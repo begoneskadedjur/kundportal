@@ -10,7 +10,8 @@ import {
 // Standardposition för Sverige (Stockholm)
 export const SWEDEN_CENTER: [number, number] = [59.3293, 18.0686]
 export const DEFAULT_ZOOM = 6
-export const DETAIL_ZOOM = 15 // Zoom-nivå när man fokuserar på en position
+export const DETAIL_ZOOM = 18 // Zoom-nivå när man fokuserar på en position (nära hus)
+export const MAX_ZOOM = 20 // Maximal zoom-nivå för detaljerat arbete
 
 /**
  * Skapa anpassad ikon för utrustningsmarkör

@@ -51,6 +51,7 @@
     "react-hot-toast": "^2.5.2",
     "react-hotkeys-hook": "^5.1.0",
     "react-leaflet": "^5.0.0",
+    "react-leaflet-cluster": "^4.0.0",
     "react-router-dom": "^7.6.2",
     "react-spring": "^10.0.1",
     "recharts": "^2.12.7",

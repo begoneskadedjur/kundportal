@@ -1,6 +1,7 @@
 // src/components/shared/equipment/EquipmentMap.tsx - Leaflet-karta för utrustningsvisning
 import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, useMapEvents, Circle } from 'react-leaflet'
+import MarkerClusterGroup from 'react-leaflet-cluster'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
@@ -13,15 +14,17 @@ import {
 import {
   createEquipmentIcon,
   createPlacementPreviewIcon,
+  createClusterIcon,
   SWEDEN_CENTER,
   DEFAULT_ZOOM,
   DETAIL_ZOOM,
+  MAX_ZOOM,
   calculateBounds,
   formatCoordinates,
   openInMapsApp,
   MARKER_CSS
 } from '../../../utils/equipmentMapUtils'
-import { MapPin, Navigation, ExternalLink, Edit, Trash2 } from 'lucide-react'
+import { MapPin, Navigation, ExternalLink, Edit, Trash2, Image as ImageIcon } from 'lucide-react'
 
 // Fix för Leaflet standardikoner
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -34,6 +37,7 @@ L.Icon.Default.mergeOptions({
 interface EquipmentMapProps {
   equipment: EquipmentPlacementWithRelations[]
   previewPosition?: { lat: number; lng: number } | null
+  gpsAccuracy?: number | null // GPS-noggrannhet i meter för att visa cirkel
   onEquipmentClick?: (equipment: EquipmentPlacementWithRelations) => void
   onEditEquipment?: (equipment: EquipmentPlacementWithRelations) => void
   onDeleteEquipment?: (equipment: EquipmentPlacementWithRelations) => void
@@ -41,6 +45,7 @@ interface EquipmentMapProps {
   height?: string
   showControls?: boolean
   readOnly?: boolean
+  enableClustering?: boolean // Aktivera klustervisning för många markörer
 }
 
 // Komponent för att hantera kartvy-uppdateringar
@@ -69,16 +74,155 @@ function MapViewUpdater({
   return null
 }
 
+// Komponent för att hantera kartklick
+function MapClickHandler({
+  onMapClick,
+  readOnly
+}: {
+  onMapClick?: (lat: number, lng: number) => void
+  readOnly: boolean
+}) {
+  useMapEvents({
+    click: (e) => {
+      if (onMapClick && !readOnly) {
+        onMapClick(e.latlng.lat, e.latlng.lng)
+      }
+    }
+  })
+
+  return null
+}
+
+// Extraherad popup-komponent för återanvändning
+function EquipmentPopupContent({
+  item,
+  readOnly,
+  onEditEquipment,
+  onDeleteEquipment
+}: {
+  item: EquipmentPlacementWithRelations
+  readOnly: boolean
+  onEditEquipment?: (equipment: EquipmentPlacementWithRelations) => void
+  onDeleteEquipment?: (equipment: EquipmentPlacementWithRelations) => void
+}) {
+  return (
+    <div className="min-w-[220px] p-1">
+      {/* Foto om finns */}
+      {item.photo_url && (
+        <div className="mb-2 -mx-1 -mt-1">
+          <img
+            src={item.photo_url}
+            alt="Utrustningsfoto"
+            className="w-full h-32 object-cover rounded-t-lg"
+            loading="lazy"
+          />
+        </div>
+      )}
+
+      {/* Typ och status */}
+      <div className="flex items-center gap-2 mb-2">
+        <div
+          className="w-3 h-3 rounded-full"
+          style={{ backgroundColor: EQUIPMENT_TYPE_CONFIG[item.equipment_type].color }}
+        />
+        <span className="font-semibold text-slate-800">
+          {getEquipmentTypeLabel(item.equipment_type)}
+        </span>
+        <span
+          className={`text-xs px-2 py-0.5 rounded-full ${
+            EQUIPMENT_STATUS_CONFIG[item.status].bgColor
+          } text-${EQUIPMENT_STATUS_CONFIG[item.status].color}`}
+        >
+          {getEquipmentStatusLabel(item.status)}
+        </span>
+      </div>
+
+      {/* Serienummer */}
+      {item.serial_number && (
+        <p className="text-sm text-slate-600 mb-1">
+          <span className="font-medium">Serienr:</span> {item.serial_number}
+        </p>
+      )}
+
+      {/* Koordinater */}
+      <p className="text-xs text-slate-500 mb-1">
+        <MapPin className="w-3 h-3 inline mr-1" />
+        {formatCoordinates(item.latitude, item.longitude)}
+      </p>
+
+      {/* Placerad av */}
+      {item.technician?.name && (
+        <p className="text-xs text-slate-500 mb-1">
+          Placerad av: {item.technician.name}
+        </p>
+      )}
+
+      {/* Datum */}
+      <p className="text-xs text-slate-500 mb-2">
+        {new Date(item.placed_at).toLocaleDateString('sv-SE')}
+      </p>
+
+      {/* Kommentar */}
+      {item.comment && (
+        <p className="text-xs text-slate-600 italic mb-2 border-t pt-2">
+          "{item.comment}"
+        </p>
+      )}
+
+      {/* Foto-indikator om saknas */}
+      {!item.photo_url && (
+        <p className="text-xs text-slate-400 mb-2 flex items-center gap-1">
+          <ImageIcon className="w-3 h-3" />
+          Inget foto
+        </p>
+      )}
+
+      {/* Åtgärder */}
+      <div className="flex flex-wrap gap-2 pt-2 border-t">
+        <button
+          onClick={() => openInMapsApp(item.latitude, item.longitude)}
+          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 min-h-[44px] px-2"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Öppna i karta
+        </button>
+
+        {!readOnly && onEditEquipment && (
+          <button
+            onClick={() => onEditEquipment(item)}
+            className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 min-h-[44px] px-2"
+          >
+            <Edit className="w-4 h-4" />
+            Redigera
+          </button>
+        )}
+
+        {!readOnly && onDeleteEquipment && (
+          <button
+            onClick={() => onDeleteEquipment(item)}
+            className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 min-h-[44px] px-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Ta bort
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function EquipmentMap({
   equipment,
   previewPosition,
+  gpsAccuracy,
   onEquipmentClick,
   onEditEquipment,
   onDeleteEquipment,
   onMapClick,
   height = '400px',
   showControls = true,
-  readOnly = false
+  readOnly = false,
+  enableClustering = true // Aktiverat som standard
 }: EquipmentMapProps) {
   const mapRef = useRef<L.Map | null>(null)
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null)
@@ -146,129 +290,132 @@ export function EquipmentMap({
         style={{ height: '100%', width: '100%' }}
         ref={mapRef}
         className="rounded-lg z-0"
+        maxZoom={MAX_ZOOM}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Gatukarta">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Satellit">
+            <TileLayer
+              attribution='&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={20}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Hybrid">
+            <TileLayer
+              attribution='&copy; Esri'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={20}
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
 
         <MapViewUpdater equipment={equipment} previewPosition={previewPosition} />
+        <MapClickHandler onMapClick={onMapClick} readOnly={readOnly} />
 
-        {/* Befintlig utrustning */}
-        {equipment.map((item) => (
-          <Marker
-            key={item.id}
-            position={[item.latitude, item.longitude]}
-            icon={createEquipmentIcon(item.equipment_type, item.status)}
-            eventHandlers={{
-              click: () => {
-                setSelectedEquipment(item.id)
-                onEquipmentClick?.(item)
-              }
-            }}
+        {/* Befintlig utrustning - med eller utan klustring */}
+        {enableClustering && equipment.length > 5 ? (
+          <MarkerClusterGroup
+            chunkedLoading
+            iconCreateFunction={createClusterIcon}
+            maxClusterRadius={60}
+            spiderfyOnMaxZoom
+            showCoverageOnHover={false}
+            zoomToBoundsOnClick
           >
-            <Popup>
-              <div className="min-w-[200px] p-1">
-                {/* Typ och status */}
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: EQUIPMENT_TYPE_CONFIG[item.equipment_type].color }}
+            {equipment.map((item) => (
+              <Marker
+                key={item.id}
+                position={[item.latitude, item.longitude]}
+                icon={createEquipmentIcon(item.equipment_type, item.status)}
+                eventHandlers={{
+                  click: () => {
+                    setSelectedEquipment(item.id)
+                    onEquipmentClick?.(item)
+                  }
+                }}
+              >
+                <Popup>
+                  <EquipmentPopupContent
+                    item={item}
+                    readOnly={readOnly}
+                    onEditEquipment={onEditEquipment}
+                    onDeleteEquipment={onDeleteEquipment}
                   />
-                  <span className="font-semibold text-slate-800">
-                    {getEquipmentTypeLabel(item.equipment_type)}
-                  </span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      EQUIPMENT_STATUS_CONFIG[item.status].bgColor
-                    } text-${EQUIPMENT_STATUS_CONFIG[item.status].color}`}
-                  >
-                    {getEquipmentStatusLabel(item.status)}
-                  </span>
-                </div>
-
-                {/* Serienummer */}
-                {item.serial_number && (
-                  <p className="text-sm text-slate-600 mb-1">
-                    <span className="font-medium">Serienr:</span> {item.serial_number}
-                  </p>
-                )}
-
-                {/* Koordinater */}
-                <p className="text-xs text-slate-500 mb-1">
-                  <MapPin className="w-3 h-3 inline mr-1" />
-                  {formatCoordinates(item.latitude, item.longitude)}
-                </p>
-
-                {/* Placerad av */}
-                {item.technician?.name && (
-                  <p className="text-xs text-slate-500 mb-1">
-                    Placerad av: {item.technician.name}
-                  </p>
-                )}
-
-                {/* Datum */}
-                <p className="text-xs text-slate-500 mb-2">
-                  {new Date(item.placed_at).toLocaleDateString('sv-SE')}
-                </p>
-
-                {/* Kommentar */}
-                {item.comment && (
-                  <p className="text-xs text-slate-600 italic mb-2 border-t pt-2">
-                    "{item.comment}"
-                  </p>
-                )}
-
-                {/* Åtgärder */}
-                <div className="flex gap-2 pt-2 border-t">
-                  <button
-                    onClick={() => openInMapsApp(item.latitude, item.longitude)}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    Öppna i karta
-                  </button>
-
-                  {!readOnly && onEditEquipment && (
-                    <button
-                      onClick={() => onEditEquipment(item)}
-                      className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800"
-                    >
-                      <Edit className="w-3 h-3" />
-                      Redigera
-                    </button>
-                  )}
-
-                  {!readOnly && onDeleteEquipment && (
-                    <button
-                      onClick={() => onDeleteEquipment(item)}
-                      className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      Ta bort
-                    </button>
-                  )}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+                </Popup>
+              </Marker>
+            ))}
+          </MarkerClusterGroup>
+        ) : (
+          equipment.map((item) => (
+            <Marker
+              key={item.id}
+              position={[item.latitude, item.longitude]}
+              icon={createEquipmentIcon(item.equipment_type, item.status)}
+              eventHandlers={{
+                click: () => {
+                  setSelectedEquipment(item.id)
+                  onEquipmentClick?.(item)
+                }
+              }}
+            >
+              <Popup>
+                <EquipmentPopupContent
+                  item={item}
+                  readOnly={readOnly}
+                  onEditEquipment={onEditEquipment}
+                  onDeleteEquipment={onDeleteEquipment}
+                />
+              </Popup>
+            </Marker>
+          ))
+        )}
 
         {/* Förhandsgranskningsmarkör för ny placering */}
         {previewPosition && (
-          <Marker
-            position={[previewPosition.lat, previewPosition.lng]}
-            icon={createPlacementPreviewIcon()}
-          >
-            <Popup>
-              <div className="text-center">
-                <p className="font-semibold text-blue-600 mb-1">Ny placering</p>
-                <p className="text-xs text-slate-500">
-                  {formatCoordinates(previewPosition.lat, previewPosition.lng)}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
+          <>
+            {/* GPS-noggrannhetscirkel */}
+            {gpsAccuracy && gpsAccuracy > 0 && (
+              <Circle
+                center={[previewPosition.lat, previewPosition.lng]}
+                radius={gpsAccuracy}
+                pathOptions={{
+                  color: gpsAccuracy <= 30 ? '#22c55e' : gpsAccuracy <= 100 ? '#eab308' : '#ef4444',
+                  fillColor: gpsAccuracy <= 30 ? '#22c55e' : gpsAccuracy <= 100 ? '#eab308' : '#ef4444',
+                  fillOpacity: 0.15,
+                  weight: 2,
+                  dashArray: '5, 5'
+                }}
+              />
+            )}
+            <Marker
+              position={[previewPosition.lat, previewPosition.lng]}
+              icon={createPlacementPreviewIcon()}
+            >
+              <Popup>
+                <div className="text-center">
+                  <p className="font-semibold text-blue-600 mb-1">Ny placering</p>
+                  <p className="text-xs text-slate-500">
+                    {formatCoordinates(previewPosition.lat, previewPosition.lng)}
+                  </p>
+                  {gpsAccuracy && (
+                    <p className={`text-xs mt-1 ${
+                      gpsAccuracy <= 30 ? 'text-green-600' :
+                      gpsAccuracy <= 100 ? 'text-amber-600' : 'text-red-600'
+                    }`}>
+                      Noggrannhet: ±{Math.round(gpsAccuracy)}m
+                    </p>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          </>
         )}
       </MapContainer>
 

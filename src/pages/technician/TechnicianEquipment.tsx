@@ -6,7 +6,9 @@ import { useAuth } from '../../contexts/AuthContext'
 import {
   EquipmentPlacementWithRelations,
   EquipmentType,
-  requiresSerialNumber
+  requiresSerialNumber,
+  getEquipmentTypeLabel,
+  EQUIPMENT_TYPE_CONFIG
 } from '../../types/database'
 import { EquipmentService } from '../../services/equipmentService'
 import {
@@ -27,7 +29,11 @@ import {
   Building,
   X,
   FileDown,
-  AlertCircle
+  AlertCircle,
+  Crosshair,
+  Box,
+  Target,
+  Check
 } from 'lucide-react'
 
 type ViewMode = 'map' | 'list'
@@ -51,7 +57,16 @@ export default function TechnicianEquipment() {
   const [editingEquipment, setEditingEquipment] = useState<EquipmentPlacementWithRelations | null>(null)
   const [previewPosition, setPreviewPosition] = useState<{ lat: number; lng: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    id: string
+    equipment: EquipmentPlacementWithRelations
+  } | null>(null)
+  const [deleteType, setDeleteType] = useState<'mark' | 'permanent'>('mark')
+
+  // Snabb-lägg-till state
+  const [quickAddPosition, setQuickAddPosition] = useState<{ lat: number; lng: number } | null>(null)
+  const [quickAddType, setQuickAddType] = useState<EquipmentType>('mechanical_trap')
+  const [quickAddSubmitting, setQuickAddSubmitting] = useState(false)
 
   // Hämta tekniker-ID från profil
   const technicianId = profile?.technician_id || ''
@@ -193,24 +208,34 @@ export default function TechnicianEquipment() {
 
   // Hantera borttagning
   const handleDeleteEquipment = async (equipment: EquipmentPlacementWithRelations) => {
-    setDeleteConfirm(equipment.id)
+    setDeleteConfirm({ id: equipment.id, equipment })
+    setDeleteType('mark') // Default till markera som borttagen
   }
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return
 
     try {
-      const result = await EquipmentService.updateEquipmentStatus(
-        deleteConfirm,
-        'removed',
-        technicianId
-      )
-
-      if (!result.success) {
-        throw new Error(result.error)
+      if (deleteType === 'permanent') {
+        // Permanent radering
+        const result = await EquipmentService.deleteEquipment(deleteConfirm.id)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        toast.success('Utrustning permanent raderad')
+      } else {
+        // Markera som borttagen
+        const result = await EquipmentService.updateEquipmentStatus(
+          deleteConfirm.id,
+          'removed',
+          technicianId
+        )
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        toast.success('Utrustning markerad som borttagen')
       }
 
-      toast.success('Utrustning markerad som borttagen')
       setDeleteConfirm(null)
       await refreshEquipment()
     } catch (error) {
@@ -229,6 +254,47 @@ export default function TechnicianEquipment() {
   // Hantera GPS-fångst
   const handleLocationCapture = (lat: number, lng: number) => {
     setPreviewPosition({ lat, lng })
+  }
+
+  // Hantera klick på karta för snabb-lägg-till
+  const handleMapClick = (lat: number, lng: number) => {
+    if (selectedCustomerId) {
+      setQuickAddPosition({ lat, lng })
+      setPreviewPosition({ lat, lng })
+    }
+  }
+
+  // Snabb-lägg-till - spara direkt med vald typ
+  const handleQuickAdd = async () => {
+    if (!quickAddPosition || !selectedCustomerId || !technicianId) return
+
+    setQuickAddSubmitting(true)
+    try {
+      const result = await EquipmentService.createEquipment({
+        customer_id: selectedCustomerId,
+        placed_by_technician_id: technicianId,
+        equipment_type: quickAddType,
+        serial_number: null,
+        latitude: quickAddPosition.lat,
+        longitude: quickAddPosition.lng,
+        comment: null,
+        status: 'active'
+      })
+
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+
+      toast.success('Utrustning placerad!')
+      setQuickAddPosition(null)
+      setPreviewPosition(null)
+      await refreshEquipment()
+    } catch (error) {
+      console.error('Fel vid snabb-placering:', error)
+      toast.error('Kunde inte placera utrustning')
+    } finally {
+      setQuickAddSubmitting(false)
+    }
   }
 
   return (
@@ -348,6 +414,7 @@ export default function TechnicianEquipment() {
                       previewPosition={previewPosition}
                       onEditEquipment={handleEditEquipment}
                       onDeleteEquipment={handleDeleteEquipment}
+                      onMapClick={handleMapClick}
                       height="500px"
                     />
                   </div>
@@ -461,28 +528,210 @@ export default function TechnicianEquipment() {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-white">
-                      Markera som borttagen?
+                      Ta bort utrustning
                     </h3>
                     <p className="text-slate-400 text-sm">
-                      Utrustningen kommer att markeras som borttagen
+                      {deleteConfirm.equipment.serial_number
+                        ? `Serienr: ${deleteConfirm.equipment.serial_number}`
+                        : getEquipmentTypeLabel(deleteConfirm.equipment.equipment_type)}
                     </p>
                   </div>
+                </div>
+
+                {/* Val mellan markera/radera */}
+                <div className="space-y-3 mb-6">
+                  <button
+                    onClick={() => setDeleteType('mark')}
+                    className={`w-full p-4 rounded-xl border text-left transition-all min-h-[80px] ${
+                      deleteType === 'mark'
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : 'border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        deleteType === 'mark' ? 'border-amber-500' : 'border-slate-600'
+                      }`}>
+                        {deleteType === 'mark' && (
+                          <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">Markera som borttagen</p>
+                        <p className="text-sm text-slate-400">
+                          Behålls i historiken men visas som inaktiv
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setDeleteType('permanent')}
+                    className={`w-full p-4 rounded-xl border text-left transition-all min-h-[80px] ${
+                      deleteType === 'permanent'
+                        ? 'border-red-500 bg-red-500/10'
+                        : 'border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        deleteType === 'permanent' ? 'border-red-500' : 'border-slate-600'
+                      }`}>
+                        {deleteType === 'permanent' && (
+                          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">Radera permanent</p>
+                        <p className="text-sm text-slate-400">
+                          Tas bort helt och kan inte återställas
+                        </p>
+                      </div>
+                    </div>
+                  </button>
                 </div>
 
                 <div className="flex gap-3">
                   <button
                     onClick={() => setDeleteConfirm(null)}
-                    className="flex-1 px-4 py-3 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800 transition-colors"
+                    className="flex-1 px-4 py-4 border border-slate-700 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors min-h-[52px]"
                   >
                     Avbryt
                   </button>
                   <button
                     onClick={confirmDelete}
-                    className="flex-1 px-4 py-3 bg-red-500 rounded-lg text-white font-medium hover:bg-red-600 transition-colors"
+                    className={`flex-1 px-4 py-4 rounded-xl text-white font-medium transition-colors min-h-[52px] ${
+                      deleteType === 'permanent'
+                        ? 'bg-red-500 hover:bg-red-600'
+                        : 'bg-amber-500 hover:bg-amber-600'
+                    }`}
                   >
-                    Markera borttagen
+                    {deleteType === 'permanent' ? 'Radera permanent' : 'Markera borttagen'}
                   </button>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Snabb-lägg-till dialog */}
+        <AnimatePresence>
+          {quickAddPosition && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
+              onClick={() => {
+                setQuickAddPosition(null)
+                setPreviewPosition(null)
+              }}
+            >
+              <motion.div
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 100, opacity: 0 }}
+                className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-md p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">
+                    Snabb-placering
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setQuickAddPosition(null)
+                      setPreviewPosition(null)
+                    }}
+                    className="p-2 rounded-lg hover:bg-slate-800 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  >
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+
+                {/* Koordinater */}
+                <p className="text-sm text-slate-400 mb-4">
+                  <MapPin className="w-4 h-4 inline mr-1" />
+                  {quickAddPosition.lat.toFixed(6)}, {quickAddPosition.lng.toFixed(6)}
+                </p>
+
+                {/* Välj utrustningstyp */}
+                <label className="block text-sm font-medium text-slate-300 mb-3">
+                  Välj utrustningstyp
+                </label>
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                  {(Object.entries(EQUIPMENT_TYPE_CONFIG) as [EquipmentType, typeof EQUIPMENT_TYPE_CONFIG[EquipmentType]][]).map(
+                    ([type, config]) => {
+                      const isSelected = quickAddType === type
+                      const Icon = type === 'mechanical_trap' ? Crosshair :
+                                   type === 'concrete_station' ? Box : Target
+
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setQuickAddType(type)}
+                          className={`p-4 rounded-xl border-2 transition-all min-h-[90px] ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-500/10'
+                              : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                          }`}
+                        >
+                          <div
+                            className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
+                            style={{ backgroundColor: config.color }}
+                          >
+                            <Icon className="w-5 h-5 text-white" />
+                          </div>
+                          <p className={`text-xs font-medium ${isSelected ? 'text-blue-400' : 'text-slate-300'}`}>
+                            {config.label}
+                          </p>
+                        </button>
+                      )
+                    }
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      // Öppna fullständigt formulär istället
+                      setIsFormOpen(true)
+                      setQuickAddPosition(null)
+                    }}
+                    className="flex-1 px-4 py-4 border border-slate-700 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors min-h-[52px]"
+                  >
+                    Fler detaljer
+                  </button>
+                  <button
+                    onClick={handleQuickAdd}
+                    disabled={quickAddSubmitting}
+                    className="flex-1 px-4 py-4 bg-emerald-500 rounded-xl text-white font-medium hover:bg-emerald-600 transition-colors min-h-[52px] flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {quickAddSubmitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Sparar...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-5 h-5" />
+                        Placera
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Visa varning för mekaniska fällor utan serienummer */}
+                {quickAddType === 'mechanical_trap' && (
+                  <p className="mt-4 text-xs text-amber-400 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Mekaniska fällor kräver normalt serienummer.
+                      Klicka "Fler detaljer" för att ange serienummer.
+                    </span>
+                  </p>
+                )}
               </motion.div>
             </motion.div>
           )}
