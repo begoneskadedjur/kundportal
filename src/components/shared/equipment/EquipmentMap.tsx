@@ -66,7 +66,9 @@ function MapViewUpdater({
       // Anpassa vy till all utrustning
       const bounds = calculateBounds(equipment)
       if (bounds) {
-        map.fitBounds(bounds, { padding: [50, 50] })
+        // maxZoom begränsar hur långt in kartan zoomar automatiskt
+        // så att tiles alltid laddas korrekt (OSM har problem vid zoom 19+)
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: DETAIL_ZOOM })
       }
     }
   }, [equipment, previewPosition, map])
