@@ -427,9 +427,9 @@ export function EquipmentMap({
         )}
       </MapContainer>
 
-      {/* Kontroller */}
+      {/* Kontroller - z-index under modaler (z-50) */}
       {showControls && (
-        <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2">
+        <div className="absolute top-3 right-3 z-[400] flex flex-col gap-2">
           <button
             onClick={centerOnUserLocation}
             className="p-2 bg-white rounded-lg shadow-md hover:bg-slate-50 transition-colors"
@@ -440,8 +440,8 @@ export function EquipmentMap({
         </div>
       )}
 
-      {/* Legend */}
-      <div className="absolute bottom-3 left-3 z-[1000] bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-3">
+      {/* Legend - z-index under modaler (z-50) */}
+      <div className="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-3">
         <p className="text-xs font-semibold text-slate-700 mb-2">Utrustningstyper</p>
         <div className="flex flex-col gap-1">
           {Object.entries(EQUIPMENT_TYPE_CONFIG).map(([key, config]) => (

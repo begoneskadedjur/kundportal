@@ -32,7 +32,8 @@ import {
   Box,
   Target,
   Check,
-  ChevronLeft
+  ChevronLeft,
+  Search
 } from 'lucide-react'
 
 type ViewMode = 'map' | 'list'
@@ -74,6 +75,7 @@ export default function TechnicianEquipment() {
   // Bottom-sheet för kundval (FAB utan vald kund)
   const [showCustomerPicker, setShowCustomerPicker] = useState(false)
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('')
 
   // Hämta tekniker-ID från profil
   const technicianId = profile?.technician_id || ''
@@ -107,6 +109,25 @@ export default function TechnicianEquipment() {
     if (!selectedCustomerId) return allEquipment
     return allEquipment.filter(eq => eq.customer_id === selectedCustomerId)
   }, [allEquipment, selectedCustomerId])
+
+  // Filtrera kunder baserat på sökfråga (för bottom-sheet)
+  const filteredCustomersForPicker = useMemo(() => {
+    if (!customerSearchQuery.trim()) {
+      return {
+        yourCustomers: customersFromEquipment,
+        otherCustomers: customers.filter(c => !customersFromEquipment.find(e => e.id === c.id))
+      }
+    }
+    const query = customerSearchQuery.toLowerCase()
+    return {
+      yourCustomers: customersFromEquipment.filter(c =>
+        c.company_name.toLowerCase().includes(query)
+      ),
+      otherCustomers: customers
+        .filter(c => !customersFromEquipment.find(e => e.id === c.id))
+        .filter(c => c.company_name.toLowerCase().includes(query))
+    }
+  }, [customerSearchQuery, customersFromEquipment, customers])
 
   // Hämta alla teknikerns placeringar vid mount
   useEffect(() => {
@@ -856,14 +877,17 @@ export default function TechnicianEquipment() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
-              onClick={() => setShowCustomerPicker(false)}
+              onClick={() => {
+                setShowCustomerPicker(false)
+                setCustomerSearchQuery('')
+              }}
             >
               <motion.div
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="absolute bottom-0 left-0 right-0 bg-slate-900 rounded-t-3xl max-h-[70vh] overflow-hidden"
+                className="absolute bottom-0 left-0 right-0 bg-slate-900 rounded-t-3xl max-h-[80vh] overflow-hidden flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Drag handle */}
@@ -871,27 +895,53 @@ export default function TechnicianEquipment() {
                   <div className="w-12 h-1 rounded-full bg-slate-700" />
                 </div>
 
-                {/* Header */}
+                {/* Header med sökfält */}
                 <div className="px-6 pb-4 border-b border-slate-800">
-                  <h3 className="text-xl font-semibold text-white">Välj kund</h3>
-                  <p className="text-sm text-slate-400 mt-1">
-                    Välj vilken kund du vill placera utrustning hos
+                  <h3 className="text-xl font-semibold text-white mb-1">Välj kund</h3>
+                  <p className="text-sm text-slate-400 mb-3">
+                    Sök eller välj vilken kund du vill placera utrustning hos
                   </p>
+
+                  {/* Sökfält */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="w-5 h-5 text-slate-500" />
+                    </div>
+                    <input
+                      type="text"
+                      value={customerSearchQuery}
+                      onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                      placeholder="Sök kund..."
+                      autoFocus
+                      className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                    {customerSearchQuery && (
+                      <button
+                        onClick={() => setCustomerSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      >
+                        <X className="w-5 h-5 text-slate-500 hover:text-white" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Kundlista */}
-                <div className="overflow-y-auto max-h-[50vh] p-4">
+                <div className="overflow-y-auto flex-1 p-4">
                   <div className="space-y-2">
                     {/* Kunder från utrustningen först (med antal) */}
-                    {customersFromEquipment.length > 0 && (
+                    {filteredCustomersForPicker.yourCustomers.length > 0 && (
                       <>
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide px-2 mb-2">
                           Dina kunder
                         </p>
-                        {customersFromEquipment.map((customer) => (
+                        {filteredCustomersForPicker.yourCustomers.map((customer) => (
                           <button
                             key={customer.id}
-                            onClick={() => handleCustomerSelect(customer.id)}
+                            onClick={() => {
+                              handleCustomerSelect(customer.id)
+                              setCustomerSearchQuery('')
+                            }}
                             className="w-full p-4 rounded-xl bg-slate-800/50 hover:bg-slate-800 transition-colors text-left flex items-center justify-between min-h-[60px]"
                           >
                             <div className="flex items-center gap-3">
@@ -907,26 +957,38 @@ export default function TechnicianEquipment() {
                     )}
 
                     {/* Övriga kunder */}
-                    {customers.filter(c => !customersFromEquipment.find(e => e.id === c.id)).length > 0 && (
+                    {filteredCustomersForPicker.otherCustomers.length > 0 && (
                       <>
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide px-2 mt-4 mb-2">
                           Alla kunder
                         </p>
-                        {customers
-                          .filter(c => !customersFromEquipment.find(e => e.id === c.id))
-                          .map((customer) => (
-                            <button
-                              key={customer.id}
-                              onClick={() => handleCustomerSelect(customer.id)}
-                              className="w-full p-4 rounded-xl bg-slate-800/30 hover:bg-slate-800 transition-colors text-left flex items-center gap-3 min-h-[60px]"
-                            >
-                              <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                                <Building className="w-5 h-5 text-slate-400" />
-                              </div>
-                              <span className="font-medium text-slate-300">{customer.company_name}</span>
-                            </button>
-                          ))}
+                        {filteredCustomersForPicker.otherCustomers.map((customer) => (
+                          <button
+                            key={customer.id}
+                            onClick={() => {
+                              handleCustomerSelect(customer.id)
+                              setCustomerSearchQuery('')
+                            }}
+                            className="w-full p-4 rounded-xl bg-slate-800/30 hover:bg-slate-800 transition-colors text-left flex items-center gap-3 min-h-[60px]"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
+                              <Building className="w-5 h-5 text-slate-400" />
+                            </div>
+                            <span className="font-medium text-slate-300">{customer.company_name}</span>
+                          </button>
+                        ))}
                       </>
+                    )}
+
+                    {/* Inga resultat */}
+                    {filteredCustomersForPicker.yourCustomers.length === 0 &&
+                     filteredCustomersForPicker.otherCustomers.length === 0 && (
+                      <div className="text-center py-8">
+                        <Building className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <p className="text-slate-400">
+                          Inga kunder matchar "{customerSearchQuery}"
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -934,7 +996,10 @@ export default function TechnicianEquipment() {
                 {/* Cancel button */}
                 <div className="p-4 border-t border-slate-800">
                   <button
-                    onClick={() => setShowCustomerPicker(false)}
+                    onClick={() => {
+                      setShowCustomerPicker(false)
+                      setCustomerSearchQuery('')
+                    }}
                     className="w-full p-4 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors min-h-[52px]"
                   >
                     Avbryt
