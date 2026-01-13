@@ -280,9 +280,14 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
 
         const result = await CaseImageService.updateImageTags(imageId, newTags)
         if (result.success) {
+          // Uppdatera images state
           setImages(prev => prev.map(img =>
             img.id === imageId ? { ...img, tags: newTags } : img
           ))
+          // Uppdatera selectedImage om det är samma bild
+          if (selectedImage && 'id' in selectedImage && selectedImage.id === imageId) {
+            setSelectedImage({ ...selectedImage, tags: newTags })
+          }
           toast.success('Taggar uppdaterade')
           onImageUpdated?.()
         } else {
@@ -555,9 +560,22 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     }
   }
 
-  // Hämta taggar för vald bild
+  // Hämta taggar för vald bild (tar hänsyn till pending changes)
   const getSelectedImageTags = (): CaseImageTag[] => {
     if (!selectedImage) return ['general']
+
+    // Kolla om det är en pending upload
+    if ('file' in selectedImage) {
+      const pending = pendingUploads.find(p => p.id === selectedImage.id)
+      return pending?.tags || ['general']
+    }
+
+    // För existerande bilder, kolla pending tag changes först
+    if (draftMode && pendingTagChanges.has(selectedImage.id)) {
+      return pendingTagChanges.get(selectedImage.id)!
+    }
+
+    // Annars returnera originalet
     if ('tags' in selectedImage) return selectedImage.tags
     return ['general']
   }
@@ -649,17 +667,17 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {/* Taggar */}
               {canEdit && editingTags === ('id' in selectedImage ? selectedImage.id : (selectedImage as PendingImage).id) ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {(Object.keys(CASE_IMAGE_TAG_DISPLAY) as CaseImageTag[]).map(tag => {
                     const isSelected = getSelectedImageTags().includes(tag)
                     const tagConfig = CASE_IMAGE_TAG_DISPLAY[tag]
-                    // SOLID färger för valda taggar - mycket tydlig kontrast
-                    const colorMap: Record<string, { bg: string; border: string }> = {
-                      'orange-500': { bg: '#f97316', border: '#fb923c' },
-                      'green-500': { bg: '#22c55e', border: '#4ade80' },
-                      'blue-500': { bg: '#3b82f6', border: '#60a5fa' },
-                      'purple-500': { bg: '#a855f7', border: '#c084fc' },
-                      'teal-500': { bg: '#14b8a6', border: '#2dd4bf' }
+                    // Färger för valda taggar - subtil bakgrund med tydlig border
+                    const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+                      'orange-500': { bg: 'rgba(249, 115, 22, 0.25)', border: '#f97316', text: '#fb923c' },
+                      'green-500': { bg: 'rgba(34, 197, 94, 0.25)', border: '#22c55e', text: '#4ade80' },
+                      'blue-500': { bg: 'rgba(59, 130, 246, 0.25)', border: '#3b82f6', text: '#60a5fa' },
+                      'purple-500': { bg: 'rgba(168, 85, 247, 0.25)', border: '#a855f7', text: '#c084fc' },
+                      'teal-500': { bg: 'rgba(20, 184, 166, 0.25)', border: '#14b8a6', text: '#2dd4bf' }
                     }
                     const colors = colorMap[tagConfig.color] || colorMap['blue-500']
                     return (
@@ -676,18 +694,17 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
                         style={isSelected ? {
                           backgroundColor: colors.bg,
                           borderColor: colors.border,
-                          color: '#ffffff',
-                          boxShadow: `0 0 12px ${colors.bg}80`
+                          color: colors.text
                         } : {
-                          backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                          borderColor: 'transparent',
-                          color: 'rgba(148, 163, 184, 0.6)'
+                          backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                          borderColor: 'rgba(71, 85, 105, 0.5)',
+                          color: 'rgba(148, 163, 184, 0.7)'
                         }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold transition-all border-2"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2"
                       >
-                        {isSelected && <Check className="w-4 h-4" />}
-                        {getTagIcon(tag, 'w-4 h-4')}
+                        {getTagIcon(tag, 'w-3.5 h-3.5')}
                         {tagConfig.label}
+                        {isSelected && <Check className="w-3 h-3" />}
                       </button>
                     )
                   })}
@@ -696,7 +713,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
                       e.stopPropagation()
                       setEditingTags(null)
                     }}
-                    className="ml-2 px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-full transition-colors font-medium"
+                    className="ml-2 px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-full transition-colors"
                   >
                     Klar
                   </button>
