@@ -281,18 +281,25 @@ export class EquipmentService {
         await this.deleteEquipmentPhoto(equipment.photo_path)
       }
 
-      // Ta bort utrustningspost
-      const { error } = await supabase
+      // Ta bort utrustningspost och returnera borttagen rad för verifiering
+      const { data: deletedRows, error } = await supabase
         .from('equipment_placements')
         .delete()
         .eq('id', id)
+        .select('id')
 
       if (error) {
         console.error('Fel vid borttagning av utrustning:', error)
         throw error
       }
 
-      console.log('Utrustning borttagen:', id)
+      // Verifiera att raden faktiskt togs bort (RLS kan blockera tyst)
+      if (!deletedRows || deletedRows.length === 0) {
+        console.error('Borttagning blockerad - inga rader påverkades (troligen RLS)')
+        throw new Error('Du har inte behörighet att ta bort denna utrustning')
+      }
+
+      console.log('Utrustning borttagen:', id, 'Raderade:', deletedRows.length)
       return { success: true }
 
     } catch (error) {
