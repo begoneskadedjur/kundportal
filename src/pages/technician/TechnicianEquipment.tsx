@@ -546,27 +546,27 @@ export default function TechnicianEquipment() {
                   />
                 </div>
 
-                {/* Statistik under kartan */}
+                {/* Statistik under kartan - kompakt mobil-design */}
                 {filteredEquipment.length > 0 && (
-                  <div className="grid grid-cols-3 gap-4 mt-4 px-4 md:px-0">
+                  <div className="flex gap-2 mt-3 px-4 md:px-0 md:gap-3 md:mt-4">
                     {Object.entries(EQUIPMENT_TYPE_CONFIG).map(([type, config]) => {
                       const count = filteredEquipment.filter(e => e.equipment_type === type).length
+                      const Icon = type === 'mechanical_trap' ? Crosshair :
+                                   type === 'concrete_station' ? Box : Target
                       return (
                         <div
                           key={type}
-                          className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 flex items-center gap-3"
+                          className="flex-1 bg-slate-800/60 rounded-lg border border-slate-700/50 p-2 md:p-3 flex items-center gap-2 md:gap-3 min-w-0"
                         >
                           <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center"
+                            className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0"
                             style={{ backgroundColor: config.color }}
                           >
-                            {type === 'mechanical_trap' ? <Crosshair className="w-5 h-5 text-white" /> :
-                             type === 'concrete_station' ? <Box className="w-5 h-5 text-white" /> :
-                             <Target className="w-5 h-5 text-white" />}
+                            <Icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
                           </div>
-                          <div>
-                            <p className="text-2xl font-bold text-white">{count}</p>
-                            <p className="text-sm text-slate-400">{config.label}</p>
+                          <div className="min-w-0">
+                            <p className="text-lg md:text-xl font-bold text-white leading-none">{count}</p>
+                            <p className="text-[10px] md:text-xs text-slate-400 truncate leading-tight mt-0.5">{config.label}</p>
                           </div>
                         </div>
                       )

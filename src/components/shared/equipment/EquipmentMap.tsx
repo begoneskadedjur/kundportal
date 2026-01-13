@@ -327,12 +327,12 @@ export function EquipmentMap({
         )}
       </MapContainer>
 
-      {/* Kontroller - z-index under modaler (z-50) */}
+      {/* Kontroller - placerad nere till hoger for att undvika kollision med kartlagerval (uppe till hoger) */}
       {showControls && (
-        <div className="absolute top-3 right-3 z-40 flex flex-col gap-2">
+        <div className="absolute bottom-3 right-3 z-40 flex flex-col gap-2">
           <button
             onClick={centerOnUserLocation}
-            className="p-2 bg-white rounded-lg shadow-md hover:bg-slate-50 transition-colors"
+            className="p-2.5 bg-white rounded-lg shadow-md hover:bg-slate-50 active:bg-slate-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
             title="Centrera på min position"
           >
             <Navigation className="w-5 h-5 text-slate-600" />
