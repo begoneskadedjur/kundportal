@@ -33,8 +33,18 @@ import {
   Target,
   Check,
   ChevronLeft,
-  Search
+  Search,
+  LogOut,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  Edit,
+  Trash2,
+  ExternalLink,
+  Image as ImageIcon,
+  MessageSquare
 } from 'lucide-react'
+import { openInMapsApp, formatCoordinates } from '../../utils/equipmentMapUtils'
 
 type ViewMode = 'map' | 'list'
 
@@ -49,8 +59,9 @@ interface CustomerWithCount extends Customer {
 }
 
 export default function TechnicianEquipment() {
-  const { user, profile } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const chipContainerRef = useRef<HTMLDivElement>(null)
+  const [expandedEquipmentId, setExpandedEquipmentId] = useState<string | null>(null)
 
   // State
   const [viewMode, setViewMode] = useState<ViewMode>('map')
@@ -404,7 +415,8 @@ export default function TechnicianEquipment() {
             <div className="flex items-center gap-3">
               <a
                 href="/technician/dashboard"
-                className="p-2 -ml-2 rounded-lg hover:bg-slate-800 transition-colors md:hidden"
+                className="p-2 -ml-2 rounded-lg hover:bg-slate-800 transition-colors"
+                title="Tillbaka till dashboard"
               >
                 <ChevronLeft className="w-5 h-5 text-slate-400" />
               </a>
@@ -452,6 +464,15 @@ export default function TechnicianEquipment() {
                 title="Uppdatera"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+
+              {/* Logga ut-knapp */}
+              <button
+                onClick={signOut}
+                className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
+                title="Logga ut"
+              >
+                <LogOut className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -522,9 +543,9 @@ export default function TechnicianEquipment() {
                   />
                 </div>
 
-                {/* Statistik under kartan (endast desktop) */}
+                {/* Statistik under kartan */}
                 {filteredEquipment.length > 0 && (
-                  <div className="hidden md:grid grid-cols-3 gap-4 mt-4">
+                  <div className="grid grid-cols-3 gap-4 mt-4 px-4 md:px-0">
                     {Object.entries(EQUIPMENT_TYPE_CONFIG).map(([type, config]) => {
                       const count = filteredEquipment.filter(e => e.equipment_type === type).length
                       return (
@@ -547,6 +568,201 @@ export default function TechnicianEquipment() {
                         </div>
                       )
                     })}
+                  </div>
+                )}
+
+                {/* Utrustningstabell - visas när en kund är vald */}
+                {selectedCustomerId && filteredEquipment.length > 0 && (
+                  <div className="mt-4 px-4 md:px-0">
+                    <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden">
+                      {/* Tabellhuvud */}
+                      <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-slate-800/50 border-b border-slate-700/50 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <div className="col-span-3">Typ</div>
+                        <div className="col-span-2">Serienr</div>
+                        <div className="col-span-3">Koordinater</div>
+                        <div className="col-span-2">Status</div>
+                        <div className="col-span-2">Åtgärder</div>
+                      </div>
+
+                      {/* Tabellrader */}
+                      <div className="divide-y divide-slate-700/50">
+                        {filteredEquipment.map((item) => {
+                          const typeConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type]
+                          const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status]
+                          const isExpanded = expandedEquipmentId === item.id
+                          const Icon = item.equipment_type === 'mechanical_trap' ? Crosshair :
+                                       item.equipment_type === 'concrete_station' ? Box : Target
+
+                          return (
+                            <div key={item.id}>
+                              {/* Huvudrad */}
+                              <div
+                                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-slate-800/30 transition-colors cursor-pointer items-center"
+                                onClick={() => setExpandedEquipmentId(isExpanded ? null : item.id)}
+                              >
+                                {/* Typ - mobil & desktop */}
+                                <div className="col-span-12 md:col-span-3 flex items-center gap-3">
+                                  <div
+                                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                    style={{ backgroundColor: typeConfig.color, opacity: item.status === 'removed' ? 0.5 : 1 }}
+                                  >
+                                    <Icon className="w-4 h-4 text-white" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-white font-medium truncate">{typeConfig.label}</p>
+                                    <p className="text-xs text-slate-500 md:hidden">
+                                      {item.serial_number || 'Inget serienr'}
+                                    </p>
+                                  </div>
+                                  {/* Expand-ikon på mobil */}
+                                  <div className="md:hidden ml-auto">
+                                    {isExpanded ? (
+                                      <ChevronUp className="w-5 h-5 text-slate-500" />
+                                    ) : (
+                                      <ChevronDown className="w-5 h-5 text-slate-500" />
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Serienr - endast desktop */}
+                                <div className="hidden md:block col-span-2">
+                                  <p className="text-slate-300 font-mono text-sm">
+                                    {item.serial_number || '-'}
+                                  </p>
+                                </div>
+
+                                {/* Koordinater - endast desktop */}
+                                <div className="hidden md:block col-span-3">
+                                  <p className="text-slate-400 text-sm font-mono">
+                                    {formatCoordinates(item.latitude, item.longitude)}
+                                  </p>
+                                </div>
+
+                                {/* Status - endast desktop */}
+                                <div className="hidden md:block col-span-2">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.borderColor} border`}>
+                                    {getEquipmentStatusLabel(item.status)}
+                                  </span>
+                                </div>
+
+                                {/* Åtgärder - endast desktop */}
+                                <div className="hidden md:flex col-span-2 gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openInMapsApp(item.latitude, item.longitude)
+                                    }}
+                                    className="p-1.5 rounded-lg hover:bg-slate-700 transition-colors"
+                                    title="Öppna i karta"
+                                  >
+                                    <ExternalLink className="w-4 h-4 text-blue-400" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleEditEquipment(item)
+                                    }}
+                                    className="p-1.5 rounded-lg hover:bg-slate-700 transition-colors"
+                                    title="Redigera"
+                                  >
+                                    <Edit className="w-4 h-4 text-amber-400" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleDeleteEquipment(item)
+                                    }}
+                                    className="p-1.5 rounded-lg hover:bg-slate-700 transition-colors"
+                                    title="Ta bort"
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-400" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Expanderad info - mobil */}
+                              <AnimatePresence>
+                                {isExpanded && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="md:hidden overflow-hidden"
+                                  >
+                                    <div className="px-4 pb-4 space-y-3 bg-slate-800/20">
+                                      {/* Status */}
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm text-slate-400">Status</span>
+                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.borderColor} border`}>
+                                          {getEquipmentStatusLabel(item.status)}
+                                        </span>
+                                      </div>
+
+                                      {/* Serienummer */}
+                                      {item.serial_number && (
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-sm text-slate-400">Serienummer</span>
+                                          <span className="text-sm text-white font-mono">{item.serial_number}</span>
+                                        </div>
+                                      )}
+
+                                      {/* Koordinater */}
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm text-slate-400">Position</span>
+                                        <span className="text-sm text-slate-300 font-mono">
+                                          {formatCoordinates(item.latitude, item.longitude)}
+                                        </span>
+                                      </div>
+
+                                      {/* Datum */}
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm text-slate-400">Placerad</span>
+                                        <span className="text-sm text-slate-300">
+                                          {new Date(item.placed_at).toLocaleDateString('sv-SE')}
+                                        </span>
+                                      </div>
+
+                                      {/* Kommentar */}
+                                      {item.comment && (
+                                        <div>
+                                          <span className="text-sm text-slate-400">Kommentar</span>
+                                          <p className="text-sm text-slate-300 mt-1">{item.comment}</p>
+                                        </div>
+                                      )}
+
+                                      {/* Åtgärder */}
+                                      <div className="flex gap-2 pt-2 border-t border-slate-700/50">
+                                        <button
+                                          onClick={() => openInMapsApp(item.latitude, item.longitude)}
+                                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/10 rounded-lg text-blue-400 text-sm"
+                                        >
+                                          <ExternalLink className="w-4 h-4" />
+                                          Visa i karta
+                                        </button>
+                                        <button
+                                          onClick={() => handleEditEquipment(item)}
+                                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-amber-500/10 rounded-lg text-amber-400 text-sm"
+                                        >
+                                          <Edit className="w-4 h-4" />
+                                          Redigera
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteEquipment(item)}
+                                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 rounded-lg text-red-400 text-sm"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                          Ta bort
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

@@ -348,7 +348,8 @@ export function EquipmentMap({
             key={clusterKey}
             chunkedLoading
             iconCreateFunction={createClusterIcon}
-            maxClusterRadius={60}
+            maxClusterRadius={80}
+            disableClusteringAtZoom={19}
             spiderfyOnMaxZoom
             showCoverageOnHover={false}
             zoomToBoundsOnClick
