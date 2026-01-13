@@ -16,6 +16,7 @@ export const MAX_ZOOM = 20 // Maximal zoom-nivå för detaljerat arbete
 /**
  * Skapa anpassad ikon för utrustningsmarkör
  * Färg baseras på utrustningstyp, opacity på status
+ * Ökad storlek (44px) för bättre touch-target på mobil
  */
 export const createEquipmentIcon = (
   type: EquipmentType,
@@ -34,14 +35,17 @@ export const createEquipmentIcon = (
   if (status === 'missing') symbol = '?'
   if (status === 'removed') symbol = '✕'
 
+  // Storlek: 44px för att uppfylla WCAG touch-target riktlinjer
+  const size = 44
+
   return L.divIcon({
     className: 'equipment-marker',
     html: `
       <div style="
         background-color: ${color};
         opacity: ${opacity};
-        width: 32px;
-        height: 32px;
+        width: ${size}px;
+        height: ${size}px;
         border-radius: 50%;
         border: 3px solid white;
         box-shadow: 0 2px 8px rgba(0,0,0,0.4);
@@ -50,14 +54,14 @@ export const createEquipmentIcon = (
         justify-content: center;
         color: white;
         font-weight: bold;
-        font-size: 14px;
+        font-size: 16px;
       ">
         ${symbol}
       </div>
     `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16]
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -(size / 2)]
   })
 }
 

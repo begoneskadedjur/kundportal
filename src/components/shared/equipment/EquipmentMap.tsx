@@ -1,5 +1,5 @@
 // src/components/shared/equipment/EquipmentMap.tsx - Leaflet-karta för utrustningsvisning
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, useMapEvents, Circle } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import L from 'leaflet'
@@ -235,6 +235,20 @@ export function EquipmentMap({
   const mapRef = useRef<L.Map | null>(null)
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null)
 
+  // Skapa en unik key för MarkerClusterGroup baserat på alla equipment IDs
+  // Detta tvingar React att återskapa komponenten när equipment ändras
+  const clusterKey = useMemo(() => {
+    const ids = equipment.map(e => e.id).sort().join(',')
+    // Enkel hash för att hålla key kort
+    let hash = 0
+    for (let i = 0; i < ids.length; i++) {
+      const char = ids.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32bit integer
+    }
+    return `cluster-${equipment.length}-${hash}`
+  }, [equipment])
+
   // Lägg till CSS för markörer
   useEffect(() => {
     const styleId = 'equipment-marker-styles'
@@ -328,8 +342,10 @@ export function EquipmentMap({
         <MapClickHandler onMapClick={onMapClick} readOnly={readOnly} />
 
         {/* Befintlig utrustning - med eller utan klustring */}
+        {/* Key tvingar omrendering när equipment ändras (t.ex. efter borttagning) */}
         {enableClustering && equipment.length > 5 ? (
           <MarkerClusterGroup
+            key={clusterKey}
             chunkedLoading
             iconCreateFunction={createClusterIcon}
             maxClusterRadius={60}
