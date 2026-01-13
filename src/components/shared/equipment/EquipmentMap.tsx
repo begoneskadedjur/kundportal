@@ -112,8 +112,16 @@ export function EquipmentMap({
   const [selectedEquipmentData, setSelectedEquipmentData] = useState<EquipmentPlacementWithRelations | null>(null)
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
 
-  // Hantera klick pa en markör - öppna detail sheet istället för popup
+  // Hantera klick pa en markör
+  // I readOnly-läge med onEquipmentClick: Anropa bara callback (låt parent hantera UI)
+  // Annars: Öppna detail sheet
   const handleMarkerClick = (item: EquipmentPlacementWithRelations) => {
+    // Om vi har en custom click-handler och är i readOnly-läge, låt parent hantera UI
+    if (readOnly && onEquipmentClick) {
+      onEquipmentClick(item)
+      return
+    }
+    // Annars öppna vår egen detail sheet
     setSelectedEquipmentData(item)
     setIsDetailSheetOpen(true)
     onEquipmentClick?.(item)
