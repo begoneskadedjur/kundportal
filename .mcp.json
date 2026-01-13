@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "mcp-server-supabase",
+      "args": [
+        "--access-token",
+        "${SUPABASE_ACCESS_TOKEN}"
+      ]
+    }
+  }
+}
