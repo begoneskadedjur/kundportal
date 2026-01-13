@@ -15,8 +15,8 @@ export const MAX_ZOOM = 20 // Maximal zoom-nivå för detaljerat arbete
 
 /**
  * Skapa anpassad ikon för utrustningsmarkör
- * Färg baseras på utrustningstyp, opacity på status
- * Ökad storlek (44px) för bättre touch-target på mobil
+ * Färg baseras på utrustningstyp, styling på status
+ * Storlek: 28px för finare visning, men touch-target är 44px via padding
  */
 export const createEquipmentIcon = (
   type: EquipmentType,
@@ -25,43 +25,69 @@ export const createEquipmentIcon = (
   const typeConfig = EQUIPMENT_TYPE_CONFIG[type]
   const color = typeConfig?.color || '#6b7280'
 
-  // Opacity baserat på status
+  // Opacity och kantfärg baserat på status
   let opacity = 1
-  if (status === 'removed') opacity = 0.5
-  if (status === 'missing') opacity = 0.7
+  let borderColor = 'white'
+  let borderStyle = 'solid'
+
+  if (status === 'removed') {
+    opacity = 0.5
+    borderColor = '#64748b' // slate-500
+  }
+  if (status === 'missing') {
+    opacity = 0.85
+    borderColor = '#f59e0b' // amber-500
+    borderStyle = 'dashed'
+  }
+  if (status === 'damaged') {
+    opacity = 0.85
+    borderColor = '#ef4444' // red-500
+  }
 
   // Ikon-symbol baserat på status
   let symbol = ''
   if (status === 'missing') symbol = '?'
   if (status === 'removed') symbol = '✕'
+  if (status === 'damaged') symbol = '!'
 
-  // Storlek: 44px för att uppfylla WCAG touch-target riktlinjer
-  const size = 44
+  // Visuell storlek: 28px, Touch-target: 44px (via osynlig padding)
+  const visualSize = 28
+  const touchSize = 44
+  const padding = (touchSize - visualSize) / 2
 
   return L.divIcon({
     className: 'equipment-marker',
     html: `
       <div style="
-        background-color: ${color};
-        opacity: ${opacity};
-        width: ${size}px;
-        height: ${size}px;
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        width: ${touchSize}px;
+        height: ${touchSize}px;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 16px;
       ">
-        ${symbol}
+        <div style="
+          background-color: ${color};
+          opacity: ${opacity};
+          width: ${visualSize}px;
+          height: ${visualSize}px;
+          border-radius: 50%;
+          border: 2px ${borderStyle} ${borderColor};
+          box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: bold;
+          font-size: 12px;
+          text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        ">
+          ${symbol}
+        </div>
       </div>
     `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    popupAnchor: [0, -(size / 2)]
+    iconSize: [touchSize, touchSize],
+    iconAnchor: [touchSize / 2, touchSize / 2],
+    popupAnchor: [0, -(visualSize / 2)]
   })
 }
 

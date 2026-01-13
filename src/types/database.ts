@@ -1687,7 +1687,7 @@ export const getLeadQuality = (score: number): { label: string; color: string; b
 // System för att spåra utplacerad utrustning med GPS-koordinater
 
 export type EquipmentType = 'mechanical_trap' | 'concrete_station' | 'bait_station'
-export type EquipmentStatus = 'active' | 'removed' | 'missing'
+export type EquipmentStatus = 'active' | 'removed' | 'missing' | 'damaged'
 
 export interface EquipmentPlacement {
   id: string
@@ -1761,12 +1761,18 @@ export const EQUIPMENT_STATUS_CONFIG = {
   },
   removed: {
     label: 'Borttagen',
-    color: 'yellow-500',
-    bgColor: 'bg-yellow-500/20',
-    borderColor: 'border-yellow-500/40'
+    color: 'slate-500',
+    bgColor: 'bg-slate-500/20',
+    borderColor: 'border-slate-500/40'
   },
   missing: {
     label: 'Försvunnen',
+    color: 'amber-500',
+    bgColor: 'bg-amber-500/20',
+    borderColor: 'border-amber-500/40'
+  },
+  damaged: {
+    label: 'Skadad & ur funktion',
     color: 'red-500',
     bgColor: 'bg-red-500/20',
     borderColor: 'border-red-500/40'

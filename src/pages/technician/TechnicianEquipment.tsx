@@ -65,7 +65,7 @@ export default function TechnicianEquipment() {
     id: string
     equipment: EquipmentPlacementWithRelations
   } | null>(null)
-  const [deleteType, setDeleteType] = useState<'mark' | 'permanent'>('mark')
+  const [deleteType, setDeleteType] = useState<'removed' | 'missing' | 'damaged' | 'permanent'>('removed')
 
   // Snabb-lägg-till state
   const [quickAddPosition, setQuickAddPosition] = useState<{ lat: number; lng: number } | null>(null)
@@ -288,7 +288,7 @@ export default function TechnicianEquipment() {
   // Hantera borttagning
   const handleDeleteEquipment = async (equipment: EquipmentPlacementWithRelations) => {
     setDeleteConfirm({ id: equipment.id, equipment })
-    setDeleteType('mark') // Default till markera som borttagen
+    setDeleteType('removed') // Default till markera som borttagen
   }
 
   const confirmDelete = async () => {
@@ -303,23 +303,28 @@ export default function TechnicianEquipment() {
         }
         toast.success('Utrustning permanent raderad')
       } else {
-        // Markera som borttagen
+        // Uppdatera status (removed, missing, eller damaged)
+        const statusLabels = {
+          removed: 'borttagen',
+          missing: 'försvunnen',
+          damaged: 'skadad'
+        }
         const result = await EquipmentService.updateEquipmentStatus(
           deleteConfirm.id,
-          'removed',
+          deleteType,
           technicianId
         )
         if (!result.success) {
           throw new Error(result.error)
         }
-        toast.success('Utrustning markerad som borttagen')
+        toast.success(`Utrustning markerad som ${statusLabels[deleteType]}`)
       }
 
       setDeleteConfirm(null)
       await refreshEquipment()
     } catch (error) {
       console.error('Fel vid borttagning:', error)
-      toast.error('Kunde inte ta bort utrustning')
+      toast.error('Kunde inte uppdatera utrustning')
     }
   }
 
@@ -670,54 +675,103 @@ export default function TechnicianEquipment() {
                   </div>
                 </div>
 
-                {/* Val mellan markera/radera */}
-                <div className="space-y-3 mb-6">
+                {/* Val mellan statusar */}
+                <div className="space-y-2 mb-6">
+                  {/* Borttagen */}
                   <button
-                    onClick={() => setDeleteType('mark')}
-                    className={`w-full p-4 rounded-xl border text-left transition-all min-h-[80px] ${
-                      deleteType === 'mark'
+                    onClick={() => setDeleteType('removed')}
+                    className={`w-full p-3 rounded-xl border text-left transition-all ${
+                      deleteType === 'removed'
+                        ? 'border-slate-400 bg-slate-500/10'
+                        : 'border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        deleteType === 'removed' ? 'border-slate-400' : 'border-slate-600'
+                      }`}>
+                        {deleteType === 'removed' && (
+                          <div className="w-2 h-2 rounded-full bg-slate-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-white text-sm">Borttagen</p>
+                        <p className="text-xs text-slate-400">Utrustning har plockats bort</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Försvunnen */}
+                  <button
+                    onClick={() => setDeleteType('missing')}
+                    className={`w-full p-3 rounded-xl border text-left transition-all ${
+                      deleteType === 'missing'
                         ? 'border-amber-500 bg-amber-500/10'
                         : 'border-slate-700 hover:border-slate-600'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        deleteType === 'mark' ? 'border-amber-500' : 'border-slate-600'
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        deleteType === 'missing' ? 'border-amber-500' : 'border-slate-600'
                       }`}>
-                        {deleteType === 'mark' && (
-                          <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                        {deleteType === 'missing' && (
+                          <div className="w-2 h-2 rounded-full bg-amber-500" />
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-white">Markera som borttagen</p>
-                        <p className="text-sm text-slate-400">
-                          Behålls i historiken men visas som inaktiv
-                        </p>
+                        <p className="font-medium text-white text-sm">Försvunnen</p>
+                        <p className="text-xs text-slate-400">Kunde inte hittas på platsen</p>
                       </div>
                     </div>
                   </button>
 
+                  {/* Skadad */}
                   <button
-                    onClick={() => setDeleteType('permanent')}
-                    className={`w-full p-4 rounded-xl border text-left transition-all min-h-[80px] ${
-                      deleteType === 'permanent'
+                    onClick={() => setDeleteType('damaged')}
+                    className={`w-full p-3 rounded-xl border text-left transition-all ${
+                      deleteType === 'damaged'
                         ? 'border-red-500 bg-red-500/10'
                         : 'border-slate-700 hover:border-slate-600'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        deleteType === 'permanent' ? 'border-red-500' : 'border-slate-600'
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        deleteType === 'damaged' ? 'border-red-500' : 'border-slate-600'
                       }`}>
-                        {deleteType === 'permanent' && (
-                          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                        {deleteType === 'damaged' && (
+                          <div className="w-2 h-2 rounded-full bg-red-500" />
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-white">Radera permanent</p>
-                        <p className="text-sm text-slate-400">
-                          Tas bort helt och kan inte återställas
-                        </p>
+                        <p className="font-medium text-white text-sm">Skadad & ur funktion</p>
+                        <p className="text-xs text-slate-400">Trasig, behöver bytas</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Separator */}
+                  <div className="border-t border-slate-700 my-3" />
+
+                  {/* Permanent radering */}
+                  <button
+                    onClick={() => setDeleteType('permanent')}
+                    className={`w-full p-3 rounded-xl border text-left transition-all ${
+                      deleteType === 'permanent'
+                        ? 'border-red-600 bg-red-600/10'
+                        : 'border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        deleteType === 'permanent' ? 'border-red-600' : 'border-slate-600'
+                      }`}>
+                        {deleteType === 'permanent' && (
+                          <div className="w-2 h-2 rounded-full bg-red-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-red-400 text-sm">Radera permanent</p>
+                        <p className="text-xs text-slate-400">Tas bort helt, kan ej återställas</p>
                       </div>
                     </div>
                   </button>
@@ -726,19 +780,23 @@ export default function TechnicianEquipment() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => setDeleteConfirm(null)}
-                    className="flex-1 px-4 py-4 border border-slate-700 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors min-h-[52px]"
+                    className="flex-1 px-4 py-3 border border-slate-700 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors"
                   >
                     Avbryt
                   </button>
                   <button
                     onClick={confirmDelete}
-                    className={`flex-1 px-4 py-4 rounded-xl text-white font-medium transition-colors min-h-[52px] ${
+                    className={`flex-1 px-4 py-3 rounded-xl text-white font-medium transition-colors ${
                       deleteType === 'permanent'
-                        ? 'bg-red-500 hover:bg-red-600'
-                        : 'bg-amber-500 hover:bg-amber-600'
+                        ? 'bg-red-600 hover:bg-red-700'
+                        : deleteType === 'damaged'
+                          ? 'bg-red-500 hover:bg-red-600'
+                          : deleteType === 'missing'
+                            ? 'bg-amber-500 hover:bg-amber-600'
+                            : 'bg-slate-500 hover:bg-slate-600'
                     }`}
                   >
-                    {deleteType === 'permanent' ? 'Radera permanent' : 'Markera borttagen'}
+                    {deleteType === 'permanent' ? 'Radera' : 'Bekräfta'}
                   </button>
                 </div>
               </motion.div>

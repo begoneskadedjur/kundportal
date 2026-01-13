@@ -343,7 +343,7 @@ export function EquipmentMap({
 
         {/* Befintlig utrustning - med eller utan klustring */}
         {/* Key tvingar omrendering när equipment ändras (t.ex. efter borttagning) */}
-        {enableClustering && equipment.length > 5 ? (
+        {enableClustering && equipment.length >= 2 ? (
           <MarkerClusterGroup
             key={clusterKey}
             chunkedLoading
