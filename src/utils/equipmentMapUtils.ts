@@ -233,6 +233,8 @@ export const getTypeCssColor = (type: EquipmentType): string => {
 
 /**
  * CSS-animationer för markörer (lägg till i stylesheet)
+ * Inkluderar z-index-överskridningar för Leaflet-kontroller
+ * så att modaler och bottom-sheets visas ovanför kartan
  */
 export const MARKER_CSS = `
   @keyframes pulse {
@@ -260,6 +262,56 @@ export const MARKER_CSS = `
   .equipment-cluster {
     background: transparent !important;
     border: none !important;
+  }
+
+  /* Sänk z-index på alla Leaflet-kontroller och popups
+   * så att modaler (z-50 = 50) visas ovanför kartan
+   * Leaflets standard är 400-1000, vi sänker till 40
+   */
+  .leaflet-control-container {
+    z-index: 40 !important;
+  }
+
+  .leaflet-control {
+    z-index: 40 !important;
+  }
+
+  .leaflet-top,
+  .leaflet-bottom {
+    z-index: 40 !important;
+  }
+
+  .leaflet-pane {
+    z-index: 30 !important;
+  }
+
+  .leaflet-tile-pane {
+    z-index: 20 !important;
+  }
+
+  .leaflet-overlay-pane {
+    z-index: 25 !important;
+  }
+
+  .leaflet-shadow-pane {
+    z-index: 26 !important;
+  }
+
+  .leaflet-marker-pane {
+    z-index: 27 !important;
+  }
+
+  .leaflet-tooltip-pane {
+    z-index: 35 !important;
+  }
+
+  .leaflet-popup-pane {
+    z-index: 38 !important;
+  }
+
+  /* Behåll popups synliga men under modaler */
+  .leaflet-popup {
+    z-index: 38 !important;
   }
 `
 
