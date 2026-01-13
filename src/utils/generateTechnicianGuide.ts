@@ -296,16 +296,64 @@ export const generateTechnicianGuide = async (): Promise<void> => {
   const pdf = new jsPDF()
   const pageWidth = pdf.internal.pageSize.width
   const pageHeight = pdf.internal.pageSize.height
-  const margins = { left: 15, right: 15, top: 18, bottom: 22 }
+  // Footer upptar ca 15mm (linje vid -18, text vid -10), så vi behöver minst 25mm marginal
+  // Ökad till 28 för extra säkerhet
+  const margins = { left: 15, right: 15, top: 18, bottom: 28 }
   const contentWidth = pageWidth - margins.left - margins.right
 
-  // Sidbrytning helper
+  // Footer-position (används för checkPageBreak)
+  const footerTop = 25  // Footern börjar 25mm från botten
+
+  // Sidbrytning helper - returnerar ny y-position efter eventuell sidbrytning
   const checkPageBreak = (y: number, needed: number): number => {
-    if (y + needed > pageHeight - margins.bottom) {
+    // Kontrollera om innehållet (y + needed) skulle överlappa footern
+    if (y + needed > pageHeight - footerTop) {
       pdf.addPage()
       return margins.top
     }
     return y
+  }
+
+  // Beräkna höjd för bullet list
+  const calculateBulletListHeight = (items: string[], maxWidth: number): number => {
+    pdf.setFontSize(9)
+    let totalHeight = 0
+    items.forEach((item) => {
+      const lines = pdf.splitTextToSize(item, maxWidth - 10)
+      totalHeight += lines.length * 4.5 + 3
+    })
+    return totalHeight + 4
+  }
+
+  // Beräkna höjd för tabell
+  const calculateTableHeight = (rowCount: number): number => {
+    return 14 + rowCount * 12 + 8  // header + rows + padding
+  }
+
+  // Beräkna höjd för info box
+  const calculateInfoBoxHeight = (text: string, width: number): number => {
+    pdf.setFontSize(8)
+    const textLines = pdf.splitTextToSize(text, width - 16)
+    return 18 + textLines.length * 4 + 8
+  }
+
+  // Beräkna höjd för step box
+  const calculateStepBoxHeight = (stepsCount: number): number => {
+    return 22 + stepsCount * 12 + 8
+  }
+
+  // Beräkna höjd för error box
+  const calculateErrorBoxHeight = (solution: string, width: number): number => {
+    pdf.setFontSize(8)
+    const solutionLines = pdf.splitTextToSize(solution, width - 16)
+    return 38 + solutionLines.length * 4 + 6
+  }
+
+  // Beräkna höjd för paragraph
+  const calculateParagraphHeight = (text: string, maxWidth: number): number => {
+    pdf.setFontSize(9)
+    const lines = pdf.splitTextToSize(text, maxWidth)
+    return lines.length * 4.5 + 6
   }
 
   // ============================================
@@ -488,19 +536,19 @@ export const generateTechnicianGuide = async (): Promise<void> => {
 
   y = drawSectionTitle(pdf, 'Fördelar med systemet', margins.left, y, contentWidth, 'h3')
 
-  y = drawBulletList(
-    pdf,
-    [
-      'Exakt dokumentation - GPS-koordinater säkerställer att varje placering är dokumenterad',
-      'Spårbarhet - Se vem som placerat utrustningen och när',
-      'Kundinsyn - Kunder kan se sin utrustning i kundportalen',
-      'Effektiv uppföljning - Hitta enkelt tillbaka till utrustning vid servicebesök',
-      'Professionella rapporter - Exportera PDF-rapporter för kunder'
-    ],
-    margins.left,
-    y,
-    contentWidth
-  )
+  const fordelarItems = [
+    'Exakt dokumentation - GPS-koordinater säkerställer att varje placering är dokumenterad',
+    'Spårbarhet - Se vem som placerat utrustningen och när',
+    'Kundinsyn - Kunder kan se sin utrustning i kundportalen',
+    'Effektiv uppföljning - Hitta enkelt tillbaka till utrustning vid servicebesök',
+    'Professionella rapporter - Exportera PDF-rapporter för kunder'
+  ]
+  y = checkPageBreak(y, calculateBulletListHeight(fordelarItems, contentWidth))
+  y = drawBulletList(pdf, fordelarItems, margins.left, y, contentWidth)
+
+  // Utrustningstyper-tabell - kontrollera sidbrytning före rubrik + tabell
+  const utrustnTyperHeight = 12 + calculateTableHeight(3)  // h3 + tabell med 3 rader
+  y = checkPageBreak(y, utrustnTyperHeight)
 
   y = drawSectionTitle(pdf, 'Utrustningstyper', margins.left, y, contentWidth, 'h3')
 
@@ -517,29 +565,29 @@ export const generateTechnicianGuide = async (): Promise<void> => {
     [60, 50, 50]
   )
 
-  y = checkPageBreak(y, 70)
+  // Sektion 2 - kontrollera att hela sektionen får plats
+  const kommaIgangHeight = 32 + 12 + calculateBulletListHeight(['Item 1', 'Item 2', 'Item 3', 'Item 4'], contentWidth)
+  y = checkPageBreak(y, kommaIgangHeight)
 
   y = drawSectionTitle(pdf, '2. KOMMA IGÅNG', margins.left, y, contentWidth, 'h1')
 
   y = drawSectionTitle(pdf, 'Förutsättningar', margins.left, y, contentWidth, 'h3')
 
-  y = drawBulletList(
-    pdf,
-    [
-      'Du är inloggad i teknikerportalen',
-      'Platsbehörighet är aktiverad i din webbläsare/app',
-      'GPS är påslagen på din mobiltelefon',
-      'Du har tillgång till en kontraktskund'
-    ],
-    margins.left,
-    y,
-    contentWidth
-  )
+  const prereqItems = [
+    'Du är inloggad i teknikerportalen',
+    'Platsbehörighet är aktiverad i din webbläsare/app',
+    'GPS är påslagen på din mobiltelefon',
+    'Du har tillgång till en kontraktskund'
+  ]
+  y = checkPageBreak(y, calculateBulletListHeight(prereqItems, contentWidth))
+  y = drawBulletList(pdf, prereqItems, margins.left, y, contentWidth)
 
+  const tipText = 'Använd en smartphone med GPS och stabil internetanslutning för bästa resultat.'
+  y = checkPageBreak(y, calculateInfoBoxHeight(tipText, contentWidth))
   y = drawInfoBox(
     pdf,
     'Tips:',
-    'Använd en smartphone med GPS och stabil internetanslutning för bästa resultat.',
+    tipText,
     margins.left,
     y,
     contentWidth,
@@ -567,58 +615,57 @@ export const generateTechnicianGuide = async (): Promise<void> => {
     contentWidth
   )
 
+  const navInfoText = 'Du kan även navigera direkt via URL: /technician/equipment'
+  y = checkPageBreak(y, calculateInfoBoxHeight(navInfoText, contentWidth))
   y = drawInfoBox(
     pdf,
     'Info:',
-    'Du kan även navigera direkt via URL: /technician/equipment',
+    navInfoText,
     margins.left,
     y,
     contentWidth,
     'info'
   )
 
-  y = checkPageBreak(y, 70)
+  // Sektion 4: Välja kund - beräkna total höjd för sektionen
+  const valjaKundParagraph = 'När du öppnar Utrustningsplacering visas först en kundväljare där du kan söka bland dina kontraktskunder.'
+  const valjaKundSectionHeight = 32 + calculateParagraphHeight(valjaKundParagraph, contentWidth) + calculateStepBoxHeight(3)
+  y = checkPageBreak(y, valjaKundSectionHeight)
 
   y = drawSectionTitle(pdf, '4. VÄLJA KUND', margins.left, y, contentWidth, 'h1')
 
-  y = drawParagraph(
-    pdf,
-    'När du öppnar Utrustningsplacering visas först en kundväljare där du kan söka bland dina kontraktskunder.',
-    margins.left,
-    y,
-    contentWidth
-  )
+  y = drawParagraph(pdf, valjaKundParagraph, margins.left, y, contentWidth)
 
+  const stegForStegSteps = [
+    'Klicka på dropdown-menyn märkt "Välj kund"',
+    'Sök eller bläddra bland dina kontraktskunder',
+    'Välj kunden du ska arbeta med'
+  ]
+  y = checkPageBreak(y, calculateStepBoxHeight(stegForStegSteps.length))
   y = drawStepBox(
     pdf,
     'Steg för steg',
-    [
-      'Klicka på dropdown-menyn märkt "Välj kund"',
-      'Sök eller bläddra bland dina kontraktskunder',
-      'Välj kunden du ska arbeta med'
-    ],
+    stegForStegSteps,
     margins.left,
     y,
     contentWidth
   )
 
+  const kundInfoText = 'Endast kunder med aktiva kontrakt visas i listan. Om en kund saknas, kontakta koordinatorn.'
+  y = checkPageBreak(y, calculateInfoBoxHeight(kundInfoText, contentWidth))
   y = drawInfoBox(
     pdf,
     'Info:',
-    'Endast kunder med aktiva kontrakt visas i listan. Om en kund saknas, kontakta koordinatorn.',
+    kundInfoText,
     margins.left,
     y,
     contentWidth,
     'info'
   )
 
-  y = drawParagraph(
-    pdf,
-    'När du valt en kund laddas automatiskt all befintlig utrustning, statistik och kartan centreras på kundens placeringar.',
-    margins.left,
-    y,
-    contentWidth
-  )
+  const valdKundText = 'När du valt en kund laddas automatiskt all befintlig utrustning, statistik och kartan centreras på kundens placeringar.'
+  y = checkPageBreak(y, calculateParagraphHeight(valdKundText, contentWidth))
+  y = drawParagraph(pdf, valdKundText, margins.left, y, contentWidth)
 
   // ============================================
   // SIDA 5: REGISTRERA NY UTRUSTNING & GPS
@@ -731,19 +778,20 @@ export const generateTechnicianGuide = async (): Promise<void> => {
     'tip'
   )
 
-  y = checkPageBreak(y, 90)
+  // Sektion 7: Kartvy och listvy - kontrollera att hela sektionen får plats
+  // h1 rubrik (32) + paragraf (~15) + två kolumner (70) + marginal = ca 125
+  const kartListvySectionHeight = 32 + 15 + 70 + 10
+  y = checkPageBreak(y, kartListvySectionHeight)
 
   y = drawSectionTitle(pdf, '7. KARTVY OCH LISTVY', margins.left, y, contentWidth, 'h1')
 
-  y = drawParagraph(
-    pdf,
-    'Systemet erbjuder två olika sätt att visa utrustning. Använd knapparna "Lista" och "Karta" för att byta vy.',
-    margins.left,
-    y,
-    contentWidth
-  )
+  const kartListParagraph = 'Systemet erbjuder två olika sätt att visa utrustning. Använd knapparna "Lista" och "Karta" för att byta vy.'
+  y = drawParagraph(pdf, kartListParagraph, margins.left, y, contentWidth)
 
-  // Två kolumner för kartvy och listvy
+  // Två kolumner för kartvy och listvy - kontrollera att de får plats
+  const twoColumnHeight = 75
+  y = checkPageBreak(y, twoColumnHeight)
+
   const halfWidth = (contentWidth - 8) / 2
 
   // Kartvy-box
@@ -785,16 +833,21 @@ export const generateTechnicianGuide = async (): Promise<void> => {
 
   y += 80
 
+  // Kontrollera om markörsymbol-tabellen får plats, annars ny sida
+  const markerTableHeight = 12 + calculateTableHeight(3) + 5  // h3 header + table + extra marginal
+  y = checkPageBreak(y, markerTableHeight)
+
   y = drawSectionTitle(pdf, 'Markörsymboler', margins.left, y, contentWidth, 'h3')
 
+  const markerRows = [
+    ['Solid cirkel', 'Aktiv utrustning'],
+    ['Cirkel med "?"', 'Försvunnen'],
+    ['Cirkel med "✕"', 'Borttagen']
+  ]
   y = drawTable(
     pdf,
     ['Symbol', 'Betydelse'],
-    [
-      ['Solid cirkel', 'Aktiv utrustning'],
-      ['Cirkel med "?"', 'Försvunnen'],
-      ['Cirkel med "✕"', 'Borttagen']
-    ],
+    markerRows,
     margins.left,
     y,
     [55, 105]
@@ -808,80 +861,77 @@ export const generateTechnicianGuide = async (): Promise<void> => {
 
   y = drawSectionTitle(pdf, '8. STATUSHANTERING', margins.left, y, contentWidth, 'h1')
 
-  y = drawParagraph(
-    pdf,
-    'Varje utrustning har en status som spårar dess tillstånd. Statusändringen loggas automatiskt.',
-    margins.left,
-    y,
-    contentWidth
-  )
+  const statusParagraph = 'Varje utrustning har en status som spårar dess tillstånd. Statusändringen loggas automatiskt.'
+  y = drawParagraph(pdf, statusParagraph, margins.left, y, contentWidth)
 
+  // Status-tabell
+  const statusRows = [
+    ['Aktiv', 'Utrustningen är på plats', 'Standard vid ny placering'],
+    ['Borttagen', 'Har plockats bort', 'Vid avslutad behandling'],
+    ['Försvunnen', 'Kunde inte hittas', 'Vid servicebesök']
+  ]
+  y = checkPageBreak(y, calculateTableHeight(statusRows.length))
   y = drawTable(
     pdf,
     ['Status', 'Beskrivning', 'När använda'],
-    [
-      ['Aktiv', 'Utrustningen är på plats', 'Standard vid ny placering'],
-      ['Borttagen', 'Har plockats bort', 'Vid avslutad behandling'],
-      ['Försvunnen', 'Kunde inte hittas', 'Vid servicebesök']
-    ],
+    statusRows,
     margins.left,
     y,
     [40, 65, 55]
   )
 
+  // Ändra status stepbox
+  const andraStatusSteps = [
+    'Öppna utrustningens detaljer',
+    'Klicka på nuvarande status',
+    'Välj ny status i dropdown-menyn'
+  ]
+  y = checkPageBreak(y, calculateStepBoxHeight(andraStatusSteps.length))
   y = drawStepBox(
     pdf,
     'Ändra status',
-    [
-      'Öppna utrustningens detaljer',
-      'Klicka på nuvarande status',
-      'Välj ny status i dropdown-menyn'
-    ],
+    andraStatusSteps,
     margins.left,
     y,
     contentWidth
   )
 
-  y = checkPageBreak(y, 80)
+  // Sektion 9: Exportera till PDF
+  const exportSectionHeight = 32 + 15 + calculateStepBoxHeight(3)
+  y = checkPageBreak(y, exportSectionHeight)
 
   y = drawSectionTitle(pdf, '9. EXPORTERA TILL PDF', margins.left, y, contentWidth, 'h1')
 
-  y = drawParagraph(
-    pdf,
-    'Du kan generera professionella PDF-rapporter för kunder med BeGone-branding.',
-    margins.left,
-    y,
-    contentWidth
-  )
+  const exportParagraph = 'Du kan generera professionella PDF-rapporter för kunder med BeGone-branding.'
+  y = drawParagraph(pdf, exportParagraph, margins.left, y, contentWidth)
 
+  const pdfRapportSteps = [
+    'Se till att rätt kund är vald',
+    'Klicka på "PDF"-knappen i verktygsfältet',
+    'PDF:en genereras och laddas ner automatiskt'
+  ]
+  y = checkPageBreak(y, calculateStepBoxHeight(pdfRapportSteps.length))
   y = drawStepBox(
     pdf,
     'Skapa PDF-rapport',
-    [
-      'Se till att rätt kund är vald',
-      'Klicka på "PDF"-knappen i verktygsfältet',
-      'PDF:en genereras och laddas ner automatiskt'
-    ],
+    pdfRapportSteps,
     margins.left,
     y,
     contentWidth
   )
+
+  const rapportItems = [
+    'BeGone-header med företagslogotyp',
+    'Sammanfattning med antal per utrustningstyp',
+    'Detaljerad lista med typ, serienummer, GPS, status och datum',
+    'Kommentarer för placeringar med anteckningar',
+    'Professionell footer med kontaktuppgifter'
+  ]
+  const rapportSectionHeight = 12 + calculateBulletListHeight(rapportItems, contentWidth)
+  y = checkPageBreak(y, rapportSectionHeight)
 
   y = drawSectionTitle(pdf, 'Rapportens innehåll', margins.left, y, contentWidth, 'h3')
-
-  y = drawBulletList(
-    pdf,
-    [
-      'BeGone-header med företagslogotyp',
-      'Sammanfattning med antal per utrustningstyp',
-      'Detaljerad lista med typ, serienummer, GPS, status och datum',
-      'Kommentarer för placeringar med anteckningar',
-      'Professionell footer med kontaktuppgifter'
-    ],
-    margins.left,
-    y,
-    contentWidth
-  )
+  y = drawBulletList(pdf, rapportItems, margins.left, y, contentWidth)
 
   // ============================================
   // SIDA 8: FELSÖKNING
@@ -891,49 +941,62 @@ export const generateTechnicianGuide = async (): Promise<void> => {
 
   y = drawSectionTitle(pdf, '10. FELSÖKNING', margins.left, y, contentWidth, 'h1')
 
+  // Error 1
+  const error1Solution = 'Öppna webbläsarens inställningar, sök efter "Platsinställningar" och tillåt platsåtkomst för BeGone-portalen. Ladda sedan om sidan.'
+  y = checkPageBreak(y, calculateErrorBoxHeight(error1Solution, contentWidth))
   y = drawErrorBox(
     pdf,
     'Åtkomst till plats nekad',
     'Webbläsaren har inte behörighet att använda GPS.',
-    'Öppna webbläsarens inställningar, sök efter "Platsinställningar" och tillåt platsåtkomst för BeGone-portalen. Ladda sedan om sidan.',
+    error1Solution,
     margins.left,
     y,
     contentWidth
   )
 
+  // Error 2
+  const error2Solution = 'Gå närmare ett fönster eller utomhus. Vänta 10-15 sekunder. Om problemet kvarstår, använd kartväljaren ("Välj på karta") istället.'
+  y = checkPageBreak(y, calculateErrorBoxHeight(error2Solution, contentWidth))
   y = drawErrorBox(
     pdf,
     'Platsinformation ej tillgänglig',
     'GPS-signalen är för svag eller enheten saknar GPS.',
-    'Gå närmare ett fönster eller utomhus. Vänta 10-15 sekunder. Om problemet kvarstår, använd kartväljaren ("Välj på karta") istället.',
+    error2Solution,
     margins.left,
     y,
     contentWidth
   )
 
+  // Error 3
+  const error3Solution = 'Vänta längre för bättre GPS-signal, gå utomhus, eller använd kartväljaren ("Välj på karta") för att manuellt markera rätt position på kartan.'
+  y = checkPageBreak(y, calculateErrorBoxHeight(error3Solution, contentWidth))
   y = drawErrorBox(
     pdf,
     'Dålig GPS-noggrannhet / Fel position',
     'GPS:en returnerar en ungefärlig position baserad på WiFi eller IP-adress.',
-    'Vänta längre för bättre GPS-signal, gå utomhus, eller använd kartväljaren ("Välj på karta") för att manuellt markera rätt position på kartan.',
+    error3Solution,
     margins.left,
     y,
     contentWidth
   )
 
+  // Error 4
+  const error4Solution = 'Kontrollera att GPS är aktiverat på enheten. Försök på en plats med bättre mottagning. Som backup, använd kartväljaren för att markera platsen manuellt.'
+  y = checkPageBreak(y, calculateErrorBoxHeight(error4Solution, contentWidth))
   y = drawErrorBox(
     pdf,
     'Timeout vid hämtning av plats',
     'Det tog för lång tid att få GPS-position.',
-    'Kontrollera att GPS är aktiverat på enheten. Försök på en plats med bättre mottagning. Som backup, använd kartväljaren för att markera platsen manuellt.',
+    error4Solution,
     margins.left,
     y,
     contentWidth
   )
 
-  y = checkPageBreak(y, 50)
+  // Support-ruta - kontrollera att den får plats
+  const supportBoxHeight = 55
+  y = checkPageBreak(y, supportBoxHeight)
 
-  // Support-ruta
   pdf.setFillColor(...colors.accent)
   pdf.roundedRect(margins.left, y, contentWidth, 45, 4, 4, 'F')
 
