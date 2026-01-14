@@ -496,7 +496,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         // Nollställda fält för det nya ärendet
         time_spent_minutes: 0,
         work_started_at: null,
-        case_price: null,
+        pris: null, // Kolumnnamnet i databasen är 'pris', inte 'case_price'
         material_cost: null,
         rapport: null,
       };
