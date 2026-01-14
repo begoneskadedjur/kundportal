@@ -8,7 +8,8 @@ import {
   ChevronRight,
   FileText,
   Wrench,
-  ClipboardList
+  ClipboardList,
+  Plus
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Card from '../ui/Card'
@@ -28,14 +29,24 @@ interface GuideItem {
 // Lista med tillgängliga guider
 const guides: GuideItem[] = [
   {
+    id: 'follow-up-case',
+    title: 'Skapa Foljeärenden',
+    description: 'Hur du skapar nya ärenden direkt i fält när du hittar extra problem',
+    icon: Plus,
+    iconColor: 'text-amber-400',
+    iconBgColor: 'bg-amber-500/20',
+    path: '/technician/guides/follow-up-case',
+    isNew: true
+  },
+  {
     id: 'equipment-placement',
     title: 'Utrustningsplacering',
-    description: 'Lär dig registrera fällor och stationer med GPS-position och foto',
+    description: 'Lar dig registrera fallor och stationer med GPS-position och foto',
     icon: MapPin,
     iconColor: 'text-emerald-400',
     iconBgColor: 'bg-emerald-500/20',
     path: '/technician/guides/equipment-placement',
-    isNew: true
+    isNew: false
   },
   // Framtida guider kan läggas till här:
   // {

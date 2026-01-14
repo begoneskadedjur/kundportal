@@ -58,7 +58,8 @@ import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions'
 import TechnicianCases from './pages/technician/TechnicianCases';
 import TechnicianSchedule from './pages/technician/TechnicianSchedule';
 import TechnicianEquipment from './pages/technician/TechnicianEquipment';
-import EquipmentPlacementGuide from './pages/technician/guides/EquipmentPlacementGuide'; 
+import EquipmentPlacementGuide from './pages/technician/guides/EquipmentPlacementGuide';
+import FollowUpCaseGuide from './pages/technician/guides/FollowUpCaseGuide';
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal';
@@ -462,6 +463,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="technician">
                   <EquipmentPlacementGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/technician/guides/follow-up-case"
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <FollowUpCaseGuide />
                 </ProtectedRoute>
               }
             />
