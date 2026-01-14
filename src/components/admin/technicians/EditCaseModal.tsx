@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useClickUpSync } from '../../../hooks/useClickUpSync'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -30,6 +30,9 @@ import CaseImageGallery, { CaseImageGalleryRef } from '../../shared/CaseImageGal
 
 // Datum-hjälpfunktioner för svensk tidszon
 import { toSwedishISOString } from '../../../utils/dateHelpers'
+
+// Skadedjurstyper för följeärenden
+import { PEST_TYPE_OPTIONS } from '../../../utils/clickupFieldMapper'
 
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
@@ -68,6 +71,10 @@ interface TechnicianCase {
   r_servicebil?: number;
   // Rapport
   rapport?: string;
+  // Följeärende-fält
+  parent_case_id?: string | null;
+  created_by_technician_id?: string | null;
+  created_by_technician_name?: string | null;
 }
 
 interface EditCaseModalProps {
@@ -330,6 +337,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
   const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
 
+  // Följeärende-states
+  const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
+  const [followUpPestType, setFollowUpPestType] = useState('')
+  const [followUpLoading, setFollowUpLoading] = useState(false)
+
   // Ref för bildgalleriet så vi kan anropa commitChanges
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
 
@@ -426,6 +438,112 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     
     toast.success('Navigerar till offertskapning med kundinformation...');
   }, [prepareCustomerData, navigate, getOneflowRoute]);
+
+  // Hantera skapning av följeärende
+  const handleCreateFollowUpCase = useCallback(async () => {
+    if (!currentCase || !followUpPestType || !profile) return;
+
+    setFollowUpLoading(true);
+
+    try {
+      // Hämta teknikernamn om det finns
+      let technicianName = profile.full_name || 'Okänd tekniker';
+      if (profile.technician_id) {
+        const { data: techData } = await supabase
+          .from('technicians')
+          .select('name')
+          .eq('id', profile.technician_id)
+          .single();
+        if (techData?.name) {
+          technicianName = techData.name;
+        }
+      }
+
+      // Bestäm rätt tabell baserat på ärendetyp
+      const tableName = currentCase.case_type === 'private' ? 'private_cases' : 'business_cases';
+
+      // Skapa det nya följeärendet med ärvd information
+      const newCaseData: any = {
+        // Ärvd kundinformation
+        title: currentCase.title, // Behåll samma titel (kundnamn/företagsnamn)
+        kontaktperson: currentCase.kontaktperson,
+        telefon_kontaktperson: currentCase.telefon_kontaktperson,
+        e_post_kontaktperson: currentCase.e_post_kontaktperson,
+        adress: currentCase.adress,
+
+        // Ny information för följeärendet
+        skadedjur: followUpPestType,
+        status: 'Bokad',
+        description: `Följeärende från ursprungsärende. Nytt skadedjursproblem: ${followUpPestType}`,
+
+        // Tekniker-tilldelning (samma som ursprungsärendet)
+        primary_assignee_id: currentCase.primary_assignee_id,
+        primary_assignee_name: currentCase.primary_assignee_name,
+        secondary_assignee_id: currentCase.secondary_assignee_id,
+        secondary_assignee_name: currentCase.secondary_assignee_name,
+        tertiary_assignee_id: currentCase.tertiary_assignee_id,
+        tertiary_assignee_name: currentCase.tertiary_assignee_name,
+
+        // Schemaläggning (samma som ursprungsärendet)
+        start_date: currentCase.start_date,
+        due_date: currentCase.due_date,
+
+        // Följeärende-referens
+        parent_case_id: currentCase.id,
+        created_by_technician_id: profile.technician_id || null,
+        created_by_technician_name: technicianName,
+
+        // Nollställda fält för det nya ärendet
+        time_spent_minutes: 0,
+        work_started_at: null,
+        case_price: null,
+        material_cost: null,
+        rapport: null,
+      };
+
+      // Lägg till specifika fält beroende på ärendetyp
+      if (currentCase.case_type === 'private') {
+        newCaseData.personnummer = currentCase.personnummer;
+      } else if (currentCase.case_type === 'business') {
+        newCaseData.org_nr = currentCase.org_nr;
+      }
+
+      const { data: newCase, error: insertError } = await supabase
+        .from(tableName)
+        .insert(newCaseData)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Stäng dialogen och återställ state
+      setShowFollowUpDialog(false);
+      setFollowUpPestType('');
+
+      toast.success(`Följeärende skapat för ${followUpPestType}!`);
+
+      // Öppna det nya ärendet genom att anropa onSuccess med det nya ärendet
+      // Detta kommer att uppdatera parent-komponenten och öppna det nya ärendet
+      const newCaseForModal: TechnicianCase = {
+        ...newCase,
+        case_type: currentCase.case_type,
+        case_price: newCase.pris || null,
+      };
+
+      onSuccess(newCaseForModal);
+
+    } catch (error: any) {
+      console.error('Error creating follow-up case:', error);
+      toast.error(`Kunde inte skapa följeärende: ${error.message}`);
+    } finally {
+      setFollowUpLoading(false);
+    }
+  }, [currentCase, followUpPestType, profile, onSuccess]);
+
+  // Kontrollera om följeärende kan skapas (inte från ett följeärende)
+  const canCreateFollowUp = currentCase &&
+    (currentCase.case_type === 'private' || currentCase.case_type === 'business') &&
+    !currentCase.parent_case_id;
 
   // Initialisera modal när ett NYTT ärende öppnas (baserat på id)
   // Uppdatera endast currentCase när caseData ändras för att behålla tidloggningsdata
@@ -764,6 +882,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                   <span className="hidden sm:inline text-sm">Offert</span>
                   <ChevronRight className="w-3 h-3 opacity-60" />
                 </button>
+
+                {/* Följeärende Button - endast för private/business och inte redan ett följeärende */}
+                {canCreateFollowUp && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFollowUpDialog(true)}
+                    className="flex items-center gap-2 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 rounded-lg text-amber-300 hover:text-amber-200 transition-all duration-200 hover:scale-105"
+                    title="Skapa följeärende för annat skadedjur"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline text-sm">Följeärende</span>
+                  </button>
+                )}
               </div>
 
               {/* Rapport Dropdown - right aligned */}
@@ -807,9 +938,88 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                 ⚠️ Komplettera kontaktuppgifter för bästa avtal/offert-skapning
               </div>
             )}
+
+            {/* Info om detta är ett följeärende */}
+            {currentCase.parent_case_id && (
+              <div className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded px-3 py-2 mt-2">
+                ℹ️ Detta är ett följeärende
+              </div>
+            )}
           </div>
         )}
-        
+
+        {/* Följeärende-dialog */}
+        {showFollowUpDialog && (
+          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h4 className="text-lg font-medium text-amber-300 flex items-center gap-2">
+                  <Plus className="w-5 h-5" />
+                  Skapa följeärende
+                </h4>
+                <p className="text-sm text-slate-400 mt-1">
+                  Välj skadedjurstyp för det nya ärendet. Kundinformation, adress och schemaläggning kopieras automatiskt.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFollowUpDialog(false);
+                  setFollowUpPestType('');
+                }}
+                className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Skadedjurstyp för det nya ärendet *
+                </label>
+                <select
+                  value={followUpPestType}
+                  onChange={(e) => setFollowUpPestType(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all duration-200"
+                >
+                  <option value="">Välj skadedjurstyp...</option>
+                  {PEST_TYPE_OPTIONS.map((pest) => (
+                    <option key={pest.id} value={pest.name}>
+                      {pest.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowFollowUpDialog(false);
+                    setFollowUpPestType('');
+                  }}
+                  disabled={followUpLoading}
+                  className="flex-1"
+                >
+                  Avbryt
+                </Button>
+                <Button
+                  type="button"
+                  variant="warning"
+                  onClick={handleCreateFollowUpCase}
+                  loading={followUpLoading}
+                  disabled={!followUpPestType || followUpLoading}
+                  className="flex-1"
+                >
+                  {followUpLoading ? 'Skapar...' : 'Skapa följeärende'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <BackupRestorePrompt pendingRestore={pendingRestore} onRestore={handleSuccessfulRestore} onDismiss={clearBackup} />
 
         <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-6">

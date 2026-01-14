@@ -237,6 +237,11 @@ export type Database = {
           commission_amount: number | null
           commission_calculated_at: string | null
           billing_status: 'pending' | 'sent' | 'paid' | 'skip' | null
+
+          // ✅ FÖLJEÄRENDE-FÄLT (för att länka relaterade ärenden)
+          parent_case_id: string | null  // Referens till ursprungsärendet
+          created_by_technician_id: string | null  // Tekniker som skapade följeärendet
+          created_by_technician_name: string | null  // Namn på teknikern
         }
         Insert: Omit<Database['public']['Tables']['private_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['private_cases']['Insert']>
@@ -295,6 +300,11 @@ export type Database = {
           commission_amount: number | null
           commission_calculated_at: string | null
           billing_status: 'pending' | 'sent' | 'paid' | 'skip' | null
+
+          // ✅ FÖLJEÄRENDE-FÄLT (för att länka relaterade ärenden)
+          parent_case_id: string | null  // Referens till ursprungsärendet
+          created_by_technician_id: string | null  // Tekniker som skapade följeärendet
+          created_by_technician_name: string | null  // Namn på teknikern
         }
         Insert: Omit<Database['public']['Tables']['business_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['business_cases']['Insert']>
