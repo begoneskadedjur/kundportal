@@ -158,9 +158,27 @@ export default function TechnicianDashboard() {
     setSelectedCase(null)
   }
 
-  const handleUpdateSuccess = () => {
-    // Refetch dashboard data efter uppdatering
-    fetchDashboardData()
+  const handleUpdateSuccess = (updatedCase?: Partial<TechnicianCase>) => {
+    // Uppdatera selectedCase med ny data om den finns
+    // Detta förhindrar att modalen tappar sin state vid tidloggning
+    if (updatedCase && selectedCase) {
+      setSelectedCase(prev => prev ? { ...prev, ...updatedCase } : prev)
+    }
+    // Uppdatera även dashboardData för att reflektera ändringar i listorna
+    if (dashboardData && updatedCase) {
+      setDashboardData(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          pending_cases: prev.pending_cases.map(c =>
+            c.id === updatedCase.id ? { ...c, ...updatedCase } : c
+          ),
+          recent_cases: prev.recent_cases.map(c =>
+            c.id === updatedCase.id ? { ...c, ...updatedCase } : c
+          )
+        }
+      })
+    }
   }
 
   const handleMonthClick = (month: any) => {

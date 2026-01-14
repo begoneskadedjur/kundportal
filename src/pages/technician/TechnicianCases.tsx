@@ -162,7 +162,14 @@ export default function TechnicianCases() {
   
   const handleOpenEditModal = (caseToEdit: TechnicianCase) => { setSelectedCase(caseToEdit); setIsEditModalOpen(true); };
   const handleCloseEditModal = () => { setIsEditModalOpen(false); setSelectedCase(null); };
-  const handleUpdateSuccess = (updatedCase: Partial<TechnicianCase>) => { setCases(currentCases => currentCases.map(c => (c.id === selectedCase?.id ? { ...c, ...updatedCase } : c))); };
+  const handleUpdateSuccess = (updatedCase: Partial<TechnicianCase>) => {
+    // Uppdatera selectedCase så modalen visar rätt data vid tidloggning
+    if (updatedCase && selectedCase) {
+      setSelectedCase(prev => prev ? { ...prev, ...updatedCase } : prev);
+    }
+    // Uppdatera även cases-listan
+    setCases(currentCases => currentCases.map(c => (c.id === selectedCase?.id ? { ...c, ...updatedCase } : c)));
+  };
 
   const technicianName = profile?.display_name || 'Tekniker';
 

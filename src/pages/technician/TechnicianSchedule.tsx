@@ -257,7 +257,13 @@ export default function TechnicianSchedule() {
     }
   };
   
-  const handleUpdateSuccess = (updatedCase?: any) => { 
+  const handleUpdateSuccess = (updatedCase?: any) => {
+    // Uppdatera selectedCase så modalen visar rätt data vid tidloggning
+    // VIKTIGT: Stäng INTE modalen här - det ska bara ske vid explicit stängning
+    if (updatedCase && selectedCase) {
+      setSelectedCase(prev => prev ? { ...prev, ...updatedCase } : prev);
+    }
+
     // Optimistic UI update - uppdatera lokalt state omedelbart
     if (updatedCase) {
       setCases(prevCases => {
@@ -265,14 +271,6 @@ export default function TechnicianSchedule() {
         return updatedCases;
       });
     }
-    
-    // Hämta fresh data från servern för att säkerställa korrekthet
-    if (profile?.technician_id) {
-      fetchScheduledCases(profile.technician_id);
-    }
-    
-    setIsEditModalOpen(false);
-    setIsEditContractModalOpen(false);
   };
 
   // Pull-to-refresh funktionalitet för mobil

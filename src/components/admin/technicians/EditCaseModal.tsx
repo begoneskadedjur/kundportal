@@ -427,41 +427,49 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     toast.success('Navigerar till offertskapning med kundinformation...');
   }, [prepareCustomerData, navigate, getOneflowRoute]);
 
+  // Initialisera modal när ett NYTT ärende öppnas (baserat på id)
+  // Uppdatera endast currentCase när caseData ändras för att behålla tidloggningsdata
   useEffect(() => {
     if (caseData) {
+      // Uppdatera alltid currentCase med senaste data (inkl. tidloggningsfält)
       setCurrentCase(caseData);
-      setFormData({
-        title: caseData.title || '',
-        status: caseData.status || '',
-        description: caseData.description || '',
-        kontaktperson: caseData.kontaktperson || '',
-        telefon_kontaktperson: caseData.telefon_kontaktperson || '',
-        e_post_kontaktperson: caseData.e_post_kontaktperson || '',
-        case_price: caseData.case_price || 0,
-        skadedjur: caseData.skadedjur || '',
-        org_nr: caseData.org_nr || '',
-        personnummer: caseData.personnummer || '',
-        // Tekniker-tilldelningar
-        primary_assignee_id: caseData.primary_assignee_id || '',
-        secondary_assignee_id: caseData.secondary_assignee_id || '',
-        tertiary_assignee_id: caseData.tertiary_assignee_id || '',
-        material_cost: caseData.material_cost || 0,
-        start_date: caseData.start_date,
-        due_date: caseData.due_date,
-        // Adress (JSONB eller string)
-        adress: caseData.adress || null,
-        // ClickUp-synkade fält
-        rapport: caseData.rapport || '',
-        // ROT/RUT-fält för privatpersoner
-        r_rot_rut: caseData.r_rot_rut || '',
-        r_fastighetsbeteckning: caseData.r_fastighetsbeteckning || '',
-        r_arbetskostnad: caseData.r_arbetskostnad || 0,
-        r_material_utrustning: caseData.r_material_utrustning || 0,
-        r_servicebil: caseData.r_servicebil || 0,
-      });
-      setError(null);
-      setTimeTrackingLoading(false);
-      setLoading(false);
+
+      // Endast resetta formData om det är ett NYTT ärende
+      // Detta förhindrar att formuläret resettas när tidloggning uppdaterar caseData
+      if (!currentCase || currentCase.id !== caseData.id) {
+        setFormData({
+          title: caseData.title || '',
+          status: caseData.status || '',
+          description: caseData.description || '',
+          kontaktperson: caseData.kontaktperson || '',
+          telefon_kontaktperson: caseData.telefon_kontaktperson || '',
+          e_post_kontaktperson: caseData.e_post_kontaktperson || '',
+          case_price: caseData.case_price || 0,
+          skadedjur: caseData.skadedjur || '',
+          org_nr: caseData.org_nr || '',
+          personnummer: caseData.personnummer || '',
+          // Tekniker-tilldelningar
+          primary_assignee_id: caseData.primary_assignee_id || '',
+          secondary_assignee_id: caseData.secondary_assignee_id || '',
+          tertiary_assignee_id: caseData.tertiary_assignee_id || '',
+          material_cost: caseData.material_cost || 0,
+          start_date: caseData.start_date,
+          due_date: caseData.due_date,
+          // Adress (JSONB eller string)
+          adress: caseData.adress || null,
+          // ClickUp-synkade fält
+          rapport: caseData.rapport || '',
+          // ROT/RUT-fält för privatpersoner
+          r_rot_rut: caseData.r_rot_rut || '',
+          r_fastighetsbeteckning: caseData.r_fastighetsbeteckning || '',
+          r_arbetskostnad: caseData.r_arbetskostnad || 0,
+          r_material_utrustning: caseData.r_material_utrustning || 0,
+          r_servicebil: caseData.r_servicebil || 0,
+        });
+        setError(null);
+        setTimeTrackingLoading(false);
+        setLoading(false);
+      }
     }
   }, [caseData]);
 
