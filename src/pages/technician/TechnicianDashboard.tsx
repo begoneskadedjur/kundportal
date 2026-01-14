@@ -23,6 +23,7 @@ import VisualTimeline from '../../components/shared/VisualTimeline'
 import RecentCasesList from '../../components/technician/RecentCasesList'
 import MonthlyOverviewList from '../../components/technician/MonthlyOverviewList'
 import MonthlyCommissionModal from '../../components/technician/MonthlyCommissionModal'
+import TechnicianHelpSection from '../../components/technician/TechnicianHelpSection'
 
 const formatAddress = (address: any): string => {
   if (!address) return 'Saknas';
@@ -684,6 +685,9 @@ export default function TechnicianDashboard() {
 
           </div>
         </Card>
+
+        {/* Hjälp och Guider-sektion */}
+        <TechnicianHelpSection />
 
         <EditCaseModal 
           isOpen={isEditModalOpen} 
