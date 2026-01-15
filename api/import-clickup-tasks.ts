@@ -448,18 +448,31 @@ function findMatchingTechnician(assignee: any): { id: string, name: string, emai
     if (emailMatch) return emailMatch
   }
   
-  // Matcha på namn (fuzzy matching)
+  // Matcha på FULLSTÄNDIGT namn (striktare matchning för att undvika Kim/Jakob-förväxling)
   if (assigneeName) {
+    const assigneeNameLower = assigneeName.toLowerCase().trim()
+
+    // Exakt matchning på fullständigt namn först
+    const exactMatch = knownTechnicians.find(tech =>
+      assigneeNameLower === tech.name.toLowerCase()
+    )
+    if (exactMatch) return exactMatch
+
+    // Matcha om assignee-namn innehåller BÅDE förnamn OCH efternamn
     const nameMatch = knownTechnicians.find(tech => {
       const techFirstName = tech.name.split(' ')[0].toLowerCase()
       const techLastName = tech.name.split(' ')[1]?.toLowerCase() || ''
-      const assigneeNameLower = assigneeName.toLowerCase()
-      
-      // Matcha förnamn eller efternamn
-      return assigneeNameLower.includes(techFirstName) || 
-             assigneeNameLower.includes(techLastName) ||
-             techFirstName.includes(assigneeNameLower) ||
-             tech.name.toLowerCase().includes(assigneeNameLower)
+
+      if (techLastName && assigneeNameLower.includes(techFirstName) && assigneeNameLower.includes(techLastName)) {
+        return true
+      }
+
+      // Matcha endast på förnamn om tekniker inte har efternamn definierat
+      if (!techLastName && assigneeNameLower.includes(techFirstName)) {
+        return true
+      }
+
+      return false
     })
     if (nameMatch) return nameMatch
   }

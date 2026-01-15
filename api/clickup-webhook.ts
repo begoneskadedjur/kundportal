@@ -557,24 +557,37 @@ function mapAssignees(assignees: any[]): any {
     const matchedTechnician = knownTechnicians.find(tech => {
       const assigneeName = assignee.username || assignee.name || ''
       const assigneeEmail = assignee.email || ''
-      
+
       // Matcha på email först (mest exakt)
       if (assigneeEmail && tech.email.toLowerCase() === assigneeEmail.toLowerCase()) {
         return true
       }
-      
-      // Matcha på namn (fuzzy matching)
+
+      // Matcha på FULLSTÄNDIGT namn (striktare matchning)
       if (assigneeName) {
+        const assigneeNameLower = assigneeName.toLowerCase().trim()
+        const techNameLower = tech.name.toLowerCase()
+
+        // Exakt matchning på fullständigt namn
+        if (assigneeNameLower === techNameLower) {
+          return true
+        }
+
+        // Matcha om assignee-namn innehåller BÅDE förnamn OCH efternamn
         const techFirstName = tech.name.split(' ')[0].toLowerCase()
         const techLastName = tech.name.split(' ')[1]?.toLowerCase() || ''
-        const assigneeNameLower = assigneeName.toLowerCase()
-        
-        return assigneeNameLower.includes(techFirstName) || 
-               assigneeNameLower.includes(techLastName) ||
-               techFirstName.includes(assigneeNameLower) ||
-               tech.name.toLowerCase().includes(assigneeNameLower)
+
+        if (techLastName && assigneeNameLower.includes(techFirstName) && assigneeNameLower.includes(techLastName)) {
+          return true
+        }
+
+        // Matcha endast på förnamn om det INTE finns efternamn-konflikt (t.ex. två Wahlberg)
+        // Undvik att matcha "Kim" mot "Jakob Wahlberg" bara för att båda har "Wahlberg"
+        if (!techLastName && assigneeNameLower.includes(techFirstName)) {
+          return true
+        }
       }
-      
+
       return false
     })
     
