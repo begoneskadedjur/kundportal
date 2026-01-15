@@ -43,8 +43,8 @@ export function TicketItem({ ticket, onStatusChange }: TicketItemProps) {
   const status = comment.status || 'open';
   const statusConfig = STATUS_CONFIG[status];
 
-  // Kan ändra status: admin och koordinator
-  const canChangeStatus = profile?.role === 'admin' || profile?.role === 'koordinator';
+  // Kan ändra status: admin, koordinator och tekniker
+  const canChangeStatus = profile?.role === 'admin' || profile?.role === 'koordinator' || profile?.role === 'technician';
 
   const handleStatusChange = async (newStatus: CommentStatus) => {
     if (!onStatusChange || updating) return;
