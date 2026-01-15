@@ -1,5 +1,5 @@
 // 📁 api/ruttplanerare/assistant-utils.ts
-// ⭐ VERSION 1.3 - ÅTERSTÄLLER KORREKT FRÅNVAROHANTERING ⭐
+// ⭐ VERSION 1.4 - Filtrerar nu på is_active för att exkludera inaktiva tekniker ⭐
 
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
@@ -186,15 +186,20 @@ export async function getAbsences(staffIds: string[], from: Date, to: Date): Pro
   return absences;
 }
 export async function getCompetentStaff(pestType: string, requiredTechnicianIds?: string[]): Promise<StaffMember[]> {
-  let query = supabase.from('staff_competencies').select('technicians(id, name, address, work_schedule)').eq('pest_type', pestType);
-  
+  // Hämta kompetenser med tekniker-data, filtrera på aktiva tekniker
+  let query = supabase
+    .from('staff_competencies')
+    .select('technicians!inner(id, name, address, work_schedule, is_active)')
+    .eq('pest_type', pestType)
+    .eq('technicians.is_active', true);  // ⭐ Endast aktiva tekniker
+
   if (requiredTechnicianIds && requiredTechnicianIds.length > 0) {
       query = query.in('technicians.id', requiredTechnicianIds);
   }
 
   const { data, error } = await query;
   if (error) throw error;
-  
+
   return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
 }
 export async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
