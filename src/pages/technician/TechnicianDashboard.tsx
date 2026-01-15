@@ -24,7 +24,7 @@ import RecentCasesList from '../../components/technician/RecentCasesList'
 import MonthlyOverviewList from '../../components/technician/MonthlyOverviewList'
 import MonthlyCommissionModal from '../../components/technician/MonthlyCommissionModal'
 import TechnicianHelpSection from '../../components/technician/TechnicianHelpSection'
-import { NotificationCenter } from '../../components/communication'
+// NotificationCenter borttagen - nu finns global header med notifikationer
 
 const formatAddress = (address: any): string => {
   if (!address) return 'Saknas';
@@ -551,13 +551,7 @@ export default function TechnicianDashboard() {
           )}
         </AnimatePresence>
 
-        {/* Notifikationer */}
-        <Card className="p-6 mb-8">
-          <NotificationCenter
-            maxItems={5}
-            showViewAll={true}
-          />
-        </Card>
+        {/* Notifikationer borttagna - nu finns global header */}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <Card className="p-6">

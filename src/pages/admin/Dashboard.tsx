@@ -49,7 +49,7 @@ import VisualTimeline from '../../components/shared/VisualTimeline'
 import StaggeredGrid from '../../components/shared/StaggeredGrid'
 import LiveStatusIndicator from '../../components/shared/LiveStatusIndicator'
 import { generateTechnicianGuide } from '../../utils/generateTechnicianGuide'
-import { NotificationCenter } from '../../components/communication'
+// NotificationCenter borttagen - nu finns global header med notifikationer
 
 interface DashboardStats {
   totalCustomers: number
@@ -658,11 +658,7 @@ const AdminDashboard: React.FC = () => {
               </Card>
             </div>
 
-            {/* Notifikationer */}
-            <NotificationCenter
-              maxItems={5}
-              showViewAll={true}
-            />
+            {/* Notifikationer - borttagna, nu finns global header */}
           </div>
         </div>
       </div>

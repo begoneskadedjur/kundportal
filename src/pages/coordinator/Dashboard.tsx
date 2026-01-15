@@ -12,7 +12,7 @@ import { BeGoneCaseRow, Technician } from '../../types/database';
 import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp, Receipt, Target } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
-import { NotificationCenter } from '../../components/communication';
+// NotificationCenter borttagen - nu finns global header med notifikationer
 
 export default function CoordinatorDashboard() {
   // State för att hålla vår data, laddningsstatus och eventuella fel
@@ -280,13 +280,7 @@ export default function CoordinatorDashboard() {
         </section>
 
 
-        {/* --- Notifikationer --- */}
-        <section className="mt-8">
-          <NotificationCenter
-            maxItems={5}
-            showViewAll={true}
-          />
-        </section>
+        {/* --- Notifikationer borttagna - nu finns global header --- */}
 
         {/* --- Verktyg (flyttat ovanför kartan) --- */}
         <section className="mt-16">

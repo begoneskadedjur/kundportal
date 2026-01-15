@@ -702,6 +702,40 @@ export interface Ticket {
   case_title: string;
   kontaktperson: string | null;
   adress: string | null;
+  skadedjur: string | null;
+}
+
+// Hjälpfunktion för att formatera adress från JSON eller sträng
+function formatAddress(adress: any): string | null {
+  if (!adress) return null;
+
+  // Om det är en sträng, försök parsa JSON
+  if (typeof adress === 'string') {
+    try {
+      const parsed = JSON.parse(adress);
+      if (parsed.formatted_address) return parsed.formatted_address;
+      if (parsed.address) return parsed.address;
+      // Om det inte är JSON, returnera strängen direkt
+      return adress;
+    } catch {
+      // Inte JSON, returnera direkt
+      return adress;
+    }
+  }
+
+  // Om det är ett objekt
+  if (typeof adress === 'object') {
+    if (adress.formatted_address) return adress.formatted_address;
+    if (adress.address) return adress.address;
+    // Försök bygga adress från komponenter
+    const parts = [];
+    if (adress.street) parts.push(adress.street);
+    if (adress.city) parts.push(adress.city);
+    if (adress.postal_code) parts.push(adress.postal_code);
+    if (parts.length > 0) return parts.join(', ');
+  }
+
+  return null;
 }
 
 export interface TicketFilter {
@@ -771,13 +805,13 @@ export async function getTickets(
   // Hämta private cases
   const { data: privateCases } = await supabase
     .from('private_cases')
-    .select('id, title, kontaktperson, adress')
+    .select('id, title, kontaktperson, adress, skadedjur')
     .in('id', caseIds);
 
   // Hämta business cases
   const { data: businessCases } = await supabase
     .from('business_cases')
-    .select('id, title, kontaktperson, adress')
+    .select('id, title, kontaktperson, adress, skadedjur')
     .in('id', caseIds);
 
   // Skapa lookup maps
@@ -786,7 +820,7 @@ export async function getTickets(
 
   // Filtrera för tekniker om technicianId är angivet
   for (const comment of comments) {
-    let caseData: { title: string; kontaktperson: string | null; adress: string | null } | null = null;
+    let caseData: { title: string; kontaktperson: string | null; adress: any; skadedjur: string | null } | null = null;
 
     if (comment.case_type === 'private') {
       caseData = privateCaseMap.get(comment.case_id) || null;
@@ -825,7 +859,8 @@ export async function getTickets(
       case_type: comment.case_type as CaseType,
       case_title: caseData?.title || 'Okänt ärende',
       kontaktperson: caseData?.kontaktperson || null,
-      adress: caseData?.adress || null,
+      adress: formatAddress(caseData?.adress),
+      skadedjur: caseData?.skadedjur || null,
     });
   }
 

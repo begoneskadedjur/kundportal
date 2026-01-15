@@ -11,7 +11,8 @@ import {
   ChevronDown,
   Building2,
   Home,
-  ExternalLink
+  ExternalLink,
+  Bug
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Ticket, CommentStatus } from '../../services/communicationService';
@@ -38,7 +39,7 @@ export function TicketItem({ ticket, onStatusChange }: TicketItemProps) {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  const { comment, case_id, case_type, case_title, kontaktperson, adress } = ticket;
+  const { comment, case_id, case_type, case_title, kontaktperson, adress, skadedjur } = ticket;
   const status = comment.status || 'open';
   const statusConfig = STATUS_CONFIG[status];
 
@@ -60,15 +61,15 @@ export function TicketItem({ ticket, onStatusChange }: TicketItemProps) {
   };
 
   const handleClick = () => {
-    // Navigera till ärendet baserat på roll och ärendetyp
+    // Navigera till schedule-sidan och öppna ärendet med kommunikationsfliken
     const basePath = profile?.role === 'technician'
-      ? '/technician'
+      ? '/technician/schedule'
       : profile?.role === 'koordinator'
-        ? '/koordinator'
-        : '/admin';
+        ? '/koordinator/schema'
+        : '/koordinator/schema'; // Admin använder koordinator-schema
 
-    const caseTypePath = case_type === 'private' ? 'arende' : 'foretag';
-    navigate(`${basePath}/${caseTypePath}/${case_id}`);
+    // Öppna ärendet med query params för att öppna rätt case och visa kommunikation
+    navigate(`${basePath}?openCase=${case_id}&caseType=${case_type}&tab=communication`);
   };
 
   const timeAgo = formatDistanceToNow(new Date(comment.created_at), {
@@ -202,6 +203,14 @@ export function TicketItem({ ticket, onStatusChange }: TicketItemProps) {
           <div className="flex items-center gap-1.5">
             <MessageSquare className="w-3.5 h-3.5" />
             <span>{kontaktperson}</span>
+          </div>
+        )}
+
+        {/* Skadedjur */}
+        {skadedjur && (
+          <div className="flex items-center gap-1.5 text-orange-400">
+            <Bug className="w-3.5 h-3.5" />
+            <span>{skadedjur}</span>
           </div>
         )}
 
