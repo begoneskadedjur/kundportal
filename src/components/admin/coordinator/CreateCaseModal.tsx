@@ -5,11 +5,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import { useClickUpSync } from '../../../hooks/useClickUpSync';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
+import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard';
 
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
@@ -24,36 +25,24 @@ import "react-datepicker/dist/react-datepicker.css";
 
 registerLocale('sv', sv);
 
-// --- Hjälpfunktioner och Datatyper (oförändrade) ---
-const getTravelTimeColor = (minutes: number): string => {
-  if (minutes <= 20) return 'text-green-400';
-  if (minutes <= 35) return 'text-sky-400';
-  if (minutes <= 60) return 'text-orange-400';
-  return 'text-red-400';
-};
-const getEfficiencyScoreInfo = (score: number): { text: string; color: string; icon: React.ReactNode } => {
-    if (score >= 100) return { text: 'Utmärkt', color: 'text-green-400', icon: <Star size={14} /> };
-    if (score >= 85) return { text: 'Bra', color: 'text-sky-400', icon: <ThumbsUp size={14} /> };
-    if (score >= 60) return { text: 'OK', color: 'text-orange-400', icon: <Meh size={14} /> };
-    return { text: 'Låg', color: 'text-red-400', icon: <ThumbsDown size={14} /> };
-};
+// --- Hjälpfunktioner och Datatyper ---
 const formatCaseAddress = (address: any): string => {
   if (!address) return '';
   if (typeof address === 'string') { try { const parsed = JSON.parse(address); return parsed.formatted_address || address; } catch (e) { return address; } }
   return address.formatted_address || '';
 };
 
-interface SingleSuggestion {
-    technician_id: string; technician_name: string; start_time: string; end_time: string;
-    travel_time_minutes: number; origin_description: string; efficiency_score: number;
-    travel_time_home_minutes?: number;
-}
 interface TeamSuggestion {
     technicians: { id: string; name: string; travel_time_minutes: number; }[];
     start_time: string; end_time: string; efficiency_score: number;
 }
-const SuggestionDescription = ({ sugg }: { sugg: SingleSuggestion }) => {
-    return (<p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap">{sugg.origin_description}</p>);
+
+// Effektivitets-hjälpfunktion för team-förslag
+const getTeamEfficiencyInfo = (score: number): { label: string; color: string } => {
+  if (score >= 90) return { label: 'Optimal', color: 'text-emerald-400' };
+  if (score >= 70) return { label: 'Bra', color: 'text-blue-400' };
+  if (score >= 50) return { label: 'OK', color: 'text-amber-400' };
+  return { label: 'Låg', color: 'text-slate-400' };
 };
 
 interface CreateCaseModalProps {
@@ -724,57 +713,88 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
                   </div>
                   
-                  {/* Denna div tar upp resterande utrymme och visar förslagen */}
+                  {/* Resultat-sektion med förbättrad presentation */}
                   <div className="flex-grow">
-                      {suggestionLoading && <div className="text-center pt-4"><LoadingSpinner text="Analyserar rutter..." /></div>}
-                      {suggestions.length > 0 && (
-                        <div className="pt-4 border-t border-slate-700 space-y-2">
-                          <h4 className="text-md font-medium text-slate-300">Bokningsförslag (1 tekniker):</h4>
-                          {suggestions.map((sugg, index) => (
-                            <div key={index} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
-                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                                  <div className="font-semibold text-white truncate">{sugg.technician_name}</div>
-                                  <div className="flex items-center gap-3 text-xs sm:text-sm">
-                                      <div className={`font-bold flex items-center gap-1.5 ${getEfficiencyScoreInfo(sugg.efficiency_score).color}`}>{getEfficiencyScoreInfo(sugg.efficiency_score).icon} {getEfficiencyScoreInfo(sugg.efficiency_score).text}</div>
-                                      {sugg.travel_time_home_minutes != null && (<div className={`font-bold flex items-center gap-1.5 text-blue-400`}><Home size={12}/> {sugg.travel_time_home_minutes} min</div>)}
-                                      <div className={`font-bold flex items-center gap-1.5 ${getTravelTimeColor(sugg.travel_time_minutes)}`}><MapPin size={12}/> {sugg.travel_time_minutes} min</div>
-                                  </div>
-                                </div>
-                                <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                                <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                                <SuggestionDescription sugg={sugg} />
-                            </div>
-                          ))}
+                      {suggestionLoading && (
+                        <div className="text-center py-8">
+                          <LoadingSpinner text="Analyserar rutter och hittar optimala tider..." />
                         </div>
                       )}
+
+                      {/* Single technician suggestions - Använd ny komponent */}
+                      {suggestions.length > 0 && (
+                        <div className="pt-4 border-t border-slate-700">
+                          <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                            <CalendarSearch className="w-4 h-4 text-purple-400" />
+                            Bokningsförslag
+                          </h4>
+                          <div className="max-h-[400px] overflow-y-auto pr-1 -mr-1">
+                            <BookingSuggestionList
+                              suggestions={suggestions}
+                              onSelect={applySuggestion}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Team suggestions - Behåller befintlig styling men förbättrad */}
                       {teamSuggestions.length > 0 && (
-                        <div className="pt-4 border-t border-slate-700 space-y-2">
-                          <h4 className="text-md font-medium text-slate-300">Team-förslag ({numberOfTechnicians} tekniker):</h4>
-                          {teamSuggestions.map((sugg, index) => {
-                            const scoreInfo = getEfficiencyScoreInfo(sugg.efficiency_score);
-                            const totalTravel = sugg.technicians.reduce((sum, tech) => sum + tech.travel_time_minutes, 0);
-                            return (
-                              <div key={index} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applyTeamSuggestion(sugg)}>
-                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                                  <div className="font-semibold text-white">Teamförslag</div>
-                                  <div className="flex items-center gap-3 text-xs sm:text-sm">
-                                      <div className={`font-bold flex items-center gap-1.5 ${scoreInfo.color}`}>{scoreInfo.icon} {scoreInfo.text}</div>
-                                      <div className={`font-bold flex items-center gap-1.5 text-sky-400`}><Users size={12}/> Total restid: {totalTravel} min</div>
+                        <div className="pt-4 border-t border-slate-700 space-y-3">
+                          <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                            <Users className="w-4 h-4 text-blue-400" />
+                            Team-förslag ({numberOfTechnicians} tekniker)
+                          </h4>
+                          <div className="max-h-[400px] overflow-y-auto space-y-3 pr-1 -mr-1">
+                            {teamSuggestions.map((sugg, index) => {
+                              const scoreInfo = getTeamEfficiencyInfo(sugg.efficiency_score);
+                              const totalTravel = sugg.technicians.reduce((sum, tech) => sum + tech.travel_time_minutes, 0);
+                              const isTopPick = index === 0;
+                              return (
+                                <div
+                                  key={index}
+                                  className={`
+                                    relative p-4 rounded-xl cursor-pointer transition-all duration-200
+                                    ${isTopPick ? 'bg-emerald-500/10 border border-emerald-500/40' : 'bg-slate-700/50 border border-slate-600 hover:border-slate-500'}
+                                    hover:shadow-lg hover:shadow-slate-900/30
+                                  `}
+                                  onClick={() => applyTeamSuggestion(sugg)}
+                                >
+                                  {isTopPick && (
+                                    <div className="absolute -top-2 -right-2 px-2 py-1 bg-emerald-500 text-white text-xs font-bold rounded-full shadow-lg">
+                                      Bästa val
+                                    </div>
+                                  )}
+                                  <div className="flex items-start justify-between gap-3 mb-3">
+                                    <div>
+                                      <p className="font-semibold text-white">
+                                        {new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                      </p>
+                                      <p className="text-2xl font-bold text-white mt-1">
+                                        {formatTime(sugg.start_time)} – {formatTime(sugg.end_time)}
+                                      </p>
+                                    </div>
+                                    <div className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${scoreInfo.color} bg-slate-800`}>
+                                      {scoreInfo.label}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm text-blue-400 mb-3">
+                                    <Users className="w-4 h-4" />
+                                    <span>Total restid: {totalTravel} min</span>
+                                  </div>
+                                  <div className="pt-3 border-t border-slate-600/50 space-y-2">
+                                    {sugg.technicians.map(tech => (
+                                      <div key={tech.id} className="flex items-center justify-between text-sm">
+                                        <span className="text-slate-300">{tech.name}</span>
+                                        <span className="text-slate-500 font-mono text-xs">
+                                          {tech.travel_time_minutes} min restid
+                                        </span>
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
-                                <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                                <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                                <div className="mt-2 pt-2 border-t border-slate-600/50 space-y-1 text-xs text-slate-400">
-                                  {sugg.technicians.map(tech => (
-                                      <div key={tech.id} className="flex justify-between">
-                                          <span>{tech.name}</span>
-                                          <span className="font-mono">🚗 {tech.travel_time_minutes} min</span>
-                                      </div>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                   </div>
