@@ -29,7 +29,7 @@ import TechnicianDropdown from '../TechnicianDropdown'
 import CaseImageGallery, { CaseImageGalleryRef } from '../../shared/CaseImageGallery'
 
 // Kommunikation
-import { CommentSection } from '../../communication'
+import { CommunicationSlidePanel } from '../../communication'
 import { CaseType } from '../../../types/communication'
 
 // Datum-hjälpfunktioner för svensk tidszon
@@ -345,6 +345,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
   const [followUpPestType, setFollowUpPestType] = useState('')
   const [followUpLoading, setFollowUpLoading] = useState(false)
+
+  // Kommunikations-panel state
+  const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
 
   // Ref för bildgalleriet så vi kan anropa commitChanges
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
@@ -854,8 +857,22 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
   const showTimeTracking = (currentCase.case_type === 'private' || currentCase.case_type === 'business');
 
+  // Kontrollera om kommunikation kan visas
+  const showCommunication = currentCase && (currentCase.case_type === 'private' || currentCase.case_type === 'business');
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true} className="scroll-smooth">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true} className="scroll-smooth"
+      headerActions={showCommunication ? (
+        <button
+          type="button"
+          onClick={() => setShowCommunicationPanel(true)}
+          className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all duration-200"
+          title="Öppna kommunikation"
+        >
+          <MessageSquare className="w-5 h-5" />
+        </button>
+      ) : undefined}
+    >
       <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
         {/* Enhanced header with report, contract, and offer functionality */}
         {currentCase && (
@@ -1364,26 +1381,20 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
               </div>
             )}
 
-            {/* Aktivitet & Kommunikation */}
-            {currentCase && (currentCase.case_type === 'private' || currentCase.case_type === 'business') && (
-              <div className="space-y-4 pt-6 border-t border-slate-700">
-                <h3 className="text-lg font-medium text-white flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-purple-400" />
-                  Aktivitet & Kommunikation
-                </h3>
-                <p className="text-sm text-slate-400">
-                  Skriv kommentarer och använd @namn för att nämna kollegor. Systemhändelser loggas automatiskt.
-                </p>
-                <CommentSection
-                  caseId={currentCase.id}
-                  caseType={currentCase.case_type as CaseType}
-                  caseTitle={currentCase.title}
-                />
-              </div>
-            )}
           </div>
         </form>
       </div>
+
+      {/* Kommunikations-panel (slide-in från höger) */}
+      {showCommunication && (
+        <CommunicationSlidePanel
+          isOpen={showCommunicationPanel}
+          onClose={() => setShowCommunicationPanel(false)}
+          caseId={currentCase.id}
+          caseType={currentCase.case_type as CaseType}
+          caseTitle={currentCase.title}
+        />
+      )}
     </Modal>
   )
 }

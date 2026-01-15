@@ -16,6 +16,8 @@ interface ModalProps {
   preventClose?: boolean
   zIndex?: number
   usePortal?: boolean
+  headerActions?: React.ReactNode // Extra actions to show in header between title and close button
+  className?: string
 }
 
 export default function Modal({
@@ -28,7 +30,9 @@ export default function Modal({
   footer,
   preventClose = false,
   zIndex = 100,
-  usePortal = false
+  usePortal = false,
+  headerActions,
+  className
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
 
@@ -111,11 +115,14 @@ export default function Modal({
               <p className="text-slate-400 mt-1 truncate">{subtitle}</p>
             )}
           </div>
-          {!preventClose && (
-            <Button variant="ghost" size="sm" onClick={onClose} className="ml-4 flex-shrink-0">
-              <X className="w-4 h-4" />
-            </Button>
-          )}
+          <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+            {headerActions}
+            {!preventClose && (
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Content */}
