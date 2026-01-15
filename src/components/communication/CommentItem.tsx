@@ -49,8 +49,8 @@ export default function CommentItem({
 
   // Rendera @mentions med highlightning
   const renderContent = (text: string) => {
-    // Matcha @mentions och highlighta dem
-    const mentionRegex = /@(\w+)/g;
+    // Matcha @mentions och highlighta dem (inkl. svenska tecken åäöÅÄÖ)
+    const mentionRegex = /@([\wåäöÅÄÖ]+)/g;
     const parts: (string | JSX.Element)[] = [];
     let lastIndex = 0;
     let match;

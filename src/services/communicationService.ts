@@ -285,41 +285,61 @@ async function searchUsers(
 ): Promise<{ id: string; name: string; role: string; avatar_url?: string }[]> {
   const results: { id: string; name: string; role: string; avatar_url?: string }[] = [];
 
-  // Hämta tekniker med deras user_id och roll
-  let techQuery = supabase
-    .from('technicians')
-    .select('id, name, user_id, role')
+  // Hämta användare via profiles med join till technicians för namndata
+  // profiles.technician_id -> technicians.id (korrekt relation)
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select(`
+      id,
+      user_id,
+      display_name,
+      role,
+      technician_id,
+      technicians (
+        id,
+        name,
+        role
+      )
+    `)
     .eq('is_active', true)
-    .order('name');
+    .not('technician_id', 'is', null)
+    .neq('id', excludeUserId)
+    .order('display_name');
 
-  if (!showAll && query.length > 0) {
-    techQuery = techQuery.ilike('name', `%${query}%`);
+  if (error) {
+    console.error('Fel vid sökning efter användare:', error);
+    return results;
   }
 
-  const { data: technicians } = await techQuery.limit(showAll ? 20 : 10);
+  // Lägg till användare
+  if (profiles) {
+    for (const profile of profiles) {
+      // Hämta namn: display_name eller teknikerns namn
+      const techData = profile.technicians as { id: string; name: string; role: string } | null;
+      const displayName = profile.display_name || techData?.name || 'Okänd användare';
 
-  // Lägg till tekniker
-  if (technicians) {
-    for (const tech of technicians) {
-      if (tech.user_id && tech.user_id !== excludeUserId) {
-        // Mappa tekniker-roll till profile-roll
-        let profileRole = 'technician';
-        if (tech.role === 'Admin') profileRole = 'admin';
-        else if (tech.role === 'Koordinator') profileRole = 'koordinator';
-
-        // Filtrera på namn om query finns
-        if (query.length === 0 || tech.name.toLowerCase().includes(query.toLowerCase())) {
-          results.push({
-            id: tech.user_id,
-            name: tech.name,
-            role: profileRole,
-          });
+      // Filtrera på namn om query finns
+      const queryLower = query.toLowerCase();
+      if (query.length === 0 || displayName.toLowerCase().includes(queryLower)) {
+        // Mappa tekniker-roll till profile-roll om den saknas
+        let userRole = profile.role || 'technician';
+        if (!profile.role && techData?.role) {
+          if (techData.role === 'Admin') userRole = 'admin';
+          else if (techData.role === 'Koordinator') userRole = 'koordinator';
+          else userRole = 'technician';
         }
+
+        results.push({
+          id: profile.id, // profile.id är auth user id
+          name: displayName,
+          role: userRole,
+        });
       }
     }
   }
 
-  return results;
+  // Begränsa antal resultat
+  return results.slice(0, showAll ? 20 : 10);
 }
 
 async function getUserCountByRole(role: string): Promise<number> {

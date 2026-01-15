@@ -213,7 +213,7 @@ export default function CommentInput({
 
         {/* Mention suggestions */}
         {isOpen && (
-          <div className="absolute bottom-full left-0 mb-2">
+          <div className="absolute bottom-full left-0 mb-2 z-[200]">
             <MentionSuggestions
               suggestions={suggestions}
               selectedIndex={selectedIndex}

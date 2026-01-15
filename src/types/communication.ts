@@ -216,12 +216,14 @@ export function truncatePreview(text: string, maxLength: number = 100): string {
 }
 
 export function getMentionTriggerRegex(): RegExp {
-  return /@(\w*)$/;
+  // Inkludera svenska bokstäver (åäöÅÄÖ) samt vanliga tecken
+  return /@([\wåäöÅÄÖ]*)$/;
 }
 
 export function extractMentions(text: string): ParsedMention[] {
   const mentions: ParsedMention[] = [];
-  const regex = /@(\w+)/g;
+  // Inkludera svenska bokstäver (åäöÅÄÖ) i regex
+  const regex = /@([\wåäöÅÄÖ]+)/g;
   let match;
 
   while ((match = regex.exec(text)) !== null) {
