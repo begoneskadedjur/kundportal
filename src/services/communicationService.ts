@@ -590,18 +590,10 @@ export async function markCommentAsRead(
 export async function getReadReceipts(
   commentId: string
 ): Promise<{ userId: string; userName: string; readAt: string }[]> {
-  const { data, error } = await supabase
+  // Steg 1: Hämta läsbekräftelser
+  const { data: receipts, error } = await supabase
     .from('comment_read_receipts')
-    .select(`
-      user_id,
-      read_at,
-      profiles!inner (
-        display_name,
-        technicians (
-          name
-        )
-      )
-    `)
+    .select('user_id, read_at')
     .eq('comment_id', commentId);
 
   if (error) {
@@ -609,9 +601,48 @@ export async function getReadReceipts(
     return [];
   }
 
-  return (data || []).map((receipt: any) => ({
+  if (!receipts || receipts.length === 0) {
+    return [];
+  }
+
+  // Steg 2: Hämta användarnamn från profiles separat
+  const userIds = receipts.map(r => r.user_id);
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, display_name, technician_id')
+    .in('id', userIds);
+
+  // Skapa en map för snabb lookup
+  const profileMap = new Map<string, string>();
+
+  if (profiles) {
+    // Hämta technician-namn för de som har technician_id
+    const technicianIds = profiles
+      .filter(p => p.technician_id)
+      .map(p => p.technician_id);
+
+    let technicianMap = new Map<string, string>();
+    if (technicianIds.length > 0) {
+      const { data: technicians } = await supabase
+        .from('technicians')
+        .select('id, name')
+        .in('id', technicianIds);
+
+      if (technicians) {
+        technicians.forEach(t => technicianMap.set(t.id, t.name));
+      }
+    }
+
+    // Bygg profileMap med bästa tillgängliga namn
+    profiles.forEach(p => {
+      const techName = p.technician_id ? technicianMap.get(p.technician_id) : null;
+      profileMap.set(p.id, p.display_name || techName || 'Okänd');
+    });
+  }
+
+  return receipts.map((receipt) => ({
     userId: receipt.user_id,
-    userName: receipt.profiles?.display_name || receipt.profiles?.technicians?.name || 'Okänd',
+    userName: profileMap.get(receipt.user_id) || 'Okänd',
     readAt: receipt.read_at,
   }));
 }
