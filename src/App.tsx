@@ -83,6 +83,10 @@ import OrganisationOversikt from './pages/organisation/shared/Oversikt';
 import ProtectedRoute from './components/shared/ProtectedRoute'
 import AdminOrKoordinatorRoute from './components/shared/AdminOrKoordinatorRoute';
 import MultisiteProtectedRoute from './components/shared/MultisiteProtectedRoute';
+import { AppLayout } from './components/shared/AppLayout';
+
+// Intern Administration (shared page)
+import InternAdministration from './pages/shared/InternAdministration';
 
 // Global styles
 import './styles/globals.css';
@@ -92,6 +96,7 @@ function App() {
     <Router>
       <AuthProvider>
         <MultisiteProvider>
+          <AppLayout>
           <div className="min-h-screen bg-slate-950">
             <Routes>
             {/* Public routes */}
@@ -657,6 +662,32 @@ function App() {
             <Route path="/portal" element={<Navigate to="/customer" replace />} />
             <Route path="/customer/portal" element={<Navigate to="/customer" replace />} />
 
+            {/* Intern Administration Routes */}
+            <Route
+              path="/admin/intern-administration"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <InternAdministration />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/koordinator/intern-administration"
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <InternAdministration />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/technician/intern-administration"
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <InternAdministration />
+                </ProtectedRoute>
+              }
+            />
+
             {/* 404 fallback */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
@@ -685,6 +716,7 @@ function App() {
             }}
           />
         </div>
+        </AppLayout>
         </MultisiteProvider>
       </AuthProvider>
     </Router>

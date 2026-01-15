@@ -17,7 +17,11 @@ import {
   ROLE_MENTIONS,
   extractMentions,
   truncatePreview,
+  CommentStatus,
 } from '../types/communication';
+
+// Re-export types for consumers
+export type { CommentStatus, CaseType };
 
 // === KOMMENTARER ===
 
@@ -687,4 +691,175 @@ export async function updateCommentStatus(
     console.error('Fel vid uppdatering av kommentarsstatus:', error);
     throw error;
   }
+}
+
+// === TICKETS (KOMMENTARER MED @MENTIONS) ===
+
+export interface Ticket {
+  comment: CaseComment;
+  case_id: string;
+  case_type: CaseType;
+  case_title: string;
+  kontaktperson: string | null;
+  adress: string | null;
+}
+
+export interface TicketFilter {
+  status?: ('open' | 'in_progress' | 'resolved' | 'needs_action')[];
+  searchQuery?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  technicianId?: string; // För tekniker: filtrera på deras ärenden
+}
+
+export interface TicketStats {
+  open: number;
+  inProgress: number;
+  needsAction: number;
+  resolved: number;
+}
+
+export async function getTickets(
+  filter: TicketFilter,
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ tickets: Ticket[]; totalCount: number }> {
+  // Bygg query för kommentarer med mentions
+  let query = supabase
+    .from('case_comments')
+    .select('*', { count: 'exact' })
+    .eq('is_system_comment', false);
+
+  // Filtrera på status
+  if (filter.status && filter.status.length > 0) {
+    query = query.in('status', filter.status);
+  }
+
+  // Sök i innehåll
+  if (filter.searchQuery && filter.searchQuery.trim()) {
+    query = query.ilike('content', `%${filter.searchQuery.trim()}%`);
+  }
+
+  // Datumfilter
+  if (filter.dateFrom) {
+    query = query.gte('created_at', filter.dateFrom);
+  }
+  if (filter.dateTo) {
+    query = query.lte('created_at', filter.dateTo);
+  }
+
+  // Sortera och paginera
+  query = query
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  const { data: comments, error, count } = await query;
+
+  if (error) {
+    console.error('Fel vid hämtning av tickets:', error);
+    throw error;
+  }
+
+  if (!comments || comments.length === 0) {
+    return { tickets: [], totalCount: 0 };
+  }
+
+  // Hämta ärendeinformation för varje kommentar
+  const caseIds = [...new Set(comments.map(c => c.case_id))];
+  const tickets: Ticket[] = [];
+
+  // Hämta private cases
+  const { data: privateCases } = await supabase
+    .from('private_cases')
+    .select('id, title, kontaktperson, adress')
+    .in('id', caseIds);
+
+  // Hämta business cases
+  const { data: businessCases } = await supabase
+    .from('business_cases')
+    .select('id, title, kontaktperson, adress')
+    .in('id', caseIds);
+
+  // Skapa lookup maps
+  const privateCaseMap = new Map(privateCases?.map(c => [c.id, c]) || []);
+  const businessCaseMap = new Map(businessCases?.map(c => [c.id, c]) || []);
+
+  // Filtrera för tekniker om technicianId är angivet
+  for (const comment of comments) {
+    let caseData: { title: string; kontaktperson: string | null; adress: string | null } | null = null;
+
+    if (comment.case_type === 'private') {
+      caseData = privateCaseMap.get(comment.case_id) || null;
+    } else if (comment.case_type === 'business') {
+      caseData = businessCaseMap.get(comment.case_id) || null;
+    }
+
+    // Om vi filtrerar för tekniker, kontrollera om de är tilldelade
+    if (filter.technicianId) {
+      // Hämta ärende för att kolla assignees
+      const { data: caseAssignee } = await supabase
+        .from(comment.case_type === 'private' ? 'private_cases' : 'business_cases')
+        .select('primary_assignee_id, secondary_assignee_id, tertiary_assignee_id')
+        .eq('id', comment.case_id)
+        .single();
+
+      if (caseAssignee) {
+        const isAssigned =
+          caseAssignee.primary_assignee_id === filter.technicianId ||
+          caseAssignee.secondary_assignee_id === filter.technicianId ||
+          caseAssignee.tertiary_assignee_id === filter.technicianId;
+
+        // Inkludera också om teknikern är nämnd i kommentaren
+        const isMentioned = comment.mentioned_user_ids?.includes(filter.technicianId) ||
+          comment.author_id === filter.technicianId;
+
+        if (!isAssigned && !isMentioned) {
+          continue; // Hoppa över denna ticket
+        }
+      }
+    }
+
+    tickets.push({
+      comment: comment as CaseComment,
+      case_id: comment.case_id,
+      case_type: comment.case_type as CaseType,
+      case_title: caseData?.title || 'Okänt ärende',
+      kontaktperson: caseData?.kontaktperson || null,
+      adress: caseData?.adress || null,
+    });
+  }
+
+  return {
+    tickets,
+    totalCount: count || 0,
+  };
+}
+
+export async function getTicketStats(technicianId?: string): Promise<TicketStats> {
+  // Bygg grundquery
+  const buildQuery = (status: string) => {
+    let query = supabase
+      .from('case_comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_system_comment', false)
+      .eq('status', status);
+
+    return query;
+  };
+
+  // Kör alla queries parallellt
+  const [openRes, inProgressRes, needsActionRes, resolvedRes] = await Promise.all([
+    buildQuery('open'),
+    buildQuery('in_progress'),
+    buildQuery('needs_action'),
+    buildQuery('resolved')
+      .gte('resolved_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()), // Senaste 30 dagarna
+  ]);
+
+  return {
+    open: openRes.count || 0,
+    inProgress: inProgressRes.count || 0,
+    needsAction: needsActionRes.count || 0,
+    resolved: resolvedRes.count || 0,
+  };
 }
