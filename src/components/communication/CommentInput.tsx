@@ -1,13 +1,14 @@
 // src/components/communication/CommentInput.tsx
 // Textfält med @mention-stöd och bilduppladdning
+// FÖRENKLAD: Visar bara @Namn i textarea, skickar IDs separat
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Send, Paperclip, Image as ImageIcon, X, Loader2 } from 'lucide-react';
-import { useMentions } from '../../hooks/useMentions';
+import { useMentions, TrackedMention } from '../../hooks/useMentions';
 import MentionSuggestions from './MentionSuggestions';
 
 interface CommentInputProps {
-  onSubmit: (content: string, attachments?: File[]) => Promise<void>;
+  onSubmit: (content: string, attachments?: File[], mentions?: TrackedMention[]) => Promise<void>;
   isSubmitting: boolean;
   placeholder?: string;
   autoFocus?: boolean;
@@ -32,10 +33,12 @@ export default function CommentInput({
     suggestions,
     isOpen,
     selectedIndex,
+    mentionedUsers,
     handleInputChange,
     handleKeyDown,
     selectSuggestion,
     closeSuggestions,
+    clearMentions,
   } = useMentions(content, setContent);
 
   // Auto-resize textarea
@@ -137,11 +140,17 @@ export default function CommentInput({
     if (isSubmitting) return;
     if (!content.trim() && attachments.length === 0) return;
 
-    await onSubmit(content, attachments.length > 0 ? attachments : undefined);
+    // Skicka med mentions-data separat
+    await onSubmit(
+      content,
+      attachments.length > 0 ? attachments : undefined,
+      mentionedUsers.length > 0 ? mentionedUsers : undefined
+    );
 
     // Rensa
     setContent('');
     setAttachments([]);
+    clearMentions(); // Rensa spårade mentions
     previewUrls.forEach(url => url && URL.revokeObjectURL(url));
     setPreviewUrls([]);
 

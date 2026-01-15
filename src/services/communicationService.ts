@@ -40,26 +40,11 @@ export async function createComment(
   comment: CaseCommentInsert,
   caseTitle?: string
 ): Promise<CaseComment> {
-  // Extrahera mentions från innehållet
-  const parsedMentions = extractMentions(comment.content);
-  const mentionedUserIds: string[] = [];
-  const mentionedRoles: string[] = [];
-  let mentionsAll = false;
-
-  // Samla unika användar-IDs och roller
-  for (const mention of parsedMentions) {
-    if (mention.type === 'all') {
-      mentionsAll = true;
-    } else if (mention.type === 'role' && mention.role) {
-      if (!mentionedRoles.includes(mention.role)) {
-        mentionedRoles.push(mention.role);
-      }
-    } else if (mention.type === 'user' && mention.userId) {
-      if (!mentionedUserIds.includes(mention.userId)) {
-        mentionedUserIds.push(mention.userId);
-      }
-    }
-  }
+  // FÖRENKLAD: Mentions-data skickas nu direkt i comment-objektet
+  // från useCaseComments hook istället för att extraheras från text
+  const mentionedUserIds = comment.mentioned_user_ids || [];
+  const mentionedRoles = comment.mentioned_roles || [];
+  const mentionsAll = comment.mentions_all || false;
 
   // Skapa kommentaren
   const { data, error } = await supabase

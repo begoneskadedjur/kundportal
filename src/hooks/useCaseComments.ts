@@ -1,5 +1,6 @@
 // src/hooks/useCaseComments.ts
 // Hook för att hantera kommentarer på ärenden
+// FÖRENKLAD: Tar emot mentions separat från text
 
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -18,6 +19,7 @@ import {
   uploadCommentAttachment,
 } from '../services/communicationService';
 import { useAuth } from '../contexts/AuthContext';
+import { TrackedMention } from './useMentions';
 import toast from 'react-hot-toast';
 
 interface UseCaseCommentsOptions {
@@ -31,7 +33,7 @@ interface UseCaseCommentsReturn {
   isLoading: boolean;
   isSubmitting: boolean;
   error: string | null;
-  addComment: (content: string, attachments?: File[]) => Promise<void>;
+  addComment: (content: string, attachments?: File[], mentions?: TrackedMention[]) => Promise<void>;
   editComment: (commentId: string, content: string) => Promise<void>;
   removeComment: (commentId: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -90,9 +92,9 @@ export function useCaseComments({
     return unsubscribe;
   }, [caseId, caseType, fetchComments]);
 
-  // Lägg till kommentar
+  // Lägg till kommentar - FÖRENKLAD: tar emot mentions separat
   const addComment = useCallback(
-    async (content: string, attachments?: File[]) => {
+    async (content: string, attachments?: File[], mentions?: TrackedMention[]) => {
       if (!user || !profile) {
         toast.error('Du måste vara inloggad för att kommentera');
         return;
@@ -118,6 +120,27 @@ export function useCaseComments({
         // Hämta användarnamn
         const authorName = await getAuthorName(user.id, profile.role);
 
+        // Extrahera mentions-data från TrackedMention[]
+        const mentionedUserIds: string[] = [];
+        const mentionedRoles: string[] = [];
+        let mentionsAll = false;
+
+        if (mentions && mentions.length > 0) {
+          for (const mention of mentions) {
+            if (mention.type === 'all') {
+              mentionsAll = true;
+            } else if (mention.type === 'role' && mention.role) {
+              if (!mentionedRoles.includes(mention.role)) {
+                mentionedRoles.push(mention.role);
+              }
+            } else if (mention.type === 'user') {
+              if (!mentionedUserIds.includes(mention.userId)) {
+                mentionedUserIds.push(mention.userId);
+              }
+            }
+          }
+        }
+
         const commentData: CaseCommentInsert = {
           case_id: caseId,
           case_type: caseType,
@@ -126,6 +149,9 @@ export function useCaseComments({
           author_role: profile.role as AuthorRole,
           content: content.trim(),
           attachments: uploadedAttachments,
+          mentioned_user_ids: mentionedUserIds,
+          mentioned_roles: mentionedRoles,
+          mentions_all: mentionsAll,
         };
 
         const newComment = await createComment(commentData, caseTitle);

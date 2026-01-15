@@ -1,20 +1,31 @@
 // src/hooks/useMentions.ts
 // Hook för @mention-funktionalitet med autocomplete
+// FÖRENKLAD: Visar bara @Namn i textarea, sparar IDs separat
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { MentionSuggestion, getMentionTriggerRegex } from '../types/communication';
 import { getMentionSuggestions } from '../services/communicationService';
 import { useAuth } from '../contexts/AuthContext';
 
+// Typ för en spårad mention med ID
+export interface TrackedMention {
+  userId: string;
+  displayName: string;
+  type: 'user' | 'role' | 'all';
+  role?: string;
+}
+
 interface UseMentionsReturn {
   suggestions: MentionSuggestion[];
   isOpen: boolean;
   selectedIndex: number;
   searchQuery: string;
+  mentionedUsers: TrackedMention[];
   handleInputChange: (text: string, cursorPosition: number) => void;
   handleKeyDown: (e: React.KeyboardEvent) => boolean;
   selectSuggestion: (suggestion: MentionSuggestion) => string;
   closeSuggestions: () => void;
+  clearMentions: () => void;
 }
 
 export function useMentions(
@@ -27,6 +38,7 @@ export function useMentions(
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
+  const [mentionedUsers, setMentionedUsers] = useState<TrackedMention[]>([]);
   const debounceRef = useRef<NodeJS.Timeout>();
 
   // Hantera textändring
@@ -112,7 +124,7 @@ export function useMentions(
     [isOpen, suggestions, selectedIndex, onTextChange]
   );
 
-  // Välj en suggestion
+  // Välj en suggestion - FÖRENKLAD: visar bara @Namn, sparar ID separat
   const selectSuggestion = useCallback(
     (suggestion: MentionSuggestion): string => {
       const textBeforeMention = currentText.substring(0, mentionStartIndex);
@@ -120,16 +132,46 @@ export function useMentions(
         mentionStartIndex + searchQuery.length + 1
       );
 
-      let mentionText: string;
+      // Visa ENDAST det snygga formatet: @Förnamn Efternamn
+      // Ingen teknisk info i texten - allt sparas i mentionedUsers
+      const cleanDisplayName = suggestion.displayName.replace(/^@/, '');
+      const mentionText = `@${cleanDisplayName}`;
+
+      // Spara mention-info separat för notifikationer
       if (suggestion.type === 'user' && suggestion.id) {
-        // För användare, inkludera ID i ett speciellt format: @[Namn](user:ID)
-        mentionText = `@[${suggestion.displayName}](user:${suggestion.id})`;
+        // Lägg till användare om den inte redan finns
+        setMentionedUsers(prev => {
+          const exists = prev.some(m => m.userId === suggestion.id);
+          if (exists) return prev;
+          return [...prev, {
+            userId: suggestion.id!,
+            displayName: suggestion.displayName,
+            type: 'user'
+          }];
+        });
       } else if (suggestion.type === 'role' && suggestion.role) {
-        // För roller, behåll vanligt format
-        mentionText = suggestion.displayName;
-      } else {
-        // För @alla
-        mentionText = suggestion.displayName;
+        // Spåra roll-mention
+        setMentionedUsers(prev => {
+          const exists = prev.some(m => m.type === 'role' && m.role === suggestion.role);
+          if (exists) return prev;
+          return [...prev, {
+            userId: `role:${suggestion.role}`,
+            displayName: suggestion.displayName,
+            type: 'role',
+            role: suggestion.role
+          }];
+        });
+      } else if (suggestion.type === 'all') {
+        // Spåra @alla
+        setMentionedUsers(prev => {
+          const exists = prev.some(m => m.type === 'all');
+          if (exists) return prev;
+          return [...prev, {
+            userId: 'all',
+            displayName: '@alla',
+            type: 'all'
+          }];
+        });
       }
 
       const newText = textBeforeMention + mentionText + ' ' + textAfterCursor;
@@ -139,6 +181,11 @@ export function useMentions(
     },
     [currentText, mentionStartIndex, searchQuery]
   );
+
+  // Rensa alla spårade mentions (vid submit)
+  const clearMentions = useCallback(() => {
+    setMentionedUsers([]);
+  }, []);
 
   // Stäng suggestions
   const closeSuggestions = useCallback(() => {
@@ -163,9 +210,11 @@ export function useMentions(
     isOpen,
     selectedIndex,
     searchQuery,
+    mentionedUsers,
     handleInputChange,
     handleKeyDown,
     selectSuggestion,
     closeSuggestions,
+    clearMentions,
   };
 }

@@ -48,29 +48,29 @@ export default function CommentItem({
   const roleColors = ROLE_COLORS[comment.author_role as AuthorRole] || ROLE_COLORS.technician;
 
   // Rendera @mentions med highlightning
+  // FÖRENKLAD: Stöder nu både gamla formatet @[Namn](user:ID) och nya @Namn
   const renderContent = (text: string) => {
     const parts: (string | JSX.Element)[] = [];
     let lastIndex = 0;
 
-    // Först: Matcha det nya formatet @[Namn](user:ID)
-    const userMentionRegex = /@\[([^\]]+)\]\(user:[^)]+\)/g;
-    const matches: { index: number; length: number; displayName: string; isUser: boolean }[] = [];
+    const matches: { index: number; length: number; displayName: string; isRole: boolean }[] = [];
 
-    let userMatch;
-    while ((userMatch = userMentionRegex.exec(text)) !== null) {
+    // 1. Matcha gamla formatet @[Namn](user:ID) för bakåtkompatibilitet
+    const oldFormatRegex = /@\[([^\]]+)\]\(user:[^)]+\)/g;
+    let oldMatch;
+    while ((oldMatch = oldFormatRegex.exec(text)) !== null) {
       matches.push({
-        index: userMatch.index,
-        length: userMatch[0].length,
-        displayName: userMatch[1],
-        isUser: true
+        index: oldMatch.index,
+        length: oldMatch[0].length,
+        displayName: oldMatch[1],
+        isRole: false
       });
     }
 
-    // Sedan: Matcha roll-mentions (@tekniker, @koordinator, @admin, @alla)
+    // 2. Matcha roll-mentions (@tekniker, @koordinator, @admin, @alla)
     const roleRegex = /@(tekniker|koordinator|admin|alla)\b/gi;
     let roleMatch;
     while ((roleMatch = roleRegex.exec(text)) !== null) {
-      // Kontrollera att denna position inte redan är en user mention
       const isOverlapping = matches.some(m =>
         roleMatch!.index >= m.index && roleMatch!.index < m.index + m.length
       );
@@ -78,8 +78,29 @@ export default function CommentItem({
         matches.push({
           index: roleMatch.index,
           length: roleMatch[0].length,
-          displayName: roleMatch[0],
-          isUser: false
+          displayName: roleMatch[1], // Bara namnet utan @
+          isRole: true
+        });
+      }
+    }
+
+    // 3. Matcha nya formatet @Namn (användarnamn med flera ord)
+    // Regex: @ följt av minst 2 tecken som innehåller svenska bokstäver och mellanslag
+    const newFormatRegex = /@([A-ZÅÄÖ][a-zåäö]+(?:\s+[A-ZÅÄÖ][a-zåäö]+)*)/g;
+    let newMatch;
+    while ((newMatch = newFormatRegex.exec(text)) !== null) {
+      const isOverlapping = matches.some(m =>
+        (newMatch!.index >= m.index && newMatch!.index < m.index + m.length) ||
+        (m.index >= newMatch!.index && m.index < newMatch!.index + newMatch![0].length)
+      );
+      // Hoppa över om det är en roll-mention
+      const isRoleMention = ['tekniker', 'koordinator', 'admin', 'alla'].includes(newMatch[1].toLowerCase());
+      if (!isOverlapping && !isRoleMention) {
+        matches.push({
+          index: newMatch.index,
+          length: newMatch[0].length,
+          displayName: newMatch[1],
+          isRole: false
         });
       }
     }
@@ -94,15 +115,15 @@ export default function CommentItem({
         parts.push(text.substring(lastIndex, match.index));
       }
 
-      // Mention med highlight
+      // Mention med highlight - användare är gröna, roller är lila
       parts.push(
         <span
           key={match.index}
           className={`
             px-1.5 py-0.5 rounded font-medium
-            ${match.isUser
-              ? 'bg-[#20c58f]/20 text-[#20c58f]'
-              : 'bg-purple-500/20 text-purple-400'
+            ${match.isRole
+              ? 'bg-purple-500/20 text-purple-400'
+              : 'bg-[#20c58f]/20 text-[#20c58f]'
             }
           `}
         >
