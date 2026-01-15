@@ -276,8 +276,8 @@ async function searchUsers(
 ): Promise<{ id: string; name: string; role: string; avatar_url?: string }[]> {
   const results: { id: string; name: string; role: string; avatar_url?: string }[] = [];
 
-  // Hämta ALLA aktiva användare (admins, koordinatorer och tekniker)
-  // Borttagen: .not('technician_id', 'is', null) som blockerade admins/koordinatorer
+  // Hämta ENDAST interna användare (admins, koordinatorer och tekniker)
+  // Filtrerar bort kunder (role = 'customer')
   const { data: profiles, error } = await supabase
     .from('profiles')
     .select(`
@@ -293,6 +293,7 @@ async function searchUsers(
       )
     `)
     .eq('is_active', true)
+    .in('role', ['admin', 'koordinator', 'technician'])
     .neq('id', excludeUserId)
     .order('display_name');
 
@@ -328,8 +329,11 @@ async function searchUsers(
     }
   }
 
-  // Begränsa antal resultat
-  return results.slice(0, showAll ? 20 : 10);
+  // Sortera efter namn (alfabetiskt) och begränsa antal resultat
+  // Filtrera bort "Okänd användare" (admins utan display_name)
+  const filteredResults = results.filter(r => r.name !== 'Okänd användare');
+  filteredResults.sort((a, b) => a.name.localeCompare(b.name, 'sv'));
+  return filteredResults.slice(0, showAll ? 20 : 10);
 }
 
 async function getUserCountByRole(role: string): Promise<number> {
