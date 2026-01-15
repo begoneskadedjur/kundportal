@@ -1,0 +1,213 @@
+// src/hooks/useCaseComments.ts
+// Hook för att hantera kommentarer på ärenden
+
+import { useState, useEffect, useCallback } from 'react';
+import {
+  CaseComment,
+  CaseCommentInsert,
+  CaseType,
+  AuthorRole,
+  CommentAttachment,
+} from '../types/communication';
+import {
+  getCommentsByCase,
+  createComment,
+  updateComment,
+  deleteComment,
+  subscribeToComments,
+  uploadCommentAttachment,
+} from '../services/communicationService';
+import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
+
+interface UseCaseCommentsOptions {
+  caseId: string;
+  caseType: CaseType;
+  caseTitle?: string;
+}
+
+interface UseCaseCommentsReturn {
+  comments: CaseComment[];
+  isLoading: boolean;
+  isSubmitting: boolean;
+  error: string | null;
+  addComment: (content: string, attachments?: File[]) => Promise<void>;
+  editComment: (commentId: string, content: string) => Promise<void>;
+  removeComment: (commentId: string) => Promise<void>;
+  refresh: () => Promise<void>;
+}
+
+export function useCaseComments({
+  caseId,
+  caseType,
+  caseTitle,
+}: UseCaseCommentsOptions): UseCaseCommentsReturn {
+  const { user, profile } = useAuth();
+  const [comments, setComments] = useState<CaseComment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Hämta kommentarer
+  const fetchComments = useCallback(async () => {
+    if (!caseId) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await getCommentsByCase(caseId, caseType);
+      setComments(data);
+    } catch (err) {
+      console.error('Fel vid hämtning av kommentarer:', err);
+      setError('Kunde inte hämta kommentarer');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [caseId, caseType]);
+
+  // Prenumerera på realtidsuppdateringar
+  useEffect(() => {
+    if (!caseId) return;
+
+    fetchComments();
+
+    const unsubscribe = subscribeToComments(
+      caseId,
+      caseType,
+      (newComment) => {
+        setComments((prev) => [...prev, newComment]);
+      },
+      (updatedComment) => {
+        setComments((prev) =>
+          prev.map((c) => (c.id === updatedComment.id ? updatedComment : c))
+        );
+      },
+      (deletedId) => {
+        setComments((prev) => prev.filter((c) => c.id !== deletedId));
+      }
+    );
+
+    return unsubscribe;
+  }, [caseId, caseType, fetchComments]);
+
+  // Lägg till kommentar
+  const addComment = useCallback(
+    async (content: string, attachments?: File[]) => {
+      if (!user || !profile) {
+        toast.error('Du måste vara inloggad för att kommentera');
+        return;
+      }
+
+      if (!content.trim() && (!attachments || attachments.length === 0)) {
+        toast.error('Kommentaren kan inte vara tom');
+        return;
+      }
+
+      try {
+        setIsSubmitting(true);
+
+        // Ladda upp bilagor först
+        const uploadedAttachments: CommentAttachment[] = [];
+        if (attachments && attachments.length > 0) {
+          for (const file of attachments) {
+            const attachment = await uploadCommentAttachment(file, user.id);
+            uploadedAttachments.push(attachment);
+          }
+        }
+
+        // Hämta användarnamn
+        const authorName = await getAuthorName(user.id, profile.role);
+
+        const commentData: CaseCommentInsert = {
+          case_id: caseId,
+          case_type: caseType,
+          author_id: user.id,
+          author_name: authorName,
+          author_role: profile.role as AuthorRole,
+          content: content.trim(),
+          attachments: uploadedAttachments,
+        };
+
+        await createComment(commentData, caseTitle);
+        // Kommentaren läggs till via realtime subscription
+      } catch (err) {
+        console.error('Fel vid skapande av kommentar:', err);
+        toast.error('Kunde inte skapa kommentar');
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [user, profile, caseId, caseType, caseTitle]
+  );
+
+  // Redigera kommentar
+  const editComment = useCallback(
+    async (commentId: string, content: string) => {
+      if (!content.trim()) {
+        toast.error('Kommentaren kan inte vara tom');
+        return;
+      }
+
+      try {
+        setIsSubmitting(true);
+        await updateComment(commentId, { content: content.trim() });
+        toast.success('Kommentar uppdaterad');
+      } catch (err) {
+        console.error('Fel vid uppdatering av kommentar:', err);
+        toast.error('Kunde inte uppdatera kommentar');
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    []
+  );
+
+  // Ta bort kommentar
+  const removeComment = useCallback(async (commentId: string) => {
+    try {
+      setIsSubmitting(true);
+      await deleteComment(commentId);
+      toast.success('Kommentar borttagen');
+    } catch (err) {
+      console.error('Fel vid borttagning av kommentar:', err);
+      toast.error('Kunde inte ta bort kommentar');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, []);
+
+  return {
+    comments,
+    isLoading,
+    isSubmitting,
+    error,
+    addComment,
+    editComment,
+    removeComment,
+    refresh: fetchComments,
+  };
+}
+
+// Hjälpfunktion för att hämta användarnamn
+async function getAuthorName(userId: string, role: string): Promise<string> {
+  // Försök hämta från technicians-tabellen först
+  if (role === 'technician') {
+    const { supabase } = await import('../lib/supabase');
+    const { data } = await supabase
+      .from('technicians')
+      .select('name')
+      .eq('user_id', userId)
+      .single();
+
+    if (data?.name) return data.name;
+  }
+
+  // Fallback till generic namn baserat på roll
+  const roleNames: Record<string, string> = {
+    admin: 'Admin',
+    koordinator: 'Koordinator',
+    technician: 'Tekniker',
+  };
+
+  return roleNames[role] || 'Användare';
+}

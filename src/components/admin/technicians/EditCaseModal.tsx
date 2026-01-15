@@ -1,10 +1,10 @@
 // 📁 src/components/admin/technicians/EditCaseModal.tsx
-// ⭐ VERSION 2.2 - ANVÄNDER ANPASSAD SVENSK DATUMVÄLJARE ⭐
+// ⭐ VERSION 2.3 - LÄGGER TILL AKTIVITET & KOMMUNIKATION ⭐
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useClickUpSync } from '../../../hooks/useClickUpSync'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -27,6 +27,10 @@ import TechnicianDropdown from '../TechnicianDropdown'
 
 // Bildhantering - med draft-läge
 import CaseImageGallery, { CaseImageGalleryRef } from '../../shared/CaseImageGallery'
+
+// Kommunikation
+import { CommentSection } from '../../communication'
+import { CaseType } from '../../../types/communication'
 
 // Datum-hjälpfunktioner för svensk tidszon
 import { toSwedishISOString } from '../../../utils/dateHelpers'
@@ -1356,6 +1360,24 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                   draftMode={true}
                   userId={profile?.id}
                   onPendingChangesUpdate={setHasPendingImageChanges}
+                />
+              </div>
+            )}
+
+            {/* Aktivitet & Kommunikation */}
+            {currentCase && (currentCase.case_type === 'private' || currentCase.case_type === 'business') && (
+              <div className="space-y-4 pt-6 border-t border-slate-700">
+                <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-purple-400" />
+                  Aktivitet & Kommunikation
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Skriv kommentarer och använd @namn för att nämna kollegor. Systemhändelser loggas automatiskt.
+                </p>
+                <CommentSection
+                  caseId={currentCase.id}
+                  caseType={currentCase.case_type as CaseType}
+                  caseTitle={currentCase.title}
                 />
               </div>
             )}

@@ -1,13 +1,13 @@
 // 📁 src/pages/coordinator/CaseSearch.tsx
-// ⭐ Dedikerad söksida för ärenden med avancerade filter ⭐
+// ⭐ VERSION 2.0 - Med kommentarsökning ⭐
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '../../components/shared';
 import { supabase } from '../../lib/supabase';
 import { BeGoneCaseRow } from '../../types/database';
-import { 
-  Search, 
-  Filter, 
+import {
+  Search,
+  Filter,
   Calendar,
   User,
   MapPin,
@@ -29,12 +29,15 @@ import {
   CircleX,
   CircleDot,
   Edit,
-  Pencil
+  Pencil,
+  MessageSquare
 } from 'lucide-react';
 import { formatAddress } from '../../utils/addressFormatter';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
+import { searchComments } from '../../services/communicationService';
+import { CaseComment } from '../../types/communication';
 
 interface FilterState {
   searchQuery: string;
@@ -46,6 +49,14 @@ interface FilterState {
   };
   caseType: string[];
   priority: string[];
+  includeComments: boolean; // Söka även i kommentarer
+}
+
+// Typ för att tracka kommentarsträffar per ärende
+interface CommentMatch {
+  caseId: string;
+  caseType: 'private' | 'business' | 'contract';
+  matchingComments: CaseComment[];
 }
 
 const defaultFilters: FilterState = {
@@ -54,7 +65,8 @@ const defaultFilters: FilterState = {
   assignedTechnician: [],
   dateRange: { start: '', end: '' },
   caseType: [],
-  priority: []
+  priority: [],
+  includeComments: false
 };
 
 const statusOptions = [
@@ -134,11 +146,49 @@ export default function CaseSearch() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
+  const [commentMatches, setCommentMatches] = useState<Map<string, CaseComment[]>>(new Map());
+  const [searchingComments, setSearchingComments] = useState(false);
 
   // Hämta data
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Sök i kommentarer när sökfrågan ändras och includeComments är aktiverat
+  useEffect(() => {
+    const searchInComments = async () => {
+      if (!filters.includeComments || !filters.searchQuery || filters.searchQuery.length < 2) {
+        setCommentMatches(new Map());
+        return;
+      }
+
+      setSearchingComments(true);
+      try {
+        const results = await searchComments(filters.searchQuery, 100);
+
+        // Gruppera kommentarer per case_id
+        const matches = new Map<string, CaseComment[]>();
+        results.forEach(comment => {
+          const key = comment.case_id;
+          if (!matches.has(key)) {
+            matches.set(key, []);
+          }
+          matches.get(key)!.push(comment);
+        });
+
+        setCommentMatches(matches);
+      } catch (error) {
+        console.error('Fel vid kommentarsökning:', error);
+        setCommentMatches(new Map());
+      } finally {
+        setSearchingComments(false);
+      }
+    };
+
+    // Debounce sökningen
+    const timeoutId = setTimeout(searchInComments, 300);
+    return () => clearTimeout(timeoutId);
+  }, [filters.searchQuery, filters.includeComments]);
 
   const fetchData = async () => {
     try {
@@ -202,8 +252,12 @@ export default function CaseSearch() {
           caseItem.beskrivning,
           caseItem.skadedjur
         ].filter(Boolean);
-        
-        if (!searchFields.some(field => field?.toLowerCase().includes(query))) {
+
+        const matchesTextSearch = searchFields.some(field => field?.toLowerCase().includes(query));
+        const hasCommentMatch = filters.includeComments && commentMatches.has(caseItem.id);
+
+        // Om varken textsökning eller kommentarsökning matchar, filtrera bort
+        if (!matchesTextSearch && !hasCommentMatch) {
           return false;
         }
       }
@@ -245,7 +299,7 @@ export default function CaseSearch() {
 
       return true;
     });
-  }, [allCases, filters]);
+  }, [allCases, filters, commentMatches]);
 
   // Sortera ärenden
   const sortedCases = useMemo(() => {
@@ -397,6 +451,33 @@ export default function CaseSearch() {
                 Filter
                 <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
               </Button>
+            </div>
+
+            {/* Kommentarsökning toggle */}
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filters.includeComments}
+                  onChange={(e) => updateFilter('includeComments', e.target.checked)}
+                  className="rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500"
+                />
+                <span className="text-sm text-slate-300 flex items-center gap-1">
+                  <MessageSquare className="w-4 h-4 text-purple-400" />
+                  Sök även i kommentarer
+                </span>
+              </label>
+              {searchingComments && (
+                <span className="text-xs text-slate-500 flex items-center gap-1">
+                  <div className="w-3 h-3 border-2 border-slate-600 border-t-purple-400 rounded-full animate-spin"></div>
+                  Söker i kommentarer...
+                </span>
+              )}
+              {filters.includeComments && commentMatches.size > 0 && !searchingComments && (
+                <span className="text-xs text-purple-400">
+                  {commentMatches.size} ärenden med kommentarsträffar
+                </span>
+              )}
             </div>
 
             {/* Expanderade filter */}
@@ -569,19 +650,29 @@ export default function CaseSearch() {
                 {paginatedCases.map((caseItem, index) => {
                   const StatusIcon = getStatusIcon(caseItem.status);
                   const price = extractPrice(caseItem);
-                  
+                  const caseCommentMatches = commentMatches.get(caseItem.id);
+                  const hasCommentMatch = !!caseCommentMatches && caseCommentMatches.length > 0;
+
                   return (
                     <div
                       key={caseItem.id}
                       className={`grid grid-cols-12 gap-4 p-4 hover:bg-slate-800/20 transition-colors ${
                         index % 2 === 0 ? 'bg-slate-900/20' : ''
-                      }`}
+                      } ${hasCommentMatch ? 'border-l-2 border-l-purple-500' : ''}`}
                     >
                       {/* Ärende & Kund */}
                       <div className="col-span-3 space-y-1">
-                        <h3 className="font-medium text-white text-sm truncate" title={caseItem.title}>
-                          {caseItem.title}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-white text-sm truncate flex-1" title={caseItem.title}>
+                            {caseItem.title}
+                          </h3>
+                          {hasCommentMatch && (
+                            <span className="flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded" title={`${caseCommentMatches.length} kommentar${caseCommentMatches.length > 1 ? 'er' : ''} matchar sökningen`}>
+                              <MessageSquare className="w-3 h-3" />
+                              {caseCommentMatches.length}
+                            </span>
+                          )}
+                        </div>
                         {caseItem.kontaktperson && (
                           <div className="flex items-center gap-1 text-xs text-slate-400">
                             <User className="w-3 h-3" />
@@ -697,9 +788,9 @@ export default function CaseSearch() {
 
                       {/* Åtgärd */}
                       <div className="col-span-1 flex justify-center items-start pt-1">
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           className="!p-0 h-8 w-8 hover:scale-110 transition-transform hover:border-[#20c58f] flex items-center justify-center"
                           onClick={() => handleEditCase(caseItem)}
                           title="Redigera ärende"
@@ -708,6 +799,37 @@ export default function CaseSearch() {
                           <Edit className="w-5 h-5 text-white" />
                         </Button>
                       </div>
+
+                      {/* Matchande kommentarer */}
+                      {hasCommentMatch && (
+                        <div className="col-span-12 mt-2 pt-2 border-t border-slate-700/50">
+                          <div className="text-xs text-purple-300 mb-2 font-medium">
+                            Matchande kommentarer:
+                          </div>
+                          <div className="space-y-2 max-h-32 overflow-y-auto">
+                            {caseCommentMatches.slice(0, 3).map((comment) => (
+                              <div key={comment.id} className="bg-purple-500/5 border border-purple-500/20 rounded p-2">
+                                <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                                  <span className="text-purple-400 font-medium">{comment.author_name}</span>
+                                  <span>•</span>
+                                  <span>{new Date(comment.created_at).toLocaleDateString('sv-SE')}</span>
+                                </div>
+                                <p className="text-xs text-slate-300 line-clamp-2">
+                                  {comment.content.length > 150 ? comment.content.substring(0, 150) + '...' : comment.content}
+                                </p>
+                              </div>
+                            ))}
+                            {caseCommentMatches.length > 3 && (
+                              <button
+                                onClick={() => handleEditCase(caseItem)}
+                                className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                              >
+                                + {caseCommentMatches.length - 3} fler kommentarer...
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

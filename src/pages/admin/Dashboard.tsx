@@ -1,4 +1,4 @@
-// 📁 src/pages/admin/AdminDashboard.tsx - KORRIGERAD MED UPPDATERAD UTLOGGNINGSFUNKTION
+// 📁 src/pages/admin/AdminDashboard.tsx - VERSION 2.0 MED NOTIFIKATIONER
 
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -28,7 +28,8 @@ import {
   Receipt,
   Image as ImageIcon,
   Megaphone,
-  BookOpen
+  BookOpen,
+  Bell
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -48,6 +49,7 @@ import VisualTimeline from '../../components/shared/VisualTimeline'
 import StaggeredGrid from '../../components/shared/StaggeredGrid'
 import LiveStatusIndicator from '../../components/shared/LiveStatusIndicator'
 import { generateTechnicianGuide } from '../../utils/generateTechnicianGuide'
+import { NotificationCenter } from '../../components/communication'
 
 interface DashboardStats {
   totalCustomers: number
@@ -656,54 +658,11 @@ const AdminDashboard: React.FC = () => {
               </Card>
             </div>
 
-            {/* System Health */}
-            <Card className="p-8 backdrop-blur-sm bg-slate-800/70 border-slate-700/50 shadow-2xl">
-              <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
-                <Shield className="w-6 h-6 text-[#20c58f]" />
-                System Status
-              </h3>
-              <div className="space-y-4">
-                <LiveStatusIndicator
-                  services={[
-                    { 
-                      name: 'Database', 
-                      status: 'online',
-                      responseTime: '< 50ms',
-                      description: 'Supabase PostgreSQL'
-                    },
-                    { 
-                      name: 'ClickUp API', 
-                      status: 'online',
-                      responseTime: '120ms',
-                      description: 'Task synchronization'
-                    },
-                    { 
-                      name: 'Webhooks', 
-                      status: 'online',
-                      description: 'Real-time updates'
-                    },
-                    { 
-                      name: 'Oneflow API', 
-                      status: 'online',
-                      responseTime: '95ms',
-                      description: 'Contract management'
-                    }
-                  ]}
-                />
-                <div className="pt-3 border-t border-slate-800">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-xs text-slate-500">Senaste kontroll</p>
-                      <p className="text-xs text-green-400 font-medium">Just nu</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-slate-500">Systemupptid</p>
-                      <p className="text-xs text-green-400 font-medium">99.9%</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            {/* Notifikationer */}
+            <NotificationCenter
+              maxItems={5}
+              showViewAll={true}
+            />
           </div>
         </div>
       </div>
