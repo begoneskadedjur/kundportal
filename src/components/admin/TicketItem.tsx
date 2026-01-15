@@ -96,11 +96,10 @@ export function TicketItem({ ticket, direction = 'all', currentUserName, onStatu
 
   const handleClick = () => {
     // Navigera till schedule-sidan och öppna ärendet med kommunikationsfliken
+    // Admin och koordinator använder koordinator-schemat, tekniker har sitt eget
     const basePath = profile?.role === 'technician'
       ? '/technician/schedule'
-      : profile?.role === 'koordinator'
-        ? '/koordinator/schema'
-        : '/koordinator/schema'; // Admin använder koordinator-schema
+      : '/koordinator/schema';
 
     // Öppna ärendet med query params för att öppna rätt case och visa kommunikation
     navigate(`${basePath}?openCase=${case_id}&caseType=${case_type}&tab=communication`);
