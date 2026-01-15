@@ -53,6 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setProfile(profileData);
 
+      // ✅ KRITISK: Sätt loading till false INNAN navigering så att
+      // dashboard-komponenter har tillgång till user och profile direkt
+      setLoading(false);
+
       const onAuthPage = ['/', '/login', '/set-password', '/forgot-password'].includes(location.pathname);
       if (onAuthPage) {
         let targetPath = '/login';
@@ -80,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   .eq('user_id', userId)
                   .eq('is_active', true)
                   .maybeSingle();
-                
+
                 targetPath = multisiteRole ? '/organisation' : '/customer';
                 console.log(`AuthContext: Customer with customer_id: ${profileData.customer_id}, multisite_role: ${multisiteRole?.role_type}. Going to: ${targetPath}`);
               } catch (error) {
@@ -92,18 +96,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             break;
         }
         console.log(`User role is '${profileData.role}'. Navigating to ${targetPath}`);
-        
-        // ✅ FÖRBÄTTRING: Omedelbar navigering utan timeout för att undvika race conditions.
+
+        // Navigera efter att loading är satt till false
         navigate(targetPath, { replace: true });
       }
     } catch (error: any) {
       console.error('💥 Profile fetch error:', error.message);
       toast.error('Kunde inte hämta profil.', { id: 'profile-fetch-error' });
+      setLoading(false);
       await supabase.auth.signOut();
       throw error;
-    } finally {
-      // Sätts bara till false här efter att profilen är hämtad
-      setLoading(false);
     }
   };
 
@@ -148,9 +150,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
       if (error) throw error;
       if (!data.user) throw new Error('Ingen användare returnerades efter inloggning.');
-      
+
+      // Sätt user INNAN fetchProfile för att säkerställa att useAuth har rätt värde
+      setUser(data.user);
+
       await fetchProfile(data.user.id);
-      
+
       toast.success('Inloggning lyckades!', { id: 'login-success' });
       return { success: true };
     } catch (error: any) {
