@@ -1,8 +1,8 @@
 // src/components/communication/CommentSection.tsx
-// Huvudkomponent för kommentarer på ärenden
+// Huvudkomponent för kommentarer på ärenden med tråd-stöd
 
-import React from 'react';
-import { CaseType } from '../../types/communication';
+import React, { useState, useMemo } from 'react';
+import { CaseType, CaseComment } from '../../types/communication';
 import { useCaseComments } from '../../hooks/useCaseComments';
 import CommentInput from './CommentInput';
 import CommentItem from './CommentItem';
@@ -13,6 +13,12 @@ interface CommentSectionProps {
   caseType: CaseType;
   caseTitle?: string;
   compact?: boolean;
+}
+
+interface ReplyingTo {
+  id: string;
+  authorName: string;
+  preview: string;
 }
 
 export default function CommentSection({
@@ -30,6 +36,73 @@ export default function CommentSection({
     editComment,
     removeComment,
   } = useCaseComments({ caseId, caseType, caseTitle });
+
+  // State för att svara på kommentar
+  const [replyingTo, setReplyingTo] = useState<ReplyingTo | null>(null);
+
+  // Organisera kommentarer i trådar
+  const { rootComments, repliesByParent } = useMemo(() => {
+    const roots: CaseComment[] = [];
+    const replies: Map<string, CaseComment[]> = new Map();
+
+    for (const comment of comments) {
+      if (comment.parent_comment_id) {
+        const existing = replies.get(comment.parent_comment_id) || [];
+        existing.push(comment);
+        replies.set(comment.parent_comment_id, existing);
+      } else {
+        roots.push(comment);
+      }
+    }
+
+    // Sortera svar efter tid
+    for (const [, replyList] of replies) {
+      replyList.sort((a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+    }
+
+    return { rootComments: roots, repliesByParent: replies };
+  }, [comments]);
+
+  // Hantera svar-knappen
+  const handleReply = (comment: CaseComment) => {
+    setReplyingTo({
+      id: comment.id,
+      authorName: comment.author_name,
+      preview: comment.content,
+    });
+  };
+
+  // Avbryt svar
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+  };
+
+  // Rendera en kommentar med sina svar rekursivt
+  const renderCommentWithReplies = (comment: CaseComment, depth: number = 0) => {
+    const replies = repliesByParent.get(comment.id) || [];
+
+    return (
+      <div key={comment.id} className="space-y-2">
+        <CommentItem
+          comment={comment}
+          onEdit={editComment}
+          onDelete={removeComment}
+          onReply={handleReply}
+          isReply={depth > 0}
+          depth={depth}
+        />
+
+        {/* Rendera svar */}
+        {replies.length > 0 && (
+          <div className="ml-8 space-y-2 border-l-2 border-slate-700/50 pl-4">
+            {replies.map((reply) => renderCommentWithReplies(reply, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (error) {
     return (
@@ -68,6 +141,8 @@ export default function CommentSection({
           onSubmit={addComment}
           isSubmitting={isSubmitting}
           placeholder={compact ? 'Skriv kommentar...' : undefined}
+          replyingTo={replyingTo}
+          onCancelReply={handleCancelReply}
         />
       </div>
 
@@ -88,14 +163,7 @@ export default function CommentSection({
             </p>
           </div>
         ) : (
-          comments.map((comment) => (
-            <CommentItem
-              key={comment.id}
-              comment={comment}
-              onEdit={editComment}
-              onDelete={removeComment}
-            />
-          ))
+          rootComments.map((comment) => renderCommentWithReplies(comment, 0))
         )}
       </div>
     </div>

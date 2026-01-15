@@ -33,7 +33,7 @@ interface UseCaseCommentsReturn {
   isLoading: boolean;
   isSubmitting: boolean;
   error: string | null;
-  addComment: (content: string, attachments?: File[], mentions?: TrackedMention[]) => Promise<void>;
+  addComment: (content: string, attachments?: File[], mentions?: TrackedMention[], parentCommentId?: string) => Promise<void>;
   editComment: (commentId: string, content: string) => Promise<void>;
   removeComment: (commentId: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -92,9 +92,9 @@ export function useCaseComments({
     return unsubscribe;
   }, [caseId, caseType, fetchComments]);
 
-  // Lägg till kommentar - FÖRENKLAD: tar emot mentions separat
+  // Lägg till kommentar - FÖRENKLAD: tar emot mentions separat, stöder trådar
   const addComment = useCallback(
-    async (content: string, attachments?: File[], mentions?: TrackedMention[]) => {
+    async (content: string, attachments?: File[], mentions?: TrackedMention[], parentCommentId?: string) => {
       if (!user || !profile) {
         toast.error('Du måste vara inloggad för att kommentera');
         return;
@@ -122,6 +122,7 @@ export function useCaseComments({
 
         // Extrahera mentions-data från TrackedMention[]
         const mentionedUserIds: string[] = [];
+        const mentionedUserNames: string[] = [];  // Spara display names för highlighting
         const mentionedRoles: string[] = [];
         let mentionsAll = false;
 
@@ -136,6 +137,9 @@ export function useCaseComments({
             } else if (mention.type === 'user') {
               if (!mentionedUserIds.includes(mention.userId)) {
                 mentionedUserIds.push(mention.userId);
+                // Spara display name (ta bort @ prefix om det finns)
+                const cleanName = mention.displayName.replace(/^@/, '');
+                mentionedUserNames.push(cleanName);
               }
             }
           }
@@ -150,8 +154,10 @@ export function useCaseComments({
           content: content.trim(),
           attachments: uploadedAttachments,
           mentioned_user_ids: mentionedUserIds,
+          mentioned_user_names: mentionedUserNames,  // Inkludera display names
           mentioned_roles: mentionedRoles,
           mentions_all: mentionsAll,
+          parent_comment_id: parentCommentId || null,  // Tråd-stöd
         };
 
         const newComment = await createComment(commentData, caseTitle);

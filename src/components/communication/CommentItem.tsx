@@ -1,7 +1,7 @@
 // src/components/communication/CommentItem.tsx
-// Enskild kommentar med författarinfo, innehåll och bilagor
+// Enskild kommentar med författarinfo, innehåll, bilagor, läsbekräftelser och status
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   CaseComment,
   CommentAttachment,
@@ -9,8 +9,11 @@ import {
   ROLE_DISPLAY_NAMES,
   AuthorRole,
   formatCommentTime,
+  CommentStatus,
+  COMMENT_STATUS_CONFIG,
 } from '../../types/communication';
 import { useAuth } from '../../contexts/AuthContext';
+import { markCommentAsRead, getReadReceipts, updateCommentStatus } from '../../services/communicationService';
 import {
   User,
   Clock,
@@ -22,34 +25,123 @@ import {
   MoreHorizontal,
   Settings,
   X,
+  Reply,
+  CornerDownRight,
+  Eye,
+  Circle,
+  CheckCircle2,
+  AlertCircle,
+  ChevronDown,
 } from 'lucide-react';
+
+interface ReadReceipt {
+  userId: string;
+  userName: string;
+  readAt: string;
+}
 
 interface CommentItemProps {
   comment: CaseComment;
   onEdit?: (commentId: string, content: string) => Promise<void>;
   onDelete?: (commentId: string) => Promise<void>;
+  onReply?: (comment: CaseComment) => void;
+  onStatusChange?: (commentId: string, status: CommentStatus) => void;
+  isReply?: boolean;
+  depth?: number;
+  showStatus?: boolean;
 }
 
 export default function CommentItem({
   comment,
   onEdit,
   onDelete,
+  onReply,
+  onStatusChange,
+  isReply = false,
+  depth = 0,
+  showStatus = false,
 }: CommentItemProps) {
   const { user, profile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [showMenu, setShowMenu] = useState(false);
   const [showImageModal, setShowImageModal] = useState<string | null>(null);
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [readReceipts, setReadReceipts] = useState<ReadReceipt[]>([]);
+  const [showReadReceipts, setShowReadReceipts] = useState(false);
+  const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
+  const commentRef = useRef<HTMLDivElement>(null);
 
   const isOwnComment = user?.id === comment.author_id;
   const canEdit = isOwnComment && !comment.is_system_comment;
   const canDelete = isOwnComment || profile?.role === 'admin';
+  const canChangeStatus = profile?.role === 'admin' || profile?.role === 'koordinator';
 
   const roleColors = ROLE_COLORS[comment.author_role as AuthorRole] || ROLE_COLORS.technician;
 
+  // Markera som läst när kommentaren blir synlig (om det inte är egen kommentar)
+  useEffect(() => {
+    if (!user || isOwnComment || hasMarkedAsRead || comment.is_system_comment) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          markCommentAsRead(comment.id, user.id);
+          setHasMarkedAsRead(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    if (commentRef.current) {
+      observer.observe(commentRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [comment.id, user, isOwnComment, hasMarkedAsRead, comment.is_system_comment]);
+
+  // Hämta läsbekräftelser när man hovrar (endast för egna kommentarer)
+  const handleShowReadReceipts = async () => {
+    if (!isOwnComment) return;
+    setShowReadReceipts(true);
+    if (readReceipts.length === 0) {
+      const receipts = await getReadReceipts(comment.id);
+      setReadReceipts(receipts);
+    }
+  };
+
+  // Hantera statusändring
+  const handleStatusChange = async (newStatus: CommentStatus) => {
+    setShowStatusMenu(false);
+    if (onStatusChange) {
+      onStatusChange(comment.id, newStatus);
+    } else {
+      try {
+        await updateCommentStatus(comment.id, newStatus, user?.id);
+      } catch (err) {
+        console.error('Fel vid statusändring:', err);
+      }
+    }
+  };
+
+  // Status-ikon
+  const StatusIcon = ({ status }: { status: CommentStatus }) => {
+    const config = COMMENT_STATUS_CONFIG[status];
+    switch (config.icon) {
+      case 'check':
+        return <CheckCircle2 className={`w-3.5 h-3.5 ${config.color}`} />;
+      case 'alert-circle':
+        return <AlertCircle className={`w-3.5 h-3.5 ${config.color}`} />;
+      case 'clock':
+        return <Clock className={`w-3.5 h-3.5 ${config.color}`} />;
+      default:
+        return <Circle className={`w-3.5 h-3.5 ${config.color}`} />;
+    }
+  };
+
   // Rendera @mentions med highlightning
-  // ENKEL APPROACH: Använd mentioned_user_ids från kommentaren för att veta vilka namn som är mentions
-  // Matcha alla @-tecken följt av text som ser ut som ett namn
+  // Använder mentioned_user_names för exakt matchning (inga regex-gissningar!)
   const renderContent = (text: string) => {
     const parts: (string | JSX.Element)[] = [];
     let lastIndex = 0;
@@ -85,29 +177,64 @@ export default function CommentItem({
       }
     }
 
-    // 3. FÖRBÄTTRAD: Matcha @Namn med 1-4 namndelar (förnamn, efternamn, etc.)
-    // Varje namndel börjar med versal följt av gemener/bindestreck/apostrof
-    // Stoppar vid: skiljetecken, radbrytning, @, dubbla mellanslag, eller ord som börjar med gemen
-    const nameRegex = /@([A-ZÅÄÖ][a-zåäöé'-]*(?:\s+[A-ZÅÄÖ][a-zåäöé'-]*){0,3})(?=\s*[.,!?:;\n]|$|\s+@|\s{2,}|\s+[a-z])/g;
-    let nameMatch;
-    while ((nameMatch = nameRegex.exec(text)) !== null) {
-      // Trimma trailing whitespace från namnet
-      const displayName = nameMatch[1].trim();
-      const actualLength = displayName.length + 1; // +1 för @
+    // 3. FÖRBÄTTRAD: Använd mentioned_user_names för exakt matchning
+    // Detta garanterar att highlighting fungerar direkt efter submit
+    const mentionedNames = comment.mentioned_user_names || [];
+    for (const name of mentionedNames) {
+      // Sök efter @Namn i texten (case-insensitive)
+      const searchPattern = `@${name}`;
+      let searchIndex = 0;
 
-      const isOverlapping = matches.some(m =>
-        (nameMatch!.index >= m.index && nameMatch!.index < m.index + m.length) ||
-        (m.index >= nameMatch!.index && m.index < nameMatch!.index + actualLength)
-      );
-      const isRoleMention = ['tekniker', 'koordinator', 'admin', 'alla'].includes(displayName.toLowerCase());
+      while (searchIndex < text.length) {
+        const foundIndex = text.toLowerCase().indexOf(searchPattern.toLowerCase(), searchIndex);
+        if (foundIndex === -1) break;
 
-      if (!isOverlapping && !isRoleMention && displayName.length >= 2) {
-        matches.push({
-          index: nameMatch.index,
-          length: actualLength,
-          displayName: displayName,
-          isRole: false
-        });
+        const actualLength = searchPattern.length;
+
+        // Kontrollera om detta redan är matchat
+        const isOverlapping = matches.some(m =>
+          (foundIndex >= m.index && foundIndex < m.index + m.length) ||
+          (m.index >= foundIndex && m.index < foundIndex + actualLength)
+        );
+
+        if (!isOverlapping) {
+          // Extrahera det faktiska namnet från texten (för att bevara case)
+          const actualName = text.substring(foundIndex + 1, foundIndex + actualLength);
+          matches.push({
+            index: foundIndex,
+            length: actualLength,
+            displayName: actualName,
+            isRole: false
+          });
+        }
+
+        searchIndex = foundIndex + 1;
+      }
+    }
+
+    // 4. Fallback: Regex för att fånga @Namn som inte finns i mentioned_user_names
+    // (t.ex. för gamla kommentarer utan mentioned_user_names)
+    if (mentionedNames.length === 0 && comment.mentioned_user_ids && comment.mentioned_user_ids.length > 0) {
+      const nameRegex = /@([A-ZÅÄÖ][a-zåäöé'-]*(?:\s+[A-ZÅÄÖ][a-zåäöé'-]*){0,3})(?=\s*[.,!?:;\n]|$|\s+@|\s{2,}|\s+[a-z])/g;
+      let nameMatch;
+      while ((nameMatch = nameRegex.exec(text)) !== null) {
+        const displayName = nameMatch[1].trim();
+        const actualLength = displayName.length + 1;
+
+        const isOverlapping = matches.some(m =>
+          (nameMatch!.index >= m.index && nameMatch!.index < m.index + m.length) ||
+          (m.index >= nameMatch!.index && m.index < nameMatch!.index + actualLength)
+        );
+        const isRoleMention = ['tekniker', 'koordinator', 'admin', 'alla'].includes(displayName.toLowerCase());
+
+        if (!isOverlapping && !isRoleMention && displayName.length >= 2) {
+          matches.push({
+            index: nameMatch.index,
+            length: actualLength,
+            displayName: displayName,
+            isRole: false
+          });
+        }
       }
     }
 
@@ -185,16 +312,29 @@ export default function CommentItem({
     );
   }
 
+  // Beräkna indent baserat på djup (max 2 nivåer för att undvika för djupa trådar)
+  const indentLevel = Math.min(depth, 2);
+  const indentClass = indentLevel > 0 ? `ml-${indentLevel * 8}` : '';
+
   return (
-    <div className="group relative">
-      <div className="flex gap-3 p-4 rounded-lg bg-slate-800/50 hover:bg-slate-800/70 transition-colors">
+    <div ref={commentRef} className={`group relative ${indentClass}`}>
+      {/* Tråd-indikator för svar */}
+      {isReply && (
+        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-purple-500/30 -ml-4" />
+      )}
+
+      <div className={`flex gap-3 p-4 rounded-lg transition-colors ${
+        isReply
+          ? 'bg-slate-800/30 hover:bg-slate-800/50 border-l-2 border-purple-500/30'
+          : 'bg-slate-800/50 hover:bg-slate-800/70'
+      }`}>
         {/* Avatar/Initial */}
         <div className="flex-shrink-0">
           <div className={`
-            w-10 h-10 rounded-full flex items-center justify-center
+            ${isReply ? 'w-8 h-8' : 'w-10 h-10'} rounded-full flex items-center justify-center
             ${roleColors.bg} ${roleColors.border} border
           `}>
-            <User className={`w-5 h-5 ${roleColors.text}`} />
+            <User className={`${isReply ? 'w-4 h-4' : 'w-5 h-5'} ${roleColors.text}`} />
           </div>
         </div>
 
@@ -219,6 +359,46 @@ export default function CommentItem({
             </span>
             {comment.is_edited && (
               <span className="text-xs text-slate-500 italic">(redigerad)</span>
+            )}
+
+            {/* Ticket-status badge */}
+            {showStatus && comment.status && (
+              <div className="relative">
+                <button
+                  onClick={() => canChangeStatus && setShowStatusMenu(!showStatusMenu)}
+                  className={`
+                    flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium
+                    ${COMMENT_STATUS_CONFIG[comment.status].bgColor}
+                    ${COMMENT_STATUS_CONFIG[comment.status].color}
+                    ${canChangeStatus ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}
+                  `}
+                >
+                  <StatusIcon status={comment.status} />
+                  {COMMENT_STATUS_CONFIG[comment.status].label}
+                  {canChangeStatus && <ChevronDown className="w-3 h-3" />}
+                </button>
+
+                {/* Status dropdown */}
+                {showStatusMenu && (
+                  <div className="absolute top-full left-0 mt-1 w-40 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-20 overflow-hidden">
+                    {(Object.keys(COMMENT_STATUS_CONFIG) as CommentStatus[]).map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => handleStatusChange(status)}
+                        className={`
+                          w-full px-3 py-2 flex items-center gap-2 text-sm transition-colors
+                          ${comment.status === status ? 'bg-slate-700' : 'hover:bg-slate-700'}
+                        `}
+                      >
+                        <StatusIcon status={status} />
+                        <span className={COMMENT_STATUS_CONFIG[status].color}>
+                          {COMMENT_STATUS_CONFIG[status].label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -271,6 +451,78 @@ export default function CommentItem({
                   }}
                 />
               ))}
+            </div>
+          )}
+
+          {/* Åtgärdsrad - Svara, antal svar och läsbekräftelser */}
+          {!isEditing && (
+            <div className="mt-2 flex items-center gap-4">
+              {/* Svara-knapp (visas inte för systemkommentarer eller för djupa trådar) */}
+              {onReply && depth < 2 && (
+                <button
+                  onClick={() => onReply(comment)}
+                  className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-purple-400 transition-colors"
+                >
+                  <Reply className="w-3.5 h-3.5" />
+                  Svara
+                </button>
+              )}
+
+              {/* Antal svar (om det finns) */}
+              {comment.reply_count > 0 && (
+                <span className="flex items-center gap-1 text-xs text-slate-500">
+                  <CornerDownRight className="w-3 h-3" />
+                  {comment.reply_count} {comment.reply_count === 1 ? 'svar' : 'svar'}
+                </span>
+              )}
+
+              {/* Läsbekräftelser (visas endast på egna kommentarer) */}
+              {isOwnComment && (
+                <div
+                  className="relative"
+                  onMouseEnter={handleShowReadReceipts}
+                  onMouseLeave={() => setShowReadReceipts(false)}
+                >
+                  <span className="flex items-center gap-1 text-xs text-slate-500 cursor-default">
+                    <Eye className="w-3 h-3" />
+                    {comment.read_count !== undefined ? (
+                      <span>Läst av {comment.read_count}</span>
+                    ) : (
+                      <span>Läsbekräftelser</span>
+                    )}
+                  </span>
+
+                  {/* Läsbekräftelse-popup */}
+                  {showReadReceipts && (
+                    <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-20 p-2">
+                      <div className="text-xs font-medium text-slate-400 mb-2 px-1">
+                        Läst av
+                      </div>
+                      {readReceipts.length === 0 ? (
+                        <div className="text-xs text-slate-500 px-1">
+                          Ingen har läst ännu
+                        </div>
+                      ) : (
+                        <div className="max-h-32 overflow-y-auto space-y-1">
+                          {readReceipts.map((receipt) => (
+                            <div
+                              key={receipt.userId}
+                              className="flex items-center justify-between px-1 py-1 text-xs"
+                            >
+                              <span className="text-white truncate">
+                                {receipt.userName}
+                              </span>
+                              <span className="text-slate-500 ml-2 flex-shrink-0">
+                                {formatCommentTime(receipt.readAt)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

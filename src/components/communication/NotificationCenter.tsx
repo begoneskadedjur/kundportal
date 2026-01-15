@@ -1,17 +1,20 @@
 // src/components/communication/NotificationCenter.tsx
 // Dashboard-kort för notifikationer
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
 import { Notification } from '../../types/communication';
 import NotificationItem from './NotificationItem';
+import NotificationModal from './NotificationModal';
 import {
   Bell,
   CheckCheck,
   Loader2,
   Inbox,
   ArrowRight,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 
 interface NotificationCenterProps {
@@ -26,13 +29,16 @@ export default function NotificationCenter({
   onNotificationClick,
 }: NotificationCenterProps) {
   const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const {
     notifications,
     unreadCount,
     isLoading,
+    error,
     markAsRead,
     markAllAsRead,
     removeNotification,
+    refresh,
   } = useNotifications();
 
   const displayedNotifications = notifications.slice(0, maxItems);
@@ -99,6 +105,21 @@ export default function NotificationCenter({
           <div className="p-8 flex items-center justify-center">
             <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
           </div>
+        ) : error ? (
+          <div className="p-8 text-center">
+            <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+            <p className="text-red-400 font-medium">Kunde inte ladda notifikationer</p>
+            <p className="text-slate-500 text-xs mt-1 mb-3">
+              {error}
+            </p>
+            <button
+              onClick={() => refresh()}
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Försök igen
+            </button>
+          </div>
         ) : displayedNotifications.length === 0 ? (
           <div className="p-8 text-center">
             <Inbox className="w-10 h-10 text-slate-600 mx-auto mb-2" />
@@ -124,10 +145,7 @@ export default function NotificationCenter({
       {showViewAll && notifications.length > maxItems && (
         <div className="px-4 py-3 border-t border-slate-700 bg-slate-800/30">
           <button
-            onClick={() => {
-              // TODO: Implementera fullständig notifikationssida eller modal
-              console.log('View all notifications');
-            }}
+            onClick={() => setIsModalOpen(true)}
             className="w-full text-center text-sm text-slate-400 hover:text-white flex items-center justify-center gap-1 transition-colors"
           >
             Visa alla notifikationer
@@ -135,6 +153,13 @@ export default function NotificationCenter({
           </button>
         </div>
       )}
+
+      {/* Fullscreen modal för alla notifikationer */}
+      <NotificationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onNotificationClick={onNotificationClick}
+      />
     </div>
   );
 }

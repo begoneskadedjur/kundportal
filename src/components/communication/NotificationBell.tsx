@@ -5,6 +5,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { Notification } from '../../types/communication';
 import NotificationItem from './NotificationItem';
+import NotificationModal from './NotificationModal';
 import {
   Bell,
   CheckCheck,
@@ -12,6 +13,8 @@ import {
   Inbox,
   ArrowRight,
   X,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 
 interface NotificationBellProps {
@@ -22,14 +25,17 @@ export default function NotificationBell({
   onNotificationClick,
 }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const {
     notifications,
     unreadCount,
     isLoading,
+    error,
     markAsRead,
     markAllAsRead,
     removeNotification,
+    refresh,
   } = useNotifications();
 
   // Stäng dropdown vid klick utanför
@@ -137,6 +143,21 @@ export default function NotificationBell({
               <div className="p-8 flex items-center justify-center">
                 <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
               </div>
+            ) : error ? (
+              <div className="p-6 text-center">
+                <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                <p className="text-red-400 text-sm font-medium">Fel vid laddning</p>
+                <p className="text-slate-500 text-xs mt-1 mb-3">
+                  {error}
+                </p>
+                <button
+                  onClick={() => refresh()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Försök igen
+                </button>
+              </div>
             ) : displayedNotifications.length === 0 ? (
               <div className="p-8 text-center">
                 <Inbox className="w-10 h-10 text-slate-600 mx-auto mb-2" />
@@ -165,7 +186,7 @@ export default function NotificationBell({
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  // TODO: Navigera till notifikationssida
+                  setIsModalOpen(true);
                 }}
                 className="w-full text-center text-sm text-slate-400 hover:text-white flex items-center justify-center gap-1 transition-colors"
               >
@@ -176,6 +197,13 @@ export default function NotificationBell({
           )}
         </div>
       )}
+
+      {/* Fullscreen modal för alla notifikationer */}
+      <NotificationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onNotificationClick={onNotificationClick}
+      />
     </div>
   );
 }

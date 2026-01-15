@@ -1,7 +1,7 @@
 // src/hooks/useNotifications.ts
 // Hook för att hantera notifikationer
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Notification } from '../types/communication';
 import {
   getNotifications,
@@ -19,6 +19,7 @@ interface UseNotificationsReturn {
   unreadCount: number;
   isLoading: boolean;
   hasMore: boolean;
+  error: string | null;
   loadMore: () => Promise<void>;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
@@ -27,14 +28,27 @@ interface UseNotificationsReturn {
 }
 
 const PAGE_SIZE = 20;
+const FETCH_TIMEOUT_MS = 10000; // 10 sekunder timeout
 
 export function useNotifications(): UseNotificationsReturn {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Starta med false, inte true
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const initialLoadDone = useRef(false);
+
+  // Hjälpfunktion för timeout
+  const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout: Servern svarade inte i tid')), timeoutMs)
+      ),
+    ]);
+  };
 
   // Hämta notifikationer
   const fetchNotifications = useCallback(async (reset: boolean = false) => {
@@ -42,9 +56,15 @@ export function useNotifications(): UseNotificationsReturn {
 
     try {
       setIsLoading(true);
+      setError(null);
       // Använd functional update för att undvika dependency på offset
       const currentOffset = reset ? 0 : offset;
-      const data = await getNotifications(user.id, PAGE_SIZE, currentOffset);
+
+      // Lägg till timeout för att undvika evig laddning
+      const data = await withTimeout(
+        getNotifications(user.id, PAGE_SIZE, currentOffset),
+        FETCH_TIMEOUT_MS
+      );
 
       if (reset) {
         setNotifications(data);
@@ -55,8 +75,16 @@ export function useNotifications(): UseNotificationsReturn {
       }
 
       setHasMore(data.length === PAGE_SIZE);
+      initialLoadDone.current = true;
     } catch (err) {
       console.error('Fel vid hämtning av notifikationer:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Kunde inte hämta notifikationer';
+      setError(errorMessage);
+      // Om det är första laddningen, sätt tomma notifikationer
+      if (!initialLoadDone.current) {
+        setNotifications([]);
+        setHasMore(false);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -199,6 +227,7 @@ export function useNotifications(): UseNotificationsReturn {
     unreadCount,
     isLoading,
     hasMore,
+    error,
     loadMore,
     markAsRead,
     markAllAsRead,

@@ -43,6 +43,7 @@ export async function createComment(
   // FÖRENKLAD: Mentions-data skickas nu direkt i comment-objektet
   // från useCaseComments hook istället för att extraheras från text
   const mentionedUserIds = comment.mentioned_user_ids || [];
+  const mentionedUserNames = comment.mentioned_user_names || [];
   const mentionedRoles = comment.mentioned_roles || [];
   const mentionsAll = comment.mentions_all || false;
 
@@ -52,6 +53,7 @@ export async function createComment(
     .insert({
       ...comment,
       mentioned_user_ids: mentionedUserIds,
+      mentioned_user_names: mentionedUserNames,
       mentioned_roles: mentionedRoles,
       mentions_all: mentionsAll,
     })
@@ -565,4 +567,93 @@ export function subscribeToNotifications(
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+// === LÄSBEKRÄFTELSER ===
+
+export async function markCommentAsRead(
+  commentId: string,
+  userId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('comment_read_receipts')
+    .upsert(
+      { comment_id: commentId, user_id: userId },
+      { onConflict: 'comment_id,user_id' }
+    );
+
+  if (error) {
+    console.error('Fel vid markering av kommentar som läst:', error);
+  }
+}
+
+export async function getReadReceipts(
+  commentId: string
+): Promise<{ userId: string; userName: string; readAt: string }[]> {
+  const { data, error } = await supabase
+    .from('comment_read_receipts')
+    .select(`
+      user_id,
+      read_at,
+      profiles!inner (
+        display_name,
+        technicians (
+          name
+        )
+      )
+    `)
+    .eq('comment_id', commentId);
+
+  if (error) {
+    console.error('Fel vid hämtning av läsbekräftelser:', error);
+    return [];
+  }
+
+  return (data || []).map((receipt: any) => ({
+    userId: receipt.user_id,
+    userName: receipt.profiles?.display_name || receipt.profiles?.technicians?.name || 'Okänd',
+    readAt: receipt.read_at,
+  }));
+}
+
+export async function getReadCount(commentId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('comment_read_receipts')
+    .select('*', { count: 'exact', head: true })
+    .eq('comment_id', commentId);
+
+  if (error) {
+    console.error('Fel vid räkning av läsbekräftelser:', error);
+    return 0;
+  }
+
+  return count || 0;
+}
+
+// === TICKET-STATUS ===
+
+export async function updateCommentStatus(
+  commentId: string,
+  status: 'open' | 'in_progress' | 'resolved' | 'needs_action',
+  resolvedBy?: string
+): Promise<void> {
+  const updateData: any = { status };
+
+  if (status === 'resolved' && resolvedBy) {
+    updateData.resolved_at = new Date().toISOString();
+    updateData.resolved_by = resolvedBy;
+  } else if (status !== 'resolved') {
+    updateData.resolved_at = null;
+    updateData.resolved_by = null;
+  }
+
+  const { error } = await supabase
+    .from('case_comments')
+    .update(updateData)
+    .eq('id', commentId);
+
+  if (error) {
+    console.error('Fel vid uppdatering av kommentarsstatus:', error);
+    throw error;
+  }
 }

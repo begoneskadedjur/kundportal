@@ -3,15 +3,23 @@
 // FÖRENKLAD: Visar bara @Namn i textarea, skickar IDs separat
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, Paperclip, Image as ImageIcon, X, Loader2 } from 'lucide-react';
+import { Send, Paperclip, Image as ImageIcon, X, Loader2, Reply, CornerDownRight } from 'lucide-react';
 import { useMentions, TrackedMention } from '../../hooks/useMentions';
 import MentionSuggestions from './MentionSuggestions';
 
+interface ReplyingTo {
+  id: string;
+  authorName: string;
+  preview: string;
+}
+
 interface CommentInputProps {
-  onSubmit: (content: string, attachments?: File[], mentions?: TrackedMention[]) => Promise<void>;
+  onSubmit: (content: string, attachments?: File[], mentions?: TrackedMention[], parentCommentId?: string) => Promise<void>;
   isSubmitting: boolean;
   placeholder?: string;
   autoFocus?: boolean;
+  replyingTo?: ReplyingTo | null;
+  onCancelReply?: () => void;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -22,6 +30,8 @@ export default function CommentInput({
   isSubmitting,
   placeholder = 'Skriv en kommentar... (använd @ för att nämna någon)',
   autoFocus = false,
+  replyingTo,
+  onCancelReply,
 }: CommentInputProps) {
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -140,11 +150,12 @@ export default function CommentInput({
     if (isSubmitting) return;
     if (!content.trim() && attachments.length === 0) return;
 
-    // Skicka med mentions-data separat
+    // Skicka med mentions-data och parent ID (om det är ett svar)
     await onSubmit(
       content,
       attachments.length > 0 ? attachments : undefined,
-      mentionedUsers.length > 0 ? mentionedUsers : undefined
+      mentionedUsers.length > 0 ? mentionedUsers : undefined,
+      replyingTo?.id
     );
 
     // Rensa
@@ -153,6 +164,11 @@ export default function CommentInput({
     clearMentions(); // Rensa spårade mentions
     previewUrls.forEach(url => url && URL.revokeObjectURL(url));
     setPreviewUrls([]);
+
+    // Avbryt svar-läge
+    if (onCancelReply) {
+      onCancelReply();
+    }
 
     // Återställ textarea-höjd
     if (textareaRef.current) {
@@ -169,6 +185,30 @@ export default function CommentInput({
 
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700 focus-within:border-[#20c58f]/50 transition-colors">
+      {/* Svarar på - visas när man svarar på en kommentar */}
+      {replyingTo && (
+        <div className="px-4 py-2 border-b border-slate-700 bg-slate-700/30 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <CornerDownRight className="w-4 h-4 text-purple-400 flex-shrink-0" />
+            <span className="text-sm text-slate-400">Svarar på</span>
+            <span className="text-sm font-medium text-white truncate">
+              {replyingTo.authorName}
+            </span>
+            <span className="text-sm text-slate-500 truncate hidden sm:inline">
+              "{replyingTo.preview.length > 50 ? replyingTo.preview.slice(0, 50) + '...' : replyingTo.preview}"
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="p-1 text-slate-400 hover:text-white hover:bg-slate-600 rounded transition-colors flex-shrink-0"
+            title="Avbryt svar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Bilagor-förhandsvisning */}
       {attachments.length > 0 && (
         <div className="p-3 border-b border-slate-700 flex flex-wrap gap-2">

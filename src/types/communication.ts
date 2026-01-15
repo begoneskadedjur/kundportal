@@ -38,6 +38,7 @@ export interface CaseComment {
   content: string;
   attachments: CommentAttachment[];
   mentioned_user_ids: string[];
+  mentioned_user_names: string[];  // Display names för highlighting
   mentioned_roles: string[];
   mentions_all: boolean;
   is_system_comment: boolean;
@@ -46,7 +47,19 @@ export interface CaseComment {
   edited_at: string | null;
   created_at: string;
   updated_at: string;
+  // Tråd-stöd
+  parent_comment_id: string | null;
+  depth: number;
+  reply_count: number;
+  // Läsbekräftelser (count från join)
+  read_count?: number;
+  // Ticket-status
+  status: CommentStatus;
+  resolved_at: string | null;
+  resolved_by: string | null;
 }
+
+export type CommentStatus = 'open' | 'in_progress' | 'resolved' | 'needs_action';
 
 export interface CaseCommentInsert {
   case_id: string;
@@ -57,10 +70,12 @@ export interface CaseCommentInsert {
   content: string;
   attachments?: CommentAttachment[];
   mentioned_user_ids?: string[];
+  mentioned_user_names?: string[];  // Display names för highlighting
   mentioned_roles?: string[];
   mentions_all?: boolean;
   is_system_comment?: boolean;
   system_event_type?: SystemEventType | null;
+  parent_comment_id?: string | null;
 }
 
 export interface CaseCommentUpdate {
@@ -187,6 +202,28 @@ export const SYSTEM_EVENT_MESSAGES: Record<SystemEventType, (data: SystemComment
   price_updated: (data) => `Pris ändrat från ${data.oldValue} kr till ${data.newValue} kr`,
   case_created: () => `Ärendet skapades`,
 };
+
+// Ticket-status konfiguration
+export const COMMENT_STATUS_CONFIG: Record<CommentStatus, {
+  label: string;
+  color: string;
+  bgColor: string;
+  icon: 'circle' | 'clock' | 'check' | 'alert-circle';
+}> = {
+  open: { label: 'Öppen', color: 'text-blue-400', bgColor: 'bg-blue-500/20', icon: 'circle' },
+  in_progress: { label: 'Pågående', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', icon: 'clock' },
+  resolved: { label: 'Löst', color: 'text-green-400', bgColor: 'bg-green-500/20', icon: 'check' },
+  needs_action: { label: 'Behöver åtgärd', color: 'text-red-400', bgColor: 'bg-red-500/20', icon: 'alert-circle' },
+};
+
+// Läsbekräftelse-typ
+export interface CommentReadReceipt {
+  id: string;
+  comment_id: string;
+  user_id: string;
+  user_name?: string;
+  read_at: string;
+}
 
 // === HJÄLPFUNKTIONER ===
 
