@@ -279,44 +279,44 @@ function mapTaskToDatabase(task: any, tableName: string): any {
 }
 
 // 🆕 FÖRBÄTTRAD DATUM-MAPPNING med completed_date logik
+// ⭐ FIXAT: Behåller nu TIDER från ClickUp (inte bara datum)
 function mapTaskDates(task: any, isCompleted: boolean): any {
   const dateData: any = {}
-  
-  // Start datum (från ClickUp start_date eller date_created)
+
+  // Start datum MED TID (från ClickUp start_date eller date_created)
   if (task.start_date) {
     const startDate = new Date(parseInt(task.start_date))
-    dateData.start_date = startDate.toISOString().split('T')[0] // YYYY-MM-DD format
+    dateData.start_date = startDate.toISOString() // Behåll tid!
   } else if (task.date_created) {
     const createdDate = new Date(parseInt(task.date_created))
-    dateData.start_date = createdDate.toISOString().split('T')[0]
+    // Om skapad utan start_date, sätt till 08:00 som standard
+    createdDate.setUTCHours(8, 0, 0, 0)
+    dateData.start_date = createdDate.toISOString()
   }
-  
-  // Due datum (förfallodatum)
+
+  // Due datum MED TID (förfallodatum/sluttid)
   if (task.due_date) {
     const dueDate = new Date(parseInt(task.due_date))
-    dateData.due_date = dueDate.toISOString().split('T')[0] // YYYY-MM-DD format
+    dateData.due_date = dueDate.toISOString() // Behåll tid!
   }
-  
+
   // 🆕 COMPLETED DATE - baserat på status och date_closed
   if (isCompleted) {
     if (task.date_closed) {
-      // Använd ClickUp:s date_closed om det finns
       const completedDate = new Date(parseInt(task.date_closed))
-      dateData.completed_date = completedDate.toISOString().split('T')[0]
+      dateData.completed_date = completedDate.toISOString()
     } else if (task.date_updated) {
-      // Fallback till senaste uppdateringsdatum
       const completedDate = new Date(parseInt(task.date_updated))
-      dateData.completed_date = completedDate.toISOString().split('T')[0]
+      dateData.completed_date = completedDate.toISOString()
     } else {
-      // Sista fallback till idag
-      dateData.completed_date = new Date().toISOString().split('T')[0]
+      dateData.completed_date = new Date().toISOString()
     }
-    
+
     console.log(`📅 Task ${task.id} completed_date set to: ${dateData.completed_date}`)
   } else {
     dateData.completed_date = null
   }
-  
+
   return dateData
 }
 

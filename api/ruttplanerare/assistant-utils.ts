@@ -71,11 +71,20 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   if (privateError) {
     console.error('Error fetching private_cases:', privateError);
   } else {
+    console.log(`[getSchedules] Hämtade ${privateCases?.length || 0} private_cases`);
     privateCases?.forEach(c => {
       if (c.start_date && c.due_date) {
+        const start = new Date(c.start_date);
+        const end = new Date(c.due_date);
+        // Ignorera ärenden utan riktig tid (00:00 till 00:00 = 0 min)
+        const durationMinutes = (end.getTime() - start.getTime()) / 60000;
+        if (durationMinutes <= 0) {
+          console.log(`[getSchedules] Ignorerar "${c.title}" - ingen tid satt (${c.start_date} -> ${c.due_date})`);
+          return;
+        }
         const eventSlot: EventSlot = {
-          start: new Date(c.start_date),
-          end: new Date(c.due_date),
+          start,
+          end,
           title: c.title || 'Privat ärende',
           address: formatAddress(c.adress),
           type: 'case'
@@ -98,11 +107,20 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   if (businessError) {
     console.error('Error fetching business_cases:', businessError);
   } else {
+    console.log(`[getSchedules] Hämtade ${businessCases?.length || 0} business_cases`);
     businessCases?.forEach(c => {
       if (c.start_date && c.due_date) {
+        const start = new Date(c.start_date);
+        const end = new Date(c.due_date);
+        // Ignorera ärenden utan riktig tid (00:00 till 00:00 = 0 min)
+        const durationMinutes = (end.getTime() - start.getTime()) / 60000;
+        if (durationMinutes <= 0) {
+          console.log(`[getSchedules] Ignorerar "${c.title}" - ingen tid satt (${c.start_date} -> ${c.due_date})`);
+          return;
+        }
         const eventSlot: EventSlot = {
-          start: new Date(c.start_date),
-          end: new Date(c.due_date),
+          start,
+          end,
           title: c.title || 'Företagsärende',
           address: formatAddress(c.adress),
           type: 'case'
@@ -125,11 +143,20 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   if (contractError) {
     console.error('Error fetching cases:', contractError);
   } else {
+    console.log(`[getSchedules] Hämtade ${contractCases?.length || 0} contract cases`);
     contractCases?.forEach(c => {
       if (c.scheduled_start && c.scheduled_end) {
+        const start = new Date(c.scheduled_start);
+        const end = new Date(c.scheduled_end);
+        // Ignorera ärenden utan riktig tid
+        const durationMinutes = (end.getTime() - start.getTime()) / 60000;
+        if (durationMinutes <= 0) {
+          console.log(`[getSchedules] Ignorerar "${c.title}" - ingen tid satt`);
+          return;
+        }
         const eventSlot: EventSlot = {
-          start: new Date(c.scheduled_start),
-          end: new Date(c.scheduled_end),
+          start,
+          end,
           title: c.title || 'Avtalsärende',
           address: formatAddress(c.address),
           type: 'case'
