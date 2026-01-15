@@ -102,7 +102,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (staffToSearch.length === 0) { return res.status(200).json([]); }
     
     const staffIds = staffToSearch.map(s => s.id);
+    console.log(`[booking-assistant] Söker schema för ${staffIds.length} tekniker: ${staffToSearch.map(s => s.name).join(', ')}`);
+    console.log(`[booking-assistant] Datumintervall: ${searchStart.toISOString()} - ${searchEnd.toISOString()}`);
+
     const [schedules, absences] = await Promise.all([ getSchedules(staffToSearch, searchStart, searchEnd), getAbsences(staffIds, searchStart, searchEnd) ]);
+
+    // Logga vad vi hittade
+    let totalCasesFound = 0;
+    schedules.forEach((cases, techId) => {
+      if (cases.length > 0) {
+        const techName = staffToSearch.find(s => s.id === techId)?.name || techId;
+        console.log(`[booking-assistant] ${techName}: ${cases.length} ärenden hittade`);
+        cases.forEach(c => console.log(`  - ${c.title}: ${c.start.toISOString()} -> ${c.end.toISOString()}`));
+        totalCasesFound += cases.length;
+      }
+    });
+    console.log(`[booking-assistant] TOTALT: ${totalCasesFound} ärenden hittade för perioden`);
+
     const allAddresses = new Set<string>(staffToSearch.map(s => s.address).filter(Boolean));
     schedules.forEach(cases => cases.forEach(c => { if (c.address) allAddresses.add(c.address); }));
     
