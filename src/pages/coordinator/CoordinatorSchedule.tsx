@@ -22,7 +22,7 @@ import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetai
 import Button from '../../components/ui/Button';
 
 import { LayoutGrid, CalendarOff, ArrowLeft, LogOut, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 import toast from 'react-hot-toast';
@@ -42,6 +42,7 @@ const DEFAULT_ACTIVE_STATUSES = ALL_VALID_STATUSES.filter(status => !status.incl
 
 export default function CoordinatorSchedule() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]); // Alla schemalagda ärenden
@@ -61,6 +62,7 @@ export default function CoordinatorSchedule() {
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
   const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false);
+  const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false);
 
   // Adapter för att konvertera Case till BeGoneCaseRow-liknande format
   const adaptCaseToBeGoneRow = (contractCase: Case & { customer?: any }): BeGoneCaseRow => {
@@ -173,6 +175,39 @@ export default function CoordinatorSchedule() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Hantera öppning av specifikt ärende från notifikation/intern administration
+  useEffect(() => {
+    const openCaseId = searchParams.get('openCase');
+    const caseType = searchParams.get('caseType');
+
+    if (!openCaseId || allCases.length === 0) return;
+
+    // Hitta ärendet i listan
+    const foundCase = allCases.find(c => c.id === openCaseId);
+
+    if (foundCase) {
+      // Öppna modal med kommunikationsfliken
+      setOpenCommunicationOnLoad(true);
+
+      if (foundCase.case_type === 'contract') {
+        const contractCase = contractCases.find(c => c.id === foundCase.id);
+        if (contractCase) {
+          setSelectedContractCase(contractCase);
+          setIsEditContractModalOpen(true);
+        }
+      } else {
+        setSelectedCase(foundCase);
+        setIsEditModalOpen(true);
+      }
+
+      // Rensa URL-parametrar
+      setSearchParams({});
+    } else if (!loading) {
+      // Ärendet finns inte - rensa params
+      setSearchParams({});
+    }
+  }, [searchParams, allCases, contractCases, loading]);
 
   // Filtrera schemalagda ärenden (från båda systemen)
   const scheduledCases = useMemo(() => allCases.filter(isScheduledCase), [allCases]);
@@ -365,12 +400,16 @@ export default function CoordinatorSchedule() {
       </div>
       
       {/* Edit Modal för ClickUp-ärenden */}
-      <EditCaseModal 
-        isOpen={isEditModalOpen} 
-        onClose={() => setIsEditModalOpen(false)} 
-        onSuccess={handleUpdateSuccess} 
-        caseData={selectedCase as any} 
-        technicians={technicians} 
+      <EditCaseModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setOpenCommunicationOnLoad(false);
+        }}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedCase as any}
+        technicians={technicians}
+        openCommunicationOnLoad={openCommunicationOnLoad}
       />
       
       {/* Edit Modal för avtalsärenden */}
@@ -379,6 +418,7 @@ export default function CoordinatorSchedule() {
         onClose={() => {
           setIsEditContractModalOpen(false);
           setSelectedContractCase(null);
+          setOpenCommunicationOnLoad(false);
         }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedContractCase}
