@@ -44,24 +44,110 @@ export const getDayKey = (date: Date): keyof WorkSchedule => {
 
 // --- Data-hämtning ---
 export async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, EventSlot[]>> {
-  const staffIds = staff.map(s => s.id); if (staffIds.length === 0) return new Map();
-  const { data, error } = await supabase.from('cases_secure_view')
+  const staffIds = staff.map(s => s.id);
+  if (staffIds.length === 0) return new Map();
+
+  const schedules = new Map<string, EventSlot[]>();
+  staff.forEach(s => schedules.set(s.id, []));
+
+  // Hjälpfunktion för att lägga till ärenden i schemat
+  const addToSchedule = (
+    techId: string | null,
+    eventSlot: EventSlot
+  ) => {
+    if (techId && staffIds.includes(techId)) {
+      schedules.get(techId)?.push(eventSlot);
+    }
+  };
+
+  // 1. Hämta från private_cases (ClickUp privatpersoner)
+  const { data: privateCases, error: privateError } = await supabase
+    .from('private_cases')
+    .select('start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title')
+    .or(`primary_assignee_id.in.(${staffIds.join(',')}),secondary_assignee_id.in.(${staffIds.join(',')}),tertiary_assignee_id.in.(${staffIds.join(',')})`)
+    .gte('start_date', from.toISOString())
+    .lte('start_date', to.toISOString());
+
+  if (privateError) {
+    console.error('Error fetching private_cases:', privateError);
+  } else {
+    privateCases?.forEach(c => {
+      if (c.start_date && c.due_date) {
+        const eventSlot: EventSlot = {
+          start: new Date(c.start_date),
+          end: new Date(c.due_date),
+          title: c.title || 'Privat ärende',
+          address: formatAddress(c.adress),
+          type: 'case'
+        };
+        addToSchedule(c.primary_assignee_id, eventSlot);
+        addToSchedule(c.secondary_assignee_id, eventSlot);
+        addToSchedule(c.tertiary_assignee_id, eventSlot);
+      }
+    });
+  }
+
+  // 2. Hämta från business_cases (ClickUp företag)
+  const { data: businessCases, error: businessError } = await supabase
+    .from('business_cases')
+    .select('start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title')
+    .or(`primary_assignee_id.in.(${staffIds.join(',')}),secondary_assignee_id.in.(${staffIds.join(',')}),tertiary_assignee_id.in.(${staffIds.join(',')})`)
+    .gte('start_date', from.toISOString())
+    .lte('start_date', to.toISOString());
+
+  if (businessError) {
+    console.error('Error fetching business_cases:', businessError);
+  } else {
+    businessCases?.forEach(c => {
+      if (c.start_date && c.due_date) {
+        const eventSlot: EventSlot = {
+          start: new Date(c.start_date),
+          end: new Date(c.due_date),
+          title: c.title || 'Företagsärende',
+          address: formatAddress(c.adress),
+          type: 'case'
+        };
+        addToSchedule(c.primary_assignee_id, eventSlot);
+        addToSchedule(c.secondary_assignee_id, eventSlot);
+        addToSchedule(c.tertiary_assignee_id, eventSlot);
+      }
+    });
+  }
+
+  // 3. Hämta från cases (Avtalskunder - direkt från tabell, inte vy)
+  const { data: contractCases, error: contractError } = await supabase
+    .from('cases')
     .select('scheduled_start, scheduled_end, primary_technician_id, secondary_technician_id, tertiary_technician_id, address, title')
     .or(`primary_technician_id.in.(${staffIds.join(',')}),secondary_technician_id.in.(${staffIds.join(',')}),tertiary_technician_id.in.(${staffIds.join(',')})`)
     .gte('scheduled_start', from.toISOString())
-    .lte('scheduled_start', to.toISOString())
-    .order('scheduled_start');
-  if (error) throw error;
-  const schedules = new Map<string, EventSlot[]>(); staff.forEach(s => schedules.set(s.id, []));
-  data?.forEach(c => { 
-    if(c.scheduled_start && c.scheduled_end) {
-      const eventSlot = { start: new Date(c.scheduled_start), end: new Date(c.scheduled_end), title: c.title || 'Ärende', address: formatAddress(c.address), type: 'case' as const };
-      // Lägg till ärendet för alla tekniker som är tilldelade
-      if (c.primary_technician_id && staffIds.includes(c.primary_technician_id)) schedules.get(c.primary_technician_id)?.push(eventSlot);
-      if (c.secondary_technician_id && staffIds.includes(c.secondary_technician_id)) schedules.get(c.secondary_technician_id)?.push(eventSlot);
-      if (c.tertiary_technician_id && staffIds.includes(c.tertiary_technician_id)) schedules.get(c.tertiary_technician_id)?.push(eventSlot);
-    }
+    .lte('scheduled_start', to.toISOString());
+
+  if (contractError) {
+    console.error('Error fetching cases:', contractError);
+  } else {
+    contractCases?.forEach(c => {
+      if (c.scheduled_start && c.scheduled_end) {
+        const eventSlot: EventSlot = {
+          start: new Date(c.scheduled_start),
+          end: new Date(c.scheduled_end),
+          title: c.title || 'Avtalsärende',
+          address: formatAddress(c.address),
+          type: 'case'
+        };
+        addToSchedule(c.primary_technician_id, eventSlot);
+        addToSchedule(c.secondary_technician_id, eventSlot);
+        addToSchedule(c.tertiary_technician_id, eventSlot);
+      }
+    });
+  }
+
+  // Logga för debugging
+  let totalCases = 0;
+  schedules.forEach((cases, techId) => {
+    totalCases += cases.length;
   });
+  console.log(`[getSchedules] Hämtade ${totalCases} ärenden för ${staffIds.length} tekniker (${from.toISOString().split('T')[0]} - ${to.toISOString().split('T')[0]})`);
+
   return schedules;
 }
 export async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Map<string, AbsencePeriod[]>> {
