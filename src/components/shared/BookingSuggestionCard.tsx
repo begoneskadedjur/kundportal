@@ -1,5 +1,5 @@
 // 📁 src/components/shared/BookingSuggestionCard.tsx
-// ⭐ VERSION 1.0 - Förbättrad presentation av bokningsförslag
+// ⭐ VERSION 1.1 - Kompaktare kort med responsivt grid-layout för desktop
 
 import React, { useState } from 'react';
 import { Clock, MapPin, Home, Star, TrendingUp, ChevronDown, ChevronUp, Route, User } from 'lucide-react';
@@ -110,7 +110,7 @@ export default function BookingSuggestionCard({
   return (
     <div
       className={`
-        relative p-4 rounded-xl cursor-pointer transition-all duration-200
+        relative p-3 rounded-lg cursor-pointer transition-all duration-200
         ${efficiencyInfo.bgColor} ${efficiencyInfo.borderColor} border
         hover:shadow-lg hover:shadow-slate-900/30 hover:scale-[1.01]
         ${isTopPick ? 'ring-2 ring-emerald-500/50' : ''}
@@ -119,19 +119,19 @@ export default function BookingSuggestionCard({
     >
       {/* Top Pick Badge */}
       {isTopPick && (
-        <div className="absolute -top-2 -right-2 px-2 py-1 bg-emerald-500 text-white text-xs font-bold rounded-full flex items-center gap-1 shadow-lg">
+        <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full flex items-center gap-1 shadow-lg">
           <Star className="w-3 h-3" />
-          Bästa val
+          Bäst
         </div>
       )}
 
-      {/* Header med tekniker och effektivitet */}
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* Header: Tekniker + Effektivitet */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
           {/* Rang-indikator */}
           {rank && rank <= 3 && (
             <div className={`
-              w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0
+              w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0
               ${rank === 1 ? 'bg-emerald-500/20 text-emerald-400' :
                 rank === 2 ? 'bg-blue-500/20 text-blue-400' :
                 'bg-amber-500/20 text-amber-400'}
@@ -142,86 +142,78 @@ export default function BookingSuggestionCard({
 
           {/* Tekniker-info */}
           <div className="min-w-0">
-            <h4 className="font-semibold text-white truncate flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-400 shrink-0" />
+            <h4 className="font-semibold text-white text-sm truncate flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               {suggestion.technician_name}
             </h4>
-            <p className="text-sm text-slate-400 capitalize">
-              {formatDate(suggestion.start_time)}
-            </p>
           </div>
         </div>
 
-        {/* Effektivitets-badge */}
+        {/* Effektivitets-badge - kompakt */}
         <div className={`
-          px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0
+          px-2 py-1 rounded text-xs font-semibold shrink-0
           ${efficiencyInfo.bgColor} ${efficiencyInfo.color} border ${efficiencyInfo.borderColor}
-          flex items-center gap-1.5
         `}>
-          <TrendingUp className="w-3.5 h-3.5" />
           {efficiencyInfo.label}
         </div>
       </div>
 
-      {/* Tid - Prominent visning */}
-      <div className="mb-3">
-        <div className="text-2xl font-bold text-white tracking-tight">
+      {/* Tid - Prominent men kompakt */}
+      <div className="mb-2">
+        <div className="text-lg font-bold text-white tracking-tight">
           {formatTime(suggestion.start_time)} – {formatTime(suggestion.end_time)}
         </div>
+        <p className="text-xs text-slate-400 capitalize">
+          {formatDate(suggestion.start_time)}
+        </p>
       </div>
 
       {/* Kompakt info-rad */}
-      <div className="flex flex-wrap items-center gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         {/* Restid till jobb */}
-        <div className={`flex items-center gap-1.5 ${travelInfo.color}`}>
-          <Route className="w-4 h-4" />
+        <div className={`flex items-center gap-1 ${travelInfo.color}`}>
+          <Route className="w-3.5 h-3.5" />
           <span className="font-medium">{suggestion.travel_time_minutes} min</span>
-          <span className="text-slate-500 text-xs">restid</span>
         </div>
 
         {/* Hemresa (om sent jobb) */}
         {homeInfo && (
-          <div className={`flex items-center gap-1.5 ${homeInfo.color}`}>
-            <Home className="w-4 h-4" />
-            <span className="font-medium">{suggestion.travel_time_home_minutes} min</span>
-            <span className="text-slate-500 text-xs">hem</span>
+          <div className={`flex items-center gap-1 ${homeInfo.color}`}>
+            <Home className="w-3.5 h-3.5" />
+            <span className="font-medium">{suggestion.travel_time_home_minutes} min hem</span>
           </div>
         )}
 
         {/* Första jobb badge */}
         {suggestion.is_first_job && (
-          <div className="flex items-center gap-1.5 text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
-            <Home className="w-3.5 h-3.5" />
-            <span className="text-xs font-medium">Från hemmet</span>
+          <div className="flex items-center gap-1 text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">
+            <Home className="w-3 h-3" />
+            <span className="font-medium">Hemstart</span>
           </div>
         )}
       </div>
 
-      {/* Expanderbar detalj-sektion */}
+      {/* Expanderbar detalj-sektion - endast på hover eller klick */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           setIsExpanded(!isExpanded);
         }}
-        className="mt-3 pt-3 border-t border-slate-700/50 w-full flex items-center justify-between text-slate-400 hover:text-white transition-colors"
+        className="mt-2 pt-2 border-t border-slate-700/50 w-full flex items-center justify-between text-slate-500 hover:text-slate-300 transition-colors"
       >
-        <span className="text-xs">{isExpanded ? 'Dölj detaljer' : 'Visa detaljer'}</span>
-        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        <span className="text-xs">{isExpanded ? 'Dölj' : 'Detaljer'}</span>
+        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
       </button>
 
       {isExpanded && (
-        <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-2 text-sm">
-          <div className="flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+        <div className="mt-2 space-y-1.5 text-xs">
+          <div className="flex items-start gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0" />
             <p className="text-slate-300">{getSimplifiedOrigin()}</p>
           </div>
-          <div className="flex items-start gap-2">
-            <Clock className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
-            <p className="text-slate-400 text-xs">{suggestion.origin_description}</p>
-          </div>
-          <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-slate-900/50">
-            <TrendingUp className={`w-4 h-4 ${efficiencyInfo.color}`} />
-            <p className="text-xs text-slate-400">{efficiencyInfo.description}</p>
+          <div className="flex items-center gap-1.5 p-1.5 rounded bg-slate-900/50">
+            <TrendingUp className={`w-3.5 h-3.5 ${efficiencyInfo.color}`} />
+            <p className="text-slate-400">{efficiencyInfo.description}</p>
           </div>
         </div>
       )}
@@ -307,8 +299,8 @@ export function BookingSuggestionList({ suggestions, onSelect }: BookingSuggesti
             </span>
           </div>
 
-          {/* Kort för denna dag */}
-          <div className="grid gap-3">
+          {/* Kort för denna dag - grid med 2 kolumner på desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {group.suggestions.map((sugg) => {
               globalRank++;
               const isTop = sugg === topSuggestion;

@@ -713,22 +713,25 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
                   </div>
                   
-                  {/* Resultat-sektion med förbättrad presentation */}
-                  <div className="flex-grow">
+                </div>
+
+                {/* Resultat-sektion - flyttad utanför kolumn-layouten för full bredd */}
+                {(suggestionLoading || suggestions.length > 0 || teamSuggestions.length > 0) && (
+                  <div className="lg:col-span-2">
                       {suggestionLoading && (
-                        <div className="text-center py-8">
+                        <div className="text-center py-8 bg-slate-800/30 rounded-lg">
                           <LoadingSpinner text="Analyserar rutter och hittar optimala tider..." />
                         </div>
                       )}
 
                       {/* Single technician suggestions - Använd ny komponent */}
                       {suggestions.length > 0 && (
-                        <div className="pt-4 border-t border-slate-700">
+                        <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-lg">
                           <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                             <CalendarSearch className="w-4 h-4 text-purple-400" />
                             Bokningsförslag
                           </h4>
-                          <div className="max-h-[400px] overflow-y-auto pr-1 -mr-1">
+                          <div className="max-h-[60vh] overflow-y-auto pr-2 -mr-2">
                             <BookingSuggestionList
                               suggestions={suggestions}
                               onSelect={applySuggestion}
@@ -739,12 +742,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
                       {/* Team suggestions - Behåller befintlig styling men förbättrad */}
                       {teamSuggestions.length > 0 && (
-                        <div className="pt-4 border-t border-slate-700 space-y-3">
+                        <div className="mt-4 p-4 bg-slate-800/30 border border-slate-700 rounded-lg space-y-3">
                           <h4 className="text-sm font-semibold text-white flex items-center gap-2">
                             <Users className="w-4 h-4 text-blue-400" />
                             Team-förslag ({numberOfTechnicians} tekniker)
                           </h4>
-                          <div className="max-h-[400px] overflow-y-auto space-y-3 pr-1 -mr-1">
+                          <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2 -mr-2">
                             {teamSuggestions.map((sugg, index) => {
                               const scoreInfo = getTeamEfficiencyInfo(sugg.efficiency_score);
                               const totalTravel = sugg.technicians.reduce((sum, tech) => sum + tech.travel_time_minutes, 0);
