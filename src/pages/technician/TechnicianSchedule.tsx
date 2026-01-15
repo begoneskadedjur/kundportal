@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -147,6 +147,7 @@ const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { i
 export default function TechnicianSchedule() {
   const { profile, isTechnician } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const calendarRef = useRef<FullCalendar>(null);
   const mobileCalendarRef = useRef<FullCalendar>(null);
 
@@ -162,6 +163,7 @@ export default function TechnicianSchedule() {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false);
 
   const fetchScheduledCases = useCallback(async (technicianId: string) => { 
     setLoading(true); 
@@ -235,6 +237,29 @@ export default function TechnicianSchedule() {
     }}, []);
   
   useEffect(() => { if (isTechnician && profile?.technician_id) { fetchScheduledCases(profile.technician_id); }}, [isTechnician, profile?.technician_id, fetchScheduledCases]);
+
+  // Hantera öppning av specifikt ärende från notifikation/länk
+  useEffect(() => {
+    const openCaseId = searchParams.get('openCase');
+    const caseType = searchParams.get('caseType');
+
+    if (!openCaseId || cases.length === 0) return;
+
+    // Hitta ärendet i listan
+    const foundCase = cases.find(c => c.id === openCaseId);
+
+    if (foundCase) {
+      // Öppna modal med kommunikationsfliken
+      setOpenCommunicationOnLoad(true);
+      handleOpenModal(foundCase);
+
+      // Rensa URL-parametrar
+      setSearchParams({});
+    } else if (!loading) {
+      // Ärendet finns inte i teknikerns lista - rensa params
+      setSearchParams({});
+    }
+  }, [searchParams, cases, loading]);
 
   const filteredCases = useMemo(() => cases.filter(c => { const matchesStatus = activeStatuses.has(c.status); const query = searchQuery.toLowerCase(); const matchesSearch = !query || c.title.toLowerCase().includes(query) || (c.kontaktperson && c.kontaktperson.toLowerCase().includes(query)) || formatAddress(c.adress).toLowerCase().includes(query); return matchesStatus && matchesSearch; }), [cases, activeStatuses, searchQuery]);
   
@@ -358,7 +383,16 @@ export default function TechnicianSchedule() {
         </div>
       </div>
       {/* Modal för ClickUp-ärenden */}
-      <EditCaseModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSuccess={handleUpdateSuccess} caseData={selectedCase as any} />
+      <EditCaseModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setOpenCommunicationOnLoad(false)
+        }}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedCase as any}
+        openCommunicationOnLoad={openCommunicationOnLoad}
+      />
       
       {/* Modal för avtalsärenden */}
       <EditContractCaseModal

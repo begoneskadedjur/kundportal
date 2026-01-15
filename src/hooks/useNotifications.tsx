@@ -42,8 +42,9 @@ export function useNotifications(): UseNotificationsReturn {
 
     try {
       setIsLoading(true);
-      const newOffset = reset ? 0 : offset;
-      const data = await getNotifications(user.id, PAGE_SIZE, newOffset);
+      // Använd functional update för att undvika dependency på offset
+      const currentOffset = reset ? 0 : offset;
+      const data = await getNotifications(user.id, PAGE_SIZE, currentOffset);
 
       if (reset) {
         setNotifications(data);
@@ -59,7 +60,8 @@ export function useNotifications(): UseNotificationsReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [user, offset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]); // Medvetet exkluderar offset för att undvika oändlig loop
 
   // Hämta antal olästa
   const fetchUnreadCount = useCallback(async () => {

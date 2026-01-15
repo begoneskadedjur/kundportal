@@ -48,7 +48,8 @@ export default function CommentItem({
   const roleColors = ROLE_COLORS[comment.author_role as AuthorRole] || ROLE_COLORS.technician;
 
   // Rendera @mentions med highlightning
-  // FÖRENKLAD: Stöder nu både gamla formatet @[Namn](user:ID) och nya @Namn
+  // ENKEL APPROACH: Använd mentioned_user_ids från kommentaren för att veta vilka namn som är mentions
+  // Matcha alla @-tecken följt av text som ser ut som ett namn
   const renderContent = (text: string) => {
     const parts: (string | JSX.Element)[] = [];
     let lastIndex = 0;
@@ -78,29 +79,34 @@ export default function CommentItem({
         matches.push({
           index: roleMatch.index,
           length: roleMatch[0].length,
-          displayName: roleMatch[1], // Bara namnet utan @
+          displayName: roleMatch[1],
           isRole: true
         });
       }
     }
 
-    // 3. Matcha nya formatet @Förnamn Efternamn (exakt två namn)
-    // Regex: @ följt av två ord med stor bokstav, och SLUT efter andra ordet
-    // Använder negativ lookahead för att inte matcha om det följs av ytterligare ord med stor bokstav
-    const newFormatRegex = /@([A-ZÅÄÖ][a-zåäö]+\s+[A-ZÅÄÖ][a-zåäö]+)(?!\s+[A-ZÅÄÖ])/g;
-    let newMatch;
-    while ((newMatch = newFormatRegex.exec(text)) !== null) {
+    // 3. FÖRENKLAD: Matcha @Namn där namn är allt fram till vanliga skiljetecken
+    // Detta fångar fullständiga namn oavsett antal ord
+    // Regex: @ följt av minst ett ord som börjar med stor bokstav, fortsätter tills vi hittar
+    // ett tecken som inte är en bokstav, siffra eller mellanslag inom ett namn
+    const nameRegex = /@([A-ZÅÄÖ][a-zåäöA-ZÅÄÖ\s]+?)(?=\s+[a-zåäö]|\s*[.,!?:;\n]|$|\s+@|\s{2,})/g;
+    let nameMatch;
+    while ((nameMatch = nameRegex.exec(text)) !== null) {
+      // Trimma trailing whitespace från namnet
+      const displayName = nameMatch[1].trim();
+      const actualLength = displayName.length + 1; // +1 för @
+
       const isOverlapping = matches.some(m =>
-        (newMatch!.index >= m.index && newMatch!.index < m.index + m.length) ||
-        (m.index >= newMatch!.index && m.index < newMatch!.index + newMatch![0].length)
+        (nameMatch!.index >= m.index && nameMatch!.index < m.index + m.length) ||
+        (m.index >= nameMatch!.index && m.index < nameMatch!.index + actualLength)
       );
-      // Hoppa över om det är en roll-mention
-      const isRoleMention = ['tekniker', 'koordinator', 'admin', 'alla'].includes(newMatch[1].toLowerCase());
-      if (!isOverlapping && !isRoleMention) {
+      const isRoleMention = ['tekniker', 'koordinator', 'admin', 'alla'].includes(displayName.toLowerCase());
+
+      if (!isOverlapping && !isRoleMention && displayName.length >= 2) {
         matches.push({
-          index: newMatch.index,
-          length: newMatch[0].length,
-          displayName: newMatch[1],
+          index: nameMatch.index,
+          length: actualLength,
+          displayName: displayName,
           isRole: false
         });
       }

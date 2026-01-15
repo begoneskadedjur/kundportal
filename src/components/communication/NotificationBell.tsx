@@ -61,15 +61,22 @@ export default function NotificationBell({
     if (onNotificationClick) {
       onNotificationClick(notification);
     } else {
-      // Default: navigera till ärendesökning med case_id för att öppna ärendet
-      const basePath = window.location.pathname.includes('/admin')
-        ? '/admin'
-        : window.location.pathname.includes('/coordinator')
-          ? '/coordinator'
-          : '/technician';
+      // Navigera till rätt sida baserat på användarens portal
+      const pathname = window.location.pathname;
 
-      // Navigera till ärendesökning med case_id som parameter
-      window.location.href = `${basePath}/case-search?openCase=${notification.case_id}&caseType=${notification.case_type}`;
+      if (pathname.includes('/technician')) {
+        // Tekniker: gå till schema-sidan och öppna ärendet där
+        window.location.href = `/technician/schedule?openCase=${notification.case_id}&caseType=${notification.case_type}`;
+      } else if (pathname.includes('/admin')) {
+        // Admin: gå till ärendesökning
+        window.location.href = `/admin/case-search?openCase=${notification.case_id}&caseType=${notification.case_type}`;
+      } else if (pathname.includes('/coordinator')) {
+        // Koordinator: gå till ärendesökning
+        window.location.href = `/coordinator/case-search?openCase=${notification.case_id}&caseType=${notification.case_type}`;
+      } else {
+        // Fallback
+        window.location.href = `/technician/schedule?openCase=${notification.case_id}&caseType=${notification.case_type}`;
+      }
     }
   };
 

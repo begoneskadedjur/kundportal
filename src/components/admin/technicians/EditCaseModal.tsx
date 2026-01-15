@@ -86,6 +86,7 @@ interface EditCaseModalProps {
   onClose: () => void
   onSuccess: (updatedCase: TechnicianCase) => void
   caseData: TechnicianCase | null
+  openCommunicationOnLoad?: boolean
 }
 
 interface BackupData {
@@ -329,7 +330,7 @@ const BackupRestorePrompt: React.FC<{
   );
 };
 
-export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: EditCaseModalProps) {
+export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, openCommunicationOnLoad }: EditCaseModalProps) {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -348,6 +349,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
   // Kommunikations-panel state
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
+
+  // Öppna kommunikationspanelen automatiskt om openCommunicationOnLoad är true
+  useEffect(() => {
+    if (isOpen && openCommunicationOnLoad && caseData) {
+      setShowCommunicationPanel(true)
+    }
+  }, [isOpen, openCommunicationOnLoad, caseData])
 
   // Ref för bildgalleriet så vi kan anropa commitChanges
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)

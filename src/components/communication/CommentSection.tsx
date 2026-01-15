@@ -46,10 +46,10 @@ export default function CommentSection({
   }
 
   return (
-    <div className={`flex flex-col ${compact ? 'gap-3' : 'gap-4'}`}>
+    <div className={`flex flex-col h-full ${compact ? 'gap-3' : 'gap-4'}`}>
       {/* Header */}
       {!compact && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-shrink-0">
           <h3 className="font-semibold text-white flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-purple-400" />
             Aktivitet & Kommunikation
@@ -62,15 +62,17 @@ export default function CommentSection({
         </div>
       )}
 
-      {/* Input */}
-      <CommentInput
-        onSubmit={addComment}
-        isSubmitting={isSubmitting}
-        placeholder={compact ? 'Skriv kommentar...' : undefined}
-      />
+      {/* Input - fast höjd */}
+      <div className="flex-shrink-0">
+        <CommentInput
+          onSubmit={addComment}
+          isSubmitting={isSubmitting}
+          placeholder={compact ? 'Skriv kommentar...' : undefined}
+        />
+      </div>
 
-      {/* Kommentarslista */}
-      <div className={`space-y-2 ${compact ? 'max-h-64' : 'max-h-[50vh]'} overflow-y-auto`}>
+      {/* Kommentarslista - fyller resterande utrymme */}
+      <div className={`space-y-2 flex-1 min-h-0 overflow-y-auto ${!compact ? 'max-h-[50vh]' : ''}`}>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />

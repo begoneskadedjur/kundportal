@@ -98,8 +98,8 @@ export default function CommunicationSlidePanel({
           </button>
         </div>
 
-        {/* Content - extra padding-top för att ge ordentlig luft under header */}
-        <div className="h-[calc(100%-65px)] overflow-y-auto px-4 pt-8 pb-4">
+        {/* Content - flex container som fyller hela höjden */}
+        <div className="h-[calc(100%-65px)] flex flex-col px-4 pt-4 pb-4">
           <CommentSection
             caseId={caseId}
             caseType={caseType}
