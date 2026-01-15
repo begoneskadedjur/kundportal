@@ -3,11 +3,12 @@
 
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, MessageSquareText, Clock, AlertTriangle, CheckCircle2, Inbox } from 'lucide-react';
+import { RefreshCw, MessageSquareText, Clock, AlertTriangle, CheckCircle2, Inbox, CircleDot, ArrowUpRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTickets } from '../../hooks/useTickets';
 import { TicketFilters } from '../../components/admin/TicketFilters';
 import { TicketList } from '../../components/admin/TicketList';
+import { TicketViewTabs, type TicketDirection } from '../../components/admin/TicketViewTabs';
 
 export default function InternAdministration() {
   const { profile } = useAuth();
@@ -16,13 +17,16 @@ export default function InternAdministration() {
   const {
     tickets,
     stats,
+    directionStats,
     loading,
     statsLoading,
     error,
     totalCount,
     hasMore,
     filter,
+    currentDirection,
     setFilter,
+    setDirection,
     loadMore,
     refresh,
     updateStatus,
@@ -45,8 +49,32 @@ export default function InternAdministration() {
     }
   };
 
-  // KPI-kort konfiguration
-  const statCards = [
+  // Direction KPI-kort (ny layout)
+  const directionCards = [
+    {
+      label: 'Behöver åtgärd',
+      shortLabel: 'Åtgärd',
+      value: directionStats?.incoming || 0,
+      icon: CircleDot,
+      color: 'from-amber-500 to-orange-500',
+      textColor: 'text-amber-400',
+      bgColor: 'bg-amber-500/10',
+      direction: 'incoming' as const,
+    },
+    {
+      label: 'Väntar på svar',
+      shortLabel: 'Väntar',
+      value: directionStats?.outgoing || 0,
+      icon: ArrowUpRight,
+      color: 'from-slate-500 to-slate-600',
+      textColor: 'text-slate-400',
+      bgColor: 'bg-slate-600/20',
+      direction: 'outgoing' as const,
+    },
+  ];
+
+  // Status KPI-kort
+  const statusCards = [
     {
       label: 'Öppna',
       value: stats?.open || 0,
@@ -95,25 +123,26 @@ export default function InternAdministration() {
     }
   };
 
-  const activeTicketCount = (stats?.open || 0) + (stats?.inProgress || 0) + (stats?.needsAction || 0);
+  const handleDirectionChange = (direction: TicketDirection) => {
+    setDirection(direction);
+  };
+
+  const activeTicketCount = (directionStats?.incoming || 0) + (directionStats?.outgoing || 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500">
                 <MessageSquareText className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Intern Administration</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">Intern Administration</h1>
                 <p className="text-slate-400 text-sm">
-                  {profile?.role === 'technician'
-                    ? 'Dina ärenden som kräver hantering'
-                    : 'Hantera och följ upp ärenden med @mentions'
-                  }
+                  Hantera och följ upp ärenden med @mentions
                 </p>
               </div>
             </div>
@@ -121,9 +150,9 @@ export default function InternAdministration() {
             <button
               onClick={refresh}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700
                        border border-slate-700 rounded-lg text-slate-300 hover:text-white
-                       transition-colors disabled:opacity-50"
+                       transition-colors disabled:opacity-50 w-full sm:w-auto"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Uppdatera
@@ -138,9 +167,60 @@ export default function InternAdministration() {
           </div>
         </div>
 
-        {/* KPI-kort */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {statCards.map((card) => {
+        {/* Direction KPI-kort (ny - viktigaste) */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {directionCards.map((card) => {
+            const Icon = card.icon;
+            const isActive = currentDirection === card.direction;
+
+            return (
+              <button
+                key={card.direction}
+                onClick={() => handleDirectionChange(card.direction)}
+                disabled={statsLoading}
+                className={`
+                  relative p-4 sm:p-5 rounded-xl border transition-all text-left
+                  ${isActive
+                    ? `${card.bgColor} border-current/30 ring-2 ring-current/20`
+                    : 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-800/70'
+                  }
+                  disabled:opacity-50
+                `}
+              >
+                {/* Bakgrundseffekt */}
+                {isActive && (
+                  <div className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-10 rounded-xl`} />
+                )}
+
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className={`p-2 rounded-lg ${card.bgColor} w-fit`}>
+                      <Icon className={`w-5 h-5 ${card.textColor}`} />
+                    </div>
+                    {isActive && (
+                      <span className={`text-xs px-2 py-1 rounded-full ${card.bgColor} ${card.textColor} font-medium`}>
+                        Aktiv
+                      </span>
+                    )}
+                  </div>
+
+                  <div className={`text-3xl sm:text-4xl font-bold ${card.textColor} mb-1`}>
+                    {statsLoading ? '...' : card.value}
+                  </div>
+
+                  <div className="text-sm text-slate-400">
+                    <span className="hidden sm:inline">{card.label}</span>
+                    <span className="sm:hidden">{card.shortLabel}</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Status KPI-kort (sekundära) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          {statusCards.map((card) => {
             const Icon = card.icon;
             const isActive = filter.status?.length === 1 && filter.status[0] === card.filterStatus;
 
@@ -150,34 +230,39 @@ export default function InternAdministration() {
                 onClick={() => handleStatCardClick(card.filterStatus)}
                 disabled={statsLoading}
                 className={`
-                  relative p-4 rounded-xl border transition-all text-left
+                  relative p-3 sm:p-4 rounded-xl border transition-all text-left
                   ${isActive
-                    ? `${card.bgColor} border-${card.textColor.replace('text-', '')}/50`
-                    : 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-800/70'
+                    ? `${card.bgColor} border-current/30`
+                    : 'bg-slate-800/30 border-slate-700/30 hover:bg-slate-800/50'
                   }
                   disabled:opacity-50
                 `}
               >
-                {/* Bakgrundseffekt */}
-                {isActive && (
-                  <div className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-5 rounded-xl`} />
-                )}
-
                 <div className="relative">
-                  <div className={`p-2 rounded-lg ${card.bgColor} w-fit mb-3`}>
-                    <Icon className={`w-5 h-5 ${card.textColor}`} />
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon className={`w-4 h-4 ${card.textColor}`} />
+                    <span className="text-xs text-slate-500">{card.label}</span>
                   </div>
 
-                  <div className={`text-3xl font-bold ${card.textColor} mb-1`}>
+                  <div className={`text-xl sm:text-2xl font-bold ${card.textColor}`}>
                     {statsLoading ? '...' : card.value}
                   </div>
-
-                  <div className="text-sm text-slate-400">{card.label}</div>
                 </div>
               </button>
             );
           })}
         </div>
+
+        {/* View Tabs */}
+        <TicketViewTabs
+          activeTab={currentDirection}
+          counts={{
+            incoming: directionStats?.incoming || 0,
+            outgoing: directionStats?.outgoing || 0,
+            all: directionStats?.all || 0,
+          }}
+          onTabChange={handleDirectionChange}
+        />
 
         {/* Filter */}
         <div className="mb-6">
@@ -196,7 +281,45 @@ export default function InternAdministration() {
           hasMore={hasMore}
           onLoadMore={loadMore}
           onStatusChange={updateStatus}
+          currentDirection={currentDirection}
         />
+
+        {/* Empty states */}
+        {!loading && tickets.length === 0 && (
+          <div className="text-center py-12">
+            {currentDirection === 'incoming' ? (
+              <>
+                <CheckCircle2 className="w-16 h-16 text-green-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">
+                  Allt avklarat!
+                </h3>
+                <p className="text-slate-400">
+                  Du har inga tickets som väntar på din åtgärd.
+                </p>
+              </>
+            ) : currentDirection === 'outgoing' ? (
+              <>
+                <Inbox className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">
+                  Inga utestående frågor
+                </h3>
+                <p className="text-slate-400">
+                  Du har inte nämnt någon i öppna tickets.
+                </p>
+              </>
+            ) : (
+              <>
+                <Inbox className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">
+                  Inga tickets
+                </h3>
+                <p className="text-slate-400">
+                  Det finns inga tickets som matchar dina filter.
+                </p>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

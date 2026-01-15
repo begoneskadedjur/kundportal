@@ -742,12 +742,16 @@ function formatAddress(adress: any): string | null {
   return null;
 }
 
+export type TicketDirection = 'incoming' | 'outgoing' | 'all';
+
 export interface TicketFilter {
   status?: ('open' | 'in_progress' | 'resolved' | 'needs_action')[];
   searchQuery?: string;
   dateFrom?: string;
   dateTo?: string;
   technicianId?: string; // För tekniker: filtrera på deras ärenden
+  direction?: TicketDirection; // incoming = nämnda mig, outgoing = jag nämnde
+  currentUserId?: string; // För direction-filtrering
 }
 
 export interface TicketStats {
@@ -784,6 +788,19 @@ export async function getTickets(
   }
   if (filter.dateTo) {
     query = query.lte('created_at', filter.dateTo);
+  }
+
+  // Direction-filter (incoming/outgoing)
+  if (filter.direction && filter.currentUserId && filter.direction !== 'all') {
+    if (filter.direction === 'incoming') {
+      // Tickets där jag är nämnd men inte är författare
+      query = query
+        .neq('author_id', filter.currentUserId)
+        .contains('mentioned_user_ids', [filter.currentUserId]);
+    } else if (filter.direction === 'outgoing') {
+      // Tickets där jag är författare
+      query = query.eq('author_id', filter.currentUserId);
+    }
   }
 
   // Sortera och paginera
@@ -900,5 +917,50 @@ export async function getTicketStats(technicianId?: string): Promise<TicketStats
     inProgress: inProgressRes.count || 0,
     needsAction: needsActionRes.count || 0,
     resolved: resolvedRes.count || 0,
+  };
+}
+
+// Direction-baserad statistik
+export interface DirectionStats {
+  incoming: number;  // Tickets där jag är nämnd
+  outgoing: number;  // Tickets där jag är författare
+  all: number;       // Totalt antal
+}
+
+export async function getDirectionStats(userId: string): Promise<DirectionStats> {
+  // Hämta incoming (där jag är nämnd men inte författare)
+  const incomingQuery = supabase
+    .from('case_comments')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_system_comment', false)
+    .neq('author_id', userId)
+    .contains('mentioned_user_ids', [userId])
+    .neq('status', 'resolved');
+
+  // Hämta outgoing (där jag är författare)
+  const outgoingQuery = supabase
+    .from('case_comments')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_system_comment', false)
+    .eq('author_id', userId)
+    .neq('status', 'resolved');
+
+  // Hämta alla (för referens)
+  const allQuery = supabase
+    .from('case_comments')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_system_comment', false)
+    .neq('status', 'resolved');
+
+  const [incomingRes, outgoingRes, allRes] = await Promise.all([
+    incomingQuery,
+    outgoingQuery,
+    allQuery,
+  ]);
+
+  return {
+    incoming: incomingRes.count || 0,
+    outgoing: outgoingRes.count || 0,
+    all: allRes.count || 0,
   };
 }

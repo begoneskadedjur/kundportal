@@ -1,5 +1,5 @@
 // src/components/admin/TicketItem.tsx
-// Enskild ticket-komponent
+// Enskild ticket-komponent med direction indicator
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,15 +12,21 @@ import {
   Building2,
   Home,
   ExternalLink,
-  Bug
+  Bug,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Ticket, CommentStatus } from '../../services/communicationService';
 import { formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
+import type { TicketDirection } from './TicketViewTabs';
 
 interface TicketItemProps {
   ticket: Ticket;
+  direction?: TicketDirection;
+  currentUserName?: string;
   onStatusChange?: (commentId: string, status: CommentStatus) => Promise<boolean>;
 }
 
@@ -33,7 +39,34 @@ const STATUS_CONFIG: Record<CommentStatus, { label: string; color: string; bgCol
 
 const STATUS_OPTIONS: CommentStatus[] = ['open', 'in_progress', 'needs_action', 'resolved'];
 
-export function TicketItem({ ticket, onStatusChange }: TicketItemProps) {
+const DIRECTION_CONFIG = {
+  incoming: {
+    label: 'Behöver åtgärd',
+    shortLabel: 'Inkommande',
+    icon: ArrowDownLeft,
+    borderClass: 'border-l-4 border-l-amber-500',
+    bgClass: 'bg-amber-500/5',
+    badgeClass: 'bg-amber-500/20 text-amber-400',
+  },
+  outgoing: {
+    label: 'Väntar på svar',
+    shortLabel: 'Utgående',
+    icon: ArrowUpRight,
+    borderClass: 'border-l-4 border-l-slate-500',
+    bgClass: 'bg-slate-800/20',
+    badgeClass: 'bg-slate-600/30 text-slate-400',
+  },
+  all: {
+    label: '',
+    shortLabel: '',
+    icon: null,
+    borderClass: '',
+    bgClass: '',
+    badgeClass: '',
+  },
+};
+
+export function TicketItem({ ticket, direction = 'all', currentUserName, onStatusChange }: TicketItemProps) {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
@@ -42,6 +75,7 @@ export function TicketItem({ ticket, onStatusChange }: TicketItemProps) {
   const { comment, case_id, case_type, case_title, kontaktperson, adress, skadedjur } = ticket;
   const status = comment.status || 'open';
   const statusConfig = STATUS_CONFIG[status];
+  const directionConfig = direction !== 'all' ? DIRECTION_CONFIG[direction] : null;
 
   // Kan ändra status: admin, koordinator och tekniker
   const canChangeStatus = profile?.role === 'admin' || profile?.role === 'koordinator' || profile?.role === 'technician';
@@ -82,13 +116,33 @@ export function TicketItem({ ticket, onStatusChange }: TicketItemProps) {
     ? comment.content.substring(0, 200) + '...'
     : comment.content;
 
+  // Hämta nämnda personer från kommentaren
+  const mentionedNames = comment.mentioned_user_names || [];
+
   return (
     <div
-      className="bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl
-               transition-all cursor-pointer group"
+      className={`
+        bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl
+        transition-all cursor-pointer group
+        ${directionConfig?.borderClass || ''}
+        ${directionConfig?.bgClass || ''}
+      `}
     >
+      {/* Direction badge (om incoming/outgoing) */}
+      {directionConfig && directionConfig.label && (
+        <div className="px-4 pt-3 pb-1">
+          <div className={`
+            inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium
+            ${directionConfig.badgeClass}
+          `}>
+            {directionConfig.icon && <directionConfig.icon className="w-3 h-3" />}
+            {directionConfig.shortLabel}
+          </div>
+        </div>
+      )}
+
       {/* Header med titel och status */}
-      <div className="flex items-start justify-between p-4 pb-2">
+      <div className={`flex items-start justify-between p-4 ${directionConfig?.label ? 'pt-2' : ''} pb-2`}>
         <div className="flex items-center gap-3 flex-1 min-w-0" onClick={handleClick}>
           {/* Ikon för ärendetyp */}
           <div className={`
@@ -189,14 +243,33 @@ export function TicketItem({ ticket, onStatusChange }: TicketItemProps) {
 
       {/* Footer med metadata */}
       <div
-        className="flex flex-wrap items-center gap-4 px-4 py-3 border-t border-slate-700/30 text-xs text-slate-500"
+        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 border-t border-slate-700/30 text-xs text-slate-500"
         onClick={handleClick}
       >
-        {/* Författare */}
-        <div className="flex items-center gap-1.5">
-          <User className="w-3.5 h-3.5" />
-          <span>{comment.author_name || 'Okänd'}</span>
-        </div>
+        {/* Författare med direction-kontext */}
+        {direction === 'incoming' ? (
+          <div className="flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-slate-300">{comment.author_name || 'Okänd'}</span>
+            <ArrowRight className="w-3 h-3 text-slate-600" />
+            <span className="text-amber-400 font-medium">dig</span>
+          </div>
+        ) : direction === 'outgoing' ? (
+          <div className="flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-slate-300">Du</span>
+            <ArrowRight className="w-3 h-3 text-slate-600" />
+            <span className="text-slate-400">
+              {mentionedNames.length > 0 ? mentionedNames.slice(0, 2).join(', ') : 'Nämnda'}
+              {mentionedNames.length > 2 && ` +${mentionedNames.length - 2}`}
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5" />
+            <span>{comment.author_name || 'Okänd'}</span>
+          </div>
+        )}
 
         {/* Kontaktperson */}
         {kontaktperson && (
@@ -214,9 +287,9 @@ export function TicketItem({ ticket, onStatusChange }: TicketItemProps) {
           </div>
         )}
 
-        {/* Adress */}
+        {/* Adress - Dölj på mobil om det blir för trångt */}
         {adress && (
-          <div className="flex items-center gap-1.5">
+          <div className="hidden sm:flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5" />
             <span className="truncate max-w-[200px]">{adress}</span>
           </div>

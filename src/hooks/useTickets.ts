@@ -6,11 +6,14 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   getTickets,
   getTicketStats,
+  getDirectionStats,
   updateCommentStatus,
   type Ticket,
   type TicketFilter,
   type TicketStats,
-  type CommentStatus
+  type DirectionStats,
+  type CommentStatus,
+  type TicketDirection
 } from '../services/communicationService';
 
 interface UseTicketsOptions {
@@ -22,13 +25,16 @@ interface UseTicketsOptions {
 interface UseTicketsReturn {
   tickets: Ticket[];
   stats: TicketStats | null;
+  directionStats: DirectionStats | null;
   loading: boolean;
   statsLoading: boolean;
   error: string | null;
   totalCount: number;
   hasMore: boolean;
   filter: TicketFilter;
+  currentDirection: TicketDirection;
   setFilter: (filter: TicketFilter) => void;
+  setDirection: (direction: TicketDirection) => void;
   loadMore: () => Promise<void>;
   refresh: () => Promise<void>;
   updateStatus: (commentId: string, status: CommentStatus) => Promise<boolean>;
@@ -40,15 +46,18 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [stats, setStats] = useState<TicketStats | null>(null);
+  const [directionStats, setDirectionStats] = useState<DirectionStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [offset, setOffset] = useState(0);
   const [filter, setFilterState] = useState<TicketFilter>(initialFilter);
+  const [currentDirection, setCurrentDirection] = useState<TicketDirection>('incoming');
 
   // Bestäm technicianId baserat på roll
   const technicianId = profile?.role === 'technician' ? profile.technician_id : undefined;
+  const currentUserId = profile?.id;
 
   // Hämta tickets
   const fetchTickets = useCallback(async (reset: boolean = false) => {
@@ -59,12 +68,14 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
 
     try {
       const currentOffset = reset ? 0 : offset;
-      const filterWithTechnician: TicketFilter = {
+      const filterWithContext: TicketFilter = {
         ...filter,
         technicianId: technicianId || undefined,
+        direction: currentDirection,
+        currentUserId: currentUserId,
       };
 
-      const result = await getTickets(filterWithTechnician, pageSize, currentOffset);
+      const result = await getTickets(filterWithContext, pageSize, currentOffset);
 
       if (reset) {
         setTickets(result.tickets);
@@ -81,7 +92,7 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
     } finally {
       setLoading(false);
     }
-  }, [authLoading, profile, filter, offset, pageSize, technicianId]);
+  }, [authLoading, profile, filter, offset, pageSize, technicianId, currentDirection, currentUserId]);
 
   // Hämta statistik
   const fetchStats = useCallback(async () => {
@@ -90,18 +101,30 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
     setStatsLoading(true);
 
     try {
-      const result = await getTicketStats(technicianId || undefined);
-      setStats(result);
+      const [statusStats, dirStats] = await Promise.all([
+        getTicketStats(technicianId || undefined),
+        currentUserId ? getDirectionStats(currentUserId) : Promise.resolve({ incoming: 0, outgoing: 0, all: 0 }),
+      ]);
+
+      setStats(statusStats);
+      setDirectionStats(dirStats);
     } catch (err) {
       console.error('Error fetching ticket stats:', err);
     } finally {
       setStatsLoading(false);
     }
-  }, [authLoading, profile, technicianId]);
+  }, [authLoading, profile, technicianId, currentUserId]);
 
   // Uppdatera filter och återställ lista
   const setFilter = useCallback((newFilter: TicketFilter) => {
     setFilterState(newFilter);
+    setOffset(0);
+    setTickets([]);
+  }, []);
+
+  // Uppdatera direction och återställ lista
+  const setDirection = useCallback((direction: TicketDirection) => {
+    setCurrentDirection(direction);
     setOffset(0);
     setTickets([]);
   }, []);
@@ -147,26 +170,35 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
     }
   }, [profile, fetchStats]);
 
-  // Auto-fetch vid mount och filter-ändring
+  // Auto-fetch vid mount och filter/direction-ändring
   useEffect(() => {
     if (autoFetch && !authLoading && profile) {
       fetchTickets(true);
+    }
+  }, [autoFetch, authLoading, profile, filter, currentDirection]);
+
+  // Hämta stats separat
+  useEffect(() => {
+    if (autoFetch && !authLoading && profile) {
       fetchStats();
     }
-  }, [autoFetch, authLoading, profile, filter]);
+  }, [autoFetch, authLoading, profile]);
 
   const hasMore = tickets.length < totalCount;
 
   return {
     tickets,
     stats,
+    directionStats,
     loading,
     statsLoading,
     error,
     totalCount,
     hasMore,
     filter,
+    currentDirection,
     setFilter,
+    setDirection,
     loadMore,
     refresh,
     updateStatus,

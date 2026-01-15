@@ -2,9 +2,9 @@
 // Lista med tickets
 
 import { useEffect, useRef, useCallback } from 'react';
-import { Inbox, Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { TicketItem } from './TicketItem';
-import type { Ticket, CommentStatus } from '../../services/communicationService';
+import type { Ticket, CommentStatus, TicketDirection } from '../../services/communicationService';
 
 interface TicketListProps {
   tickets: Ticket[];
@@ -13,6 +13,7 @@ interface TicketListProps {
   hasMore: boolean;
   onLoadMore: () => Promise<void>;
   onStatusChange?: (commentId: string, status: CommentStatus) => Promise<boolean>;
+  currentDirection?: TicketDirection;
 }
 
 export function TicketList({
@@ -22,6 +23,7 @@ export function TicketList({
   hasMore,
   onLoadMore,
   onStatusChange,
+  currentDirection = 'all',
 }: TicketListProps) {
   const observerRef = useRef<HTMLDivElement>(null);
 
@@ -88,19 +90,9 @@ export function TicketList({
     );
   }
 
-  // Empty state
+  // Empty state handled by parent component now
   if (!loading && tickets.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-slate-700/30 flex items-center justify-center mb-4">
-          <Inbox className="w-8 h-8 text-slate-500" />
-        </div>
-        <h3 className="text-lg font-medium text-white mb-2">Inga tickets hittades</h3>
-        <p className="text-slate-400">
-          Prova att ändra dina filter eller sökord
-        </p>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -109,6 +101,7 @@ export function TicketList({
         <TicketItem
           key={ticket.comment.id}
           ticket={ticket}
+          direction={currentDirection}
           onStatusChange={onStatusChange}
         />
       ))}
