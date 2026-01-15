@@ -112,17 +112,51 @@ export function useNotifications(): UseNotificationsReturn {
       return;
     }
 
-    // Kolla om user har ändrats (för att undvika dubbla fetches)
-    if (userIdRef.current === user.id && initialLoadDone.current) {
-      return;
-    }
-    userIdRef.current = user.id;
+    const userId = user.id;
+    let isCancelled = false;
 
-    // Hämta data
-    fetchNotifications(true);
-    fetchUnreadCount();
+    // Hämta notifikationer direkt i useEffect
+    const loadInitialData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-    const unsubscribe = subscribeToNotifications(user.id, (newNotification) => {
+        // Hämta notifikationer med timeout
+        const data = await withTimeout(
+          getNotifications(userId, PAGE_SIZE, 0),
+          FETCH_TIMEOUT_MS
+        );
+
+        if (!isCancelled) {
+          setNotifications(data);
+          setOffset(PAGE_SIZE);
+          setHasMore(data.length === PAGE_SIZE);
+          initialLoadDone.current = true;
+        }
+
+        // Hämta olästa
+        const count = await getUnreadNotificationCount(userId);
+        if (!isCancelled) {
+          setUnreadCount(count);
+        }
+      } catch (err) {
+        console.error('Fel vid hämtning av notifikationer:', err);
+        if (!isCancelled) {
+          const errorMessage = err instanceof Error ? err.message : 'Kunde inte hämta notifikationer';
+          setError(errorMessage);
+          setNotifications([]);
+          setHasMore(false);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadInitialData();
+
+    const unsubscribe = subscribeToNotifications(userId, (newNotification) => {
       setNotifications(prev => [newNotification, ...prev]);
       setUnreadCount(prev => prev + 1);
 
@@ -170,7 +204,10 @@ export function useNotifications(): UseNotificationsReturn {
       });
     });
 
-    return unsubscribe;
+    return () => {
+      isCancelled = true;
+      unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]); // Kör bara när user.id ändras
 
