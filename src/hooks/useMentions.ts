@@ -121,11 +121,14 @@ export function useMentions(
       );
 
       let mentionText: string;
-      if (suggestion.type === 'user') {
-        // För användare, använd visningsnamn
-        mentionText = `@${suggestion.displayName}`;
+      if (suggestion.type === 'user' && suggestion.id) {
+        // För användare, inkludera ID i ett speciellt format: @[Namn](user:ID)
+        mentionText = `@[${suggestion.displayName}](user:${suggestion.id})`;
+      } else if (suggestion.type === 'role' && suggestion.role) {
+        // För roller, behåll vanligt format
+        mentionText = suggestion.displayName;
       } else {
-        // För roller och @alla
+        // För @alla
         mentionText = suggestion.displayName;
       }
 

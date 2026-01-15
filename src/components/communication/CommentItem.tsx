@@ -49,29 +49,68 @@ export default function CommentItem({
 
   // Rendera @mentions med highlightning
   const renderContent = (text: string) => {
-    // Matcha @mentions och highlighta dem (inkl. svenska tecken åäöÅÄÖ)
-    const mentionRegex = /@([\wåäöÅÄÖ]+)/g;
     const parts: (string | JSX.Element)[] = [];
     let lastIndex = 0;
-    let match;
 
-    while ((match = mentionRegex.exec(text)) !== null) {
+    // Först: Matcha det nya formatet @[Namn](user:ID)
+    const userMentionRegex = /@\[([^\]]+)\]\(user:[^)]+\)/g;
+    const matches: { index: number; length: number; displayName: string; isUser: boolean }[] = [];
+
+    let userMatch;
+    while ((userMatch = userMentionRegex.exec(text)) !== null) {
+      matches.push({
+        index: userMatch.index,
+        length: userMatch[0].length,
+        displayName: userMatch[1],
+        isUser: true
+      });
+    }
+
+    // Sedan: Matcha roll-mentions (@tekniker, @koordinator, @admin, @alla)
+    const roleRegex = /@(tekniker|koordinator|admin|alla)\b/gi;
+    let roleMatch;
+    while ((roleMatch = roleRegex.exec(text)) !== null) {
+      // Kontrollera att denna position inte redan är en user mention
+      const isOverlapping = matches.some(m =>
+        roleMatch!.index >= m.index && roleMatch!.index < m.index + m.length
+      );
+      if (!isOverlapping) {
+        matches.push({
+          index: roleMatch.index,
+          length: roleMatch[0].length,
+          displayName: roleMatch[0],
+          isUser: false
+        });
+      }
+    }
+
+    // Sortera efter position
+    matches.sort((a, b) => a.index - b.index);
+
+    // Bygg upp parts-arrayen
+    for (const match of matches) {
       // Text före mention
       if (match.index > lastIndex) {
         parts.push(text.substring(lastIndex, match.index));
       }
 
-      // Mention
+      // Mention med highlight
       parts.push(
         <span
           key={match.index}
-          className="text-[#20c58f] font-medium hover:underline cursor-pointer"
+          className={`
+            px-1.5 py-0.5 rounded font-medium
+            ${match.isUser
+              ? 'bg-[#20c58f]/20 text-[#20c58f]'
+              : 'bg-purple-500/20 text-purple-400'
+            }
+          `}
         >
-          {match[0]}
+          @{match.displayName}
         </span>
       );
 
-      lastIndex = match.index + match[0].length;
+      lastIndex = match.index + match.length;
     }
 
     // Text efter sista mention
@@ -134,17 +173,19 @@ export default function CommentItem({
 
         {/* Innehåll */}
         <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium text-white">
-              {comment.author_name}
-            </span>
-            <span className={`
-              px-2 py-0.5 rounded text-xs font-medium
-              ${roleColors.bg} ${roleColors.text}
-            `}>
-              {ROLE_DISPLAY_NAMES[comment.author_role as AuthorRole]}
-            </span>
+          {/* Header - Namn framträdande, roll diskret */}
+          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-white text-[15px]">
+                {comment.author_name}
+              </span>
+              <span className={`
+                px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide
+                ${roleColors.bg} ${roleColors.text} opacity-80
+              `}>
+                {ROLE_DISPLAY_NAMES[comment.author_role as AuthorRole]}
+              </span>
+            </div>
             <span className="text-xs text-slate-500 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {formatCommentTime(comment.created_at)}

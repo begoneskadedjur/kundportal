@@ -100,17 +100,11 @@ export default function CommunicationSlidePanel({
 
         {/* Content */}
         <div className="h-[calc(100%-65px)] overflow-y-auto p-4">
-          <div className="mb-4">
-            <p className="text-sm text-slate-400">
-              Skriv kommentarer och använd <span className="text-purple-400 font-medium">@namn</span> för att nämna kollegor.
-              Systemhändelser loggas automatiskt.
-            </p>
-          </div>
-
           <CommentSection
             caseId={caseId}
             caseType={caseType}
             caseTitle={caseTitle}
+            compact={true}
           />
         </div>
       </div>

@@ -222,14 +222,44 @@ export function getMentionTriggerRegex(): RegExp {
 
 export function extractMentions(text: string): ParsedMention[] {
   const mentions: ParsedMention[] = [];
-  // Inkludera svenska bokstäver (åäöÅÄÖ) i regex
-  const regex = /@([\wåäöÅÄÖ]+)/g;
-  let match;
 
-  while ((match = regex.exec(text)) !== null) {
-    const value = match[1].toLowerCase();
-    const startIndex = match.index;
-    const endIndex = match.index + match[0].length;
+  // Första: Matcha det nya formatet @[Namn](user:ID)
+  const userMentionRegex = /@\[([^\]]+)\]\(user:([^)]+)\)/g;
+  let userMatch;
+  const processedRanges: { start: number; end: number }[] = [];
+
+  while ((userMatch = userMentionRegex.exec(text)) !== null) {
+    const displayName = userMatch[1];
+    const userId = userMatch[2];
+    const startIndex = userMatch.index;
+    const endIndex = userMatch.index + userMatch[0].length;
+
+    mentions.push({
+      type: 'user',
+      value: displayName.toLowerCase(),
+      userId: userId,
+      startIndex,
+      endIndex
+    });
+
+    processedRanges.push({ start: startIndex, end: endIndex });
+  }
+
+  // Andra: Matcha roller och @alla (enkelt format)
+  const roleRegex = /@([\wåäöÅÄÖ]+)/g;
+  let roleMatch;
+
+  while ((roleMatch = roleRegex.exec(text)) !== null) {
+    const startIndex = roleMatch.index;
+    const endIndex = roleMatch.index + roleMatch[0].length;
+
+    // Hoppa över om redan processad som user mention
+    const isAlreadyProcessed = processedRanges.some(
+      range => startIndex >= range.start && startIndex < range.end
+    );
+    if (isAlreadyProcessed) continue;
+
+    const value = roleMatch[1].toLowerCase();
 
     if (value === 'alla') {
       mentions.push({ type: 'all', value, startIndex, endIndex });
@@ -241,10 +271,8 @@ export function extractMentions(text: string): ParsedMention[] {
         startIndex,
         endIndex
       });
-    } else {
-      // Specifik användare (ID måste lösas upp senare)
-      mentions.push({ type: 'user', value, startIndex, endIndex });
     }
+    // Ignorera okända @mentions (gammalt format utan ID)
   }
 
   return mentions;

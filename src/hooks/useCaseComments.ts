@@ -128,8 +128,17 @@ export function useCaseComments({
           attachments: uploadedAttachments,
         };
 
-        await createComment(commentData, caseTitle);
-        // Kommentaren läggs till via realtime subscription
+        const newComment = await createComment(commentData, caseTitle);
+
+        // Lägg till kommentaren direkt i listan (optimistisk uppdatering)
+        // Realtime subscription kan vara långsam eller inaktiverad
+        setComments((prev) => {
+          // Kontrollera om kommentaren redan finns (från realtime)
+          if (prev.some((c) => c.id === newComment.id)) {
+            return prev;
+          }
+          return [...prev, newComment];
+        });
       } catch (err) {
         console.error('Fel vid skapande av kommentar:', err);
         toast.error('Kunde inte skapa kommentar');
@@ -190,16 +199,25 @@ export function useCaseComments({
 
 // Hjälpfunktion för att hämta användarnamn
 async function getAuthorName(userId: string, role: string): Promise<string> {
-  // Försök hämta från technicians-tabellen först
-  if (role === 'technician') {
-    const { supabase } = await import('../lib/supabase');
-    const { data } = await supabase
-      .from('technicians')
-      .select('name')
-      .eq('user_id', userId)
-      .single();
+  const { supabase } = await import('../lib/supabase');
 
-    if (data?.name) return data.name;
+  // Försök hämta via profiles med join till technicians
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select(`
+      display_name,
+      technicians (
+        name
+      )
+    `)
+    .eq('id', userId)
+    .single();
+
+  if (profile) {
+    // Använd display_name eller teknikerns namn
+    const techData = profile.technicians as { name: string } | null;
+    if (profile.display_name) return profile.display_name;
+    if (techData?.name) return techData.name;
   }
 
   // Fallback till generic namn baserat på roll
