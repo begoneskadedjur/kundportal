@@ -41,9 +41,15 @@ export default function NotificationCenter({
     if (onNotificationClick) {
       onNotificationClick(notification);
     } else {
-      // Default: navigera till ärendet
-      // TODO: Implementera navigation till ärende baserat på case_type och case_id
-      console.log('Navigate to case:', notification.case_id, notification.case_type);
+      // Default: navigera till ärendesökning med case_id för att öppna ärendet
+      const basePath = window.location.pathname.includes('/admin')
+        ? '/admin'
+        : window.location.pathname.includes('/coordinator')
+          ? '/coordinator'
+          : '/technician';
+
+      // Navigera till ärendesökning med case_id som parameter
+      navigate(`${basePath}/case-search?openCase=${notification.case_id}&caseType=${notification.case_type}`);
     }
   };
 

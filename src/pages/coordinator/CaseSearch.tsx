@@ -2,6 +2,7 @@
 // ⭐ VERSION 2.0 - Med kommentarsökning ⭐
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/shared';
 import { supabase } from '../../lib/supabase';
 import { BeGoneCaseRow } from '../../types/database';
@@ -134,6 +135,7 @@ type SortField = 'title' | 'kontaktperson' | 'status' | 'primary_assignee_name' 
 type SortDirection = 'asc' | 'desc';
 
 export default function CaseSearch() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]);
   const [technicians, setTechnicians] = useState<any[]>([]);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
@@ -153,6 +155,23 @@ export default function CaseSearch() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Hantera openCase URL-parameter (från notifikationer)
+  useEffect(() => {
+    const openCaseId = searchParams.get('openCase');
+    const caseType = searchParams.get('caseType');
+
+    if (openCaseId && allCases.length > 0) {
+      // Hitta ärendet i listan
+      const caseToOpen = allCases.find(c => c.id === openCaseId);
+      if (caseToOpen) {
+        setSelectedCase(caseToOpen);
+        setEditModalOpen(true);
+        // Ta bort parametrarna från URL
+        setSearchParams({});
+      }
+    }
+  }, [searchParams, allCases, setSearchParams]);
 
   // Sök i kommentarer när sökfrågan ändras och includeComments är aktiverat
   useEffect(() => {

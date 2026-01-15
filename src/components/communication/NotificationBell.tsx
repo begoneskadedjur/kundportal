@@ -60,6 +60,16 @@ export default function NotificationBell({
     setIsOpen(false);
     if (onNotificationClick) {
       onNotificationClick(notification);
+    } else {
+      // Default: navigera till ärendesökning med case_id för att öppna ärendet
+      const basePath = window.location.pathname.includes('/admin')
+        ? '/admin'
+        : window.location.pathname.includes('/coordinator')
+          ? '/coordinator'
+          : '/technician';
+
+      // Navigera till ärendesökning med case_id som parameter
+      window.location.href = `${basePath}/case-search?openCase=${notification.case_id}&caseType=${notification.case_type}`;
     }
   };
 

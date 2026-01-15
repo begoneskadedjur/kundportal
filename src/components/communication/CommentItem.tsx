@@ -84,9 +84,10 @@ export default function CommentItem({
       }
     }
 
-    // 3. Matcha nya formatet @Namn (användarnamn med flera ord)
-    // Regex: @ följt av minst 2 tecken som innehåller svenska bokstäver och mellanslag
-    const newFormatRegex = /@([A-ZÅÄÖ][a-zåäö]+(?:\s+[A-ZÅÄÖ][a-zåäö]+)*)/g;
+    // 3. Matcha nya formatet @Förnamn Efternamn (exakt två namn)
+    // Regex: @ följt av två ord med stor bokstav, och SLUT efter andra ordet
+    // Använder negativ lookahead för att inte matcha om det följs av ytterligare ord med stor bokstav
+    const newFormatRegex = /@([A-ZÅÄÖ][a-zåäö]+\s+[A-ZÅÄÖ][a-zåäö]+)(?!\s+[A-ZÅÄÖ])/g;
     let newMatch;
     while ((newMatch = newFormatRegex.exec(text)) !== null) {
       const isOverlapping = matches.some(m =>
