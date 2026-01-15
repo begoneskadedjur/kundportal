@@ -712,97 +712,91 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     
                     <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
                   </div>
-                  
+
+                  {/* Resultat-sektion - under Intelligent Bokning i vänstra kolumnen */}
+                  {suggestionLoading && (
+                    <div className="text-center py-6">
+                      <LoadingSpinner text="Analyserar rutter och hittar optimala tider..." />
+                    </div>
+                  )}
+
+                  {/* Single technician suggestions */}
+                  {suggestions.length > 0 && (
+                    <div className="pt-4 border-t border-slate-700">
+                      <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                        <CalendarSearch className="w-4 h-4 text-purple-400" />
+                        Bokningsförslag ({suggestions.length} st)
+                      </h4>
+                      <div className="max-h-[50vh] overflow-y-auto pr-1 -mr-1">
+                        <BookingSuggestionList
+                          suggestions={suggestions}
+                          onSelect={applySuggestion}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Team suggestions */}
+                  {teamSuggestions.length > 0 && (
+                    <div className="pt-4 border-t border-slate-700 space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                        <Users className="w-4 h-4 text-blue-400" />
+                        Team-förslag ({numberOfTechnicians} tekniker)
+                      </h4>
+                      <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-1 -mr-1">
+                        {teamSuggestions.map((sugg, index) => {
+                          const scoreInfo = getTeamEfficiencyInfo(sugg.efficiency_score);
+                          const totalTravel = sugg.technicians.reduce((sum, tech) => sum + tech.travel_time_minutes, 0);
+                          const isTopPick = index === 0;
+                          return (
+                            <div
+                              key={index}
+                              className={`
+                                relative p-3 rounded-lg cursor-pointer transition-all duration-200
+                                ${isTopPick ? 'bg-emerald-500/10 border border-emerald-500/40' : 'bg-slate-700/50 border border-slate-600 hover:border-slate-500'}
+                                hover:shadow-lg hover:shadow-slate-900/30
+                              `}
+                              onClick={() => applyTeamSuggestion(sugg)}
+                            >
+                              {isTopPick && (
+                                <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full shadow-lg">
+                                  Bäst
+                                </div>
+                              )}
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div>
+                                  <p className="text-lg font-bold text-white">
+                                    {formatTime(sugg.start_time)} – {formatTime(sugg.end_time)}
+                                  </p>
+                                  <p className="text-xs text-slate-400">
+                                    {new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                  </p>
+                                </div>
+                                <div className={`px-2 py-1 rounded text-xs font-semibold ${scoreInfo.color} bg-slate-800`}>
+                                  {scoreInfo.label}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-blue-400 mb-2">
+                                <Users className="w-3.5 h-3.5" />
+                                <span>Total: {totalTravel} min restid</span>
+                              </div>
+                              <div className="pt-2 border-t border-slate-600/50 space-y-1">
+                                {sugg.technicians.map(tech => (
+                                  <div key={tech.id} className="flex items-center justify-between text-xs">
+                                    <span className="text-slate-300">{tech.name}</span>
+                                    <span className="text-slate-500">{tech.travel_time_minutes} min</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Resultat-sektion - flyttad utanför kolumn-layouten för full bredd */}
-                {(suggestionLoading || suggestions.length > 0 || teamSuggestions.length > 0) && (
-                  <div className="lg:col-span-2">
-                      {suggestionLoading && (
-                        <div className="text-center py-8 bg-slate-800/30 rounded-lg">
-                          <LoadingSpinner text="Analyserar rutter och hittar optimala tider..." />
-                        </div>
-                      )}
-
-                      {/* Single technician suggestions - Använd ny komponent */}
-                      {suggestions.length > 0 && (
-                        <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-lg">
-                          <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                            <CalendarSearch className="w-4 h-4 text-purple-400" />
-                            Bokningsförslag
-                          </h4>
-                          <div className="max-h-[60vh] overflow-y-auto pr-2 -mr-2">
-                            <BookingSuggestionList
-                              suggestions={suggestions}
-                              onSelect={applySuggestion}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Team suggestions - Behåller befintlig styling men förbättrad */}
-                      {teamSuggestions.length > 0 && (
-                        <div className="mt-4 p-4 bg-slate-800/30 border border-slate-700 rounded-lg space-y-3">
-                          <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                            <Users className="w-4 h-4 text-blue-400" />
-                            Team-förslag ({numberOfTechnicians} tekniker)
-                          </h4>
-                          <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2 -mr-2">
-                            {teamSuggestions.map((sugg, index) => {
-                              const scoreInfo = getTeamEfficiencyInfo(sugg.efficiency_score);
-                              const totalTravel = sugg.technicians.reduce((sum, tech) => sum + tech.travel_time_minutes, 0);
-                              const isTopPick = index === 0;
-                              return (
-                                <div
-                                  key={index}
-                                  className={`
-                                    relative p-4 rounded-xl cursor-pointer transition-all duration-200
-                                    ${isTopPick ? 'bg-emerald-500/10 border border-emerald-500/40' : 'bg-slate-700/50 border border-slate-600 hover:border-slate-500'}
-                                    hover:shadow-lg hover:shadow-slate-900/30
-                                  `}
-                                  onClick={() => applyTeamSuggestion(sugg)}
-                                >
-                                  {isTopPick && (
-                                    <div className="absolute -top-2 -right-2 px-2 py-1 bg-emerald-500 text-white text-xs font-bold rounded-full shadow-lg">
-                                      Bästa val
-                                    </div>
-                                  )}
-                                  <div className="flex items-start justify-between gap-3 mb-3">
-                                    <div>
-                                      <p className="font-semibold text-white">
-                                        {new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                      </p>
-                                      <p className="text-2xl font-bold text-white mt-1">
-                                        {formatTime(sugg.start_time)} – {formatTime(sugg.end_time)}
-                                      </p>
-                                    </div>
-                                    <div className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${scoreInfo.color} bg-slate-800`}>
-                                      {scoreInfo.label}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-sm text-blue-400 mb-3">
-                                    <Users className="w-4 h-4" />
-                                    <span>Total restid: {totalTravel} min</span>
-                                  </div>
-                                  <div className="pt-3 border-t border-slate-600/50 space-y-2">
-                                    {sugg.technicians.map(tech => (
-                                      <div key={tech.id} className="flex items-center justify-between text-sm">
-                                        <span className="text-slate-300">{tech.name}</span>
-                                        <span className="text-slate-500 font-mono text-xs">
-                                          {tech.travel_time_minutes} min restid
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                  </div>
-                )}
-
+                {/* Höger kolumn: Bokning & Detaljer */}
                 <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-6">
                   <h3 className="font-semibold text-white text-lg flex items-center gap-2"><FileText className="text-green-400"/>Bokning & Detaljer</h3>
                   <div className="space-y-4">
