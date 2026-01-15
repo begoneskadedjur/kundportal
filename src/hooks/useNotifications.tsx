@@ -106,14 +106,18 @@ export function useNotifications(): UseNotificationsReturn {
 
   // Initial laddning och realtime subscription
   useEffect(() => {
+    console.log('[useNotifications] useEffect triggered, user:', user?.id || 'null');
+
     // Om ingen användare, sätt isLoading till false och avbryt
     if (!user) {
+      console.log('[useNotifications] No user, setting isLoading=false');
       setIsLoading(false);
       return;
     }
 
     const userId = user.id;
     let isCancelled = false;
+    console.log('[useNotifications] Starting loadInitialData for user:', userId);
 
     // Hämta notifikationer direkt i useEffect
     const loadInitialData = async () => {
@@ -121,26 +125,31 @@ export function useNotifications(): UseNotificationsReturn {
         setIsLoading(true);
         setError(null);
 
+        console.log('[useNotifications] Fetching notifications...');
         // Hämta notifikationer med timeout
         const data = await withTimeout(
           getNotifications(userId, PAGE_SIZE, 0),
           FETCH_TIMEOUT_MS
         );
+        console.log('[useNotifications] Got notifications:', data?.length || 0);
 
         if (!isCancelled) {
           setNotifications(data);
           setOffset(PAGE_SIZE);
           setHasMore(data.length === PAGE_SIZE);
           initialLoadDone.current = true;
+        } else {
+          console.log('[useNotifications] Cancelled, not setting state');
         }
 
         // Hämta olästa
         const count = await getUnreadNotificationCount(userId);
+        console.log('[useNotifications] Unread count:', count);
         if (!isCancelled) {
           setUnreadCount(count);
         }
       } catch (err) {
-        console.error('Fel vid hämtning av notifikationer:', err);
+        console.error('[useNotifications] Fel vid hämtning av notifikationer:', err);
         if (!isCancelled) {
           const errorMessage = err instanceof Error ? err.message : 'Kunde inte hämta notifikationer';
           setError(errorMessage);
@@ -150,6 +159,7 @@ export function useNotifications(): UseNotificationsReturn {
       } finally {
         if (!isCancelled) {
           setIsLoading(false);
+          console.log('[useNotifications] Loading complete');
         }
       }
     };
@@ -205,6 +215,7 @@ export function useNotifications(): UseNotificationsReturn {
     });
 
     return () => {
+      console.log('[useNotifications] Cleanup called, setting isCancelled=true');
       isCancelled = true;
       unsubscribe();
     };
