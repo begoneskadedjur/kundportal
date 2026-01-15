@@ -34,11 +34,12 @@ export function useNotifications(): UseNotificationsReturn {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false); // Starta med false, inte true
+  const [isLoading, setIsLoading] = useState(true); // Starta med true för initial laddning
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const initialLoadDone = useRef(false);
+  const userIdRef = useRef<string | null>(null);
 
   // Hjälpfunktion för timeout
   const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
@@ -105,8 +106,19 @@ export function useNotifications(): UseNotificationsReturn {
 
   // Initial laddning och realtime subscription
   useEffect(() => {
-    if (!user) return;
+    // Om ingen användare, sätt isLoading till false och avbryt
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
 
+    // Kolla om user har ändrats (för att undvika dubbla fetches)
+    if (userIdRef.current === user.id && initialLoadDone.current) {
+      return;
+    }
+    userIdRef.current = user.id;
+
+    // Hämta data
     fetchNotifications(true);
     fetchUnreadCount();
 
@@ -159,7 +171,8 @@ export function useNotifications(): UseNotificationsReturn {
     });
 
     return unsubscribe;
-  }, [user, fetchNotifications, fetchUnreadCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Kör bara när user.id ändras
 
   // Ladda fler
   const loadMore = useCallback(async () => {
