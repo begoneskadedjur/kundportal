@@ -83,7 +83,8 @@
       "Bash(git show:*)",
       "Bash(npm ls:*)",
       "Bash(npm install:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm run lint:*)"
     ],
     "deny": [],
     "ask": [],

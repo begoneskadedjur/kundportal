@@ -1,5 +1,5 @@
 // 📁 api/ruttplanerare/booking-assistant/index.ts
-// ⭐ VERSION 7.3 - ANVÄNDER NU DEN KORRIGERADE VERKTYGSLÅDAN FÖR FRÅNVARO
+// ⭐ VERSION 7.4 - FIXAT: Hämtar nu ärenden från alla 3 tabeller + loggning
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { startOfDay, addDays, subMinutes, max, min, addMinutes } from 'date-fns';
@@ -160,7 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json(sortedSuggestions);
 
   } catch (error: any) {
-    console.error("Fel i bokningsassistent (v7.3):", error);
+    console.error("Fel i bokningsassistent (v7.4):", error);
     res.status(500).json({ error: "Ett internt fel uppstod.", details: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 }
