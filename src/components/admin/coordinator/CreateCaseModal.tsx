@@ -801,7 +801,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         </div>
                       )}
                   </div>
-                </div>
+                )}
+
                 <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-6">
                   <h3 className="font-semibold text-white text-lg flex items-center gap-2"><FileText className="text-green-400"/>Bokning & Detaljer</h3>
                   <div className="space-y-4">
