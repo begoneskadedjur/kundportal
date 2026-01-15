@@ -31,7 +31,7 @@ const PAGE_SIZE = 20;
 const FETCH_TIMEOUT_MS = 10000; // 10 sekunder timeout
 
 export function useNotifications(): UseNotificationsReturn {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true); // Starta med true för initial laddning
@@ -39,7 +39,7 @@ export function useNotifications(): UseNotificationsReturn {
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const initialLoadDone = useRef(false);
-  const userIdRef = useRef<string | null>(null);
+  const loadedForUserId = useRef<string | null>(null);
 
   // Hjälpfunktion för timeout
   const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
@@ -106,18 +106,27 @@ export function useNotifications(): UseNotificationsReturn {
 
   // Initial laddning och realtime subscription
   useEffect(() => {
-    console.log('[useNotifications] useEffect triggered, user:', user?.id || 'null');
+    // Vänta tills auth är klar med att ladda
+    if (authLoading) {
+      return;
+    }
 
-    // Om ingen användare, sätt isLoading till false och avbryt
+    // Om ingen användare efter auth är klar, visa tom lista
     if (!user) {
-      console.log('[useNotifications] No user, setting isLoading=false');
       setIsLoading(false);
+      setNotifications([]);
+      setUnreadCount(0);
       return;
     }
 
     const userId = user.id;
+
+    // Undvik att ladda om för samma användare
+    if (loadedForUserId.current === userId && initialLoadDone.current) {
+      return;
+    }
+
     let isCancelled = false;
-    console.log('[useNotifications] Starting loadInitialData for user:', userId);
 
     // Hämta notifikationer direkt i useEffect
     const loadInitialData = async () => {
@@ -125,31 +134,27 @@ export function useNotifications(): UseNotificationsReturn {
         setIsLoading(true);
         setError(null);
 
-        console.log('[useNotifications] Fetching notifications...');
         // Hämta notifikationer med timeout
         const data = await withTimeout(
           getNotifications(userId, PAGE_SIZE, 0),
           FETCH_TIMEOUT_MS
         );
-        console.log('[useNotifications] Got notifications:', data?.length || 0);
 
         if (!isCancelled) {
           setNotifications(data);
           setOffset(PAGE_SIZE);
           setHasMore(data.length === PAGE_SIZE);
           initialLoadDone.current = true;
-        } else {
-          console.log('[useNotifications] Cancelled, not setting state');
+          loadedForUserId.current = userId;
         }
 
         // Hämta olästa
         const count = await getUnreadNotificationCount(userId);
-        console.log('[useNotifications] Unread count:', count);
         if (!isCancelled) {
           setUnreadCount(count);
         }
       } catch (err) {
-        console.error('[useNotifications] Fel vid hämtning av notifikationer:', err);
+        console.error('Fel vid hämtning av notifikationer:', err);
         if (!isCancelled) {
           const errorMessage = err instanceof Error ? err.message : 'Kunde inte hämta notifikationer';
           setError(errorMessage);
@@ -159,7 +164,6 @@ export function useNotifications(): UseNotificationsReturn {
       } finally {
         if (!isCancelled) {
           setIsLoading(false);
-          console.log('[useNotifications] Loading complete');
         }
       }
     };
@@ -215,12 +219,10 @@ export function useNotifications(): UseNotificationsReturn {
     });
 
     return () => {
-      console.log('[useNotifications] Cleanup called, setting isCancelled=true');
       isCancelled = true;
       unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]); // Kör bara när user.id ändras
+  }, [user?.id, authLoading]); // Kör när user.id eller authLoading ändras
 
   // Ladda fler
   const loadMore = useCallback(async () => {
