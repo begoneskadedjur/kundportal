@@ -85,11 +85,10 @@ export default function CommentItem({
       }
     }
 
-    // 3. FÖRENKLAD: Matcha @Namn där namn är allt fram till vanliga skiljetecken
-    // Detta fångar fullständiga namn oavsett antal ord
-    // Regex: @ följt av minst ett ord som börjar med stor bokstav, fortsätter tills vi hittar
-    // ett tecken som inte är en bokstav, siffra eller mellanslag inom ett namn
-    const nameRegex = /@([A-ZÅÄÖ][a-zåäöA-ZÅÄÖ\s]+?)(?=\s+[a-zåäö]|\s*[.,!?:;\n]|$|\s+@|\s{2,})/g;
+    // 3. FÖRBÄTTRAD: Matcha @Namn med 1-4 namndelar (förnamn, efternamn, etc.)
+    // Varje namndel börjar med versal följt av gemener/bindestreck/apostrof
+    // Stoppar vid: skiljetecken, radbrytning, @, dubbla mellanslag, eller ord som börjar med gemen
+    const nameRegex = /@([A-ZÅÄÖ][a-zåäöé'-]*(?:\s+[A-ZÅÄÖ][a-zåäöé'-]*){0,3})(?=\s*[.,!?:;\n]|$|\s+@|\s{2,}|\s+[a-z])/g;
     let nameMatch;
     while ((nameMatch = nameRegex.exec(text)) !== null) {
       // Trimma trailing whitespace från namnet

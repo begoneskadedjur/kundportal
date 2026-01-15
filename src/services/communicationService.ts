@@ -270,8 +270,8 @@ async function searchUsers(
 ): Promise<{ id: string; name: string; role: string; avatar_url?: string }[]> {
   const results: { id: string; name: string; role: string; avatar_url?: string }[] = [];
 
-  // Hämta användare via profiles med join till technicians för namndata
-  // profiles.technician_id -> technicians.id (korrekt relation)
+  // Hämta ALLA aktiva användare (admins, koordinatorer och tekniker)
+  // Borttagen: .not('technician_id', 'is', null) som blockerade admins/koordinatorer
   const { data: profiles, error } = await supabase
     .from('profiles')
     .select(`
@@ -287,7 +287,6 @@ async function searchUsers(
       )
     `)
     .eq('is_active', true)
-    .not('technician_id', 'is', null)
     .neq('id', excludeUserId)
     .order('display_name');
 

@@ -72,7 +72,7 @@ export default function CommentSection({
       </div>
 
       {/* Kommentarslista - fyller resterande utrymme */}
-      <div className={`space-y-2 flex-1 min-h-0 overflow-y-auto ${!compact ? 'max-h-[50vh]' : ''}`}>
+      <div className="space-y-2 flex-1 min-h-0 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />

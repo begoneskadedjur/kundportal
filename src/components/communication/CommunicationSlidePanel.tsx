@@ -75,11 +75,12 @@ export default function CommunicationSlidePanel({
           fixed top-0 right-0 h-full w-full sm:w-[450px] lg:w-[500px]
           bg-slate-900 border-l border-slate-700 shadow-2xl z-[101]
           transform transition-transform duration-300 ease-out
+          flex flex-col
           ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         `}
       >
-        {/* Header */}
-        <div className="sticky top-0 bg-slate-900 border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
+        {/* Header - fast höjd, inte sticky */}
+        <div className="flex-shrink-0 bg-slate-900 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-500/20 rounded-lg">
               <MessageSquare className="w-5 h-5 text-purple-400" />
@@ -98,8 +99,8 @@ export default function CommunicationSlidePanel({
           </button>
         </div>
 
-        {/* Content - flex container som fyller hela höjden */}
-        <div className="h-[calc(100%-65px)] flex flex-col px-4 pt-4 pb-4">
+        {/* Content - fyller resterande utrymme */}
+        <div className="flex-1 min-h-0 flex flex-col px-4 pt-4 pb-4">
           <CommentSection
             caseId={caseId}
             caseType={caseType}

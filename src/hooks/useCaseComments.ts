@@ -227,23 +227,33 @@ export function useCaseComments({
 async function getAuthorName(userId: string, role: string): Promise<string> {
   const { supabase } = await import('../lib/supabase');
 
-  // Försök hämta via profiles med join till technicians
-  const { data: profile } = await supabase
+  // Hämta profil med technician_id
+  const { data: profile, error } = await supabase
     .from('profiles')
-    .select(`
-      display_name,
-      technicians (
-        name
-      )
-    `)
+    .select('display_name, technician_id')
     .eq('id', userId)
     .single();
 
-  if (profile) {
-    // Använd display_name eller teknikerns namn
-    const techData = profile.technicians as { name: string } | null;
-    if (profile.display_name) return profile.display_name;
-    if (techData?.name) return techData.name;
+  if (error) {
+    console.error('Fel vid hämtning av profil:', error);
+  }
+
+  // Prioritet 1: display_name från profilen
+  if (profile?.display_name) {
+    return profile.display_name;
+  }
+
+  // Prioritet 2: Om technician_id finns, hämta namn därifrån
+  if (profile?.technician_id) {
+    const { data: technician } = await supabase
+      .from('technicians')
+      .select('name')
+      .eq('id', profile.technician_id)
+      .single();
+
+    if (technician?.name) {
+      return technician.name;
+    }
   }
 
   // Fallback till generic namn baserat på roll
