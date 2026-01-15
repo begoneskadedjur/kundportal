@@ -1,5 +1,5 @@
 // 📁 src/pages/coordinator/CoordinatorSchedule.tsx
-// ⭐ VERSION 3.1 - Hybrid system med ClickUp och avtalskundärenden ⭐
+// ⭐ VERSION 3.2 - Dismiss-funktion för actionable cases ⭐
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -25,6 +25,7 @@ import { LayoutGrid, CalendarOff, ArrowLeft, LogOut, FileText } from 'lucide-rea
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
+import toast from 'react-hot-toast';
 
 export interface Absence {
   id: string;
@@ -231,6 +232,33 @@ export default function CoordinatorSchedule() {
     setIsCreateModalOpen(true);
   };
 
+  // ✅ Dismiss actionable case - ändra status så den försvinner från listan
+  const handleDismissCase = async (caseData: BeGoneCaseRow) => {
+    try {
+      // Bestäm rätt tabell baserat på case_type
+      const tableName = caseData.case_type === 'business' ? 'business_cases' : 'private_cases';
+
+      // Uppdatera status till "Stängt - slasklogg" (avvisad)
+      const { error } = await supabase
+        .from(tableName)
+        .update({ status: 'Stängt - slasklogg' })
+        .eq('id', caseData.id);
+
+      if (error) throw error;
+
+      // Uppdatera lokalt state för omedelbar feedback
+      setAllCases(prev => prev.map(c =>
+        c.id === caseData.id ? { ...c, status: 'Stängt - slasklogg' } : c
+      ));
+
+      toast.success(`Ärendet "${caseData.title}" har tagits bort från listan`);
+    } catch (err) {
+      console.error('Fel vid borttagning av avisering:', err);
+      toast.error('Kunde inte ta bort aviseringen. Försök igen.');
+      throw err; // Re-throw för att uppdatera dismiss-knappens laddningstillstånd
+    }
+  };
+
   const handleUpdateSuccess = () => { 
     setIsEditModalOpen(false); 
     setIsEditContractModalOpen(false);
@@ -315,6 +343,7 @@ export default function CoordinatorSchedule() {
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               onCaseClick={handleScheduleActionableCase}
+              onDismissCase={handleDismissCase}
             />
           </aside>
           

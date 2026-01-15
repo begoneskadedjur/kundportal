@@ -1,16 +1,16 @@
 // 📁 src/components/admin/coordinator/ScheduleControlPanel.tsx
-// ⭐ VERSION 1.4 - FOKUSERAR PÅ "ÄRENDEN ATT BOKA IN" ⭐
+// ⭐ VERSION 1.5 - LÄGGER TILL DISMISS-FUNKTION ⭐
 
 import React, { useState } from 'react';
 import { BeGoneCaseRow, Technician } from '../../../types/database';
-import { Search, ChevronDown, ChevronUp, Users, Filter, CalendarPlus } from 'lucide-react'; // ✅ Ikon uppdaterad
+import { Search, ChevronDown, ChevronUp, Users, Filter, CalendarPlus } from 'lucide-react';
 
 import TechnicianFilter from './TechnicianFilter';
-import ActionableCasesPanel from './ActionableCasesPanel'; // ✅ Komponenten har bytt namn
+import ActionableCasesPanel from './ActionableCasesPanel';
 
 interface ScheduleControlPanelProps {
   technicians: Technician[];
-  actionableCases: BeGoneCaseRow[]; // ✅ Prop har bytt namn
+  actionableCases: BeGoneCaseRow[];
   activeStatuses: Set<string>;
   setActiveStatuses: (statuses: Set<string>) => void;
   selectedTechnicianIds: Set<string>;
@@ -18,6 +18,7 @@ interface ScheduleControlPanelProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   onCaseClick: (caseData: BeGoneCaseRow) => void;
+  onDismissCase?: (caseData: BeGoneCaseRow) => Promise<void>;
 }
 
 const ALL_STATUSES = ['Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
@@ -45,6 +46,7 @@ export default function ScheduleControlPanel({
   searchQuery,
   setSearchQuery,
   onCaseClick,
+  onDismissCase, // ✅ Ny prop för dismiss-funktion
 }: ScheduleControlPanelProps) {
   
   const toggleStatus = (status: string) => {
@@ -87,9 +89,10 @@ export default function ScheduleControlPanel({
            <h3 className="font-bold text-white">Ärenden att Boka In ({actionableCases.length})</h3>
         </div>
         <div className="flex-grow overflow-y-auto">
-            <ActionableCasesPanel 
+            <ActionableCasesPanel
               actionableCases={actionableCases} // ✅ Prop har bytt namn
-              onCaseClick={onCaseClick} 
+              onCaseClick={onCaseClick}
+              onDismissCase={onDismissCase} // ✅ Vidarebefordra dismiss-funktion
             />
         </div>
       </div>
