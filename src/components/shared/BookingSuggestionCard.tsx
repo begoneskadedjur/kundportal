@@ -1,5 +1,5 @@
 // 📁 src/components/shared/BookingSuggestionCard.tsx
-// ⭐ VERSION 1.1 - Kompaktare kort med responsivt grid-layout för desktop
+// ⭐ VERSION 2.0 - Top Picks-sortering och strukturerad origin-data ⭐
 
 import React, { useState } from 'react';
 import { Clock, MapPin, Home, Star, TrendingUp, ChevronDown, ChevronUp, Route, User } from 'lucide-react';
@@ -15,6 +15,10 @@ export interface SingleSuggestion {
   efficiency_score: number;
   is_first_job?: boolean;
   travel_time_home_minutes?: number;
+  // Strukturerad origin-data
+  origin_address?: string;        // Varifrån teknikern kommer
+  origin_case_title?: string;     // Namn på föregående ärende
+  origin_end_time?: string;       // ISO-tid när föregående ärende slutar
 }
 
 // --- Hjälpfunktioner ---
@@ -65,7 +69,7 @@ const getTravelTimeInfo = (minutes: number): { color: string; label: string } =>
 const formatTime = (isoString: string) =>
   new Date(isoString).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
 
-const formatDate = (isoString: string) =>
+const formatDateStr = (isoString: string) =>
   new Date(isoString).toLocaleDateString('sv-SE', {
     weekday: 'long',
     day: 'numeric',
@@ -93,19 +97,6 @@ export default function BookingSuggestionCard({
   const homeInfo = suggestion.travel_time_home_minutes
     ? getTravelTimeInfo(suggestion.travel_time_home_minutes)
     : null;
-
-  // Förenkla origin-beskrivningen
-  const getSimplifiedOrigin = () => {
-    if (suggestion.is_first_job) {
-      return 'Första jobbet för dagen';
-    }
-    // Extrahera ärendenamn från origin_description
-    const match = suggestion.origin_description.match(/Efter "([^"]+)"/);
-    if (match) {
-      return `Efter "${match[1].substring(0, 25)}${match[1].length > 25 ? '...' : ''}"`;
-    }
-    return suggestion.origin_description.split('.')[0];
-  };
 
   return (
     <div
@@ -164,7 +155,7 @@ export default function BookingSuggestionCard({
           {formatTime(suggestion.start_time)} – {formatTime(suggestion.end_time)}
         </div>
         <p className="text-xs text-slate-400 capitalize">
-          {formatDate(suggestion.start_time)}
+          {formatDateStr(suggestion.start_time)}
         </p>
       </div>
 
@@ -193,7 +184,7 @@ export default function BookingSuggestionCard({
         )}
       </div>
 
-      {/* Expanderbar detalj-sektion - endast på hover eller klick */}
+      {/* Expanderbar detalj-sektion */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -206,12 +197,60 @@ export default function BookingSuggestionCard({
       </button>
 
       {isExpanded && (
-        <div className="mt-2 space-y-1.5 text-xs">
-          <div className="flex items-start gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0" />
-            <p className="text-slate-300">{getSimplifiedOrigin()}</p>
-          </div>
-          <div className="flex items-center gap-1.5 p-1.5 rounded bg-slate-900/50">
+        <div className="mt-3 space-y-2 text-xs">
+          {/* Föregående ärende - strukturerad info */}
+          {!suggestion.is_first_job && (
+            <div className="p-2.5 rounded-md bg-slate-900/60 border border-slate-700/50 space-y-1.5">
+              <p className="text-slate-500 uppercase tracking-wider text-[10px] font-semibold">
+                Kommer från
+              </p>
+
+              {/* Ärendenamn */}
+              {suggestion.origin_case_title && (
+                <p className="text-slate-200 font-medium">
+                  {suggestion.origin_case_title}
+                </p>
+              )}
+
+              {/* Tidsspann - när föregående ärende slutar */}
+              {suggestion.origin_end_time && (
+                <div className="flex items-center gap-1.5 text-slate-400">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>
+                    Slutar kl. {formatTime(suggestion.origin_end_time)}
+                  </span>
+                </div>
+              )}
+
+              {/* Adress */}
+              {suggestion.origin_address && (
+                <div className="flex items-start gap-1.5 text-slate-400">
+                  <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span className="break-words">
+                    {suggestion.origin_address}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Första jobbet - startar hemifrån */}
+          {suggestion.is_first_job && (
+            <div className="p-2.5 rounded-md bg-purple-500/10 border border-purple-500/30 space-y-1">
+              <p className="text-purple-300 font-medium flex items-center gap-1.5">
+                <Home className="w-3.5 h-3.5" />
+                Startar från hemadress
+              </p>
+              {suggestion.origin_address && (
+                <p className="text-slate-400 text-[11px] ml-5">
+                  {suggestion.origin_address}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Effektivitetsbeskrivning */}
+          <div className="flex items-center gap-1.5 p-2 rounded bg-slate-800/50">
             <TrendingUp className={`w-3.5 h-3.5 ${efficiencyInfo.color}`} />
             <p className="text-slate-400">{efficiencyInfo.description}</p>
           </div>
@@ -221,10 +260,11 @@ export default function BookingSuggestionCard({
   );
 }
 
-// --- Grupperad lista-komponent ---
+// --- Grupperad lista-komponent med Top Picks-sortering ---
 interface GroupedSuggestion {
   date: string;
   suggestions: SingleSuggestion[];
+  bestScore: number;
 }
 
 interface BookingSuggestionListProps {
@@ -233,11 +273,25 @@ interface BookingSuggestionListProps {
 }
 
 export function BookingSuggestionList({ suggestions, onSelect }: BookingSuggestionListProps) {
-  // Gruppera förslag per dag
-  const groupedSuggestions: GroupedSuggestion[] = React.useMemo(() => {
+  // Sortera alla förslag efter effektivitet (bäst först)
+  const sortedByEfficiency = React.useMemo(() =>
+    [...suggestions].sort((a, b) => b.efficiency_score - a.efficiency_score),
+    [suggestions]
+  );
+
+  // Top 3 picks (de absolut bästa oavsett dag)
+  const topPicks = sortedByEfficiency.slice(0, 3);
+  const topPickIds = new Set(topPicks.map(s => `${s.technician_id}-${s.start_time}`));
+
+  // Övriga förslag grupperade per dag (exkluderar top picks)
+  const remainingSuggestions = sortedByEfficiency.filter(
+    s => !topPickIds.has(`${s.technician_id}-${s.start_time}`)
+  );
+
+  const groupedRemaining: GroupedSuggestion[] = React.useMemo(() => {
     const groups: Record<string, SingleSuggestion[]> = {};
 
-    suggestions.forEach(sugg => {
+    remainingSuggestions.forEach(sugg => {
       const dateKey = new Date(sugg.start_time).toLocaleDateString('sv-SE', {
         weekday: 'long',
         day: 'numeric',
@@ -247,20 +301,17 @@ export function BookingSuggestionList({ suggestions, onSelect }: BookingSuggesti
       groups[dateKey].push(sugg);
     });
 
-    return Object.entries(groups).map(([date, suggs]) => ({
-      date,
-      suggestions: suggs.sort((a, b) => b.efficiency_score - a.efficiency_score)
-    }));
-  }, [suggestions]);
+    // Sortera dagarna efter bästa förslag i varje dag
+    return Object.entries(groups)
+      .map(([date, suggs]) => ({
+        date,
+        suggestions: suggs.sort((a, b) => b.efficiency_score - a.efficiency_score),
+        bestScore: Math.max(...suggs.map(s => s.efficiency_score))
+      }))
+      .sort((a, b) => b.bestScore - a.bestScore);
+  }, [remainingSuggestions]);
 
   if (suggestions.length === 0) return null;
-
-  // Hitta bästa förslaget totalt
-  const topSuggestion = suggestions.reduce((best, current) =>
-    current.efficiency_score > best.efficiency_score ? current : best
-  , suggestions[0]);
-
-  let globalRank = 0;
 
   return (
     <div className="space-y-6">
@@ -285,38 +336,67 @@ export function BookingSuggestionList({ suggestions, onSelect }: BookingSuggesti
         </div>
       </div>
 
-      {/* Grupperade förslag per dag */}
-      {groupedSuggestions.map((group) => (
-        <div key={group.date} className="space-y-3">
-          {/* Dag-header */}
-          <div className="flex items-center gap-3">
-            <h4 className="text-sm font-semibold text-white capitalize">
-              {group.date}
+      {/* TOP PICKS - Alltid överst */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Star className="w-4 h-4 text-emerald-400" />
+            <h4 className="text-sm font-semibold text-white">
+              Rekommenderade tider
+            </h4>
+          </div>
+          <div className="flex-1 h-px bg-emerald-500/30" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {topPicks.map((sugg, index) => (
+            <BookingSuggestionCard
+              key={`${sugg.technician_id}-${sugg.start_time}`}
+              suggestion={sugg}
+              onClick={() => onSelect(sugg)}
+              isTopPick={index === 0}
+              rank={index + 1}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ÖVRIGA FÖRSLAG - Grupperade per dag, sorterade efter bästa dag först */}
+      {groupedRemaining.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 pt-2">
+            <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+              Övriga alternativ
             </h4>
             <div className="flex-1 h-px bg-slate-700" />
-            <span className="text-xs text-slate-500">
-              {group.suggestions.length} {group.suggestions.length === 1 ? 'förslag' : 'förslag'}
-            </span>
           </div>
 
-          {/* Kort för denna dag - grid med 2 kolumner på desktop */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {group.suggestions.map((sugg) => {
-              globalRank++;
-              const isTop = sugg === topSuggestion;
-              return (
-                <BookingSuggestionCard
-                  key={`${sugg.technician_id}-${sugg.start_time}`}
-                  suggestion={sugg}
-                  onClick={() => onSelect(sugg)}
-                  isTopPick={isTop}
-                  rank={globalRank <= 3 ? globalRank : undefined}
-                />
-              );
-            })}
-          </div>
+          {groupedRemaining.map((group) => (
+            <div key={group.date} className="space-y-2">
+              {/* Dag-header */}
+              <div className="flex items-center gap-3">
+                <h5 className="text-sm font-medium text-slate-300 capitalize">
+                  {group.date}
+                </h5>
+                <span className="text-xs text-slate-500">
+                  {group.suggestions.length} förslag
+                </span>
+              </div>
+
+              {/* Kort för denna dag */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+                {group.suggestions.map((sugg) => (
+                  <BookingSuggestionCard
+                    key={`${sugg.technician_id}-${sugg.start_time}`}
+                    suggestion={sugg}
+                    onClick={() => onSelect(sugg)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

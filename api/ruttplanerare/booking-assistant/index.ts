@@ -1,5 +1,5 @@
 // 📁 api/ruttplanerare/booking-assistant/index.ts
-// ⭐ VERSION 7.4 - FIXAT: Hämtar nu ärenden från alla 3 tabeller + loggning
+// ⭐ VERSION 7.5 - Strukturerad origin-data för förbättrad UX
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { startOfDay, addDays, subMinutes, max, min, addMinutes } from 'date-fns';
@@ -77,8 +77,12 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
         technician_id: daySchedule.technician.id, technician_name: daySchedule.technician.name,
         start_time: currentTry.toISOString(), end_time: slotEnd.toISOString(),
         travel_time_minutes: travelTime, origin_description: originDescription,
-        efficiency_score: calculateEfficiencyScore(travelTime, isFirstJob, gapUtilization, travelTimeHome), 
-        is_first_job: isFirstJob, travel_time_home_minutes: travelTimeHome
+        efficiency_score: calculateEfficiencyScore(travelTime, isFirstJob, gapUtilization, travelTimeHome),
+        is_first_job: isFirstJob, travel_time_home_minutes: travelTimeHome,
+        // Strukturerad origin-data för förbättrad UX
+        origin_address: currentEvent.address || daySchedule.technician.address,
+        origin_case_title: isFirstJob ? undefined : (currentEvent.title || undefined),
+        origin_end_time: isFirstJob ? undefined : currentEvent.end.toISOString()
       });
       currentTry = addMinutes(currentTry, SUGGESTION_STRIDE_MINUTES);
     }

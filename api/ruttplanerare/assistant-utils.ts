@@ -1,5 +1,5 @@
 // 📁 api/ruttplanerare/assistant-utils.ts
-// ⭐ VERSION 1.4 - Filtrerar nu på is_active för att exkludera inaktiva tekniker ⭐
+// ⭐ VERSION 1.5 - Strukturerad origin-data för förbättrad UX ⭐
 
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
@@ -21,10 +21,14 @@ export interface StaffMember { id: string; name: string; address: string; work_s
 export interface EventSlot { start: Date; end: Date; type: 'case' | 'absence'; title?: string; address?: string; }
 export interface AbsencePeriod { start: Date; end: Date; }
 export interface TechnicianDaySchedule { technician: StaffMember; date: Date; workStart: Date; workEnd: Date; absences: AbsencePeriod[]; existingCases: EventSlot[]; }
-export interface Suggestion { 
-  technician_id: string; technician_name: string; start_time: string; end_time: string; 
-  travel_time_minutes: number; origin_description: string; efficiency_score: number; 
-  is_first_job: boolean; travel_time_home_minutes?: number; 
+export interface Suggestion {
+  technician_id: string; technician_name: string; start_time: string; end_time: string;
+  travel_time_minutes: number; origin_description: string; efficiency_score: number;
+  is_first_job: boolean; travel_time_home_minutes?: number;
+  // Strukturerad origin-data
+  origin_address?: string;        // Varifrån teknikern kommer
+  origin_case_title?: string;     // Namn på föregående ärende
+  origin_end_time?: string;       // ISO-tid när föregående ärende slutar
 }
 export interface TeamSuggestion {
     technicians: { id: string; name: string; travel_time_minutes: number; origin_description: string; }[];
