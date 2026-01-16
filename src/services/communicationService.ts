@@ -766,6 +766,10 @@ export async function getTickets(
   limit: number = 50,
   offset: number = 0
 ): Promise<{ tickets: Ticket[]; totalCount: number }> {
+  // För "outgoing" behöver vi en mer komplex logik:
+  // Vi måste filtrera bort tickets där de nämnda personerna har svarat
+  const isOutgoing = filter.direction === 'outgoing' && filter.currentUserId;
+
   // Bygg query för kommentarer med mentions
   let query = supabase
     .from('case_comments')
@@ -798,8 +802,11 @@ export async function getTickets(
         .neq('author_id', filter.currentUserId)
         .contains('mentioned_user_ids', [filter.currentUserId]);
     } else if (filter.direction === 'outgoing') {
-      // Tickets där jag är författare
-      query = query.eq('author_id', filter.currentUserId);
+      // Tickets där jag är författare OCH har nämnt någon
+      // Filtrera bort besvarade tickets efter query
+      query = query
+        .eq('author_id', filter.currentUserId)
+        .not('mentioned_user_ids', 'eq', '{}'); // Har minst en mention
     }
   }
 
@@ -819,8 +826,39 @@ export async function getTickets(
     return { tickets: [], totalCount: 0 };
   }
 
+  // För "outgoing": Filtrera bort tickets där någon av de nämnda personerna har svarat
+  let filteredComments = comments;
+  if (isOutgoing && filter.currentUserId) {
+    // Hämta alla kommentarer i samma ärenden för att kolla efter svar
+    const caseIdsForReplyCheck = [...new Set(comments.map(c => c.case_id))];
+
+    const { data: allCaseComments } = await supabase
+      .from('case_comments')
+      .select('id, case_id, case_type, author_id, created_at')
+      .in('case_id', caseIdsForReplyCheck)
+      .eq('is_system_comment', false);
+
+    if (allCaseComments) {
+      filteredComments = comments.filter(comment => {
+        const mentionedUserIds = comment.mentioned_user_ids || [];
+        if (mentionedUserIds.length === 0) return false;
+
+        // Kolla om någon av de nämnda har skrivit en NYARE kommentar i samma ärende
+        const hasReply = allCaseComments.some(otherComment => {
+          const isInSameCase = otherComment.case_id === comment.case_id;
+          const isFromMentionedUser = mentionedUserIds.includes(otherComment.author_id);
+          const isNewer = new Date(otherComment.created_at) > new Date(comment.created_at);
+          return isInSameCase && isFromMentionedUser && isNewer;
+        });
+
+        // Behåll ticketen endast om det INTE finns svar
+        return !hasReply;
+      });
+    }
+  }
+
   // Hämta ärendeinformation för varje kommentar
-  const caseIds = [...new Set(comments.map(c => c.case_id))];
+  const caseIds = [...new Set(filteredComments.map(c => c.case_id))];
   const tickets: Ticket[] = [];
 
   // Hämta private cases
@@ -839,8 +877,8 @@ export async function getTickets(
   const privateCaseMap = new Map(privateCases?.map(c => [c.id, c]) || []);
   const businessCaseMap = new Map(businessCases?.map(c => [c.id, c]) || []);
 
-  // Filtrera för tekniker om technicianId är angivet
-  for (const comment of comments) {
+  // Bygg tickets från filtrerade kommentarer
+  for (const comment of filteredComments) {
     let caseData: { title: string; kontaktperson: string | null; adress: any; skadedjur: string | null } | null = null;
 
     if (comment.case_type === 'private') {
@@ -922,14 +960,14 @@ export async function getTicketStats(technicianId?: string): Promise<TicketStats
 
 // Direction-baserad statistik
 export interface DirectionStats {
-  incoming: number;  // Tickets där jag är nämnd
-  outgoing: number;  // Tickets där jag är författare
-  all: number;       // Totalt antal
+  incoming: number;  // Tickets där jag är nämnd och väntar på mitt svar
+  outgoing: number;  // Tickets där jag nämnt någon och väntar på deras svar
+  all: number;       // Totalt antal aktiva
 }
 
 export async function getDirectionStats(userId: string): Promise<DirectionStats> {
   // Hämta incoming (där jag är nämnd men inte författare)
-  const incomingQuery = supabase
+  const { count: incomingCount } = await supabase
     .from('case_comments')
     .select('*', { count: 'exact', head: true })
     .eq('is_system_comment', false)
@@ -937,30 +975,60 @@ export async function getDirectionStats(userId: string): Promise<DirectionStats>
     .contains('mentioned_user_ids', [userId])
     .neq('status', 'resolved');
 
-  // Hämta outgoing (där jag är författare)
-  const outgoingQuery = supabase
+  // För outgoing behöver vi en mer komplex logik:
+  // Räkna bara tickets där jag nämnt någon OCH de inte har svarat
+  const { data: outgoingComments } = await supabase
     .from('case_comments')
-    .select('*', { count: 'exact', head: true })
+    .select('id, case_id, case_type, mentioned_user_ids, created_at')
     .eq('is_system_comment', false)
     .eq('author_id', userId)
+    .not('mentioned_user_ids', 'eq', '{}') // Har minst en mention
     .neq('status', 'resolved');
 
-  // Hämta alla (för referens)
-  const allQuery = supabase
+  let outgoingCount = 0;
+
+  if (outgoingComments && outgoingComments.length > 0) {
+    // Hämta alla kommentarer i samma ärenden för att kolla efter svar
+    const caseIds = [...new Set(outgoingComments.map(c => c.case_id))];
+
+    const { data: allCaseComments } = await supabase
+      .from('case_comments')
+      .select('id, case_id, author_id, created_at')
+      .in('case_id', caseIds)
+      .eq('is_system_comment', false);
+
+    if (allCaseComments) {
+      // Räkna bara de som INTE har fått svar
+      for (const comment of outgoingComments) {
+        const mentionedUserIds = comment.mentioned_user_ids || [];
+        if (mentionedUserIds.length === 0) continue;
+
+        // Kolla om någon av de nämnda har skrivit en NYARE kommentar i samma ärende
+        const hasReply = allCaseComments.some(otherComment => {
+          const isInSameCase = otherComment.case_id === comment.case_id;
+          const isFromMentionedUser = mentionedUserIds.includes(otherComment.author_id);
+          const isNewer = new Date(otherComment.created_at) > new Date(comment.created_at);
+          return isInSameCase && isFromMentionedUser && isNewer;
+        });
+
+        // Räkna endast om det INTE finns svar
+        if (!hasReply) {
+          outgoingCount++;
+        }
+      }
+    }
+  }
+
+  // Hämta alla aktiva tickets (för referens)
+  const { count: allCount } = await supabase
     .from('case_comments')
     .select('*', { count: 'exact', head: true })
     .eq('is_system_comment', false)
     .neq('status', 'resolved');
 
-  const [incomingRes, outgoingRes, allRes] = await Promise.all([
-    incomingQuery,
-    outgoingQuery,
-    allQuery,
-  ]);
-
   return {
-    incoming: incomingRes.count || 0,
-    outgoing: outgoingRes.count || 0,
-    all: allRes.count || 0,
+    incoming: incomingCount || 0,
+    outgoing: outgoingCount,
+    all: allCount || 0,
   };
 }
