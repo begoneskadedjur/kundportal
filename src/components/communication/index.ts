@@ -10,3 +10,5 @@ export { default as NotificationBell } from './NotificationBell';
 export { default as NotificationItem } from './NotificationItem';
 export { default as CommunicationSlidePanel } from './CommunicationSlidePanel';
 export { default as CaseContextCommunicationModal } from './CaseContextCommunicationModal';
+export { default as EmbeddedMapPreview } from './EmbeddedMapPreview';
+export { default as CaseContextImagePreview } from './CaseContextImagePreview';

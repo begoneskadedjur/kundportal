@@ -20,9 +20,12 @@ import {
   FileText,
   Loader2,
   AlertCircle,
-  Users
+  Users,
+  ClipboardCheck
 } from 'lucide-react';
 import CommentSection from './CommentSection';
+import EmbeddedMapPreview from './EmbeddedMapPreview';
+import CaseContextImagePreview from './CaseContextImagePreview';
 import { CaseType } from '../../types/communication';
 import { useCaseContext, CaseContext } from '../../hooks/useCaseContext';
 import { formatSwedishDateTime } from '../../types/database';
@@ -93,27 +96,19 @@ const ContextSectionDesktop: React.FC<{
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Address with Maps link */}
-        {context.address && (
+        {/* Embedded Map with Address */}
+        {(context.address || (context.addressLat && context.addressLng)) && (
           <div className="space-y-1.5">
             <h4 className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
               <MapPin className="w-3.5 h-3.5 text-teal-400" />
-              Adress
+              Plats
             </h4>
-            <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
-              <p className="text-sm text-slate-200">{context.address}</p>
-              {mapsUrl && (
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 mt-2 text-xs text-teal-400 hover:text-teal-300 transition-colors"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  Öppna i Maps
-                </a>
-              )}
-            </div>
+            <EmbeddedMapPreview
+              lat={context.addressLat}
+              lng={context.addressLng}
+              address={context.address}
+              height={140}
+            />
           </div>
         )}
 
@@ -212,20 +207,27 @@ const ContextSectionDesktop: React.FC<{
           </div>
         )}
 
-        {/* Report */}
+        {/* Dokumentation Tekniker - teknikerns egen dokumentation av ärendet */}
         {context.rapport && (
           <div className="space-y-1.5">
-            <h4 className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
-              <FileText className="w-3.5 h-3.5 text-amber-400" />
-              Rapport
+            <h4 className="flex items-center gap-2 text-xs font-medium text-amber-400 uppercase tracking-wide">
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              Dokumentation Tekniker
             </h4>
-            <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
+            <div className="bg-amber-500/5 rounded-lg p-3 border border-amber-500/20">
               <p className="text-sm text-slate-300 whitespace-pre-wrap line-clamp-6">
                 {context.rapport}
               </p>
             </div>
           </div>
         )}
+
+        {/* Case Images */}
+        <CaseContextImagePreview
+          caseId={context.id}
+          caseType={context.caseType}
+          maxThumbnails={6}
+        />
       </div>
 
       {/* Footer with "Open full case" button */}
@@ -386,13 +388,26 @@ const MobileExpandableContext: React.FC<{
             </div>
           )}
 
-          {/* Report */}
+          {/* Dokumentation Tekniker */}
           {context.rapport && (
             <div className="space-y-1">
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Rapport</p>
-              <p className="text-sm text-slate-300 line-clamp-3">{context.rapport}</p>
+              <p className="text-xs text-amber-400 uppercase tracking-wide flex items-center gap-1.5">
+                <ClipboardCheck className="w-3 h-3" />
+                Dokumentation Tekniker
+              </p>
+              <div className="bg-amber-500/5 rounded-lg p-2 border border-amber-500/20">
+                <p className="text-sm text-slate-300 line-clamp-3">{context.rapport}</p>
+              </div>
             </div>
           )}
+
+          {/* Case Images (mobile) */}
+          <CaseContextImagePreview
+            caseId={context.id}
+            caseType={context.caseType}
+            maxThumbnails={4}
+            compact={true}
+          />
         </div>
       )}
     </div>
