@@ -44,14 +44,15 @@ export default function MentionSuggestions({
     return groups.length + sectionIndex;
   };
 
+  // REDESIGN: Mindre ikoner
   const getRoleIcon = (suggestion: MentionSuggestion) => {
     if (suggestion.type === 'all') {
-      return <Users className="w-4 h-4 text-[#20c58f]" />;
+      return <Users className="w-3 h-3 text-[#20c58f]" />;
     }
     if (suggestion.type === 'role') {
-      return <Users className="w-4 h-4 text-purple-400" />;
+      return <Users className="w-3 h-3 text-purple-400" />;
     }
-    return <User className="w-4 h-4 text-slate-400" />;
+    return <User className="w-3 h-3 text-slate-400" />;
   };
 
   const getRoleBadgeColors = (role?: string): string => {
@@ -61,30 +62,31 @@ export default function MentionSuggestions({
     return 'bg-slate-500/20 text-slate-300';
   };
 
+  // REDESIGN: Kompaktare suggestion items
   const renderSuggestionItem = (suggestion: MentionSuggestion, globalIndex: number) => (
     <li key={`${suggestion.type}-${suggestion.id || suggestion.role || 'all'}`}>
       <button
         type="button"
         onClick={() => onSelect(suggestion)}
         className={`
-          w-full px-3 py-2.5 flex items-center gap-3 text-left transition-colors
+          w-full px-2.5 py-2 flex items-center gap-2.5 text-left transition-colors
           ${globalIndex === selectedIndex
-            ? 'bg-slate-700'
-            : 'hover:bg-slate-700/50'
+            ? 'bg-slate-700/70'
+            : 'hover:bg-slate-700/40'
           }
         `}
       >
-        {/* Ikon/Avatar */}
+        {/* Ikon/Avatar - REDESIGN: Mindre */}
         <div className="flex-shrink-0">
           {suggestion.avatarUrl ? (
             <img
               src={suggestion.avatarUrl}
               alt={suggestion.displayName}
-              className="w-8 h-8 rounded-full object-cover"
+              className="w-6 h-6 rounded-full object-cover"
             />
           ) : (
             <div className={`
-              w-8 h-8 rounded-full flex items-center justify-center
+              w-6 h-6 rounded-full flex items-center justify-center
               ${suggestion.type === 'all'
                 ? 'bg-[#20c58f]/20'
                 : suggestion.type === 'role'
@@ -97,22 +99,22 @@ export default function MentionSuggestions({
           )}
         </div>
 
-        {/* Text */}
+        {/* Text - REDESIGN: Kompaktare */}
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-white text-sm truncate">
+          <p className="font-medium text-slate-200 text-[12px] truncate">
             {suggestion.displayName}
           </p>
-          {suggestion.subtitle && (
-            <p className="text-xs text-slate-400 truncate">
+          {suggestion.subtitle && suggestion.type !== 'user' && (
+            <p className="text-[10px] text-slate-500 truncate">
               {suggestion.subtitle}
             </p>
           )}
         </div>
 
-        {/* Roll-badge för användare */}
+        {/* Roll-badge för användare - REDESIGN: Subtilare */}
         {suggestion.type === 'user' && suggestion.subtitle && (
           <span className={`
-            flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium
+            flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium opacity-80
             ${getRoleBadgeColors(suggestion.role)}
           `}>
             {suggestion.subtitle}
@@ -124,23 +126,24 @@ export default function MentionSuggestions({
 
   return (
     <div
-      className="absolute z-50 w-72 bg-slate-800 border border-slate-600 rounded-lg shadow-xl overflow-hidden"
+      className="absolute z-50 w-64 bg-slate-800/95 backdrop-blur-sm border border-slate-700 rounded-md shadow-xl overflow-hidden"
       style={position ? { top: position.top, left: position.left } : undefined}
     >
-      <div className="px-3 py-2 border-b border-slate-700">
-        <p className="text-xs text-slate-400 flex items-center gap-1.5">
-          <AtSign className="w-3 h-3" />
-          Nämn någon
+      {/* Header - REDESIGN: Kompaktare */}
+      <div className="px-2.5 py-1.5 border-b border-slate-700/60">
+        <p className="text-[10px] text-slate-500 flex items-center gap-1 uppercase tracking-wider font-medium">
+          <AtSign className="w-2.5 h-2.5" />
+          Nämn
         </p>
       </div>
 
-      <div className="max-h-80 overflow-y-auto">
+      <div className="max-h-64 overflow-y-auto">
         {/* GRUPPER sektion */}
         {groups.length > 0 && (
           <div>
-            <div className="px-3 py-1.5 bg-slate-900/50 border-b border-slate-700/50">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Users className="w-3 h-3" />
+            <div className="px-2.5 py-1 bg-slate-900/30">
+              <p className="text-[9px] font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                <Users className="w-2.5 h-2.5" />
                 Grupper
               </p>
             </div>
@@ -155,9 +158,9 @@ export default function MentionSuggestions({
         {/* PERSONER sektion */}
         {people.length > 0 && (
           <div>
-            <div className="px-3 py-1.5 bg-slate-900/50 border-y border-slate-700/50">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <User className="w-3 h-3" />
+            <div className="px-2.5 py-1 bg-slate-900/30">
+              <p className="text-[9px] font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                <User className="w-2.5 h-2.5" />
                 Personer
               </p>
             </div>
@@ -170,14 +173,14 @@ export default function MentionSuggestions({
         )}
       </div>
 
-      <div className="px-3 py-2 border-t border-slate-700 bg-slate-800/50">
-        <p className="text-xs text-slate-500">
-          <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">↑↓</kbd>
-          {' '}navigera{' '}
-          <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">↵</kbd>
-          {' '}välj{' '}
-          <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">Esc</kbd>
-          {' '}stäng
+      {/* Footer - REDESIGN: Mer diskret */}
+      <div className="px-2 py-1.5 border-t border-slate-700/60 bg-slate-800/50">
+        <p className="text-[10px] text-slate-600">
+          <kbd className="px-1 py-0.5 bg-slate-700/70 rounded text-[9px] text-slate-400">↑↓</kbd>
+          {' '}
+          <kbd className="px-1 py-0.5 bg-slate-700/70 rounded text-[9px] text-slate-400">↵</kbd>
+          {' '}
+          <kbd className="px-1 py-0.5 bg-slate-700/70 rounded text-[9px] text-slate-400">Esc</kbd>
         </p>
       </div>
     </div>

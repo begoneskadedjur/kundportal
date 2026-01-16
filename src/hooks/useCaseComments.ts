@@ -9,6 +9,7 @@ import {
   CaseType,
   AuthorRole,
   CommentAttachment,
+  CommentStatus,
 } from '../types/communication';
 import {
   getCommentsByCase,
@@ -17,6 +18,7 @@ import {
   deleteComment,
   subscribeToComments,
   uploadCommentAttachment,
+  updateCommentStatus,
 } from '../services/communicationService';
 import { useAuth } from '../contexts/AuthContext';
 import { TrackedMention } from './useMentions';
@@ -36,6 +38,7 @@ interface UseCaseCommentsReturn {
   addComment: (content: string, attachments?: File[], mentions?: TrackedMention[], parentCommentId?: string) => Promise<void>;
   editComment: (commentId: string, content: string) => Promise<void>;
   removeComment: (commentId: string) => Promise<void>;
+  changeStatus: (commentId: string, status: CommentStatus) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -217,6 +220,26 @@ export function useCaseComments({
     }
   }, []);
 
+  // Ändra status på kommentar (med optimistisk uppdatering)
+  const changeStatus = useCallback(
+    async (commentId: string, status: CommentStatus) => {
+      // Optimistisk uppdatering - uppdatera UI direkt
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, status } : c))
+      );
+
+      try {
+        await updateCommentStatus(commentId, status, user?.id);
+      } catch (err) {
+        console.error('Fel vid statusändring:', err);
+        toast.error('Kunde inte ändra status');
+        // Återställ vid fel - hämta om kommentarer
+        fetchComments();
+      }
+    },
+    [user?.id, fetchComments]
+  );
+
   return {
     comments,
     isLoading,
@@ -225,6 +248,7 @@ export function useCaseComments({
     addComment,
     editComment,
     removeComment,
+    changeStatus,
     refresh: fetchComments,
   };
 }

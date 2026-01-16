@@ -1,5 +1,6 @@
 // src/components/communication/CommentItem.tsx
 // Enskild kommentar med författarinfo, innehåll, bilagor, läsbekräftelser och status
+// REDESIGN: Apple/Linear-inspirerad - kompakt, sofistikerad, hög polish
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -20,7 +21,6 @@ import {
   Pencil,
   Trash2,
   FileText,
-  Image as ImageIcon,
   Download,
   MoreHorizontal,
   Settings,
@@ -296,79 +296,70 @@ export default function CommentItem({
     }
   };
 
-  // Systemkommentar har egen styling
+  // Systemkommentar har egen styling - REDESIGN: Mer subtil och inline
   if (comment.is_system_comment) {
     return (
-      <div className="flex items-center gap-3 py-2 px-3 text-sm">
-        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-          <Settings className="w-4 h-4 text-slate-400" />
+      <div className="flex items-center gap-2 py-1.5 px-2">
+        <div className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
+          <Settings className="w-3 h-3 text-slate-500" />
         </div>
-        <div className="flex-1">
-          <span className="text-slate-400">{comment.content}</span>
-        </div>
-        <span className="text-xs text-slate-500">
+        <span className="text-[13px] text-slate-500 flex-1">{comment.content}</span>
+        <span className="text-[11px] text-slate-600">
           {formatCommentTime(comment.created_at)}
         </span>
       </div>
     );
   }
 
-  // Beräkna indent baserat på djup (max 2 nivåer för att undvika för djupa trådar)
-  const indentLevel = Math.min(depth, 2);
-  const indentClass = indentLevel > 0 ? `ml-${indentLevel * 8}` : '';
-
   return (
-    <div ref={commentRef} className={`group relative ${indentClass}`}>
-      {/* Tråd-indikator för svar */}
-      {isReply && (
-        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-purple-500/30 -ml-4" />
-      )}
-
-      <div className={`flex gap-3 p-4 rounded-lg transition-colors ${
-        isReply
-          ? 'bg-slate-800/30 hover:bg-slate-800/50 border-l-2 border-purple-500/30'
-          : 'bg-slate-800/50 hover:bg-slate-800/70'
-      }`}>
-        {/* Avatar/Initial */}
-        <div className="flex-shrink-0">
+    <div ref={commentRef} className="group relative">
+      <div className={`
+        flex gap-2.5 py-2.5 px-3 rounded-lg transition-all duration-200
+        ${isReply
+          ? 'bg-transparent hover:bg-slate-800/30'
+          : 'bg-slate-800/40 hover:bg-slate-800/60'
+        }
+      `}>
+        {/* Avatar/Initial - REDESIGN: Mindre, med initial istället för ikon */}
+        <div className="flex-shrink-0 pt-0.5">
           <div className={`
-            ${isReply ? 'w-8 h-8' : 'w-10 h-10'} rounded-full flex items-center justify-center
-            ${roleColors.bg} ${roleColors.border} border
+            ${isReply ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-[11px]'}
+            rounded-full flex items-center justify-center font-semibold
+            ${roleColors.bg} ${roleColors.text}
+            ring-1 ring-inset ${roleColors.border}
           `}>
-            <User className={`${isReply ? 'w-4 h-4' : 'w-5 h-5'} ${roleColors.text}`} />
+            {comment.author_name.charAt(0).toUpperCase()}
           </div>
         </div>
 
         {/* Innehåll */}
         <div className="flex-1 min-w-0">
-          {/* Header - Namn framträdande, roll diskret */}
-          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1.5">
-            <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-white text-[15px]">
-                {comment.author_name}
-              </span>
-              <span className={`
-                px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide
-                ${roleColors.bg} ${roleColors.text} opacity-80
-              `}>
-                {ROLE_DISPLAY_NAMES[comment.author_role as AuthorRole]}
-              </span>
-            </div>
-            <span className="text-xs text-slate-500 flex items-center gap-1">
-              <Clock className="w-3 h-3" />
+          {/* Header - REDESIGN: Tightare, mer kompakt */}
+          <div className="flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5 mb-0.5">
+            <span className="font-medium text-slate-100 text-[13px] leading-tight">
+              {comment.author_name}
+            </span>
+            <span className={`
+              text-[10px] font-medium uppercase tracking-wider opacity-70
+              ${roleColors.text}
+            `}>
+              {ROLE_DISPLAY_NAMES[comment.author_role as AuthorRole]}
+            </span>
+            <span className="text-[11px] text-slate-500">
               {formatCommentTime(comment.created_at)}
             </span>
             {comment.is_edited && (
-              <span className="text-xs text-slate-500 italic">(redigerad)</span>
+              <span className="text-[10px] text-slate-600">(redigerad)</span>
             )}
 
-            {/* Ticket-status badge */}
+            {/* Ticket-status badge - REDESIGN: Mer diskret */}
             {showStatus && comment.status && (
-              <div className="relative">
+              <div className="relative ml-auto">
                 <button
                   onClick={() => canChangeStatus && setShowStatusMenu(!showStatusMenu)}
                   className={`
-                    flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium
+                    inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium
+                    transition-opacity duration-150
                     ${COMMENT_STATUS_CONFIG[comment.status].bgColor}
                     ${COMMENT_STATUS_CONFIG[comment.status].color}
                     ${canChangeStatus ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}
@@ -376,19 +367,19 @@ export default function CommentItem({
                 >
                   <StatusIcon status={comment.status} />
                   {COMMENT_STATUS_CONFIG[comment.status].label}
-                  {canChangeStatus && <ChevronDown className="w-3 h-3" />}
+                  {canChangeStatus && <ChevronDown className="w-2.5 h-2.5" />}
                 </button>
 
-                {/* Status dropdown */}
+                {/* Status dropdown - REDESIGN: Tightare */}
                 {showStatusMenu && (
-                  <div className="absolute top-full left-0 mt-1 w-40 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-20 overflow-hidden">
+                  <div className="absolute top-full right-0 mt-1 w-36 bg-slate-800 border border-slate-700 rounded-md shadow-xl z-20 overflow-hidden py-1">
                     {(Object.keys(COMMENT_STATUS_CONFIG) as CommentStatus[]).map((status) => (
                       <button
                         key={status}
                         onClick={() => handleStatusChange(status)}
                         className={`
-                          w-full px-3 py-2 flex items-center gap-2 text-sm transition-colors
-                          ${comment.status === status ? 'bg-slate-700' : 'hover:bg-slate-700'}
+                          w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] transition-colors
+                          ${comment.status === status ? 'bg-slate-700/50' : 'hover:bg-slate-700/50'}
                         `}
                       >
                         <StatusIcon status={status} />
@@ -403,19 +394,19 @@ export default function CommentItem({
             )}
           </div>
 
-          {/* Text */}
+          {/* Text - REDESIGN: Kompaktare typografi */}
           {isEditing ? (
-            <div className="space-y-2">
+            <div className="space-y-2 mt-1">
               <textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-[#20c58f]"
-                rows={3}
+                className="w-full px-2.5 py-2 bg-slate-900/80 border border-slate-600 rounded-md text-[13px] text-slate-200 focus:outline-none focus:border-[#20c58f] focus:ring-1 focus:ring-[#20c58f]/30 transition-all"
+                rows={2}
               />
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <button
                   onClick={handleSaveEdit}
-                  className="px-3 py-1.5 bg-[#20c58f] text-white rounded-lg text-sm font-medium hover:bg-[#1ab07f]"
+                  className="px-2.5 py-1 bg-[#20c58f] text-white rounded-md text-[12px] font-medium hover:bg-[#1ab07f] transition-colors"
                 >
                   Spara
                 </button>
@@ -424,21 +415,21 @@ export default function CommentItem({
                     setIsEditing(false);
                     setEditContent(comment.content);
                   }}
-                  className="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm font-medium hover:bg-slate-600"
+                  className="px-2.5 py-1 bg-slate-700/50 text-slate-400 rounded-md text-[12px] font-medium hover:bg-slate-700 hover:text-slate-300 transition-colors"
                 >
                   Avbryt
                 </button>
               </div>
             </div>
           ) : (
-            <p className="text-slate-200 whitespace-pre-wrap break-words">
+            <p className="text-[13px] text-slate-300 whitespace-pre-wrap break-words leading-relaxed">
               {renderContent(comment.content)}
             </p>
           )}
 
-          {/* Bilagor */}
+          {/* Bilagor - REDESIGN: Mindre thumbnails */}
           {comment.attachments && comment.attachments.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {comment.attachments.map((attachment, index) => (
                 <AttachmentPreview
                   key={index}
@@ -455,65 +446,65 @@ export default function CommentItem({
             </div>
           )}
 
-          {/* Åtgärdsrad - Svara, antal svar och läsbekräftelser */}
+          {/* Åtgärdsrad - REDESIGN: Mer diskret, visas vid hover */}
           {!isEditing && (
-            <div className="mt-2 flex items-center gap-4">
-              {/* Svara-knapp (visas inte för systemkommentarer eller för djupa trådar) */}
+            <div className="mt-1.5 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              {/* Svara-knapp */}
               {onReply && depth < 2 && (
                 <button
                   onClick={() => onReply(comment)}
-                  className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-purple-400 transition-colors"
+                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-[#20c58f] transition-colors"
                 >
-                  <Reply className="w-3.5 h-3.5" />
+                  <Reply className="w-3 h-3" />
                   Svara
                 </button>
               )}
 
-              {/* Antal svar (om det finns) */}
+              {/* Antal svar */}
               {comment.reply_count > 0 && (
-                <span className="flex items-center gap-1 text-xs text-slate-500">
-                  <CornerDownRight className="w-3 h-3" />
-                  {comment.reply_count} {comment.reply_count === 1 ? 'svar' : 'svar'}
+                <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                  <CornerDownRight className="w-2.5 h-2.5" />
+                  {comment.reply_count} svar
                 </span>
               )}
 
-              {/* Läsbekräftelser (visas endast på egna kommentarer) */}
+              {/* Läsbekräftelser */}
               {isOwnComment && (
                 <div
                   className="relative"
                   onMouseEnter={handleShowReadReceipts}
                   onMouseLeave={() => setShowReadReceipts(false)}
                 >
-                  <span className="flex items-center gap-1 text-xs text-slate-500 cursor-default">
-                    <Eye className="w-3 h-3" />
+                  <span className="flex items-center gap-1 text-[11px] text-slate-500 cursor-default">
+                    <Eye className="w-2.5 h-2.5" />
                     {comment.read_count !== undefined ? (
-                      <span>Läst av {comment.read_count}</span>
+                      <span>{comment.read_count} läst</span>
                     ) : (
                       <span>Läsbekräftelser</span>
                     )}
                   </span>
 
-                  {/* Läsbekräftelse-popup */}
+                  {/* Läsbekräftelse-popup - REDESIGN: Tightare */}
                   {showReadReceipts && (
-                    <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-20 p-2">
-                      <div className="text-xs font-medium text-slate-400 mb-2 px-1">
+                    <div className="absolute bottom-full left-0 mb-1.5 w-44 bg-slate-800/95 backdrop-blur-sm border border-slate-700 rounded-md shadow-xl z-20 py-1.5 px-2">
+                      <div className="text-[10px] font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
                         Läst av
                       </div>
                       {readReceipts.length === 0 ? (
-                        <div className="text-xs text-slate-500 px-1">
+                        <div className="text-[11px] text-slate-500">
                           Ingen har läst ännu
                         </div>
                       ) : (
-                        <div className="max-h-32 overflow-y-auto space-y-1">
+                        <div className="max-h-28 overflow-y-auto space-y-0.5">
                           {readReceipts.map((receipt) => (
                             <div
                               key={receipt.userId}
-                              className="flex items-center justify-between px-1 py-1 text-xs"
+                              className="flex items-center justify-between py-0.5 text-[11px]"
                             >
-                              <span className="text-white truncate">
+                              <span className="text-slate-200 truncate">
                                 {receipt.userName}
                               </span>
-                              <span className="text-slate-500 ml-2 flex-shrink-0">
+                              <span className="text-slate-500 ml-2 flex-shrink-0 text-[10px]">
                                 {formatCommentTime(receipt.readAt)}
                               </span>
                             </div>
@@ -528,28 +519,28 @@ export default function CommentItem({
           )}
         </div>
 
-        {/* Åtgärdsmeny */}
+        {/* Åtgärdsmeny - REDESIGN: Mindre, tightare */}
         {(canEdit || canDelete) && !isEditing && (
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 self-start">
             <div className="relative">
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-1 text-slate-600 hover:text-slate-400 hover:bg-slate-700/50 rounded opacity-0 group-hover:opacity-100 transition-all duration-150"
               >
-                <MoreHorizontal className="w-4 h-4" />
+                <MoreHorizontal className="w-3.5 h-3.5" />
               </button>
 
               {showMenu && (
-                <div className="absolute right-0 top-full mt-1 w-32 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-10 overflow-hidden">
+                <div className="absolute right-0 top-full mt-0.5 w-28 bg-slate-800/95 backdrop-blur-sm border border-slate-700 rounded-md shadow-xl z-10 overflow-hidden py-0.5">
                   {canEdit && (
                     <button
                       onClick={() => {
                         setIsEditing(true);
                         setShowMenu(false);
                       }}
-                      className="w-full px-3 py-2 flex items-center gap-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                      className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-slate-300 hover:bg-slate-700/50 transition-colors"
                     >
-                      <Pencil className="w-3.5 h-3.5" />
+                      <Pencil className="w-3 h-3" />
                       Redigera
                     </button>
                   )}
@@ -559,9 +550,9 @@ export default function CommentItem({
                         handleDelete();
                         setShowMenu(false);
                       }}
-                      className="w-full px-3 py-2 flex items-center gap-2 text-sm text-red-400 hover:bg-slate-700 transition-colors"
+                      className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-red-400 hover:bg-slate-700/50 transition-colors"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3 h-3" />
                       Ta bort
                     </button>
                   )}
@@ -572,22 +563,22 @@ export default function CommentItem({
         )}
       </div>
 
-      {/* Bild-modal */}
+      {/* Bild-modal - REDESIGN: Mer sofistikerad */}
       {showImageModal && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setShowImageModal(null)}
         >
           <button
             onClick={() => setShowImageModal(null)}
-            className="absolute top-4 right-4 p-2 text-white hover:bg-white/10 rounded-lg"
+            className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
           <img
             src={showImageModal}
             alt="Förstoring"
-            className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            className="max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
@@ -596,7 +587,7 @@ export default function CommentItem({
   );
 }
 
-// Förhandsvisning av bilaga
+// Förhandsvisning av bilaga - REDESIGN: Mindre, mer polerad
 function AttachmentPreview({
   attachment,
   onClick,
@@ -605,31 +596,30 @@ function AttachmentPreview({
   onClick: () => void;
 }) {
   const isImage = attachment.mimetype.startsWith('image/');
-  const isPdf = attachment.mimetype === 'application/pdf';
 
   return (
     <button
       onClick={onClick}
-      className="group/attachment relative rounded-lg overflow-hidden border border-slate-600 hover:border-slate-500 transition-colors"
+      className="group/attachment relative rounded-md overflow-hidden border border-slate-700 hover:border-slate-600 transition-all duration-150 hover:shadow-lg"
     >
       {isImage ? (
         <img
           src={attachment.url}
           alt={attachment.filename}
-          className="w-24 h-24 object-cover"
+          className="w-16 h-16 object-cover"
         />
       ) : (
-        <div className="w-24 h-24 bg-slate-700 flex flex-col items-center justify-center p-2">
-          <FileText className="w-8 h-8 text-red-400 mb-1" />
-          <span className="text-xs text-slate-400 truncate w-full text-center">
+        <div className="w-16 h-16 bg-slate-800 flex flex-col items-center justify-center p-1.5">
+          <FileText className="w-5 h-5 text-red-400 mb-0.5" />
+          <span className="text-[9px] text-slate-500 truncate w-full text-center leading-tight">
             {attachment.filename}
           </span>
         </div>
       )}
 
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex items-center justify-center">
-        <Download className="w-5 h-5 text-white" />
+      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/attachment:opacity-100 transition-opacity duration-150 flex items-center justify-center">
+        <Download className="w-4 h-4 text-white" />
       </div>
     </button>
   );

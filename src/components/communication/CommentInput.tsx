@@ -184,34 +184,34 @@ export default function CommentInput({
   }, []);
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700 focus-within:border-[#20c58f]/50 transition-colors">
-      {/* Svarar på - visas när man svarar på en kommentar */}
+    <div className="bg-slate-800/40 rounded-md border border-slate-700/80 focus-within:border-[#20c58f]/50 focus-within:ring-1 focus-within:ring-[#20c58f]/20 transition-all duration-200">
+      {/* Svarar på - REDESIGN: Tightare, mer subtil */}
       {replyingTo && (
-        <div className="px-4 py-2 border-b border-slate-700 bg-slate-700/30 flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <CornerDownRight className="w-4 h-4 text-purple-400 flex-shrink-0" />
-            <span className="text-sm text-slate-400">Svarar på</span>
-            <span className="text-sm font-medium text-white truncate">
+        <div className="px-2.5 py-1.5 border-b border-slate-700/60 bg-slate-700/20 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0 text-[12px]">
+            <CornerDownRight className="w-3 h-3 text-[#20c58f] flex-shrink-0" />
+            <span className="text-slate-500">Svarar</span>
+            <span className="font-medium text-slate-300 truncate">
               {replyingTo.authorName}
             </span>
-            <span className="text-sm text-slate-500 truncate hidden sm:inline">
-              "{replyingTo.preview.length > 50 ? replyingTo.preview.slice(0, 50) + '...' : replyingTo.preview}"
+            <span className="text-slate-600 truncate hidden sm:inline max-w-[150px]">
+              {replyingTo.preview.length > 30 ? replyingTo.preview.slice(0, 30) + '...' : replyingTo.preview}
             </span>
           </div>
           <button
             type="button"
             onClick={onCancelReply}
-            className="p-1 text-slate-400 hover:text-white hover:bg-slate-600 rounded transition-colors flex-shrink-0"
+            className="p-0.5 text-slate-500 hover:text-slate-300 hover:bg-slate-600/50 rounded transition-colors flex-shrink-0"
             title="Avbryt svar"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* Bilagor-förhandsvisning */}
+      {/* Bilagor-forhandsvisning - REDESIGN: Mindre thumbnails */}
       {attachments.length > 0 && (
-        <div className="p-3 border-b border-slate-700 flex flex-wrap gap-2">
+        <div className="px-2.5 py-2 border-b border-slate-700/60 flex flex-wrap gap-1.5">
           {attachments.map((file, index) => (
             <div
               key={index}
@@ -221,11 +221,11 @@ export default function CommentInput({
                 <img
                   src={previewUrls[index]}
                   alt={file.name}
-                  className="w-16 h-16 object-cover rounded-lg border border-slate-600"
+                  className="w-12 h-12 object-cover rounded border border-slate-600"
                 />
               ) : (
-                <div className="w-16 h-16 bg-slate-700 rounded-lg border border-slate-600 flex items-center justify-center">
-                  <span className="text-xs text-slate-400 uppercase">
+                <div className="w-12 h-12 bg-slate-700/50 rounded border border-slate-600 flex items-center justify-center">
+                  <span className="text-[9px] text-slate-400 uppercase font-medium">
                     {file.name.split('.').pop()}
                   </span>
                 </div>
@@ -233,16 +233,16 @@ export default function CommentInput({
               <button
                 type="button"
                 onClick={() => removeAttachment(index)}
-                className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <X className="w-3 h-3 text-white" />
+                <X className="w-2.5 h-2.5 text-white" />
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Textfält */}
+      {/* Textfalt - REDESIGN: Kompaktare */}
       <div className="relative">
         <textarea
           ref={textareaRef}
@@ -250,19 +250,19 @@ export default function CommentInput({
           onChange={handleChange}
           onKeyDown={handleKey}
           onBlur={() => {
-            // Fördröj stängning för att tillåta klick på suggestions
+            // Fordröj stängning för att tillåta klick på suggestions
             setTimeout(closeSuggestions, 200);
           }}
           placeholder={placeholder}
           autoFocus={autoFocus}
           rows={1}
-          className="w-full px-4 py-3 bg-transparent text-white placeholder-slate-500 resize-none focus:outline-none"
-          style={{ minHeight: '44px' }}
+          className="w-full px-3 py-2.5 bg-transparent text-[13px] text-slate-200 placeholder-slate-500 resize-none focus:outline-none"
+          style={{ minHeight: '38px' }}
         />
 
         {/* Mention suggestions */}
         {isOpen && (
-          <div className="absolute bottom-full left-0 mb-2 z-[200]">
+          <div className="absolute bottom-full left-0 mb-1.5 z-[200]">
             <MentionSuggestions
               suggestions={suggestions}
               selectedIndex={selectedIndex}
@@ -272,9 +272,9 @@ export default function CommentInput({
         )}
       </div>
 
-      {/* Verktygsfält */}
-      <div className="px-3 py-2 border-t border-slate-700/50 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      {/* Verktygsfalt - REDESIGN: Tightare, mer diskret */}
+      <div className="px-2 py-1.5 border-t border-slate-700/40 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
           {/* Fil-uppladdning */}
           <input
             ref={fileInputRef}
@@ -287,40 +287,40 @@ export default function CommentInput({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 rounded transition-colors"
             title="Bifoga fil (bilder eller PDF)"
           >
-            <Paperclip className="w-4 h-4" />
+            <Paperclip className="w-3.5 h-3.5" />
           </button>
 
-          <span className="text-xs text-slate-500">
-            @ för att nämna
+          <span className="text-[11px] text-slate-600">
+            @ nämn
           </span>
         </div>
 
-        {/* Skicka-knapp */}
+        {/* Skicka-knapp - REDESIGN: Kompaktare */}
         <button
           type="button"
           onClick={handleSubmit}
           disabled={isSubmitting || (!content.trim() && attachments.length === 0)}
           className={`
-            flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
-            transition-all duration-200
+            flex items-center gap-1.5 px-2.5 py-1.5 rounded-md font-medium text-[12px]
+            transition-all duration-150
             ${isSubmitting || (!content.trim() && attachments.length === 0)
-              ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-              : 'bg-[#20c58f] text-white hover:bg-[#1ab07f] shadow-lg shadow-[#20c58f]/20'
+              ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
+              : 'bg-[#20c58f] text-white hover:bg-[#1ab07f] shadow-sm'
             }
           `}
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Skickar...
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span className="hidden sm:inline">Skickar...</span>
             </>
           ) : (
             <>
-              <Send className="w-4 h-4" />
-              Skicka
+              <Send className="w-3 h-3" />
+              <span className="hidden sm:inline">Skicka</span>
             </>
           )}
         </button>

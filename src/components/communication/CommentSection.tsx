@@ -35,6 +35,7 @@ export default function CommentSection({
     addComment,
     editComment,
     removeComment,
+    changeStatus,
   } = useCaseComments({ caseId, caseType, caseTitle });
 
   // State för att svara på kommentar
@@ -80,6 +81,7 @@ export default function CommentSection({
   };
 
   // Rendera en kommentar med sina svar rekursivt
+  // REDESIGN: Subtil tråd-indikator istället för tjock lila border
   const renderCommentWithReplies = (comment: CaseComment, depth: number = 0) => {
     const replies = repliesByParent.get(comment.id) || [];
 
@@ -87,21 +89,26 @@ export default function CommentSection({
     const hasMentions = comment.mentioned_user_ids && comment.mentioned_user_ids.length > 0;
 
     return (
-      <div key={comment.id} className="space-y-2">
+      <div key={comment.id}>
         <CommentItem
           comment={comment}
           onEdit={editComment}
           onDelete={removeComment}
           onReply={handleReply}
+          onStatusChange={changeStatus}
           isReply={depth > 0}
           depth={depth}
           showStatus={hasMentions}
         />
 
-        {/* Rendera svar */}
+        {/* Rendera svar - REDESIGN: Subtil indentation utan tjock border */}
         {replies.length > 0 && (
-          <div className="ml-8 space-y-2 border-l-2 border-slate-700/50 pl-4">
-            {replies.map((reply) => renderCommentWithReplies(reply, depth + 1))}
+          <div className="ml-6 mt-0.5 pl-3 relative">
+            {/* Subtil tråd-linje */}
+            <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-slate-700/60 via-slate-700/30 to-transparent" />
+            <div className="space-y-0.5">
+              {replies.map((reply) => renderCommentWithReplies(reply, depth + 1))}
+            </div>
           </div>
         )}
       </div>
@@ -110,11 +117,11 @@ export default function CommentSection({
 
   if (error) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-red-400">{error}</p>
+      <div className="p-4 text-center">
+        <p className="text-red-400 text-[13px]">{error}</p>
         <button
           onClick={() => window.location.reload()}
-          className="mt-2 text-sm text-slate-400 hover:text-white"
+          className="mt-2 text-[12px] text-slate-400 hover:text-white transition-colors"
         >
           Försök igen
         </button>
@@ -123,23 +130,23 @@ export default function CommentSection({
   }
 
   return (
-    <div className={`flex flex-col h-full ${compact ? 'gap-3' : 'gap-4'}`}>
-      {/* Header */}
+    <div className={`flex flex-col h-full ${compact ? 'gap-2.5' : 'gap-3'}`}>
+      {/* Header - REDESIGN: Tightare */}
       {!compact && (
         <div className="flex items-center justify-between flex-shrink-0">
-          <h3 className="font-semibold text-white flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-purple-400" />
-            Aktivitet & Kommunikation
+          <h3 className="font-medium text-slate-200 text-[14px] flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-purple-400" />
+            Aktivitet
             {comments.length > 0 && (
-              <span className="text-sm text-slate-400">
-                ({comments.length})
+              <span className="text-[12px] text-slate-500 font-normal">
+                {comments.length}
               </span>
             )}
           </h3>
         </div>
       )}
 
-      {/* Input - fast höjd */}
+      {/* Input - fast hojd */}
       <div className="flex-shrink-0">
         <CommentInput
           onSubmit={addComment}
@@ -150,19 +157,19 @@ export default function CommentSection({
         />
       </div>
 
-      {/* Kommentarslista - fyller resterande utrymme */}
-      <div className="space-y-2 flex-1 min-h-0 overflow-y-auto">
+      {/* Kommentarslista - REDESIGN: Tightare spacing */}
+      <div className="space-y-1 flex-1 min-h-0 overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />
           </div>
         ) : comments.length === 0 ? (
-          <div className="text-center py-8">
-            <MessageSquare className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-slate-500 text-sm">
+          <div className="text-center py-6">
+            <MessageSquare className="w-8 h-8 text-slate-700 mx-auto mb-1.5" />
+            <p className="text-slate-500 text-[13px]">
               Inga kommentarer ännu
             </p>
-            <p className="text-slate-600 text-xs mt-1">
+            <p className="text-slate-600 text-[11px] mt-0.5">
               Använd @namn för att nämna någon
             </p>
           </div>
