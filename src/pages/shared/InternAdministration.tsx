@@ -1,56 +1,72 @@
 // src/pages/shared/InternAdministration.tsx
-// Dedikerad sida för intern administration och ticket-hantering
-// REDESIGN: Tydlig separation mellan navigation, statistik och filtrering
+// Dedikerad sida för intern administration - ärende-centrerad vy med händelser
+// REDESIGN: Visar ärenden med grupperade händelser istället för enskilda kommentarer
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw, MessageSquareText, Clock, AlertTriangle, CheckCircle2, Inbox } from 'lucide-react';
+import {
+  RefreshCw,
+  MessageSquareText,
+  AtSign,
+  MessageCircle,
+  Bell,
+  CheckCircle2,
+  Inbox,
+  Loader2
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTickets } from '../../hooks/useTickets';
-import { TicketFilters } from '../../components/admin/TicketFilters';
-import { TicketList } from '../../components/admin/TicketList';
-import { TicketViewTabs, type TicketDirection } from '../../components/admin/TicketViewTabs';
+import { useCaseEvents } from '../../hooks/useCaseEvents';
+import CaseEventCard from '../../components/admin/CaseEventCard';
 import { CaseContextCommunicationModal } from '../../components/communication';
-import type { CaseType } from '../../types/communication';
+import type { CaseType, CommentStatus } from '../../types/communication';
 
-// State för vald ticket (för att öppna kommunikationspanel)
-interface SelectedTicket {
+// State för valt ärende (för att öppna kommunikationspanel)
+interface SelectedCase {
   caseId: string;
   caseType: CaseType;
   caseTitle: string;
 }
 
+// Filter-flikar för händelsetyper
+type EventFilter = 'all' | 'mentions' | 'replies' | 'activity';
+
 export default function InternAdministration() {
   const { profile } = useAuth();
   const [searchParams] = useSearchParams();
 
-  // State för kommunikationspanel (öppnas vid klick på ticket)
-  const [selectedTicket, setSelectedTicket] = useState<SelectedTicket | null>(null);
+  // State för kommunikationspanel
+  const [selectedCase, setSelectedCase] = useState<SelectedCase | null>(null);
+
+  // State för filter
+  const [activeFilter, setActiveFilter] = useState<EventFilter>('all');
 
   const {
-    tickets,
+    cases,
     stats,
-    directionStats,
     loading,
     statsLoading,
     error,
     hasMore,
-    filter,
-    currentDirection,
-    setFilter,
-    setDirection,
     loadMore,
     refresh,
     updateStatus,
-  } = useTickets();
+  } = useCaseEvents();
 
-  // Filtrera på status från URL
+  // Hantera URL-parameter
   useEffect(() => {
-    const statusParam = searchParams.get('status');
-    if (statusParam && ['open', 'in_progress', 'needs_action', 'resolved'].includes(statusParam)) {
-      setFilter({ ...filter, status: [statusParam as any] });
+    const caseId = searchParams.get('caseId');
+    const caseType = searchParams.get('caseType') as CaseType | null;
+    if (caseId && caseType) {
+      const foundCase = cases.find(c => c.case_id === caseId && c.case_type === caseType);
+      if (foundCase) {
+        setSelectedCase({
+          caseId: foundCase.case_id,
+          caseType: foundCase.case_type,
+          caseTitle: foundCase.case_title
+        });
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, cases]);
 
   const getRoleName = () => {
     switch (profile?.role) {
@@ -61,50 +77,83 @@ export default function InternAdministration() {
     }
   };
 
-  // Status-statistik (endast informativ, INTE klickbar)
-  const statusStats = [
+  // Filtrera ärenden baserat på vald flik
+  const filteredCases = cases.filter(c => {
+    switch (activeFilter) {
+      case 'mentions':
+        return c.unanswered_mentions > 0;
+      case 'replies':
+        return c.replies_to_my_questions > 0;
+      case 'activity':
+        return c.new_comments > 0;
+      default:
+        return true;
+    }
+  });
+
+  // Statistik-kort
+  const filterTabs = [
     {
-      label: 'Öppna',
-      value: stats?.open || 0,
+      id: 'all' as EventFilter,
+      label: 'Alla ärenden',
+      count: cases.length,
       icon: Inbox,
-      textColor: 'text-blue-400',
-      bgColor: 'bg-blue-500/10',
+      color: 'text-slate-400',
+      activeColor: 'bg-slate-600 text-white'
     },
     {
-      label: 'Pågår',
-      value: stats?.inProgress || 0,
-      icon: Clock,
-      textColor: 'text-yellow-400',
-      bgColor: 'bg-yellow-500/10',
+      id: 'mentions' as EventFilter,
+      label: 'Väntar på svar',
+      count: stats?.unansweredMentions || 0,
+      icon: AtSign,
+      color: 'text-red-400',
+      activeColor: 'bg-red-600 text-white'
     },
     {
-      label: 'Kräver åtgärd',
-      value: stats?.needsAction || 0,
-      icon: AlertTriangle,
-      textColor: 'text-red-400',
-      bgColor: 'bg-red-500/10',
+      id: 'replies' as EventFilter,
+      label: 'Svar mottagna',
+      count: stats?.waitingForReplies || 0,
+      icon: MessageCircle,
+      color: 'text-amber-400',
+      activeColor: 'bg-amber-600 text-white'
     },
     {
-      label: 'Avklarade',
-      value: stats?.resolved || 0,
-      icon: CheckCircle2,
-      textColor: 'text-green-400',
-      bgColor: 'bg-green-500/10',
-    },
+      id: 'activity' as EventFilter,
+      label: 'Ny aktivitet',
+      count: stats?.newActivity || 0,
+      icon: Bell,
+      color: 'text-blue-400',
+      activeColor: 'bg-blue-600 text-white'
+    }
   ];
 
-  const handleDirectionChange = (direction: TicketDirection) => {
-    setDirection(direction);
-  };
-
-  // Öppna kommunikationspanel för en ticket
-  const handleOpenCommunication = (caseId: string, caseType: CaseType, caseTitle: string) => {
-    setSelectedTicket({ caseId, caseType, caseTitle });
+  // Öppna kommunikationspanel för ett ärende
+  const handleOpenCase = (caseId: string, caseType: 'private' | 'business' | 'contract') => {
+    const foundCase = cases.find(c => c.case_id === caseId && c.case_type === caseType);
+    if (foundCase) {
+      setSelectedCase({
+        caseId: foundCase.case_id,
+        caseType: foundCase.case_type,
+        caseTitle: foundCase.case_title
+      });
+    }
   };
 
   // Stäng kommunikationspanel
-  const handleCloseCommunication = () => {
-    setSelectedTicket(null);
+  const handleCloseCase = () => {
+    setSelectedCase(null);
+  };
+
+  // Hantera statusändring
+  const handleStatusChange = async (caseId: string, caseType: 'private' | 'business' | 'contract', status: CommentStatus) => {
+    const foundCase = cases.find(c => c.case_id === caseId && c.case_type === caseType);
+    if (foundCase && foundCase.events.length > 0) {
+      // Uppdatera senaste kommentarens status
+      const latestCommentId = foundCase.events[0].source_comment_id;
+      if (latestCommentId) {
+        await updateStatus(caseId, caseType as CaseType, latestCommentId, status);
+      }
+    }
   };
 
   return (
@@ -143,115 +192,117 @@ export default function InternAdministration() {
           </div>
         </div>
 
-        {/* PRIMÄR NAVIGATION: Direction Tabs */}
-        <TicketViewTabs
-          activeTab={currentDirection}
-          counts={{
-            incoming: directionStats?.incoming || 0,
-            outgoing: directionStats?.outgoing || 0,
-            all: directionStats?.all || 0,
-          }}
-          onTabChange={handleDirectionChange}
-        />
-
-        {/* STATISTIK: Status-översikt (endast informativ, ej klickbar) */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
-          {statusStats.map((stat) => {
-            const Icon = stat.icon;
+        {/* Filter-tabs */}
+        <div className="flex flex-wrap gap-2 mb-6 p-1 bg-slate-800/50 rounded-lg">
+          {filterTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeFilter === tab.id;
 
             return (
-              <div
-                key={stat.label}
-                className="bg-slate-800/30 border border-slate-700/30 rounded-lg p-2 sm:p-3"
+              <button
+                key={tab.id}
+                onClick={() => setActiveFilter(tab.id)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all
+                  ${isActive
+                    ? tab.activeColor
+                    : `bg-transparent ${tab.color} hover:bg-slate-700/50`
+                  }`}
               >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Icon className={`w-3.5 h-3.5 ${stat.textColor}`} />
-                  <span className="text-[10px] sm:text-xs text-slate-500 truncate">{stat.label}</span>
-                </div>
-                <div className={`text-lg sm:text-xl font-bold ${stat.textColor}`}>
-                  {statsLoading ? '...' : stat.value}
-                </div>
-              </div>
+                <Icon className="w-4 h-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className={`ml-1 px-1.5 py-0.5 rounded text-xs font-bold
+                  ${isActive ? 'bg-white/20' : 'bg-slate-700'}`}>
+                  {statsLoading ? '...' : tab.count}
+                </span>
+              </button>
             );
           })}
         </div>
 
-        {/* SEKUNDÄR FILTRERING: Sök och status-filter */}
-        <div className="mb-6">
-          <TicketFilters
-            filter={filter}
-            onFilterChange={setFilter}
-            disabled={loading}
-          />
-        </div>
-
-        {/* Visar antal resultat */}
-        {!loading && tickets.length > 0 && (
+        {/* Resultat-info */}
+        {!loading && filteredCases.length > 0 && (
           <div className="text-xs text-slate-500 mb-3">
-            Visar {tickets.length} ticket{tickets.length !== 1 ? 's' : ''}
-            {filter.status && filter.status.length > 0 && (
-              <span> med status-filter aktivt</span>
+            Visar {filteredCases.length} ärende{filteredCases.length !== 1 ? 'n' : ''}
+            {activeFilter !== 'all' && (
+              <span> med {filterTabs.find(t => t.id === activeFilter)?.label.toLowerCase()}</span>
             )}
           </div>
         )}
 
-        {/* Ticket-lista */}
-        <TicketList
-          tickets={tickets}
-          loading={loading}
-          error={error}
-          hasMore={hasMore}
-          onLoadMore={loadMore}
-          onStatusChange={updateStatus}
-          currentDirection={currentDirection}
-          onOpenCommunication={handleOpenCommunication}
-        />
+        {/* Laddar */}
+        {loading && cases.length === 0 && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Ärende-lista */}
+        {!loading && filteredCases.length > 0 && (
+          <div className="space-y-3">
+            {filteredCases.map((caseData) => (
+              <CaseEventCard
+                key={`${caseData.case_id}:${caseData.case_type}`}
+                caseData={caseData}
+                onOpenCase={handleOpenCase}
+                onStatusChange={handleStatusChange}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Ladda mer */}
+        {hasMore && !loading && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={loadMore}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700
+                       rounded-lg text-slate-300 hover:text-white transition-colors"
+            >
+              Ladda fler ärenden
+            </button>
+          </div>
+        )}
+
+        {/* Empty states */}
+        {!loading && filteredCases.length === 0 && cases.length > 0 && (
+          <div className="text-center py-12">
+            <CheckCircle2 className="w-16 h-16 text-green-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">
+              Inga ärenden i denna kategori
+            </h3>
+            <p className="text-slate-400">
+              Byt flik för att se andra ärenden.
+            </p>
+          </div>
+        )}
+
+        {!loading && cases.length === 0 && (
+          <div className="text-center py-12">
+            <Inbox className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">
+              Inga ärenden
+            </h3>
+            <p className="text-slate-400">
+              Du har inga ärenden med aktivitet just nu.
+            </p>
+          </div>
+        )}
 
         {/* Kontextuell kommunikationsmodal */}
         <CaseContextCommunicationModal
-          isOpen={!!selectedTicket}
-          onClose={handleCloseCommunication}
-          caseId={selectedTicket?.caseId || ''}
-          caseType={selectedTicket?.caseType || 'private'}
-          caseTitle={selectedTicket?.caseTitle || ''}
+          isOpen={!!selectedCase}
+          onClose={handleCloseCase}
+          caseId={selectedCase?.caseId || ''}
+          caseType={selectedCase?.caseType || 'private'}
+          caseTitle={selectedCase?.caseTitle || ''}
         />
-
-        {/* Empty states */}
-        {!loading && tickets.length === 0 && (
-          <div className="text-center py-12">
-            {currentDirection === 'incoming' ? (
-              <>
-                <CheckCircle2 className="w-16 h-16 text-green-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">
-                  Allt avklarat!
-                </h3>
-                <p className="text-slate-400">
-                  Du har inga tickets som väntar på din åtgärd.
-                </p>
-              </>
-            ) : currentDirection === 'outgoing' ? (
-              <>
-                <Inbox className="w-16 h-16 text-slate-500 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">
-                  Inga utestående frågor
-                </h3>
-                <p className="text-slate-400">
-                  Du har inte nämnt någon i öppna tickets.
-                </p>
-              </>
-            ) : (
-              <>
-                <Inbox className="w-16 h-16 text-slate-500 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">
-                  Inga tickets
-                </h3>
-                <p className="text-slate-400">
-                  Det finns inga tickets som matchar dina filter.
-                </p>
-              </>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

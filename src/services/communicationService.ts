@@ -1056,12 +1056,14 @@ export async function getTicketStats(userId?: string): Promise<TicketStats> {
     };
   }
 
-  // Med userId: räkna endast tickets där användaren är involverad
+  // Med userId: räkna endast UNIKA ÄRENDEN där användaren är involverad
   // (nämnd i mentioned_user_ids ELLER är author_id)
+  // Deduplicera per ärende - ett ärende räknas bara en gång oavsett antal kommentarer
   const { data: allComments } = await supabase
     .from('case_comments')
-    .select('id, status, author_id, mentioned_user_ids, resolved_at')
-    .eq('is_system_comment', false);
+    .select('id, case_id, case_type, status, author_id, mentioned_user_ids, resolved_at, created_at')
+    .eq('is_system_comment', false)
+    .order('created_at', { ascending: false });
 
   if (!allComments || allComments.length === 0) {
     return { open: 0, inProgress: 0, needsAction: 0, resolved: 0 };
@@ -1074,7 +1076,24 @@ export async function getTicketStats(userId?: string): Promise<TicketStats> {
     return isMentioned || isAuthor;
   });
 
-  // Räkna per status
+  // Gruppera per ärende och ta den senaste kommentarens status
+  // Ett ärende kan bara ha EN status (baserat på senaste kommentaren)
+  const caseStatusMap = new Map<string, { status: string; resolved_at: string | null }>();
+
+  for (const comment of userComments) {
+    const caseKey = `${comment.case_id}:${comment.case_type}`;
+
+    // Eftersom kommentarer är sorterade med senaste först,
+    // tar vi bara den första (senaste) för varje ärende
+    if (!caseStatusMap.has(caseKey)) {
+      caseStatusMap.set(caseKey, {
+        status: comment.status,
+        resolved_at: comment.resolved_at
+      });
+    }
+  }
+
+  // Räkna unika ärenden per status
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   const stats = {
@@ -1084,8 +1103,8 @@ export async function getTicketStats(userId?: string): Promise<TicketStats> {
     resolved: 0,
   };
 
-  for (const comment of userComments) {
-    switch (comment.status) {
+  for (const [, caseData] of caseStatusMap) {
+    switch (caseData.status) {
       case 'open':
         stats.open++;
         break;
@@ -1097,7 +1116,7 @@ export async function getTicketStats(userId?: string): Promise<TicketStats> {
         break;
       case 'resolved':
         // Resolved räknas bara om den är från senaste 30 dagarna
-        if (comment.resolved_at && new Date(comment.resolved_at) >= thirtyDaysAgo) {
+        if (caseData.resolved_at && new Date(caseData.resolved_at) >= thirtyDaysAgo) {
           stats.resolved++;
         }
         break;
@@ -1149,5 +1168,271 @@ export async function getDirectionStats(userId: string): Promise<DirectionStats>
     incoming: incomingCases.size,
     outgoing: outgoingCases.size,
     all: allCases.size,
+  };
+}
+
+// =============================================================================
+// HÄNDELSE-BASERAD MODELL (Case Events)
+// =============================================================================
+
+export type CaseEventType = 'mention' | 'reply' | 'comment' | 'status_change' | 'assignment';
+
+export interface CaseEvent {
+  id: string;
+  case_id: string;
+  case_type: CaseType;
+  actor_id: string;
+  actor_name: string;
+  event_type: CaseEventType;
+  source_comment_id: string | null;
+  parent_comment_id: string | null;
+  target_user_ids: string[];
+  preview: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface CaseWithEvents {
+  case_id: string;
+  case_type: CaseType;
+  case_title: string;
+  kontaktperson: string | null;
+  adress: string | null;
+  skadedjur: string | null;
+  status: CommentStatus;
+  events: CaseEvent[];
+  unread_count: number;
+  latest_event_at: string;
+  // Kategoriserade händelser
+  unanswered_mentions: number;  // Obesvarade frågor till mig
+  replies_to_my_questions: number;  // Svar på mina frågor
+  new_comments: number;  // Nya kommentarer
+}
+
+export interface CaseEventsFilter {
+  userId: string;
+  eventTypes?: CaseEventType[];
+  unreadOnly?: boolean;
+  caseId?: string;
+  caseType?: CaseType;
+}
+
+/**
+ * Hämtar ärenden grupperade med händelser för en användare
+ * Ersätter getTickets med ärende-centrerad vy
+ */
+export async function getCasesWithEvents(
+  userId: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ cases: CaseWithEvents[]; totalCount: number }> {
+  // Hämta alla kommentarer där användaren är involverad
+  const { data: allComments } = await supabase
+    .from('case_comments')
+    .select(`
+      id, case_id, case_type, content, status, author_id, author_name,
+      mentioned_user_ids, mentioned_user_names, parent_comment_id,
+      created_at, resolved_at
+    `)
+    .eq('is_system_comment', false)
+    .order('created_at', { ascending: false });
+
+  if (!allComments || allComments.length === 0) {
+    return { cases: [], totalCount: 0 };
+  }
+
+  // Filtrera till kommentarer där användaren är involverad
+  const userComments = allComments.filter(comment => {
+    const isMentioned = comment.mentioned_user_ids?.includes(userId);
+    const isAuthor = comment.author_id === userId;
+    return isMentioned || isAuthor;
+  });
+
+  if (userComments.length === 0) {
+    return { cases: [], totalCount: 0 };
+  }
+
+  // Gruppera kommentarer per ärende
+  const caseMap = new Map<string, {
+    comments: typeof userComments;
+    latestAt: string;
+  }>();
+
+  for (const comment of userComments) {
+    const caseKey = `${comment.case_id}:${comment.case_type}`;
+    const existing = caseMap.get(caseKey);
+
+    if (existing) {
+      existing.comments.push(comment);
+      if (comment.created_at > existing.latestAt) {
+        existing.latestAt = comment.created_at;
+      }
+    } else {
+      caseMap.set(caseKey, {
+        comments: [comment],
+        latestAt: comment.created_at
+      });
+    }
+  }
+
+  // Sortera ärenden efter senaste aktivitet
+  const sortedCases = Array.from(caseMap.entries())
+    .sort((a, b) => new Date(b[1].latestAt).getTime() - new Date(a[1].latestAt).getTime());
+
+  const totalCount = sortedCases.length;
+
+  // Applicera paginering
+  const paginatedCases = sortedCases.slice(offset, offset + limit);
+
+  // Hämta ärendeinfo
+  const caseIds = paginatedCases.map(([key]) => key.split(':')[0]);
+
+  const { data: privateCases } = await supabase
+    .from('private_cases')
+    .select('id, title, kontaktperson, adress, skadedjur')
+    .in('id', caseIds);
+
+  const { data: businessCases } = await supabase
+    .from('business_cases')
+    .select('id, title, kontaktperson, adress, skadedjur')
+    .in('id', caseIds);
+
+  const privateCaseMap = new Map(privateCases?.map(c => [c.id, c]) || []);
+  const businessCaseMap = new Map(businessCases?.map(c => [c.id, c]) || []);
+
+  // Analysera mentions för att hitta obesvarade frågor
+  const questions = analyzeMentionQuestions(allComments);
+  const unansweredForMe = getUnansweredQuestionsForUser(questions, userId);
+  const unansweredFromMe = getUnansweredQuestionsFromUser(questions, userId);
+
+  // Bygg CaseWithEvents
+  const cases: CaseWithEvents[] = paginatedCases.map(([caseKey, caseData]) => {
+    const [caseId, caseType] = caseKey.split(':') as [string, CaseType];
+    const caseInfo = caseType === 'private'
+      ? privateCaseMap.get(caseId)
+      : businessCaseMap.get(caseId);
+
+    // Räkna händelser
+    const unansweredMentionsForCase = unansweredForMe.filter(
+      q => q.caseId === caseId && q.caseType === caseType
+    ).length;
+
+    const repliesForCase = unansweredFromMe.filter(
+      q => q.caseId === caseId && q.caseType === caseType && q.isAnswered
+    ).length;
+
+    // Nya kommentarer = kommentarer som inte är frågor till mig eller mina frågor
+    const newCommentsCount = caseData.comments.filter(c =>
+      c.author_id !== userId &&
+      !c.mentioned_user_ids?.includes(userId)
+    ).length;
+
+    // Senaste kommentarens status
+    const latestComment = caseData.comments[0];
+
+    // Konvertera kommentarer till events
+    const events: CaseEvent[] = caseData.comments.slice(0, 5).map(comment => ({
+      id: comment.id,
+      case_id: comment.case_id,
+      case_type: comment.case_type as CaseType,
+      actor_id: comment.author_id,
+      actor_name: comment.author_name,
+      event_type: determineEventType(comment, userId),
+      source_comment_id: comment.id,
+      parent_comment_id: comment.parent_comment_id,
+      target_user_ids: comment.mentioned_user_ids || [],
+      preview: truncatePreview(comment.content, 100),
+      metadata: {},
+      created_at: comment.created_at
+    }));
+
+    return {
+      case_id: caseId,
+      case_type: caseType,
+      case_title: caseInfo?.title || 'Okänt ärende',
+      kontaktperson: caseInfo?.kontaktperson || null,
+      adress: formatAddress(caseInfo?.adress),
+      skadedjur: caseInfo?.skadedjur || null,
+      status: (latestComment?.status || 'open') as CommentStatus,
+      events,
+      unread_count: caseData.comments.length,
+      latest_event_at: caseData.latestAt,
+      unanswered_mentions: unansweredMentionsForCase,
+      replies_to_my_questions: repliesForCase,
+      new_comments: newCommentsCount
+    };
+  });
+
+  return { cases, totalCount };
+}
+
+/**
+ * Bestäm händelsetyp baserat på kommentar
+ */
+function determineEventType(
+  comment: { author_id: string; mentioned_user_ids: string[] | null; parent_comment_id: string | null },
+  userId: string
+): CaseEventType {
+  if (comment.mentioned_user_ids?.includes(userId)) {
+    return 'mention';
+  }
+  if (comment.parent_comment_id) {
+    return 'reply';
+  }
+  return 'comment';
+}
+
+/**
+ * Skapa automatisk följning för en användare på ett ärende
+ */
+export async function followCase(
+  caseId: string,
+  caseType: CaseType,
+  userId: string,
+  reason: 'assigned' | 'mentioned' | 'replied' | 'commented' | 'created'
+): Promise<void> {
+  const { error } = await supabase
+    .from('case_followers')
+    .upsert({
+      case_id: caseId,
+      case_type: caseType,
+      user_id: userId,
+      follow_reason: reason,
+      followed_at: new Date().toISOString()
+    }, {
+      onConflict: 'case_id,case_type,user_id'
+    });
+
+  if (error) {
+    console.error('Error following case:', error);
+  }
+}
+
+/**
+ * Hämta ärende-baserad statistik för notifikationsbadge
+ */
+export async function getCaseBasedStats(userId: string): Promise<{
+  totalCases: number;
+  unansweredMentions: number;
+  waitingForReplies: number;
+  newActivity: number;
+}> {
+  const { cases } = await getCasesWithEvents(userId, 1000, 0);
+
+  let unansweredMentions = 0;
+  let waitingForReplies = 0;
+  let newActivity = 0;
+
+  for (const c of cases) {
+    unansweredMentions += c.unanswered_mentions;
+    waitingForReplies += c.replies_to_my_questions;
+    newActivity += c.new_comments;
+  }
+
+  return {
+    totalCases: cases.length,
+    unansweredMentions,
+    waitingForReplies,
+    newActivity
   };
 }
