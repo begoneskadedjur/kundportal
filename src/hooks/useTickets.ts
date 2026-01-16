@@ -155,7 +155,7 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
       const resolvedBy = status === 'resolved' ? profile.id : undefined;
       await updateCommentStatus(commentId, status, resolvedBy);
 
-      // Uppdatera lokalt state
+      // Uppdatera lokalt state optimistiskt
       setTickets(prev => prev.map(ticket =>
         ticket.comment.id === commentId
           ? { ...ticket, comment: { ...ticket.comment, status } }
@@ -165,13 +165,18 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
       // Uppdatera statistik
       await fetchStats();
 
+      // Gör en fullständig refresh för att uppdatera listan korrekt
+      // (tickets kan försvinna/dyka upp baserat på direction-filter)
+      setOffset(0);
+      await fetchTickets(true);
+
       return true;
     } catch (err) {
       console.error('Error updating ticket status:', err);
       setError('Kunde inte uppdatera status');
       return false;
     }
-  }, [profile, fetchStats]);
+  }, [profile, fetchStats, fetchTickets]);
 
   // Auto-fetch vid mount och filter/direction-ändring
   useEffect(() => {
