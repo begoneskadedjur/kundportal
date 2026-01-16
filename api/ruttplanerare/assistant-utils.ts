@@ -47,6 +47,14 @@ export const getDayKey = (date: Date): keyof WorkSchedule => {
 };
 
 // --- Data-hämtning ---
+
+// Statusar som ska exkluderas från schemaläggning (ärenden som inte blockerar tid)
+const EXCLUDED_STATUSES = [
+  'Privatperson - review',
+  'Stängt - slasklogg',
+  'Avslutat'
+];
+
 export async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, EventSlot[]>> {
   const staffIds = staff.map(s => s.id);
   if (staffIds.length === 0) return new Map();
@@ -65,12 +73,14 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   };
 
   // 1. Hämta från private_cases (ClickUp privatpersoner)
+  // Exkludera stängda/avslutade statusar
   const { data: privateCases, error: privateError } = await supabase
     .from('private_cases')
-    .select('start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title')
+    .select('start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title, status')
     .or(`primary_assignee_id.in.(${staffIds.join(',')}),secondary_assignee_id.in.(${staffIds.join(',')}),tertiary_assignee_id.in.(${staffIds.join(',')})`)
     .gte('start_date', from.toISOString())
-    .lte('start_date', to.toISOString());
+    .lte('start_date', to.toISOString())
+    .not('status', 'in', `(${EXCLUDED_STATUSES.join(',')})`);
 
   if (privateError) {
     console.error('Error fetching private_cases:', privateError);
@@ -101,12 +111,14 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   }
 
   // 2. Hämta från business_cases (ClickUp företag)
+  // Exkludera stängda/avslutade statusar
   const { data: businessCases, error: businessError } = await supabase
     .from('business_cases')
-    .select('start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title')
+    .select('start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title, status')
     .or(`primary_assignee_id.in.(${staffIds.join(',')}),secondary_assignee_id.in.(${staffIds.join(',')}),tertiary_assignee_id.in.(${staffIds.join(',')})`)
     .gte('start_date', from.toISOString())
-    .lte('start_date', to.toISOString());
+    .lte('start_date', to.toISOString())
+    .not('status', 'in', `(${EXCLUDED_STATUSES.join(',')})`);
 
   if (businessError) {
     console.error('Error fetching business_cases:', businessError);
@@ -137,12 +149,14 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   }
 
   // 3. Hämta från cases (Avtalskunder - direkt från tabell, inte vy)
+  // Exkludera avslutade ärenden
   const { data: contractCases, error: contractError } = await supabase
     .from('cases')
-    .select('scheduled_start, scheduled_end, primary_technician_id, secondary_technician_id, tertiary_technician_id, address, title')
+    .select('scheduled_start, scheduled_end, primary_technician_id, secondary_technician_id, tertiary_technician_id, address, title, status')
     .or(`primary_technician_id.in.(${staffIds.join(',')}),secondary_technician_id.in.(${staffIds.join(',')}),tertiary_technician_id.in.(${staffIds.join(',')})`)
     .gte('scheduled_start', from.toISOString())
-    .lte('scheduled_start', to.toISOString());
+    .lte('scheduled_start', to.toISOString())
+    .neq('status', 'Avslutat');
 
   if (contractError) {
     console.error('Error fetching cases:', contractError);
