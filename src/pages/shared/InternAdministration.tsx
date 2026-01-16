@@ -10,7 +10,7 @@ import { useTickets } from '../../hooks/useTickets';
 import { TicketFilters } from '../../components/admin/TicketFilters';
 import { TicketList } from '../../components/admin/TicketList';
 import { TicketViewTabs, type TicketDirection } from '../../components/admin/TicketViewTabs';
-import CommunicationSlidePanel from '../../components/communication/CommunicationSlidePanel';
+import { CaseContextCommunicationModal } from '../../components/communication';
 import type { CaseType } from '../../types/communication';
 
 // State för vald ticket (för att öppna kommunikationspanel)
@@ -207,8 +207,8 @@ export default function InternAdministration() {
           onOpenCommunication={handleOpenCommunication}
         />
 
-        {/* Kommunikationspanel (slide-over) */}
-        <CommunicationSlidePanel
+        {/* Kontextuell kommunikationsmodal */}
+        <CaseContextCommunicationModal
           isOpen={!!selectedTicket}
           onClose={handleCloseCommunication}
           caseId={selectedTicket?.caseId || ''}
