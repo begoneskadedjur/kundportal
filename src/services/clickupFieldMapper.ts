@@ -473,10 +473,17 @@ export async function convertSupabaseToClickUpAsync(caseData: any, caseType: 'pr
     // Fortsätt utan assignees om mappningen misslyckas
   }
 
+  // ClickUp API förväntar sig status-namn i lowercase
+  const statusForClickUp = caseData.status
+    ? caseData.status.toLowerCase()
+    : 'bokat'
+
+  console.log(`[ClickUpMapper] Mapping status: "${caseData.status}" -> "${statusForClickUp}"`)
+
   const taskData = {
     name: caseData.title,
     description: caseData.description || '',
-    status: 'bokat', // ClickUp API förväntar sig status-namn som sträng (case-sensitive)
+    status: statusForClickUp,
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
     due_date: convertToClickUpTimestamp(caseData.due_date),
@@ -801,10 +808,15 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     }
   }
 
+  // ClickUp API förväntar sig status-namn i lowercase
+  const statusForClickUp = caseData.status
+    ? caseData.status.toLowerCase()
+    : 'bokat'
+
   return {
     name: caseData.title,
     description: caseData.description || '',
-    status: 'bokat', // ClickUp API förväntar sig status-namn som sträng (case-sensitive)
+    status: statusForClickUp,
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
     due_date: convertToClickUpTimestamp(caseData.due_date),

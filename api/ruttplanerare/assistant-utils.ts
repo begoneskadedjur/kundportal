@@ -251,15 +251,40 @@ export async function getCompetentStaff(pestType: string, requiredTechnicianIds?
 export async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
     if (origins.length === 0) return new Map();
     const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
-    const uniqueOrigins = [...new Set(origins)]; const travelTimes = new Map<string, number>();
-    for (let i = 0; i < uniqueOrigins.length; i += 25) {
-      const batch = uniqueOrigins.slice(i, i + 25);
+    const travelTimes = new Map<string, number>();
+
+    // Normalisera destination för jämförelse
+    const normalizedDestination = formatAddress(destination).toLowerCase().trim();
+
+    // Filtrera bort origins som är samma som destination (restid = 1 min)
+    const originsNeedingLookup: string[] = [];
+    const uniqueOrigins = [...new Set(origins)];
+
+    for (const origin of uniqueOrigins) {
+        const normalizedOrigin = formatAddress(origin).toLowerCase().trim();
+        if (normalizedOrigin === normalizedDestination) {
+            // Samma adress = 1 minut (för parkering/gång mellan ingångar)
+            travelTimes.set(origin, 1);
+            console.log(`[getTravelTimes] Samma adress detekterad: "${origin}" -> 1 min`);
+        } else {
+            originsNeedingLookup.push(origin);
+        }
+    }
+
+    // Om alla adresser var samma, returnera direkt
+    if (originsNeedingLookup.length === 0) {
+        return travelTimes;
+    }
+
+    // Hämta restider från Google Maps för resterande adresser
+    for (let i = 0; i < originsNeedingLookup.length; i += 25) {
+      const batch = originsNeedingLookup.slice(i, i + 25);
       const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(batch.join('|'))}&destinations=${encodeURIComponent(destination)}&key=${googleMapsApiKey}&mode=driving&language=sv`;
       try {
         const matrixResponse = await fetch(matrixApiUrl); const matrixData = await matrixResponse.json() as any;
         if (matrixData.status !== 'OK') { batch.forEach(origin => travelTimes.set(origin, DEFAULT_TRAVEL_TIME)); continue; }
-        matrixData.rows.forEach((row: any, index: number) => { 
-          if (row.elements[0].status === 'OK') { travelTimes.set(batch[index], Math.ceil(row.elements[0].duration.value / 60)); } 
+        matrixData.rows.forEach((row: any, index: number) => {
+          if (row.elements[0].status === 'OK') { travelTimes.set(batch[index], Math.ceil(row.elements[0].duration.value / 60)); }
           else { travelTimes.set(batch[index], DEFAULT_TRAVEL_TIME); }
         });
       } catch (error) { batch.forEach(origin => travelTimes.set(origin, DEFAULT_TRAVEL_TIME)); }
