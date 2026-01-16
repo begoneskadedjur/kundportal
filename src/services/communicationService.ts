@@ -905,6 +905,7 @@ export async function getTickets(
   }
 
   let filteredComments = comments;
+  let actualTotalCount = count || 0; // Startvärde från Supabase
 
   // Applicera per-mention direction-filter
   if (needsDirectionFilter && filter.currentUserId) {
@@ -953,6 +954,9 @@ export async function getTickets(
         return true;
       });
     }
+
+    // Spara det faktiska antalet EFTER direction-filtrering men FÖRE paginering
+    actualTotalCount = filteredComments.length;
 
     // Applicera paginering efter filtrering
     filteredComments = filteredComments.slice(offset, offset + limit);
@@ -1026,7 +1030,7 @@ export async function getTickets(
 
   return {
     tickets,
-    totalCount: count || 0,
+    totalCount: actualTotalCount,
   };
 }
 
