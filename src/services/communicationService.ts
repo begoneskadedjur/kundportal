@@ -857,8 +857,11 @@ export async function getTickets(
   // PER-MENTION LOGIK:
   // - Incoming: Obesvarade frågor riktade till MIG (jag är nämnd och har inte svarat)
   // - Outgoing: Obesvarade frågor JAG har ställt (jag nämnde någon som inte svarat)
+  // - All: Alla ärenden där jag är involverad (nämnd eller författare)
 
-  const needsDirectionFilter = filter.direction && filter.currentUserId && filter.direction !== 'all';
+  // Om vi har currentUserId måste vi alltid filtrera på klient-sidan
+  // (för att filtrera baserat på mentioned_user_ids array)
+  const needsClientSideFilter = !!filter.currentUserId;
 
   // Bygg grundquery för kommentarer
   let query = supabase
@@ -884,13 +887,14 @@ export async function getTickets(
     query = query.lte('created_at', filter.dateTo);
   }
 
-  // Hämta alla för direction-filter eller paginera direkt
-  if (!needsDirectionFilter) {
+  // Om vi behöver klient-filtrering, hämta alla först
+  // Annars paginera direkt i SQL
+  if (needsClientSideFilter) {
+    query = query.order('created_at', { ascending: false });
+  } else {
     query = query
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
-  } else {
-    query = query.order('created_at', { ascending: false });
   }
 
   const { data: comments, error, count } = await query;
@@ -913,44 +917,54 @@ export async function getTickets(
   let filteredComments = comments;
   let actualTotalCount = count || 0; // Startvärde från Supabase
 
-  // Applicera per-mention direction-filter
-  if (needsDirectionFilter && filter.currentUserId) {
+  // Applicera klient-side filtrering om vi har currentUserId
+  if (needsClientSideFilter && filter.currentUserId) {
+    const userId = filter.currentUserId;
+
     // Analysera alla mentions och vilka som är besvarade
     const questions = analyzeMentionQuestions(comments);
 
     if (filter.direction === 'incoming') {
       // Incoming: Visa kommentarer där JAG är nämnd och INTE har svarat
-      const unansweredForMe = getUnansweredQuestionsForUser(questions, filter.currentUserId);
-
-      // Hämta unika comment IDs (en kommentar kan ha flera mentions till mig)
+      const unansweredForMe = getUnansweredQuestionsForUser(questions, userId);
       const incomingCommentIds = new Set(unansweredForMe.map(q => q.commentId));
 
       // Filtrera till dessa kommentarer, ta den senaste per ärende
       const seenCases = new Set<string>();
       filteredComments = comments.filter(comment => {
-        // Måste vara en kommentar som har en obesvarad mention till mig
         if (!incomingCommentIds.has(comment.id)) return false;
-
-        // Visa bara en ticket per ärende (den senaste)
         const caseKey = `${comment.case_id}:${comment.case_type}`;
         if (seenCases.has(caseKey)) return false;
         seenCases.add(caseKey);
-
         return true;
       });
 
     } else if (filter.direction === 'outgoing') {
       // Outgoing: Visa kommentarer där JAG nämnde någon som INTE har svarat
-      const unansweredFromMe = getUnansweredQuestionsFromUser(questions, filter.currentUserId);
-
-      // Hämta unika comment IDs
+      const unansweredFromMe = getUnansweredQuestionsFromUser(questions, userId);
       const outgoingCommentIds = new Set(unansweredFromMe.map(q => q.commentId));
 
       // Filtrera till dessa kommentarer, ta den senaste per ärende
       const seenCases = new Set<string>();
       filteredComments = comments.filter(comment => {
-        // Måste vara en kommentar där jag har en obesvarad mention
         if (!outgoingCommentIds.has(comment.id)) return false;
+        const caseKey = `${comment.case_id}:${comment.case_type}`;
+        if (seenCases.has(caseKey)) return false;
+        seenCases.add(caseKey);
+        return true;
+      });
+
+    } else {
+      // "all" direction: Visa alla ärenden där användaren är involverad
+      // (nämnd i mentioned_user_ids ELLER är author_id)
+      // Deduplicera per ärende - visa den senaste kommentaren per ärende
+      const seenCases = new Set<string>();
+      filteredComments = comments.filter(comment => {
+        // Kolla om användaren är involverad i denna kommentar
+        const isMentioned = comment.mentioned_user_ids?.includes(userId);
+        const isAuthor = comment.author_id === userId;
+
+        if (!isMentioned && !isAuthor) return false;
 
         // Visa bara en ticket per ärende (den senaste)
         const caseKey = `${comment.case_id}:${comment.case_type}`;
@@ -996,25 +1010,6 @@ export async function getTickets(
       caseData = privateCaseMap.get(comment.case_id) || null;
     } else if (comment.case_type === 'business') {
       caseData = businessCaseMap.get(comment.case_id) || null;
-    }
-
-    // Om vi filtrerar för tekniker, kontrollera om de är relevanta för ärendet
-    if (filter.technicianId) {
-      // Kontrollera om teknikern är nämnd i kommentaren eller är författaren
-      // Vi behöver INTE hämta ärendet separat - om teknikern är nämnd ska de se ticketen
-      // oavsett om de är tilldelade ärendet eller inte
-      const isMentioned = comment.mentioned_user_ids?.includes(filter.technicianId);
-      const isAuthor = comment.author_id === filter.technicianId;
-
-      // Kontrollera också om teknikern har ett profile_id som matchar (för @mentions via profiles)
-      // mentioned_user_ids innehåller profile IDs, inte technician IDs
-      const currentUserProfileId = filter.currentUserId;
-      const isMentionedByProfile = currentUserProfileId &&
-        comment.mentioned_user_ids?.includes(currentUserProfileId);
-
-      if (!isMentioned && !isAuthor && !isMentionedByProfile) {
-        continue; // Hoppa över denna ticket
-      }
     }
 
     tickets.push({
