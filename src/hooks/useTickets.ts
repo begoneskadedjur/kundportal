@@ -67,7 +67,6 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
     setError(null);
 
     try {
-      const currentOffset = reset ? 0 : offset;
       const filterWithContext: TicketFilter = {
         ...filter,
         technicianId: technicianId || undefined,
@@ -75,14 +74,18 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
         currentUserId: currentUserId,
       };
 
-      const result = await getTickets(filterWithContext, pageSize, currentOffset);
+      const result = await getTickets(
+        filterWithContext,
+        pageSize,
+        reset ? 0 : offset
+      );
 
       if (reset) {
         setTickets(result.tickets);
-        setOffset(pageSize);
+        setOffset(result.tickets.length);
       } else {
         setTickets(prev => [...prev, ...result.tickets]);
-        setOffset(prev => prev + pageSize);
+        setOffset(prev => prev + result.tickets.length);
       }
 
       setTotalCount(result.totalCount);
@@ -180,11 +183,37 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
   }, [profile, fetchStats, fetchTickets]);
 
   // Auto-fetch vid mount och filter/direction-ändring
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (autoFetch && !authLoading && profile) {
-      fetchTickets(true);
+      // Alltid reset offset först, sedan hämta
+      setOffset(0);
+      setTickets([]);
+      setTotalCount(0);
+      // Hämta med offset=0 direkt i denna effect
+      (async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const filterWithContext: TicketFilter = {
+            ...filter,
+            technicianId: technicianId || undefined,
+            direction: currentDirection,
+            currentUserId: currentUserId,
+          };
+          const result = await getTickets(filterWithContext, pageSize, 0);
+          setTickets(result.tickets);
+          setOffset(result.tickets.length);
+          setTotalCount(result.totalCount);
+        } catch (err) {
+          console.error('Error fetching tickets:', err);
+          setError('Kunde inte hämta tickets');
+        } finally {
+          setLoading(false);
+        }
+      })();
     }
-  }, [autoFetch, authLoading, profile, filter, currentDirection]);
+  }, [autoFetch, authLoading, profile, filter, currentDirection, technicianId, currentUserId, pageSize]);
 
   // Hämta stats separat
   useEffect(() => {
