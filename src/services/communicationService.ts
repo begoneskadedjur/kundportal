@@ -766,11 +766,13 @@ export async function getTickets(
   limit: number = 50,
   offset: number = 0
 ): Promise<{ tickets: Ticket[]; totalCount: number }> {
-  // För "outgoing" behöver vi en mer komplex logik:
-  // Vi måste filtrera bort tickets där de nämnda personerna har svarat
-  const isOutgoing = filter.direction === 'outgoing' && filter.currentUserId;
+  // NY LOGIK baserad på "vem skrev senast":
+  // - Incoming: Ärenden där jag är delaktig OCH senaste kommentaren INTE är från mig
+  // - Outgoing: Ärenden där jag skrev senast OCH väntar på svar från någon jag nämnde
 
-  // Bygg query för kommentarer med mentions
+  const needsDirectionFilter = filter.direction && filter.currentUserId && filter.direction !== 'all';
+
+  // Bygg grundquery för kommentarer med mentions (tickets)
   let query = supabase
     .from('case_comments')
     .select('*', { count: 'exact' })
@@ -794,26 +796,17 @@ export async function getTickets(
     query = query.lte('created_at', filter.dateTo);
   }
 
-  // Direction-filter (incoming/outgoing)
-  if (filter.direction && filter.currentUserId && filter.direction !== 'all') {
-    if (filter.direction === 'incoming') {
-      // Tickets där jag är nämnd men inte är författare
-      query = query
-        .neq('author_id', filter.currentUserId)
-        .contains('mentioned_user_ids', [filter.currentUserId]);
-    } else if (filter.direction === 'outgoing') {
-      // Tickets där jag är författare OCH har nämnt någon
-      // Filtrera bort besvarade tickets efter query
-      query = query
-        .eq('author_id', filter.currentUserId)
-        .not('mentioned_user_ids', 'eq', '{}'); // Har minst en mention
-    }
+  // För direction-filter behöver vi hämta alla relevanta kommentarer först
+  // och sen filtrera baserat på "senaste kommentar i ärendet"
+  if (!needsDirectionFilter) {
+    // Ingen direction-filtrering - paginera direkt
+    query = query
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+  } else {
+    // Hämta alla för att kunna filtrera på "senaste i ärendet"
+    query = query.order('created_at', { ascending: false });
   }
-
-  // Sortera och paginera
-  query = query
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
 
   const { data: comments, error, count } = await query;
 
@@ -826,35 +819,88 @@ export async function getTickets(
     return { tickets: [], totalCount: 0 };
   }
 
-  // För "outgoing": Filtrera bort tickets där någon av de nämnda personerna har svarat
   let filteredComments = comments;
-  if (isOutgoing && filter.currentUserId) {
-    // Hämta alla kommentarer i samma ärenden för att kolla efter svar
-    const caseIdsForReplyCheck = [...new Set(comments.map(c => c.case_id))];
 
-    const { data: allCaseComments } = await supabase
-      .from('case_comments')
-      .select('id, case_id, case_type, author_id, created_at')
-      .in('case_id', caseIdsForReplyCheck)
-      .eq('is_system_comment', false);
+  // Applicera direction-filter baserat på "senaste kommentar i ärendet"
+  if (needsDirectionFilter && filter.currentUserId) {
+    // Gruppera kommentarer per ärende och hitta senaste kommentar per ärende
+    const caseLatestComment = new Map<string, { author_id: string; created_at: string }>();
+    const userInvolvedCases = new Set<string>(); // Ärenden där användaren är delaktig
 
-    if (allCaseComments) {
-      filteredComments = comments.filter(comment => {
-        const mentionedUserIds = comment.mentioned_user_ids || [];
-        if (mentionedUserIds.length === 0) return false;
+    for (const comment of comments) {
+      const caseKey = `${comment.case_id}:${comment.case_type}`;
 
-        // Kolla om någon av de nämnda har skrivit en NYARE kommentar i samma ärende
-        const hasReply = allCaseComments.some(otherComment => {
-          const isInSameCase = otherComment.case_id === comment.case_id;
-          const isFromMentionedUser = mentionedUserIds.includes(otherComment.author_id);
-          const isNewer = new Date(otherComment.created_at) > new Date(comment.created_at);
-          return isInSameCase && isFromMentionedUser && isNewer;
+      // Kolla om användaren är delaktig i ärendet (författare eller nämnd)
+      if (comment.author_id === filter.currentUserId ||
+          comment.mentioned_user_ids?.includes(filter.currentUserId)) {
+        userInvolvedCases.add(caseKey);
+      }
+
+      // Spara senaste kommentar per ärende
+      const existing = caseLatestComment.get(caseKey);
+      if (!existing || new Date(comment.created_at) > new Date(existing.created_at)) {
+        caseLatestComment.set(caseKey, {
+          author_id: comment.author_id,
+          created_at: comment.created_at,
         });
+      }
+    }
 
-        // Behåll ticketen endast om det INTE finns svar
-        return !hasReply;
+    if (filter.direction === 'incoming') {
+      // Incoming: Ärenden där jag är delaktig OCH senaste kommentaren INTE är från mig
+      // (dvs. bollen ligger hos mig - någon väntar på mitt svar)
+      const incomingCases = new Set<string>();
+
+      for (const caseKey of userInvolvedCases) {
+        const latest = caseLatestComment.get(caseKey);
+        if (latest && latest.author_id !== filter.currentUserId) {
+          incomingCases.add(caseKey);
+        }
+      }
+
+      // Filtrera till kommentarer i dessa ärenden (visa senaste kommentaren per ärende)
+      const seenCases = new Set<string>();
+      filteredComments = comments.filter(comment => {
+        const caseKey = `${comment.case_id}:${comment.case_type}`;
+        if (!incomingCases.has(caseKey)) return false;
+
+        // Visa bara senaste kommentaren per ärende för att undvika dubletter
+        if (seenCases.has(caseKey)) return false;
+        seenCases.add(caseKey);
+        return true;
+      });
+
+    } else if (filter.direction === 'outgoing') {
+      // Outgoing: Ärenden där JAG skrev senast OCH jag har nämnt någon
+      // (dvs. jag väntar på svar från någon)
+      const outgoingCases = new Set<string>();
+
+      for (const [caseKey, latest] of caseLatestComment) {
+        if (latest.author_id === filter.currentUserId) {
+          outgoingCases.add(caseKey);
+        }
+      }
+
+      // Filtrera till kommentarer där jag skrev senast OCH har nämnt någon
+      const seenCases = new Set<string>();
+      filteredComments = comments.filter(comment => {
+        const caseKey = `${comment.case_id}:${comment.case_type}`;
+
+        // Måste vara ett ärende där jag skrev senast
+        if (!outgoingCases.has(caseKey)) return false;
+
+        // Visa bara den senaste kommentaren per ärende
+        if (seenCases.has(caseKey)) return false;
+        seenCases.add(caseKey);
+
+        // Kommentaren måste ha mentions för att vara "väntar på svar"
+        const hasMentions = comment.mentioned_user_ids && comment.mentioned_user_ids.length > 0;
+        return hasMentions;
       });
     }
+
+    // Applicera paginering efter filtrering
+    filteredComments = filteredComments.slice(offset, offset + limit);
   }
 
   // Hämta ärendeinformation för varje kommentar
@@ -960,66 +1006,69 @@ export async function getTicketStats(technicianId?: string): Promise<TicketStats
 
 // Direction-baserad statistik
 export interface DirectionStats {
-  incoming: number;  // Tickets där jag är nämnd och väntar på mitt svar
-  outgoing: number;  // Tickets där jag nämnt någon och väntar på deras svar
-  all: number;       // Totalt antal aktiva
+  incoming: number;  // Ärenden där senaste kommentaren INTE är från mig (jag behöver agera)
+  outgoing: number;  // Ärenden där JAG skrev senast och väntar på svar
+  all: number;       // Totalt antal aktiva ärenden
 }
 
 export async function getDirectionStats(userId: string): Promise<DirectionStats> {
-  // Hämta incoming (där jag är nämnd men inte författare)
-  const { count: incomingCount } = await supabase
+  // NY LOGIK: Baserat på "vem skrev senast" per ärende
+  // Hämta alla icke-resolved kommentarer
+  const { data: allComments } = await supabase
     .from('case_comments')
-    .select('*', { count: 'exact', head: true })
+    .select('id, case_id, case_type, author_id, mentioned_user_ids, created_at')
     .eq('is_system_comment', false)
-    .neq('author_id', userId)
-    .contains('mentioned_user_ids', [userId])
-    .neq('status', 'resolved');
+    .neq('status', 'resolved')
+    .order('created_at', { ascending: false });
 
-  // För outgoing behöver vi en mer komplex logik:
-  // Räkna bara tickets där jag nämnt någon OCH de inte har svarat
-  const { data: outgoingComments } = await supabase
-    .from('case_comments')
-    .select('id, case_id, case_type, mentioned_user_ids, created_at')
-    .eq('is_system_comment', false)
-    .eq('author_id', userId)
-    .not('mentioned_user_ids', 'eq', '{}') // Har minst en mention
-    .neq('status', 'resolved');
+  if (!allComments || allComments.length === 0) {
+    return { incoming: 0, outgoing: 0, all: 0 };
+  }
 
-  let outgoingCount = 0;
+  // Gruppera per ärende och hitta senaste kommentar + om användaren är delaktig
+  const caseLatestComment = new Map<string, { author_id: string; has_mentions: boolean }>();
+  const userInvolvedCases = new Set<string>();
+  const allCases = new Set<string>();
 
-  if (outgoingComments && outgoingComments.length > 0) {
-    // Hämta alla kommentarer i samma ärenden för att kolla efter svar
-    const caseIds = [...new Set(outgoingComments.map(c => c.case_id))];
+  for (const comment of allComments) {
+    const caseKey = `${comment.case_id}:${comment.case_type}`;
+    allCases.add(caseKey);
 
-    const { data: allCaseComments } = await supabase
-      .from('case_comments')
-      .select('id, case_id, author_id, created_at')
-      .in('case_id', caseIds)
-      .eq('is_system_comment', false);
+    // Kolla om användaren är delaktig (författare eller nämnd)
+    if (comment.author_id === userId ||
+        comment.mentioned_user_ids?.includes(userId)) {
+      userInvolvedCases.add(caseKey);
+    }
 
-    if (allCaseComments) {
-      // Räkna bara de som INTE har fått svar
-      for (const comment of outgoingComments) {
-        const mentionedUserIds = comment.mentioned_user_ids || [];
-        if (mentionedUserIds.length === 0) continue;
-
-        // Kolla om någon av de nämnda har skrivit en NYARE kommentar i samma ärende
-        const hasReply = allCaseComments.some(otherComment => {
-          const isInSameCase = otherComment.case_id === comment.case_id;
-          const isFromMentionedUser = mentionedUserIds.includes(otherComment.author_id);
-          const isNewer = new Date(otherComment.created_at) > new Date(comment.created_at);
-          return isInSameCase && isFromMentionedUser && isNewer;
-        });
-
-        // Räkna endast om det INTE finns svar
-        if (!hasReply) {
-          outgoingCount++;
-        }
-      }
+    // Spara senaste kommentar per ärende (första vi ser pga sortering)
+    if (!caseLatestComment.has(caseKey)) {
+      const hasMentions = comment.mentioned_user_ids && comment.mentioned_user_ids.length > 0;
+      caseLatestComment.set(caseKey, {
+        author_id: comment.author_id,
+        has_mentions: hasMentions,
+      });
     }
   }
 
-  // Hämta alla aktiva tickets (för referens)
+  let incomingCount = 0;
+  let outgoingCount = 0;
+
+  // Räkna incoming: Ärenden där jag är delaktig OCH senaste kommentaren INTE är från mig
+  for (const caseKey of userInvolvedCases) {
+    const latest = caseLatestComment.get(caseKey);
+    if (latest && latest.author_id !== userId) {
+      incomingCount++;
+    }
+  }
+
+  // Räkna outgoing: Ärenden där JAG skrev senast OCH kommentaren har mentions
+  for (const [caseKey, latest] of caseLatestComment) {
+    if (latest.author_id === userId && latest.has_mentions) {
+      outgoingCount++;
+    }
+  }
+
+  // Hämta totalt antal aktiva ärenden (unika ärenden med icke-resolved kommentarer)
   const { count: allCount } = await supabase
     .from('case_comments')
     .select('*', { count: 'exact', head: true })
