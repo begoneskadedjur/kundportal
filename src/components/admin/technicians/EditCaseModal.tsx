@@ -891,64 +891,57 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
         {/* Enhanced header with report, contract, and offer functionality */}
         {currentCase && (
-          <div className="mb-6 -mt-6 -mx-6 px-6 py-4 bg-slate-800/30 border-b border-slate-700">
-            {/* Main action buttons */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 lg:gap-4">
+          <div className="mb-6 -mt-6 -mx-6 px-4 sm:px-6 py-4 bg-slate-800/30 border-b border-slate-700">
+            {/* Snabbåtgärder - Mobil-responsiv layout */}
+            <div className="flex flex-col gap-3">
+              {/* Rad 1: Produktiva åtgärder - grid på mobil, flex på desktop */}
+              <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-3">
                 {/* Avtal Button */}
                 <button
                   type="button"
                   onClick={handleCreateContract}
-                  className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 rounded-lg text-purple-300 hover:text-purple-200 transition-all duration-200 hover:scale-105"
+                  className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 rounded-lg text-purple-300 hover:text-purple-200 text-sm font-medium transition-all duration-200 active:scale-95"
                   title="Skapa serviceavtal för denna kund"
                 >
                   <FileSignature className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">Avtal</span>
-                  <ChevronRight className="w-3 h-3 opacity-60" />
+                  <span className="sm:inline text-xs sm:text-sm">Avtal</span>
+                  <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
                 </button>
 
                 {/* Offert Button */}
                 <button
                   type="button"
                   onClick={handleCreateOffer}
-                  className="flex items-center gap-2 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 rounded-lg text-green-300 hover:text-green-200 transition-all duration-200 hover:scale-105"
+                  className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 rounded-lg text-green-300 hover:text-green-200 text-sm font-medium transition-all duration-200 active:scale-95"
                   title="Skapa offertförslag för denna kund"
                 >
                   <DollarSign className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">Offert</span>
-                  <ChevronRight className="w-3 h-3 opacity-60" />
+                  <span className="sm:inline text-xs sm:text-sm">Offert</span>
+                  <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
                 </button>
 
                 {/* Följeärende Button - endast för private/business och inte redan ett följeärende */}
-                {canCreateFollowUp && (
+                {canCreateFollowUp ? (
                   <button
                     type="button"
                     onClick={() => setShowFollowUpDialog(true)}
-                    className="flex items-center gap-2 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 rounded-lg text-amber-300 hover:text-amber-200 transition-all duration-200 hover:scale-105"
+                    className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 rounded-lg text-amber-300 hover:text-amber-200 text-sm font-medium transition-all duration-200 active:scale-95"
                     title="Skapa följeärende för annat skadedjur"
                   >
                     <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline text-sm">Följeärende</span>
+                    <span className="sm:inline text-xs sm:text-sm">Följe</span>
                   </button>
+                ) : (
+                  // Placeholder för att behålla grid-layouten
+                  <div className="sm:hidden" />
                 )}
-
-                {/* Radera Button */}
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="flex items-center gap-2 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 rounded-lg text-red-300 hover:text-red-200 transition-all duration-200 hover:scale-105"
-                  title="Radera detta ärende permanent"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">Radera</span>
-                </button>
               </div>
 
-              {/* Rapport Dropdown - right aligned */}
-              <div className="flex items-center gap-3">
+              {/* Rad 2: Rapport dropdown - full bredd på mobil */}
+              <div className="flex items-center justify-between sm:justify-start gap-3">
                 {reportGeneration.canGenerateReport ? (
-                  <div className="flex items-center gap-2">
-                    <span className="hidden lg:inline text-xs text-slate-400">Rapport:</span>
+                  <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                    <span className="text-xs text-slate-400">Rapport:</span>
                     <WorkReportDropdown
                       onDownload={reportGeneration.downloadReport}
                       onSendToTechnician={reportGeneration.sendToTechnician}
@@ -965,7 +958,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 ) : (
                   <div className="flex items-center gap-2 text-slate-500">
                     <FileCheck className="w-4 h-4" />
-                    <span className="hidden sm:inline text-xs">Rapport ej tillgänglig</span>
+                    <span className="text-xs">Rapport ej tillgänglig</span>
                   </div>
                 )}
               </div>
@@ -1406,6 +1399,37 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 />
               </div>
             )}
+
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {/* DANGER ZONE - Radera ärende (separerad från arbetsflödet)           */}
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            <div className="mt-8 pt-6 border-t-2 border-red-500/30">
+              <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-lg">
+                {/* Rubrik med varningsikon */}
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                  <h4 className="text-sm font-medium text-red-400">
+                    Farligt område
+                  </h4>
+                </div>
+
+                {/* Förklarande text */}
+                <p className="text-xs text-slate-400 mb-4">
+                  Radering av ärende kan inte ångras. All data, inklusive bilder och kommunikation, kommer att tas bort permanent.
+                </p>
+
+                {/* Radera-knapp - medvetet mindre framträdande */}
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 text-sm text-red-400 bg-transparent border border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 rounded-lg transition-all duration-200"
+                  aria-label="Radera ärende permanent - kan inte ångras"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Radera detta ärende</span>
+                </button>
+              </div>
+            </div>
 
           </div>
         </form>
