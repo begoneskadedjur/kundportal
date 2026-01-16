@@ -299,7 +299,7 @@ export async function uploadSelectedImages(
       caseId,
       caseType,
       img.file,
-      img.category,
+      [img.category],  // Konvertera enskild kategori till array av tags
       undefined,
       userId
     )
