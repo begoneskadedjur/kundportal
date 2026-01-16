@@ -1,9 +1,10 @@
 // src/pages/shared/InternAdministration.tsx
 // Dedikerad sida för intern administration och ticket-hantering
+// REDESIGN: Tydlig separation mellan navigation, statistik och filtrering
 
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw, MessageSquareText, Clock, AlertTriangle, CheckCircle2, Inbox, CircleDot, ArrowUpRight } from 'lucide-react';
+import { RefreshCw, MessageSquareText, Clock, AlertTriangle, CheckCircle2, Inbox } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTickets } from '../../hooks/useTickets';
 import { TicketFilters } from '../../components/admin/TicketFilters';
@@ -21,7 +22,6 @@ export default function InternAdministration() {
     loading,
     statsLoading,
     error,
-    totalCount,
     hasMore,
     filter,
     currentDirection,
@@ -49,91 +49,47 @@ export default function InternAdministration() {
     }
   };
 
-  // Direction KPI-kort (ny layout)
-  const directionCards = [
-    {
-      label: 'Behöver åtgärd',
-      shortLabel: 'Åtgärd',
-      value: directionStats?.incoming || 0,
-      icon: CircleDot,
-      color: 'from-amber-500 to-orange-500',
-      textColor: 'text-amber-400',
-      bgColor: 'bg-amber-500/10',
-      direction: 'incoming' as const,
-    },
-    {
-      label: 'Väntar på svar',
-      shortLabel: 'Väntar',
-      value: directionStats?.outgoing || 0,
-      icon: ArrowUpRight,
-      color: 'from-slate-500 to-slate-600',
-      textColor: 'text-slate-400',
-      bgColor: 'bg-slate-600/20',
-      direction: 'outgoing' as const,
-    },
-  ];
-
-  // Status KPI-kort
-  const statusCards = [
+  // Status-statistik (endast informativ, INTE klickbar)
+  const statusStats = [
     {
       label: 'Öppna',
       value: stats?.open || 0,
       icon: Inbox,
-      color: 'from-blue-500 to-blue-600',
       textColor: 'text-blue-400',
       bgColor: 'bg-blue-500/10',
-      filterStatus: 'open' as const,
     },
     {
       label: 'Pågår',
       value: stats?.inProgress || 0,
       icon: Clock,
-      color: 'from-yellow-500 to-orange-500',
       textColor: 'text-yellow-400',
       bgColor: 'bg-yellow-500/10',
-      filterStatus: 'in_progress' as const,
     },
     {
       label: 'Kräver åtgärd',
       value: stats?.needsAction || 0,
       icon: AlertTriangle,
-      color: 'from-red-500 to-pink-500',
       textColor: 'text-red-400',
       bgColor: 'bg-red-500/10',
-      filterStatus: 'needs_action' as const,
     },
     {
-      label: 'Avklarade (30d)',
+      label: 'Avklarade',
       value: stats?.resolved || 0,
       icon: CheckCircle2,
-      color: 'from-green-500 to-emerald-500',
       textColor: 'text-green-400',
       bgColor: 'bg-green-500/10',
-      filterStatus: 'resolved' as const,
     },
   ];
-
-  const handleStatCardClick = (status: 'open' | 'in_progress' | 'needs_action' | 'resolved') => {
-    // Toggle filter - om redan aktivt, ta bort det
-    const currentStatuses = filter.status || [];
-    if (currentStatuses.length === 1 && currentStatuses[0] === status) {
-      setFilter({ ...filter, status: undefined });
-    } else {
-      setFilter({ ...filter, status: [status] });
-    }
-  };
 
   const handleDirectionChange = (direction: TicketDirection) => {
     setDirection(direction);
   };
 
-  const activeTicketCount = (directionStats?.incoming || 0) + (directionStats?.outgoing || 0);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-6 sm:mb-8">
+        <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500">
@@ -159,101 +115,13 @@ export default function InternAdministration() {
             </button>
           </div>
 
-          {/* Roll och antal */}
-          <div className="flex items-center gap-4 text-sm text-slate-500">
-            <span>{getRoleName()}</span>
-            <span>•</span>
-            <span>{activeTicketCount} aktiva ärenden</span>
+          {/* Roll */}
+          <div className="text-sm text-slate-500">
+            {getRoleName()}
           </div>
         </div>
 
-        {/* Direction KPI-kort (ny - viktigaste) */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {directionCards.map((card) => {
-            const Icon = card.icon;
-            const isActive = currentDirection === card.direction;
-
-            return (
-              <button
-                key={card.direction}
-                onClick={() => handleDirectionChange(card.direction)}
-                disabled={statsLoading}
-                className={`
-                  relative p-4 sm:p-5 rounded-xl border transition-all text-left
-                  ${isActive
-                    ? `${card.bgColor} border-current/30 ring-2 ring-current/20`
-                    : 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-800/70'
-                  }
-                  disabled:opacity-50
-                `}
-              >
-                {/* Bakgrundseffekt */}
-                {isActive && (
-                  <div className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-10 rounded-xl`} />
-                )}
-
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className={`p-2 rounded-lg ${card.bgColor} w-fit`}>
-                      <Icon className={`w-5 h-5 ${card.textColor}`} />
-                    </div>
-                    {isActive && (
-                      <span className={`text-xs px-2 py-1 rounded-full ${card.bgColor} ${card.textColor} font-medium`}>
-                        Aktiv
-                      </span>
-                    )}
-                  </div>
-
-                  <div className={`text-3xl sm:text-4xl font-bold ${card.textColor} mb-1`}>
-                    {statsLoading ? '...' : card.value}
-                  </div>
-
-                  <div className="text-sm text-slate-400">
-                    <span className="hidden sm:inline">{card.label}</span>
-                    <span className="sm:hidden">{card.shortLabel}</span>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Status KPI-kort (sekundära) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {statusCards.map((card) => {
-            const Icon = card.icon;
-            const isActive = filter.status?.length === 1 && filter.status[0] === card.filterStatus;
-
-            return (
-              <button
-                key={card.label}
-                onClick={() => handleStatCardClick(card.filterStatus)}
-                disabled={statsLoading}
-                className={`
-                  relative p-3 sm:p-4 rounded-xl border transition-all text-left
-                  ${isActive
-                    ? `${card.bgColor} border-current/30`
-                    : 'bg-slate-800/30 border-slate-700/30 hover:bg-slate-800/50'
-                  }
-                  disabled:opacity-50
-                `}
-              >
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon className={`w-4 h-4 ${card.textColor}`} />
-                    <span className="text-xs text-slate-500">{card.label}</span>
-                  </div>
-
-                  <div className={`text-xl sm:text-2xl font-bold ${card.textColor}`}>
-                    {statsLoading ? '...' : card.value}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* View Tabs */}
+        {/* PRIMÄR NAVIGATION: Direction Tabs */}
         <TicketViewTabs
           activeTab={currentDirection}
           counts={{
@@ -264,7 +132,29 @@ export default function InternAdministration() {
           onTabChange={handleDirectionChange}
         />
 
-        {/* Filter */}
+        {/* STATISTIK: Status-översikt (endast informativ, ej klickbar) */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
+          {statusStats.map((stat) => {
+            const Icon = stat.icon;
+
+            return (
+              <div
+                key={stat.label}
+                className="bg-slate-800/30 border border-slate-700/30 rounded-lg p-2 sm:p-3"
+              >
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Icon className={`w-3.5 h-3.5 ${stat.textColor}`} />
+                  <span className="text-[10px] sm:text-xs text-slate-500 truncate">{stat.label}</span>
+                </div>
+                <div className={`text-lg sm:text-xl font-bold ${stat.textColor}`}>
+                  {statsLoading ? '...' : stat.value}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* SEKUNDÄR FILTRERING: Sök och status-filter */}
         <div className="mb-6">
           <TicketFilters
             filter={filter}
@@ -272,6 +162,16 @@ export default function InternAdministration() {
             disabled={loading}
           />
         </div>
+
+        {/* Visar antal resultat */}
+        {!loading && tickets.length > 0 && (
+          <div className="text-xs text-slate-500 mb-3">
+            Visar {tickets.length} ticket{tickets.length !== 1 ? 's' : ''}
+            {filter.status && filter.status.length > 0 && (
+              <span> med status-filter aktivt</span>
+            )}
+          </div>
+        )}
 
         {/* Ticket-lista */}
         <TicketList
