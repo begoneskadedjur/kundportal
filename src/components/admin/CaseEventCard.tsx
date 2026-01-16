@@ -46,15 +46,30 @@ const eventTypeColors: Record<CaseEventType, string> = {
 
 // Händelsetyp till bakgrundsfärg för kort
 const getCardBorderColor = (caseData: CaseWithEvents): string => {
+  // Röd: Obesvarade frågor TILL mig (jag behöver svara)
   if (caseData.unanswered_mentions > 0) {
     return 'border-l-red-500 bg-red-500/5';
   }
-  if (caseData.replies_to_my_questions > 0) {
+
+  // Amber: Jag har ställt frågor och väntar på svar
+  // Visas så länge det finns NÅGON som inte svarat ännu
+  const hasPendingOutgoing = caseData.outgoing_questions_total > 0 &&
+    caseData.outgoing_questions_answered < caseData.outgoing_questions_total;
+  if (hasPendingOutgoing) {
     return 'border-l-amber-500 bg-amber-500/5';
   }
+
+  // Grön-ish: Alla har svarat på mina frågor (kan markeras som löst)
+  if (caseData.outgoing_questions_total > 0 &&
+      caseData.outgoing_questions_answered === caseData.outgoing_questions_total) {
+    return 'border-l-green-500 bg-green-500/5';
+  }
+
+  // Blå: Ny aktivitet
   if (caseData.new_comments > 0) {
     return 'border-l-blue-500 bg-blue-500/5';
   }
+
   return 'border-l-slate-600 bg-slate-800/50';
 };
 
@@ -102,9 +117,32 @@ export default function CaseEventCard({ caseData, onOpenCase, onMarkResolved, is
     if (caseData.unanswered_mentions > 0) {
       parts.push(`${caseData.unanswered_mentions} obesvarad${caseData.unanswered_mentions > 1 ? 'e' : ''} fråg${caseData.unanswered_mentions > 1 ? 'or' : 'a'} till dig`);
     }
-    if (caseData.replies_to_my_questions > 0) {
-      parts.push(`${caseData.replies_to_my_questions} svar på din${caseData.replies_to_my_questions > 1 ? 'a' : ''} fråg${caseData.replies_to_my_questions > 1 ? 'or' : 'a'}`);
+
+    // Multi-mention: Visa "X av Y har svarat" om det finns utgående frågor
+    if (caseData.outgoing_questions_total > 0) {
+      const answered = caseData.outgoing_questions_answered;
+      const total = caseData.outgoing_questions_total;
+      const pendingNames = caseData.outgoing_questions_pending_names || [];
+
+      if (answered === total) {
+        // Alla har svarat
+        parts.push(`Alla ${total} har svarat`);
+      } else if (answered > 0) {
+        // Delvis svar
+        parts.push(`${answered} av ${total} har svarat`);
+      } else {
+        // Ingen har svarat
+        parts.push(`Väntar på svar från ${total} person${total > 1 ? 'er' : ''}`);
+      }
+
+      // Visa vilka som inte svarat (max 3 namn)
+      if (pendingNames.length > 0 && pendingNames.length <= 3) {
+        parts.push(`Väntar på: ${pendingNames.join(', ')}`);
+      } else if (pendingNames.length > 3) {
+        parts.push(`Väntar på: ${pendingNames.slice(0, 3).join(', ')} +${pendingNames.length - 3}`);
+      }
     }
+
     if (caseData.new_comments > 0) {
       parts.push(`${caseData.new_comments} ny${caseData.new_comments > 1 ? 'a' : ''} kommentar${caseData.new_comments > 1 ? 'er' : ''}`);
     }

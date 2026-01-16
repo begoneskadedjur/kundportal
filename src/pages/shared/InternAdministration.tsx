@@ -108,9 +108,13 @@ export default function InternAdministration() {
   const filteredCases = isArchiveView ? cases : cases.filter(c => {
     switch (activeFilter) {
       case 'mentions':
+        // Frågor riktade till mig som jag inte svarat på
         return c.unanswered_mentions > 0;
       case 'replies':
-        return c.replies_to_my_questions > 0;
+        // Frågor JAG ställt där inte alla har svarat ännu
+        // Visas tills ALLA har svarat (inte bara någon)
+        return c.outgoing_questions_total > 0 &&
+               c.outgoing_questions_answered < c.outgoing_questions_total;
       case 'activity':
         return c.new_comments > 0;
       default:
@@ -138,7 +142,7 @@ export default function InternAdministration() {
     },
     {
       id: 'replies' as EventFilter,
-      label: 'Svar mottagna',
+      label: 'Väntar på andras svar',
       count: stats?.waitingForReplies || 0,
       icon: MessageCircle,
       color: 'text-amber-400',

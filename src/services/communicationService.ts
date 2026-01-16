@@ -817,6 +817,7 @@ interface MentionQuestion {
   caseType: string;
   askerId: string;        // Vem som ställde frågan
   mentionedUserId: string; // Vem som blev nämnd
+  mentionedUserName: string; // Namn på den nämnda personen
   askedAt: string;        // När frågan ställdes
   isAnswered: boolean;    // Har den nämnda personen svarat?
 }
@@ -849,8 +850,13 @@ function analyzeMentionQuestions(comments: any[]): MentionQuestion[] {
   // Gå igenom alla kommentarer och skapa "frågor" för varje mention
   for (const comment of sortedComments) {
     const mentionedUserIds = comment.mentioned_user_ids || [];
+    const mentionedUserNames = comment.mentioned_user_names || [];
 
-    for (const mentionedUserId of mentionedUserIds) {
+    for (let i = 0; i < mentionedUserIds.length; i++) {
+      const mentionedUserId = mentionedUserIds[i];
+      // Hämta namn från mentioned_user_names array (samma index)
+      const mentionedUserName = mentionedUserNames[i] || 'Okänd';
+
       // Skippa om man nämner sig själv
       if (mentionedUserId === comment.author_id) continue;
 
@@ -868,6 +874,7 @@ function analyzeMentionQuestions(comments: any[]): MentionQuestion[] {
         caseType: comment.case_type,
         askerId: comment.author_id,
         mentionedUserId,
+        mentionedUserName,
         askedAt: comment.created_at,
         isAnswered,
       });
@@ -1251,8 +1258,12 @@ export interface CaseWithEvents {
   latest_event_at: string;
   // Kategoriserade händelser
   unanswered_mentions: number;  // Obesvarade frågor till mig
-  replies_to_my_questions: number;  // Svar på mina frågor
+  replies_to_my_questions: number;  // Antal besvarade frågor jag ställt
   new_comments: number;  // Nya kommentarer
+  // Multi-mention tracking - för att visa "X av Y har svarat"
+  outgoing_questions_total: number;  // Totalt antal personer jag har frågat
+  outgoing_questions_answered: number;  // Antal som har svarat
+  outgoing_questions_pending_names: string[];  // Namn på de som inte svarat ännu
 }
 
 export interface CaseEventsFilter {
@@ -1364,7 +1375,8 @@ export async function getCasesWithEvents(
   // Analysera mentions för att hitta obesvarade frågor
   const questions = analyzeMentionQuestions(allComments);
   const unansweredForMe = getUnansweredQuestionsForUser(questions, userId);
-  const unansweredFromMe = getUnansweredQuestionsFromUser(questions, userId);
+  // Alla frågor jag ställt (för multi-mention tracking)
+  const allQuestionsFromMe = questions.filter(q => q.askerId === userId);
 
   // Bygg CaseWithEvents
   const cases: CaseWithEvents[] = paginatedCases.map(([caseKey, caseData]) => {
@@ -1378,9 +1390,18 @@ export async function getCasesWithEvents(
       q => q.caseId === caseId && q.caseType === caseType
     ).length;
 
-    const repliesForCase = unansweredFromMe.filter(
-      q => q.caseId === caseId && q.caseType === caseType && q.isAnswered
-    ).length;
+    // Multi-mention tracking: Alla frågor jag ställt i detta ärende
+    const myQuestionsInCase = allQuestionsFromMe.filter(
+      q => q.caseId === caseId && q.caseType === caseType
+    );
+    const totalMentioned = myQuestionsInCase.length;
+    const answeredCount = myQuestionsInCase.filter(q => q.isAnswered).length;
+    const pendingNames = myQuestionsInCase
+      .filter(q => !q.isAnswered)
+      .map(q => q.mentionedUserName);
+
+    // replies_to_my_questions = antal besvarade (för bakåtkompatibilitet)
+    const repliesForCase = answeredCount;
 
     // Nya kommentarer = kommentarer som inte är frågor till mig eller mina frågor
     const newCommentsCount = caseData.comments.filter(c =>
@@ -1420,7 +1441,11 @@ export async function getCasesWithEvents(
       latest_event_at: caseData.latestAt,
       unanswered_mentions: unansweredMentionsForCase,
       replies_to_my_questions: repliesForCase,
-      new_comments: newCommentsCount
+      new_comments: newCommentsCount,
+      // Multi-mention tracking
+      outgoing_questions_total: totalMentioned,
+      outgoing_questions_answered: answeredCount,
+      outgoing_questions_pending_names: pendingNames
     };
   });
 
@@ -1489,9 +1514,19 @@ export async function getCaseBasedStats(userId: string): Promise<{
   let newActivity = 0;
 
   for (const c of activeCases) {
-    unansweredMentions += c.unanswered_mentions;
-    waitingForReplies += c.replies_to_my_questions;
-    newActivity += c.new_comments;
+    // Räkna ärenden med obesvarade frågor till mig
+    if (c.unanswered_mentions > 0) {
+      unansweredMentions++;
+    }
+    // Räkna ärenden där jag väntar på andras svar (inte alla har svarat ännu)
+    if (c.outgoing_questions_total > 0 &&
+        c.outgoing_questions_answered < c.outgoing_questions_total) {
+      waitingForReplies++;
+    }
+    // Räkna ärenden med ny aktivitet
+    if (c.new_comments > 0) {
+      newActivity++;
+    }
   }
 
   return {
