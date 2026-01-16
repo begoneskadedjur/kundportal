@@ -12,6 +12,7 @@ import { BeGoneCaseRow, Technician } from '../../types/database';
 import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp, Receipt, Target } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
+import EventLogCard from '../../components/shared/EventLogCard';
 // NotificationCenter borttagen - nu finns global header med notifikationer
 
 export default function CoordinatorDashboard() {
@@ -359,9 +360,14 @@ export default function CoordinatorDashboard() {
           </div>
         </section>
 
-        {/* --- Geografisk översikt --- */}
-        <section className="mt-16">
-          <GeographicOverview />
+        {/* --- Geografisk översikt och Händelselogg --- */}
+        <section className="mt-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <GeographicOverview />
+          </div>
+          <div className="lg:col-span-1">
+            <EventLogCard maxEntries={8} />
+          </div>
         </section>
       </div>
 

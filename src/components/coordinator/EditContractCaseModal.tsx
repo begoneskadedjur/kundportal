@@ -9,7 +9,7 @@ import {
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save,
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
   FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign, Lightbulb,
-  Building, Building2, Image as ImageIcon
+  Building, Building2, Image as ImageIcon, Trash2
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -25,6 +25,9 @@ import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
 import { toSwedishISOString } from '../../utils/dateHelpers'
 import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
+
+// Radering av ärenden
+import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
 
 // Registrera svensk lokalisering för DatePicker
 registerLocale('sv', sv)
@@ -163,6 +166,9 @@ export default function EditContractCaseModal({
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
   const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
+
+  // Radering state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // Multisite recipient logic
   const isMultisiteCustomer = customerData?.is_multisite === true
@@ -1101,6 +1107,16 @@ export default function EditContractCaseModal({
           currentReport={currentReport}
           getTimeSinceReport={getTimeSinceReport}
         />
+
+        {/* Radera-knapp */}
+        <button
+          onClick={() => setShowDeleteDialog(true)}
+          className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-300 transition-colors"
+          title="Radera detta ärende permanent"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span className="text-sm font-medium">Radera</span>
+        </button>
       </div>
     </div>
   )
@@ -1953,6 +1969,22 @@ export default function EditContractCaseModal({
               </div>
             </div>
           </div>
+
+      {/* Bekräftelsedialog för radering */}
+      {!isCustomerView && (
+        <DeleteCaseConfirmDialog
+          isOpen={showDeleteDialog}
+          onClose={() => setShowDeleteDialog(false)}
+          onDeleted={() => {
+            // Stäng modalen efter radering
+            handleClose();
+            if (onSuccess) onSuccess();
+          }}
+          caseId={caseData?.id || ''}
+          caseType="contract"
+          caseTitle={formData.title || caseData?.title || 'Namnlöst ärende'}
+        />
+      )}
     </Modal>
   )
 }

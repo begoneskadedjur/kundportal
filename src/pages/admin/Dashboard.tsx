@@ -38,6 +38,7 @@ import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency } from '../../utils/formatters'
 import { PageHeader } from '../../components/shared'
+import EventLogCard from '../../components/shared/EventLogCard'
 import AdminKpiCard from '../../components/admin/AdminKpiCard'
 import AdminDashboardCard from '../../components/admin/AdminDashboardCard'
 import AdminKpiModal from '../../components/admin/AdminKpiModal'
@@ -658,7 +659,10 @@ const AdminDashboard: React.FC = () => {
               </Card>
             </div>
 
-            {/* Notifikationer - borttagna, nu finns global header */}
+            {/* Händelselogg */}
+            <div className="lg:col-span-1">
+              <EventLogCard maxEntries={8} />
+            </div>
           </div>
         </div>
       </div>

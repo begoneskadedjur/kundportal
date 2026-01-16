@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useClickUpSync } from '../../../hooks/useClickUpSync'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -37,6 +37,10 @@ import { toSwedishISOString } from '../../../utils/dateHelpers'
 
 // Skadedjurstyper för följeärenden
 import { PEST_TYPE_OPTIONS } from '../../../utils/clickupFieldMapper'
+
+// Radering av ärenden
+import DeleteCaseConfirmDialog from '../../shared/DeleteCaseConfirmDialog'
+import type { DeleteableCaseType } from '../../../services/caseDeleteService'
 
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
@@ -349,6 +353,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
   // Kommunikations-panel state
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
+
+  // Radering state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // Öppna kommunikationspanelen automatiskt om openCommunicationOnLoad är true
   useEffect(() => {
@@ -924,6 +931,17 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     <span className="hidden sm:inline text-sm">Följeärende</span>
                   </button>
                 )}
+
+                {/* Radera Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 rounded-lg text-red-300 hover:text-red-200 transition-all duration-200 hover:scale-105"
+                  title="Radera detta ärende permanent"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">Radera</span>
+                </button>
               </div>
 
               {/* Rapport Dropdown - right aligned */}
@@ -1403,6 +1421,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           caseTitle={currentCase.title}
         />
       )}
+
+      {/* Bekräftelsedialog för radering */}
+      <DeleteCaseConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onDeleted={() => {
+          // Stäng modalen efter radering
+          onClose();
+        }}
+        caseId={currentCase.id}
+        caseType={currentCase.case_type as DeleteableCaseType}
+        caseTitle={currentCase.title}
+      />
     </Modal>
   )
 }
