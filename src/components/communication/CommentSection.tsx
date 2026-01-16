@@ -83,6 +83,9 @@ export default function CommentSection({
   const renderCommentWithReplies = (comment: CaseComment, depth: number = 0) => {
     const replies = repliesByParent.get(comment.id) || [];
 
+    // Visa status på kommentarer som har @mentions (tickets)
+    const hasMentions = comment.mentioned_user_ids && comment.mentioned_user_ids.length > 0;
+
     return (
       <div key={comment.id} className="space-y-2">
         <CommentItem
@@ -92,6 +95,7 @@ export default function CommentSection({
           onReply={handleReply}
           isReply={depth > 0}
           depth={depth}
+          showStatus={hasMentions}
         />
 
         {/* Rendera svar */}
