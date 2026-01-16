@@ -210,15 +210,38 @@ export const technicianManagementService = {
   },
 
   async updateUserPassword(userId: string, newPassword: string): Promise<void> {
-    if (!userId) { toast.error("Användar-ID saknas."); throw new Error("User ID is missing."); }
-    if (newPassword.length < 6) { toast.error("Lösenordet måste vara minst 6 tecken."); throw new Error("Password too short."); }
+    if (!userId) {
+      toast.error("Användar-ID saknas.");
+      throw new Error("User ID is missing.");
+    }
+    if (newPassword.length < 6) {
+      toast.error("Lösenordet måste vara minst 6 tecken.");
+      throw new Error("Password too short.");
+    }
     try {
-        const { error } = await supabase.auth.admin.updateUserById(userId, { password: newPassword });
-        if (error) throw error;
-        toast.success("Lösenordet har uppdaterats!");
+      // Använd API-route istället för direkt admin-anrop
+      // (admin API kräver service_role key som inte ska exponeras i frontend)
+      const response = await fetch('/api/update-user-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          new_password: newPassword
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte uppdatera lösenordet');
+      }
+
+      toast.success("Lösenordet har uppdaterats!");
     } catch (error: any) {
-        toast.error(`Kunde inte uppdatera lösenordet: ${error.message}`);
-        throw error;
+      toast.error(`Kunde inte uppdatera lösenordet: ${error.message}`);
+      throw error;
     }
   },
   
