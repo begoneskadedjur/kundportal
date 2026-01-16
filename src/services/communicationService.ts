@@ -992,28 +992,22 @@ export async function getTickets(
       caseData = businessCaseMap.get(comment.case_id) || null;
     }
 
-    // Om vi filtrerar för tekniker, kontrollera om de är tilldelade
+    // Om vi filtrerar för tekniker, kontrollera om de är relevanta för ärendet
     if (filter.technicianId) {
-      // Hämta ärende för att kolla assignees
-      const { data: caseAssignee } = await supabase
-        .from(comment.case_type === 'private' ? 'private_cases' : 'business_cases')
-        .select('primary_assignee_id, secondary_assignee_id, tertiary_assignee_id')
-        .eq('id', comment.case_id)
-        .single();
+      // Kontrollera om teknikern är nämnd i kommentaren eller är författaren
+      // Vi behöver INTE hämta ärendet separat - om teknikern är nämnd ska de se ticketen
+      // oavsett om de är tilldelade ärendet eller inte
+      const isMentioned = comment.mentioned_user_ids?.includes(filter.technicianId);
+      const isAuthor = comment.author_id === filter.technicianId;
 
-      if (caseAssignee) {
-        const isAssigned =
-          caseAssignee.primary_assignee_id === filter.technicianId ||
-          caseAssignee.secondary_assignee_id === filter.technicianId ||
-          caseAssignee.tertiary_assignee_id === filter.technicianId;
+      // Kontrollera också om teknikern har ett profile_id som matchar (för @mentions via profiles)
+      // mentioned_user_ids innehåller profile IDs, inte technician IDs
+      const currentUserProfileId = filter.currentUserId;
+      const isMentionedByProfile = currentUserProfileId &&
+        comment.mentioned_user_ids?.includes(currentUserProfileId);
 
-        // Inkludera också om teknikern är nämnd i kommentaren
-        const isMentioned = comment.mentioned_user_ids?.includes(filter.technicianId) ||
-          comment.author_id === filter.technicianId;
-
-        if (!isAssigned && !isMentioned) {
-          continue; // Hoppa över denna ticket
-        }
+      if (!isMentioned && !isAuthor && !isMentionedByProfile) {
+        continue; // Hoppa över denna ticket
       }
     }
 
