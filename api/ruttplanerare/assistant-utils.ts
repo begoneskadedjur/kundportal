@@ -39,7 +39,35 @@ export interface TeamSuggestion {
 
 
 // --- Hjälpfunktioner ---
-export const formatAddress = (address: any): string => { if (!address) return ''; if (typeof address === 'object' && address.formatted_address) return address.formatted_address; return String(address); };
+export const formatAddress = (address: any): string => {
+  if (!address) return '';
+
+  // Om det är en sträng som ser ut som JSON, försök parsa den
+  if (typeof address === 'string') {
+    // Kolla om det är JSON (börjar med { eller ")
+    if (address.startsWith('{') || address.startsWith('"')) {
+      try {
+        const parsed = JSON.parse(address);
+        if (parsed && typeof parsed === 'object') {
+          // Kolla efter formatted_address i olika strukturer
+          if (parsed.formatted_address) return parsed.formatted_address;
+          if (parsed.location && parsed.formatted_address) return parsed.formatted_address;
+        }
+      } catch (e) {
+        // Inte giltig JSON, använd som vanlig sträng
+      }
+    }
+    return address;
+  }
+
+  // Om det redan är ett objekt
+  if (typeof address === 'object') {
+    if (address.formatted_address) return address.formatted_address;
+    if (address.location && address.formatted_address) return address.formatted_address;
+  }
+
+  return String(address);
+};
 export const getDayKey = (date: Date): keyof WorkSchedule => {
     const dayIndex = getDay(date);
     const dayMap: (keyof WorkSchedule)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
