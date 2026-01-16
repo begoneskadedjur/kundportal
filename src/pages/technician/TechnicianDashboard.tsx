@@ -63,6 +63,9 @@ interface TechnicianCase {
   material_cost?: number;
   time_spent_minutes?: number;
   work_started_at?: string;
+  // Tekniker-tilldelningar (för rapportgenerering)
+  primary_assignee_id?: string | null;
+  primary_assignee_name?: string | null;
   // ROT/RUT fält
   r_rot_rut?: string;
   r_fastighetsbeteckning?: string;
@@ -72,9 +75,6 @@ interface TechnicianCase {
   // Rapport
   rapport?: string;
   // Övriga fält från databas
-  priority?: string;
-  case_number?: string;
-  billing_status?: 'pending' | 'sent' | 'paid' | 'skip';
   filer?: any;
   reklamation?: string;
   avvikelser_tillbud_olyckor?: string;
@@ -216,6 +216,11 @@ export default function TechnicianDashboard() {
       work_started_at: pendingCase.work_started_at,
       start_date: pendingCase.start_date,
       due_date: pendingCase.due_date,
+      // Tekniker-tilldelning - använd inloggad tekniker som är ägare av ärendet
+      // eller hämta från case-data om tillgängligt
+      primary_assignee_id: pendingCase.primary_assignee_id || technicianId,
+      primary_assignee_name: pendingCase.primary_assignee_name || displayName,
+      assignee_name: pendingCase.assignee_name || displayName,
       // ROT/RUT fält (bara för privatpersoner)
       r_rot_rut: pendingCase.r_rot_rut,
       r_fastighetsbeteckning: pendingCase.r_fastighetsbeteckning,

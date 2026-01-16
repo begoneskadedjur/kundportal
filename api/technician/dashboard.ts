@@ -164,17 +164,19 @@ async function getTechnicianMonthlyData(technicianId: string) {
 async function getRecentCases(technicianId: string) {
   const [recentPrivate, recentBusiness] = await Promise.allSettled([
     // Private cases - ALLA FÄLT för både visning och pending-räkning
+    // Inkluderar primary_assignee_id och primary_assignee_name för rapport-generering
     supabase
       .from('private_cases')
-      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, created_at, description, skadedjur, telefon_kontaktperson, e_post_kontaktperson, personnummer, pris, material_cost, time_spent_minutes, work_started_at, start_date, due_date, r_rot_rut, r_fastighetsbeteckning, r_arbetskostnad, r_material_utrustning, r_servicebil, rapport, adress, priority, case_number, billing_status, filer, reklamation, avvikelser_tillbud_olyckor, annat_skadedjur, skicka_bokningsbekraftelse')
+      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, created_at, description, skadedjur, telefon_kontaktperson, e_post_kontaktperson, personnummer, pris, material_cost, time_spent_minutes, work_started_at, start_date, due_date, r_rot_rut, r_fastighetsbeteckning, r_arbetskostnad, r_material_utrustning, r_servicebil, rapport, adress, priority, case_number, billing_status, filer, reklamation, avvikelser_tillbud_olyckor, annat_skadedjur, skicka_bokningsbekraftelse, primary_assignee_id, primary_assignee_name')
       .eq('primary_assignee_id', technicianId)
       .order('created_at', { ascending: false })
       .limit(50), // Öka limit för att få fler cases för pending-räkning
 
     // Business cases - ALLA FÄLT för både visning och pending-räkning
+    // Inkluderar primary_assignee_id och primary_assignee_name för rapport-generering
     supabase
       .from('business_cases')
-      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, created_at, description, skadedjur, telefon_kontaktperson, e_post_kontaktperson, org_nr, pris, material_cost, time_spent_minutes, work_started_at, start_date, due_date, rapport, adress, priority, case_number, billing_status, filer, reklamation, avvikelser_tillbud_olyckor, annat_skadedjur, skicka_bokningsbekraftelse, markning_faktura, e_post_faktura, skicka_erbjudande, bestallare')
+      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, created_at, description, skadedjur, telefon_kontaktperson, e_post_kontaktperson, org_nr, pris, material_cost, time_spent_minutes, work_started_at, start_date, due_date, rapport, adress, priority, case_number, billing_status, filer, reklamation, avvikelser_tillbud_olyckor, annat_skadedjur, skicka_bokningsbekraftelse, markning_faktura, e_post_faktura, skicka_erbjudande, bestallare, primary_assignee_id, primary_assignee_name')
       .eq('primary_assignee_id', technicianId)
       .order('created_at', { ascending: false })
       .limit(50) // Öka limit för att få fler cases för pending-räkning
