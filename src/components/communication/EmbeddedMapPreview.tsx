@@ -13,12 +13,13 @@ interface EmbeddedMapPreviewProps {
 }
 
 // Generera Google Maps URL för iframe embed
+// Zoom-nivå 12 ger stadsvy så man ser var i staden ärendet ligger
 const generateEmbedUrl = (lat: number | null, lng: number | null, address: string | null): string | null => {
   if (lat && lng) {
-    return `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`;
+    return `https://maps.google.com/maps?q=${lat},${lng}&z=12&output=embed`;
   }
   if (address) {
-    return `https://maps.google.com/maps?q=${encodeURIComponent(address)}&z=15&output=embed`;
+    return `https://maps.google.com/maps?q=${encodeURIComponent(address)}&z=12&output=embed`;
   }
   return null;
 };
