@@ -620,72 +620,77 @@ const guideSteps: GuideStep[] = [
             Vad du ska göra:
           </h4>
           <p className="text-lg text-slate-300">
-            Öppna ett ärende och scrolla ner till <strong className="text-white">"Aktivitet"</strong>-sektionen. Där finns chattfunktionen!
+            Öppna ett ärende och titta på <strong className="text-white">modalens övre högra hörn</strong>. Där finns en <strong className="text-purple-300">pratbubbla-ikon</strong> till vänster om stängknappen (X).
           </p>
         </div>
 
-        {/* Simulerad ärendevy */}
+        {/* Simulerad modal-header */}
         <div className="space-y-3">
-          <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Så här ser det ut i ett ärende:</p>
+          <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Så här ser det ut när du öppnar ett ärende:</p>
 
           <div className="bg-slate-900 rounded-2xl border-2 border-slate-700 overflow-hidden">
-            {/* Ärendets rubrik (dimmad) */}
-            <div className="p-4 border-b border-slate-700 bg-slate-800/50 opacity-50">
-              <h3 className="text-white font-semibold">Familjen Andersson - Råttor</h3>
-              <p className="text-sm text-slate-400">Storgatan 15, 123 45 Staden</p>
-            </div>
-
-            {/* Ärendeinfo (dimmad) */}
-            <div className="p-4 border-b border-slate-700 opacity-30 blur-[1px]">
-              <div className="h-20 bg-slate-800 rounded-lg"></div>
-            </div>
-
-            {/* AKTIVITET-SEKTIONEN - HIGHLIGHTAD */}
-            <motion.div
-              className="border-2 border-cyan-500/50 rounded-xl m-2"
-              animate={{
-                boxShadow: [
-                  '0 0 0 0 rgba(6, 182, 212, 0)',
-                  '0 0 15px 5px rgba(6, 182, 212, 0.3)',
-                  '0 0 0 0 rgba(6, 182, 212, 0)'
-                ]
-              }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <div className="p-4 bg-slate-800/30">
-                <div className="flex items-center gap-2 mb-3">
-                  <MessageSquareText className="w-5 h-5 text-cyan-400" />
-                  <h4 className="font-semibold text-white">Aktivitet</h4>
+            {/* MODAL HEADER - HIGHLIGHTAD */}
+            <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+              <div className="flex items-center justify-between">
+                {/* Titel */}
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-white font-semibold truncate">Redigera ärende: Familjen Andersson</h3>
                 </div>
 
-                {/* Befintligt meddelande */}
-                <div className="mb-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-6 h-6 rounded-full bg-amber-500/20" />
-                    <span className="text-sm font-medium text-white">Anna K.</span>
-                    <span className="text-xs text-slate-500">igår</span>
-                  </div>
-                  <p className="text-sm text-slate-300">Kunden har ringt - väntar på offert</p>
-                </div>
+                {/* Knappar - HIGHLIGHTAD SEKTION */}
+                <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                  {/* CHATT-KNAPPEN */}
+                  <motion.button
+                    className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all duration-200 border-2 border-cyan-500/50"
+                    animate={{
+                      boxShadow: [
+                        '0 0 0 0 rgba(6, 182, 212, 0)',
+                        '0 0 15px 5px rgba(6, 182, 212, 0.4)',
+                        '0 0 0 0 rgba(6, 182, 212, 0)'
+                      ]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    title="Öppna kommunikation"
+                  >
+                    <MessageSquareText className="w-5 h-5 text-purple-400" />
+                  </motion.button>
 
-                {/* Input-fält */}
-                <div className="flex items-center gap-2 p-3 bg-slate-900/50 rounded-lg border border-slate-600">
-                  <span className="text-slate-500 text-sm">Skriv ett meddelande...</span>
-                  <Send className="w-4 h-4 text-slate-600 ml-auto" />
+                  {/* STÄNG-KNAPPEN (X) */}
+                  <button className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors opacity-50">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
-            {/* Pil som pekar */}
-            <div className="p-4 flex items-center justify-center">
+            {/* Modal-innehåll (dimmad för att fokusera på headern) */}
+            <div className="p-4 opacity-30 blur-[1px]">
+              <div className="h-32 bg-slate-800 rounded-lg"></div>
+            </div>
+
+            {/* Pil som pekar uppåt mot chattknappen */}
+            <div className="p-4 flex items-center justify-end pr-20">
               <motion.div
-                className="flex items-center gap-2 text-cyan-400"
+                className="flex flex-col items-center gap-2 text-cyan-400"
                 animate={{ y: [0, -5, 0] }}
                 transition={{ duration: 1, repeat: Infinity }}
               >
                 <AnimatedArrow direction="up" />
-                <span className="text-lg font-semibold">CHATTEN FINNS HÄR!</span>
+                <span className="text-lg font-semibold whitespace-nowrap">KLICKA HÄR FÖR CHATT!</span>
               </motion.div>
+            </div>
+          </div>
+        </div>
+
+        {/* Förklaring av vad som händer */}
+        <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-5">
+          <div className="flex items-start gap-4">
+            <MessageSquareText className="w-6 h-6 text-purple-400 flex-shrink-0 mt-1" />
+            <div>
+              <h5 className="font-semibold text-purple-300 mb-2">När du klickar på pratbubblan:</h5>
+              <p className="text-slate-300">
+                En <strong className="text-white">kommunikationspanel</strong> glider in från höger sida. Där kan du läsa och skriva meddelanden, tagga kollegor med @mentions, och se hela konversationshistoriken för ärendet.
+              </p>
             </div>
           </div>
         </div>
@@ -697,7 +702,7 @@ const guideSteps: GuideStep[] = [
             <div>
               <h5 className="font-semibold text-blue-300 mb-2">Tips!</h5>
               <p className="text-slate-300">
-                På mobil kan du behöva <strong className="text-white">scrolla nedåt</strong> för att se aktivitet-sektionen.
+                På mobil öppnas kommunikationspanelen som ett <strong className="text-white">underifrån-kommande fönster</strong> istället för från sidan. Samma funktionalitet, anpassad för mindre skärmar!
               </p>
             </div>
           </div>
@@ -1670,7 +1675,7 @@ const guideSteps: GuideStep[] = [
           </h4>
 
           {[
-            { step: 1, text: 'Skriv i "Aktivitet"-sektionen i ärendet', color: 'cyan', icon: MessageSquareText },
+            { step: 1, text: 'Klicka på pratbubblan i ärendets header för att öppna chatten', color: 'cyan', icon: MessageSquareText },
             { step: 2, text: 'Använd @namn för att tagga en person', color: 'purple', icon: AtSign },
             { step: 3, text: 'Använd @Roll för att nå en hel grupp', color: 'amber', icon: Users },
             { step: 4, text: 'Klicka "Svara" för att svara på ett meddelande', color: 'slate', icon: Reply },
