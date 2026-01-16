@@ -12,13 +12,14 @@ import {
   Bell,
   CheckCircle2,
   Inbox,
-  Loader2
+  Loader2,
+  Archive
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCaseEvents } from '../../hooks/useCaseEvents';
 import CaseEventCard from '../../components/admin/CaseEventCard';
 import { CaseContextCommunicationModal } from '../../components/communication';
-import type { CaseType, CommentStatus } from '../../types/communication';
+import type { CaseType } from '../../types/communication';
 
 // State för valt ärende (för att öppna kommunikationspanel)
 interface SelectedCase {
@@ -28,7 +29,7 @@ interface SelectedCase {
 }
 
 // Filter-flikar för händelsetyper
-type EventFilter = 'all' | 'mentions' | 'replies' | 'activity';
+type EventFilter = 'all' | 'mentions' | 'replies' | 'activity' | 'archived';
 
 export default function InternAdministration() {
   const { profile } = useAuth();
@@ -40,24 +41,49 @@ export default function InternAdministration() {
   // State för filter
   const [activeFilter, setActiveFilter] = useState<EventFilter>('all');
 
+  // Hämta aktiva ärenden
   const {
-    cases,
+    cases: activeCases,
     stats,
-    loading,
+    loading: activeLoading,
     statsLoading,
-    error,
-    hasMore,
-    loadMore,
-    refresh,
+    error: activeError,
+    hasMore: activeHasMore,
+    loadMore: activeLoadMore,
+    refresh: activeRefresh,
     updateStatus,
-  } = useCaseEvents();
+  } = useCaseEvents({ includeArchived: false });
+
+  // Hämta arkiverade ärenden
+  const {
+    cases: archivedCases,
+    loading: archivedLoading,
+    error: archivedError,
+    hasMore: archivedHasMore,
+    loadMore: archivedLoadMore,
+    refresh: archivedRefresh,
+  } = useCaseEvents({ includeArchived: true });
+
+  // Bestäm vilka cases som ska visas baserat på filter
+  const isArchiveView = activeFilter === 'archived';
+  const cases = isArchiveView ? archivedCases : activeCases;
+  const loading = isArchiveView ? archivedLoading : activeLoading;
+  const error = isArchiveView ? archivedError : activeError;
+  const hasMore = isArchiveView ? archivedHasMore : activeHasMore;
+  const loadMore = isArchiveView ? archivedLoadMore : activeLoadMore;
+  const refresh = () => {
+    activeRefresh();
+    archivedRefresh();
+  };
 
   // Hantera URL-parameter
   useEffect(() => {
     const caseId = searchParams.get('caseId');
     const caseType = searchParams.get('caseType') as CaseType | null;
     if (caseId && caseType) {
-      const foundCase = cases.find(c => c.case_id === caseId && c.case_type === caseType);
+      // Sök i både aktiva och arkiverade ärenden
+      const allCases = [...activeCases, ...archivedCases];
+      const foundCase = allCases.find(c => c.case_id === caseId && c.case_type === caseType);
       if (foundCase) {
         setSelectedCase({
           caseId: foundCase.case_id,
@@ -66,7 +92,7 @@ export default function InternAdministration() {
         });
       }
     }
-  }, [searchParams, cases]);
+  }, [searchParams, activeCases, archivedCases]);
 
   const getRoleName = () => {
     switch (profile?.role) {
@@ -78,7 +104,8 @@ export default function InternAdministration() {
   };
 
   // Filtrera ärenden baserat på vald flik
-  const filteredCases = cases.filter(c => {
+  // För arkiv-vyn visas alla arkiverade ärenden utan extra filtrering
+  const filteredCases = isArchiveView ? cases : cases.filter(c => {
     switch (activeFilter) {
       case 'mentions':
         return c.unanswered_mentions > 0;
@@ -96,7 +123,7 @@ export default function InternAdministration() {
     {
       id: 'all' as EventFilter,
       label: 'Alla ärenden',
-      count: cases.length,
+      count: stats?.totalCases || 0,
       icon: Inbox,
       color: 'text-slate-400',
       activeColor: 'bg-slate-600 text-white'
@@ -124,12 +151,22 @@ export default function InternAdministration() {
       icon: Bell,
       color: 'text-blue-400',
       activeColor: 'bg-blue-600 text-white'
+    },
+    {
+      id: 'archived' as EventFilter,
+      label: 'Arkiv',
+      count: stats?.archivedCases || 0,
+      icon: Archive,
+      color: 'text-green-400',
+      activeColor: 'bg-green-600 text-white'
     }
   ];
 
   // Öppna kommunikationspanel för ett ärende
   const handleOpenCase = (caseId: string, caseType: 'private' | 'business' | 'contract') => {
-    const foundCase = cases.find(c => c.case_id === caseId && c.case_type === caseType);
+    // Sök i både aktiva och arkiverade ärenden
+    const allCases = [...activeCases, ...archivedCases];
+    const foundCase = allCases.find(c => c.case_id === caseId && c.case_type === caseType);
     if (foundCase) {
       setSelectedCase({
         caseId: foundCase.case_id,
@@ -144,14 +181,18 @@ export default function InternAdministration() {
     setSelectedCase(null);
   };
 
-  // Hantera statusändring
-  const handleStatusChange = async (caseId: string, caseType: 'private' | 'business' | 'contract', status: CommentStatus) => {
-    const foundCase = cases.find(c => c.case_id === caseId && c.case_type === caseType);
+  // Hantera statusändring (markera löst)
+  const handleMarkResolved = async (caseId: string, caseType: 'private' | 'business' | 'contract') => {
+    // Sök i både aktiva och arkiverade ärenden
+    const allCases = [...activeCases, ...archivedCases];
+    const foundCase = allCases.find(c => c.case_id === caseId && c.case_type === caseType);
     if (foundCase && foundCase.events.length > 0) {
-      // Uppdatera senaste kommentarens status
+      // Uppdatera senaste kommentarens status till resolved
       const latestCommentId = foundCase.events[0].source_comment_id;
       if (latestCommentId) {
-        await updateStatus(caseId, caseType as CaseType, latestCommentId, status);
+        await updateStatus(caseId, caseType as CaseType, latestCommentId, 'resolved');
+        // Refresh för att uppdatera listan
+        refresh();
       }
     }
   };
@@ -251,7 +292,8 @@ export default function InternAdministration() {
                 key={`${caseData.case_id}:${caseData.case_type}`}
                 caseData={caseData}
                 onOpenCase={handleOpenCase}
-                onStatusChange={handleStatusChange}
+                onMarkResolved={handleMarkResolved}
+                isArchiveView={isArchiveView}
               />
             ))}
           </div>
@@ -271,7 +313,7 @@ export default function InternAdministration() {
         )}
 
         {/* Empty states */}
-        {!loading && filteredCases.length === 0 && cases.length > 0 && (
+        {!loading && filteredCases.length === 0 && !isArchiveView && activeCases.length > 0 && (
           <div className="text-center py-12">
             <CheckCircle2 className="w-16 h-16 text-green-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">
@@ -283,14 +325,27 @@ export default function InternAdministration() {
           </div>
         )}
 
-        {!loading && cases.length === 0 && (
+        {!loading && cases.length === 0 && !isArchiveView && (
           <div className="text-center py-12">
             <Inbox className="w-16 h-16 text-slate-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">
-              Inga ärenden
+              Inga aktiva ärenden
             </h3>
             <p className="text-slate-400">
               Du har inga ärenden med aktivitet just nu.
+            </p>
+          </div>
+        )}
+
+        {/* Empty state för arkiv */}
+        {!loading && isArchiveView && archivedCases.length === 0 && (
+          <div className="text-center py-12">
+            <Archive className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">
+              Arkivet är tomt
+            </h3>
+            <p className="text-slate-400">
+              Du har inga avklarade ärenden ännu. Klicka "Markera löst" på ett ärende för att arkivera det.
             </p>
           </div>
         )}

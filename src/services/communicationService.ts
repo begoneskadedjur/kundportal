@@ -51,6 +51,11 @@ export async function createComment(
   const mentionedRoles = comment.mentioned_roles || [];
   const mentionsAll = comment.mentions_all || false;
 
+  // AUTOMATISK ÅTERAKTIVERING:
+  // Om det finns resolved-kommentarer i detta ärende, återaktivera dem
+  // så att ärendet flyttas tillbaka från arkivet till aktiva ärenden
+  await reactivateResolvedCase(comment.case_id, comment.case_type);
+
   // Skapa kommentaren
   const { data, error } = await supabase
     .from('case_comments')
@@ -671,6 +676,47 @@ export async function getReadCount(commentId: string): Promise<number> {
 
 // === TICKET-STATUS ===
 
+/**
+ * Återaktiverar ett resolved-ärende genom att sätta alla resolved-kommentarer till 'open'.
+ * Anropas automatiskt när en ny kommentar skapas i ett ärende.
+ * Detta gör att ärendet flyttas tillbaka från arkivet till aktiva ärenden.
+ */
+async function reactivateResolvedCase(caseId: string, caseType: string): Promise<void> {
+  // Hitta alla resolved-kommentarer i detta ärende
+  const { data: resolvedComments, error: fetchError } = await supabase
+    .from('case_comments')
+    .select('id')
+    .eq('case_id', caseId)
+    .eq('case_type', caseType)
+    .eq('status', 'resolved');
+
+  if (fetchError) {
+    console.error('Fel vid hämtning av resolved kommentarer:', fetchError);
+    return;
+  }
+
+  if (!resolvedComments || resolvedComments.length === 0) {
+    return; // Inga resolved-kommentarer att återaktivera
+  }
+
+  // Återaktivera alla resolved-kommentarer till 'open'
+  const commentIds = resolvedComments.map(c => c.id);
+  const { error: updateError } = await supabase
+    .from('case_comments')
+    .update({
+      status: 'open',
+      resolved_at: null,
+      resolved_by: null
+    })
+    .in('id', commentIds);
+
+  if (updateError) {
+    console.error('Fel vid återaktivering av resolved kommentarer:', updateError);
+  } else {
+    console.log(`Återaktiverade ${commentIds.length} kommentar(er) i ärende ${caseId}`);
+  }
+}
+
 export async function updateCommentStatus(
   commentId: string,
   status: 'open' | 'in_progress' | 'resolved' | 'needs_action',
@@ -1220,11 +1266,15 @@ export interface CaseEventsFilter {
 /**
  * Hämtar ärenden grupperade med händelser för en användare
  * Ersätter getTickets med ärende-centrerad vy
+ *
+ * @param includeArchived - Om true, visa ENDAST arkiverade (resolved) ärenden
+ *                          Om false (default), visa endast aktiva ärenden
  */
 export async function getCasesWithEvents(
   userId: string,
   limit: number = 50,
-  offset: number = 0
+  offset: number = 0,
+  includeArchived: boolean = false
 ): Promise<{ cases: CaseWithEvents[]; totalCount: number }> {
   // Hämta alla kommentarer där användaren är involverad
   const { data: allComments } = await supabase
@@ -1279,10 +1329,21 @@ export async function getCasesWithEvents(
   const sortedCases = Array.from(caseMap.entries())
     .sort((a, b) => new Date(b[1].latestAt).getTime() - new Date(a[1].latestAt).getTime());
 
-  const totalCount = sortedCases.length;
+  // Filtrera baserat på archived-status
+  // Ett ärende anses "resolved" om den senaste kommentaren har status 'resolved'
+  const filteredCases = sortedCases.filter(([, caseData]) => {
+    const latestComment = caseData.comments[0]; // Redan sorterad senast först
+    const isResolved = latestComment?.status === 'resolved';
+
+    // includeArchived=true → visa ENDAST resolved
+    // includeArchived=false → visa ENDAST aktiva (ej resolved)
+    return includeArchived ? isResolved : !isResolved;
+  });
+
+  const totalCount = filteredCases.length;
 
   // Applicera paginering
-  const paginatedCases = sortedCases.slice(offset, offset + limit);
+  const paginatedCases = filteredCases.slice(offset, offset + limit);
 
   // Hämta ärendeinfo
   const caseIds = paginatedCases.map(([key]) => key.split(':')[0]);
@@ -1416,23 +1477,28 @@ export async function getCaseBasedStats(userId: string): Promise<{
   unansweredMentions: number;
   waitingForReplies: number;
   newActivity: number;
+  archivedCases: number;
 }> {
-  const { cases } = await getCasesWithEvents(userId, 1000, 0);
+  // Hämta aktiva ärenden
+  const { cases: activeCases } = await getCasesWithEvents(userId, 1000, 0, false);
+  // Hämta arkiverade ärenden
+  const { cases: archivedCases } = await getCasesWithEvents(userId, 1000, 0, true);
 
   let unansweredMentions = 0;
   let waitingForReplies = 0;
   let newActivity = 0;
 
-  for (const c of cases) {
+  for (const c of activeCases) {
     unansweredMentions += c.unanswered_mentions;
     waitingForReplies += c.replies_to_my_questions;
     newActivity += c.new_comments;
   }
 
   return {
-    totalCases: cases.length,
+    totalCases: activeCases.length,
     unansweredMentions,
     waitingForReplies,
-    newActivity
+    newActivity,
+    archivedCases: archivedCases.length
   };
 }

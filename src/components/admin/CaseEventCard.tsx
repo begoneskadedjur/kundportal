@@ -16,13 +16,14 @@ import {
   Clock,
   Bug
 } from 'lucide-react';
-import { CaseWithEvents, CaseEvent, CaseEventType, CommentStatus } from '../../services/communicationService';
+import { CaseWithEvents, CaseEvent, CaseEventType } from '../../services/communicationService';
 import { formatDistanceToNow } from '../../utils/dateUtils';
 
 interface CaseEventCardProps {
   caseData: CaseWithEvents;
   onOpenCase: (caseId: string, caseType: 'private' | 'business' | 'contract') => void;
-  onStatusChange?: (caseId: string, caseType: 'private' | 'business' | 'contract', status: CommentStatus) => void;
+  onMarkResolved?: (caseId: string, caseType: 'private' | 'business' | 'contract') => void;
+  isArchiveView?: boolean; // Om true, visa inte "Markera löst"-knappen
 }
 
 // Händelsetyp till ikon
@@ -57,14 +58,6 @@ const getCardBorderColor = (caseData: CaseWithEvents): string => {
   return 'border-l-slate-600 bg-slate-800/50';
 };
 
-// Status-färger
-const statusColors: Record<CommentStatus, { bg: string; text: string; label: string }> = {
-  open: { bg: 'bg-teal-500', text: 'text-teal-400', label: 'Öppen' },
-  in_progress: { bg: 'bg-yellow-500', text: 'text-yellow-400', label: 'Pågår' },
-  needs_action: { bg: 'bg-red-500', text: 'text-red-400', label: 'Kräver åtgärd' },
-  resolved: { bg: 'bg-green-500', text: 'text-green-400', label: 'Avklarad' }
-};
-
 // Enskild händelse-rad
 const EventItem: React.FC<{ event: CaseEvent }> = ({ event }) => {
   const icon = eventTypeIcons[event.event_type];
@@ -92,11 +85,14 @@ const EventItem: React.FC<{ event: CaseEvent }> = ({ event }) => {
   );
 };
 
-export default function CaseEventCard({ caseData, onOpenCase, onStatusChange }: CaseEventCardProps) {
+export default function CaseEventCard({ caseData, onOpenCase, onMarkResolved, isArchiveView = false }: CaseEventCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const borderColorClass = getCardBorderColor(caseData);
-  const statusConfig = statusColors[caseData.status];
+  // Arkiverade ärenden har grön kant
+  const borderColorClass = isArchiveView
+    ? 'border-l-green-500 bg-green-500/5'
+    : getCardBorderColor(caseData);
+  const isResolved = caseData.status === 'resolved';
   const CaseIcon = caseData.case_type === 'private' ? Home : Building2;
 
   // Sammanfattning av händelser
@@ -187,12 +183,14 @@ export default function CaseEventCard({ caseData, onOpenCase, onStatusChange }: 
             </div>
           </div>
 
-          {/* Höger: Status och expand */}
+          {/* Höger: Status-indikator och expand */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Status-badge */}
-            <span className={`px-2 py-1 rounded text-xs font-medium ${statusConfig.bg}/20 ${statusConfig.text}`}>
-              {statusConfig.label}
-            </span>
+            {/* Visa "Avklarad" badge endast för arkiverade ärenden */}
+            {isResolved && (
+              <span className="px-2 py-1 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                Avklarad
+              </span>
+            )}
 
             {/* Expand-knapp */}
             <button
@@ -235,11 +233,12 @@ export default function CaseEventCard({ caseData, onOpenCase, onStatusChange }: 
               Öppna ärende
             </button>
 
-            {onStatusChange && caseData.status !== 'resolved' && (
+            {/* Visa "Markera löst"-knappen endast för aktiva ärenden (inte arkiv) */}
+            {onMarkResolved && !isArchiveView && !isResolved && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onStatusChange(caseData.case_id, caseData.case_type, 'resolved');
+                  onMarkResolved(caseData.case_id, caseData.case_type);
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30
                            border border-green-500/30 rounded text-sm text-green-400 transition-colors"

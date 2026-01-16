@@ -15,6 +15,7 @@ import {
 interface UseCaseEventsOptions {
   autoFetch?: boolean;
   pageSize?: number;
+  includeArchived?: boolean; // Om true, hämta arkiverade ärenden istället
 }
 
 interface CaseStats {
@@ -22,6 +23,7 @@ interface CaseStats {
   unansweredMentions: number;
   waitingForReplies: number;
   newActivity: number;
+  archivedCases: number;
 }
 
 interface UseCaseEventsReturn {
@@ -38,7 +40,7 @@ interface UseCaseEventsReturn {
 }
 
 export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEventsReturn {
-  const { autoFetch = true, pageSize = 20 } = options;
+  const { autoFetch = true, pageSize = 20, includeArchived = false } = options;
   const { profile, loading: authLoading } = useAuth();
 
   const [cases, setCases] = useState<CaseWithEvents[]>([]);
@@ -62,7 +64,8 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
       const result = await getCasesWithEvents(
         currentUserId,
         pageSize,
-        reset ? 0 : offset
+        reset ? 0 : offset,
+        includeArchived
       );
 
       if (reset) {
@@ -80,7 +83,7 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
     } finally {
       setLoading(false);
     }
-  }, [authLoading, profile, currentUserId, offset, pageSize]);
+  }, [authLoading, profile, currentUserId, offset, pageSize, includeArchived]);
 
   // Hämta statistik
   const fetchStats = useCallback(async () => {
@@ -156,7 +159,7 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
         setLoading(true);
         setError(null);
         try {
-          const result = await getCasesWithEvents(currentUserId, pageSize, 0);
+          const result = await getCasesWithEvents(currentUserId, pageSize, 0, includeArchived);
           setCases(result.cases);
           setOffset(result.cases.length);
           setTotalCount(result.totalCount);
@@ -168,7 +171,7 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
         }
       })();
     }
-  }, [autoFetch, authLoading, profile, currentUserId, pageSize]);
+  }, [autoFetch, authLoading, profile, currentUserId, pageSize, includeArchived]);
 
   // Hämta stats separat
   useEffect(() => {
