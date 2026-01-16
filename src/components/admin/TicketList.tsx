@@ -1,5 +1,5 @@
 // src/components/admin/TicketList.tsx
-// Lista med tickets
+// Lista med tickets - förbättrad med stabil layout för att undvika hopp
 
 import { useEffect, useRef, useCallback } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -14,6 +14,52 @@ interface TicketListProps {
   onLoadMore: () => Promise<void>;
   onStatusChange?: (commentId: string, status: CommentStatus) => Promise<boolean>;
   currentDirection?: TicketDirection;
+}
+
+// Skeleton som matchar TicketItem-strukturen exakt (~200px höjd)
+function TicketSkeleton({ showDirectionBadge = true }: { showDirectionBadge?: boolean }) {
+  return (
+    <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl animate-pulse border-l-4 border-l-slate-600">
+      {/* Direction badge placeholder */}
+      {showDirectionBadge && (
+        <div className="px-4 pt-3 pb-1">
+          <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-slate-700/50 w-24 h-6" />
+        </div>
+      )}
+
+      {/* Header med titel och status - matchar TicketItem header */}
+      <div className={`flex items-start justify-between p-4 ${showDirectionBadge ? 'pt-2' : ''} pb-2`}>
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {/* Ikon för ärendetyp */}
+          <div className="p-2 rounded-lg flex-shrink-0 bg-slate-700/50 w-9 h-9" />
+
+          {/* Titel och typ */}
+          <div className="min-w-0 flex-1">
+            <div className="h-5 bg-slate-700 rounded w-48 mb-2" />
+            <div className="h-3 bg-slate-700/50 rounded w-16" />
+          </div>
+        </div>
+
+        {/* Status-knapp placeholder */}
+        <div className="flex-shrink-0 ml-3">
+          <div className="h-8 bg-slate-700/50 rounded-lg w-24" />
+        </div>
+      </div>
+
+      {/* Kommentarsinnehåll placeholder */}
+      <div className="px-4 pb-3">
+        <div className="h-4 bg-slate-700/50 rounded w-full mb-2" />
+        <div className="h-4 bg-slate-700/50 rounded w-4/5" />
+      </div>
+
+      {/* Footer med metadata placeholder */}
+      <div className="flex items-center gap-4 px-4 py-3 border-t border-slate-700/30">
+        <div className="h-3 bg-slate-700/50 rounded w-24" />
+        <div className="h-3 bg-slate-700/50 rounded w-20" />
+        <div className="h-3 bg-slate-700/50 rounded w-16 ml-auto" />
+      </div>
+    </div>
+  );
 }
 
 export function TicketList({
@@ -52,10 +98,13 @@ export function TicketList({
     return () => observer.disconnect();
   }, [handleObserver]);
 
+  // Visa direction badge i skeleton om vi filtrerar på incoming/outgoing
+  const showDirectionBadge = currentDirection !== 'all';
+
   // Error state
   if (error && tickets.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="min-h-[400px] flex flex-col items-center justify-center py-16 text-center">
         <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
           <AlertCircle className="w-8 h-8 text-red-400" />
         </div>
@@ -65,26 +114,12 @@ export function TicketList({
     );
   }
 
-  // Loading skeleton (initial)
+  // Loading skeleton (initial) - med stabil min-height
   if (loading && tickets.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3 min-h-[400px]">
         {[...Array(5)].map((_, i) => (
-          <div
-            key={i}
-            className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 animate-pulse"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-slate-700 rounded-lg" />
-              <div className="flex-1">
-                <div className="h-4 bg-slate-700 rounded w-48 mb-2" />
-                <div className="h-3 bg-slate-700/50 rounded w-24" />
-              </div>
-              <div className="h-7 bg-slate-700 rounded-lg w-24" />
-            </div>
-            <div className="h-4 bg-slate-700/50 rounded w-full mb-2" />
-            <div className="h-4 bg-slate-700/50 rounded w-3/4" />
-          </div>
+          <TicketSkeleton key={i} showDirectionBadge={showDirectionBadge} />
         ))}
       </div>
     );
@@ -96,33 +131,36 @@ export function TicketList({
   }
 
   return (
-    <div className="space-y-3">
-      {tickets.map((ticket) => (
+    <div className="space-y-3 min-h-[400px]">
+      {tickets.map((ticket, index) => (
         <TicketItem
           key={ticket.comment.id}
           ticket={ticket}
           direction={currentDirection}
           onStatusChange={onStatusChange}
+          animationDelay={index * 50} // Staggered animation
         />
       ))}
 
       {/* Infinite scroll trigger */}
       <div ref={observerRef} className="h-4" />
 
-      {/* Loading more indicator */}
-      {loading && tickets.length > 0 && (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
-          <span className="ml-2 text-slate-400">Laddar fler...</span>
-        </div>
-      )}
+      {/* Loading more indicator - fast höjd för att undvika hopp */}
+      <div className="h-14 flex items-center justify-center">
+        {loading && tickets.length > 0 && (
+          <div className="flex items-center justify-center py-4 animate-in fade-in duration-200">
+            <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+            <span className="ml-2 text-slate-400">Laddar fler...</span>
+          </div>
+        )}
 
-      {/* End of list */}
-      {!hasMore && tickets.length > 0 && (
-        <div className="text-center py-4 text-slate-500 text-sm">
-          Visar alla {tickets.length} tickets
-        </div>
-      )}
+        {/* End of list */}
+        {!hasMore && tickets.length > 0 && !loading && (
+          <div className="text-center py-4 text-slate-500 text-sm">
+            Visar alla {tickets.length} tickets
+          </div>
+        )}
+      </div>
     </div>
   );
 }

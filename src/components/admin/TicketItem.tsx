@@ -1,7 +1,7 @@
 // src/components/admin/TicketItem.tsx
-// Enskild ticket-komponent med direction indicator
+// Enskild ticket-komponent med direction indicator och smooth animations
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MessageSquare,
@@ -28,6 +28,7 @@ interface TicketItemProps {
   direction?: TicketDirection;
   currentUserName?: string;
   onStatusChange?: (commentId: string, status: CommentStatus) => Promise<boolean>;
+  animationDelay?: number; // Delay i ms för staggered animation
 }
 
 const STATUS_CONFIG: Record<CommentStatus, { label: string; color: string; bgColor: string }> = {
@@ -66,11 +67,26 @@ const DIRECTION_CONFIG = {
   },
 };
 
-export function TicketItem({ ticket, direction = 'all', currentUserName, onStatusChange }: TicketItemProps) {
+export function TicketItem({
+  ticket,
+  direction = 'all',
+  currentUserName,
+  onStatusChange,
+  animationDelay = 0
+}: TicketItemProps) {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Smooth fade-in animation med optional delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, animationDelay);
+    return () => clearTimeout(timer);
+  }, [animationDelay]);
 
   const { comment, case_id, case_type, case_title, kontaktperson, adress, skadedjur } = ticket;
   const status = comment.status || 'open';
@@ -122,7 +138,9 @@ export function TicketItem({ ticket, direction = 'all', currentUserName, onStatu
     <div
       className={`
         bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl
-        transition-all cursor-pointer group
+        cursor-pointer group
+        transition-all duration-300 ease-out
+        ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
         ${directionConfig?.borderClass || ''}
         ${directionConfig?.bgClass || ''}
       `}

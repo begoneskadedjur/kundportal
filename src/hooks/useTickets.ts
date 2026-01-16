@@ -115,18 +115,21 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
     }
   }, [authLoading, profile, technicianId, currentUserId]);
 
-  // Uppdatera filter och återställ lista
+  // Uppdatera filter - behåll stale data tills nya laddats
+  // (setTickets([]) tas bort för att undvika layout-hopp)
   const setFilter = useCallback((newFilter: TicketFilter) => {
     setFilterState(newFilter);
     setOffset(0);
-    setTickets([]);
+    // VIKTIGT: Ta INTE bort tickets här - de rensas automatiskt i fetchTickets(true)
+    // Detta undviker att listan "hoppar" när man byter filter
   }, []);
 
-  // Uppdatera direction och återställ lista
+  // Uppdatera direction - behåll stale data tills nya laddats
   const setDirection = useCallback((direction: TicketDirection) => {
     setCurrentDirection(direction);
     setOffset(0);
-    setTickets([]);
+    // VIKTIGT: Ta INTE bort tickets här - de rensas automatiskt i fetchTickets(true)
+    // Detta undviker att listan "hoppar" när man byter flik
   }, []);
 
   // Ladda mer tickets
