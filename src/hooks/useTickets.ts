@@ -133,10 +133,11 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
   }, []);
 
   // Ladda mer tickets
+  // VIKTIGT: Kontrollera också att det inte finns ett fel, annars hamnar vi i infinite loop
   const loadMore = useCallback(async () => {
-    if (loading || tickets.length >= totalCount) return;
+    if (loading || error || tickets.length >= totalCount) return;
     await fetchTickets(false);
-  }, [loading, tickets.length, totalCount, fetchTickets]);
+  }, [loading, error, tickets.length, totalCount, fetchTickets]);
 
   // Uppdatera allt
   const refresh = useCallback(async () => {

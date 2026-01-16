@@ -896,12 +896,18 @@ export async function getTickets(
   const { data: comments, error, count } = await query;
 
   if (error) {
+    // PGRST103 = "Requested range not satisfiable" - detta händer när offset > antal rader
+    // Returnera tom lista istället för att kasta fel
+    if (error.code === 'PGRST103') {
+      console.log('Offset beyond available rows, returning empty list');
+      return { tickets: [], totalCount: count || 0 };
+    }
     console.error('Fel vid hämtning av tickets:', error);
     throw error;
   }
 
   if (!comments || comments.length === 0) {
-    return { tickets: [], totalCount: 0 };
+    return { tickets: [], totalCount: count || 0 };
   }
 
   let filteredComments = comments;
