@@ -301,36 +301,68 @@ export const technicianManagementService = {
   
   async enableTechnicianAuth(technicianId: string, email: string, password: string, displayName: string, role: string): Promise<void> {
     try {
-      const { data: existingProfile } = await supabase.from('profiles').select('user_id').or(`technician_id.eq.${technicianId},email.eq.${email}`).single();
-      if (existingProfile) throw new Error('Personen har redan inloggning aktiverat');
-      
-      const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
-        email: email, password: password, email_confirm: true,
-        user_metadata: { display_name: displayName, role: role, technician_id: technicianId }
+      // Använd API-route istället för direkt admin-anrop
+      // (admin API kräver service_role key som inte ska exponeras i frontend)
+      const response = await fetch('/api/enable-technician-auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          technician_id: technicianId,
+          email: email,
+          password: password,
+          display_name: displayName,
+          role: role
+        })
       });
-      if (authError) throw new Error(`Kunde inte skapa konto: ${authError.message}`);
 
-      const { error: profileError } = await supabase.from('profiles').insert({
-        user_id: newAuthUser.user.id, email: email, is_active: true,
-        technician_id: technicianId, role: role, display_name: displayName
-      });
-      if (profileError) {
-        await supabase.auth.admin.deleteUser(newAuthUser.user.id);
-        throw new Error(`Kunde inte skapa profil: ${profileError.message}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte aktivera inloggning');
       }
+
       toast.success('Inloggning aktiverat!');
     } catch (error: any) {
       toast.error(error.message || 'Kunde inte aktivera inloggning');
       throw error;
     }
   },
-  
+
   async disableTechnicianAuth(technicianId: string): Promise<void> {
     try {
-      const { data: profile } = await supabase.from('profiles').select('user_id').eq('technician_id', technicianId).single();
+      // Använd delete-technician API som har logik för att ta bort auth
+      // Men vi vill bara inaktivera auth, inte ta bort teknikern
+      // Skapa en dedikerad API-route för detta
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('technician_id', technicianId)
+        .single();
+
       if (profile) {
+        // Ta bort profilen först (detta kräver inte admin-key)
         await supabase.from('profiles').delete().eq('technician_id', technicianId);
-        await supabase.auth.admin.deleteUser(profile.user_id);
+
+        // För att ta bort auth-användaren behövs admin-anrop
+        // Använd delete-technician API men skicka bara user_id
+        const response = await fetch('/api/disable-technician-auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: profile.user_id,
+            technician_id: technicianId
+          })
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          console.warn('Auth-användaren kunde inte tas bort:', result.error);
+          // Fortsätt ändå - profilen är borttagen
+        }
       }
       toast.success('Inloggning inaktiverat!');
     } catch (error: any) {
