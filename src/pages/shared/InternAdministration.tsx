@@ -2,7 +2,7 @@
 // Dedikerad sida för intern administration och ticket-hantering
 // REDESIGN: Tydlig separation mellan navigation, statistik och filtrering
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { RefreshCw, MessageSquareText, Clock, AlertTriangle, CheckCircle2, Inbox } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,10 +10,22 @@ import { useTickets } from '../../hooks/useTickets';
 import { TicketFilters } from '../../components/admin/TicketFilters';
 import { TicketList } from '../../components/admin/TicketList';
 import { TicketViewTabs, type TicketDirection } from '../../components/admin/TicketViewTabs';
+import CommunicationSlidePanel from '../../components/communication/CommunicationSlidePanel';
+import type { CaseType } from '../../types/communication';
+
+// State för vald ticket (för att öppna kommunikationspanel)
+interface SelectedTicket {
+  caseId: string;
+  caseType: CaseType;
+  caseTitle: string;
+}
 
 export default function InternAdministration() {
   const { profile } = useAuth();
   const [searchParams] = useSearchParams();
+
+  // State för kommunikationspanel (öppnas vid klick på ticket)
+  const [selectedTicket, setSelectedTicket] = useState<SelectedTicket | null>(null);
 
   const {
     tickets,
@@ -83,6 +95,16 @@ export default function InternAdministration() {
 
   const handleDirectionChange = (direction: TicketDirection) => {
     setDirection(direction);
+  };
+
+  // Öppna kommunikationspanel för en ticket
+  const handleOpenCommunication = (caseId: string, caseType: CaseType, caseTitle: string) => {
+    setSelectedTicket({ caseId, caseType, caseTitle });
+  };
+
+  // Stäng kommunikationspanel
+  const handleCloseCommunication = () => {
+    setSelectedTicket(null);
   };
 
   return (
@@ -182,6 +204,16 @@ export default function InternAdministration() {
           onLoadMore={loadMore}
           onStatusChange={updateStatus}
           currentDirection={currentDirection}
+          onOpenCommunication={handleOpenCommunication}
+        />
+
+        {/* Kommunikationspanel (slide-over) */}
+        <CommunicationSlidePanel
+          isOpen={!!selectedTicket}
+          onClose={handleCloseCommunication}
+          caseId={selectedTicket?.caseId || ''}
+          caseType={selectedTicket?.caseType || 'private'}
+          caseTitle={selectedTicket?.caseTitle || ''}
         />
 
         {/* Empty states */}

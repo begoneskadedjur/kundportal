@@ -5,6 +5,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { TicketItem } from './TicketItem';
 import type { Ticket, CommentStatus, TicketDirection } from '../../services/communicationService';
+import type { CaseType } from '../../types/communication';
 
 interface TicketListProps {
   tickets: Ticket[];
@@ -14,6 +15,7 @@ interface TicketListProps {
   onLoadMore: () => Promise<void>;
   onStatusChange?: (commentId: string, status: CommentStatus) => Promise<boolean>;
   currentDirection?: TicketDirection;
+  onOpenCommunication?: (caseId: string, caseType: CaseType, caseTitle: string) => void;
 }
 
 // Skeleton som matchar TicketItem-strukturen exakt (~200px höjd)
@@ -70,6 +72,7 @@ export function TicketList({
   onLoadMore,
   onStatusChange,
   currentDirection = 'all',
+  onOpenCommunication,
 }: TicketListProps) {
   const observerRef = useRef<HTMLDivElement>(null);
 
@@ -138,6 +141,7 @@ export function TicketList({
           ticket={ticket}
           direction={currentDirection}
           onStatusChange={onStatusChange}
+          onOpenCommunication={onOpenCommunication}
           animationDelay={index * 50} // Staggered animation
         />
       ))}

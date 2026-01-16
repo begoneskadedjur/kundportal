@@ -68,19 +68,32 @@ export default function CommunicationSlidePanel({
         aria-hidden="true"
       />
 
-      {/* Panel - REDESIGN: Tightare, mer sofistikerad */}
+      {/* Panel - REDESIGN: Bottom sheet på mobil, slide-over på desktop */}
       <div
         ref={panelRef}
         className={`
-          fixed top-0 right-0 h-full w-full sm:w-[400px] lg:w-[440px]
-          bg-slate-900 border-l border-slate-800 shadow-2xl z-[101]
-          transform transition-transform duration-300 ease-out
-          flex flex-col
-          ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+          fixed z-[101] bg-slate-900 shadow-2xl flex flex-col
+
+          /* Desktop: Slide-over från höger */
+          sm:top-0 sm:right-0 sm:h-full sm:w-[400px] lg:sm:w-[440px]
+          sm:border-l sm:border-slate-800
+          sm:transform sm:transition-transform sm:duration-300 sm:ease-out
+          ${isOpen ? 'sm:translate-x-0' : 'sm:translate-x-full'}
+
+          /* Mobil: Bottom sheet */
+          max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:h-[85vh]
+          max-sm:rounded-t-2xl max-sm:border-t max-sm:border-slate-700
+          max-sm:transform max-sm:transition-transform max-sm:duration-300 max-sm:ease-out
+          ${isOpen ? 'max-sm:translate-y-0' : 'max-sm:translate-y-full'}
         `}
       >
+        {/* Drag handle för mobil (indikerar att man kan svepa ned) */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-slate-600 rounded-full" />
+        </div>
+
         {/* Header - REDESIGN: Kompaktare */}
-        <div className="flex-shrink-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 px-3 py-2.5 flex items-center justify-between">
+        <div className="flex-shrink-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 px-3 py-2.5 max-sm:pt-1 flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-1.5 bg-purple-500/15 rounded-md">
               <MessageSquare className="w-4 h-4 text-purple-400" />

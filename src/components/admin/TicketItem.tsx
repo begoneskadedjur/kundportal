@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Ticket, CommentStatus } from '../../services/communicationService';
+import type { CaseType } from '../../types/communication';
 import { formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import type { TicketDirection } from './TicketViewTabs';
@@ -28,6 +29,7 @@ interface TicketItemProps {
   direction?: TicketDirection;
   currentUserName?: string;
   onStatusChange?: (commentId: string, status: CommentStatus) => Promise<boolean>;
+  onOpenCommunication?: (caseId: string, caseType: CaseType, caseTitle: string) => void;
   animationDelay?: number; // Delay i ms för staggered animation
 }
 
@@ -72,6 +74,7 @@ export function TicketItem({
   direction = 'all',
   currentUserName,
   onStatusChange,
+  onOpenCommunication,
   animationDelay = 0
 }: TicketItemProps) {
   const navigate = useNavigate();
@@ -111,7 +114,14 @@ export function TicketItem({
   };
 
   const handleClick = () => {
-    // Navigera till schedule-sidan och öppna ärendet med kommunikationsfliken
+    // Om callback finns - öppna kommunikationspanel direkt (slide-over)
+    // Detta är bättre UX, särskilt för tekniker som är nämnda men inte tilldelade ärendet
+    if (onOpenCommunication) {
+      onOpenCommunication(case_id, case_type as CaseType, case_title);
+      return;
+    }
+
+    // Fallback: Navigera till schedule-sidan och öppna ärendet med kommunikationsfliken
     // Admin och koordinator använder koordinator-schemat, tekniker har sitt eget
     const basePath = profile?.role === 'technician'
       ? '/technician/schedule'
