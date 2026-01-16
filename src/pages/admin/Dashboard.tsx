@@ -29,7 +29,8 @@ import {
   Image as ImageIcon,
   Megaphone,
   BookOpen,
-  Bell
+  Bell,
+  MessageSquareText
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -519,6 +520,16 @@ const AdminDashboard: React.FC = () => {
                   tag="Kommunikation"
                   iconColor="text-purple-400"
                   className="opacity-60"
+                />
+
+                <AdminDashboardCard
+                  href="/admin/guides/communication-system"
+                  icon={MessageSquareText}
+                  title="Kommunikationsguide"
+                  description="Interaktiv guide för @mentions, trådar och notifikationer"
+                  stats="Steg-för-steg"
+                  tag="Guide"
+                  iconColor="text-cyan-400"
                 />
               </StaggeredGrid>
             </div>

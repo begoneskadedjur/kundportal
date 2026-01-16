@@ -60,6 +60,7 @@ import TechnicianSchedule from './pages/technician/TechnicianSchedule';
 import TechnicianEquipment from './pages/technician/TechnicianEquipment';
 import EquipmentPlacementGuide from './pages/technician/guides/EquipmentPlacementGuide';
 import FollowUpCaseGuide from './pages/technician/guides/FollowUpCaseGuide';
+import CommunicationSystemGuide from './pages/technician/guides/CommunicationSystemGuide';
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal';
@@ -476,6 +477,32 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="technician">
                   <FollowUpCaseGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/technician/guides/communication-system"
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <CommunicationSystemGuide />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Communication guide for all internal roles */}
+            <Route
+              path="/admin/guides/communication-system"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <CommunicationSystemGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/koordinator/guides/communication-system"
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <CommunicationSystemGuide />
                 </ProtectedRoute>
               }
             />

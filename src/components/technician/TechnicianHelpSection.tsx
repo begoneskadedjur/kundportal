@@ -9,7 +9,8 @@ import {
   FileText,
   Wrench,
   ClipboardList,
-  Plus
+  Plus,
+  MessageSquareText
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Card from '../ui/Card'
@@ -29,6 +30,16 @@ interface GuideItem {
 // Lista med tillgängliga guider
 const guides: GuideItem[] = [
   {
+    id: 'communication-system',
+    title: 'Kommunikationssystemet',
+    description: 'Lär dig använda @mentions, svarstrådar och notifikationer',
+    icon: MessageSquareText,
+    iconColor: 'text-cyan-400',
+    iconBgColor: 'bg-cyan-500/20',
+    path: '/technician/guides/communication-system',
+    isNew: true
+  },
+  {
     id: 'follow-up-case',
     title: 'Skapa Foljeärenden',
     description: 'Hur du skapar nya ärenden direkt i fält när du hittar extra problem',
@@ -36,7 +47,7 @@ const guides: GuideItem[] = [
     iconColor: 'text-amber-400',
     iconBgColor: 'bg-amber-500/20',
     path: '/technician/guides/follow-up-case',
-    isNew: true
+    isNew: false
   },
   {
     id: 'equipment-placement',
