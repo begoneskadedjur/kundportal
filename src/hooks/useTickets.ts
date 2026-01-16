@@ -104,8 +104,10 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
     setStatsLoading(true);
 
     try {
+      // Skicka currentUserId till getTicketStats för att filtrera per användare
+      // (admins/koordinatorer kan skicka undefined för att se alla)
       const [statusStats, dirStats] = await Promise.all([
-        getTicketStats(technicianId || undefined),
+        getTicketStats(currentUserId || undefined),
         currentUserId ? getDirectionStats(currentUserId) : Promise.resolve({ incoming: 0, outgoing: 0, all: 0 }),
       ]);
 
@@ -116,7 +118,7 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
     } finally {
       setStatsLoading(false);
     }
-  }, [authLoading, profile, technicianId, currentUserId]);
+  }, [authLoading, profile, currentUserId]);
 
   // Uppdatera filter - behåll stale data tills nya laddats
   // (setTickets([]) tas bort för att undvika layout-hopp)

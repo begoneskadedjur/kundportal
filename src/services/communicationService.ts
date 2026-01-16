@@ -1034,33 +1034,82 @@ export async function getTickets(
   };
 }
 
-export async function getTicketStats(technicianId?: string): Promise<TicketStats> {
-  // Bygg grundquery
-  const buildQuery = (status: string) => {
-    let query = supabase
-      .from('case_comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_system_comment', false)
-      .eq('status', status);
+export async function getTicketStats(userId?: string): Promise<TicketStats> {
+  // Om ingen userId, räkna ALLA tickets (för admin/koordinator-översikt)
+  if (!userId) {
+    const buildQuery = (status: string) => {
+      return supabase
+        .from('case_comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_system_comment', false)
+        .eq('status', status);
+    };
 
-    return query;
+    const [openRes, inProgressRes, needsActionRes, resolvedRes] = await Promise.all([
+      buildQuery('open'),
+      buildQuery('in_progress'),
+      buildQuery('needs_action'),
+      buildQuery('resolved')
+        .gte('resolved_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+    ]);
+
+    return {
+      open: openRes.count || 0,
+      inProgress: inProgressRes.count || 0,
+      needsAction: needsActionRes.count || 0,
+      resolved: resolvedRes.count || 0,
+    };
+  }
+
+  // Med userId: räkna endast tickets där användaren är involverad
+  // (nämnd i mentioned_user_ids ELLER är author_id)
+  const { data: allComments } = await supabase
+    .from('case_comments')
+    .select('id, status, author_id, mentioned_user_ids, resolved_at')
+    .eq('is_system_comment', false);
+
+  if (!allComments || allComments.length === 0) {
+    return { open: 0, inProgress: 0, needsAction: 0, resolved: 0 };
+  }
+
+  // Filtrera till kommentarer där användaren är involverad
+  const userComments = allComments.filter(comment => {
+    const isMentioned = comment.mentioned_user_ids?.includes(userId);
+    const isAuthor = comment.author_id === userId;
+    return isMentioned || isAuthor;
+  });
+
+  // Räkna per status
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const stats = {
+    open: 0,
+    inProgress: 0,
+    needsAction: 0,
+    resolved: 0,
   };
 
-  // Kör alla queries parallellt
-  const [openRes, inProgressRes, needsActionRes, resolvedRes] = await Promise.all([
-    buildQuery('open'),
-    buildQuery('in_progress'),
-    buildQuery('needs_action'),
-    buildQuery('resolved')
-      .gte('resolved_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()), // Senaste 30 dagarna
-  ]);
+  for (const comment of userComments) {
+    switch (comment.status) {
+      case 'open':
+        stats.open++;
+        break;
+      case 'in_progress':
+        stats.inProgress++;
+        break;
+      case 'needs_action':
+        stats.needsAction++;
+        break;
+      case 'resolved':
+        // Resolved räknas bara om den är från senaste 30 dagarna
+        if (comment.resolved_at && new Date(comment.resolved_at) >= thirtyDaysAgo) {
+          stats.resolved++;
+        }
+        break;
+    }
+  }
 
-  return {
-    open: openRes.count || 0,
-    inProgress: inProgressRes.count || 0,
-    needsAction: needsActionRes.count || 0,
-    resolved: resolvedRes.count || 0,
-  };
+  return stats;
 }
 
 // Direction-baserad statistik med per-mention spårning
