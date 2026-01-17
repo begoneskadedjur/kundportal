@@ -283,6 +283,16 @@ export default function TechnicianSchedule() {
   };
   
   const handleUpdateSuccess = (updatedCase?: any) => {
+    // Om inget updatedCase skickades = ärendet har raderats
+    // Ta bort det från listan och stäng modalen
+    if (!updatedCase && selectedCase) {
+      setCases(prevCases => prevCases.filter(c => c.id !== selectedCase.id));
+      setIsEditModalOpen(false);
+      setIsEditContractModalOpen(false);
+      setSelectedCase(null);
+      return;
+    }
+
     // Uppdatera selectedCase så modalen visar rätt data vid tidloggning
     // VIKTIGT: Stäng INTE modalen här - det ska bara ske vid explicit stängning
     if (updatedCase && selectedCase) {

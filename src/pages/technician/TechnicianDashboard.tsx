@@ -160,6 +160,22 @@ export default function TechnicianDashboard() {
   }
 
   const handleUpdateSuccess = (updatedCase?: Partial<TechnicianCase>) => {
+    // Om inget updatedCase skickades = ärendet har raderats
+    // Ta bort det från listorna och stäng modalen
+    if (!updatedCase && selectedCase && dashboardData) {
+      setDashboardData(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          pending_cases: prev.pending_cases.filter(c => c.id !== selectedCase.id),
+          recent_cases: prev.recent_cases.filter(c => c.id !== selectedCase.id)
+        }
+      })
+      setIsEditModalOpen(false)
+      setSelectedCase(null)
+      return
+    }
+
     // Uppdatera selectedCase med ny data om den finns
     // Detta förhindrar att modalen tappar sin state vid tidloggning
     if (updatedCase && selectedCase) {
