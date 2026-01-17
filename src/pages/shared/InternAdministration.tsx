@@ -122,11 +122,13 @@ export default function InternAdministration() {
     }
   });
 
-  // Statistik-kort
+  // Statistik-kort med tydliga namn och tooltips
   const filterTabs = [
     {
       id: 'all' as EventFilter,
       label: 'Alla ärenden',
+      shortLabel: 'Alla',
+      tooltip: 'Visar alla ärenden där du är involverad, antingen genom att du skrivit eller blivit omnämnd',
       count: stats?.totalCases || 0,
       icon: Inbox,
       color: 'text-slate-400',
@@ -135,6 +137,8 @@ export default function InternAdministration() {
     {
       id: 'mentions' as EventFilter,
       label: 'Väntar på svar',
+      shortLabel: 'Att göra',
+      tooltip: 'Någon har @nämnt dig och väntar på ditt svar. Du behöver agera!',
       count: stats?.unansweredMentions || 0,
       icon: AtSign,
       color: 'text-red-400',
@@ -143,6 +147,8 @@ export default function InternAdministration() {
     {
       id: 'replies' as EventFilter,
       label: 'Väntar på andras svar',
+      shortLabel: 'Bevaka',
+      tooltip: 'Du har @nämnt någon annan och väntar på deras svar. Inget du behöver göra just nu.',
       count: stats?.waitingForReplies || 0,
       icon: MessageCircle,
       color: 'text-amber-400',
@@ -151,6 +157,8 @@ export default function InternAdministration() {
     {
       id: 'activity' as EventFilter,
       label: 'Ny aktivitet',
+      shortLabel: 'Nytt',
+      tooltip: 'Ärenden med nya kommentarer som du kanske vill kolla på',
       count: stats?.newActivity || 0,
       icon: Bell,
       color: 'text-blue-400',
@@ -159,6 +167,8 @@ export default function InternAdministration() {
     {
       id: 'archived' as EventFilter,
       label: 'Arkiv',
+      shortLabel: 'Klart',
+      tooltip: 'Avslutade och lösta ärenden. Bra jobbat!',
       count: stats?.archivedCases || 0,
       icon: Archive,
       color: 'text-green-400',
@@ -237,29 +247,44 @@ export default function InternAdministration() {
           </div>
         </div>
 
-        {/* Filter-tabs */}
+        {/* Filter-tabs med tooltips */}
         <div className="flex flex-wrap gap-2 mb-6 p-1 bg-slate-800/50 rounded-lg">
           {filterTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeFilter === tab.id;
 
             return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveFilter(tab.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all
-                  ${isActive
-                    ? tab.activeColor
-                    : `bg-transparent ${tab.color} hover:bg-slate-700/50`
-                  }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className={`ml-1 px-1.5 py-0.5 rounded text-xs font-bold
-                  ${isActive ? 'bg-white/20' : 'bg-slate-700'}`}>
-                  {statsLoading ? '...' : tab.count}
-                </span>
-              </button>
+              <div key={tab.id} className="relative group/tab">
+                <button
+                  onClick={() => setActiveFilter(tab.id)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all
+                    ${isActive
+                      ? tab.activeColor
+                      : `bg-transparent ${tab.color} hover:bg-slate-700/50`
+                    }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.shortLabel}</span>
+                  <span className={`ml-1 px-1.5 py-0.5 rounded text-xs font-bold
+                    ${isActive ? 'bg-white/20' : 'bg-slate-700'}`}>
+                    {statsLoading ? '...' : tab.count}
+                  </span>
+                </button>
+                {/* Tooltip */}
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2
+                              bg-slate-900 border border-slate-700 rounded-lg shadow-xl
+                              text-xs text-slate-300 whitespace-normal w-48 text-center
+                              opacity-0 invisible group-hover/tab:opacity-100 group-hover/tab:visible
+                              transition-all duration-200 z-50 pointer-events-none">
+                  {tab.tooltip}
+                  {/* Tooltip arrow */}
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0
+                                border-l-[6px] border-l-transparent
+                                border-r-[6px] border-r-transparent
+                                border-t-[6px] border-t-slate-700" />
+                </div>
+              </div>
             );
           })}
         </div>
