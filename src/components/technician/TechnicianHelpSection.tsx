@@ -10,7 +10,8 @@ import {
   Wrench,
   ClipboardList,
   Plus,
-  MessageSquareText
+  MessageSquareText,
+  Trash2
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Card from '../ui/Card'
@@ -58,6 +59,16 @@ const guides: GuideItem[] = [
     iconBgColor: 'bg-emerald-500/20',
     path: '/technician/guides/equipment-placement',
     isNew: false
+  },
+  {
+    id: 'case-deletion',
+    title: 'Radera vs Slaska arenden',
+    description: 'Nar och hur du avbryter arenden - och varfor du aldrig ska radera',
+    icon: Trash2,
+    iconColor: 'text-red-400',
+    iconBgColor: 'bg-red-500/20',
+    path: '/technician/guides/case-deletion',
+    isNew: true
   },
   // Framtida guider kan läggas till här:
   // {

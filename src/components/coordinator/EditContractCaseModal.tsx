@@ -9,7 +9,7 @@ import {
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save,
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
   FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign, Lightbulb,
-  Building, Building2, Image as ImageIcon, Trash2
+  Building, Building2, Image as ImageIcon, Trash2, Plus, AlertTriangle, MessageSquare
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -29,6 +29,10 @@ import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGaller
 // Radering av ärenden
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
 
+// Kommunikation - endast för intern användning (ALDRIG för kundvyer)
+import CommunicationSlidePanel from '../communication/CommunicationSlidePanel'
+import { CaseType } from '../../types/communication'
+
 // Registrera svensk lokalisering för DatePicker
 registerLocale('sv', sv)
 
@@ -38,6 +42,7 @@ interface EditContractCaseModalProps {
   onSuccess?: () => void
   caseData: any
   isCustomerView?: boolean
+  openCommunicationOnLoad?: boolean // Öppna kommunikationspanelen direkt vid öppning
 }
 
 // Generate BE-number for contract cases
@@ -78,7 +83,8 @@ export default function EditContractCaseModal({
   onClose,
   onSuccess,
   caseData,
-  isCustomerView = false
+  isCustomerView = false,
+  openCommunicationOnLoad = false
 }: EditContractCaseModalProps) {
   const navigate = useNavigate()
   const { profile } = useAuth()
@@ -169,6 +175,14 @@ export default function EditContractCaseModal({
 
   // Radering state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+  // Följeärende-states (follow-up cases)
+  const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
+  const [followUpPestType, setFollowUpPestType] = useState('')
+  const [followUpLoading, setFollowUpLoading] = useState(false)
+
+  // Kommunikations-panel state - ENDAST för intern användning (ALDRIG för kundvyer)
+  const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
 
   // Multisite recipient logic
   const isMultisiteCustomer = customerData?.is_multisite === true
@@ -344,6 +358,14 @@ export default function EditContractCaseModal({
       fetchOrganizationSites(caseData.customer_id)
     }
   }, [isOpen, caseData])
+
+  // Öppna kommunikationspanelen automatiskt om openCommunicationOnLoad är true
+  // VIKTIGT: Endast för interna användare - ALDRIG för kundvyer
+  useEffect(() => {
+    if (isOpen && openCommunicationOnLoad && caseData && !isCustomerView) {
+      setShowCommunicationPanel(true)
+    }
+  }, [isOpen, openCommunicationOnLoad, caseData, isCustomerView])
 
   useEffect(() => {
     // Timer logic
@@ -968,6 +990,75 @@ export default function EditContractCaseModal({
     onClose()
   }
 
+  // Skapa följeärende (follow-up case)
+  const handleCreateFollowUpCase = async () => {
+    if (!followUpPestType) {
+      toast.error('Välj skadedjurstyp för följeärendet')
+      return
+    }
+
+    setFollowUpLoading(true)
+    try {
+      // Generera nytt BE-nummer
+      const newCaseNumber = await generateBENumber()
+
+      // Hämta inloggad användares info
+      const technicianId = profile?.technician_id || formData.primary_technician_id
+      const technicianName = profile?.display_name || formData.primary_technician_name
+
+      // Skapa följeärendet med data från ursprungsärendet
+      const followUpCaseData = {
+        case_number: newCaseNumber,
+        title: `Följeärende: ${followUpPestType} - ${formData.contact_person || customerData?.contact_person || 'Kund'}`,
+        description: `Följeärende skapat från ${formData.case_number}.\n\nUrsprungligt ärende: ${formData.title || caseData?.title || 'Ej angivet'}`,
+        status: 'Bokad',
+        customer_id: formData.customer_id || caseData?.customer_id || null,
+        contact_person: formData.contact_person,
+        contact_phone: formData.contact_phone,
+        contact_email: formData.contact_email,
+        alternative_contact_person: formData.alternative_contact_person,
+        alternative_contact_phone: formData.alternative_contact_phone,
+        alternative_contact_email: formData.alternative_contact_email,
+        address: formData.address,
+        pest_type: followUpPestType,
+        // Kopiera tekniker-tilldelning
+        primary_technician_id: formData.primary_technician_id || null,
+        primary_technician_name: formData.primary_technician_name || null,
+        secondary_technician_id: formData.secondary_technician_id || null,
+        secondary_technician_name: formData.secondary_technician_name || null,
+        tertiary_technician_id: formData.tertiary_technician_id || null,
+        tertiary_technician_name: formData.tertiary_technician_name || null,
+        // Följeärende-koppling
+        parent_case_id: caseData?.id,
+        created_by_technician_id: technicianId || null,
+        created_by_technician_name: technicianName || null,
+        // Datum
+        created_date: new Date().toISOString(),
+      }
+
+      const { data: newCase, error } = await supabase
+        .from('cases')
+        .insert(followUpCaseData)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      toast.success(`Följeärende ${newCaseNumber} skapat!`)
+      setShowFollowUpDialog(false)
+      setFollowUpPestType('')
+
+      // Uppdatera listan
+      if (onSuccess) onSuccess()
+
+    } catch (error) {
+      console.error('Error creating follow-up case:', error)
+      toast.error('Kunde inte skapa följeärende')
+    } finally {
+      setFollowUpLoading(false)
+    }
+  }
+
   if (!isOpen) return null
 
   const formatTime = (minutes: number) => {
@@ -996,23 +1087,23 @@ export default function EditContractCaseModal({
     </div>
   )
 
-  // Header action buttons (for inside modal content)
+  // Header action buttons (for inside modal content) - MOBILANPASSAD
   const headerActions = !isCustomerView && (
-    <div className="mb-6 -mt-6 -mx-6 px-6 py-4 bg-slate-800/30 border-b border-slate-700">
-      <div className="flex items-center justify-end gap-2">
+    <div className="mb-6 -mt-6 -mx-6 px-4 sm:px-6 py-4 bg-slate-800/30 border-b border-slate-700">
+      <div className="grid grid-cols-3 sm:flex sm:items-center sm:justify-end gap-2 sm:gap-3">
         {/* Quote dropdown */}
         <div className="relative">
           <button
             onClick={() => setShowQuoteDropdown(!showQuoteDropdown)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-300 transition-colors"
+            className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-300 transition-colors active:scale-95"
           >
             <FileSignature className="w-4 h-4" />
-            <span className="text-sm font-medium">Offert</span>
-            <ChevronDown className="w-3 h-3" />
+            <span className="text-xs sm:text-sm font-medium">Offert</span>
+            <ChevronDown className="w-3 h-3 hidden sm:block" />
           </button>
-          
+
           {showQuoteDropdown && (
-            <div className="absolute right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
+            <div className="absolute right-0 sm:right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
               {/* Multisite recipient selection */}
               {isMultisiteCustomer && (
                 <div className="p-4 border-b border-slate-700">
@@ -1108,14 +1199,14 @@ export default function EditContractCaseModal({
           getTimeSinceReport={getTimeSinceReport}
         />
 
-        {/* Radera-knapp */}
+        {/* Följeärende-knapp - MOBILANPASSAD */}
         <button
-          onClick={() => setShowDeleteDialog(true)}
-          className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-300 transition-colors"
-          title="Radera detta ärende permanent"
+          onClick={() => setShowFollowUpDialog(true)}
+          className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 rounded-lg text-amber-300 transition-colors active:scale-95"
+          title="Skapa ett uppföljningsärende baserat på detta ärende"
         >
-          <Trash2 className="w-4 h-4" />
-          <span className="text-sm font-medium">Radera</span>
+          <Plus className="w-4 h-4" />
+          <span className="text-xs sm:text-sm font-medium">Följeärende</span>
         </button>
       </div>
     </div>
@@ -1144,6 +1235,10 @@ export default function EditContractCaseModal({
     </div>
   )
 
+  // Kontrollera om kommunikation kan visas - ENDAST för interna användare
+  // KRITISKT: isCustomerView måste ALLTID blockera kommunikation
+  const showCommunication = caseData && !isCustomerView
+
   return (
     <Modal
       isOpen={isOpen}
@@ -1153,6 +1248,16 @@ export default function EditContractCaseModal({
       footer={modalFooter}
       usePortal={true}
       className="scroll-smooth"
+      headerActions={showCommunication ? (
+        <button
+          type="button"
+          onClick={() => setShowCommunicationPanel(true)}
+          className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all duration-200"
+          title="Öppna intern kommunikation"
+        >
+          <MessageSquare className="w-5 h-5" />
+        </button>
+      ) : undefined}
     >
       <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
         {headerActions}
@@ -1968,7 +2073,113 @@ export default function EditContractCaseModal({
                 </div>
               </div>
             </div>
+
+              {/* DANGER ZONE - Radera ärende (endast för icke-kundvyer) */}
+              {!isCustomerView && (
+                <div className="mt-8 pt-6 border-t-2 border-red-500/30">
+                  <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="w-5 h-5 text-red-400" />
+                      <h4 className="text-sm font-medium text-red-400">Farligt område</h4>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-4">
+                      Radering av ärende kan inte ångras. All data, inklusive bilder och kommunikation, kommer att tas bort permanent.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] px-4 py-2.5 text-sm text-red-400 bg-transparent border border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 rounded-lg transition-all duration-200 active:scale-95"
+                      aria-label="Radera ärende permanent - kan inte ångras"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Radera detta ärende</span>
+                    </button>
+                  </div>
+                </div>
+              )}
           </div>
+
+      {/* Följeärende-dialog */}
+      {showFollowUpDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md mx-4 border border-slate-700">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-amber-400" />
+              Skapa följeärende
+            </h3>
+
+            <p className="text-sm text-slate-400 mb-4">
+              Ett följeärende skapas baserat på detta ärende. Kundinformation och tekniker kopieras automatiskt.
+            </p>
+
+            {/* Visa information om ursprungsärendet */}
+            <div className="bg-slate-700/50 rounded-lg p-3 mb-4">
+              <p className="text-xs text-slate-400 mb-1">Ursprungsärende</p>
+              <p className="text-sm text-white font-medium">{formData.case_number} - {formData.title || caseData?.title}</p>
+            </div>
+
+            {/* Välj skadedjurstyp */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Skadedjurstyp för följeärendet *
+              </label>
+              <select
+                value={followUpPestType}
+                onChange={(e) => setFollowUpPestType(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="">Välj skadedjurstyp...</option>
+                {PEST_TYPES.map(pest => (
+                  <option key={pest} value={pest}>{pest}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Knappar - MOBILANPASSADE */}
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowFollowUpDialog(false)
+                  setFollowUpPestType('')
+                }}
+                disabled={followUpLoading}
+                className="flex-1 sm:flex-none min-h-[44px] px-4 py-2.5 text-sm text-slate-400 hover:text-white border border-slate-600 sm:border-transparent rounded-lg transition-colors active:scale-95"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={handleCreateFollowUpCase}
+                disabled={!followUpPestType || followUpLoading}
+                className="flex-1 sm:flex-none min-h-[44px] px-4 py-2.5 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95"
+              >
+                {followUpLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Skapar...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Skapa följeärende
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Kommunikations-panel (slide-in från höger) */}
+      {/* KRITISKT: Endast för interna användare - ALDRIG för kundvyer */}
+      {showCommunication && (
+        <CommunicationSlidePanel
+          isOpen={showCommunicationPanel}
+          onClose={() => setShowCommunicationPanel(false)}
+          caseId={caseData?.id || ''}
+          caseType={'contract' as CaseType}
+          caseTitle={formData.title || caseData?.title || 'Avtalsärende'}
+        />
+      )}
 
       {/* Bekräftelsedialog för radering */}
       {!isCustomerView && (

@@ -66,16 +66,14 @@ export async function getCaseDeleteInfo(
     throw new Error(`Kunde inte hitta ärendet: ${caseError?.message || 'Okänt fel'}`);
   }
 
-  // Kontrollera om det finns underärenden (child cases) - endast för private/business
+  // Kontrollera om det finns underärenden (child cases) - för alla ärendetyper
   let childCasesCount = 0;
-  if (caseType === 'private' || caseType === 'business') {
-    const { count: childCount } = await supabase
-      .from(tableName)
-      .select('id', { count: 'exact', head: true })
-      .eq('parent_case_id', caseId);
+  const { count: childCount } = await supabase
+    .from(tableName)
+    .select('id', { count: 'exact', head: true })
+    .eq('parent_case_id', caseId);
 
-    childCasesCount = childCount || 0;
-  }
+  childCasesCount = childCount || 0;
 
   // Räkna kommentarer
   const { count: commentsCount } = await supabase
@@ -171,19 +169,17 @@ export async function deleteCase(
       return { success: false, error: `Kunde inte hitta ärendet: ${fetchError?.message}` };
     }
 
-    // Kontrollera om det finns child cases
-    if (caseType === 'private' || caseType === 'business') {
-      const { count: childCount } = await supabase
-        .from(tableName)
-        .select('id', { count: 'exact', head: true })
-        .eq('parent_case_id', caseId);
+    // Kontrollera om det finns child cases (för alla ärendetyper)
+    const { count: childCount } = await supabase
+      .from(tableName)
+      .select('id', { count: 'exact', head: true })
+      .eq('parent_case_id', caseId);
 
-      if (childCount && childCount > 0) {
-        return {
-          success: false,
-          error: `Ärendet har ${childCount} underärende(n) som måste raderas först.`
-        };
-      }
+    if (childCount && childCount > 0) {
+      return {
+        success: false,
+        error: `Ärendet har ${childCount} underärende(n) som måste raderas först.`
+      };
     }
 
     // Radera i rätt ordning (beroenden först)

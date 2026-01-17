@@ -38,7 +38,8 @@ import {
   MousePointer2,
   User,
   UserCheck,
-  Users2
+  Users2,
+  Shield
 } from 'lucide-react'
 import Card from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
@@ -602,6 +603,53 @@ const guideSteps: GuideStep[] = [
             </div>
           </div>
         </div>
+
+        {/* Viktig säkerhetsinformation */}
+        <motion.div
+          className="bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-amber-500/20 rounded-xl flex-shrink-0">
+              <Shield className="w-8 h-8 text-amber-400" />
+            </div>
+            <div className="space-y-3">
+              <h4 className="text-xl font-bold text-amber-300 flex items-center gap-2">
+                Viktig säkerhetsinformation
+              </h4>
+              <div className="space-y-3 text-slate-300">
+                <p className="text-lg">
+                  <strong className="text-white">Kommunikationssystemet fungerar för ALLA ärendetyper:</strong>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full text-sm font-medium">
+                    Privatperson
+                  </span>
+                  <span className="px-3 py-1.5 bg-blue-500/20 text-blue-300 rounded-full text-sm font-medium">
+                    Företag
+                  </span>
+                  <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 rounded-full text-sm font-medium">
+                    Avtalskunder
+                  </span>
+                </div>
+                <div className="mt-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+                  <p className="text-amber-200 font-semibold flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-400" />
+                    KRITISKT ATT VETA:
+                  </p>
+                  <p className="mt-2 text-slate-300">
+                    Kunder kan <strong className="text-white">ALDRIG</strong> se den interna kommunikationen -
+                    detta gäller även avtalskunder som loggar in i kundportalen.
+                    Allt ni skriver här är <strong className="text-emerald-400">100% internt</strong> och
+                    synligt endast för BeGone-personal.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       </div>
     )
   },
@@ -1549,7 +1597,28 @@ const guideSteps: GuideStep[] = [
               </div>
             </div>
 
-            {/* Ärende 3 - Avklarad */}
+            {/* Ärende 3 - Avtalskund (NYTT exempel) */}
+            <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <h4 className="text-white font-medium">Kvartalsbesök - Coop Konsum</h4>
+                  <p className="text-sm text-slate-400 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs">Avtal</span>
+                    Avtalskund
+                  </p>
+                </div>
+                <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">
+                  Nytt meddelande
+                </span>
+              </div>
+              <p className="text-sm text-slate-300 mb-2">"@Koordinator Hittade spår vid lageringången, behöver extra besök"</p>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Clock className="w-3 h-3" />
+                <span>Magnus, 30 min sedan</span>
+              </div>
+            </div>
+
+            {/* Ärende 4 - Avklarad */}
             <div className="p-4 bg-slate-800/30 border border-slate-700/50 rounded-xl opacity-75">
               <div className="flex items-start justify-between mb-2">
                 <div>
@@ -1598,8 +1667,13 @@ const guideSteps: GuideStep[] = [
         {[
           {
             question: 'Vem kan se mina meddelanden?',
-            answer: 'Alla som har tillgång till ärendet kan se alla meddelanden. Intern kommunikation är INTE synlig för kunder.',
+            answer: 'Alla BeGone-anställda med tillgång till ärendet kan se meddelandena. Kunder kan ALDRIG se den interna kommunikationen - detta gäller privatpersoner, företag OCH avtalskunder som loggar in i kundportalen.',
             icon: Users
+          },
+          {
+            question: 'Fungerar chatten för avtalskunder?',
+            answer: 'Ja! Kommunikationssystemet fungerar för ALLA ärendetyper: Privatperson, Företag och Avtalskunder. Avtalskunder kan logga in i kundportalen men ser ALDRIG den interna kommunikationen mellan BeGone-personal.',
+            icon: Shield
           },
           {
             question: 'Kan jag redigera eller ta bort ett meddelande?',
