@@ -82,8 +82,8 @@ export default function CommentItem({
   const isOwnComment = user?.id === comment.author_id;
   const canEdit = isOwnComment && !comment.is_system_comment;
   const canDelete = isOwnComment || profile?.role === 'admin';
-  // Admin, koordinator och tekniker kan ändra ticket-status
-  const canChangeStatus = profile?.role === 'admin' || profile?.role === 'koordinator' || profile?.role === 'technician';
+  // Endast författaren till kommentaren kan ändra status
+  const canChangeStatus = isOwnComment && !comment.is_system_comment;
 
   const roleColors = ROLE_COLORS[comment.author_role as AuthorRole] || ROLE_COLORS.technician;
 
