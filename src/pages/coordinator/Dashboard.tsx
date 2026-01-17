@@ -9,10 +9,11 @@ import GeographicOverview from '../../components/admin/coordinator/GeographicOve
 import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
-import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp, Receipt, Target, MessageSquareText } from 'lucide-react';
+import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp, Receipt, Target } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 import EventLogCard from '../../components/shared/EventLogCard';
+import CoordinatorHelpSection from '../../components/coordinator/CoordinatorHelpSection';
 // NotificationCenter borttagen - nu finns global header med notifikationer
 
 export default function CoordinatorDashboard() {
@@ -357,14 +358,6 @@ export default function CoordinatorDashboard() {
               description="Djup analys av din koordinatorspåverkan på verksamheten och konkreta förbättringsförslag."
               tag="Ny"
             />
-            <CoordinatorDashboardCard
-              href="/koordinator/guides/communication-system"
-              icon={MessageSquareText}
-              iconColor="text-cyan-400"
-              title="Kommunikationsguide"
-              description="Interaktiv guide för @mentions, trådar och notifikationer i ärendekommunikation."
-              tag="Guide"
-            />
           </div>
         </section>
 
@@ -376,6 +369,11 @@ export default function CoordinatorDashboard() {
           <div className="lg:col-span-1">
             <EventLogCard maxEntries={8} />
           </div>
+        </section>
+
+        {/* --- Guider och Hjälp --- */}
+        <section className="mt-16">
+          <CoordinatorHelpSection />
         </section>
       </div>
 

@@ -515,6 +515,22 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/koordinator/guides/case-deletion"
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <CaseDeletionGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/guides/case-deletion"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <CaseDeletionGuide />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Shared routes - accessible by all authenticated users */}
             <Route 
