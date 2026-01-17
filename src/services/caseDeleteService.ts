@@ -55,16 +55,25 @@ export async function getCaseDeleteInfo(
 ): Promise<CaseDeleteInfo> {
   const tableName = getTableName(caseType);
 
-  // Hämta ärendets grundinfo
+  // Hämta ärendets grundinfo - olika kolumnnamn för contract vs private/business
+  const selectFields = caseType === 'contract'
+    ? 'id, title, contact_person'
+    : 'id, title, kontaktperson';
+
   const { data: caseData, error: caseError } = await supabase
     .from(tableName)
-    .select('id, title, kontaktperson')
+    .select(selectFields)
     .eq('id', caseId)
     .single();
 
   if (caseError || !caseData) {
     throw new Error(`Kunde inte hitta ärendet: ${caseError?.message || 'Okänt fel'}`);
   }
+
+  // Normalisera kontaktperson-fältet
+  const customerName = caseType === 'contract'
+    ? (caseData as any).contact_person
+    : (caseData as any).kontaktperson;
 
   // Kontrollera om det finns underärenden (child cases) - för alla ärendetyper
   let childCasesCount = 0;
@@ -143,7 +152,7 @@ export async function getCaseDeleteInfo(
     caseId,
     caseType,
     caseTitle: caseData.title || 'Namnlöst ärende',
-    customerName: caseData.kontaktperson,
+    customerName: customerName,
     relatedData: {
       comments: commentsCount || 0,
       images: imagesCount || 0,
@@ -298,7 +307,61 @@ export async function deleteCase(
       console.error('Error deleting billing logs:', billingError);
     }
 
-    // 7. Slutligen, radera själva ärendet
+    // 7. Radera case_events
+    const { error: eventsError } = await supabase
+      .from('case_events')
+      .delete()
+      .eq('case_id', caseId)
+      .eq('case_type', caseType);
+
+    if (eventsError) {
+      console.error('Error deleting case events:', eventsError);
+    }
+
+    // 8. Radera case_followers
+    const { error: followersError } = await supabase
+      .from('case_followers')
+      .delete()
+      .eq('case_id', caseId)
+      .eq('case_type', caseType);
+
+    if (followersError) {
+      console.error('Error deleting case followers:', followersError);
+    }
+
+    // 9. Radera user_case_events
+    const { error: userEventsError } = await supabase
+      .from('user_case_events')
+      .delete()
+      .eq('case_id', caseId)
+      .eq('case_type', caseType);
+
+    if (userEventsError) {
+      console.error('Error deleting user case events:', userEventsError);
+    }
+
+    // 10. Radera sanitation_reports
+    const { error: sanitationError } = await supabase
+      .from('sanitation_reports')
+      .delete()
+      .eq('case_id', caseId)
+      .eq('case_type', caseType);
+
+    if (sanitationError) {
+      console.error('Error deleting sanitation reports:', sanitationError);
+    }
+
+    // 11. Radera case_updates_log
+    const { error: updatesLogError } = await supabase
+      .from('case_updates_log')
+      .delete()
+      .eq('case_id', caseId);
+
+    if (updatesLogError) {
+      console.error('Error deleting case updates log:', updatesLogError);
+    }
+
+    // 12. Slutligen, radera själva ärendet
     const { error: caseDeleteError } = await supabase
       .from(tableName)
       .delete()

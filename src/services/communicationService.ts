@@ -1356,10 +1356,10 @@ export async function getCasesWithEvents(
   // Applicera paginering
   const paginatedCases = filteredCases.slice(offset, offset + limit);
 
-  // Hämta ärendeinfo från private_cases och business_cases
+  // Hämta ärendeinfo från alla tre ärendetabeller
   const caseIds = paginatedCases.map(([key]) => key.split(':')[0]);
 
-  const [privateCasesResult, businessCasesResult] = await Promise.all([
+  const [privateCasesResult, businessCasesResult, contractCasesResult] = await Promise.all([
     supabase
       .from('private_cases')
       .select('id, title, kontaktperson, adress, skadedjur')
@@ -1367,11 +1367,24 @@ export async function getCasesWithEvents(
     supabase
       .from('business_cases')
       .select('id, title, kontaktperson, adress, skadedjur')
+      .in('id', caseIds),
+    // Avtalskunder lagras i 'cases'-tabellen med annan kolumnstruktur
+    supabase
+      .from('cases')
+      .select('id, title, contact_person, address, pest_type')
       .in('id', caseIds)
   ]);
 
   const privateCaseMap = new Map(privateCasesResult.data?.map(c => [c.id, c]) || []);
   const businessCaseMap = new Map(businessCasesResult.data?.map(c => [c.id, c]) || []);
+  // Mappa contract cases till samma format som private/business
+  const contractCaseMap = new Map(contractCasesResult.data?.map(c => [c.id, {
+    id: c.id,
+    title: c.title,
+    kontaktperson: c.contact_person,
+    adress: c.address, // Detta är JSONB, formatAddress hanterar det
+    skadedjur: c.pest_type
+  }]) || []);
 
   // Analysera mentions för att hitta obesvarade frågor
   const questions = analyzeMentionQuestions(allComments);
@@ -1384,10 +1397,15 @@ export async function getCasesWithEvents(
     .map(([caseKey, caseData]) => {
       const [caseId, caseType] = caseKey.split(':') as [string, CaseType];
 
-      // Hämta ärendeinfo från rätt tabell
-      const caseInfo = caseType === 'private'
-        ? privateCaseMap.get(caseId)
-        : businessCaseMap.get(caseId);
+      // Hämta ärendeinfo från rätt tabell baserat på case_type
+      let caseInfo;
+      if (caseType === 'private') {
+        caseInfo = privateCaseMap.get(caseId);
+      } else if (caseType === 'business') {
+        caseInfo = businessCaseMap.get(caseId);
+      } else if (caseType === 'contract') {
+        caseInfo = contractCaseMap.get(caseId);
+      }
 
       // Om ärendet inte finns (raderat), returnera null så vi kan filtrera bort det
       if (!caseInfo) {
