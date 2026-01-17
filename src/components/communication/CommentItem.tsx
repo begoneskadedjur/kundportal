@@ -65,6 +65,13 @@ export default function CommentItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [showMenu, setShowMenu] = useState(false);
+
+  // Synka editContent med comment.content när den ändras (t.ex. via realtime)
+  useEffect(() => {
+    if (!isEditing) {
+      setEditContent(comment.content);
+    }
+  }, [comment.content, isEditing]);
   const [showImageModal, setShowImageModal] = useState<string | null>(null);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [readReceipts, setReadReceipts] = useState<ReadReceipt[]>([]);

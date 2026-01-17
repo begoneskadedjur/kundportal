@@ -98,7 +98,7 @@ export default function CommentSection({
           onStatusChange={changeStatus}
           isReply={depth > 0}
           depth={depth}
-          showStatus={hasMentions}
+          showStatus={hasMentions && depth === 0}
         />
 
         {/* Rendera svar - REDESIGN: Subtil indentation utan tjock border */}

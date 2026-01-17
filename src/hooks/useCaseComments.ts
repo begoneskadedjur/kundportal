@@ -206,8 +206,11 @@ export function useCaseComments({
     []
   );
 
-  // Ta bort kommentar
+  // Ta bort kommentar - med optimistisk uppdatering
   const removeComment = useCallback(async (commentId: string) => {
+    // Optimistisk uppdatering - ta bort från UI direkt
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+
     try {
       setIsSubmitting(true);
       await deleteComment(commentId);
@@ -215,10 +218,12 @@ export function useCaseComments({
     } catch (err) {
       console.error('Fel vid borttagning av kommentar:', err);
       toast.error('Kunde inte ta bort kommentar');
+      // Återställ vid fel - hämta om kommentarer
+      fetchComments();
     } finally {
       setIsSubmitting(false);
     }
-  }, []);
+  }, [fetchComments]);
 
   // Ändra status på kommentar (med optimistisk uppdatering)
   const changeStatus = useCallback(
