@@ -67,21 +67,21 @@ export default function NotificationBell({
     if (onNotificationClick) {
       onNotificationClick(notification);
     } else {
-      // Navigera till rätt sida baserat på användarens portal
+      // Navigera till Intern Administration med ärendet öppet
       const pathname = window.location.pathname;
 
       if (pathname.includes('/technician')) {
-        // Tekniker: gå till schema-sidan och öppna ärendet där
-        window.location.href = `/technician/schedule?openCase=${notification.case_id}&caseType=${notification.case_type}`;
+        // Tekniker: gå till intern-administration
+        window.location.href = `/technician/intern-administration?caseId=${notification.case_id}&caseType=${notification.case_type}`;
       } else if (pathname.includes('/admin')) {
-        // Admin: gå till ärendesökning
-        window.location.href = `/admin/case-search?openCase=${notification.case_id}&caseType=${notification.case_type}`;
-      } else if (pathname.includes('/coordinator')) {
-        // Koordinator: gå till ärendesökning
-        window.location.href = `/coordinator/case-search?openCase=${notification.case_id}&caseType=${notification.case_type}`;
+        // Admin: gå till intern-administration
+        window.location.href = `/admin/intern-administration?caseId=${notification.case_id}&caseType=${notification.case_type}`;
+      } else if (pathname.includes('/koordinator')) {
+        // Koordinator: gå till intern-administration
+        window.location.href = `/koordinator/intern-administration?caseId=${notification.case_id}&caseType=${notification.case_type}`;
       } else {
-        // Fallback
-        window.location.href = `/technician/schedule?openCase=${notification.case_id}&caseType=${notification.case_type}`;
+        // Fallback till admin
+        window.location.href = `/admin/intern-administration?caseId=${notification.case_id}&caseType=${notification.case_type}`;
       }
     }
   };

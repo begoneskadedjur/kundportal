@@ -1356,21 +1356,22 @@ export async function getCasesWithEvents(
   // Applicera paginering
   const paginatedCases = filteredCases.slice(offset, offset + limit);
 
-  // Hämta ärendeinfo
+  // Hämta ärendeinfo från private_cases och business_cases
   const caseIds = paginatedCases.map(([key]) => key.split(':')[0]);
 
-  const { data: privateCases } = await supabase
-    .from('private_cases')
-    .select('id, title, kontaktperson, adress, skadedjur')
-    .in('id', caseIds);
+  const [privateCasesResult, businessCasesResult] = await Promise.all([
+    supabase
+      .from('private_cases')
+      .select('id, title, kontaktperson, adress, skadedjur')
+      .in('id', caseIds),
+    supabase
+      .from('business_cases')
+      .select('id, title, kontaktperson, adress, skadedjur')
+      .in('id', caseIds)
+  ]);
 
-  const { data: businessCases } = await supabase
-    .from('business_cases')
-    .select('id, title, kontaktperson, adress, skadedjur')
-    .in('id', caseIds);
-
-  const privateCaseMap = new Map(privateCases?.map(c => [c.id, c]) || []);
-  const businessCaseMap = new Map(businessCases?.map(c => [c.id, c]) || []);
+  const privateCaseMap = new Map(privateCasesResult.data?.map(c => [c.id, c]) || []);
+  const businessCaseMap = new Map(businessCasesResult.data?.map(c => [c.id, c]) || []);
 
   // Analysera mentions för att hitta obesvarade frågor
   const questions = analyzeMentionQuestions(allComments);
@@ -1378,12 +1379,20 @@ export async function getCasesWithEvents(
   // Alla frågor jag ställt (för multi-mention tracking)
   const allQuestionsFromMe = questions.filter(q => q.askerId === userId);
 
-  // Bygg CaseWithEvents
-  const cases: CaseWithEvents[] = paginatedCases.map(([caseKey, caseData]) => {
-    const [caseId, caseType] = caseKey.split(':') as [string, CaseType];
-    const caseInfo = caseType === 'private'
-      ? privateCaseMap.get(caseId)
-      : businessCaseMap.get(caseId);
+  // Bygg CaseWithEvents - filtrera bort ärenden som inte finns längre (raderade)
+  const cases: CaseWithEvents[] = paginatedCases
+    .map(([caseKey, caseData]) => {
+      const [caseId, caseType] = caseKey.split(':') as [string, CaseType];
+
+      // Hämta ärendeinfo från rätt tabell
+      const caseInfo = caseType === 'private'
+        ? privateCaseMap.get(caseId)
+        : businessCaseMap.get(caseId);
+
+      // Om ärendet inte finns (raderat), returnera null så vi kan filtrera bort det
+      if (!caseInfo) {
+        return null;
+      }
 
     // Räkna händelser
     const unansweredMentionsForCase = unansweredForMe.filter(
@@ -1445,28 +1454,31 @@ export async function getCasesWithEvents(
       created_at: comment.created_at
     }));
 
-    return {
-      case_id: caseId,
-      case_type: caseType,
-      case_title: caseInfo?.title || 'Okänt ärende',
-      kontaktperson: caseInfo?.kontaktperson || null,
-      adress: formatAddress(caseInfo?.adress),
-      skadedjur: caseInfo?.skadedjur || null,
-      status: (latestComment?.status || 'open') as CommentStatus,
-      events,
-      unread_count: allCommentsInCase.length, // Nu räknar vi alla kommentarer
-      latest_event_at: caseData.latestAt,
-      unanswered_mentions: unansweredMentionsForCase,
-      replies_to_my_questions: repliesForCase,
-      new_comments: newCommentsCount,
-      // Multi-mention tracking
-      outgoing_questions_total: totalMentioned,
-      outgoing_questions_answered: answeredCount,
-      outgoing_questions_pending_names: pendingNames
-    };
-  });
+      return {
+        case_id: caseId,
+        case_type: caseType,
+        case_title: caseInfo.title || 'Namnlöst ärende',
+        kontaktperson: caseInfo.kontaktperson || null,
+        adress: formatAddress(caseInfo.adress),
+        skadedjur: caseInfo.skadedjur || null,
+        status: (latestComment?.status || 'open') as CommentStatus,
+        events,
+        unread_count: allCommentsInCase.length,
+        latest_event_at: caseData.latestAt,
+        unanswered_mentions: unansweredMentionsForCase,
+        replies_to_my_questions: repliesForCase,
+        new_comments: newCommentsCount,
+        // Multi-mention tracking
+        outgoing_questions_total: totalMentioned,
+        outgoing_questions_answered: answeredCount,
+        outgoing_questions_pending_names: pendingNames
+      };
+    })
+    .filter((c): c is CaseWithEvents => c !== null); // Filtrera bort raderade ärenden
 
-  return { cases, totalCount };
+  // Justera totalCount för att exkludera raderade ärenden
+  const actualCount = totalCount - (paginatedCases.length - cases.length);
+  return { cases, totalCount: actualCount };
 }
 
 /**
