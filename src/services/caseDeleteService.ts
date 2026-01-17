@@ -96,12 +96,25 @@ export async function getCaseDeleteInfo(
     .eq('case_id', caseId)
     .eq('case_type', caseType);
 
-  // Räkna läsbekräftelser
-  const { count: readReceiptsCount } = await supabase
-    .from('comment_read_receipts')
-    .select('id', { count: 'exact', head: true })
-    .eq('case_id', caseId)
-    .eq('case_type', caseType);
+  // Räkna läsbekräftelser (via comment_ids eftersom tabellen inte har case_id)
+  let readReceiptsCount = 0;
+  if (commentsCount && commentsCount > 0) {
+    // Hämta alla comment_ids för ärendet
+    const { data: commentIds } = await supabase
+      .from('case_comments')
+      .select('id')
+      .eq('case_id', caseId)
+      .eq('case_type', caseType);
+
+    if (commentIds && commentIds.length > 0) {
+      const ids = commentIds.map(c => c.id);
+      const { count } = await supabase
+        .from('comment_read_receipts')
+        .select('id', { count: 'exact', head: true })
+        .in('comment_id', ids);
+      readReceiptsCount = count || 0;
+    }
+  }
 
   // Räkna besök (visits) - endast för contract cases
   let visitsCount = 0;
@@ -184,15 +197,24 @@ export async function deleteCase(
 
     // Radera i rätt ordning (beroenden först)
 
-    // 1. Radera läsbekräftelser
-    const { error: readReceiptsError } = await supabase
-      .from('comment_read_receipts')
-      .delete()
+    // 1. Radera läsbekräftelser (via comment_ids eftersom tabellen inte har case_id)
+    // Hämta först alla comment_ids för ärendet
+    const { data: commentIdsForReceipts } = await supabase
+      .from('case_comments')
+      .select('id')
       .eq('case_id', caseId)
       .eq('case_type', caseType);
 
-    if (readReceiptsError) {
-      console.error('Error deleting read receipts:', readReceiptsError);
+    if (commentIdsForReceipts && commentIdsForReceipts.length > 0) {
+      const ids = commentIdsForReceipts.map(c => c.id);
+      const { error: readReceiptsError } = await supabase
+        .from('comment_read_receipts')
+        .delete()
+        .in('comment_id', ids);
+
+      if (readReceiptsError) {
+        console.error('Error deleting read receipts:', readReceiptsError);
+      }
     }
 
     // 2. Radera notifikationer
@@ -218,24 +240,18 @@ export async function deleteCase(
     }
 
     // 4. Radera bilder (radera även från storage)
+    // Kolumnen heter 'file_path' inte 'image_url'
     const { data: images } = await supabase
       .from('case_images')
-      .select('image_url')
+      .select('file_path')
       .eq('case_id', caseId)
       .eq('case_type', caseType);
 
     if (images && images.length > 0) {
-      // Extrahera filnamn från URL:er och radera från storage
+      // file_path innehåller den relativa sökvägen i storage-bucketen
       const filePaths = images
-        .map(img => {
-          if (img.image_url) {
-            // Extrahera sökvägen efter 'case-images/'
-            const match = img.image_url.match(/case-images\/(.+)/);
-            return match ? match[1] : null;
-          }
-          return null;
-        })
-        .filter((path): path is string => path !== null);
+        .map(img => img.file_path)
+        .filter((path): path is string => path !== null && path !== undefined);
 
       if (filePaths.length > 0) {
         const { error: storageError } = await supabase.storage
