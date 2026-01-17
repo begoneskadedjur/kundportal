@@ -39,7 +39,7 @@ export default function InternAdministration() {
   const [selectedCase, setSelectedCase] = useState<SelectedCase | null>(null);
 
   // State för filter
-  const [activeFilter, setActiveFilter] = useState<EventFilter>('all');
+  const [activeFilter, setActiveFilter] = useState<EventFilter>('mentions');
 
   // Hämta aktiva ärenden
   const {
@@ -123,20 +123,11 @@ export default function InternAdministration() {
   });
 
   // Statistik-kort med tydliga namn och tooltips
+  // Ordning: Väntar på ditt svar → Väntar på andras svar → Ny aktivitet → Alla ärenden → Avslutade
   const filterTabs = [
     {
-      id: 'all' as EventFilter,
-      label: 'Alla ärenden',
-      shortLabel: 'Alla',
-      tooltip: 'Visar alla ärenden där du är involverad, antingen genom att du skrivit eller blivit omnämnd',
-      count: stats?.totalCases || 0,
-      icon: Inbox,
-      color: 'text-slate-400',
-      activeColor: 'bg-slate-600 text-white'
-    },
-    {
       id: 'mentions' as EventFilter,
-      label: 'Väntar på svar',
+      label: 'Väntar på ditt svar',
       shortLabel: 'Att göra',
       tooltip: 'Någon har @nämnt dig och väntar på ditt svar. Du behöver agera!',
       count: stats?.unansweredMentions || 0,
@@ -165,8 +156,18 @@ export default function InternAdministration() {
       activeColor: 'bg-blue-600 text-white'
     },
     {
+      id: 'all' as EventFilter,
+      label: 'Alla ärenden',
+      shortLabel: 'Alla',
+      tooltip: 'Visar alla ärenden där du är involverad, antingen genom att du skrivit eller blivit omnämnd',
+      count: stats?.totalCases || 0,
+      icon: Inbox,
+      color: 'text-slate-400',
+      activeColor: 'bg-slate-600 text-white'
+    },
+    {
       id: 'archived' as EventFilter,
-      label: 'Arkiv',
+      label: 'Avslutade ärenden',
       shortLabel: 'Klart',
       tooltip: 'Avslutade och lösta ärenden. Bra jobbat!',
       count: stats?.archivedCases || 0,
