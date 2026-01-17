@@ -125,14 +125,22 @@ export default function CaseEventCard({ caseData, onOpenCase, onMarkResolved, is
       const pendingNames = caseData.outgoing_questions_pending_names || [];
 
       if (answered === total) {
-        // Alla har svarat
-        parts.push(`Alla ${total} har svarat`);
+        // Alla har svarat - anpassa text baserat på antal
+        if (total === 1) {
+          parts.push('Svar mottaget');
+        } else {
+          parts.push(`Alla ${total} har svarat`);
+        }
       } else if (answered > 0) {
         // Delvis svar
         parts.push(`${answered} av ${total} har svarat`);
       } else {
         // Ingen har svarat
-        parts.push(`Väntar på svar från ${total} person${total > 1 ? 'er' : ''}`);
+        if (total === 1) {
+          parts.push('Väntar på svar');
+        } else {
+          parts.push(`Väntar på svar från ${total} personer`);
+        }
       }
 
       // Visa vilka som inte svarat (max 3 namn)

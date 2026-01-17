@@ -1403,17 +1403,34 @@ export async function getCasesWithEvents(
     // replies_to_my_questions = antal besvarade (för bakåtkompatibilitet)
     const repliesForCase = answeredCount;
 
-    // Nya kommentarer = kommentarer som inte är frågor till mig eller mina frågor
-    const newCommentsCount = caseData.comments.filter(c =>
-      c.author_id !== userId &&
-      !c.mentioned_user_ids?.includes(userId)
-    ).length;
+    // FÖRBÄTTRING B3: Hämta ALLA kommentarer i ärendet (inte bara användarens)
+    // för att visa fullständig historik i "Senaste händelser"
+    const allCommentsInCase = allComments.filter(
+      c => c.case_id === caseId && c.case_type === caseType
+    ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    // Senaste kommentarens status
-    const latestComment = caseData.comments[0];
+    // NY LOGIK: Nya kommentarer = kommentarer som är nyare än min senaste kommentar i ärendet
+    // Detta fångar upp ALLA nya svar, inklusive svar på mina frågor
+    const myLatestCommentInCase = allCommentsInCase
+      .filter(c => c.author_id === userId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 
-    // Konvertera kommentarer till events
-    const events: CaseEvent[] = caseData.comments.slice(0, 5).map(comment => ({
+    const newCommentsCount = allCommentsInCase.filter(c => {
+      // Inte skriven av mig
+      if (c.author_id === userId) return false;
+
+      // Om jag inte har skrivit någon kommentar, räkna alla andras kommentarer som "nya"
+      if (!myLatestCommentInCase) return true;
+
+      // Annars räkna kommentarer som är nyare än min senaste
+      return new Date(c.created_at) > new Date(myLatestCommentInCase.created_at);
+    }).length;
+
+    // Senaste kommentarens status (från alla kommentarer i ärendet)
+    const latestComment = allCommentsInCase[0];
+
+    // Konvertera kommentarer till events - nu med ALLA kommentarer i ärendet
+    const events: CaseEvent[] = allCommentsInCase.slice(0, 5).map(comment => ({
       id: comment.id,
       case_id: comment.case_id,
       case_type: comment.case_type as CaseType,
@@ -1437,7 +1454,7 @@ export async function getCasesWithEvents(
       skadedjur: caseInfo?.skadedjur || null,
       status: (latestComment?.status || 'open') as CommentStatus,
       events,
-      unread_count: caseData.comments.length,
+      unread_count: allCommentsInCase.length, // Nu räknar vi alla kommentarer
       latest_event_at: caseData.latestAt,
       unanswered_mentions: unansweredMentionsForCase,
       replies_to_my_questions: repliesForCase,

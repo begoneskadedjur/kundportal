@@ -1,8 +1,9 @@
 // src/hooks/useCaseEvents.ts
-// Hook för ärende-centrerad händelsevy
+// Hook för ärende-centrerad händelsevy med realtime-uppdateringar
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import {
   getCasesWithEvents,
   getCaseBasedStats,
@@ -179,6 +180,45 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
       fetchStats();
     }
   }, [autoFetch, authLoading, profile, currentUserId, fetchStats]);
+
+  // Realtime-subscription för automatiska uppdateringar
+  // Använder debounce för att undvika för många uppdateringar vid snabba ändringar
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!currentUserId || !autoFetch) return;
+
+    const channel = supabase
+      .channel('intern-admin-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',  // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'case_comments'
+        },
+        (payload) => {
+          // Debounce: Vänta 500ms innan refresh för att samla ihop flera ändringar
+          if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+          }
+
+          debounceTimerRef.current = setTimeout(() => {
+            // Refresh både ärenden och statistik
+            refresh();
+          }, 500);
+        }
+      )
+      .subscribe();
+
+    // Cleanup
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, autoFetch, refresh]);
 
   const hasMore = cases.length < totalCount;
 
