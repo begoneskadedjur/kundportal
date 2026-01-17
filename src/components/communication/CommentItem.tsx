@@ -451,7 +451,7 @@ export default function CommentItem({
           {!isEditing && (
             <div className="mt-1.5 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
               {/* Svara-knapp */}
-              {onReply && depth < 2 && (
+              {onReply && (
                 <button
                   onClick={() => onReply(comment)}
                   className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-[#20c58f] transition-colors"
