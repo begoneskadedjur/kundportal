@@ -17,7 +17,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { markCommentAsRead, getReadReceipts, updateCommentStatus } from '../../services/communicationService';
 import {
   User,
-  Clock,
   Pencil,
   Trash2,
   FileText,
@@ -30,7 +29,6 @@ import {
   Eye,
   Circle,
   CheckCircle2,
-  AlertCircle,
   ChevronDown,
 } from 'lucide-react';
 
@@ -139,10 +137,6 @@ export default function CommentItem({
     switch (config.icon) {
       case 'check':
         return <CheckCircle2 className={`w-3.5 h-3.5 ${config.color}`} />;
-      case 'alert-circle':
-        return <AlertCircle className={`w-3.5 h-3.5 ${config.color}`} />;
-      case 'clock':
-        return <Clock className={`w-3.5 h-3.5 ${config.color}`} />;
       default:
         return <Circle className={`w-3.5 h-3.5 ${config.color}`} />;
     }

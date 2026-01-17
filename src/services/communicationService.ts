@@ -719,7 +719,7 @@ async function reactivateResolvedCase(caseId: string, caseType: string): Promise
 
 export async function updateCommentStatus(
   commentId: string,
-  status: 'open' | 'in_progress' | 'resolved' | 'needs_action',
+  status: 'open' | 'resolved',
   resolvedBy?: string
 ): Promise<void> {
   const updateData: any = { status };
@@ -791,7 +791,7 @@ function formatAddress(adress: any): string | null {
 export type TicketDirection = 'incoming' | 'outgoing' | 'all';
 
 export interface TicketFilter {
-  status?: ('open' | 'in_progress' | 'resolved' | 'needs_action')[];
+  status?: ('open' | 'resolved')[];
   searchQuery?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -802,8 +802,6 @@ export interface TicketFilter {
 
 export interface TicketStats {
   open: number;
-  inProgress: number;
-  needsAction: number;
   resolved: number;
 }
 
@@ -1093,18 +1091,14 @@ export async function getTicketStats(userId?: string): Promise<TicketStats> {
         .eq('status', status);
     };
 
-    const [openRes, inProgressRes, needsActionRes, resolvedRes] = await Promise.all([
+    const [openRes, resolvedRes] = await Promise.all([
       buildQuery('open'),
-      buildQuery('in_progress'),
-      buildQuery('needs_action'),
       buildQuery('resolved')
         .gte('resolved_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
     ]);
 
     return {
       open: openRes.count || 0,
-      inProgress: inProgressRes.count || 0,
-      needsAction: needsActionRes.count || 0,
       resolved: resolvedRes.count || 0,
     };
   }
@@ -1119,7 +1113,7 @@ export async function getTicketStats(userId?: string): Promise<TicketStats> {
     .order('created_at', { ascending: false });
 
   if (!allComments || allComments.length === 0) {
-    return { open: 0, inProgress: 0, needsAction: 0, resolved: 0 };
+    return { open: 0, resolved: 0 };
   }
 
   // Filtrera till kommentarer där användaren är involverad
@@ -1151,8 +1145,6 @@ export async function getTicketStats(userId?: string): Promise<TicketStats> {
 
   const stats = {
     open: 0,
-    inProgress: 0,
-    needsAction: 0,
     resolved: 0,
   };
 
@@ -1160,12 +1152,6 @@ export async function getTicketStats(userId?: string): Promise<TicketStats> {
     switch (caseData.status) {
       case 'open':
         stats.open++;
-        break;
-      case 'in_progress':
-        stats.inProgress++;
-        break;
-      case 'needs_action':
-        stats.needsAction++;
         break;
       case 'resolved':
         // Resolved räknas bara om den är från senaste 30 dagarna

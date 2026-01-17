@@ -35,12 +35,10 @@ interface TicketItemProps {
 
 const STATUS_CONFIG: Record<CommentStatus, { label: string; color: string; bgColor: string }> = {
   open: { label: 'Öppen', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
-  in_progress: { label: 'Pågår', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20' },
-  needs_action: { label: 'Kräver åtgärd', color: 'text-red-400', bgColor: 'bg-red-500/20' },
-  resolved: { label: 'Avklarad', color: 'text-green-400', bgColor: 'bg-green-500/20' },
+  resolved: { label: 'Löst', color: 'text-green-400', bgColor: 'bg-green-500/20' },
 };
 
-const STATUS_OPTIONS: CommentStatus[] = ['open', 'in_progress', 'needs_action', 'resolved'];
+const STATUS_OPTIONS: CommentStatus[] = ['open', 'resolved'];
 
 const DIRECTION_CONFIG = {
   incoming: {

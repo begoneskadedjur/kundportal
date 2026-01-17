@@ -13,9 +13,7 @@ interface TicketFiltersProps {
 
 const STATUS_OPTIONS: { value: CommentStatus; label: string; color: string }[] = [
   { value: 'open', label: 'Öppen', color: 'bg-blue-500' },
-  { value: 'in_progress', label: 'Pågår', color: 'bg-yellow-500' },
-  { value: 'needs_action', label: 'Kräver åtgärd', color: 'bg-red-500' },
-  { value: 'resolved', label: 'Avklarad', color: 'bg-green-500' },
+  { value: 'resolved', label: 'Löst', color: 'bg-green-500' },
 ];
 
 export function TicketFilters({ filter, onFilterChange, disabled }: TicketFiltersProps) {

@@ -59,7 +59,7 @@ export interface CaseComment {
   resolved_by: string | null;
 }
 
-export type CommentStatus = 'open' | 'in_progress' | 'resolved' | 'needs_action';
+export type CommentStatus = 'open' | 'resolved';
 
 export interface CaseCommentInsert {
   case_id: string;
@@ -208,12 +208,10 @@ export const COMMENT_STATUS_CONFIG: Record<CommentStatus, {
   label: string;
   color: string;
   bgColor: string;
-  icon: 'circle' | 'clock' | 'check' | 'alert-circle';
+  icon: 'circle' | 'check';
 }> = {
   open: { label: 'Öppen', color: 'text-blue-400', bgColor: 'bg-blue-500/20', icon: 'circle' },
-  in_progress: { label: 'Pågående', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', icon: 'clock' },
   resolved: { label: 'Löst', color: 'text-green-400', bgColor: 'bg-green-500/20', icon: 'check' },
-  needs_action: { label: 'Behöver åtgärd', color: 'text-red-400', bgColor: 'bg-red-500/20', icon: 'alert-circle' },
 };
 
 // Läsbekräftelse-typ
