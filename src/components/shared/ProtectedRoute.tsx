@@ -46,38 +46,44 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   // ✅ 4. UPPDATERAD LOGIK MED ADMIN-ÖVERÅTKOMST
   let hasAccess = false;
-  
-  switch (profile.role) {
-    case 'admin':
-      // Admins har FULL åtkomst till ALLT (admin, koordinator, technician, customer)
-      hasAccess = true;
-      break;
-    
-    case 'koordinator':
-      // Koordinatorer har endast tillgång till koordinator-sidor
-      if (requiredRole === 'koordinator') {
+
+  // Om ingen requiredRole är angiven, tillåt alla inloggade användare
+  // (används för delade sidor som /larosate, /profile etc.)
+  if (!requiredRole) {
+    hasAccess = true;
+  } else {
+    switch (profile.role) {
+      case 'admin':
+        // Admins har FULL åtkomst till ALLT (admin, koordinator, technician, customer)
         hasAccess = true;
-      }
-      break;
-    
-    case 'technician':
-      // Tekniker har tillgång till tekniker-sidor
-      if (requiredRole === 'technician') {
-        hasAccess = true;  
-      }
-      break;
-      
-    case 'customer':
-      // Kunder har tillgång till kund-sidor
-      if (requiredRole === 'customer') {
-        hasAccess = true;
-      }
-      break;
-      
-    default:
-      // Om rollen är okänd, nekas alltid tillträde
-      hasAccess = false;
-      break;
+        break;
+
+      case 'koordinator':
+        // Koordinatorer har endast tillgång till koordinator-sidor
+        if (requiredRole === 'koordinator') {
+          hasAccess = true;
+        }
+        break;
+
+      case 'technician':
+        // Tekniker har tillgång till tekniker-sidor
+        if (requiredRole === 'technician') {
+          hasAccess = true;
+        }
+        break;
+
+      case 'customer':
+        // Kunder har tillgång till kund-sidor
+        if (requiredRole === 'customer') {
+          hasAccess = true;
+        }
+        break;
+
+      default:
+        // Om rollen är okänd, nekas alltid tillträde
+        hasAccess = false;
+        break;
+    }
   }
   
   // 4. Returnera antingen barn-komponenten eller en omdirigering
