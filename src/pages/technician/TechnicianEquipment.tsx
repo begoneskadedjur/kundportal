@@ -512,7 +512,7 @@ export default function TechnicianEquipment() {
           </div>
         </div>
 
-        {/* Horisontell chip-filter för kunder - endast för utomhus */}
+        {/* Horisontell chip-filter för kunder */}
         {equipmentMode === 'outdoor' && customersFromEquipment.length > 0 && (
           <div className="border-t border-slate-800/50">
             <div
@@ -544,6 +544,41 @@ export default function TechnicianEquipment() {
                   }`}
                 >
                   {customer.company_name} ({customer.count})
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Horisontell chip-filter för kunder - inomhus (alla avtalskunder) */}
+        {equipmentMode === 'indoor' && customers.length > 0 && (
+          <div className="border-t border-slate-800/50">
+            <div
+              className="flex gap-2 overflow-x-auto px-4 py-2 scrollbar-hide"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {/* "Välj kund" chip - ingen kund vald */}
+              {!selectedCustomerId && (
+                <button
+                  className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 whitespace-nowrap min-h-[44px] flex items-center gap-2"
+                >
+                  <Building className="w-4 h-4" />
+                  Välj kund för att börja
+                </button>
+              )}
+
+              {/* Kund-chips */}
+              {customers.map((customer) => (
+                <button
+                  key={customer.id}
+                  onClick={() => setSelectedCustomerId(customer.id)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
+                    selectedCustomerId === customer.id
+                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {customer.company_name}
                 </button>
               ))}
             </div>
