@@ -62,6 +62,7 @@ import EquipmentPlacementGuide from './pages/technician/guides/EquipmentPlacemen
 import FollowUpCaseGuide from './pages/technician/guides/FollowUpCaseGuide';
 import CommunicationSystemGuide from './pages/technician/guides/CommunicationSystemGuide';
 import CaseDeletionGuide from './pages/technician/guides/CaseDeletionGuide';
+import TicketSystemGuide from './pages/technician/guides/TicketSystemGuide';
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal';
@@ -528,6 +529,32 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <CaseDeletionGuide />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Ticket System guide for all internal roles */}
+            <Route
+              path="/technician/guides/ticket-system"
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <TicketSystemGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/koordinator/guides/ticket-system"
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <TicketSystemGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/guides/ticket-system"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <TicketSystemGuide />
                 </ProtectedRoute>
               }
             />
