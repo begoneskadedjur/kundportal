@@ -42,7 +42,7 @@ export function FloorPlanSelector({
 
   if (variant === 'dropdown') {
     return (
-      <div className="relative">
+      <div className="relative z-20">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-left hover:bg-slate-700 transition-colors"
@@ -65,12 +65,12 @@ export function FloorPlanSelector({
           <>
             {/* Backdrop */}
             <div
-              className="fixed inset-0 z-40"
+              className="fixed inset-0 z-[55]"
               onClick={() => setIsOpen(false)}
             />
 
             {/* Dropdown menu */}
-            <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-1 z-[60] bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-64 overflow-y-auto">
               {buildingNames.map((building) => (
                 <div key={building}>
                   {buildingNames.length > 1 && building !== 'Övriga' && (
