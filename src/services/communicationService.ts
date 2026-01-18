@@ -1335,10 +1335,16 @@ export async function getCasesWithEvents(
     .sort((a, b) => new Date(b[1].latestAt).getTime() - new Date(a[1].latestAt).getTime());
 
   // Filtrera baserat på archived-status
-  // Ett ärende anses "resolved" om den senaste kommentaren har status 'resolved'
-  const filteredCases = sortedCases.filter(([, caseData]) => {
-    const latestComment = caseData.comments[0]; // Redan sorterad senast först
-    const isResolved = latestComment?.status === 'resolved';
+  // Ett ärende anses "resolved" om den senaste kommentaren (från ALLA kommentarer) har status 'resolved'
+  const filteredCases = sortedCases.filter(([caseKey]) => {
+    const [caseId, caseType] = caseKey.split(':');
+
+    // Hitta den senaste kommentaren i ärendet (från alla kommentarer, inte bara användarens)
+    const latestCommentInCase = allComments
+      .filter(c => c.case_id === caseId && c.case_type === caseType)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+    const isResolved = latestCommentInCase?.status === 'resolved';
 
     // includeArchived=true → visa ENDAST resolved
     // includeArchived=false → visa ENDAST aktiva (ej resolved)
