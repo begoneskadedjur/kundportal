@@ -94,6 +94,9 @@ export default function TechnicianEquipment() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customerSearchQuery, setCustomerSearchQuery] = useState('')
 
+  // Sökfält för inomhus-vy
+  const [indoorCustomerSearch, setIndoorCustomerSearch] = useState('')
+
   // Hämta tekniker-ID från profil
   const technicianId = profile?.technician_id || ''
 
@@ -145,6 +148,15 @@ export default function TechnicianEquipment() {
         .filter(c => c.company_name.toLowerCase().includes(query))
     }
   }, [customerSearchQuery, customersFromEquipment, customers])
+
+  // Filtrera kunder för inomhus-vy baserat på sökfråga
+  const filteredIndoorCustomers = useMemo(() => {
+    if (!indoorCustomerSearch.trim()) {
+      return customers
+    }
+    const query = indoorCustomerSearch.toLowerCase()
+    return customers.filter(c => c.company_name.toLowerCase().includes(query))
+  }, [indoorCustomerSearch, customers])
 
   // Hämta alla teknikerns placeringar vid mount
   useEffect(() => {
@@ -550,28 +562,64 @@ export default function TechnicianEquipment() {
           </div>
         )}
 
-        {/* Horisontell chip-filter för kunder - inomhus (alla avtalskunder) */}
+        {/* Kundfilter för inomhus - med sökfält */}
         {equipmentMode === 'indoor' && customers.length > 0 && (
           <div className="border-t border-slate-800/50">
+            {/* Sökfält */}
+            <div className="px-4 pt-3 pb-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Sök kund..."
+                  value={indoorCustomerSearch}
+                  onChange={(e) => setIndoorCustomerSearch(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                />
+                {indoorCustomerSearch && (
+                  <button
+                    onClick={() => setIndoorCustomerSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Horisontell chip-lista */}
             <div
-              className="flex gap-2 overflow-x-auto px-4 py-2 scrollbar-hide"
+              className="flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
+              {/* Vald kund visas först (om det finns en och den inte syns i sökresultaten) */}
+              {selectedCustomerId && !filteredIndoorCustomers.find(c => c.id === selectedCustomerId) && (
+                <button
+                  onClick={() => setSelectedCustomerId(selectedCustomerId)}
+                  className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 whitespace-nowrap min-h-[44px]"
+                >
+                  {selectedCustomerName}
+                </button>
+              )}
+
               {/* "Välj kund" chip - ingen kund vald */}
-              {!selectedCustomerId && (
+              {!selectedCustomerId && !indoorCustomerSearch && (
                 <button
                   className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 whitespace-nowrap min-h-[44px] flex items-center gap-2"
                 >
                   <Building className="w-4 h-4" />
-                  Välj kund för att börja
+                  Välj kund nedan
                 </button>
               )}
 
-              {/* Kund-chips */}
-              {customers.map((customer) => (
+              {/* Filtrerade kund-chips */}
+              {filteredIndoorCustomers.map((customer) => (
                 <button
                   key={customer.id}
-                  onClick={() => setSelectedCustomerId(customer.id)}
+                  onClick={() => {
+                    setSelectedCustomerId(customer.id)
+                    setIndoorCustomerSearch('') // Rensa sökning efter val
+                  }}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                     selectedCustomerId === customer.id
                       ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
@@ -581,6 +629,13 @@ export default function TechnicianEquipment() {
                   {customer.company_name}
                 </button>
               ))}
+
+              {/* Ingen träff */}
+              {indoorCustomerSearch && filteredIndoorCustomers.length === 0 && (
+                <div className="flex-shrink-0 px-4 py-2 text-sm text-slate-500 whitespace-nowrap">
+                  Ingen kund matchar "{indoorCustomerSearch}"
+                </div>
+              )}
             </div>
           </div>
         )}
