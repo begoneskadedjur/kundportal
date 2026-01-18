@@ -80,7 +80,13 @@ export function useCaseComments({
       caseId,
       caseType,
       (newComment) => {
-        setComments((prev) => [...prev, newComment]);
+        // Lägg till med duplicate-check för att undvika race condition med optimistisk uppdatering
+        setComments((prev) => {
+          if (prev.some((c) => c.id === newComment.id)) {
+            return prev;
+          }
+          return [...prev, newComment];
+        });
       },
       (updatedComment) => {
         setComments((prev) =>

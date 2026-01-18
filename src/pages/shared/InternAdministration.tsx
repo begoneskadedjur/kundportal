@@ -9,6 +9,7 @@ import {
   MessageSquareText,
   AtSign,
   MessageCircle,
+  CornerDownRight,
   Bell,
   CheckCircle2,
   Inbox,
@@ -29,7 +30,7 @@ interface SelectedCase {
 }
 
 // Filter-flikar för ticket-typer
-type TicketFilter = 'all' | 'mentions' | 'replies' | 'activity' | 'archived';
+type TicketFilter = 'all' | 'mentions' | 'replies_to_me' | 'replies' | 'activity' | 'archived';
 
 export default function InternAdministration() {
   const { profile } = useAuth();
@@ -110,6 +111,9 @@ export default function InternAdministration() {
       case 'mentions':
         // Frågor riktade till mig som jag inte svarat på
         return t.unanswered_mentions > 0;
+      case 'replies_to_me':
+        // Svar på MINA kommentarer (utan @mention)
+        return t.replies_to_my_comments > 0;
       case 'replies':
         // Frågor JAG ställt där inte alla har svarat ännu
         return t.outgoing_questions_total > 0 &&
@@ -132,6 +136,16 @@ export default function InternAdministration() {
       icon: AtSign,
       color: 'text-red-400',
       activeColor: 'bg-red-600 text-white'
+    },
+    {
+      id: 'replies_to_me' as TicketFilter,
+      label: 'Svar till dig',
+      shortLabel: 'Svar',
+      tooltip: 'Någon har svarat på din kommentar.',
+      count: stats?.repliesToMe || 0,
+      icon: CornerDownRight,
+      color: 'text-orange-400',
+      activeColor: 'bg-orange-600 text-white'
     },
     {
       id: 'replies' as TicketFilter,

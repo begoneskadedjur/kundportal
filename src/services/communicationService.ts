@@ -1560,10 +1560,28 @@ export async function getTicketsWithEvents(
   const rootComments = allComments.filter(c => !c.parent_comment_id);
   const replyComments = allComments.filter(c => c.parent_comment_id);
 
-  // Bygg en map: root_id -> replies
+  // Skapa en map för snabb lookup av kommentarer via id
+  const commentsById = new Map<string, typeof allComments[0]>();
+  for (const comment of allComments) {
+    commentsById.set(comment.id, comment);
+  }
+
+  // Hitta root-id för en kommentar genom att följa parent-kedjan uppåt
+  // (hanterar nästade svar på godtyckligt djup)
+  const findRootId = (commentId: string): string | null => {
+    const comment = commentsById.get(commentId);
+    if (!comment) return null;
+    if (!comment.parent_comment_id) return comment.id; // Detta ÄR root
+    return findRootId(comment.parent_comment_id);
+  };
+
+  // Bygg en map: root_id -> ALLA replies (inklusive nästade svar)
   const repliesMap = new Map<string, typeof replyComments>();
   for (const reply of replyComments) {
-    const rootId = reply.parent_comment_id!;
+    // Hitta den faktiska root-kommentaren, inte bara direkt parent
+    const rootId = findRootId(reply.parent_comment_id!);
+    if (!rootId) continue; // Orphan-kommentar, hoppa över
+
     const existing = repliesMap.get(rootId) || [];
     existing.push(reply);
     repliesMap.set(rootId, existing);
@@ -1706,6 +1724,23 @@ export async function getTicketsWithEvents(
         return true;
       }).length;
 
+      // Räkna olästa svar på MINA kommentarer (utan @mention till mig)
+      // Detta fångar svar-på-svar som inte explicit nämner användaren
+      const repliesToMyComments = sortedReplies.filter(reply => {
+        // Skippa om jag skrev svaret själv
+        if (reply.author_id === userId) return false;
+        // Skippa om jag redan läst det
+        if (readCommentIds.has(reply.id)) return false;
+        // Skippa om jag är @nämnd (räknas redan i unanswered_mentions)
+        if (reply.mentioned_user_ids?.includes(userId)) return false;
+
+        // Kolla om detta är ett svar på MIN kommentar
+        const parentComment = commentsById.get(reply.parent_comment_id || '');
+        if (!parentComment) return false;
+
+        return parentComment.author_id === userId;
+      }).length;
+
       // Konvertera root till CaseComment-typ
       const rootComment: CaseComment = {
         ...root,
@@ -1768,6 +1803,7 @@ export async function getTicketsWithEvents(
         outgoing_questions_total: total,
         outgoing_questions_answered: answered,
         outgoing_questions_pending_names: pendingNames,
+        replies_to_my_comments: repliesToMyComments,
         unread_count: unreadCount
       };
 
@@ -1968,6 +2004,7 @@ export async function getTicketBasedStats(userId: string): Promise<TicketStats> 
   const { tickets: resolvedTickets } = await getTicketsWithEvents(userId, 1000, 0, true);
 
   let unansweredMentions = 0;
+  let repliesToMe = 0;
   let waitingForReplies = 0;
   let newActivity = 0;
 
@@ -1975,6 +2012,10 @@ export async function getTicketBasedStats(userId: string): Promise<TicketStats> 
     // Räkna tickets med obesvarade frågor till mig
     if (ticket.unanswered_mentions > 0) {
       unansweredMentions++;
+    }
+    // Räkna tickets med olästa svar på MINA kommentarer (utan @mention)
+    if (ticket.replies_to_my_comments > 0) {
+      repliesToMe++;
     }
     // Räkna tickets där jag väntar på andras svar (inte alla har svarat ännu)
     if (ticket.outgoing_questions_total > 0 &&
@@ -1991,6 +2032,7 @@ export async function getTicketBasedStats(userId: string): Promise<TicketStats> 
     openTickets: activeTickets.length,
     resolvedTickets: resolvedTickets.length,
     unansweredMentions,
+    repliesToMe,
     waitingForReplies,
     newActivity
   };

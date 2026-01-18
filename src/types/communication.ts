@@ -338,6 +338,8 @@ export interface Ticket {
   outgoing_questions_total: number;        // Frågor JAG ställt i denna ticket
   outgoing_questions_answered: number;     // Frågor JAG ställt som har svarats
   outgoing_questions_pending_names: string[]; // Namn på de som inte svarat på mina frågor
+  // Svar på mina kommentarer (utan @mention)
+  replies_to_my_comments: number;          // Antal olästa svar på MINA kommentarer i denna ticket
   // Läskvitton
   unread_count: number;                    // Olästa kommentarer i denna ticket
 }
@@ -346,6 +348,7 @@ export interface TicketStats {
   openTickets: number;                     // Totalt antal öppna tickets där jag är involverad
   resolvedTickets: number;                 // Resolved tickets (senaste 30 dagarna)
   unansweredMentions: number;              // Tickets där någon väntar på mitt svar
+  repliesToMe: number;                     // Tickets där någon svarat på min kommentar (utan @mention)
   waitingForReplies: number;               // Tickets där jag väntar på andras svar
   newActivity: number;                     // Tickets med olästa kommentarer
 }

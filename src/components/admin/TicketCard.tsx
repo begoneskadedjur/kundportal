@@ -40,6 +40,11 @@ const getCardBorderColor = (ticket: Ticket, isArchiveView: boolean): string => {
     return 'border-l-red-500 bg-red-500/5';
   }
 
+  // Orange: Olästa svar på MINA kommentarer (utan @mention)
+  if (ticket.replies_to_my_comments > 0) {
+    return 'border-l-orange-500 bg-orange-500/5';
+  }
+
   // Amber: Jag har ställt frågor och väntar på svar
   const hasPendingOutgoing = ticket.outgoing_questions_total > 0 &&
     ticket.outgoing_questions_answered < ticket.outgoing_questions_total;
