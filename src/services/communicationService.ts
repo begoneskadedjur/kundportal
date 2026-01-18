@@ -3,6 +3,11 @@
 
 import { supabase } from '../lib/supabase';
 import {
+  ROLE_MENTIONS,
+  extractMentions,
+  truncatePreview,
+} from '../types/communication';
+import type {
   CaseComment,
   CaseCommentInsert,
   CaseCommentUpdate,
@@ -14,14 +19,15 @@ import {
   ParsedMention,
   MentionSuggestion,
   SystemEventType,
-  ROLE_MENTIONS,
-  extractMentions,
-  truncatePreview,
   CommentStatus,
+  Ticket,
+  TicketStats,
 } from '../types/communication';
 
 // Re-export types for consumers
 export type { CommentStatus, CaseType };
+// Re-exportera nya Ticket-typer från types/communication.ts
+export type { Ticket, TicketStats } from '../types/communication';
 
 // === KOMMENTARER ===
 
@@ -51,10 +57,12 @@ export async function createComment(
   const mentionedRoles = comment.mentioned_roles || [];
   const mentionsAll = comment.mentions_all || false;
 
-  // AUTOMATISK ÅTERAKTIVERING:
-  // Om det finns resolved-kommentarer i detta ärende, återaktivera dem
-  // så att ärendet flyttas tillbaka från arkivet till aktiva ärenden
-  await reactivateResolvedCase(comment.case_id, comment.case_type);
+  // AUTOMATISK ÅTERAKTIVERING (Ticket-nivå):
+  // Om detta är ett svar (parent_comment_id finns) på en resolved ticket,
+  // återaktivera ENDAST den specifika ticketen - andra tickets påverkas INTE.
+  if (comment.parent_comment_id) {
+    await reactivateTicketOnReply(comment.parent_comment_id);
+  }
 
   // Skapa kommentaren
   const { data, error } = await supabase
@@ -677,30 +685,44 @@ export async function getReadCount(commentId: string): Promise<number> {
 // === TICKET-STATUS ===
 
 /**
- * Återaktiverar ett resolved-ärende genom att sätta alla resolved-kommentarer till 'open'.
- * Anropas automatiskt när en ny kommentar skapas i ett ärende.
- * Detta gör att ärendet flyttas tillbaka från arkivet till aktiva ärenden.
+ * Återaktiverar EN specifik ticket (root-kommentar) när ett svar skapas på den.
+ * ENDAST denna ticket påverkas - andra tickets i samma ärende förblir orörda.
+ *
+ * @param parentCommentId - ID för root-kommentaren (ticketen) som svaret tillhör
  */
-async function reactivateResolvedCase(caseId: string, caseType: string): Promise<void> {
-  // Hitta alla resolved-kommentarer i detta ärende
-  const { data: resolvedComments, error: fetchError } = await supabase
-    .from('case_comments')
-    .select('id')
-    .eq('case_id', caseId)
-    .eq('case_type', caseType)
-    .eq('status', 'resolved');
+async function reactivateTicketOnReply(parentCommentId: string): Promise<void> {
+  if (!parentCommentId) {
+    return; // Inte ett svar, inget att återaktivera
+  }
 
-  if (fetchError) {
-    console.error('Fel vid hämtning av resolved kommentarer:', fetchError);
+  // Kolla om parent-kommentaren (ticketen) är resolved
+  const { data: parentComment, error: fetchError } = await supabase
+    .from('case_comments')
+    .select('id, status, parent_comment_id')
+    .eq('id', parentCommentId)
+    .single();
+
+  if (fetchError || !parentComment) {
+    console.error('Fel vid hämtning av parent-kommentar:', fetchError);
     return;
   }
 
-  if (!resolvedComments || resolvedComments.length === 0) {
-    return; // Inga resolved-kommentarer att återaktivera
+  // Om parent själv har en parent, hitta root-ticketen
+  let rootId = parentCommentId;
+  if (parentComment.parent_comment_id) {
+    // Detta är ett svar på ett svar - hitta den riktiga root-ticketen
+    const { data: rootComment } = await supabase
+      .from('case_comments')
+      .select('id')
+      .eq('id', parentComment.parent_comment_id)
+      .single();
+
+    if (rootComment) {
+      rootId = rootComment.id;
+    }
   }
 
-  // Återaktivera alla resolved-kommentarer till 'open'
-  const commentIds = resolvedComments.map(c => c.id);
+  // Återaktivera ENDAST denna root-ticket om den är resolved
   const { error: updateError } = await supabase
     .from('case_comments')
     .update({
@@ -708,12 +730,11 @@ async function reactivateResolvedCase(caseId: string, caseType: string): Promise
       resolved_at: null,
       resolved_by: null
     })
-    .in('id', commentIds);
+    .eq('id', rootId)
+    .eq('status', 'resolved'); // Endast om den faktiskt är resolved
 
   if (updateError) {
-    console.error('Fel vid återaktivering av resolved kommentarer:', updateError);
-  } else {
-    console.log(`Återaktiverade ${commentIds.length} kommentar(er) i ärende ${caseId}`);
+    console.error('Fel vid återaktivering av ticket:', updateError);
   }
 }
 
@@ -743,9 +764,10 @@ export async function updateCommentStatus(
   }
 }
 
-// === TICKETS (KOMMENTARER MED @MENTIONS) ===
+// === LEGACY TICKETS (GAMMAL MODELL - BEHÅLLS FÖR BAKÅTKOMPATIBILITET) ===
+// OBS: Använd nya Ticket-typen från types/communication.ts för ny kod
 
-export interface Ticket {
+export interface LegacyTicket {
   comment: CaseComment;
   case_id: string;
   case_type: CaseType;
@@ -800,7 +822,7 @@ export interface TicketFilter {
   currentUserId?: string; // För direction-filtrering
 }
 
-export interface TicketStats {
+export interface LegacyTicketStats {
   open: number;
   resolved: number;
 }
@@ -904,7 +926,7 @@ export async function getTickets(
   filter: TicketFilter,
   limit: number = 50,
   offset: number = 0
-): Promise<{ tickets: Ticket[]; totalCount: number }> {
+): Promise<{ tickets: LegacyTicket[]; totalCount: number }> {
   // PER-MENTION LOGIK:
   // - Incoming: Obesvarade frågor riktade till MIG (jag är nämnd och har inte svarat)
   // - Outgoing: Obesvarade frågor JAG har ställt (jag nämnde någon som inte svarat)
@@ -1035,7 +1057,7 @@ export async function getTickets(
 
   // Hämta ärendeinformation för varje kommentar
   const caseIds = [...new Set(filteredComments.map(c => c.case_id))];
-  const tickets: Ticket[] = [];
+  const tickets: LegacyTicket[] = [];
 
   // Hämta private cases
   const { data: privateCases } = await supabase
@@ -1080,7 +1102,7 @@ export async function getTickets(
   };
 }
 
-export async function getTicketStats(userId?: string): Promise<TicketStats> {
+export async function getTicketStats(userId?: string): Promise<LegacyTicketStats> {
   // Om ingen userId, räkna ALLA tickets (för admin/koordinator-översikt)
   if (!userId) {
     const buildQuery = (status: string) => {
@@ -1494,6 +1516,361 @@ export async function getCasesWithEvents(
   return { cases, totalCount: actualCount };
 }
 
+// =============================================================================
+// TICKET-CENTRERAD MODELL
+// =============================================================================
+
+/**
+ * Hämtar tickets (root-kommentarer) med svar för en användare
+ * En ticket = en root-kommentar (parent_comment_id IS NULL)
+ *
+ * SKILLNAD MOT getCasesWithEvents:
+ * - getCasesWithEvents grupperar på ärende (case_id) - ett kort per ärende
+ * - getTicketsWithEvents grupperar på root-kommentar - ett kort per ticket
+ *
+ * @param includeArchived - Om true, visa ENDAST arkiverade (resolved) tickets
+ *                          Om false (default), visa endast aktiva tickets
+ */
+export async function getTicketsWithEvents(
+  userId: string,
+  limit: number = 50,
+  offset: number = 0,
+  includeArchived: boolean = false
+): Promise<{ tickets: Ticket[]; totalCount: number }> {
+  // Hämta ALLA kommentarer (vi behöver både roots och replies)
+  const { data: allComments, error: commentsError } = await supabase
+    .from('case_comments')
+    .select('*')
+    .eq('is_system_comment', false)
+    .order('created_at', { ascending: false });
+
+  if (commentsError || !allComments || allComments.length === 0) {
+    return { tickets: [], totalCount: 0 };
+  }
+
+  // Hämta läskvitton för användaren
+  const { data: readReceipts } = await supabase
+    .from('comment_read_receipts')
+    .select('comment_id')
+    .eq('user_id', userId);
+
+  const readCommentIds = new Set(readReceipts?.map(r => r.comment_id) || []);
+
+  // Separera root-kommentarer (tickets) och replies
+  const rootComments = allComments.filter(c => !c.parent_comment_id);
+  const replyComments = allComments.filter(c => c.parent_comment_id);
+
+  // Bygg en map: root_id -> replies
+  const repliesMap = new Map<string, typeof replyComments>();
+  for (const reply of replyComments) {
+    const rootId = reply.parent_comment_id!;
+    const existing = repliesMap.get(rootId) || [];
+    existing.push(reply);
+    repliesMap.set(rootId, existing);
+  }
+
+  // Filtrera till tickets där användaren är involverad
+  // En användare är involverad om:
+  // 1. De är author av root-kommentaren
+  // 2. De är nämnda i root-kommentaren
+  // 3. De är author av ett reply
+  // 4. De är nämnda i ett reply
+  const relevantTickets = rootComments.filter(root => {
+    const rootId = root.id;
+    const replies = repliesMap.get(rootId) || [];
+
+    // Kolla root
+    if (root.author_id === userId) return true;
+    if (root.mentioned_user_ids?.includes(userId)) return true;
+
+    // Kolla replies
+    for (const reply of replies) {
+      if (reply.author_id === userId) return true;
+      if (reply.mentioned_user_ids?.includes(userId)) return true;
+    }
+
+    return false;
+  });
+
+  if (relevantTickets.length === 0) {
+    return { tickets: [], totalCount: 0 };
+  }
+
+  // Filtrera baserat på archived-status (root.status)
+  const filteredTickets = relevantTickets.filter(root => {
+    const isResolved = root.status === 'resolved';
+    return includeArchived ? isResolved : !isResolved;
+  });
+
+  // Sortera efter senaste aktivitet (root eller reply)
+  const sortedTickets = filteredTickets.sort((a, b) => {
+    const repliesA = repliesMap.get(a.id) || [];
+    const repliesB = repliesMap.get(b.id) || [];
+
+    const latestA = repliesA.length > 0
+      ? Math.max(new Date(a.created_at).getTime(), ...repliesA.map(r => new Date(r.created_at).getTime()))
+      : new Date(a.created_at).getTime();
+    const latestB = repliesB.length > 0
+      ? Math.max(new Date(b.created_at).getTime(), ...repliesB.map(r => new Date(r.created_at).getTime()))
+      : new Date(b.created_at).getTime();
+
+    return latestB - latestA; // Nyaste först
+  });
+
+  const totalCount = sortedTickets.length;
+
+  // Applicera paginering
+  const paginatedTickets = sortedTickets.slice(offset, offset + limit);
+
+  // Hämta ärendeinfo för alla relevanta ärenden
+  const caseIds = [...new Set(paginatedTickets.map(t => t.case_id))];
+
+  const [privateCasesResult, businessCasesResult, contractCasesResult] = await Promise.all([
+    supabase
+      .from('private_cases')
+      .select('id, title, kontaktperson, adress, skadedjur')
+      .in('id', caseIds),
+    supabase
+      .from('business_cases')
+      .select('id, title, kontaktperson, adress, skadedjur')
+      .in('id', caseIds),
+    supabase
+      .from('cases')
+      .select('id, title, contact_person, address, pest_type')
+      .in('id', caseIds)
+  ]);
+
+  const privateCaseMap = new Map(privateCasesResult.data?.map(c => [c.id, c]) || []);
+  const businessCaseMap = new Map(businessCasesResult.data?.map(c => [c.id, c]) || []);
+  const contractCaseMap = new Map(contractCasesResult.data?.map(c => [c.id, {
+    id: c.id,
+    title: c.title,
+    kontaktperson: c.contact_person,
+    adress: c.address,
+    skadedjur: c.pest_type
+  }]) || []);
+
+  // Bygg tickets
+  const tickets: Ticket[] = paginatedTickets
+    .map(root => {
+      const caseType = root.case_type as CaseType;
+      const caseId = root.case_id;
+
+      // Hämta ärendeinfo
+      let caseInfo;
+      if (caseType === 'private') {
+        caseInfo = privateCaseMap.get(caseId);
+      } else if (caseType === 'business') {
+        caseInfo = businessCaseMap.get(caseId);
+      } else if (caseType === 'contract') {
+        caseInfo = contractCaseMap.get(caseId);
+      }
+
+      // Om ärendet inte finns (raderat), returnera null
+      if (!caseInfo) {
+        return null;
+      }
+
+      const replies = repliesMap.get(root.id) || [];
+      const sortedReplies = replies.sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+
+      // Beräkna senaste aktivitet
+      const latestActivityAt = sortedReplies.length > 0
+        ? sortedReplies[sortedReplies.length - 1].created_at
+        : root.created_at;
+
+      // Analysera mentions PER TICKET
+      // En fråga är besvarad om den nämnda personen har skrivit ETT svar
+      const allTicketComments = [root, ...sortedReplies];
+
+      // Obesvarade mentions TILL mig i denna ticket
+      const unansweredMentionsToMe = countUnansweredMentionsInTicket(
+        root,
+        sortedReplies,
+        userId
+      );
+
+      // Frågor JAG ställt i denna ticket
+      const { total, answered, pendingNames } = countOutgoingQuestionsInTicket(
+        root,
+        sortedReplies,
+        userId
+      );
+
+      // Olästa kommentarer (inte skrivna av mig, inte lästa)
+      const unreadCount = allTicketComments.filter(c => {
+        if (c.author_id === userId) return false;
+        if (readCommentIds.has(c.id)) return false;
+        return true;
+      }).length;
+
+      // Konvertera root till CaseComment-typ
+      const rootComment: CaseComment = {
+        ...root,
+        case_type: caseType,
+        author_role: root.author_role as AuthorRole,
+        attachments: root.attachments || [],
+        mentioned_user_ids: root.mentioned_user_ids || [],
+        mentioned_user_names: root.mentioned_user_names || [],
+        mentioned_roles: root.mentioned_roles || [],
+        mentions_all: root.mentions_all || false,
+        is_system_comment: root.is_system_comment || false,
+        system_event_type: root.system_event_type || null,
+        is_edited: root.is_edited || false,
+        edited_at: root.edited_at || null,
+        parent_comment_id: root.parent_comment_id || null,
+        depth: root.depth || 0,
+        reply_count: sortedReplies.length,
+        status: root.status as CommentStatus,
+        resolved_at: root.resolved_at || null,
+        resolved_by: root.resolved_by || null
+      };
+
+      // Konvertera replies
+      const repliesAsComments: CaseComment[] = sortedReplies.map(r => ({
+        ...r,
+        case_type: r.case_type as CaseType,
+        author_role: r.author_role as AuthorRole,
+        attachments: r.attachments || [],
+        mentioned_user_ids: r.mentioned_user_ids || [],
+        mentioned_user_names: r.mentioned_user_names || [],
+        mentioned_roles: r.mentioned_roles || [],
+        mentions_all: r.mentions_all || false,
+        is_system_comment: r.is_system_comment || false,
+        system_event_type: r.system_event_type || null,
+        is_edited: r.is_edited || false,
+        edited_at: r.edited_at || null,
+        parent_comment_id: r.parent_comment_id || null,
+        depth: r.depth || 1,
+        reply_count: 0,
+        status: r.status as CommentStatus,
+        resolved_at: r.resolved_at || null,
+        resolved_by: r.resolved_by || null
+      }));
+
+      const ticket: Ticket = {
+        id: root.id,
+        root_comment: rootComment,
+        replies: repliesAsComments,
+        case_id: caseId,
+        case_type: caseType,
+        case_title: caseInfo.title || 'Namnlöst ärende',
+        kontaktperson: caseInfo.kontaktperson || null,
+        adress: formatAddress(caseInfo.adress),
+        skadedjur: caseInfo.skadedjur || null,
+        status: root.status as CommentStatus,
+        created_at: root.created_at,
+        latest_activity_at: latestActivityAt,
+        reply_count: sortedReplies.length,
+        unanswered_mentions: unansweredMentionsToMe,
+        outgoing_questions_total: total,
+        outgoing_questions_answered: answered,
+        outgoing_questions_pending_names: pendingNames,
+        unread_count: unreadCount
+      };
+
+      return ticket;
+    })
+    .filter((t): t is Ticket => t !== null);
+
+  const actualCount = totalCount - (paginatedTickets.length - tickets.length);
+  return { tickets, totalCount: actualCount };
+}
+
+/**
+ * Räknar obesvarade mentions TILL en specifik användare inom en ticket
+ */
+function countUnansweredMentionsInTicket(
+  root: any,
+  replies: any[],
+  userId: string
+): number {
+  let unanswered = 0;
+
+  // Kolla om jag är nämnd i root-kommentaren
+  if (root.mentioned_user_ids?.includes(userId) && root.author_id !== userId) {
+    // Har jag svarat på denna ticket?
+    const myReplies = replies.filter(r => r.author_id === userId);
+    if (myReplies.length === 0) {
+      unanswered++;
+    }
+  }
+
+  // Kolla om jag är nämnd i något reply (där jag inte redan svarat efter)
+  for (const reply of replies) {
+    if (reply.mentioned_user_ids?.includes(userId) && reply.author_id !== userId) {
+      // Har jag svarat EFTER denna reply?
+      const myRepliesAfter = replies.filter(
+        r => r.author_id === userId &&
+        new Date(r.created_at).getTime() > new Date(reply.created_at).getTime()
+      );
+      if (myRepliesAfter.length === 0) {
+        unanswered++;
+      }
+    }
+  }
+
+  return unanswered;
+}
+
+/**
+ * Räknar utgående frågor (mentions JAG gjort) inom en ticket
+ */
+function countOutgoingQuestionsInTicket(
+  root: any,
+  replies: any[],
+  userId: string
+): { total: number; answered: number; pendingNames: string[] } {
+  const questions: { mentionedUserId: string; mentionedUserName: string; isAnswered: boolean }[] = [];
+
+  // Kolla root-kommentar om JAG skrev den
+  if (root.author_id === userId && root.mentioned_user_ids?.length > 0) {
+    for (let i = 0; i < root.mentioned_user_ids.length; i++) {
+      const mentionedId = root.mentioned_user_ids[i];
+      const mentionedName = root.mentioned_user_names?.[i] || 'Okänd';
+
+      // Har denna person svarat?
+      const theirReplies = replies.filter(r => r.author_id === mentionedId);
+      questions.push({
+        mentionedUserId: mentionedId,
+        mentionedUserName: mentionedName,
+        isAnswered: theirReplies.length > 0
+      });
+    }
+  }
+
+  // Kolla replies som JAG skrev
+  for (const reply of replies) {
+    if (reply.author_id === userId && reply.mentioned_user_ids?.length > 0) {
+      for (let i = 0; i < reply.mentioned_user_ids.length; i++) {
+        const mentionedId = reply.mentioned_user_ids[i];
+        const mentionedName = reply.mentioned_user_names?.[i] || 'Okänd';
+
+        // Har denna person svarat EFTER min reply?
+        const theirRepliesAfter = replies.filter(
+          r => r.author_id === mentionedId &&
+          new Date(r.created_at).getTime() > new Date(reply.created_at).getTime()
+        );
+        questions.push({
+          mentionedUserId: mentionedId,
+          mentionedUserName: mentionedName,
+          isAnswered: theirRepliesAfter.length > 0
+        });
+      }
+    }
+  }
+
+  const total = questions.length;
+  const answered = questions.filter(q => q.isAnswered).length;
+  const pendingNames = questions
+    .filter(q => !q.isAnswered)
+    .map(q => q.mentionedUserName);
+
+  return { total, answered, pendingNames };
+}
+
 /**
  * Bestäm händelsetyp baserat på kommentar
  */
@@ -1577,5 +1954,44 @@ export async function getCaseBasedStats(userId: string): Promise<{
     waitingForReplies,
     newActivity,
     archivedCases: archivedCases.length
+  };
+}
+
+/**
+ * Hämta TICKET-baserad statistik (för nya ticket-vyn)
+ * Räknar individuella tickets istället för ärenden
+ */
+export async function getTicketBasedStats(userId: string): Promise<TicketStats> {
+  // Hämta aktiva tickets
+  const { tickets: activeTickets } = await getTicketsWithEvents(userId, 1000, 0, false);
+  // Hämta arkiverade tickets
+  const { tickets: resolvedTickets } = await getTicketsWithEvents(userId, 1000, 0, true);
+
+  let unansweredMentions = 0;
+  let waitingForReplies = 0;
+  let newActivity = 0;
+
+  for (const ticket of activeTickets) {
+    // Räkna tickets med obesvarade frågor till mig
+    if (ticket.unanswered_mentions > 0) {
+      unansweredMentions++;
+    }
+    // Räkna tickets där jag väntar på andras svar (inte alla har svarat ännu)
+    if (ticket.outgoing_questions_total > 0 &&
+        ticket.outgoing_questions_answered < ticket.outgoing_questions_total) {
+      waitingForReplies++;
+    }
+    // Räkna tickets med olästa kommentarer
+    if (ticket.unread_count > 0) {
+      newActivity++;
+    }
+  }
+
+  return {
+    openTickets: activeTickets.length,
+    resolvedTickets: resolvedTickets.length,
+    unansweredMentions,
+    waitingForReplies,
+    newActivity
   };
 }

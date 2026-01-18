@@ -312,3 +312,40 @@ export function extractMentions(text: string): ParsedMention[] {
 
   return mentions;
 }
+
+// === TICKET-MODELL ===
+// En Ticket är en root-kommentar (parent_comment_id IS NULL) med alla dess svar.
+// Varje ticket spåras individuellt med egen status och mentions-tracking.
+
+export interface Ticket {
+  id: string;                              // root_comment.id
+  root_comment: CaseComment;               // Själva root-kommentaren
+  replies: CaseComment[];                  // Alla svar (sorterade efter created_at)
+  // Ärende-info
+  case_id: string;
+  case_type: CaseType;
+  case_title: string;
+  kontaktperson: string | null;
+  adress: string | null;
+  skadedjur: string | null;
+  // Ticket-metadata
+  status: CommentStatus;                   // root_comment.status
+  created_at: string;                      // root_comment.created_at
+  latest_activity_at: string;              // Senaste aktivitet (root eller reply)
+  reply_count: number;                     // Antal svar
+  // Mentions-tracking per ticket
+  unanswered_mentions: number;             // Obesvarade frågor TILL mig i denna ticket
+  outgoing_questions_total: number;        // Frågor JAG ställt i denna ticket
+  outgoing_questions_answered: number;     // Frågor JAG ställt som har svarats
+  outgoing_questions_pending_names: string[]; // Namn på de som inte svarat på mina frågor
+  // Läskvitton
+  unread_count: number;                    // Olästa kommentarer i denna ticket
+}
+
+export interface TicketStats {
+  openTickets: number;                     // Totalt antal öppna tickets där jag är involverad
+  resolvedTickets: number;                 // Resolved tickets (senaste 30 dagarna)
+  unansweredMentions: number;              // Tickets där någon väntar på mitt svar
+  waitingForReplies: number;               // Tickets där jag väntar på andras svar
+  newActivity: number;                     // Tickets med olästa kommentarer
+}

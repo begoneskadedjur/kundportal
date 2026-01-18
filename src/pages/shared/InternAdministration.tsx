@@ -1,6 +1,6 @@
 // src/pages/shared/InternAdministration.tsx
-// Dedikerad sida för intern administration - ärende-centrerad vy med händelser
-// REDESIGN: Visar ärenden med grupperade händelser istället för enskilda kommentarer
+// Dedikerad sida för intern administration - TICKET-centrerad vy
+// REDESIGN: Visar individuella tickets (root-kommentarer) istället för hela ärenden
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -16,8 +16,8 @@ import {
   Archive
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCaseEvents } from '../../hooks/useCaseEvents';
-import CaseEventCard from '../../components/admin/CaseEventCard';
+import { useTicketEvents } from '../../hooks/useTicketEvents';
+import TicketCard from '../../components/admin/TicketCard';
 import { CaseContextCommunicationModal } from '../../components/communication';
 import type { CaseType } from '../../types/communication';
 
@@ -28,8 +28,8 @@ interface SelectedCase {
   caseTitle: string;
 }
 
-// Filter-flikar för händelsetyper
-type EventFilter = 'all' | 'mentions' | 'replies' | 'activity' | 'archived';
+// Filter-flikar för ticket-typer
+type TicketFilter = 'all' | 'mentions' | 'replies' | 'activity' | 'archived';
 
 export default function InternAdministration() {
   const { profile } = useAuth();
@@ -39,11 +39,11 @@ export default function InternAdministration() {
   const [selectedCase, setSelectedCase] = useState<SelectedCase | null>(null);
 
   // State för filter
-  const [activeFilter, setActiveFilter] = useState<EventFilter>('mentions');
+  const [activeFilter, setActiveFilter] = useState<TicketFilter>('mentions');
 
-  // Hämta aktiva ärenden
+  // Hämta aktiva tickets
   const {
-    cases: activeCases,
+    tickets: activeTickets,
     stats,
     loading: activeLoading,
     statsLoading,
@@ -51,22 +51,23 @@ export default function InternAdministration() {
     hasMore: activeHasMore,
     loadMore: activeLoadMore,
     refresh: activeRefresh,
-    updateStatus,
-  } = useCaseEvents({ includeArchived: false });
+    resolveTicket,
+  } = useTicketEvents({ includeArchived: false });
 
-  // Hämta arkiverade ärenden
+  // Hämta arkiverade tickets
   const {
-    cases: archivedCases,
+    tickets: archivedTickets,
     loading: archivedLoading,
     error: archivedError,
     hasMore: archivedHasMore,
     loadMore: archivedLoadMore,
     refresh: archivedRefresh,
-  } = useCaseEvents({ includeArchived: true });
+    reopenTicket,
+  } = useTicketEvents({ includeArchived: true });
 
-  // Bestäm vilka cases som ska visas baserat på filter
+  // Bestäm vilka tickets som ska visas baserat på filter
   const isArchiveView = activeFilter === 'archived';
-  const cases = isArchiveView ? archivedCases : activeCases;
+  const tickets = isArchiveView ? archivedTickets : activeTickets;
   const loading = isArchiveView ? archivedLoading : activeLoading;
   const error = isArchiveView ? archivedError : activeError;
   const hasMore = isArchiveView ? archivedHasMore : activeHasMore;
@@ -76,23 +77,23 @@ export default function InternAdministration() {
     archivedRefresh();
   };
 
-  // Hantera URL-parameter
+  // Hantera URL-parameter för att öppna specifikt ärende
   useEffect(() => {
     const caseId = searchParams.get('caseId');
     const caseType = searchParams.get('caseType') as CaseType | null;
     if (caseId && caseType) {
-      // Sök i både aktiva och arkiverade ärenden
-      const allCases = [...activeCases, ...archivedCases];
-      const foundCase = allCases.find(c => c.case_id === caseId && c.case_type === caseType);
-      if (foundCase) {
+      // Sök i både aktiva och arkiverade tickets
+      const allTickets = [...activeTickets, ...archivedTickets];
+      const foundTicket = allTickets.find(t => t.case_id === caseId && t.case_type === caseType);
+      if (foundTicket) {
         setSelectedCase({
-          caseId: foundCase.case_id,
-          caseType: foundCase.case_type,
-          caseTitle: foundCase.case_title
+          caseId: foundTicket.case_id,
+          caseType: foundTicket.case_type,
+          caseTitle: foundTicket.case_title
         });
       }
     }
-  }, [searchParams, activeCases, archivedCases]);
+  }, [searchParams, activeTickets, archivedTickets]);
 
   const getRoleName = () => {
     switch (profile?.role) {
@@ -103,74 +104,71 @@ export default function InternAdministration() {
     }
   };
 
-  // Filtrera ärenden baserat på vald flik
-  // För arkiv-vyn visas alla arkiverade ärenden utan extra filtrering
-  const filteredCases = isArchiveView ? cases : cases.filter(c => {
+  // Filtrera tickets baserat på vald flik
+  const filteredTickets = isArchiveView ? tickets : tickets.filter(t => {
     switch (activeFilter) {
       case 'mentions':
         // Frågor riktade till mig som jag inte svarat på
-        return c.unanswered_mentions > 0;
+        return t.unanswered_mentions > 0;
       case 'replies':
         // Frågor JAG ställt där inte alla har svarat ännu
-        // Visas tills ALLA har svarat (inte bara någon)
-        return c.outgoing_questions_total > 0 &&
-               c.outgoing_questions_answered < c.outgoing_questions_total;
+        return t.outgoing_questions_total > 0 &&
+               t.outgoing_questions_answered < t.outgoing_questions_total;
       case 'activity':
-        return c.new_comments > 0;
+        return t.unread_count > 0;
       default:
         return true;
     }
   });
 
-  // Statistik-kort med tydliga namn och tooltips
-  // Ordning: Väntar på ditt svar → Väntar på andras svar → Ny aktivitet → Alla ärenden → Avslutade
+  // Statistik-kort med tooltips
   const filterTabs = [
     {
-      id: 'mentions' as EventFilter,
+      id: 'mentions' as TicketFilter,
       label: 'Väntar på ditt svar',
       shortLabel: 'Att göra',
-      tooltip: 'Någon har @nämnt dig och väntar på ditt svar. Du behöver agera!',
+      tooltip: 'Någon har @nämnt dig i en ticket och väntar på ditt svar.',
       count: stats?.unansweredMentions || 0,
       icon: AtSign,
       color: 'text-red-400',
       activeColor: 'bg-red-600 text-white'
     },
     {
-      id: 'replies' as EventFilter,
+      id: 'replies' as TicketFilter,
       label: 'Väntar på andras svar',
       shortLabel: 'Bevaka',
-      tooltip: 'Du har @nämnt någon annan och väntar på deras svar. Inget du behöver göra just nu.',
+      tooltip: 'Du har @nämnt någon annan och väntar på deras svar.',
       count: stats?.waitingForReplies || 0,
       icon: MessageCircle,
       color: 'text-amber-400',
       activeColor: 'bg-amber-600 text-white'
     },
     {
-      id: 'activity' as EventFilter,
+      id: 'activity' as TicketFilter,
       label: 'Ny aktivitet',
       shortLabel: 'Nytt',
-      tooltip: 'Ärenden med nya kommentarer som du kanske vill kolla på',
+      tooltip: 'Tickets med olästa kommentarer',
       count: stats?.newActivity || 0,
       icon: Bell,
       color: 'text-blue-400',
       activeColor: 'bg-blue-600 text-white'
     },
     {
-      id: 'all' as EventFilter,
-      label: 'Alla ärenden',
+      id: 'all' as TicketFilter,
+      label: 'Alla tickets',
       shortLabel: 'Alla',
-      tooltip: 'Visar alla ärenden där du är involverad, antingen genom att du skrivit eller blivit omnämnd',
-      count: stats?.totalCases || 0,
+      tooltip: 'Alla tickets där du är involverad',
+      count: stats?.openTickets || 0,
       icon: Inbox,
       color: 'text-slate-400',
       activeColor: 'bg-slate-600 text-white'
     },
     {
-      id: 'archived' as EventFilter,
-      label: 'Avslutade ärenden',
+      id: 'archived' as TicketFilter,
+      label: 'Avslutade',
       shortLabel: 'Klart',
-      tooltip: 'Avslutade och lösta ärenden. Bra jobbat!',
-      count: stats?.archivedCases || 0,
+      tooltip: 'Lösta tickets. Bra jobbat!',
+      count: stats?.resolvedTickets || 0,
       icon: Archive,
       color: 'text-green-400',
       activeColor: 'bg-green-600 text-white'
@@ -179,14 +177,13 @@ export default function InternAdministration() {
 
   // Öppna kommunikationspanel för ett ärende
   const handleOpenCase = (caseId: string, caseType: 'private' | 'business' | 'contract') => {
-    // Sök i både aktiva och arkiverade ärenden
-    const allCases = [...activeCases, ...archivedCases];
-    const foundCase = allCases.find(c => c.case_id === caseId && c.case_type === caseType);
-    if (foundCase) {
+    const allTickets = [...activeTickets, ...archivedTickets];
+    const foundTicket = allTickets.find(t => t.case_id === caseId && t.case_type === caseType);
+    if (foundTicket) {
       setSelectedCase({
-        caseId: foundCase.case_id,
-        caseType: foundCase.case_type,
-        caseTitle: foundCase.case_title
+        caseId: foundTicket.case_id,
+        caseType: foundTicket.case_type,
+        caseTitle: foundTicket.case_title
       });
     }
   };
@@ -196,20 +193,17 @@ export default function InternAdministration() {
     setSelectedCase(null);
   };
 
-  // Hantera statusändring (markera löst)
-  const handleMarkResolved = async (caseId: string, caseType: 'private' | 'business' | 'contract') => {
-    // Sök i både aktiva och arkiverade ärenden
-    const allCases = [...activeCases, ...archivedCases];
-    const foundCase = allCases.find(c => c.case_id === caseId && c.case_type === caseType);
-    if (foundCase && foundCase.events.length > 0) {
-      // Uppdatera senaste kommentarens status till resolved
-      const latestCommentId = foundCase.events[0].source_comment_id;
-      if (latestCommentId) {
-        await updateStatus(caseId, caseType as CaseType, latestCommentId, 'resolved');
-        // Refresh för att uppdatera listan
-        refresh();
-      }
-    }
+  // Markera ticket som löst
+  const handleResolveTicket = async (ticketId: string) => {
+    await resolveTicket(ticketId);
+    // Refresh för att flytta ticket till arkiv
+    refresh();
+  };
+
+  // Återöppna ticket
+  const handleReopenTicket = async (ticketId: string) => {
+    await reopenTicket(ticketId);
+    refresh();
   };
 
   return (
@@ -225,7 +219,7 @@ export default function InternAdministration() {
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-white">Intern Administration</h1>
                 <p className="text-slate-400 text-sm">
-                  Hantera och följ upp ärenden med @mentions
+                  Hantera och följ upp tickets med @mentions
                 </p>
               </div>
             </div>
@@ -248,7 +242,7 @@ export default function InternAdministration() {
           </div>
         </div>
 
-        {/* Filter-tabs med tooltips */}
+        {/* Filter-tabs */}
         <div className="flex flex-wrap gap-2 mb-6 p-1 bg-slate-800/50 rounded-lg">
           {filterTabs.map((tab) => {
             const Icon = tab.icon;
@@ -279,7 +273,6 @@ export default function InternAdministration() {
                               opacity-0 invisible group-hover/tab:opacity-100 group-hover/tab:visible
                               transition-all duration-200 z-50 pointer-events-none">
                   {tab.tooltip}
-                  {/* Tooltip arrow */}
                   <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0
                                 border-l-[6px] border-l-transparent
                                 border-r-[6px] border-r-transparent
@@ -291,17 +284,17 @@ export default function InternAdministration() {
         </div>
 
         {/* Resultat-info */}
-        {!loading && filteredCases.length > 0 && (
+        {!loading && filteredTickets.length > 0 && (
           <div className="text-xs text-slate-500 mb-3">
-            Visar {filteredCases.length} ärende{filteredCases.length !== 1 ? 'n' : ''}
-            {activeFilter !== 'all' && (
+            Visar {filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}
+            {activeFilter !== 'all' && activeFilter !== 'archived' && (
               <span> med {filterTabs.find(t => t.id === activeFilter)?.label.toLowerCase()}</span>
             )}
           </div>
         )}
 
         {/* Laddar */}
-        {loading && cases.length === 0 && (
+        {loading && tickets.length === 0 && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
           </div>
@@ -314,15 +307,16 @@ export default function InternAdministration() {
           </div>
         )}
 
-        {/* Ärende-lista */}
-        {!loading && filteredCases.length > 0 && (
+        {/* Ticket-lista */}
+        {!loading && filteredTickets.length > 0 && (
           <div className="space-y-3">
-            {filteredCases.map((caseData) => (
-              <CaseEventCard
-                key={`${caseData.case_id}:${caseData.case_type}`}
-                caseData={caseData}
+            {filteredTickets.map((ticket) => (
+              <TicketCard
+                key={ticket.id}
+                ticket={ticket}
                 onOpenCase={handleOpenCase}
-                onMarkResolved={handleMarkResolved}
+                onResolveTicket={handleResolveTicket}
+                onReopenTicket={handleReopenTicket}
                 isArchiveView={isArchiveView}
               />
             ))}
@@ -337,45 +331,45 @@ export default function InternAdministration() {
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700
                        rounded-lg text-slate-300 hover:text-white transition-colors"
             >
-              Ladda fler ärenden
+              Ladda fler tickets
             </button>
           </div>
         )}
 
         {/* Empty states */}
-        {!loading && filteredCases.length === 0 && !isArchiveView && activeCases.length > 0 && (
+        {!loading && filteredTickets.length === 0 && !isArchiveView && activeTickets.length > 0 && (
           <div className="text-center py-12">
             <CheckCircle2 className="w-16 h-16 text-green-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">
-              Inga ärenden i denna kategori
+              Inga tickets i denna kategori
             </h3>
             <p className="text-slate-400">
-              Byt flik för att se andra ärenden.
+              Byt flik för att se andra tickets.
             </p>
           </div>
         )}
 
-        {!loading && cases.length === 0 && !isArchiveView && (
+        {!loading && tickets.length === 0 && !isArchiveView && (
           <div className="text-center py-12">
             <Inbox className="w-16 h-16 text-slate-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">
-              Inga aktiva ärenden
+              Inga aktiva tickets
             </h3>
             <p className="text-slate-400">
-              Du har inga ärenden med aktivitet just nu.
+              Du har inga tickets med aktivitet just nu.
             </p>
           </div>
         )}
 
         {/* Empty state för arkiv */}
-        {!loading && isArchiveView && archivedCases.length === 0 && (
+        {!loading && isArchiveView && archivedTickets.length === 0 && (
           <div className="text-center py-12">
             <Archive className="w-16 h-16 text-slate-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">
               Arkivet är tomt
             </h3>
             <p className="text-slate-400">
-              Du har inga avklarade ärenden ännu. Klicka "Markera löst" på ett ärende för att arkivera det.
+              Du har inga avklarade tickets ännu. Klicka "Markera löst" på en ticket för att arkivera den.
             </p>
           </div>
         )}
