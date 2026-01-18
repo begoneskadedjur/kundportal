@@ -185,11 +185,22 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
   // Använder debounce för att undvika för många uppdateringar vid snabba ändringar
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Debounced refresh-funktion
+  const debouncedRefresh = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      refresh();
+    }, 500);
+  }, [refresh]);
+
   useEffect(() => {
     if (!currentUserId || !autoFetch) return;
 
     const channel = supabase
       .channel('intern-admin-realtime')
+      // Lyssna på kommentarer
       .on(
         'postgres_changes',
         {
@@ -197,17 +208,18 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
           schema: 'public',
           table: 'case_comments'
         },
-        (payload) => {
-          // Debounce: Vänta 500ms innan refresh för att samla ihop flera ändringar
-          if (debounceTimerRef.current) {
-            clearTimeout(debounceTimerRef.current);
-          }
-
-          debounceTimerRef.current = setTimeout(() => {
-            // Refresh både ärenden och statistik
-            refresh();
-          }, 500);
-        }
+        () => debouncedRefresh()
+      )
+      // Lyssna på läskvitton (för att uppdatera "Ny aktivitet" när kommentarer läses)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'comment_read_receipts',
+          filter: `user_id=eq.${currentUserId}`  // Endast mina egna läskvitton
+        },
+        () => debouncedRefresh()
       )
       .subscribe();
 
@@ -218,7 +230,7 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
       }
       supabase.removeChannel(channel);
     };
-  }, [currentUserId, autoFetch, refresh]);
+  }, [currentUserId, autoFetch, debouncedRefresh]);
 
   const hasMore = cases.length < totalCount;
 

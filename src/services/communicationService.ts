@@ -1288,6 +1288,14 @@ export async function getCasesWithEvents(
     return { cases: [], totalCount: 0 };
   }
 
+  // Hämta alla läskvitton för användaren (för att avgöra vad som är "nytt")
+  const { data: readReceipts } = await supabase
+    .from('comment_read_receipts')
+    .select('comment_id')
+    .eq('user_id', userId);
+
+  const readCommentIds = new Set(readReceipts?.map(r => r.comment_id) || []);
+
   // Filtrera till kommentarer där användaren är involverad
   const userComments = allComments.filter(comment => {
     const isMentioned = comment.mentioned_user_ids?.includes(userId);
@@ -1422,21 +1430,16 @@ export async function getCasesWithEvents(
       c => c.case_id === caseId && c.case_type === caseType
     ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    // NY LOGIK: Nya kommentarer = kommentarer som är nyare än min senaste kommentar i ärendet
-    // Detta fångar upp ALLA nya svar, inklusive svar på mina frågor
-    const myLatestCommentInCase = allCommentsInCase
-      .filter(c => c.author_id === userId)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-
+    // NY LOGIK: Nya kommentarer = kommentarer som jag inte har läst ännu
+    // Använder comment_read_receipts för att avgöra vad som är läst
     const newCommentsCount = allCommentsInCase.filter(c => {
-      // Inte skriven av mig
+      // Inte skriven av mig (egna kommentarer är aldrig "nya")
       if (c.author_id === userId) return false;
 
-      // Om jag inte har skrivit någon kommentar, räkna alla andras kommentarer som "nya"
-      if (!myLatestCommentInCase) return true;
+      // Inte redan läst av mig
+      if (readCommentIds.has(c.id)) return false;
 
-      // Annars räkna kommentarer som är nyare än min senaste
-      return new Date(c.created_at) > new Date(myLatestCommentInCase.created_at);
+      return true;
     }).length;
 
     // Senaste kommentarens status (från alla kommentarer i ärendet)
