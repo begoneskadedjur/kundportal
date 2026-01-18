@@ -47,8 +47,10 @@ import {
   MessageSquare
 } from 'lucide-react'
 import { openInMapsApp, formatCoordinates } from '../../utils/equipmentMapUtils'
+import { IndoorEquipmentView } from '../../components/shared/indoor'
 
 type ViewMode = 'map' | 'list'
+type EquipmentMode = 'outdoor' | 'indoor'
 
 interface Customer {
   id: string
@@ -66,6 +68,7 @@ export default function TechnicianEquipment() {
   const [expandedEquipmentId, setExpandedEquipmentId] = useState<string | null>(null)
 
   // State
+  const [equipmentMode, setEquipmentMode] = useState<EquipmentMode>('outdoor') // Utomhus / Inomhus
   const [viewMode, setViewMode] = useState<ViewMode>('map')
   const [allEquipment, setAllEquipment] = useState<EquipmentPlacementWithRelations[]>([]) // Alla teknikerns placeringar
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('') // '' = visa alla
@@ -481,8 +484,36 @@ export default function TechnicianEquipment() {
           </div>
         </div>
 
-        {/* Horisontell chip-filter för kunder */}
-        {customersFromEquipment.length > 0 && (
+        {/* Utomhus / Inomhus toggle */}
+        <div className="border-t border-slate-800/50 px-4 py-3">
+          <div className="flex bg-slate-800 rounded-lg p-1 max-w-xs">
+            <button
+              onClick={() => setEquipmentMode('outdoor')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                equipmentMode === 'outdoor'
+                  ? 'bg-emerald-500 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+              Utomhus
+            </button>
+            <button
+              onClick={() => setEquipmentMode('indoor')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                equipmentMode === 'indoor'
+                  ? 'bg-emerald-500 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Building className="w-4 h-4" />
+              Inomhus
+            </button>
+          </div>
+        </div>
+
+        {/* Horisontell chip-filter för kunder - endast för utomhus */}
+        {equipmentMode === 'outdoor' && customersFromEquipment.length > 0 && (
           <div className="border-t border-slate-800/50">
             <div
               ref={chipContainerRef}
@@ -522,18 +553,26 @@ export default function TechnicianEquipment() {
 
       {/* Huvudinnehåll */}
       <div className="max-w-7xl mx-auto">
-        {/* Laddar */}
-        {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="text-center">
-              <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mx-auto mb-3" />
-              <p className="text-slate-400">Laddar utrustning...</p>
-            </div>
-          </div>
+        {/* Inomhus-vy */}
+        {equipmentMode === 'indoor' ? (
+          <IndoorEquipmentView
+            customerId={selectedCustomerId || null}
+            customerName={selectedCustomerName || undefined}
+          />
         ) : (
           <>
-            {/* Karta - visas alltid som primär vy */}
-            {viewMode === 'map' && (
+            {/* Laddar */}
+            {loading ? (
+              <div className="flex items-center justify-center py-24">
+                <div className="text-center">
+                  <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mx-auto mb-3" />
+                  <p className="text-slate-400">Laddar utrustning...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Karta - visas alltid som primär vy */}
+                {viewMode === 'map' && (
               <div className="md:p-4">
                 <div className="md:rounded-xl md:border md:border-slate-700/50 overflow-hidden">
                   <EquipmentMap
@@ -1379,20 +1418,24 @@ export default function TechnicianEquipment() {
             </motion.div>
           )}
         </AnimatePresence>
+          </>
+        )}
       </div>
 
-      {/* FAB-knapp för ny placering - fixerad nere till höger */}
-      <motion.button
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={handleFabClick}
-        className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full bg-emerald-500 shadow-xl shadow-emerald-500/30 flex items-center justify-center hover:bg-emerald-600 transition-colors"
-        style={{ touchAction: 'none' }}
-      >
-        <Plus className="w-8 h-8 text-white" />
-      </motion.button>
+      {/* FAB-knapp för ny placering - endast utomhus-vy */}
+      {equipmentMode === 'outdoor' && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleFabClick}
+          className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full bg-emerald-500 shadow-xl shadow-emerald-500/30 flex items-center justify-center hover:bg-emerald-600 transition-colors"
+          style={{ touchAction: 'none' }}
+        >
+          <Plus className="w-8 h-8 text-white" />
+        </motion.button>
+      )}
     </div>
   )
 }
