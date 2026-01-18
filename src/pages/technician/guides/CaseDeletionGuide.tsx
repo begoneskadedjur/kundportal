@@ -1094,10 +1094,10 @@ const guideSteps: GuideStep[] = [
             Huvudregeln:
           </h4>
           <p className="text-xl text-white mb-2">
-            Osaker? <span className="text-amber-300 font-bold">SLASKA!</span>
+            Osäker? <span className="text-amber-300 font-bold">SLASKA!</span>
           </p>
           <p className="text-slate-400">
-            Det ar alltid battre att slaska an att radera.
+            Det är alltid bättre att slaska än att radera.
             All data bevaras och kan behövas senare.
           </p>
         </div>

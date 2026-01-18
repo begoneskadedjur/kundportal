@@ -2,7 +2,6 @@
 // Centraliserad metadata för alla guider i BeGone Lärosäte
 
 import {
-  MessageSquareText,
   Ticket,
   Plus,
   Trash2,
@@ -43,18 +42,6 @@ export interface Guide {
 // Alla tillgängliga guider
 export const guides: Guide[] = [
   {
-    id: 'case-communication',
-    title: 'Ärendekommunikation',
-    description: 'Lär dig chatta effektivt med kollegor i ärenden',
-    category: 'communication',
-    icon: MessageSquareText,
-    iconColor: 'text-cyan-400',
-    iconBgColor: 'bg-cyan-500/20',
-    path: '/larosate/guides/case-communication',
-    tags: ['chatt', 'meddelanden', 'mentions', 'kommunikation', 'bilagor'],
-    isNew: true
-  },
-  {
     id: 'ticket-system',
     title: 'Ticket-systemet',
     description: 'Förstå de 6 flikarna och hur du hanterar tickets effektivt',
@@ -68,7 +55,7 @@ export const guides: Guide[] = [
   },
   {
     id: 'follow-up-case',
-    title: 'Skapa Följeärenden',
+    title: 'Följeärenden',
     description: 'Hur du skapar nya ärenden direkt i fält när du hittar extra problem',
     category: 'cases',
     icon: Plus,
@@ -91,7 +78,7 @@ export const guides: Guide[] = [
   },
   {
     id: 'equipment-placement',
-    title: 'Utrustningsplacering',
+    title: 'Placera stationer utomhus',
     description: 'Lär dig registrera fällor och stationer med GPS-position och foto',
     category: 'equipment',
     icon: MapPin,

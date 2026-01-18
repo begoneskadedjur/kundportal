@@ -60,9 +60,6 @@ import TechnicianSchedule from './pages/technician/TechnicianSchedule';
 import TechnicianEquipment from './pages/technician/TechnicianEquipment';
 import EquipmentPlacementGuide from './pages/technician/guides/EquipmentPlacementGuide';
 import FollowUpCaseGuide from './pages/technician/guides/FollowUpCaseGuide';
-import CaseCommunicationGuide from './pages/technician/guides/CaseCommunicationGuide';
-// Note: CommunicationSystemGuide has been replaced by CaseCommunicationGuide
-// The old file is kept for reference but no longer imported
 import CaseDeletionGuide from './pages/technician/guides/CaseDeletionGuide';
 import TicketSystemGuide from './pages/technician/guides/TicketSystemGuide';
 
@@ -488,23 +485,6 @@ function App() {
               }
             />
             <Route
-              path="/technician/guides/case-communication"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <CaseCommunicationGuide />
-                </ProtectedRoute>
-              }
-            />
-            {/* Legacy redirect */}
-            <Route
-              path="/technician/guides/communication-system"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <CaseCommunicationGuide />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/technician/guides/case-deletion"
               element={
                 <ProtectedRoute requiredRole="technician">
@@ -513,41 +493,6 @@ function App() {
               }
             />
 
-            {/* Communication guide for all internal roles */}
-            <Route
-              path="/admin/guides/case-communication"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <CaseCommunicationGuide />
-                </ProtectedRoute>
-              }
-            />
-            {/* Legacy redirect */}
-            <Route
-              path="/admin/guides/communication-system"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <CaseCommunicationGuide />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/koordinator/guides/case-communication"
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <CaseCommunicationGuide />
-                </ProtectedRoute>
-              }
-            />
-            {/* Legacy redirect */}
-            <Route
-              path="/koordinator/guides/communication-system"
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <CaseCommunicationGuide />
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="/koordinator/guides/case-deletion"
               element={
@@ -611,23 +556,6 @@ function App() {
               }
             />
             {/* Lärosäte guide routes - alla guider nås via /larosate/guides/... */}
-            <Route
-              path="/larosate/guides/case-communication"
-              element={
-                <ProtectedRoute>
-                  <CaseCommunicationGuide />
-                </ProtectedRoute>
-              }
-            />
-            {/* Legacy redirect for old communication-system path */}
-            <Route
-              path="/larosate/guides/communication-system"
-              element={
-                <ProtectedRoute>
-                  <CaseCommunicationGuide />
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="/larosate/guides/ticket-system"
               element={

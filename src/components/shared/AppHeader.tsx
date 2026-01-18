@@ -31,21 +31,21 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Schema', path: '/koordinator/schema', icon: Calendar },
     { label: 'Sök ärenden', path: '/koordinator/sok-arenden', icon: Search },
     { label: 'Tickets', path: '/admin/tickets', icon: MessageSquareText },
-    { label: 'Lärosäte', path: '/larosate', icon: GraduationCap },
+    { label: 'Lär dig systemet', path: '/larosate', icon: GraduationCap },
   ],
   koordinator: [
     { label: 'Dashboard', path: '/koordinator/dashboard', icon: LayoutDashboard },
     { label: 'Schema', path: '/koordinator/schema', icon: Calendar },
     { label: 'Sök ärenden', path: '/koordinator/sok-arenden', icon: Search },
     { label: 'Tickets', path: '/koordinator/tickets', icon: MessageSquareText },
-    { label: 'Lärosäte', path: '/larosate', icon: GraduationCap },
+    { label: 'Lär dig systemet', path: '/larosate', icon: GraduationCap },
   ],
   technician: [
     { label: 'Dashboard', path: '/technician/dashboard', icon: LayoutDashboard },
     { label: 'Schema', path: '/technician/schedule', icon: Calendar },
     { label: 'Mina ärenden', path: '/technician/cases', icon: Search },
     { label: 'Tickets', path: '/technician/tickets', icon: MessageSquareText },
-    { label: 'Lärosäte', path: '/larosate', icon: GraduationCap },
+    { label: 'Lär dig systemet', path: '/larosate', icon: GraduationCap },
   ],
 };
 
