@@ -23,7 +23,7 @@ import VisualTimeline from '../../components/shared/VisualTimeline'
 import RecentCasesList from '../../components/technician/RecentCasesList'
 import MonthlyOverviewList from '../../components/technician/MonthlyOverviewList'
 import MonthlyCommissionModal from '../../components/technician/MonthlyCommissionModal'
-import TechnicianHelpSection from '../../components/technician/TechnicianHelpSection'
+// TechnicianHelpSection borttagen - nu finns gemensamt Lärosäte i huvudmenyn
 // NotificationCenter borttagen - nu finns global header med notifikationer
 
 const formatAddress = (address: any): string => {
@@ -728,8 +728,7 @@ export default function TechnicianDashboard() {
           </div>
         </Card>
 
-        {/* Hjälp och Guider-sektion */}
-        <TechnicianHelpSection />
+        {/* Hjälp och Guider finns nu i Lärosäte (huvudmenyn) */}
 
         <EditCaseModal 
           isOpen={isEditModalOpen} 

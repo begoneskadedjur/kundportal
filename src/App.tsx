@@ -91,6 +91,9 @@ import { AppLayout } from './components/shared/AppLayout';
 // Tickets (shared page for internal communication)
 import InternAdministration from './pages/shared/InternAdministration';
 
+// Lärosäte (shared learning center for all internal roles)
+import Larosate from './pages/shared/Larosate';
+
 // Global styles
 import './styles/globals.css';
 
@@ -560,13 +563,64 @@ function App() {
             />
 
             {/* Shared routes - accessible by all authenticated users */}
-            <Route 
-              path="/profile" 
+            <Route
+              path="/profile"
               element={
                 <ProtectedRoute>
                   <UserProfile />
                 </ProtectedRoute>
-              } 
+              }
+            />
+
+            {/* Lärosäte - Internt kunskapscenter för alla interna roller */}
+            <Route
+              path="/larosate"
+              element={
+                <ProtectedRoute>
+                  <Larosate />
+                </ProtectedRoute>
+              }
+            />
+            {/* Lärosäte guide routes - alla guider nås via /larosate/guides/... */}
+            <Route
+              path="/larosate/guides/communication-system"
+              element={
+                <ProtectedRoute>
+                  <CommunicationSystemGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/larosate/guides/ticket-system"
+              element={
+                <ProtectedRoute>
+                  <TicketSystemGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/larosate/guides/follow-up-case"
+              element={
+                <ProtectedRoute>
+                  <FollowUpCaseGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/larosate/guides/case-deletion"
+              element={
+                <ProtectedRoute>
+                  <CaseDeletionGuide />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/larosate/guides/equipment-placement"
+              element={
+                <ProtectedRoute>
+                  <EquipmentPlacementGuide />
+                </ProtectedRoute>
+              }
             />
 
             {/* Customer routes */}

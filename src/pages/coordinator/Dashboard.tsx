@@ -13,7 +13,7 @@ import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch
 import { PageHeader } from '../../components/shared';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 import EventLogCard from '../../components/shared/EventLogCard';
-import CoordinatorHelpSection from '../../components/coordinator/CoordinatorHelpSection';
+// CoordinatorHelpSection borttagen - nu finns gemensamt Lärosäte i huvudmenyn
 // NotificationCenter borttagen - nu finns global header med notifikationer
 
 export default function CoordinatorDashboard() {
@@ -371,10 +371,7 @@ export default function CoordinatorDashboard() {
           </div>
         </section>
 
-        {/* --- Guider och Hjälp --- */}
-        <section className="mt-16">
-          <CoordinatorHelpSection />
-        </section>
+        {/* Guider och Hjälp finns nu i Lärosäte (huvudmenyn) */}
       </div>
 
       {/* KPI Case List Modal */}
