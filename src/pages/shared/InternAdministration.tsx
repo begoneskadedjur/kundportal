@@ -188,9 +188,12 @@ export default function InternAdministration() {
     }
   };
 
-  // Stäng kommunikationspanel
+  // Stäng kommunikationspanel och uppdatera listan
+  // Refresh triggas för att fånga upp eventuella ändringar (nya svar, statusändringar etc.)
   const handleCloseCase = () => {
     setSelectedCase(null);
+    // Uppdatera ticket-listan för att reflektera ändringar gjorda i modalen
+    refresh();
   };
 
   // Markera ticket som löst
