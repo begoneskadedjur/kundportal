@@ -162,14 +162,15 @@ const MockTicketCard = ({
 const MockFilterTabs = ({
   activeTab,
   onSelect,
-  counts = { mentions: 3, replies: 2, activity: 5, all: 15, archived: 8 }
+  counts = { mentions: 3, replies_to_me: 1, replies: 2, activity: 5, all: 15, archived: 8 }
 }: {
   activeTab: string
   onSelect: (tab: string) => void
-  counts?: { mentions: number; replies: number; activity: number; all: number; archived: number }
+  counts?: { mentions: number; replies_to_me: number; replies: number; activity: number; all: number; archived: number }
 }) => {
   const tabs = [
     { id: 'mentions', label: 'Vantar pa ditt svar', shortLabel: 'Att gora', count: counts.mentions, color: 'red', icon: AtSign },
+    { id: 'replies_to_me', label: 'Svar till dig', shortLabel: 'Svar', count: counts.replies_to_me, color: 'orange', icon: CornerDownRight },
     { id: 'replies', label: 'Vantar pa andras svar', shortLabel: 'Bevaka', count: counts.replies, color: 'amber', icon: MessageCircle },
     { id: 'activity', label: 'Ny aktivitet', shortLabel: 'Nytt', count: counts.activity, color: 'blue', icon: Bell },
     { id: 'all', label: 'Alla tickets', shortLabel: 'Alla', count: counts.all, color: 'slate', icon: Inbox },
@@ -180,6 +181,7 @@ const MockFilterTabs = ({
     if (isActive) {
       switch (color) {
         case 'red': return 'bg-red-600 text-white ring-2 ring-red-500/30'
+        case 'orange': return 'bg-orange-600 text-white ring-2 ring-orange-500/30'
         case 'amber': return 'bg-amber-600 text-white ring-2 ring-amber-500/30'
         case 'blue': return 'bg-blue-600 text-white ring-2 ring-blue-500/30'
         case 'green': return 'bg-green-600 text-white ring-2 ring-green-500/30'
@@ -441,7 +443,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     id: 2,
-    title: 'De 5 flikarna',
+    title: 'De 6 flikarna',
     subtitle: 'Oversikt i Tickets',
     icon: Filter,
     iconColor: 'text-purple-400',
@@ -457,6 +459,15 @@ const guideSteps: GuideStep[] = [
               '"@Tekniker" - Kan du kolla nar du ar dar?',
               '"@Admin" - Vi behover godkannande for offerten',
               '"@Koordinator" - Kunden vill boka om'
+            ]
+          },
+          replies_to_me: {
+            title: 'Svar till dig',
+            description: 'Nagon har svarat pa din kommentar, aven om de inte @namnde dig. Bra att kolla for att halla koll pa konversationer du deltar i.',
+            examples: [
+              'Du skrev en kommentar → Erik svarade pa den',
+              'Du stallde en fraga → Anna svarade med mer info',
+              'Du la till en notering → Kollegan foljde upp'
             ]
           },
           replies: {
@@ -505,10 +516,10 @@ const guideSteps: GuideStep[] = [
             <div className="bg-purple-500/10 border-2 border-purple-500/30 rounded-2xl p-6">
               <h4 className="text-xl font-semibold text-purple-300 mb-3 flex items-center gap-3">
                 <Filter className="w-6 h-6" />
-                Fem flikar - fem syften:
+                Sex flikar - sex syften:
               </h4>
               <p className="text-lg text-slate-300">
-                I <strong className="text-white">Tickets</strong> finns fem flikar som hjalper dig att prioritera och organisera ditt arbete.
+                I <strong className="text-white">Tickets</strong> finns sex flikar som hjalper dig att prioritera och organisera ditt arbete.
               </p>
             </div>
 
@@ -550,11 +561,16 @@ const guideSteps: GuideStep[] = [
                 <Sparkles className="w-5 h-5 text-amber-400" />
                 Fargkodernas betydelse:
               </h5>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                   <div className="w-4 h-4 rounded-full bg-red-500" />
                   <span className="text-red-300 font-medium">Rod</span>
                   <span className="text-slate-400 text-sm">= Vantar pa DIG</span>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                  <div className="w-4 h-4 rounded-full bg-orange-500" />
+                  <span className="text-orange-300 font-medium">Orange</span>
+                  <span className="text-slate-400 text-sm">= Svar till dig</span>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   <div className="w-4 h-4 rounded-full bg-amber-500" />
