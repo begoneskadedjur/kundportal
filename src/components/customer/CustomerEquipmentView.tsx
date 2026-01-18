@@ -17,9 +17,12 @@ import {
   Filter,
   Map,
   List,
-  Sparkles
+  Sparkles,
+  Home,
+  Building2
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
+import { FloorPlanService } from '../../services/floorPlanService'
 import {
   EquipmentPlacementWithRelations,
   EquipmentType,
@@ -31,6 +34,7 @@ import {
 } from '../../types/database'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { EquipmentDetailSheet } from '../shared/equipment/EquipmentDetailSheet'
+import { CustomerIndoorEquipmentView } from './CustomerIndoorEquipmentView'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import { generateEquipmentPdf } from '../../utils/equipmentPdfGenerator'
 import toast from 'react-hot-toast'
@@ -70,6 +74,10 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentPlacementWithRelations | null>(null)
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
 
+  // Equipment type toggle (outdoor/indoor)
+  const [equipmentType, setEquipmentType] = useState<'outdoor' | 'indoor'>('outdoor')
+  const [indoorStationCount, setIndoorStationCount] = useState(0)
+
   // Hamta utrustning
   const fetchEquipment = useCallback(async () => {
     try {
@@ -88,6 +96,20 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   useEffect(() => {
     fetchEquipment()
   }, [fetchEquipment])
+
+  // Hämta antal inomhusstationer för kombinerad statistik
+  useEffect(() => {
+    const fetchIndoorCount = async () => {
+      try {
+        const floorPlans = await FloorPlanService.getFloorPlansByCustomer(customerId)
+        const totalIndoor = floorPlans.reduce((sum, fp) => sum + (fp.station_count || 0), 0)
+        setIndoorStationCount(totalIndoor)
+      } catch (error) {
+        console.error('Kunde inte hämta inomhusstationer:', error)
+      }
+    }
+    fetchIndoorCount()
+  }, [customerId])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -237,23 +259,29 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
               </div>
             </div>
 
-            {/* Right side - Stats */}
+            {/* Right side - Stats (kombinerad utomhus + inomhus) */}
             <div className="flex flex-wrap gap-4">
-              {/* Total equipment */}
+              {/* Total equipment (utomhus + inomhus) */}
               <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-5 min-w-[140px]">
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="w-4 h-4 text-emerald-400" />
                   <span className="text-xs text-slate-400 uppercase tracking-wide">Totalt</span>
                 </div>
-                <p className="text-3xl font-bold text-white">{stats.total}</p>
-                <p className="text-sm text-slate-400">enheter</p>
+                <p className="text-3xl font-bold text-white">{stats.total + indoorStationCount}</p>
+                <p className="text-sm text-slate-400">
+                  {stats.total > 0 && indoorStationCount > 0 ? (
+                    <span>{stats.total} ute + {indoorStationCount} inne</span>
+                  ) : (
+                    <span>enheter</span>
+                  )}
+                </p>
               </div>
 
               {/* Active equipment */}
               <div className="bg-emerald-500/10 backdrop-blur rounded-2xl border border-emerald-500/20 p-5 min-w-[140px]">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-emerald-400 uppercase tracking-wide">Aktiva</span>
+                  <span className="text-xs text-emerald-400 uppercase tracking-wide">Aktiva (ute)</span>
                 </div>
                 <p className="text-3xl font-bold text-emerald-400">{stats.active}</p>
                 <p className="text-sm text-emerald-400/70">i drift</p>
@@ -277,36 +305,82 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {/* Controls Bar */}
+        {/* Equipment Type Toggle (Utomhus / Inomhus) */}
         <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-            {/* View Toggle */}
-            <div className="flex items-center gap-2 bg-slate-900/50 rounded-xl p-1">
-              <button
-                onClick={() => setViewMode('map')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                  viewMode === 'map'
-                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-              >
-                <Map className="w-4 h-4" />
-                Karta
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                  viewMode === 'list'
-                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                Lista
-              </button>
-            </div>
+          <div className="flex items-center gap-2 bg-slate-900/50 rounded-xl p-1 w-fit">
+            <button
+              onClick={() => setEquipmentType('outdoor')}
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
+                equipmentType === 'outdoor'
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+              Utomhus
+              <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
+                equipmentType === 'outdoor' ? 'bg-emerald-600' : 'bg-slate-700'
+              }`}>
+                {stats.total}
+              </span>
+            </button>
+            <button
+              onClick={() => setEquipmentType('indoor')}
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
+                equipmentType === 'indoor'
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+              }`}
+            >
+              <Home className="w-4 h-4" />
+              Inomhus
+              <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
+                equipmentType === 'indoor' ? 'bg-emerald-600' : 'bg-slate-700'
+              }`}>
+                {indoorStationCount}
+              </span>
+            </button>
+          </div>
+        </div>
 
-            {/* Filters */}
+        {/* Indoor Equipment View */}
+        {equipmentType === 'indoor' ? (
+          <CustomerIndoorEquipmentView
+            customerId={customerId}
+            companyName={companyName}
+          />
+        ) : (
+          <>
+            {/* Controls Bar (för utomhus) */}
+            <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-4 mb-6">
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                {/* View Toggle */}
+                <div className="flex items-center gap-2 bg-slate-900/50 rounded-xl p-1">
+                  <button
+                    onClick={() => setViewMode('map')}
+                    className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
+                      viewMode === 'map'
+                        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                    }`}
+                  >
+                    <Map className="w-4 h-4" />
+                    Karta
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
+                      viewMode === 'list'
+                        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                    }`}
+                  >
+                    <List className="w-4 h-4" />
+                    Lista
+                  </button>
+                </div>
+
+                {/* Filters */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-slate-400" />
@@ -573,6 +647,8 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                 </AnimatePresence>
               </div>
             )}
+          </>
+        )}
           </>
         )}
       </div>
