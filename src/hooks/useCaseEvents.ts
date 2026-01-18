@@ -199,7 +199,7 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
     if (!currentUserId || !autoFetch) return;
 
     const channel = supabase
-      .channel('intern-admin-realtime')
+      .channel('tickets-realtime')
       // Lyssna på kommentarer
       .on(
         'postgres_changes',

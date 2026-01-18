@@ -88,7 +88,7 @@ import AdminOrKoordinatorRoute from './components/shared/AdminOrKoordinatorRoute
 import MultisiteProtectedRoute from './components/shared/MultisiteProtectedRoute';
 import { AppLayout } from './components/shared/AppLayout';
 
-// Intern Administration (shared page)
+// Tickets (shared page for internal communication)
 import InternAdministration from './pages/shared/InternAdministration';
 
 // Global styles
@@ -741,9 +741,9 @@ function App() {
             <Route path="/portal" element={<Navigate to="/customer" replace />} />
             <Route path="/customer/portal" element={<Navigate to="/customer" replace />} />
 
-            {/* Intern Administration Routes */}
+            {/* Tickets Routes */}
             <Route
-              path="/admin/intern-administration"
+              path="/admin/tickets"
               element={
                 <ProtectedRoute requiredRole="admin">
                   <InternAdministration />
@@ -751,7 +751,7 @@ function App() {
               }
             />
             <Route
-              path="/koordinator/intern-administration"
+              path="/koordinator/tickets"
               element={
                 <ProtectedRoute requiredRole="koordinator">
                   <InternAdministration />
@@ -759,7 +759,7 @@ function App() {
               }
             />
             <Route
-              path="/technician/intern-administration"
+              path="/technician/tickets"
               element={
                 <ProtectedRoute requiredRole="technician">
                   <InternAdministration />

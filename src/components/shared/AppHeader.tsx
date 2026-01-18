@@ -29,19 +29,19 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Schema', path: '/koordinator/schema', icon: Calendar },
     { label: 'Sök ärenden', path: '/koordinator/sok-arenden', icon: Search },
-    { label: 'Intern Admin', path: '/admin/intern-administration', icon: MessageSquareText },
+    { label: 'Tickets', path: '/admin/tickets', icon: MessageSquareText },
   ],
   koordinator: [
     { label: 'Dashboard', path: '/koordinator/dashboard', icon: LayoutDashboard },
     { label: 'Schema', path: '/koordinator/schema', icon: Calendar },
     { label: 'Sök ärenden', path: '/koordinator/sok-arenden', icon: Search },
-    { label: 'Intern Admin', path: '/koordinator/intern-administration', icon: MessageSquareText },
+    { label: 'Tickets', path: '/koordinator/tickets', icon: MessageSquareText },
   ],
   technician: [
     { label: 'Dashboard', path: '/technician/dashboard', icon: LayoutDashboard },
     { label: 'Schema', path: '/technician/schedule', icon: Calendar },
     { label: 'Mina ärenden', path: '/technician/cases', icon: Search },
-    { label: 'Intern Admin', path: '/technician/intern-administration', icon: MessageSquareText },
+    { label: 'Tickets', path: '/technician/tickets', icon: MessageSquareText },
   ],
 };
 

@@ -1,6 +1,6 @@
 // src/pages/shared/InternAdministration.tsx
-// Dedikerad sida för intern administration - TICKET-centrerad vy
-// REDESIGN: Visar individuella tickets (root-kommentarer) istället för hela ärenden
+// Tickets - Sida för intern kommunikation med @mentions
+// TICKET-centrerad vy: Visar individuella tickets (root-kommentarer) istället för hela ärenden
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -217,9 +217,9 @@ export default function InternAdministration() {
                 <MessageSquareText className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-white">Intern Administration</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">Tickets</h1>
                 <p className="text-slate-400 text-sm">
-                  Hantera och följ upp tickets med @mentions
+                  Intern kommunikation med @mentions
                 </p>
               </div>
             </div>

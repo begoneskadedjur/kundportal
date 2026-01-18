@@ -1,10 +1,10 @@
 // src/pages/technician/guides/TicketSystemGuide.tsx
-// SUPER-PEDAGOGISK GUIDE: Ticketsystemet och Intern Administration
-// Version 1.0 - Optimerad for alla interna medarbetare (admin, koordinatorer, tekniker)
+// SUPER-PEDAGOGISK GUIDE: Ticketsystemet
+// Version 1.1 - Optimerad for alla interna medarbetare (admin, koordinatorer, tekniker)
 // Fokus: Hur man anvander ticketsystemet for effektiv intern kommunikation
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft,
@@ -158,7 +158,7 @@ const MockTicketCard = ({
   )
 }
 
-// Mock: Filter-flikar for Intern Administration
+// Mock: Filter-flikar for Tickets-sidan
 const MockFilterTabs = ({
   activeTab,
   onSelect,
@@ -442,7 +442,7 @@ const guideSteps: GuideStep[] = [
   {
     id: 2,
     title: 'De 5 flikarna',
-    subtitle: 'Oversikt i Intern Administration',
+    subtitle: 'Oversikt i Tickets',
     icon: Filter,
     iconColor: 'text-purple-400',
     content: (() => {
@@ -454,18 +454,18 @@ const guideSteps: GuideStep[] = [
             title: 'Vantar pa DITT svar',
             description: 'Nagon har @namnt dig och vantar pa att du ska svara eller agera. Detta ar din "att-gora-lista".',
             examples: [
-              '@Tekniker Kan du kolla nar du ar dar?',
-              '@Admin Vi behover godkannande for offerten',
-              '@Koordinator Kunden vill boka om'
+              '"@Tekniker" - Kan du kolla nar du ar dar?',
+              '"@Admin" - Vi behover godkannande for offerten',
+              '"@Koordinator" - Kunden vill boka om'
             ]
           },
           replies: {
             title: 'Vantar pa ANDRAS svar',
             description: 'Du har stallt en fraga till nagon annan och vantar pa deras svar. Bevaka dessa!',
             examples: [
-              'Du: @Admin Klar att fakturera',
-              'Du: @Koordinator Nar ska jag aka dit?',
-              'Du: @Tekniker Har du materialet?'
+              'Du skrev: "@Admin" - Klar att fakturera',
+              'Du skrev: "@Koordinator" - Nar ska jag aka dit?',
+              'Du skrev: "@Tekniker" - Har du materialet?'
             ]
           },
           activity: {
@@ -508,7 +508,7 @@ const guideSteps: GuideStep[] = [
                 Fem flikar - fem syften:
               </h4>
               <p className="text-lg text-slate-300">
-                I <strong className="text-white">Intern Administration</strong> finns fem flikar som hjalper dig att prioritera och organisera ditt arbete.
+                I <strong className="text-white">Tickets</strong> finns fem flikar som hjalper dig att prioritera och organisera ditt arbete.
               </p>
             </div>
 
@@ -729,7 +729,7 @@ const guideSteps: GuideStep[] = [
               <ol className="text-lg text-slate-300 space-y-3">
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm">1</span>
-                  <span>Hitta ticketen i <strong className="text-white">Intern Administration</strong></span>
+                  <span>Hitta ticketen i <strong className="text-white">Tickets</strong></span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm">2</span>
@@ -752,7 +752,7 @@ const guideSteps: GuideStep[] = [
                     <MockTicketCard
                       title="Familjen Andersson - Rattor"
                       caseType="private"
-                      preview="@Tekniker Nar kan du aka dit for uppfoljning?"
+                      preview="Nar kan du aka dit for uppfoljning?"
                       author="Anna K."
                       time="1 timme sedan"
                       status="waiting_for_you"
@@ -1129,7 +1129,7 @@ const guideSteps: GuideStep[] = [
             Sok pa vad som helst:
           </h4>
           <p className="text-lg text-slate-300">
-            Anvand sokfaltet i <strong className="text-white">Intern Administration</strong> for att hitta tickets baserat pa nyckelord, fakturanummer, kundnamn eller annat.
+            Anvand sokfaltet i <strong className="text-white">Tickets</strong> for att hitta tickets baserat pa nyckelord, fakturanummer, kundnamn eller annat.
           </p>
         </div>
 
@@ -1229,7 +1229,7 @@ const guideSteps: GuideStep[] = [
           },
           {
             question: 'Hur hittar jag en gammal ticket?',
-            answer: 'Anvand sokfaltet i Intern Administration. Du kan soka pa fakturanummer, kundnamn, nyckelord mm.',
+            answer: 'Anvand sokfaltet i Tickets. Du kan soka pa fakturanummer, kundnamn, nyckelord mm.',
             icon: Search
           },
           {
@@ -1329,10 +1329,10 @@ const guideSteps: GuideStep[] = [
             Snabblank:
           </h5>
           <p className="text-slate-300 mb-3">
-            For att oppna Intern Administration, ga till:
+            For att oppna Tickets, ga till:
           </p>
           <div className="p-3 bg-slate-900 rounded-lg font-mono text-cyan-400">
-            Meny - Intern Administration
+            Meny → Tickets
           </div>
         </div>
 
@@ -1361,8 +1361,17 @@ const guideSteps: GuideStep[] = [
 
 export default function TicketSystemGuide() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [currentStep, setCurrentStep] = useState(0)
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
+
+  // Bestam tickets-sökväg baserat på vilken roll som ser guiden
+  const getTicketsPath = () => {
+    const path = location.pathname
+    if (path.includes('/admin')) return '/admin/tickets'
+    if (path.includes('/koordinator')) return '/koordinator/tickets'
+    return '/technician/tickets'
+  }
 
   const handleStepComplete = (stepIndex: number) => {
     setCompletedSteps(prev => new Set([...prev, stepIndex]))
@@ -1561,11 +1570,11 @@ export default function TicketSystemGuide() {
 
               {currentStep === guideSteps.length - 1 ? (
                 <Button
-                  onClick={() => navigate('/intern-administration')}
+                  onClick={() => navigate(getTicketsPath())}
                   className="flex items-center gap-2 py-4 px-6 text-lg bg-cyan-500 hover:bg-cyan-400 text-white"
                 >
                   <Inbox className="w-5 h-5" />
-                  Oppna Intern Administration
+                  Oppna Tickets
                 </Button>
               ) : (
                 <Button
