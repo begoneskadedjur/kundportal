@@ -189,7 +189,7 @@ export function AppHeader() {
 
               {/* Dropdown */}
               {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden">
+                <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
                   <div className="px-4 py-3 border-b border-slate-700">
                     <p className="text-sm font-medium text-white truncate">
                       {getUserDisplayName()}

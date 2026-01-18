@@ -438,7 +438,11 @@ function BottomSheet({ children, onClose }: { children: React.ReactNode; onClose
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center md:justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-md md:mx-4">
+      <div className="relative w-full md:max-w-md md:mx-4 bg-slate-800 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+        {/* Drag handle för mobil */}
+        <div className="flex justify-center pt-3 pb-1 md:hidden">
+          <div className="w-10 h-1 bg-slate-600 rounded-full" />
+        </div>
         {children}
       </div>
     </div>

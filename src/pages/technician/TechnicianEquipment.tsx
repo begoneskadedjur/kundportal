@@ -427,7 +427,7 @@ export default function TechnicianEquipment() {
   return (
     <div className="min-h-screen bg-slate-950 pb-24 md:pb-8">
       {/* Kompakt header för mobil */}
-      <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800">
+      <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

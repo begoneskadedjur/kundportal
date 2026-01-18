@@ -2,7 +2,7 @@
 // Formulär för att skapa/redigera inomhusstationer
 
 import { useState, useRef } from 'react'
-import { X, Camera, MapPin, FileText, Hash, Tag } from 'lucide-react'
+import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target } from 'lucide-react'
 import {
   IndoorStationType,
   IndoorStationWithRelations,
@@ -127,8 +127,15 @@ export function IndoorStationForm({
     }
   }
 
+  // Ikon-mappning för stationstyper
+  const TYPE_ICONS: Record<IndoorStationType, React.ElementType> = {
+    mechanical_trap: Crosshair,
+    concrete_station: Box,
+    bait_station: Target
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-700">
         <h3 className="text-lg font-semibold text-white">
@@ -143,11 +150,11 @@ export function IndoorStationForm({
         </button>
       </div>
 
-      {/* Position info */}
-      <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg">
-        <MapPin className="w-4 h-4 text-teal-400" />
-        <span className="text-sm text-slate-300">
-          Position: {position.x.toFixed(1)}%, {position.y.toFixed(1)}%
+      {/* Position info - Förenklad visning */}
+      <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+        <MapPin className="w-4 h-4 text-emerald-400" />
+        <span className="text-sm text-emerald-300">
+          Position vald på planritningen
         </span>
       </div>
 
@@ -160,24 +167,27 @@ export function IndoorStationForm({
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(INDOOR_STATION_TYPE_CONFIG) as IndoorStationType[]).map((type) => {
               const config = INDOOR_STATION_TYPE_CONFIG[type]
+              const Icon = TYPE_ICONS[type]
               return (
                 <button
                   key={type}
                   type="button"
                   onClick={() => handleTypeChange(type)}
                   className={`
-                    p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2
+                    p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 min-h-[80px]
                     ${stationType === type
-                      ? 'border-teal-500 bg-teal-500/10'
-                      : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                      ? 'border-emerald-500 bg-emerald-500/10'
+                      : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
                     }
                   `}
                 >
                   <div
-                    className="w-6 h-6 rounded-full border-2 border-white/50"
+                    className="w-8 h-8 rounded-full flex items-center justify-center"
                     style={{ backgroundColor: config.color }}
-                  />
-                  <span className={`text-xs text-center ${stationType === type ? 'text-teal-400' : 'text-slate-400'}`}>
+                  >
+                    <Icon className="w-4 h-4 text-white" />
+                  </div>
+                  <span className={`text-xs text-center font-medium ${stationType === type ? 'text-emerald-400' : 'text-slate-300'}`}>
                     {config.label}
                   </span>
                 </button>
@@ -270,7 +280,7 @@ export function IndoorStationForm({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="w-full p-4 border-2 border-dashed border-slate-600 hover:border-teal-500 rounded-lg text-center transition-colors"
+            className="w-full p-4 border-2 border-dashed border-slate-600 hover:border-emerald-500 rounded-lg text-center transition-colors"
           >
             <Camera className="w-6 h-6 text-slate-500 mx-auto mb-2" />
             <p className="text-sm text-slate-400">Ta eller välj foto</p>
@@ -307,7 +317,7 @@ export function IndoorStationForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
             <>
@@ -331,34 +341,45 @@ export function StationTypeSelector({
   selectedType: IndoorStationType | null
   onSelect: (type: IndoorStationType) => void
 }) {
+  // Ikon-mappning för stationstyper
+  const TYPE_ICONS: Record<IndoorStationType, React.ElementType> = {
+    mechanical_trap: Crosshair,
+    concrete_station: Box,
+    bait_station: Target
+  }
+
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-slate-400 mb-3">Välj stationstyp:</p>
-      <div className="flex flex-col gap-2">
+    <div className="p-4 space-y-3">
+      <h3 className="text-lg font-semibold text-white">Välj stationstyp</h3>
+      <p className="text-sm text-slate-400">Välj vilken typ av station du vill placera</p>
+      <div className="flex flex-col gap-2 pt-2">
         {(Object.keys(INDOOR_STATION_TYPE_CONFIG) as IndoorStationType[]).map((type) => {
           const config = INDOOR_STATION_TYPE_CONFIG[type]
+          const Icon = TYPE_ICONS[type]
           return (
             <button
               key={type}
               onClick={() => onSelect(type)}
               className={`
-                w-full p-3 rounded-lg border transition-all flex items-center gap-3 text-left
+                w-full p-4 rounded-lg border-2 transition-all flex items-center gap-4 text-left min-h-[64px]
                 ${selectedType === type
-                  ? 'border-teal-500 bg-teal-500/10'
-                  : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                  ? 'border-emerald-500 bg-emerald-500/10'
+                  : 'border-slate-600 bg-slate-700/50 hover:border-slate-500 hover:bg-slate-700'
                 }
               `}
             >
               <div
-                className="w-5 h-5 rounded-full border-2 border-white/50 flex-shrink-0"
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: config.color }}
-              />
-              <div>
-                <p className={`font-medium ${selectedType === type ? 'text-teal-400' : 'text-white'}`}>
+              >
+                <Icon className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className={`font-medium ${selectedType === type ? 'text-emerald-400' : 'text-white'}`}>
                   {config.label}
                 </p>
                 {config.requiresSerialNumber && (
-                  <p className="text-xs text-slate-500">Kräver serienummer</p>
+                  <p className="text-xs text-slate-400">Kräver serienummer</p>
                 )}
               </div>
             </button>
