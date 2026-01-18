@@ -43,15 +43,15 @@ export interface Guide {
 // Alla tillgängliga guider
 export const guides: Guide[] = [
   {
-    id: 'communication-system',
-    title: 'Kommunikationssystemet',
-    description: 'Lär dig använda @mentions, svarstrådar och notifikationer',
+    id: 'case-communication',
+    title: 'Ärendekommunikation',
+    description: 'Lär dig chatta effektivt med kollegor i ärenden',
     category: 'communication',
     icon: MessageSquareText,
     iconColor: 'text-cyan-400',
     iconBgColor: 'bg-cyan-500/20',
-    path: '/larosate/guides/communication-system',
-    tags: ['mentions', 'notifikationer', 'meddelanden', 'chatt', 'kommunikation'],
+    path: '/larosate/guides/case-communication',
+    tags: ['chatt', 'meddelanden', 'mentions', 'kommunikation', 'bilagor'],
     isNew: true
   },
   {

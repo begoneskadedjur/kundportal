@@ -59,7 +59,7 @@ const MockStatusDropdown = ({
 }) => {
   const statusOptions = [
     { name: 'Bokad', color: 'bg-blue-500/20 text-blue-300' },
-    { name: 'Pagaende', color: 'bg-amber-500/20 text-amber-300' },
+    { name: 'Pågående', color: 'bg-amber-500/20 text-amber-300' },
     { name: 'Avslutad', color: 'bg-green-500/20 text-green-300' },
     { name: 'Slaskad', color: 'bg-red-500/20 text-red-300', highlight: true },
   ]
@@ -79,7 +79,7 @@ const MockStatusDropdown = ({
         transition={animated ? { duration: 2, repeat: Infinity } : {}}
       >
         <span className={selected ? 'text-white' : 'text-slate-400'}>
-          {selected || 'Valj status...'}
+          {selected || 'Välj status...'}
         </span>
         <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </motion.button>
@@ -108,7 +108,7 @@ const MockStatusDropdown = ({
                   {status.name}
                 </span>
                 {status.highlight && (
-                  <span className="text-sm text-red-400 ml-auto">Anvand denna!</span>
+                  <span className="text-sm text-red-400 ml-auto">Använd denna!</span>
                 )}
               </button>
             ))}
@@ -148,7 +148,7 @@ const MockDocumentationField = ({
     <textarea
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      placeholder="Skriv anledningen till varfor arendet slaskas..."
+      placeholder="Skriv anledningen till varför ärendet slaskas..."
       className="w-full px-4 py-3 bg-slate-800/70 border-2 border-amber-500/50 rounded-xl text-white text-lg placeholder:text-slate-500 resize-none outline-none focus:border-amber-500 transition-colors min-h-[120px]"
       rows={4}
     />
@@ -172,7 +172,7 @@ const MockDangerZone = ({
       </div>
       <div>
         <h4 className="text-lg font-semibold text-red-400">Danger Zone</h4>
-        <p className="text-sm text-slate-400">Oaterkalleliga atgarder</p>
+        <p className="text-sm text-slate-400">Oåterkalleliga åtgärder</p>
       </div>
     </div>
 
@@ -181,10 +181,10 @@ const MockDangerZone = ({
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-red-300">
-            <p className="font-semibold mb-1">VARNING: Detta kan INTE angras!</p>
+            <p className="font-semibold mb-1">VARNING: Detta kan INTE ångras!</p>
             <p className="text-slate-400">
-              All data forsvinner permanent - kommentarer, bilder, historik.
-              Anvand "Slaskad"-status istallet om mojligt.
+              All data försvinner permanent - kommentarer, bilder, historik.
+              Använd "Slaskad"-status istället om möjligt.
             </p>
           </div>
         </div>
@@ -205,7 +205,7 @@ const MockDangerZone = ({
       whileTap={{ scale: 0.98 }}
     >
       <Trash2 className="w-5 h-5" />
-      Radera arende permanent
+      Radera ärende permanent
     </motion.button>
   </div>
 )
@@ -264,7 +264,7 @@ const MockComparisonCard = ({
         <div>
           <h5 className="text-sm font-medium text-green-400 mb-2 flex items-center gap-2">
             <ThumbsUp className="w-4 h-4" />
-            Fordelar
+            Fördelar
           </h5>
           <ul className="space-y-2">
             {pros.map((pro, index) => (
@@ -311,8 +311,8 @@ const MockCaseCard = ({
           <Trash2 className="w-8 h-8 text-red-400" />
         </div>
         <p className="text-red-400 font-semibold mb-2">RADERAT</p>
-        <p className="text-slate-500 text-sm">Arendet existerar inte langre</p>
-        <p className="text-slate-600 text-xs mt-2">All data ar permanent borta</p>
+        <p className="text-slate-500 text-sm">Ärendet existerar inte längre</p>
+        <p className="text-slate-600 text-xs mt-2">All data är permanent borta</p>
       </div>
     )
   }
@@ -423,7 +423,7 @@ interface GuideStep {
 const guideSteps: GuideStep[] = [
   {
     id: 1,
-    title: 'Varfor raderar vi inte arenden?',
+    title: 'Varför raderar vi inte ärenden?',
     subtitle: 'Den viktigaste regeln',
     icon: Shield,
     iconColor: 'text-blue-400',
@@ -439,10 +439,10 @@ const guideSteps: GuideStep[] = [
             <Ban className="w-12 h-12 text-red-400" />
           </motion.div>
           <h3 className="text-2xl font-bold text-white mb-4">
-            Radera ALDRIG ett arende!
+            Radera ALDRIG ett ärende!
           </h3>
           <p className="text-xl text-slate-300 max-w-md mx-auto leading-relaxed">
-            I 99% av fallen ska du istallet <strong className="text-amber-300">slaska</strong> arendet - inte radera det.
+            I 99% av fallen ska du istället <strong className="text-amber-300">slaska</strong> ärendet - inte radera det.
           </p>
         </div>
 
@@ -454,12 +454,12 @@ const guideSteps: GuideStep[] = [
             </div>
             <div>
               <h4 className="text-xl font-semibold text-red-300 mb-2">
-                Vad hander vid radering?
+                Vad händer vid radering?
               </h4>
               <ul className="space-y-3 text-lg text-slate-300">
                 <li className="flex items-center gap-3">
                   <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                  <span>All data forsvinner <strong className="text-white">PERMANENT</strong></span>
+                  <span>All data försvinner <strong className="text-white">PERMANENT</strong></span>
                 </li>
                 <li className="flex items-center gap-3">
                   <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -467,11 +467,11 @@ const guideSteps: GuideStep[] = [
                 </li>
                 <li className="flex items-center gap-3">
                   <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                  <span>Historik och tidsloggar forsvinner</span>
+                  <span>Historik och tidsloggar försvinner</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                  <span>Det gar <strong className="text-red-300">INTE</strong> att angra</span>
+                  <span>Det går <strong className="text-red-300">INTE</strong> att ångra</span>
                 </li>
               </ul>
             </div>
@@ -486,12 +486,12 @@ const guideSteps: GuideStep[] = [
             </div>
             <div>
               <h4 className="text-xl font-semibold text-green-300 mb-2">
-                Darfor "slaskar" vi istallet:
+                Därför "slaskar" vi istället:
               </h4>
               <ul className="space-y-3 text-lg text-slate-300">
                 <li className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span>All data bevaras for framtida referens</span>
+                  <span>All data bevaras för framtida referens</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
@@ -499,11 +499,11 @@ const guideSteps: GuideStep[] = [
                 </li>
                 <li className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span>Kan ateroppnas om det behövs</span>
+                  <span>Kan återöppnas om det behövs</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span>Statistik och rapporter paverkas inte</span>
+                  <span>Statistik och rapporter påverkas inte</span>
                 </li>
               </ul>
             </div>
@@ -514,8 +514,8 @@ const guideSteps: GuideStep[] = [
   },
   {
     id: 2,
-    title: 'Vad ar "Slaska"?',
-    subtitle: 'Ratt satt att avsluta arenden',
+    title: 'Vad är "Slaska"?',
+    subtitle: 'Rätt sätt att avsluta ärenden',
     icon: Archive,
     iconColor: 'text-amber-400',
     content: (
@@ -524,11 +524,11 @@ const guideSteps: GuideStep[] = [
         <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-2xl p-6">
           <h4 className="text-xl font-semibold text-amber-300 mb-4 flex items-center gap-3">
             <Archive className="w-6 h-6" />
-            "Slaska" = Andra status till "Slaskad"
+            "Slaska" = Ändra status till "Slaskad"
           </h4>
           <p className="text-lg text-slate-300 leading-relaxed">
-            Istallet for att radera, andrar du arendets <strong className="text-white">status</strong> till
-            "Slaskad". Det innebar att arendet ar avbrutet, men all data finns kvar.
+            Istället för att radera, ändrar du ärendets <strong className="text-white">status</strong> till
+            "Slaskad". Det innebär att ärendet är avbrutet, men all data finns kvar.
           </p>
         </div>
 
@@ -536,15 +536,15 @@ const guideSteps: GuideStep[] = [
         <div className="space-y-4">
           <h4 className="text-lg font-semibold text-white flex items-center gap-3">
             <HelpCircle className="w-5 h-5 text-purple-400" />
-            Nar ska du slaska ett arende?
+            När ska du slaska ett ärende?
           </h4>
 
           <div className="grid grid-cols-1 gap-4">
             {[
               { icon: Ban, text: 'Kunden vill avboka eller avbryta', color: 'text-red-400' },
-              { icon: XCircle, text: 'Kunden ar inte kontaktbar (svarar inte)', color: 'text-orange-400' },
-              { icon: Clock, text: 'Arendet ar inte langre aktuellt', color: 'text-amber-400' },
-              { icon: AlertTriangle, text: 'Problem som gor att jobbet inte kan utforas', color: 'text-yellow-400' },
+              { icon: XCircle, text: 'Kunden är inte kontaktbar (svarar inte)', color: 'text-orange-400' },
+              { icon: Clock, text: 'Ärendet är inte längre aktuellt', color: 'text-amber-400' },
+              { icon: AlertTriangle, text: 'Problem som gör att jobbet inte kan utföras', color: 'text-yellow-400' },
             ].map((item, index) => (
               <motion.div
                 key={index}
@@ -564,14 +564,14 @@ const guideSteps: GuideStep[] = [
 
         {/* Visuell jämförelse */}
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold text-white">Sa har ser skillnaden ut:</h4>
+          <h4 className="text-lg font-semibold text-white">Så här ser skillnaden ut:</h4>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-              <p className="text-sm text-slate-400 uppercase tracking-wider mb-3">Slaskat arende:</p>
+              <p className="text-sm text-slate-400 uppercase tracking-wider mb-3">Slaskat ärende:</p>
               <MockCaseCard status="slaskad" />
             </div>
             <div>
-              <p className="text-sm text-slate-400 uppercase tracking-wider mb-3">Raderat arende:</p>
+              <p className="text-sm text-slate-400 uppercase tracking-wider mb-3">Raderat ärende:</p>
               <MockCaseCard status="deleted" />
             </div>
           </div>
@@ -581,8 +581,8 @@ const guideSteps: GuideStep[] = [
   },
   {
     id: 3,
-    title: 'Hur slaskar man ett arende?',
-    subtitle: 'Steg-for-steg instruktion',
+    title: 'Hur slaskar man ett ärende?',
+    subtitle: 'Steg-för-steg instruktion',
     icon: Edit3,
     iconColor: 'text-teal-400',
     content: (() => {
@@ -596,27 +596,27 @@ const guideSteps: GuideStep[] = [
             <div className="bg-teal-500/10 border-2 border-teal-500/30 rounded-2xl p-6">
               <h4 className="text-xl font-semibold text-teal-300 mb-4 flex items-center gap-3">
                 <Edit3 className="w-6 h-6" />
-                Steg 1: Oppna arendet och hitta "Status"
+                Steg 1: Öppna ärendet och hitta "Status"
               </h4>
               <ol className="text-lg text-slate-300 space-y-3">
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-sm">1</span>
-                  <span>Oppna det arende du vill slaska</span>
+                  <span>Öppna det ärende du vill slaska</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-sm">2</span>
-                  <span>Hitta "Status"-faltet (ofta langst upp)</span>
+                  <span>Hitta "Status"-fältet (ofta längst upp)</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-sm">3</span>
-                  <span>Klicka pa dropdown-menyn</span>
+                  <span>Klicka på dropdown-menyn</span>
                 </li>
               </ol>
             </div>
 
             {/* Interaktiv demo */}
             <div className="space-y-3">
-              <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Prova sjalv - valj "Slaskad":</p>
+              <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Prova själv - välj "Slaskad":</p>
 
               <div className="bg-slate-900/70 rounded-2xl border border-slate-700 p-6">
                 <label className="block text-slate-300 text-lg mb-3 font-medium">
@@ -638,7 +638,7 @@ const guideSteps: GuideStep[] = [
                   >
                     <CheckCircle className="w-6 h-6 text-green-400" />
                     <span className="text-green-300 text-lg">
-                      Bra! Nu maste du dokumentera anledningen.
+                      Bra! Nu måste du dokumentera anledningen.
                     </span>
                   </motion.div>
                 )}
@@ -652,8 +652,8 @@ const guideSteps: GuideStep[] = [
                 <div>
                   <h5 className="font-semibold text-blue-300 mb-2">Tips!</h5>
                   <p className="text-slate-300">
-                    I de flesta vyer kan du snabbt andra status direkt fran arendelistan
-                    utan att oppna hela arendet.
+                    I de flesta vyer kan du snabbt ändra status direkt från ärendelistan
+                    utan att öppna hela ärendet.
                   </p>
                 </div>
               </div>
@@ -668,7 +668,7 @@ const guideSteps: GuideStep[] = [
   {
     id: 4,
     title: 'Dokumentera anledningen',
-    subtitle: 'KRITISKT STEG - far inte hoppas over!',
+    subtitle: 'KRITISKT STEG - får inte hoppas över!',
     icon: FileText,
     iconColor: 'text-amber-400',
     content: (() => {
@@ -677,10 +677,10 @@ const guideSteps: GuideStep[] = [
 
         const exampleReasons = [
           'Kunden avbokade pga flytt till annan stad',
-          'Kunden svarar inte pa telefon - forsokt 3 ganger',
-          'Adressen stammer inte - fel i systeme',
-          'Kunden lost problemet sjalv',
-          'Dubblettarende - se arende #12345',
+          'Kunden svarar inte på telefon - försökt 3 gånger',
+          'Adressen stämmer inte - fel i systemet',
+          'Kunden löste problemet själv',
+          'Dubblettärende - se ärende #12345',
         ]
 
         return (
@@ -696,8 +696,8 @@ const guideSteps: GuideStep[] = [
                     VIKTIGT: Dokumentera ALLTID anledningen!
                   </h4>
                   <p className="text-lg text-slate-300">
-                    Innan du sparar status "Slaskad" <strong className="text-white">MASTE</strong> du
-                    skriva varfor arendet avbryts i "Tekniker dokumentation"-faltet.
+                    Innan du sparar status "Slaskad" <strong className="text-white">MÅSTE</strong> du
+                    skriva varför ärendet avbryts i "Tekniker dokumentation"-fältet.
                   </p>
                 </div>
               </div>
@@ -727,7 +727,7 @@ const guideSteps: GuideStep[] = [
             <div className="space-y-4">
               <h4 className="text-lg font-semibold text-white flex items-center gap-3">
                 <Lightbulb className="w-5 h-5 text-amber-400" />
-                Exempel pa bra anledningar:
+                Exempel på bra anledningar:
               </h4>
               <div className="grid grid-cols-1 gap-2">
                 {exampleReasons.map((reason, index) => (
@@ -744,7 +744,7 @@ const guideSteps: GuideStep[] = [
                 ))}
               </div>
               <p className="text-sm text-slate-500 italic">
-                Klicka pa ett exempel for att anvanda det i faltet ovan
+                Klicka på ett exempel för att använda det i fältet ovan
               </p>
             </div>
           </div>
@@ -756,7 +756,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     id: 5,
-    title: 'Nar FAR man radera?',
+    title: 'När FÅR man radera?',
     subtitle: 'Endast i undantagsfall',
     icon: Trash2,
     iconColor: 'text-red-400',
@@ -772,10 +772,10 @@ const guideSteps: GuideStep[] = [
             <AlertTriangle className="w-10 h-10 text-amber-400" />
           </motion.div>
           <h3 className="text-xl font-bold text-white mb-2">
-            Radering ar endast for undantagsfall
+            Radering är endast för undantagsfall
           </h3>
           <p className="text-slate-400">
-            I de allra flesta fall ska du slaska istallet
+            I de allra flesta fall ska du slaska istället
           </p>
         </div>
 
@@ -783,24 +783,24 @@ const guideSteps: GuideStep[] = [
         <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-2xl p-6">
           <h4 className="text-lg font-semibold text-amber-300 mb-4 flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5" />
-            Godkanda skal for radering:
+            Godkända skäl för radering:
           </h4>
           <div className="space-y-4">
             {[
               {
                 icon: FileX,
-                title: 'Dubblettarende',
-                description: 'Om du av misstag skapat en kopia av ett befintligt arende'
+                title: 'Dubblettärende',
+                description: 'Om du av misstag skapat en kopia av ett befintligt ärende'
               },
               {
                 icon: XCircle,
-                title: 'Helt felaktigt arende',
-                description: 'Om arendet skapats med helt fel kund, adress eller information'
+                title: 'Helt felaktigt ärende',
+                description: 'Om ärendet skapats med helt fel kund, adress eller information'
               },
               {
                 icon: AlertTriangle,
-                title: 'Testarende',
-                description: 'Arenden som skapats for testning och inte ska finnas i systemet'
+                title: 'Testärende',
+                description: 'Ärenden som skapats för testning och inte ska finnas i systemet'
               },
             ].map((item, index) => (
               <motion.div
@@ -826,14 +826,14 @@ const guideSteps: GuideStep[] = [
         <div className="bg-red-500/10 border-2 border-red-500/30 rounded-2xl p-6">
           <h4 className="text-lg font-semibold text-red-300 mb-4 flex items-center gap-3">
             <Ban className="w-5 h-5" />
-            INTE godkanda skal for radering:
+            INTE godkända skäl för radering:
           </h4>
           <div className="space-y-3">
             {[
-              'Kunden avbokade - SLASKA istallet',
-              'Jobbet kunde inte utforas - SLASKA istallet',
-              'Kunden ar missnojd - SLASKA istallet',
-              '"For att rensa upp" - SLASKA istallet',
+              'Kunden avbokade - SLASKA istället',
+              'Jobbet kunde inte utföras - SLASKA istället',
+              'Kunden är missnöjd - SLASKA istället',
+              '"För att rensa upp" - SLASKA istället',
             ].map((item, index) => (
               <div key={index} className="flex items-center gap-3 text-slate-300">
                 <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -848,10 +848,10 @@ const guideSteps: GuideStep[] = [
           <div className="flex items-start gap-4">
             <Info className="w-6 h-6 text-blue-400 flex-shrink-0 mt-1" />
             <div>
-              <h5 className="font-semibold text-blue-300 mb-2">Osaker?</h5>
+              <h5 className="font-semibold text-blue-300 mb-2">Osäker?</h5>
               <p className="text-slate-300">
-                Om du ar osaker - <strong className="text-white">slaska istallet</strong>.
-                Det ar battre att ha ett slaskat arende kvar an att forlora all data permanent.
+                Om du är osäker - <strong className="text-white">slaska istället</strong>.
+                Det är bättre att ha ett slaskat ärende kvar än att förlora all data permanent.
               </p>
             </div>
           </div>
@@ -862,7 +862,7 @@ const guideSteps: GuideStep[] = [
   {
     id: 6,
     title: 'Hur raderar man?',
-    subtitle: 'Danger Zone - endast om absolut nodvandigt',
+    subtitle: 'Danger Zone - endast om absolut nödvändigt',
     icon: AlertOctagon,
     iconColor: 'text-red-400',
     content: (() => {
@@ -893,9 +893,9 @@ const guideSteps: GuideStep[] = [
                 >
                   <Trash2 className="w-20 h-20 text-red-400 mx-auto mb-4" />
                 </motion.div>
-                <h4 className="text-2xl font-bold text-red-300 mb-2">Arendet ar raderat</h4>
+                <h4 className="text-2xl font-bold text-red-300 mb-2">Ärendet är raderat</h4>
                 <p className="text-lg text-slate-300 mb-4">
-                  All data ar nu permanent borta.
+                  All data är nu permanent borta.
                 </p>
                 <button
                   onClick={() => {
@@ -904,7 +904,7 @@ const guideSteps: GuideStep[] = [
                   }}
                   className="text-slate-400 hover:text-white underline"
                 >
-                  Aterstall demo
+                  Återställ demo
                 </button>
               </motion.div>
             </div>
@@ -921,10 +921,10 @@ const guideSteps: GuideStep[] = [
                 </div>
                 <div>
                   <h4 className="text-xl font-semibold text-red-300 mb-2">
-                    Anvand ENDAST om du ar 100% saker
+                    Använd ENDAST om du är 100% säker
                   </h4>
                   <p className="text-lg text-slate-300">
-                    Raderingsknappen finns i "Danger Zone" langst ner i arendets redigeringslage.
+                    Raderingsknappen finns i "Danger Zone" längst ner i ärendets redigeringsläge.
                   </p>
                 </div>
               </div>
@@ -935,7 +935,7 @@ const guideSteps: GuideStep[] = [
               {/* Modal header */}
               <div className="bg-slate-800/50 border-b border-slate-700 p-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-white font-semibold">Redigera arende: Test</h3>
+                  <h3 className="text-white font-semibold">Redigera ärende: Test</h3>
                   <button className="p-1 text-slate-400">
                     <X className="w-5 h-5" />
                   </button>
@@ -965,7 +965,7 @@ const guideSteps: GuideStep[] = [
                     className="mt-4 p-4 bg-red-500/20 border-2 border-red-500/40 rounded-xl"
                   >
                     <p className="text-red-300 font-semibold mb-3">
-                      Ar du HELT saker? Klicka igen for att radera permanent.
+                      Är du HELT säker? Klicka igen för att radera permanent.
                     </p>
                     <div className="flex gap-3">
                       <button
@@ -995,7 +995,7 @@ const guideSteps: GuideStep[] = [
   {
     id: 7,
     title: 'Sammanfattning',
-    subtitle: 'Checklista att komma ihag',
+    subtitle: 'Checklista att komma ihåg',
     icon: CheckCircle,
     iconColor: 'text-green-400',
     content: (
@@ -1005,18 +1005,18 @@ const guideSteps: GuideStep[] = [
           <MockComparisonCard
             type="slaska"
             title="SLASKA"
-            description="Det ratta sattet"
+            description="Det rätta sättet"
             icon={Archive}
             color="amber"
             pros={[
               'All data bevaras',
-              'Kan ateroppnas om nodvandigt',
+              'Kan återöppnas om nödvändigt',
               'Historik finns kvar',
-              'Paverkar inte statistik negativt',
+              'Påverkar inte statistik negativt',
             ]}
             cons={[
-              'Arendet syns fortfarande i systemet',
-              'Kraver dokumentation',
+              'Ärendet syns fortfarande i systemet',
+              'Kräver dokumentation',
             ]}
           />
           <MockComparisonCard
@@ -1026,14 +1026,14 @@ const guideSteps: GuideStep[] = [
             icon={Trash2}
             color="red"
             pros={[
-              'Arendet forsvinner helt',
+              'Ärendet försvinner helt',
               'Rensar upp dubbletter',
             ]}
             cons={[
-              'Permanent - kan INTE angras',
-              'All data forsvinner',
+              'Permanent - kan INTE ångras',
+              'All data försvinner',
               'Ingen historik kvar',
-              'Svarar att forklara for kund',
+              'Svårare att förklara för kund',
             ]}
           />
         </div>
@@ -1042,16 +1042,16 @@ const guideSteps: GuideStep[] = [
         <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
           <h4 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
             <CheckCircle2 className="w-6 h-6 text-green-400" />
-            Checklista innan du gor nagot:
+            Checklista innan du gör något:
           </h4>
 
           <div className="space-y-4">
             {[
-              { text: 'Ar det verkligen nodvandigt att avsluta arendet?', important: false },
-              { text: 'Kan jag SLASKA istallet for att radera?', important: true },
+              { text: 'Är det verkligen nödvändigt att avsluta ärendet?', important: false },
+              { text: 'Kan jag SLASKA istället för att radera?', important: true },
               { text: 'Har jag dokumenterat anledningen?', important: true },
-              { text: 'Ar det en dubblett/testarende? Bara da kan jag radera.', important: false },
-              { text: 'Ar jag 100% saker? Radering kan INTE angras.', important: true },
+              { text: 'Är det en dubblett/testärende? Bara då kan jag radera.', important: false },
+              { text: 'Är jag 100% säker? Radering kan INTE ångras.', important: true },
             ].map((item, index) => (
               <motion.div
                 key={index}
@@ -1179,7 +1179,7 @@ export default function CaseDeletionGuide() {
             <div className="flex justify-between mt-2 text-xs text-slate-500">
               <span>Start</span>
               <span>{Math.round(progress)}% klart</span>
-              <span>Mal</span>
+              <span>Mål</span>
             </div>
           </div>
         </div>
@@ -1192,7 +1192,7 @@ export default function CaseDeletionGuide() {
             <div className="sticky top-40">
               <Card className="p-4">
                 <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-4">
-                  Innehall
+                  Innehåll
                 </h3>
                 <nav className="space-y-1">
                   {guideSteps.map((step, index) => {
@@ -1306,8 +1306,8 @@ export default function CaseDeletionGuide() {
                 className="flex items-center gap-2 py-4 px-6 text-lg"
               >
                 <ChevronLeft className="w-5 h-5" />
-                <span className="hidden sm:inline">Foregaende</span>
-                <span className="sm:hidden">Bakat</span>
+                <span className="hidden sm:inline">Föregående</span>
+                <span className="sm:hidden">Bakåt</span>
               </Button>
 
               {currentStep === guideSteps.length - 1 ? (
@@ -1316,14 +1316,14 @@ export default function CaseDeletionGuide() {
                   className="flex items-center gap-2 py-4 px-6 text-lg bg-amber-500 hover:bg-amber-400 text-slate-900"
                 >
                   <FileText className="w-5 h-5" />
-                  Ga till mina arenden
+                  Gå till mina ärenden
                 </Button>
               ) : (
                 <Button
                   onClick={goToNextStep}
                   className="flex items-center gap-2 py-4 px-6 text-lg bg-amber-500 hover:bg-amber-400 text-slate-900"
                 >
-                  <span>Nasta steg</span>
+                  <span>Nästa steg</span>
                   <ChevronRight className="w-5 h-5" />
                 </Button>
               )}
@@ -1334,7 +1334,7 @@ export default function CaseDeletionGuide() {
               <div className="flex items-center gap-3 text-slate-400">
                 <HelpCircle className="w-5 h-5 flex-shrink-0" />
                 <p className="text-sm">
-                  Behover du mer hjalp? Kontakta kontoret pa{' '}
+                  Behöver du mer hjälp? Kontakta kontoret på{' '}
                   <a href="tel:010-2051600" className="text-amber-400 hover:text-amber-300">
                     010-205 16 00
                   </a>

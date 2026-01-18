@@ -74,7 +74,7 @@ const MockFollowUpButton = ({
       } : {}}
     >
       <Plus className={size === 'large' ? 'w-6 h-6' : 'w-4 h-4'} />
-      <span>Foljeärende</span>
+      <span>Följeärende</span>
     </motion.button>
   )
 }
@@ -107,7 +107,7 @@ const MockPestDropdown = ({
         className="w-full px-4 py-3 bg-slate-800/70 border-2 border-slate-600 rounded-xl text-left flex items-center justify-between text-white text-lg transition-all duration-200 hover:border-amber-500/50 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
       >
         <span className={selected ? 'text-white' : 'text-slate-400'}>
-          {selected || 'Valj skadedjurstyp...'}
+          {selected || 'Välj skadedjurstyp...'}
         </span>
         <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -173,7 +173,7 @@ const MockCreateButton = ({
     ) : (
       <>
         <Plus className="w-5 h-5" />
-        Skapa foljeärende
+        Skapa följeärende
       </>
     )}
   </motion.button>
@@ -219,7 +219,7 @@ const MockCaseCard = ({
       </div>
       <span className={`px-3 py-1 rounded-full text-sm font-medium ${
         status === 'Bokad' ? 'bg-blue-500/20 text-blue-300' :
-        status === 'Pagaende' ? 'bg-amber-500/20 text-amber-300' :
+        status === 'Pågående' ? 'bg-amber-500/20 text-amber-300' :
         'bg-slate-700 text-slate-300'
       }`}>
         {status}
@@ -397,7 +397,7 @@ const guideSteps: GuideStep[] = [
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-sm">Pagaende</span>
+                <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-sm">Pågående</span>
                 <MousePointer2 className="w-5 h-5 text-teal-400 animate-bounce" />
               </div>
             </div>
@@ -727,7 +727,7 @@ const guideSteps: GuideStep[] = [
             <MockCaseCard
               title="Familjen Andersson"
               pest="Råttor"
-              status="Pagaende"
+              status="Pågående"
               highlighted={true}
             />
           </div>
@@ -756,7 +756,7 @@ const guideSteps: GuideStep[] = [
             <MockCaseCard
               title="Familjen Andersson"
               pest="Råttor"
-              status="Pagaende"
+              status="Pågående"
             />
             <MockCaseCard
               title="Familjen Andersson"

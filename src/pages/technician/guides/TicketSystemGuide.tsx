@@ -1,7 +1,7 @@
 // src/pages/technician/guides/TicketSystemGuide.tsx
 // SUPER-PEDAGOGISK GUIDE: Ticketsystemet
-// Version 1.1 - Optimerad for alla interna medarbetare (admin, koordinatorer, tekniker)
-// Fokus: Hur man anvander ticketsystemet for effektiv intern kommunikation
+// Version 1.1 - Optimerad för alla interna medarbetare (admin, koordinatorer, tekniker)
+// Fokus: Hur man använder ticketsystemet för effektiv intern kommunikation
 
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -76,13 +76,13 @@ const MockTicketCard = ({
       bg: 'bg-red-500/10',
       border: 'border-red-500/30',
       badge: 'bg-red-500/20 text-red-400',
-      label: 'Vantar pa ditt svar'
+      label: 'Väntar på ditt svar'
     },
     waiting_for_others: {
       bg: 'bg-amber-500/10',
       border: 'border-amber-500/30',
       badge: 'bg-amber-500/20 text-amber-400',
-      label: 'Vantar pa andras svar'
+      label: 'Väntar på andras svar'
     },
     new_activity: {
       bg: 'bg-blue-500/10',
@@ -94,13 +94,13 @@ const MockTicketCard = ({
       bg: 'bg-green-500/10',
       border: 'border-green-500/30',
       badge: 'bg-green-500/20 text-green-400',
-      label: 'Lost'
+      label: 'Löst'
     }
   }
 
   const caseTypeLabels = {
     private: { label: 'Privat', color: 'text-purple-400' },
-    business: { label: 'Foretag', color: 'text-blue-400' },
+    business: { label: 'Företag', color: 'text-blue-400' },
     contract: { label: 'Avtal', color: 'text-emerald-400' }
   }
 
@@ -158,7 +158,7 @@ const MockTicketCard = ({
   )
 }
 
-// Mock: Filter-flikar for Tickets-sidan
+// Mock: Filter-flikar för Tickets-sidan
 const MockFilterTabs = ({
   activeTab,
   onSelect,
@@ -169,9 +169,9 @@ const MockFilterTabs = ({
   counts?: { mentions: number; replies_to_me: number; replies: number; activity: number; all: number; archived: number }
 }) => {
   const tabs = [
-    { id: 'mentions', label: 'Vantar pa ditt svar', shortLabel: 'Att gora', count: counts.mentions, color: 'red', icon: AtSign },
+    { id: 'mentions', label: 'Väntar på ditt svar', shortLabel: 'Att göra', count: counts.mentions, color: 'red', icon: AtSign },
     { id: 'replies_to_me', label: 'Svar till dig', shortLabel: 'Svar', count: counts.replies_to_me, color: 'orange', icon: CornerDownRight },
-    { id: 'replies', label: 'Vantar pa andras svar', shortLabel: 'Bevaka', count: counts.replies, color: 'amber', icon: MessageCircle },
+    { id: 'replies', label: 'Väntar på andras svar', shortLabel: 'Bevaka', count: counts.replies, color: 'amber', icon: MessageCircle },
     { id: 'activity', label: 'Ny aktivitet', shortLabel: 'Nytt', count: counts.activity, color: 'blue', icon: Bell },
     { id: 'all', label: 'Alla tickets', shortLabel: 'Alla', count: counts.all, color: 'slate', icon: Inbox },
     { id: 'archived', label: 'Avslutade', shortLabel: 'Klart', count: counts.archived, color: 'green', icon: Archive }
@@ -215,7 +215,7 @@ const MockFilterTabs = ({
   )
 }
 
-// Mock: Kommentarsinput med @mention-stod
+// Mock: Kommentarsinput med @mention-stöd
 const MockCommentInput = ({
   value = '',
   onChange,
@@ -253,7 +253,7 @@ const MockCommentInput = ({
   </div>
 )
 
-// Mock: Markera lost-knapp
+// Mock: Markera löst-knapp
 const MockResolveButton = ({
   onClick,
   animated = false,
@@ -281,11 +281,11 @@ const MockResolveButton = ({
     whileTap={{ scale: 0.98 }}
   >
     <CheckCircle2 className="w-4 h-4" />
-    {resolved ? 'Lost!' : 'Markera lost'}
+    {resolved ? 'Löst!' : 'Markera löst'}
   </motion.button>
 )
 
-// Glodande highlight-ring
+// Glödande highlight-ring
 const GlowingHighlight = ({ children, color = 'cyan' }: { children: React.ReactNode, color?: 'cyan' | 'green' | 'purple' | 'amber' | 'red' }) => {
   const colors = {
     cyan: 'rgba(6, 182, 212, 0.4)',
@@ -348,8 +348,8 @@ interface GuideStep {
 const guideSteps: GuideStep[] = [
   {
     id: 1,
-    title: 'Vad ar en ticket?',
-    subtitle: 'Grundlaggande koncept',
+    title: 'Vad är en ticket?',
+    subtitle: 'Grundläggande koncept',
     icon: Ticket,
     iconColor: 'text-cyan-400',
     content: (
@@ -364,10 +364,10 @@ const guideSteps: GuideStep[] = [
             <Ticket className="w-12 h-12 text-cyan-400" />
           </motion.div>
           <h3 className="text-2xl font-bold text-white mb-4">
-            En ticket = En sparbar fraga
+            En ticket = En sparbar fråga
           </h3>
           <p className="text-xl text-slate-300 max-w-md mx-auto leading-relaxed">
-            Nar du skriver en kommentar med <strong className="text-purple-300">@namn</strong> i ett arende skapas en <strong className="text-cyan-300">ticket</strong> - en sparbar trad som foljs upp tills den ar lost.
+            När du skriver en kommentar med <strong className="text-purple-300">@namn</strong> i ett ärende skapas en <strong className="text-cyan-300">ticket</strong> - en sparbar tråd som följs upp tills den är löst.
           </p>
         </div>
 
@@ -384,7 +384,7 @@ const guideSteps: GuideStep[] = [
             </div>
             <div className="flex items-start gap-4">
               <span className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">2</span>
-              <p>En <strong className="text-cyan-300">ticket</strong> skapas och Admin far en notis</p>
+              <p>En <strong className="text-cyan-300">ticket</strong> skapas och Admin får en notis</p>
             </div>
             <div className="flex items-start gap-4">
               <span className="flex-shrink-0 w-8 h-8 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center font-bold">3</span>
@@ -392,12 +392,12 @@ const guideSteps: GuideStep[] = [
             </div>
             <div className="flex items-start gap-4">
               <span className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center font-bold">4</span>
-              <p>Admin klickar <strong className="text-green-300">"Markera lost"</strong> - klart!</p>
+              <p>Admin klickar <strong className="text-green-300">"Markera löst"</strong> - klart!</p>
             </div>
           </div>
         </div>
 
-        {/* Fordelar */}
+        {/* Fördelar */}
         <div className="grid grid-cols-1 gap-4">
           <div className="flex items-center gap-4 p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
             <ThumbsUp className="w-8 h-8 text-green-400 flex-shrink-0" />
@@ -410,19 +410,19 @@ const guideSteps: GuideStep[] = [
             <ThumbsUp className="w-8 h-8 text-green-400 flex-shrink-0" />
             <div>
               <h5 className="font-semibold text-green-300">Full sparbarhet</h5>
-              <p className="text-slate-400">Alla fragor och svar sparas - perfekt for revision och uppfoljning</p>
+              <p className="text-slate-400">Alla frågor och svar sparas - perfekt för revision och uppföljning</p>
             </div>
           </div>
           <div className="flex items-center gap-4 p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
             <ThumbsUp className="w-8 h-8 text-green-400 flex-shrink-0" />
             <div>
-              <h5 className="font-semibold text-green-300">Sokbar historik</h5>
-              <p className="text-slate-400">Sok pa fakturanummer, nyckelord eller namn</p>
+              <h5 className="font-semibold text-green-300">Sökbar historik</h5>
+              <p className="text-slate-400">Sök på fakturanummer, nyckelord eller namn</p>
             </div>
           </div>
         </div>
 
-        {/* Ersatter ClickUp */}
+        {/* Ersätter ClickUp */}
         <div className="bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl p-6">
           <div className="flex items-start gap-4">
             <div className="p-3 bg-amber-500/20 rounded-xl">
@@ -430,10 +430,10 @@ const guideSteps: GuideStep[] = [
             </div>
             <div>
               <h4 className="text-xl font-semibold text-amber-300 mb-2">
-                Ersatter mejl och ClickUp-kommentarer
+                Ersätter mejl och ClickUp-kommentarer
               </h4>
               <p className="text-lg text-slate-300">
-                Istallet for att skicka mejl eller skriva i ClickUp, anvander ni nu <strong className="text-white">ticketsystemet</strong> for all intern kommunikation. Allt samlas pa ett stalle!
+                Istället för att skicka mejl eller skriva i ClickUp, använder ni nu <strong className="text-white">ticketsystemet</strong> för all intern kommunikation. Allt samlas på ett ställe!
               </p>
             </div>
           </div>
@@ -444,7 +444,7 @@ const guideSteps: GuideStep[] = [
   {
     id: 2,
     title: 'De 6 flikarna',
-    subtitle: 'Oversikt i Tickets',
+    subtitle: 'Översikt i Tickets',
     icon: Filter,
     iconColor: 'text-purple-400',
     content: (() => {
@@ -453,56 +453,56 @@ const guideSteps: GuideStep[] = [
 
         const tabDescriptions: Record<string, { title: string; description: string; examples: string[] }> = {
           mentions: {
-            title: 'Vantar pa DITT svar',
-            description: 'Nagon har @namnt dig och vantar pa att du ska svara eller agera. Detta ar din "att-gora-lista".',
+            title: 'Väntar på DITT svar',
+            description: 'Någon har @nämnt dig och väntar på att du ska svara eller agera. Detta är din "att-göra-lista".',
             examples: [
-              '"@Tekniker" - Kan du kolla nar du ar dar?',
-              '"@Admin" - Vi behover godkannande for offerten',
+              '"@Tekniker" - Kan du kolla när du är där?',
+              '"@Admin" - Vi behöver godkännande för offerten',
               '"@Koordinator" - Kunden vill boka om'
             ]
           },
           replies_to_me: {
             title: 'Svar till dig',
-            description: 'Nagon har svarat pa din kommentar, aven om de inte @namnde dig. Bra att kolla for att halla koll pa konversationer du deltar i.',
+            description: 'Någon har svarat på din kommentar, även om de inte @nämnde dig. Bra att kolla för att hålla koll på konversationer du deltar i.',
             examples: [
-              'Du skrev en kommentar → Erik svarade pa den',
-              'Du stallde en fraga → Anna svarade med mer info',
-              'Du la till en notering → Kollegan foljde upp'
+              'Du skrev en kommentar → Erik svarade på den',
+              'Du ställde en fråga → Anna svarade med mer info',
+              'Du la till en notering → Kollegan följde upp'
             ]
           },
           replies: {
-            title: 'Vantar pa ANDRAS svar',
-            description: 'Du har stallt en fraga till nagon annan och vantar pa deras svar. Bevaka dessa!',
+            title: 'Väntar på ANDRAS svar',
+            description: 'Du har ställt en fråga till någon annan och väntar på deras svar. Bevaka dessa!',
             examples: [
               'Du skrev: "@Admin" - Klar att fakturera',
-              'Du skrev: "@Koordinator" - Nar ska jag aka dit?',
+              'Du skrev: "@Koordinator" - När ska jag åka dit?',
               'Du skrev: "@Tekniker" - Har du materialet?'
             ]
           },
           activity: {
             title: 'Ny aktivitet',
-            description: 'Tickets dar det kommit nya kommentarer som du inte last annu.',
+            description: 'Tickets där det kommit nya kommentarer som du inte läst ännu.',
             examples: [
-              'Erik svarade pa din fraga',
+              'Erik svarade på din fråga',
               'Anna la till en kommentar',
-              'Ny uppdatering i arendet'
+              'Ny uppdatering i ärendet'
             ]
           },
           all: {
             title: 'Alla tickets',
-            description: 'Komplett oversikt over alla oppna tickets dar du ar involverad pa nagot satt.',
+            description: 'Komplett översikt över alla öppna tickets där du är involverad på något sätt.',
             examples: [
               'Alla aktiva diskussioner',
-              'Fragor du foljer',
-              'Arenden du arbetat med'
+              'Frågor du följer',
+              'Ärenden du arbetat med'
             ]
           },
           archived: {
             title: 'Avslutade tickets',
-            description: 'Losta tickets. Bra jobbat! Dessa kan du soka i om du behover hitta gammal information.',
+            description: 'Lösta tickets. Bra jobbat! Dessa kan du söka i om du behöver hitta gammal information.',
             examples: [
-              'Fakturerade arenden',
-              'Besvarade fragor',
+              'Fakturerade ärenden',
+              'Besvarade frågor',
               'Avklarade uppgifter'
             ]
           }
@@ -519,13 +519,13 @@ const guideSteps: GuideStep[] = [
                 Sex flikar - sex syften:
               </h4>
               <p className="text-lg text-slate-300">
-                I <strong className="text-white">Tickets</strong> finns sex flikar som hjalper dig att prioritera och organisera ditt arbete.
+                I <strong className="text-white">Tickets</strong> finns sex flikar som hjälper dig att prioritera och organisera ditt arbete.
               </p>
             </div>
 
             {/* Interaktiva flikar */}
             <div className="space-y-3">
-              <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Prova - klicka pa en flik:</p>
+              <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Prova - klicka på en flik:</p>
 
               <div className="bg-slate-900/70 rounded-2xl border border-slate-700 p-5 space-y-4">
                 <MockFilterTabs activeTab={activeTab} onSelect={setActiveTab} />
@@ -555,17 +555,17 @@ const guideSteps: GuideStep[] = [
               </div>
             </div>
 
-            {/* Fargkoder */}
+            {/* Färgkoder */}
             <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
               <h5 className="font-semibold text-white mb-4 flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-400" />
-                Fargkodernas betydelse:
+                Färgkodernas betydelse:
               </h5>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                   <div className="w-4 h-4 rounded-full bg-red-500" />
-                  <span className="text-red-300 font-medium">Rod</span>
-                  <span className="text-slate-400 text-sm">= Vantar pa DIG</span>
+                  <span className="text-red-300 font-medium">Röd</span>
+                  <span className="text-slate-400 text-sm">= Väntar på DIG</span>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
                   <div className="w-4 h-4 rounded-full bg-orange-500" />
@@ -575,17 +575,17 @@ const guideSteps: GuideStep[] = [
                 <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   <div className="w-4 h-4 rounded-full bg-amber-500" />
                   <span className="text-amber-300 font-medium">Gul</span>
-                  <span className="text-slate-400 text-sm">= Vantar pa ANDRA</span>
+                  <span className="text-slate-400 text-sm">= Väntar på ANDRA</span>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                   <div className="w-4 h-4 rounded-full bg-blue-500" />
-                  <span className="text-blue-300 font-medium">Bla</span>
-                  <span className="text-slate-400 text-sm">= Olasta nyheter</span>
+                  <span className="text-blue-300 font-medium">Blå</span>
+                  <span className="text-slate-400 text-sm">= Olästa nyheter</span>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
                   <div className="w-4 h-4 rounded-full bg-green-500" />
-                  <span className="text-green-300 font-medium">Gron</span>
-                  <span className="text-slate-400 text-sm">= Avklarade/losta</span>
+                  <span className="text-green-300 font-medium">Grön</span>
+                  <span className="text-slate-400 text-sm">= Avklarade/lösta</span>
                 </div>
               </div>
             </div>
@@ -599,7 +599,7 @@ const guideSteps: GuideStep[] = [
   {
     id: 3,
     title: 'Skapa en ticket',
-    subtitle: 'Sa har borjar du en konversation',
+    subtitle: 'Så här börjar du en konversation',
     icon: MessageSquareText,
     iconColor: 'text-cyan-400',
     content: (() => {
@@ -624,11 +624,11 @@ const guideSteps: GuideStep[] = [
               <ol className="text-lg text-slate-300 space-y-3">
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm">1</span>
-                  <span>Oppna ett <strong className="text-white">arende</strong> (privat, foretag eller avtal)</span>
+                  <span>Öppna ett <strong className="text-white">ärende</strong> (privat, företag eller avtal)</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm">2</span>
-                  <span>Klicka pa <strong className="text-purple-300">pratbubblan</strong> i ovre hogra hornet</span>
+                  <span>Klicka på <strong className="text-purple-300">pratbubblan</strong> i övre högra hörnet</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm">3</span>
@@ -657,7 +657,7 @@ const guideSteps: GuideStep[] = [
                       <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                         <p className="text-amber-300 text-sm flex items-center gap-2">
                           <AlertTriangle className="w-4 h-4" />
-                          Glom inte att tagga nagon med @ for att skapa en ticket!
+                          Glöm inte att tagga någon med @ för att skapa en ticket!
                         </p>
                       </div>
                     )}
@@ -670,7 +670,7 @@ const guideSteps: GuideStep[] = [
                       >
                         <p className="text-green-300 text-sm flex items-center gap-2">
                           <CheckCircle className="w-4 h-4" />
-                          Bra! Du har taggat nagon. Klicka pa skicka-knappen!
+                          Bra! Du har taggat någon. Klicka på skicka-knappen!
                         </p>
                       </motion.div>
                     )}
@@ -685,7 +685,7 @@ const guideSteps: GuideStep[] = [
                       <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
                       <h5 className="text-lg font-semibold text-green-300 mb-2">Ticket skapad!</h5>
                       <p className="text-slate-300">
-                        Den du taggade far nu en notis och ticketen visas i deras "Vantar pa ditt svar"-flik.
+                        Den du taggade får nu en notis och ticketen visas i deras "Väntar på ditt svar"-flik.
                       </p>
                     </div>
 
@@ -710,9 +710,9 @@ const guideSteps: GuideStep[] = [
                 <div>
                   <h5 className="font-semibold text-purple-300 mb-2">Vem kan du tagga?</h5>
                   <div className="space-y-2 text-slate-300">
-                    <p><strong className="text-purple-300">@Fornamn Efternamn</strong> - en specifik person</p>
+                    <p><strong className="text-purple-300">@Förnamn Efternamn</strong> - en specifik person</p>
                     <p><strong className="text-amber-300">@Admin / @Koordinator / @Tekniker</strong> - alla med den rollen</p>
-                    <p><strong className="text-cyan-300">@alla</strong> - alla med tillgang till arendet</p>
+                    <p><strong className="text-cyan-300">@alla</strong> - alla med tillgång till ärendet</p>
                   </div>
                 </div>
               </div>
@@ -726,8 +726,8 @@ const guideSteps: GuideStep[] = [
   },
   {
     id: 4,
-    title: 'Svara pa en ticket',
-    subtitle: 'Hur du svarar och foljer upp',
+    title: 'Svara på en ticket',
+    subtitle: 'Hur du svarar och följer upp',
     icon: CornerDownRight,
     iconColor: 'text-amber-400',
     content: (() => {
@@ -740,7 +740,7 @@ const guideSteps: GuideStep[] = [
             <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-2xl p-6">
               <h4 className="text-xl font-semibold text-amber-300 mb-3 flex items-center gap-3">
                 <CornerDownRight className="w-6 h-6" />
-                Steg for att svara:
+                Steg för att svara:
               </h4>
               <ol className="text-lg text-slate-300 space-y-3">
                 <li className="flex items-start gap-3">
@@ -749,7 +749,7 @@ const guideSteps: GuideStep[] = [
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm">2</span>
-                  <span><strong className="text-cyan-300">Klicka pa ticketen</strong> for att oppna arendet</span>
+                  <span><strong className="text-cyan-300">Klicka på ticketen</strong> för att öppna ärendet</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm">3</span>
@@ -760,15 +760,15 @@ const guideSteps: GuideStep[] = [
 
             {/* Interaktiv demo */}
             <div className="space-y-3">
-              <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Prova - klicka pa ticketen:</p>
+              <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Prova - klicka på ticketen:</p>
 
               <div className="bg-slate-900/70 rounded-2xl border border-slate-700 p-5 space-y-4">
                 {step === 0 && (
                   <GlowingHighlight color="cyan">
                     <MockTicketCard
-                      title="Familjen Andersson - Rattor"
+                      title="Familjen Andersson - Råttor"
                       caseType="private"
-                      preview="Nar kan du aka dit for uppfoljning?"
+                      preview="När kan du åka dit för uppföljning?"
                       author="Anna K."
                       time="1 timme sedan"
                       status="waiting_for_you"
@@ -801,7 +801,7 @@ const guideSteps: GuideStep[] = [
                         </div>
                         <p className="text-slate-300">
                           <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded text-sm">@Tekniker</span>
-                          {' '}Nar kan du aka dit for uppfoljning?
+                          {' '}När kan du åka dit för uppföljning?
                         </p>
                       </div>
 
@@ -814,7 +814,7 @@ const guideSteps: GuideStep[] = [
                       </GlowingHighlight>
                     </div>
 
-                    <p className="text-center text-slate-400">Klicka pa textfaltet for att fortsatta...</p>
+                    <p className="text-center text-slate-400">Klicka på textfältet för att fortsätta...</p>
                   </motion.div>
                 )}
 
@@ -827,13 +827,13 @@ const guideSteps: GuideStep[] = [
                     <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
                     <h5 className="text-lg font-semibold text-green-300 mb-2">Perfekt!</h5>
                     <p className="text-slate-300 mb-4">
-                      Nar du skickar ditt svar flyttas ticketen fran "Vantar pa ditt svar" till "Vantar pa andras svar".
+                      När du skickar ditt svar flyttas ticketen från "Väntar på ditt svar" till "Väntar på andras svar".
                     </p>
                     <button
                       onClick={() => setStep(0)}
                       className="text-slate-400 hover:text-white text-sm underline"
                     >
-                      Borja om
+                      Börja om
                     </button>
                   </motion.div>
                 )}
@@ -847,7 +847,7 @@ const guideSteps: GuideStep[] = [
                 <div>
                   <h5 className="font-semibold text-blue-300 mb-2">Tips!</h5>
                   <p className="text-slate-300">
-                    Du kan ocksa oppna arendet direkt fran <strong className="text-white">notifikationsikonen</strong> i menyn nar nagon taggar dig.
+                    Du kan också öppna ärendet direkt från <strong className="text-white">notifikationsikonen</strong> i menyn när någon taggar dig.
                   </p>
                 </div>
               </div>
@@ -861,7 +861,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     id: 5,
-    title: 'Markera som lost',
+    title: 'Markera som löst',
     subtitle: 'Avsluta en ticket',
     icon: CheckCircle2,
     iconColor: 'text-green-400',
@@ -875,16 +875,16 @@ const guideSteps: GuideStep[] = [
             <div className="bg-green-500/10 border-2 border-green-500/30 rounded-2xl p-6">
               <h4 className="text-xl font-semibold text-green-300 mb-3 flex items-center gap-3">
                 <CheckCircle2 className="w-6 h-6" />
-                Nar ar en ticket "lost"?
+                När är en ticket "löst"?
               </h4>
               <p className="text-lg text-slate-300">
-                Nar fragan ar besvarad och ingen mer atgard kravs, klickar du pa <strong className="text-green-300">"Markera lost"</strong>. Ticketen flyttas da till Avslutade-fliken.
+                När frågan är besvarad och ingen mer åtgärd krävs, klickar du på <strong className="text-green-300">"Markera löst"</strong>. Ticketen flyttas då till Avslutade-fliken.
               </p>
             </div>
 
             {/* Demo */}
             <div className="space-y-3">
-              <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Prova - markera ticketen som lost:</p>
+              <p className="text-sm text-slate-400 uppercase tracking-wider font-medium">Prova - markera ticketen som löst:</p>
 
               <div className="bg-slate-900/70 rounded-2xl border border-slate-700 p-5 space-y-4">
                 <div className={`p-4 rounded-xl border-2 transition-all ${
@@ -895,12 +895,12 @@ const guideSteps: GuideStep[] = [
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h4 className="text-white font-semibold">Restaurang Smak AB</h4>
-                      <p className="text-sm text-blue-400">Foretag</p>
+                      <p className="text-sm text-blue-400">Företag</p>
                     </div>
                     {resolved && (
                       <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />
-                        Lost
+                        Löst
                       </span>
                     )}
                   </div>
@@ -910,7 +910,7 @@ const guideSteps: GuideStep[] = [
                       <p className="text-sm text-slate-300">
                         <span className="text-purple-300">@Admin</span> Klar att fakturera
                       </p>
-                      <p className="text-xs text-slate-500 mt-1">Erik T., igar</p>
+                      <p className="text-xs text-slate-500 mt-1">Erik T., igår</p>
                     </div>
                     <div className="p-3 bg-slate-800/50 rounded-lg border-l-2 border-cyan-500/50 ml-4">
                       <p className="text-sm text-slate-300">
@@ -939,9 +939,9 @@ const guideSteps: GuideStep[] = [
                     <div className="flex items-center gap-3 text-green-300">
                       <CheckCircle className="w-6 h-6" />
                       <div>
-                        <span className="text-lg font-medium">Ticket lost!</span>
+                        <span className="text-lg font-medium">Ticket löst!</span>
                         <p className="text-sm text-slate-400">
-                          Ticketen ar nu arkiverad och finns under "Avslutade". Du kan ateropna den om det behovs.
+                          Ticketen är nu arkiverad och finns under "Avslutade". Du kan återöppna den om det behövs.
                         </p>
                       </div>
                     </div>
@@ -950,16 +950,16 @@ const guideSteps: GuideStep[] = [
                       onClick={() => setResolved(false)}
                       className="mt-3 text-slate-400 hover:text-white text-sm underline"
                     >
-                      Aterstall demo
+                      Återställ demo
                     </button>
                   </motion.div>
                 )}
               </div>
             </div>
 
-            {/* Vem kan losa? */}
+            {/* Vem kan lösa? */}
             <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
-              <h5 className="font-semibold text-white mb-4">Vem kan markera en ticket som lost?</h5>
+              <h5 className="font-semibold text-white mb-4">Vem kan markera en ticket som löst?</h5>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-slate-300">
                   <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
@@ -971,7 +971,7 @@ const guideSteps: GuideStep[] = [
                 </div>
                 <div className="flex items-center gap-3 text-slate-300">
                   <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span><strong className="text-white">Admin</strong> kan alltid markera som lost</span>
+                  <span><strong className="text-white">Admin</strong> kan alltid markera som löst</span>
                 </div>
               </div>
             </div>
@@ -984,8 +984,8 @@ const guideSteps: GuideStep[] = [
   },
   {
     id: 6,
-    title: 'Vanliga arbetsfloden',
-    subtitle: 'Exempel fran vardagen',
+    title: 'Vanliga arbetsflöden',
+    subtitle: 'Exempel från vardagen',
     icon: Zap,
     iconColor: 'text-amber-400',
     content: (
@@ -994,14 +994,14 @@ const guideSteps: GuideStep[] = [
         <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-2xl p-6">
           <h4 className="text-xl font-semibold text-amber-300 mb-3 flex items-center gap-3">
             <Zap className="w-6 h-6" />
-            Har ar tre vanliga arbetsfloden:
+            Här är tre vanliga arbetsflöden:
           </h4>
           <p className="text-lg text-slate-300">
-            Se hur ticketsystemet anvands i praktiken for att effektivisera kommunikationen.
+            Se hur ticketsystemet används i praktiken för att effektivisera kommunikationen.
           </p>
         </div>
 
-        {/* Arbetsflode 1: Fakturering */}
+        {/* Arbetsflöde 1: Fakturering */}
         <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-emerald-500/20 rounded-lg">
@@ -1020,7 +1020,7 @@ const guideSteps: GuideStep[] = [
               </div>
               <div className="flex-1 p-3 bg-slate-900/50 rounded-lg">
                 <p className="text-sm text-slate-400 mb-1">Tekniker:</p>
-                <p className="text-slate-200">"<span className="text-purple-300">@Admin</span> Arendet ar klart. Klar att fakturera."</p>
+                <p className="text-slate-200">"<span className="text-purple-300">@Admin</span> Ärendet är klart. Klar att fakturera."</p>
               </div>
             </div>
             <AnimatedArrow />
@@ -1033,21 +1033,21 @@ const guideSteps: GuideStep[] = [
                 <p className="text-slate-200">"Fakturerat! Faktura #12345"</p>
                 <p className="text-green-400 text-sm mt-2 flex items-center gap-1">
                   <CheckCircle2 className="w-4 h-4" />
-                  Markerar som lost
+                  Markerar som löst
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Arbetsflode 2: Kundfraga */}
+        {/* Arbetsflöde 2: Kundfråga */}
         <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-amber-500/20 rounded-lg">
               <MessageCircle className="w-6 h-6 text-amber-400" />
             </div>
             <div>
-              <h4 className="text-lg font-semibold text-white">Kundfraga</h4>
+              <h4 className="text-lg font-semibold text-white">Kundfråga</h4>
               <p className="text-sm text-slate-400">Koordinator - Tekniker</p>
             </div>
           </div>
@@ -1059,7 +1059,7 @@ const guideSteps: GuideStep[] = [
               </div>
               <div className="flex-1 p-3 bg-slate-900/50 rounded-lg">
                 <p className="text-sm text-slate-400 mb-1">Koordinator:</p>
-                <p className="text-slate-200">"<span className="text-purple-300">@Erik Tekniker</span> Kunden undrar vad du hittade vid senaste besoket?"</p>
+                <p className="text-slate-200">"<span className="text-purple-300">@Erik Tekniker</span> Kunden undrar vad du hittade vid senaste besöket?"</p>
               </div>
             </div>
             <AnimatedArrow />
@@ -1069,7 +1069,7 @@ const guideSteps: GuideStep[] = [
               </div>
               <div className="flex-1 p-3 bg-slate-900/50 rounded-lg">
                 <p className="text-sm text-slate-400 mb-1">Tekniker:</p>
-                <p className="text-slate-200">"Hittade spar av morkratten vid ingangen. Satte ut extra fallor."</p>
+                <p className="text-slate-200">"Hittade spår av mörkråttan vid ingången. Satte ut extra fällor."</p>
               </div>
             </div>
             <AnimatedArrow />
@@ -1079,24 +1079,24 @@ const guideSteps: GuideStep[] = [
               </div>
               <div className="flex-1 p-3 bg-slate-900/50 rounded-lg">
                 <p className="text-sm text-slate-400 mb-1">Koordinator:</p>
-                <p className="text-slate-200">"Tack! Aterrapporterar till kunden."</p>
+                <p className="text-slate-200">"Tack! Återrapporterar till kunden."</p>
                 <p className="text-green-400 text-sm mt-2 flex items-center gap-1">
                   <CheckCircle2 className="w-4 h-4" />
-                  Markerar som lost
+                  Markerar som löst
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Arbetsflode 3: Betalningspaminnelse */}
+        {/* Arbetsflöde 3: Betalningspåminnelse */}
         <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-red-500/20 rounded-lg">
               <AlertTriangle className="w-6 h-6 text-red-400" />
             </div>
             <div>
-              <h4 className="text-lg font-semibold text-white">Betalningspaminnelse</h4>
+              <h4 className="text-lg font-semibold text-white">Betalningspåminnelse</h4>
               <p className="text-sm text-slate-400">Admin - Tekniker</p>
             </div>
           </div>
@@ -1108,7 +1108,7 @@ const guideSteps: GuideStep[] = [
               </div>
               <div className="flex-1 p-3 bg-slate-900/50 rounded-lg">
                 <p className="text-sm text-slate-400 mb-1">Admin:</p>
-                <p className="text-slate-200">"<span className="text-purple-300">@Erik Tekniker</span> Kunden har inte betalat faktura #12345. Kan du hora av dig nar du ar dar nasta gang?"</p>
+                <p className="text-slate-200">"<span className="text-purple-300">@Erik Tekniker</span> Kunden har inte betalat faktura #12345. Kan du höra av dig när du är där nästa gång?"</p>
               </div>
             </div>
             <AnimatedArrow />
@@ -1121,7 +1121,7 @@ const guideSteps: GuideStep[] = [
                 <p className="text-slate-200">"Pratade med dom idag, de betalar i morgon."</p>
                 <p className="text-green-400 text-sm mt-2 flex items-center gap-1">
                   <CheckCircle2 className="w-4 h-4" />
-                  Markerar som lost
+                  Markerar som löst
                 </p>
               </div>
             </div>
@@ -1132,7 +1132,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     id: 7,
-    title: 'Sok och hitta',
+    title: 'Sök och hitta',
     subtitle: 'Hitta gamla tickets snabbt',
     icon: Search,
     iconColor: 'text-blue-400',
@@ -1142,21 +1142,21 @@ const guideSteps: GuideStep[] = [
         <div className="bg-blue-500/10 border-2 border-blue-500/30 rounded-2xl p-6">
           <h4 className="text-xl font-semibold text-blue-300 mb-3 flex items-center gap-3">
             <Search className="w-6 h-6" />
-            Sok pa vad som helst:
+            Sök på vad som helst:
           </h4>
           <p className="text-lg text-slate-300">
-            Anvand sokfaltet i <strong className="text-white">Tickets</strong> for att hitta tickets baserat pa nyckelord, fakturanummer, kundnamn eller annat.
+            Använd sökfältet i <strong className="text-white">Tickets</strong> för att hitta tickets baserat på nyckelord, fakturanummer, kundnamn eller annat.
           </p>
         </div>
 
-        {/* Simulerat sokfalt */}
+        {/* Simulerat sökfält */}
         <div className="bg-slate-900/70 rounded-2xl border border-slate-700 p-5 space-y-4">
           <div className="flex gap-2">
             <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-slate-800 border border-slate-600 rounded-xl focus-within:border-cyan-500 transition-colors">
               <Search className="w-5 h-5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Sok nyckelord, fakturanr, kundnamn..."
+                placeholder="Sök nyckelord, fakturanr, kundnamn..."
                 className="flex-1 bg-transparent text-white placeholder:text-slate-500 outline-none text-lg"
               />
             </div>
@@ -1164,19 +1164,19 @@ const guideSteps: GuideStep[] = [
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-              <p className="text-sm text-slate-400 mb-1">Sok pa fakturanummer:</p>
+              <p className="text-sm text-slate-400 mb-1">Sök på fakturanummer:</p>
               <p className="text-cyan-400 font-mono">"12345"</p>
             </div>
             <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-              <p className="text-sm text-slate-400 mb-1">Sok pa kundnamn:</p>
+              <p className="text-sm text-slate-400 mb-1">Sök på kundnamn:</p>
               <p className="text-cyan-400 font-mono">"IKEA"</p>
             </div>
             <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-              <p className="text-sm text-slate-400 mb-1">Sok pa nyckelord:</p>
+              <p className="text-sm text-slate-400 mb-1">Sök på nyckelord:</p>
               <p className="text-cyan-400 font-mono">"fakturering"</p>
             </div>
             <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-              <p className="text-sm text-slate-400 mb-1">Sok pa personnamn:</p>
+              <p className="text-sm text-slate-400 mb-1">Sök på personnamn:</p>
               <p className="text-cyan-400 font-mono">"Anna"</p>
             </div>
           </div>
@@ -1187,19 +1187,19 @@ const guideSteps: GuideStep[] = [
           <div className="flex items-start gap-4">
             <Lightbulb className="w-6 h-6 text-amber-400 flex-shrink-0 mt-1" />
             <div>
-              <h5 className="font-semibold text-amber-300 mb-2">Tips for effektiv sokning:</h5>
+              <h5 className="font-semibold text-amber-300 mb-2">Tips för effektiv sökning:</h5>
               <ul className="space-y-2 text-slate-300">
                 <li className="flex items-start gap-2">
                   <ChevronRight className="w-4 h-4 text-amber-400 mt-1 flex-shrink-0" />
-                  <span>Sokningen letar i <strong className="text-white">alla flikar</strong> - bade aktiva och arkiverade</span>
+                  <span>Sökningen letar i <strong className="text-white">alla flikar</strong> - både aktiva och arkiverade</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <ChevronRight className="w-4 h-4 text-amber-400 mt-1 flex-shrink-0" />
-                  <span>Du kan soka pa <strong className="text-white">delar av ord</strong> - "faktur" hittar "fakturering"</span>
+                  <span>Du kan söka på <strong className="text-white">delar av ord</strong> - "faktur" hittar "fakturering"</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <ChevronRight className="w-4 h-4 text-amber-400 mt-1 flex-shrink-0" />
-                  <span>Anvand <strong className="text-white">Avslutade-fliken</strong> for att begranasa sokningen till losta arenden</span>
+                  <span>Använd <strong className="text-white">Avslutade-fliken</strong> för att begränsa sökningen till lösta ärenden</span>
                 </li>
               </ul>
             </div>
@@ -1210,8 +1210,8 @@ const guideSteps: GuideStep[] = [
   },
   {
     id: 8,
-    title: 'Vanliga fragor (FAQ)',
-    subtitle: 'Svar pa det du undrar',
+    title: 'Vanliga frågor (FAQ)',
+    subtitle: 'Svar på det du undrar',
     icon: HelpCircle,
     iconColor: 'text-pink-400',
     content: (
@@ -1219,38 +1219,38 @@ const guideSteps: GuideStep[] = [
         {/* FAQ-kort */}
         {[
           {
-            question: 'Vad ar skillnaden pa en ticket och en vanlig kommentar?',
-            answer: 'En ticket skapas nar du taggar nagon med @. Den foljs upp och har en status (oppen/lost). Kommentarer utan @ ar bara anteckningar.',
+            question: 'Vad är skillnaden på en ticket och en vanlig kommentar?',
+            answer: 'En ticket skapas när du taggar någon med @. Den följs upp och har en status (öppen/löst). Kommentarer utan @ är bara anteckningar.',
             icon: Ticket
           },
           {
             question: 'Kan kunder se mina tickets?',
-            answer: 'NEJ! Alla tickets och intern kommunikation ar 100% internt. Kunder - oavsett typ - kan aldrig se detta.',
+            answer: 'NEJ! Alla tickets och intern kommunikation är 100% internt. Kunder - oavsett typ - kan aldrig se detta.',
             icon: Users
           },
           {
-            question: 'Hur vet jag nar nagon svarar?',
-            answer: 'Du far en notifikation (klockan i menyn). Dessutom flyttas ticketen till "Ny aktivitet"-fliken.',
+            question: 'Hur vet jag när någon svarar?',
+            answer: 'Du får en notifikation (klockan i menyn). Dessutom flyttas ticketen till "Ny aktivitet"-fliken.',
             icon: Bell
           },
           {
-            question: 'Kan jag ateropna en lost ticket?',
-            answer: 'Ja! Ga till Avslutade-fliken, oppna ticketen och klicka "Ateropna". Ticketen blir aktiv igen.',
+            question: 'Kan jag återöppna en löst ticket?',
+            answer: 'Ja! Gå till Avslutade-fliken, öppna ticketen och klicka "Återöppna". Ticketen blir aktiv igen.',
             icon: Archive
           },
           {
-            question: 'Vad hander om jag taggar @alla?',
-            answer: 'Alla med tillgang till arendet far en notis. Anvand sparsamt - bara nar det verkligen galler alla.',
+            question: 'Vad händer om jag taggar @alla?',
+            answer: 'Alla med tillgång till ärendet får en notis. Använd sparsamt - bara när det verkligen gäller alla.',
             icon: Users
           },
           {
             question: 'Hur hittar jag en gammal ticket?',
-            answer: 'Anvand sokfaltet i Tickets. Du kan soka pa fakturanummer, kundnamn, nyckelord mm.',
+            answer: 'Använd sökfältet i Tickets. Du kan söka på fakturanummer, kundnamn, nyckelord mm.',
             icon: Search
           },
           {
-            question: 'Kan jag se vem som last min ticket?',
-            answer: 'Nej, men du ser nar nagon svarar. Om ingen svarar ligger ticketen kvar i deras "Vantar pa ditt svar"-flik.',
+            question: 'Kan jag se vem som läst min ticket?',
+            answer: 'Nej, men du ser när någon svarar. Om ingen svarar ligger ticketen kvar i deras "Väntar på ditt svar"-flik.',
             icon: CheckCircle2
           }
         ].map((faq, index) => (
@@ -1280,7 +1280,7 @@ const guideSteps: GuideStep[] = [
   {
     id: 9,
     title: 'Sammanfattning',
-    subtitle: 'Allt du behover komma ihag',
+    subtitle: 'Allt du behöver komma ihåg',
     icon: CheckCircle,
     iconColor: 'text-green-400',
     content: (
@@ -1288,15 +1288,15 @@ const guideSteps: GuideStep[] = [
         {/* Huvudpunkter */}
         <div className="space-y-4">
           <h4 className="text-xl font-semibold text-white text-center mb-6">
-            5 saker att komma ihag:
+            5 saker att komma ihåg:
           </h4>
 
           {[
             { step: 1, text: 'Skriv @namn i en kommentar = skapa ticket', color: 'cyan', icon: AtSign },
-            { step: 2, text: 'Kolla "Vantar pa ditt svar" dagligen', color: 'red', icon: Inbox },
+            { step: 2, text: 'Kolla "Väntar på ditt svar" dagligen', color: 'red', icon: Inbox },
             { step: 3, text: 'Svara snabbt - minska ledtider!', color: 'amber', icon: Zap },
-            { step: 4, text: 'Markera som lost nar klart', color: 'green', icon: CheckCircle2 },
-            { step: 5, text: 'Sok for att hitta gammal info', color: 'blue', icon: Search },
+            { step: 4, text: 'Markera som löst när klart', color: 'green', icon: CheckCircle2 },
+            { step: 5, text: 'Sök för att hitta gammal info', color: 'blue', icon: Search },
           ].map((item, index) => (
             <motion.div
               key={item.step}
@@ -1338,14 +1338,14 @@ const guideSteps: GuideStep[] = [
           ))}
         </div>
 
-        {/* Snabblankar */}
+        {/* Snabblänkar */}
         <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
           <h5 className="font-semibold text-white mb-4 flex items-center gap-2">
             <Target className="w-5 h-5 text-cyan-400" />
-            Snabblank:
+            Snabblänk:
           </h5>
           <p className="text-slate-300 mb-3">
-            For att oppna Tickets, ga till:
+            För att öppna Tickets, gå till:
           </p>
           <div className="p-3 bg-slate-900 rounded-lg font-mono text-cyan-400">
             Meny → Tickets
@@ -1361,9 +1361,9 @@ const guideSteps: GuideStep[] = [
           >
             <ThumbsUp className="w-16 h-16 text-green-400" />
           </motion.div>
-          <h4 className="text-2xl font-bold text-green-300 mb-2">Nu ar du redo!</h4>
+          <h4 className="text-2xl font-bold text-green-300 mb-2">Nu är du redo!</h4>
           <p className="text-lg text-slate-300">
-            Borja anvanda ticketsystemet for att effektivisera kommunikationen. Slipp mejl och telefon - allt pa ett stalle!
+            Börja använda ticketsystemet för att effektivisera kommunikationen. Slipp mejl och telefon - allt på ett ställe!
           </p>
         </div>
       </div>
@@ -1381,7 +1381,7 @@ export default function TicketSystemGuide() {
   const [currentStep, setCurrentStep] = useState(0)
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
 
-  // Bestam tickets-sökväg baserat på vilken roll som ser guiden
+  // Bestäm tickets-sökväg baserat på vilken roll som ser guiden
   const getTicketsPath = () => {
     const path = location.pathname
     if (path.includes('/admin')) return '/admin/tickets'
@@ -1453,7 +1453,7 @@ export default function TicketSystemGuide() {
             <div className="flex justify-between mt-2 text-xs text-slate-500">
               <span>Start</span>
               <span>{Math.round(progress)}% klart</span>
-              <span>Mal</span>
+              <span>Mål</span>
             </div>
           </div>
         </div>
@@ -1466,7 +1466,7 @@ export default function TicketSystemGuide() {
             <div className="sticky top-40">
               <Card className="p-4">
                 <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-4">
-                  Innehall
+                  Innehåll
                 </h3>
                 <nav className="space-y-1">
                   {guideSteps.map((step, index) => {
@@ -1539,7 +1539,7 @@ export default function TicketSystemGuide() {
               </div>
             </div>
 
-            {/* Steginnehall */}
+            {/* Steginnehåll */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
@@ -1563,7 +1563,7 @@ export default function TicketSystemGuide() {
                     </div>
                   </div>
 
-                  {/* Steginnehall */}
+                  {/* Steginnehåll */}
                   <div className="min-h-[400px]">
                     {currentStepData.content}
                   </div>
@@ -1580,8 +1580,8 @@ export default function TicketSystemGuide() {
                 className="flex items-center gap-2 py-4 px-6 text-lg"
               >
                 <ChevronLeft className="w-5 h-5" />
-                <span className="hidden sm:inline">Foregaende</span>
-                <span className="sm:hidden">Bakat</span>
+                <span className="hidden sm:inline">Föregående</span>
+                <span className="sm:hidden">Bakåt</span>
               </Button>
 
               {currentStep === guideSteps.length - 1 ? (
@@ -1590,25 +1590,25 @@ export default function TicketSystemGuide() {
                   className="flex items-center gap-2 py-4 px-6 text-lg bg-cyan-500 hover:bg-cyan-400 text-white"
                 >
                   <Inbox className="w-5 h-5" />
-                  Oppna Tickets
+                  Öppna Tickets
                 </Button>
               ) : (
                 <Button
                   onClick={goToNextStep}
                   className="flex items-center gap-2 py-4 px-6 text-lg bg-cyan-500 hover:bg-cyan-400 text-white"
                 >
-                  <span>Nasta steg</span>
+                  <span>Nästa steg</span>
                   <ChevronRight className="w-5 h-5" />
                 </Button>
               )}
             </div>
 
-            {/* Snabbhjalp */}
+            {/* Snabbhjälp */}
             <div className="mt-8 p-4 bg-slate-800/30 rounded-xl border border-slate-700">
               <div className="flex items-center gap-3 text-slate-400">
                 <HelpCircle className="w-5 h-5 flex-shrink-0" />
                 <p className="text-sm">
-                  Behover du mer hjalp? Kontakta kontoret pa{' '}
+                  Behöver du mer hjälp? Kontakta kontoret på{' '}
                   <a href="tel:010-2051600" className="text-cyan-400 hover:text-cyan-300">
                     010-205 16 00
                   </a>
