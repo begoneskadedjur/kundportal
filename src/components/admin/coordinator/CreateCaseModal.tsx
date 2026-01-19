@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import { useClickUpSync } from '../../../hooks/useClickUpSync';
 import SiteSelector from '../../shared/SiteSelector';
@@ -52,7 +52,7 @@ interface CreateCaseModalProps {
 
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
-  const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | null>(null);
+  const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
   const [contractCustomers, setContractCustomers] = useState<any[]>([]);
   const [selectedContractCustomer, setSelectedContractCustomer] = useState<string | null>(null);
@@ -296,13 +296,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   }, [selectedContractCustomer, selectedSiteId, contractCustomers, multisiteRoles]);
 
-  const selectCaseType = (type: 'private' | 'business' | 'contract') => {
-    setCaseType(type); 
-    if (type === 'contract' && contractCustomers.length === 0) {
+  const selectCaseType = (type: 'private' | 'business' | 'contract' | 'inspection') => {
+    setCaseType(type);
+    if ((type === 'contract' || type === 'inspection') && contractCustomers.length === 0) {
       toast.error('Inga avtalskunder hittades');
       return;
     }
-    setFormData({ status: 'Bokat' }); 
+    setFormData({ status: 'Bokat' });
     setStep('form');
   };
   
@@ -420,18 +420,29 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     toast.success(`Team bokat för ${new Date(suggestion.start_time).toLocaleDateString('sv-SE')}`);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => { 
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!caseType || !formData.title || !formData.start_date || !formData.due_date || !formData.primary_assignee_id) { 
-      return toast.error("Alla fält med * under 'Bokning & Detaljer' måste vara ifyllda."); 
+
+    // För inspection-ärenden krävs inte title från användaren
+    if (!caseType) {
+      return toast.error("Du måste välja en ärendetyp.");
     }
-    if (caseType === 'contract' && !selectedContractCustomer) {
+
+    if (caseType !== 'inspection' && !formData.title) {
+      return toast.error("Ärendetitel måste vara ifylld.");
+    }
+
+    if (!formData.start_date || !formData.due_date || !formData.primary_assignee_id) {
+      return toast.error("Alla fält med * under 'Bokning & Detaljer' måste vara ifyllda.");
+    }
+
+    if ((caseType === 'contract' || caseType === 'inspection') && !selectedContractCustomer) {
       return toast.error('Du måste välja en avtalskund');
     }
-    
+
     // Validera site för multisite-kunder
     const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
-    if (caseType === 'contract' && customer?.is_multisite && !selectedSiteId) {
+    if ((caseType === 'contract' || caseType === 'inspection') && customer?.is_multisite && !selectedSiteId) {
       return toast.error('Du måste välja en anläggning för denna multisite-kund');
     }
     
@@ -439,7 +450,101 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setError(null);
     
     try {
-      if (caseType === 'contract') {
+      if (caseType === 'inspection') {
+        // Hantera stationskontroll-ärenden
+        // Om multisite, använd sitens customer_id istället för huvudkundens
+        let actualCustomerId = selectedContractCustomer;
+        if (customer?.is_multisite && selectedSiteId) {
+          actualCustomerId = selectedSiteId;
+        }
+
+        // Hämta kundnamn för titeln
+        const customerForTitle = selectedSiteId
+          ? contractCustomers.find(c => c.id === selectedSiteId)
+          : customer;
+        const customerName = customerForTitle?.company_name || 'Okänd kund';
+
+        // Auto-generera titel för stationskontroll
+        const inspectionTitle = `Stationskontroll - ${customerName}`;
+
+        // Skapa case-ärende först
+        const caseData = {
+          customer_id: actualCustomerId!,
+          site_id: customer?.is_multisite ? selectedSiteId : null,
+          title: inspectionTitle,
+          description: formData.description || 'Schemalagd stationskontroll',
+          status: 'Bokad',
+          priority: formData.priority || 'normal',
+          service_type: 'inspection' as const,
+          pest_type: null,
+          scheduled_start: formData.start_date,
+          scheduled_end: formData.due_date,
+          primary_technician_id: formData.primary_assignee_id,
+          primary_technician_name: formData.primary_assignee_name || null,
+          contact_person: formData.kontaktperson || customer?.contact_person || null,
+          contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
+          contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
+          address: formData.adress ? { formatted_address: formData.adress } : null,
+          price: null,
+          case_number: `INS-${Date.now().toString().slice(-6)}`
+        };
+
+        // Skapa case
+        const { data: createdCase, error: caseError } = await supabase
+          .from('cases')
+          .insert([caseData])
+          .select('id')
+          .single();
+
+        if (caseError) throw caseError;
+
+        // Räkna stationer för denna kund
+        const [outdoorResult, indoorResult] = await Promise.all([
+          supabase
+            .from('equipment_placements')
+            .select('id', { count: 'exact' })
+            .eq('customer_id', actualCustomerId!)
+            .eq('status', 'active'),
+          supabase
+            .from('indoor_stations')
+            .select('id, floor_plan_id', { count: 'exact' })
+            .eq('status', 'active')
+            .in('floor_plan_id',
+              (await supabase
+                .from('floor_plans')
+                .select('id')
+                .eq('customer_id', actualCustomerId!)
+              ).data?.map(fp => fp.id) || []
+            )
+        ]);
+
+        const outdoorCount = outdoorResult.count || 0;
+        const indoorCount = indoorResult.count || 0;
+
+        // Skapa inspektionssession kopplad till ärendet
+        const sessionData = {
+          case_id: createdCase?.id,
+          customer_id: actualCustomerId!,
+          technician_id: formData.primary_assignee_id,
+          scheduled_at: formData.start_date,
+          status: 'scheduled' as const,
+          total_outdoor_stations: outdoorCount,
+          total_indoor_stations: indoorCount,
+          notes: formData.description || null
+        };
+
+        const { error: sessionError } = await supabase
+          .from('station_inspection_sessions')
+          .insert([sessionData]);
+
+        if (sessionError) {
+          console.error('Varning: Kunde inte skapa inspektionssession:', sessionError);
+          // Fortsätt ändå - ärendet är skapat
+        }
+
+        toast.success(`Stationskontroll inbokad för ${customerName}!`);
+
+      } else if (caseType === 'contract') {
         // Hantera avtalskundärenden
         // Om multisite, använd sitens customer_id istället för huvudkundens
         let actualCustomerId = selectedContractCustomer;
@@ -447,11 +552,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           // selectedSiteId är faktiskt customer_id för siten från SiteSelector
           actualCustomerId = selectedSiteId;
         }
-        
+
         const caseData = {
           customer_id: actualCustomerId, // Använd rätt customer_id (site eller huvudkund)
           site_id: customer?.is_multisite ? selectedSiteId : null,
-          title: formData.title.trim(),
+          title: formData.title!.trim(),
           description: formData.description || '',
           status: 'Bokad', // Korrekt svensk status som används i systemet
           priority: formData.priority || 'normal',
@@ -468,7 +573,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           price: formData.pris || null,
           case_number: `AVT-${Date.now().toString().slice(-6)}`
         };
-        
+
         let createdCaseId: string | null = null;
         if (initialCaseData && initialCaseData.case_type === 'contract') {
           // Uppdatera befintligt avtalskundärende
@@ -564,11 +669,26 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   
   const showRotRutDetails = formData.r_rot_rut === 'ROT' || formData.r_rot_rut === 'RUT';
 
+  // Dynamisk titel för modalen
+  const getModalTitle = () => {
+    if (initialCaseData) return `Boka in: ${initialCaseData.title}`;
+    if (step === 'selectType') return 'Välj ärendetyp';
+    switch (caseType) {
+      case 'private': return 'Nytt ärende: Privatperson';
+      case 'business': return 'Nytt ärende: Företag';
+      case 'contract': return 'Nytt ärende: Avtalskund';
+      case 'inspection': return 'Ny stationskontroll';
+      default: return 'Nytt ärende';
+    }
+  };
+
   return (
-      <Modal isOpen={isOpen} onClose={onClose} title={initialCaseData ? `Boka in: ${initialCaseData.title}` : (step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : caseType === 'business' ? 'Företag' : 'Avtalskund'}`)} size="w-11/12 max-w-4xl" preventClose={loading} footer={footer} usePortal={true}>
+      <Modal isOpen={isOpen} onClose={onClose} title={getModalTitle()} size="w-11/12 max-w-4xl" preventClose={loading} footer={footer} usePortal={true}>
         <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
           {step === 'selectType' && !initialCaseData && (
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="space-y-4">
+                {/* Rad 1: Engångsärenden */}
+                <div className="flex flex-col md:flex-row gap-4">
                   <button type="button" onClick={() => selectCaseType('private')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
                     <User className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-blue-400" />
                     <h3 className="text-xl font-bold">Privatperson</h3>
@@ -579,14 +699,30 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     <h3 className="text-xl font-bold">Företag</h3>
                     <p className="text-sm text-slate-400 mt-2">Engångsjobb via ClickUp</p>
                   </button>
-                  <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
-                    <FileCheck className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-emerald-400" />
-                    <h3 className="text-xl font-bold">Avtalskund</h3>
-                    <p className="text-sm text-slate-400 mt-2">Återkommande tjänster</p>
-                    {contractCustomers.length > 0 && (
-                      <p className="text-xs text-emerald-400 mt-1">{contractCustomers.length} kunder</p>
-                    )}
-                  </button>
+                </div>
+
+                {/* Rad 2: Avtalskundrelaterade ärenden */}
+                <div className="pt-2 border-t border-slate-700">
+                  <p className="text-xs text-slate-500 mb-3 uppercase tracking-wider">Avtalskunder</p>
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
+                      <FileCheck className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-emerald-400" />
+                      <h3 className="text-xl font-bold">Servicebesök</h3>
+                      <p className="text-sm text-slate-400 mt-2">Återkommande tjänster</p>
+                      {contractCustomers.length > 0 && (
+                        <p className="text-xs text-emerald-400 mt-1">{contractCustomers.length} kunder</p>
+                      )}
+                    </button>
+                    <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
+                      <ClipboardCheck className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-cyan-400" />
+                      <h3 className="text-xl font-bold">Stationskontroll</h3>
+                      <p className="text-sm text-slate-400 mt-2">Kontroll av fällor & stationer</p>
+                      {contractCustomers.length > 0 && (
+                        <p className="text-xs text-cyan-400 mt-1">{contractCustomers.length} kunder</p>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
           )}
           {step === 'form' && (
@@ -596,9 +732,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               )}
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3"><AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" /><p className="text-red-400">{error}</p></div>)}
               
-              {/* Avtalskund-väljare */}
-              {caseType === 'contract' && (
-                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+              {/* Avtalskund-väljare (för contract och inspection) */}
+              {(caseType === 'contract' || caseType === 'inspection') && (
+                <div className={`p-4 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-lg`}>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Välj avtalskund *
                   </label>
@@ -609,7 +745,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       setSelectedSiteId(null); // Reset site when customer changes
                       // Data fylls nu i via useEffect när selectedContractCustomer ändras
                     }}
-                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
+                    className={`w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none ${caseType === 'inspection' ? 'focus:border-cyan-500' : 'focus:border-emerald-500'}`}
                     required
                   >
                     <option value="">Välj kund...</option>
@@ -624,8 +760,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 </div>
               )}
 
-              {/* Site-väljare för multisite-kunder */}
-              {caseType === 'contract' && selectedContractCustomer && (
+              {/* Site-väljare för multisite-kunder (contract och inspection) */}
+              {(caseType === 'contract' || caseType === 'inspection') && selectedContractCustomer && (
                 (() => {
                   const selectedCustomer = contractCustomers.find(c => c.id === selectedContractCustomer);
                   if (selectedCustomer?.is_multisite && selectedCustomer?.organization_id) {
@@ -644,7 +780,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           className="w-full"
                         />
                         <p className="text-xs text-slate-500 mt-2">
-                          Välj vilken anläggning ärendet gäller för denna multisite-organisation
+                          Välj vilken anläggning {caseType === 'inspection' ? 'stationskontrollen' : 'ärendet'} gäller
                         </p>
                       </div>
                     );
@@ -653,6 +789,107 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 })()
               )}
               
+              {/* STATIONSKONTROLL: Förenklat formulär */}
+              {caseType === 'inspection' && (
+                <div className="p-4 sm:p-6 bg-cyan-500/5 border border-cyan-500/20 rounded-lg space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                      <ClipboardCheck className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white text-lg">Stationskontroll</h3>
+                      <p className="text-sm text-slate-400">Schemalägg kontroll av fällor och stationer</p>
+                    </div>
+                  </div>
+
+                  {/* Bokningsinformation */}
+                  <div className="space-y-4">
+                    <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
+                      <Users size={16}/> Bokning
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label>
+                        <DatePicker
+                          selected={formData.start_date ? new Date(formData.start_date) : null}
+                          onChange={(date) => handleDateChange(date, 'start_date')}
+                          locale="sv"
+                          showTimeSelect
+                          timeFormat="HH:mm"
+                          timeIntervals={15}
+                          dateFormat="yyyy-MM-dd HH:mm"
+                          timeCaption="Tid"
+                          placeholderText="Välj starttid..."
+                          isClearable
+                          required
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Sluttid *</label>
+                        <DatePicker
+                          selected={formData.due_date ? new Date(formData.due_date) : null}
+                          onChange={(date) => handleDateChange(date, 'due_date')}
+                          locale="sv"
+                          showTimeSelect
+                          timeFormat="HH:mm"
+                          timeIntervals={15}
+                          dateFormat="yyyy-MM-dd HH:mm"
+                          timeCaption="Tid"
+                          placeholderText="Välj sluttid..."
+                          isClearable
+                          required
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Ansvarig tekniker *</label>
+                      <select
+                        name="primary_assignee_id"
+                        value={formData.primary_assignee_id || ''}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                      >
+                        <option value="" disabled>Välj tekniker...</option>
+                        {technicians.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Valfri beskrivning */}
+                  <div className="space-y-4">
+                    <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
+                      <FileText size={16}/> Övrig information (valfritt)
+                    </h4>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Anteckningar till tekniker</label>
+                      <textarea
+                        name="description"
+                        value={formData.description || ''}
+                        onChange={handleChange}
+                        rows={3}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                        placeholder="T.ex. portkod, speciella instruktioner..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Info-ruta */}
+                  <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                    <p className="text-sm text-slate-400">
+                      <span className="font-medium text-cyan-400">Tips:</span> Stationskontrollen kommer automatiskt visa alla stationer (utomhus och inomhus) för den valda kunden.
+                      Teknikern kan sedan gå igenom och kontrollera varje station i valfri ordning.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ÖVRIGA ÄRENDETYPER: Fullt formulär */}
+              {caseType !== 'inspection' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4 flex flex-col">
                   <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
@@ -881,6 +1118,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   </div>
                 </div>
               </div>
+              )}
             </form>
           )}
         </div>

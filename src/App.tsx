@@ -58,6 +58,7 @@ import TechnicianDashboard from './pages/technician/TechnicianDashboard';
 import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions';
 import TechnicianCases from './pages/technician/TechnicianCases';
 import TechnicianSchedule from './pages/technician/TechnicianSchedule';
+import StationInspectionModule from './pages/technician/StationInspectionModule';
 import TechnicianEquipment from './pages/technician/TechnicianEquipment';
 import EquipmentPlacementGuide from './pages/technician/guides/EquipmentPlacementGuide';
 import FollowUpCaseGuide from './pages/technician/guides/FollowUpCaseGuide';
@@ -445,15 +446,23 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/technician/schedule" 
+            <Route
+              path="/technician/schedule"
               element={
                 <ProtectedRoute requiredRole="technician">
                   <TechnicianSchedule />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
+            <Route
+              path="/technician/inspection/:caseId"
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <StationInspectionModule />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/technician/leads" 
               element={
                 <ProtectedRoute requiredRole="technician">

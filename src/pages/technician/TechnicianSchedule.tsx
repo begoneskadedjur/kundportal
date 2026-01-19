@@ -26,9 +26,10 @@ import '../../styles/FullCalendar.css'
 
 // Definiera en mer komplett typ för ärenden som används i denna komponent
 type ScheduleCaseType = BeGoneCaseRow & {
-    case_type: 'private' | 'business' | 'contract';
+    case_type: 'private' | 'business' | 'contract' | 'inspection';
     case_price?: number;
     technician_role?: 'primary' | 'secondary' | 'tertiary';
+    service_type?: string; // 'routine' | 'inspection' etc.
 }
 
 const toDateString = (date: Date): string => date.toISOString().split('T')[0];
@@ -73,10 +74,18 @@ const openInMaps = (addressData: any) => {
     }
   }
 };
-const getCaseTypeIcon = (caseType: 'private' | 'business' | 'contract') => { const props = { className: "w-4 h-4" }; switch (caseType) { case 'private': return <User {...props} color="#60a5fa" />; case 'business': return <Users {...props} color="#4ade80" />; case 'contract': return <span className="text-purple-400">👑</span>; default: return <Clock {...props} color="#c084fc" />; } };
-const getStatusColor = (status: string, caseType?: string): { bg: string; text: string; border: string } => { 
+const getCaseTypeIcon = (caseType: 'private' | 'business' | 'contract' | 'inspection') => { const props = { className: "w-4 h-4" }; switch (caseType) { case 'private': return <User {...props} color="#60a5fa" />; case 'business': return <Users {...props} color="#4ade80" />; case 'contract': return <span className="text-purple-400">👑</span>; case 'inspection': return <span className="text-cyan-400">📋</span>; default: return <Clock {...props} color="#c084fc" />; } };
+const getStatusColor = (status: string, caseType?: string): { bg: string; text: string; border: string } => {
   const ls = status?.toLowerCase() || '';
-  
+
+  // Cyan färgschema för stationskontroll
+  if (caseType === 'inspection') {
+    if (ls.includes('avslutat')) return { bg: 'bg-cyan-900/50', text: 'text-cyan-300', border: 'border-cyan-700/50' };
+    if (ls.includes('pågående')) return { bg: 'bg-cyan-800/50', text: 'text-cyan-200', border: 'border-cyan-600/50' };
+    if (ls.includes('bokad') || ls.includes('bokat')) return { bg: 'bg-cyan-700/50', text: 'text-cyan-100', border: 'border-cyan-500/50' };
+    return { bg: 'bg-cyan-800/50', text: 'text-cyan-200', border: 'border-cyan-600/50' };
+  }
+
   // Premium lila färgschema för avtalsärenden
   if (caseType === 'contract') {
     if (ls.includes('avslutat')) return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700/50' };
@@ -84,14 +93,14 @@ const getStatusColor = (status: string, caseType?: string): { bg: string; text: 
     if (ls.includes('bokad') || ls.includes('bokat')) return { bg: 'bg-purple-700/50', text: 'text-purple-100', border: 'border-purple-500/50' };
     return { bg: 'bg-purple-800/50', text: 'text-purple-200', border: 'border-purple-600/50' };
   }
-  
+
   // Standard färgschema för ClickUp-ärenden
-  if (ls.includes('avslutat')) return { bg: 'bg-green-900/50', text: 'text-green-300', border: 'border-green-700/50' }; 
-  if (ls.startsWith('återbesök')) return { bg: 'bg-cyan-900/50', text: 'text-cyan-300', border: 'border-cyan-700/50' }; 
-  if (ls.includes('bokad') || ls.includes('bokat') || ls.includes('signerad')) return { bg: 'bg-blue-900/50', text: 'text-blue-300', border: 'border-blue-700/50' }; 
-  if (ls.includes('öppen') || ls.includes('offert')) return { bg: 'bg-yellow-900/50', text: 'text-yellow-300', border: 'border-yellow-700/50' }; 
-  if (ls.includes('review')) return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700/50' }; 
-  return { bg: 'bg-slate-800/50', text: 'text-slate-400', border: 'border-slate-700/50' }; 
+  if (ls.includes('avslutat')) return { bg: 'bg-green-900/50', text: 'text-green-300', border: 'border-green-700/50' };
+  if (ls.startsWith('återbesök')) return { bg: 'bg-cyan-900/50', text: 'text-cyan-300', border: 'border-cyan-700/50' };
+  if (ls.includes('bokad') || ls.includes('bokat') || ls.includes('signerad')) return { bg: 'bg-blue-900/50', text: 'text-blue-300', border: 'border-blue-700/50' };
+  if (ls.includes('öppen') || ls.includes('offert')) return { bg: 'bg-yellow-900/50', text: 'text-yellow-300', border: 'border-yellow-700/50' };
+  if (ls.includes('review')) return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700/50' };
+  return { bg: 'bg-slate-800/50', text: 'text-slate-400', border: 'border-slate-700/50' };
 };
 const formatTimeSpan = (start: string, end?: string): string => { if (!start) return ''; const s = new Date(start); const e = end ? new Date(end) : null; const opt: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' }; const fs = s.toLocaleTimeString('sv-SE', opt); if (!e || e.getTime() === s.getTime()) return fs; return `${fs} - ${e.toLocaleTimeString('sv-SE', opt)}`; };
 import { ALL_VALID_STATUSES } from '../../types/database';
@@ -196,6 +205,8 @@ export default function TechnicianSchedule() {
       // Anpassa avtalsärenden till BeGoneCaseRow-format
       const contractCases = (contractResult.data || []).map(c => {
         const customer = c.customer || {};
+        // Bestäm case_type baserat på service_type
+        const caseType = c.service_type === 'inspection' ? 'inspection' as const : 'contract' as const;
         return {
           ...c,
           // Mappa fields korrekt från cases-tabellen
@@ -220,7 +231,8 @@ export default function TechnicianSchedule() {
           status: c.status,
           // Övriga fält
           case_price: c.price,
-          case_type: 'contract' as const,
+          case_type: caseType,
+          service_type: c.service_type,
           technician_role: 'primary' as const,
           // Företagsinformation
           bestallare: customer.company_name,
@@ -272,8 +284,11 @@ export default function TechnicianSchedule() {
   
   const eventsByDay = useMemo(() => filteredCases.reduce((acc, event) => { if (!event.start_date) return acc; const day = event.start_date.split('T')[0]; if (!acc[day]) acc[day] = 0; acc[day]++; return acc; }, {} as Record<string, number>), [filteredCases]);
 
-  const handleOpenModal = (caseData: ScheduleCaseType) => { 
-    if (caseData.case_type === 'contract') {
+  const handleOpenModal = (caseData: ScheduleCaseType) => {
+    if (caseData.case_type === 'inspection') {
+      // Navigera till inspektionsmodulen för stationskontroll
+      navigate(`/technician/inspection/${caseData.id}`);
+    } else if (caseData.case_type === 'contract') {
       setSelectedCase(caseData);
       setIsEditContractModalOpen(true);
     } else {
