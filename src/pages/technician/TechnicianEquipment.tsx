@@ -20,9 +20,11 @@ import {
   RefreshCw,
   X,
   AlertCircle,
-  ChevronLeft,
-  LogOut
+  ArrowLeft,
+  MapPin
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import Button from '../../components/ui/Button'
 import { AllCustomersList } from '../../components/technician/AllCustomersList'
 import { CustomerStationsModal } from '../../components/technician/CustomerStationsModal'
 import { CollapsibleMapSection } from '../../components/technician/CollapsibleMapSection'
@@ -34,7 +36,8 @@ interface Customer {
 }
 
 export default function TechnicianEquipment() {
-  const { profile, signOut } = useAuth()
+  const { profile } = useAuth()
+  const navigate = useNavigate()
 
   // State
   const [allEquipment, setAllEquipment] = useState<EquipmentPlacementWithRelations[]>([])
@@ -330,51 +333,24 @@ export default function TechnicianEquipment() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-24 md:pb-8">
-      {/* Kompakt header */}
-      <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <a
-                href="/technician/dashboard"
-                className="p-2 -ml-2 rounded-lg hover:bg-slate-800 transition-colors"
-                title="Tillbaka till dashboard"
-              >
-                <ChevronLeft className="w-5 h-5 text-slate-400" />
-              </a>
-              <div>
-                <h1 className="text-lg font-semibold text-white">Stationer</h1>
-                <p className="text-xs text-slate-400 hidden sm:block">
-                  {stats.total} placeringar hos {stats.customerCount} kunder
-                </p>
-              </div>
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col pb-24 md:pb-8">
+      {/* Header - samma design som schedule */}
+      <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-500/10 p-2 rounded-lg">
+              <MapPin className="w-6 h-6 text-emerald-400" />
             </div>
-
-            <div className="flex items-center gap-2">
-              {/* Uppdateringsknapp */}
-              <button
-                onClick={refreshData}
-                disabled={loading}
-                className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                title="Uppdatera"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-
-              {/* Logga ut-knapp */}
-              <button
-                onClick={signOut}
-                className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
-                title="Logga ut"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+            <div>
+              <h1 className="text-xl font-bold text-white">Mina Stationer</h1>
+              <p className="text-sm text-slate-400">{profile?.display_name}</p>
             </div>
           </div>
+          <Button variant="secondary" onClick={() => navigate('/technician/dashboard')} size="sm">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
         </div>
-
-      </div>
+      </header>
 
       {/* Huvudinnehåll - enhetlig vy utan tabbar */}
       <div className="max-w-7xl mx-auto">

@@ -261,8 +261,8 @@ export function CustomerStationsModal({
                 </div>
               </div>
 
-              {/* Innehåll */}
-              <div className="flex-1 overflow-y-auto">
+              {/* Innehåll - scrollbart */}
+              <div className="flex-1 overflow-y-auto min-h-0">
                 {loading ? (
                   <div className="flex items-center justify-center py-16">
                     <div className="w-10 h-10 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
@@ -271,7 +271,7 @@ export function CustomerStationsModal({
                   <>
                     {/* Utomhus - Karta + stationslista */}
                     {activeView === 'outdoor' && (
-                      <div className="flex flex-col h-full">
+                      <div className="flex flex-col">
                         {outdoorStations.length > 0 ? (
                           <>
                             {/* Karta - fixad höjd */}
