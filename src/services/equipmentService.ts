@@ -506,6 +506,326 @@ export class EquipmentService {
       return []
     }
   }
+
+  /**
+   * Hämta aggregerad stationssammanfattning per kund för en tekniker
+   * Kombinerar utomhus- och inomhusstationer med hälsostatus
+   */
+  static async getCustomerStationSummaries(
+    technicianId: string
+  ): Promise<CustomerStationSummary[]> {
+    try {
+      console.log('Hämtar kundsammanfattningar för tekniker:', technicianId)
+
+      // Hämta utomhusstationer grupperat per kund
+      const { data: outdoorData, error: outdoorError } = await supabase
+        .from('equipment_placements')
+        .select(`
+          customer_id,
+          status,
+          placed_at,
+          customer:customers!customer_id(id, company_name, contact_address)
+        `)
+        .eq('placed_by_technician_id', technicianId)
+
+      if (outdoorError) {
+        console.error('Fel vid hämtning av utomhusstationer:', outdoorError)
+        throw outdoorError
+      }
+
+      // Hämta inomhusstationer via floor_plans
+      const { data: indoorData, error: indoorError } = await supabase
+        .from('indoor_stations')
+        .select(`
+          id,
+          status,
+          placed_at,
+          floor_plan:floor_plans!floor_plan_id(
+            customer_id,
+            customer:customers!customer_id(id, company_name, contact_address)
+          )
+        `)
+        .eq('placed_by_technician_id', technicianId)
+
+      if (indoorError) {
+        console.error('Fel vid hämtning av inomhusstationer:', indoorError)
+        throw indoorError
+      }
+
+      // Gruppera och aggregera data per kund
+      const customerMap = new Map<string, {
+        customer_id: string
+        customer_name: string
+        customer_address: string | null
+        outdoor_stations: Array<{ status: string; placed_at: string }>
+        indoor_stations: Array<{ status: string; placed_at: string }>
+      }>()
+
+      // Lägg till utomhusstationer
+      outdoorData?.forEach((item: any) => {
+        if (!item.customer) return
+        const customerId = item.customer_id
+
+        if (!customerMap.has(customerId)) {
+          customerMap.set(customerId, {
+            customer_id: customerId,
+            customer_name: item.customer.company_name,
+            customer_address: item.customer.contact_address,
+            outdoor_stations: [],
+            indoor_stations: []
+          })
+        }
+
+        customerMap.get(customerId)!.outdoor_stations.push({
+          status: item.status,
+          placed_at: item.placed_at
+        })
+      })
+
+      // Lägg till inomhusstationer
+      indoorData?.forEach((item: any) => {
+        if (!item.floor_plan?.customer) return
+        const customerId = item.floor_plan.customer_id
+
+        if (!customerMap.has(customerId)) {
+          customerMap.set(customerId, {
+            customer_id: customerId,
+            customer_name: item.floor_plan.customer.company_name,
+            customer_address: item.floor_plan.customer.contact_address,
+            outdoor_stations: [],
+            indoor_stations: []
+          })
+        }
+
+        customerMap.get(customerId)!.indoor_stations.push({
+          status: item.status,
+          placed_at: item.placed_at
+        })
+      })
+
+      // Beräkna hälsostatus och senaste aktivitet för varje kund
+      const summaries: CustomerStationSummary[] = Array.from(customerMap.values()).map(customer => {
+        const allStations = [...customer.outdoor_stations, ...customer.indoor_stations]
+
+        // Beräkna hälsostatus
+        const problematic = allStations.filter(s =>
+          s.status === 'damaged' ||
+          s.status === 'missing' ||
+          s.status === 'needs_service'
+        ).length
+
+        const ratio = allStations.length > 0 ? problematic / allStations.length : 0
+        let health_status: 'excellent' | 'good' | 'fair' | 'poor'
+        if (ratio === 0) health_status = 'excellent'
+        else if (ratio < 0.1) health_status = 'good'
+        else if (ratio < 0.3) health_status = 'fair'
+        else health_status = 'poor'
+
+        // Hitta senaste placering
+        const allDates = allStations.map(s => new Date(s.placed_at))
+        const latestDate = allDates.length > 0
+          ? new Date(Math.max(...allDates.map(d => d.getTime())))
+          : null
+
+        return {
+          customer_id: customer.customer_id,
+          customer_name: customer.customer_name,
+          customer_address: customer.customer_address,
+          outdoor_count: customer.outdoor_stations.length,
+          indoor_count: customer.indoor_stations.length,
+          health_status,
+          latest_inspection_date: latestDate?.toISOString() || null,
+          latest_inspector_name: null // Kräver separat query om vi vill ha detta
+        }
+      })
+
+      // Sortera alfabetiskt som standard
+      summaries.sort((a, b) => a.customer_name.localeCompare(b.customer_name, 'sv'))
+
+      console.log('Kundsammanfattningar hämtade:', summaries.length)
+      return summaries
+
+    } catch (error) {
+      console.error('EquipmentService.getCustomerStationSummaries fel:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Hämta alla stationer för en specifik kund (både utomhus och inomhus)
+   */
+  static async getStationsByCustomer(customerId: string): Promise<{
+    outdoor: EquipmentPlacementWithRelations[]
+    indoor: any[]
+  }> {
+    try {
+      console.log('Hämtar stationer för kund:', customerId)
+
+      // Hämta utomhusstationer
+      const { data: outdoorData, error: outdoorError } = await supabase
+        .from('equipment_placements')
+        .select(`
+          *,
+          technician:technicians!placed_by_technician_id(id, name)
+        `)
+        .eq('customer_id', customerId)
+        .order('placed_at', { ascending: false })
+
+      if (outdoorError) {
+        console.error('Fel vid hämtning av utomhusstationer:', outdoorError)
+        throw outdoorError
+      }
+
+      // Hämta floor_plans för denna kund först
+      const { data: floorPlans, error: fpError } = await supabase
+        .from('floor_plans')
+        .select('id')
+        .eq('customer_id', customerId)
+
+      if (fpError) {
+        console.error('Fel vid hämtning av planritningar:', fpError)
+      }
+
+      let indoorData: any[] = []
+      if (floorPlans && floorPlans.length > 0) {
+        const floorPlanIds = floorPlans.map(fp => fp.id)
+        const { data: indoor, error: indoorError } = await supabase
+          .from('indoor_stations')
+          .select(`
+            *,
+            technician:technicians!placed_by_technician_id(id, name),
+            floor_plan:floor_plans!floor_plan_id(id, name, customer_id)
+          `)
+          .in('floor_plan_id', floorPlanIds)
+          .order('placed_at', { ascending: false })
+
+        if (indoorError) {
+          console.error('Fel vid hämtning av inomhusstationer:', indoorError)
+        } else {
+          indoorData = indoor || []
+        }
+      }
+
+      // Lägg till signerade URLs för foton
+      const outdoorWithUrls = await Promise.all(
+        (outdoorData || []).map(async (equipment) => ({
+          ...equipment,
+          photo_url: equipment.photo_path
+            ? await this.getEquipmentPhotoUrl(equipment.photo_path)
+            : undefined
+        }))
+      )
+
+      console.log('Stationer hämtade - utomhus:', outdoorWithUrls.length, 'inomhus:', indoorData.length)
+
+      return {
+        outdoor: outdoorWithUrls,
+        indoor: indoorData
+      }
+
+    } catch (error) {
+      console.error('EquipmentService.getStationsByCustomer fel:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Hämta aggregerad statistik för alla teknikerns stationer
+   */
+  static async getTechnicianStationStats(technicianId: string): Promise<{
+    total: number
+    outdoor: number
+    indoor: number
+    byStatus: Record<string, number>
+    customerCount: number
+  }> {
+    try {
+      // Hämta utomhusstationer
+      const { data: outdoorData, error: outdoorError } = await supabase
+        .from('equipment_placements')
+        .select('status, customer_id')
+        .eq('placed_by_technician_id', technicianId)
+
+      if (outdoorError) throw outdoorError
+
+      // Hämta inomhusstationer
+      const { data: indoorData, error: indoorError } = await supabase
+        .from('indoor_stations')
+        .select('status, floor_plan:floor_plans!floor_plan_id(customer_id)')
+        .eq('placed_by_technician_id', technicianId)
+
+      if (indoorError) throw indoorError
+
+      // Räkna statusar
+      const byStatus: Record<string, number> = {
+        active: 0,
+        damaged: 0,
+        missing: 0,
+        removed: 0,
+        needs_service: 0
+      }
+
+      const customerIds = new Set<string>()
+
+      outdoorData?.forEach((item: any) => {
+        byStatus[item.status] = (byStatus[item.status] || 0) + 1
+        customerIds.add(item.customer_id)
+      })
+
+      indoorData?.forEach((item: any) => {
+        byStatus[item.status] = (byStatus[item.status] || 0) + 1
+        if (item.floor_plan?.customer_id) {
+          customerIds.add(item.floor_plan.customer_id)
+        }
+      })
+
+      return {
+        total: (outdoorData?.length || 0) + (indoorData?.length || 0),
+        outdoor: outdoorData?.length || 0,
+        indoor: indoorData?.length || 0,
+        byStatus,
+        customerCount: customerIds.size
+      }
+
+    } catch (error) {
+      console.error('EquipmentService.getTechnicianStationStats fel:', error)
+      return {
+        total: 0,
+        outdoor: 0,
+        indoor: 0,
+        byStatus: {},
+        customerCount: 0
+      }
+    }
+  }
+}
+
+// Typer för aggregerad data
+export interface CustomerStationSummary {
+  customer_id: string
+  customer_name: string
+  customer_address: string | null
+  outdoor_count: number
+  indoor_count: number
+  health_status: 'excellent' | 'good' | 'fair' | 'poor'
+  latest_inspection_date: string | null
+  latest_inspector_name: string | null
+}
+
+export interface IndoorStationWithRelations {
+  id: string
+  floor_plan_id: string
+  station_type: string
+  station_number: string | null
+  position_x_percent: number
+  position_y_percent: number
+  location_description: string | null
+  comment: string | null
+  photo_path: string | null
+  status: string
+  placed_at: string
+  technician?: { id: string; name: string }
+  floor_plan?: { id: string; name: string; customer_id: string }
 }
 
 // Hjälpfunktion för att formatera koordinater
