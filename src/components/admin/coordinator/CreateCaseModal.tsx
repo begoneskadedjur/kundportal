@@ -55,6 +55,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
   const [contractCustomers, setContractCustomers] = useState<any[]>([]);
+  const [customersWithStations, setCustomersWithStations] = useState<Set<string>>(new Set());
   const [selectedContractCustomer, setSelectedContractCustomer] = useState<string | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
   const [multisiteRoles, setMultisiteRoles] = useState<any[]>([]);
@@ -95,9 +96,39 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         .select('*')
         // Hämta ALLA kunder, både huvudkunder och multisite-enheter
         .order('company_name');
-      
+
       if (!error && data) {
         setContractCustomers(data);
+      }
+    };
+
+    // Hämta vilka kunder som har stationer (för stationskontroll-filtrering)
+    const fetchCustomersWithStations = async () => {
+      try {
+        // Hämta kunder med utomhusstationer
+        const { data: outdoorData } = await supabase
+          .from('equipment_placements')
+          .select('customer_id')
+          .eq('status', 'active');
+
+        // Hämta kunder med planritningar (som kan ha inomhusstationer)
+        const { data: floorPlanData } = await supabase
+          .from('floor_plans')
+          .select('customer_id');
+
+        const customerIds = new Set<string>();
+
+        outdoorData?.forEach(item => {
+          if (item.customer_id) customerIds.add(item.customer_id);
+        });
+
+        floorPlanData?.forEach(item => {
+          if (item.customer_id) customerIds.add(item.customer_id);
+        });
+
+        setCustomersWithStations(customerIds);
+      } catch (err) {
+        console.error('Kunde inte hämta kunder med stationer:', err);
       }
     };
 
@@ -151,6 +182,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     if (isOpen) {
       fetchContractCustomers();
       fetchMultisiteRoles();
+      fetchCustomersWithStations();
     }
   }, [isOpen]);
 
@@ -349,7 +381,31 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   };
   
   const handleSuggestTime = async () => {
-    if (!formData.adress || !formData.skadedjur) { return toast.error('Adress och Skadedjur måste vara ifyllda.'); }
+    // För stationskontroll, hämta adressen från vald kund
+    let searchAddress = formData.adress;
+    let searchPestType = formData.skadedjur;
+
+    if (caseType === 'inspection') {
+      // Hämta kundens adress för stationskontroll
+      const customer = selectedSiteId
+        ? contractCustomers.find(c => c.id === selectedSiteId)
+        : contractCustomers.find(c => c.id === selectedContractCustomer);
+
+      if (!customer) {
+        return toast.error('Välj en kund först.');
+      }
+      searchAddress = customer.contact_address || customer.service_address || '';
+      searchPestType = 'Stationskontroll'; // Dummy-värde för API
+
+      if (!searchAddress) {
+        return toast.error('Kunden saknar adress. Ange adress manuellt.');
+      }
+    } else {
+      if (!formData.adress || !formData.skadedjur) {
+        return toast.error('Adress och Skadedjur måste vara ifyllda.');
+      }
+    }
+
     setSuggestionLoading(true); setSuggestions([]); setTeamSuggestions([]); setError(null);
 
     const isTeamBooking = numberOfTechnicians > 1;
@@ -359,15 +415,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       const response = await fetch(endpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            newCaseAddress: formData.adress, pestType: formData.skadedjur,
+            newCaseAddress: searchAddress, pestType: searchPestType,
             timeSlotDuration: timeSlotDuration, searchStartDate: searchStartDate ? searchStartDate.toISOString().split('T')[0] : null,
             ...(isTeamBooking ? { numberOfTechnicians } : { selectedTechnicianIds })
         })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Något gick fel.');
-      
-      if (isTeamBooking) { setTeamSuggestions(data); } 
+
+      if (isTeamBooking) { setTeamSuggestions(data); }
       else { setSuggestions(data); }
 
       if (data.length === 0) toast.success('Inga optimala tider hittades.');
@@ -682,8 +738,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   };
 
+  // Dynamisk storlek för modalen
+  const getModalSize = () => {
+    if (step === 'selectType') return 'max-w-2xl'; // Smalare för typval
+    // Alla ärendetyper med tvåkolumnslayout behöver full bredd
+    return 'max-w-5xl';
+  };
+
   return (
-      <Modal isOpen={isOpen} onClose={onClose} title={getModalTitle()} size="w-11/12 max-w-4xl" preventClose={loading} footer={footer} usePortal={true}>
+      <Modal isOpen={isOpen} onClose={onClose} title={getModalTitle()} size={`w-full sm:w-11/12 ${getModalSize()}`} preventClose={loading} footer={footer} usePortal={true}>
         <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
           {step === 'selectType' && !initialCaseData && (
               <div className="space-y-4">
@@ -736,7 +799,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               {(caseType === 'contract' || caseType === 'inspection') && (
                 <div className={`p-4 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-lg`}>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Välj avtalskund *
+                    {caseType === 'inspection' ? 'Välj kund med stationer *' : 'Välj avtalskund *'}
                   </label>
                   <select
                     value={selectedContractCustomer || ''}
@@ -745,18 +808,31 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       setSelectedSiteId(null); // Reset site when customer changes
                       // Data fylls nu i via useEffect när selectedContractCustomer ändras
                     }}
-                    className={`w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none ${caseType === 'inspection' ? 'focus:border-cyan-500' : 'focus:border-emerald-500'}`}
+                    className={`w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none ${caseType === 'inspection' ? 'focus:border-cyan-500' : 'focus:border-emerald-500'}`}
                     required
                   >
-                    <option value="">Välj kund...</option>
+                    <option value="">{caseType === 'inspection' ? 'Välj kund med stationer...' : 'Välj kund...'}</option>
                     {contractCustomers
-                      .filter(c => !c.parent_customer_id) // Visa bara huvudkunder, inte multisite-enheter
+                      .filter(c => {
+                        // Visa bara huvudkunder, inte multisite-enheter
+                        if (c.parent_customer_id) return false;
+                        // För stationskontroll: Visa endast kunder med stationer
+                        if (caseType === 'inspection') {
+                          return customersWithStations.has(c.id);
+                        }
+                        return true;
+                      })
                       .map(customer => (
                         <option key={customer.id} value={customer.id}>
                           {customer.company_name} {customer.organization_number ? `(${customer.organization_number})` : ''}
                         </option>
                       ))}
                   </select>
+                  {caseType === 'inspection' && customersWithStations.size === 0 && (
+                    <p className="text-xs text-amber-400 mt-2">
+                      Inga kunder med etablerade stationer hittades.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -789,101 +865,198 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 })()
               )}
               
-              {/* STATIONSKONTROLL: Förenklat formulär */}
+              {/* STATIONSKONTROLL: Tvåkolumnslayout med bokningsassistent */}
               {caseType === 'inspection' && (
-                <div className="p-4 sm:p-6 bg-cyan-500/5 border border-cyan-500/20 rounded-lg space-y-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
-                      <ClipboardCheck className="w-5 h-5 text-cyan-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-white text-lg">Stationskontroll</h3>
-                      <p className="text-sm text-slate-400">Schemalägg kontroll av fällor och stationer</p>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Vänster kolumn: Intelligent bokning */}
+                  <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4">
+                    <h3 className="font-semibold text-white text-lg flex items-center gap-2">
+                      <Zap className="text-cyan-400"/>Intelligent Bokning
+                    </h3>
 
-                  {/* Bokningsinformation */}
-                  <div className="space-y-4">
-                    <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
-                      <Users size={16}/> Bokning
-                    </h4>
+                    {/* Sökparametrar för bokningsassistent */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Hitta tider från:</label>
                         <DatePicker
-                          selected={formData.start_date ? new Date(formData.start_date) : null}
-                          onChange={(date) => handleDateChange(date, 'start_date')}
+                          selected={searchStartDate}
+                          onChange={(date) => handleDateChange(date, 'searchStartDate')}
                           locale="sv"
-                          showTimeSelect
-                          timeFormat="HH:mm"
-                          timeIntervals={15}
-                          dateFormat="yyyy-MM-dd HH:mm"
-                          timeCaption="Tid"
-                          placeholderText="Välj starttid..."
+                          dateFormat="yyyy-MM-dd"
+                          placeholderText="Välj startdatum..."
                           isClearable
-                          required
                           className="w-full"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Sluttid *</label>
-                        <DatePicker
-                          selected={formData.due_date ? new Date(formData.due_date) : null}
-                          onChange={(date) => handleDateChange(date, 'due_date')}
-                          locale="sv"
-                          showTimeSelect
-                          timeFormat="HH:mm"
-                          timeIntervals={15}
-                          dateFormat="yyyy-MM-dd HH:mm"
-                          timeCaption="Tid"
-                          placeholderText="Välj sluttid..."
-                          isClearable
-                          required
-                          className="w-full"
-                        />
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Tidsåtgång</label>
+                        <select
+                          value={timeSlotDuration}
+                          onChange={e => setTimeSlotDuration(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                        >
+                          <option value={60}>1 timme</option>
+                          <option value={90}>1.5 timmar</option>
+                          <option value={120}>2 timmar</option>
+                          <option value={180}>3 timmar</option>
+                          <option value={240}>4 timmar</option>
+                        </select>
                       </div>
                     </div>
+
+                    {/* Teknikerval för sökning */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Ansvarig tekniker *</label>
-                      <select
-                        name="primary_assignee_id"
-                        value={formData.primary_assignee_id || ''}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
-                      >
-                        <option value="" disabled>Välj tekniker...</option>
-                        {technicians.map(t => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
+                      <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                        <Users size={16} /> Sök bland valda tekniker
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {technicians.map(tech => (
+                          <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-cyan-500 focus:ring-cyan-500"
+                              checked={selectedTechnicianIds.includes(tech.id)}
+                              onChange={() => handleTechnicianSelectionChange(tech.id)}
+                            />
+                            <span className="text-sm text-white truncate">{tech.name}</span>
+                          </label>
                         ))}
-                      </select>
+                      </div>
                     </div>
+
+                    {/* Hitta tider-knapp */}
+                    <Button
+                      type="button"
+                      onClick={handleSuggestTime}
+                      loading={suggestionLoading}
+                      className="w-full"
+                      variant="primary"
+                      size="lg"
+                      disabled={!selectedContractCustomer}
+                    >
+                      <Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker
+                    </Button>
+
+                    {!selectedContractCustomer && (
+                      <p className="text-xs text-amber-400 text-center">Välj en kund först för att använda bokningsassistenten</p>
+                    )}
+
+                    {/* Laddningsindikator */}
+                    {suggestionLoading && (
+                      <div className="text-center py-4">
+                        <LoadingSpinner text="Analyserar rutter och hittar optimala tider..." />
+                      </div>
+                    )}
+
+                    {/* Bokningsförslag */}
+                    {suggestions.length > 0 && (
+                      <div className="pt-4 border-t border-slate-700">
+                        <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                          <CalendarSearch className="w-4 h-4 text-cyan-400" />
+                          Bokningsförslag ({suggestions.length} st)
+                        </h4>
+                        <div className="max-h-[40vh] overflow-y-auto pr-1 -mr-1">
+                          <BookingSuggestionList
+                            suggestions={suggestions}
+                            onSelect={applySuggestion}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Valfri beskrivning */}
-                  <div className="space-y-4">
-                    <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
-                      <FileText size={16}/> Övrig information (valfritt)
-                    </h4>
+                  {/* Höger kolumn: Bokning & Detaljer */}
+                  <div className="p-4 sm:p-6 bg-cyan-500/5 border border-cyan-500/20 rounded-lg space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                        <ClipboardCheck className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white text-lg">Bokningsdetaljer</h3>
+                        <p className="text-sm text-slate-400">Tid och tekniker för stationskontroll</p>
+                      </div>
+                    </div>
+
+                    {/* Tid och tekniker */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label>
+                          <DatePicker
+                            selected={formData.start_date ? new Date(formData.start_date) : null}
+                            onChange={(date) => handleDateChange(date, 'start_date')}
+                            locale="sv"
+                            showTimeSelect
+                            timeFormat="HH:mm"
+                            timeIntervals={15}
+                            dateFormat="yyyy-MM-dd HH:mm"
+                            timeCaption="Tid"
+                            placeholderText="Välj starttid..."
+                            isClearable
+                            required
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Sluttid *</label>
+                          <DatePicker
+                            selected={formData.due_date ? new Date(formData.due_date) : null}
+                            onChange={(date) => handleDateChange(date, 'due_date')}
+                            locale="sv"
+                            showTimeSelect
+                            timeFormat="HH:mm"
+                            timeIntervals={15}
+                            dateFormat="yyyy-MM-dd HH:mm"
+                            timeCaption="Tid"
+                            placeholderText="Välj sluttid..."
+                            minDate={formData.start_date ? new Date(formData.start_date) : undefined}
+                            isClearable
+                            required
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Ansvarig tekniker *</label>
+                        <select
+                          name="primary_assignee_id"
+                          value={formData.primary_assignee_id || ''}
+                          onChange={handleChange}
+                          required
+                          className="w-full px-3 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-base"
+                        >
+                          <option value="" disabled>Välj tekniker...</option>
+                          {technicians.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Anteckningar */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Anteckningar till tekniker</label>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        <FileText size={14} className="inline mr-1" />
+                        Anteckningar till tekniker (valfritt)
+                      </label>
                       <textarea
                         name="description"
                         value={formData.description || ''}
                         onChange={handleChange}
                         rows={3}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-base"
                         placeholder="T.ex. portkod, speciella instruktioner..."
                       />
                     </div>
-                  </div>
 
-                  {/* Info-ruta */}
-                  <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                    <p className="text-sm text-slate-400">
-                      <span className="font-medium text-cyan-400">Tips:</span> Stationskontrollen kommer automatiskt visa alla stationer (utomhus och inomhus) för den valda kunden.
-                      Teknikern kan sedan gå igenom och kontrollera varje station i valfri ordning.
-                    </p>
+                    {/* Info-ruta */}
+                    <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                      <p className="text-sm text-slate-400">
+                        <span className="font-medium text-cyan-400">Tips:</span> Stationskontrollen kommer automatiskt visa alla stationer (utomhus och inomhus) för den valda kunden.
+                        Teknikern kan sedan gå igenom och kontrollera varje station i valfri ordning.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
