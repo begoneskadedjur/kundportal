@@ -1,7 +1,8 @@
 // src/components/technician/CustomerStationsModal.tsx
 // Fullständig kunddetaljmodal med tabbar: Utomhus (karta) och Inomhus (planritningar)
+// Med inline inomhusplacering för att lägga till stationer direkt på planritningar
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -19,17 +20,31 @@ import {
   Phone,
   Mail,
   Navigation,
-  FileImage
+  FileImage,
+  Upload
 } from 'lucide-react'
 import { CustomerStationSummary } from '../../services/equipmentService'
 import { StationHealthBadge, StationHealthDetail, calculateHealthStatusWithPercentage } from '../shared/StationHealthBadge'
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService } from '../../services/floorPlanService'
+import { IndoorStationService } from '../../services/indoorStationService'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
+import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
+import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
+import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
+import { StationLegend } from '../shared/indoor/IndoorStationMarker'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG, EQUIPMENT_STATUS_CONFIG } from '../../types/database'
-import { FloorPlanWithRelations } from '../../types/indoor'
+import {
+  FloorPlanWithRelations,
+  IndoorStationWithRelations,
+  IndoorStationType,
+  PlacementMode,
+  CreateFloorPlanInput,
+  CreateIndoorStationInput
+} from '../../types/indoor'
 import { openInMapsApp } from '../../utils/equipmentMapUtils'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 interface CustomerStationsModalProps {
@@ -67,12 +82,25 @@ export function CustomerStationsModal({
   onAddStation,
   onStationClick
 }: CustomerStationsModalProps) {
+  const { profile } = useAuth()
   const [activeView, setActiveView] = useState<ViewType>('outdoor')
   const [loading, setLoading] = useState(false)
   const [outdoorStations, setOutdoorStations] = useState<EquipmentPlacementWithRelations[]>([])
-  const [indoorStations, setIndoorStations] = useState<any[]>([])
+  const [indoorStations, setIndoorStations] = useState<IndoorStationWithRelations[]>([])
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails | null>(null)
   const [floorPlans, setFloorPlans] = useState<FloorPlanWithRelations[]>([])
+
+  // Inomhusplacering state
+  const [selectedFloorPlan, setSelectedFloorPlan] = useState<FloorPlanWithRelations | null>(null)
+  const [floorPlanStations, setFloorPlanStations] = useState<IndoorStationWithRelations[]>([])
+  const [placementMode, setPlacementMode] = useState<PlacementMode>('view')
+  const [selectedStationType, setSelectedStationType] = useState<IndoorStationType | null>(null)
+  const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showTypeSelector, setShowTypeSelector] = useState(false)
+  const [showStationForm, setShowStationForm] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAddingIndoor, setIsAddingIndoor] = useState(false)
 
   // Ladda data när modal öppnas
   useEffect(() => {
@@ -129,6 +157,134 @@ export function CustomerStationsModal({
       setLoading(false)
     }
   }
+
+  // Ladda stationer för vald planritning
+  const loadStationsForFloorPlan = async (floorPlanId: string) => {
+    try {
+      const stationList = await IndoorStationService.getStationsByFloorPlan(floorPlanId)
+      setFloorPlanStations(stationList)
+    } catch (error) {
+      console.error('Fel vid hämtning av stationer för planritning:', error)
+    }
+  }
+
+  // Hantera val av planritning
+  const handleSelectFloorPlan = (plan: FloorPlanWithRelations) => {
+    setSelectedFloorPlan(plan)
+    loadStationsForFloorPlan(plan.id)
+  }
+
+  // Hantera klick på planritningsbild för placering
+  const handleImageClick = useCallback((x: number, y: number) => {
+    if (placementMode === 'place' && selectedStationType) {
+      setPreviewPosition({ x, y })
+      setShowStationForm(true)
+    }
+  }, [placementMode, selectedStationType])
+
+  // Starta placeringsläge med vald stationstyp
+  const startPlacementMode = (type: IndoorStationType) => {
+    setSelectedStationType(type)
+    setPlacementMode('place')
+    setShowTypeSelector(false)
+  }
+
+  // Återställ placeringsläge
+  const resetPlacementMode = () => {
+    setPlacementMode('view')
+    setSelectedStationType(null)
+    setPreviewPosition(null)
+  }
+
+  // Hantera uppladdning av planritning
+  const handleUploadFloorPlan = async (input: CreateFloorPlanInput) => {
+    setIsSubmitting(true)
+    try {
+      const newPlan = await FloorPlanService.createFloorPlan(input, profile?.id)
+      toast.success('Planritning uppladdad!')
+      setShowUploadModal(false)
+      // Ladda om planritningar och välj den nya
+      if (customer) {
+        const updatedPlans = await FloorPlanService.getFloorPlansByCustomer(customer.customer_id)
+        setFloorPlans(updatedPlans)
+        const createdPlan = await FloorPlanService.getFloorPlanById(newPlan.id)
+        if (createdPlan) {
+          setSelectedFloorPlan(createdPlan)
+          setFloorPlanStations([])
+        }
+      }
+    } catch (error) {
+      console.error('Fel vid uppladdning:', error)
+      toast.error(error instanceof Error ? error.message : 'Kunde inte ladda upp planritning')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Skapa ny inomhusstation
+  const handleCreateStation = async (input: CreateIndoorStationInput) => {
+    setIsSubmitting(true)
+    try {
+      const technicianId = profile?.technician_id || profile?.technicians?.id
+      await IndoorStationService.createStation(input, technicianId)
+      toast.success('Station placerad!')
+      setShowStationForm(false)
+      resetPlacementMode()
+
+      // Ladda om stationer och uppdatera räknare
+      if (selectedFloorPlan) {
+        await loadStationsForFloorPlan(selectedFloorPlan.id)
+        // Uppdatera planritningens stationsantal
+        const updatedPlan = await FloorPlanService.getFloorPlanById(selectedFloorPlan.id)
+        if (updatedPlan) setSelectedFloorPlan(updatedPlan)
+      }
+
+      // Uppdatera total inomhusstationslista
+      if (customer) {
+        const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+        setIndoorStations(indoor)
+        // Uppdatera planritningar med nya antal
+        const updatedPlans = await FloorPlanService.getFloorPlansByCustomer(customer.customer_id)
+        setFloorPlans(updatedPlans)
+      }
+    } catch (error) {
+      console.error('Fel vid skapande av station:', error)
+      toast.error(error instanceof Error ? error.message : 'Kunde inte skapa station')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Hantera "Lägg till station"-knappen
+  const handleAddStationClick = () => {
+    if (activeView === 'indoor') {
+      // Inomhus: Aktivera inomhusplaceringsläge
+      if (floorPlans.length === 0) {
+        // Inga planritningar - visa uppladdningsmodal
+        setShowUploadModal(true)
+      } else {
+        // Välj första planritningen om ingen är vald
+        if (!selectedFloorPlan && floorPlans.length > 0) {
+          handleSelectFloorPlan(floorPlans[0])
+        }
+        setIsAddingIndoor(true)
+      }
+    } else {
+      // Utomhus: Anropa original callback
+      onAddStation?.(customer!.customer_id, 'outdoor')
+    }
+  }
+
+  // Avbryt inomhusplacering
+  const cancelIndoorPlacement = () => {
+    setIsAddingIndoor(false)
+    resetPlacementMode()
+    setShowTypeSelector(false)
+    setShowStationForm(false)
+  }
+
+  // Hämta byggnadsnamn för uppladdning
+  const existingBuildings = [...new Set(floorPlans.map(p => p.building_name).filter(Boolean))] as string[]
 
   // Beräkna hälsostatus
   const allStations = [...outdoorStations, ...indoorStations.map(s => ({ status: s.status }))]
@@ -333,109 +489,222 @@ export function CustomerStationsModal({
 
                     {/* Inomhus - Planritningar + stationslista */}
                     {activeView === 'indoor' && (
-                      <div className="p-5 space-y-6">
-                        {/* Planritningar med stationsmarkörer */}
-                        {floorPlans.length > 0 ? (
-                          <div>
-                            <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
-                              <FileImage className="w-4 h-4" />
-                              Planritningar ({floorPlans.length})
-                            </h3>
-                            <div className="space-y-4">
-                              {floorPlans.map(plan => {
-                                const stationsOnPlan = indoorStations.filter(s => s.floor_plan_id === plan.id)
-                                return (
-                                  <div
+                      <>
+                        {/* PLACERINGSLÄGE - Visa FloorPlanViewer med interaktivt placeringsläge */}
+                        {isAddingIndoor ? (
+                          <div className="flex flex-col h-full">
+                            {/* Planritningsval i placeringsläge */}
+                            <div className="px-4 py-3 border-b border-slate-700/50 bg-slate-900/50 flex-shrink-0">
+                              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                                {floorPlans.map((plan) => (
+                                  <button
                                     key={plan.id}
-                                    className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden"
+                                    onClick={() => handleSelectFloorPlan(plan)}
+                                    className={`
+                                      flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap
+                                      ${plan.id === selectedFloorPlan?.id
+                                        ? 'bg-cyan-600 text-white'
+                                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                                      }
+                                    `}
                                   >
-                                    {/* Planritningsbild med markörer */}
-                                    {plan.image_url ? (
-                                      <div className="relative bg-slate-900 overflow-hidden">
-                                        {/* Container som matchar bildens aspektratio */}
-                                        <div className="relative w-full" style={{ paddingBottom: plan.image_height && plan.image_width ? `${(plan.image_height / plan.image_width) * 100}%` : '66.67%' }}>
-                                          <img
-                                            src={plan.image_url}
-                                            alt={plan.name}
-                                            className="absolute inset-0 w-full h-full object-contain"
-                                          />
-                                          {/* Stationsmarkörer */}
-                                          {stationsOnPlan.map(station => {
-                                            const TypeIcon = INDOOR_TYPE_ICONS[station.station_type] || Box
-                                            return (
-                                              <button
-                                                key={station.id}
-                                                onClick={() => onStationClick?.(station, 'indoor')}
-                                                className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 bg-cyan-500 border-2 border-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer z-10"
-                                                style={{
-                                                  left: `${station.position_x_percent}%`,
-                                                  top: `${station.position_y_percent}%`
-                                                }}
-                                                title={station.station_number || 'Station'}
-                                              >
-                                                <TypeIcon className="w-4 h-4 text-white" />
-                                              </button>
-                                            )
-                                          })}
+                                    {plan.name}
+                                    <span className={`ml-1.5 ${plan.id === selectedFloorPlan?.id ? 'text-cyan-200' : 'text-slate-500'}`}>
+                                      ({plan.station_count || 0})
+                                    </span>
+                                  </button>
+                                ))}
+                                <button
+                                  onClick={() => setShowUploadModal(true)}
+                                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700/30 text-cyan-400 hover:bg-cyan-600/10 border border-dashed border-slate-600 hover:border-cyan-500 transition-all flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Ny
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Planritningsvisare med placeringsläge */}
+                            <div className="flex-1 min-h-0 relative">
+                              {selectedFloorPlan?.image_url ? (
+                                <FloorPlanViewer
+                                  imageUrl={selectedFloorPlan.image_url}
+                                  imageWidth={selectedFloorPlan.image_width}
+                                  imageHeight={selectedFloorPlan.image_height}
+                                  stations={floorPlanStations}
+                                  placementMode={placementMode}
+                                  selectedType={selectedStationType}
+                                  previewPosition={previewPosition}
+                                  onImageClick={handleImageClick}
+                                  onCancelPlacement={resetPlacementMode}
+                                  onStationClick={(station) => onStationClick?.(station, 'indoor')}
+                                  height="350px"
+                                />
+                              ) : (
+                                <div className="flex items-center justify-center h-full min-h-[300px]">
+                                  <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                              )}
+
+                              {/* FAB för att välja stationstyp (endast i visningsläge) */}
+                              {placementMode === 'view' && selectedFloorPlan && (
+                                <button
+                                  onClick={() => setShowTypeSelector(true)}
+                                  className="absolute bottom-4 right-4 w-14 h-14 bg-cyan-600 hover:bg-cyan-500 text-white rounded-full shadow-lg shadow-cyan-600/30 flex items-center justify-center transition-all hover:scale-105 z-20"
+                                >
+                                  <Plus className="w-6 h-6" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Legend och avbryt-knapp */}
+                            <div className="px-4 py-3 border-t border-slate-700/50 bg-slate-900/50 flex-shrink-0">
+                              <div className="flex items-center justify-between">
+                                {floorPlanStations.length > 0 ? (
+                                  <StationLegend />
+                                ) : (
+                                  <p className="text-sm text-slate-400">Klicka på planritningen för att placera stationer</p>
+                                )}
+                                <button
+                                  onClick={cancelIndoorPlacement}
+                                  className="px-4 py-2 text-sm text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                                >
+                                  Avbryt
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Placeringsindikator */}
+                            {placementMode === 'place' && (
+                              <div className="px-4 py-3 bg-cyan-600/20 border-t border-cyan-500/30 flex-shrink-0">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-cyan-300 text-sm">
+                                    Klicka pa planritningen for att placera stationen
+                                  </p>
+                                  <button
+                                    onClick={resetPlacementMode}
+                                    className="px-3 py-1 text-sm text-cyan-400 hover:text-white transition-colors"
+                                  >
+                                    Avbryt
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* VISNINGSLÄGE - Visa planritningar och stationslista */
+                          <div className="p-5 space-y-6">
+                            {/* Planritningar med stationsmarkörer */}
+                            {floorPlans.length > 0 ? (
+                              <div>
+                                <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                                  <FileImage className="w-4 h-4" />
+                                  Planritningar ({floorPlans.length})
+                                </h3>
+                                <div className="space-y-4">
+                                  {floorPlans.map(plan => {
+                                    const stationsOnPlan = indoorStations.filter(s => s.floor_plan_id === plan.id)
+                                    return (
+                                      <div
+                                        key={plan.id}
+                                        className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden"
+                                      >
+                                        {/* Planritningsbild med markörer */}
+                                        {plan.image_url ? (
+                                          <div className="relative bg-slate-900 overflow-hidden">
+                                            {/* Container som matchar bildens aspektratio */}
+                                            <div className="relative w-full" style={{ paddingBottom: plan.image_height && plan.image_width ? `${(plan.image_height / plan.image_width) * 100}%` : '66.67%' }}>
+                                              <img
+                                                src={plan.image_url}
+                                                alt={plan.name}
+                                                className="absolute inset-0 w-full h-full object-contain"
+                                              />
+                                              {/* Stationsmarkörer */}
+                                              {stationsOnPlan.map(station => {
+                                                const TypeIcon = INDOOR_TYPE_ICONS[station.station_type] || Box
+                                                return (
+                                                  <button
+                                                    key={station.id}
+                                                    onClick={() => onStationClick?.(station, 'indoor')}
+                                                    className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 bg-cyan-500 border-2 border-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer z-10"
+                                                    style={{
+                                                      left: `${station.position_x_percent}%`,
+                                                      top: `${station.position_y_percent}%`
+                                                    }}
+                                                    title={station.station_number || 'Station'}
+                                                  >
+                                                    <TypeIcon className="w-4 h-4 text-white" />
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="w-full h-40 bg-slate-800 flex items-center justify-center">
+                                            <FileImage className="w-12 h-12 text-slate-600" />
+                                          </div>
+                                        )}
+                                        <div className="p-3 border-t border-slate-700/50">
+                                          <h4 className="font-medium text-white">{plan.name}</h4>
+                                          <p className="text-xs text-slate-400 mt-1">
+                                            {stationsOnPlan.length} {stationsOnPlan.length === 1 ? 'station' : 'stationer'}
+                                          </p>
                                         </div>
                                       </div>
-                                    ) : (
-                                      <div className="w-full h-40 bg-slate-800 flex items-center justify-center">
-                                        <FileImage className="w-12 h-12 text-slate-600" />
-                                      </div>
-                                    )}
-                                    <div className="p-3 border-t border-slate-700/50">
-                                      <h4 className="font-medium text-white">{plan.name}</h4>
-                                      <p className="text-xs text-slate-400 mt-1">
-                                        {stationsOnPlan.length} {stationsOnPlan.length === 1 ? 'station' : 'stationer'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-8">
-                            <FileImage className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                            <p className="text-slate-400">Inga planritningar uppladdade</p>
-                          </div>
-                        )}
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <FileImage className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                                <p className="text-slate-400 mb-4">Inga planritningar uppladdade</p>
+                                <button
+                                  onClick={() => setShowUploadModal(true)}
+                                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-lg transition-colors inline-flex items-center gap-2"
+                                >
+                                  <Upload className="w-4 h-4" />
+                                  Ladda upp planritning
+                                </button>
+                              </div>
+                            )}
 
-                        {/* Inomhusstationslista */}
-                        {indoorStations.length > 0 ? (
-                          <div>
-                            <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
-                              <Home className="w-4 h-4" />
-                              Inomhusstationer ({indoorStations.length})
-                            </h3>
-                            <div className="space-y-2">
-                              {indoorStations.map(station => (
-                                <IndoorStationCard
-                                  key={station.id}
-                                  station={station}
-                                  onClick={() => onStationClick?.(station, 'indoor')}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-8">
-                            <Home className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                            <p className="text-slate-400">Inga inomhusstationer utplacerade</p>
+                            {/* Inomhusstationslista */}
+                            {indoorStations.length > 0 ? (
+                              <div>
+                                <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                                  <Home className="w-4 h-4" />
+                                  Inomhusstationer ({indoorStations.length})
+                                </h3>
+                                <div className="space-y-2">
+                                  {indoorStations.map(station => (
+                                    <IndoorStationCard
+                                      key={station.id}
+                                      station={station}
+                                      onClick={() => onStationClick?.(station, 'indoor')}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <Home className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                                <p className="text-slate-400">Inga inomhusstationer utplacerade</p>
+                              </div>
+                            )}
                           </div>
                         )}
-                      </div>
+                      </>
                     )}
                   </>
                 )}
               </div>
 
-              {/* Footer med lägg till-knapp */}
-              {onAddStation && (
+              {/* Footer med lägg till-knapp - döljs i inomhusplaceringsläge */}
+              {!isAddingIndoor && (
                 <div className="px-5 py-4 border-t border-slate-700 bg-slate-800/50">
                   <button
-                    onClick={() => onAddStation(customer.customer_id, activeView)}
+                    onClick={handleAddStationClick}
                     className={`w-full py-3 px-4 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
                       activeView === 'outdoor'
                         ? 'bg-blue-500 hover:bg-blue-600 text-white'
@@ -459,6 +728,66 @@ export function CustomerStationsModal({
               )}
             </div>
           </motion.div>
+
+          {/* Modal: Ladda upp planritning */}
+          {showUploadModal && customer && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
+              <div className="relative bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+                <div className="p-4">
+                  <FloorPlanUploadForm
+                    customerId={customer.customer_id}
+                    customerName={customer.customer_name}
+                    existingBuildings={existingBuildings}
+                    onSubmit={handleUploadFloorPlan}
+                    onCancel={() => setShowUploadModal(false)}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Sheet: Välj stationstyp */}
+          {showTypeSelector && (
+            <div className="fixed inset-0 z-[60] flex items-end md:items-center md:justify-center">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowTypeSelector(false)} />
+              <div className="relative w-full md:max-w-md md:mx-4 bg-slate-800 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-center pt-3 pb-1 md:hidden">
+                  <div className="w-10 h-1 bg-slate-600 rounded-full" />
+                </div>
+                <div className="p-4">
+                  <h3 className="text-lg font-semibold text-white mb-4">Ny station</h3>
+                  <StationTypeSelector
+                    selectedType={selectedStationType}
+                    onSelect={(type) => startPlacementMode(type)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Sheet: Stationsformulär */}
+          {showStationForm && previewPosition && selectedFloorPlan && (
+            <div className="fixed inset-0 z-[60] flex items-end md:items-center md:justify-center">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setShowStationForm(false); resetPlacementMode() }} />
+              <div className="relative w-full md:max-w-md md:mx-4 bg-slate-800 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-center pt-3 pb-1 md:hidden">
+                  <div className="w-10 h-1 bg-slate-600 rounded-full" />
+                </div>
+                <div className="p-4">
+                  <IndoorStationForm
+                    floorPlanId={selectedFloorPlan.id}
+                    position={previewPosition}
+                    existingStationNumbers={floorPlanStations.map(s => s.station_number).filter(Boolean) as string[]}
+                    onSubmit={handleCreateStation}
+                    onCancel={() => { setShowStationForm(false); resetPlacementMode() }}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </AnimatePresence>
