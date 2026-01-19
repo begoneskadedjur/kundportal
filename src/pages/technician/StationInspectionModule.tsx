@@ -1,5 +1,5 @@
 // src/pages/technician/StationInspectionModule.tsx
-// TEST 6: Lägg till framer-motion (motion + AnimatePresence)
+// TEST 7: Lägg till AnimatedProgressBar-komponenten
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -8,6 +8,9 @@ import { ArrowLeft, MapPin, Building2 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { supabase } from '../../lib/supabase'
+
+// TEST 7: Importera AnimatedProgressBar
+import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
 
 // Service-funktioner
 import {
@@ -44,7 +47,7 @@ export default function StationInspectionModule() {
       }
 
       try {
-        console.log('TEST 6: Laddar med framer-motion...')
+        console.log('TEST 7: Laddar med AnimatedProgressBar...')
 
         const { data, error: caseError } = await supabase
           .from('cases')
@@ -100,7 +103,13 @@ export default function StationInspectionModule() {
     icon: INSPECTION_STATUS_CONFIG[key].icon
   }))
 
-  console.log('TEST 6: Render med framer-motion')
+  // TEST 7: Steg för AnimatedProgressBar
+  const wizardSteps = [
+    { id: 1, title: 'Utomhus', icon: MapPin },
+    { id: 2, title: 'Inomhus', icon: Building2 }
+  ]
+
+  console.log('TEST 7: Render med AnimatedProgressBar')
 
   if (loading) {
     return (
@@ -135,12 +144,20 @@ export default function StationInspectionModule() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-white">TEST 6: framer-motion</h1>
-            <p className="text-slate-400 text-sm">motion + AnimatePresence</p>
+            <h1 className="text-xl font-bold text-white">TEST 7: AnimatedProgressBar</h1>
+            <p className="text-slate-400 text-sm">Testar AnimatedProgressBar-komponenten</p>
           </div>
         </div>
 
-        {/* Tabs med AnimatePresence */}
+        {/* TEST 7: AnimatedProgressBar */}
+        <div className="glass rounded-xl p-4 mb-4">
+          <AnimatedProgressBar
+            steps={wizardSteps}
+            currentStep={activeTab === 'outdoor' ? 1 : 2}
+          />
+        </div>
+
+        {/* Tabs */}
         <div className="glass rounded-xl p-4 mb-4">
           <div className="flex gap-2 mb-4">
             <button
@@ -167,7 +184,6 @@ export default function StationInspectionModule() {
             </button>
           </div>
 
-          {/* AnimatePresence för tab-innehåll */}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -180,32 +196,18 @@ export default function StationInspectionModule() {
                 <div className="space-y-2">
                   <h3 className="text-white font-medium">Utomhusstationer</h3>
                   {outdoorStations.map((station, i) => (
-                    <motion.div
-                      key={station.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="bg-slate-800 p-3 rounded-lg"
-                    >
+                    <div key={station.id} className="bg-slate-800 p-3 rounded-lg">
                       <p className="text-slate-300">{station.serial_number || `Station ${i + 1}`}</p>
-                      <p className="text-slate-500 text-sm">{station.station_type_data?.name || station.equipment_type}</p>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
               ) : (
                 <div className="space-y-2">
                   <h3 className="text-white font-medium">Inomhusstationer</h3>
                   {indoorStations.map((station, i) => (
-                    <motion.div
-                      key={station.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="bg-slate-800 p-3 rounded-lg"
-                    >
+                    <div key={station.id} className="bg-slate-800 p-3 rounded-lg">
                       <p className="text-slate-300">{station.station_number || `Station ${i + 1}`}</p>
-                      <p className="text-slate-500 text-sm">{station.floor_plan?.name}</p>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -213,46 +215,30 @@ export default function StationInspectionModule() {
           </AnimatePresence>
         </div>
 
-        {/* Status selector */}
-        <div className="glass rounded-xl p-6 mb-4">
-          <h2 className="text-lg font-semibold text-white mb-4">Status</h2>
-          <div className="flex gap-2 flex-wrap">
+        {/* Status + Progress */}
+        <div className="glass rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Status & Progress</h2>
+          <div className="flex gap-2 flex-wrap mb-4">
             {STATUS_OPTIONS.map(opt => (
-              <motion.button
+              <button
                 key={opt.key}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
                 onClick={() => setSelectedStatus(opt.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                className={`px-4 py-2 rounded-lg text-sm ${
                   selectedStatus === opt.key
                     ? 'bg-green-500 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    : 'bg-slate-700 text-slate-300'
                 }`}
               >
-                <span>{opt.icon}</span>
-                <span>{opt.label}</span>
-              </motion.button>
+                {opt.icon} {opt.label}
+              </button>
             ))}
           </div>
-        </div>
-
-        {/* Progress */}
-        {progress && (
-          <div className="glass rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Progress</h2>
-            <div className="w-full bg-slate-700 rounded-full h-3 mb-2">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progress.percentComplete}%` }}
-                transition={{ duration: 0.5 }}
-                className="bg-green-500 h-3 rounded-full"
-              />
-            </div>
+          {progress && (
             <p className="text-slate-300">
-              {progress.inspectedStations}/{progress.totalStations} ({progress.percentComplete}%)
+              Progress: {progress.inspectedStations}/{progress.totalStations} ({progress.percentComplete}%)
             </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </motion.div>
   )
