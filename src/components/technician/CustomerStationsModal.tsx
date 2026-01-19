@@ -158,9 +158,9 @@ export function CustomerStationsModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-2 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:max-h-[90vh] z-50"
+            className="fixed inset-2 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:h-auto md:max-h-[90vh] z-50 flex flex-col"
           >
-            <div className="h-full bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex-1 min-h-0 bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
               {/* Header */}
               <div className="px-5 py-4 border-b border-slate-700 flex-shrink-0 bg-slate-800">
                 <div className="flex items-start justify-between gap-3">

@@ -69,28 +69,22 @@ export function CollapsibleMapSection({
 
           {/* Statusfördelning */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm text-slate-300">Aktiva</span>
-              </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm text-slate-300">Aktiva</span>
               <span className="text-sm font-medium text-emerald-400">{activeCount}</span>
             </div>
             {problematicCount > 0 && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400" />
-                  <span className="text-sm text-slate-300">Kräver åtgärd</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <span className="text-sm text-slate-300">Kräver åtgärd</span>
                 <span className="text-sm font-medium text-amber-400">{problematicCount}</span>
               </div>
             )}
             {removedCount > 0 && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm text-slate-300">Borttagna</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-slate-400" />
+                <span className="text-sm text-slate-300">Borttagna</span>
                 <span className="text-sm font-medium text-slate-400">{removedCount}</span>
               </div>
             )}
