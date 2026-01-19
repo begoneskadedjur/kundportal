@@ -15,7 +15,7 @@ import { StationLegend } from './IndoorStationMarker'
 import { FloorPlanService } from '../../../services/floorPlanService'
 import { IndoorStationService } from '../../../services/indoorStationService'
 
-import {
+import type {
   FloorPlanWithRelations,
   IndoorStationWithRelations,
   IndoorStationInspectionWithRelations,

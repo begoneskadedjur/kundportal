@@ -1,14 +1,16 @@
 // src/components/shared/indoor/IndoorStationMarker.tsx
 // Markör-komponent för stationer på planritning
 
-import {
+import type {
   IndoorStationWithRelations,
   IndoorStationType,
-  IndoorStationStatus,
+  IndoorStationStatus
+} from '../../../types/indoor'
+import {
   INDOOR_STATION_TYPE_CONFIG,
   INDOOR_STATION_STATUS_CONFIG
 } from '../../../types/indoor'
-import { CalculatedStatus } from '../../../types/stationTypes'
+import type { CalculatedStatus } from '../../../types/stationTypes'
 import { CALCULATED_STATUS_CONFIG } from '../CalculatedStatusBadge'
 
 interface IndoorStationMarkerProps {

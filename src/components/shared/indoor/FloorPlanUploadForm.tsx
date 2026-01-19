@@ -3,7 +3,7 @@
 
 import { useState, useRef } from 'react'
 import { Upload, X, Image as ImageIcon, Building2, FileText } from 'lucide-react'
-import { CreateFloorPlanInput } from '../../../types/indoor'
+import type { CreateFloorPlanInput } from '../../../types/indoor'
 import { ALLOWED_FLOOR_PLAN_TYPES, MAX_FLOOR_PLAN_SIZE } from '../../../services/floorPlanService'
 
 interface FloorPlanUploadFormProps {

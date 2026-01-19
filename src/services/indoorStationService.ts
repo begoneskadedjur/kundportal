@@ -1,6 +1,6 @@
 // src/services/indoorStationService.ts - Service för inomhusstationer
 import { supabase } from '../lib/supabase'
-import {
+import type {
   IndoorStation,
   IndoorStationWithRelations,
   IndoorStationInspection,
@@ -8,9 +8,9 @@ import {
   CreateIndoorStationInput,
   UpdateIndoorStationInput,
   CreateInspectionInput,
-  IndoorStationStatus,
-  generateStationNumber
+  IndoorStationStatus
 } from '../types/indoor'
+import { generateStationNumber } from '../types/indoor'
 
 export const INDOOR_STATION_PHOTOS_BUCKET = 'indoor-station-photos'
 export const MAX_STATION_PHOTO_SIZE = 5 * 1024 * 1024 // 5MB

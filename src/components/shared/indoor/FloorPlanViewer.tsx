@@ -4,7 +4,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch'
 import { ZoomIn, ZoomOut, Maximize, Move, Plus, X } from 'lucide-react'
-import { IndoorStationWithRelations, PlacementMode, IndoorStationType, INDOOR_STATION_TYPE_CONFIG } from '../../../types/indoor'
+import type { IndoorStationWithRelations, PlacementMode, IndoorStationType } from '../../../types/indoor'
+import { INDOOR_STATION_TYPE_CONFIG } from '../../../types/indoor'
 import { IndoorStationMarker } from './IndoorStationMarker'
 
 interface FloorPlanViewerProps {

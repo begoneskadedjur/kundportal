@@ -1,8 +1,8 @@
 // src/types/inspectionSession.ts
 // TypeScript-typer för stationskontroll-sessioner (Fas 5)
 
-import { InspectionStatus } from './indoor'
-import { MeasurementUnit } from './stationTypes'
+import type { InspectionStatus } from './indoor'
+import type { MeasurementUnit } from './stationTypes'
 
 // ============================================
 // SESSION STATUS

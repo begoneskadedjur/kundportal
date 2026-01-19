@@ -3,12 +3,14 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2 } from 'lucide-react'
-import {
+import type {
   IndoorStationType,
   IndoorStationWithRelations,
-  INDOOR_STATION_TYPE_CONFIG,
   CreateIndoorStationInput,
-  UpdateIndoorStationInput,
+  UpdateIndoorStationInput
+} from '../../../types/indoor'
+import {
+  INDOOR_STATION_TYPE_CONFIG,
   generateStationNumber
 } from '../../../types/indoor'
 import { MAX_STATION_PHOTO_SIZE, ALLOWED_PHOTO_TYPES } from '../../../services/indoorStationService'

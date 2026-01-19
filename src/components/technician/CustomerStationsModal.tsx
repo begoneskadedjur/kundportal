@@ -34,7 +34,7 @@ import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
 import { StationLegend } from '../shared/indoor/IndoorStationMarker'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG, EQUIPMENT_STATUS_CONFIG } from '../../types/database'
-import {
+import type {
   FloorPlanWithRelations,
   IndoorStationWithRelations,
   IndoorStationType,

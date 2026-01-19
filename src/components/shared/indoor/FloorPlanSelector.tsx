@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { ChevronDown, Image as ImageIcon, Plus, Building2 } from 'lucide-react'
-import { FloorPlanWithRelations } from '../../../types/indoor'
+import type { FloorPlanWithRelations } from '../../../types/indoor'
 
 interface FloorPlanSelectorProps {
   floorPlans: FloorPlanWithRelations[]

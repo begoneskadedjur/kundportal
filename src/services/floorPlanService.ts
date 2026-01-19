@@ -1,6 +1,6 @@
 // src/services/floorPlanService.ts - Service för planritningar
 import { supabase } from '../lib/supabase'
-import {
+import type {
   FloorPlan,
   FloorPlanWithRelations,
   CreateFloorPlanInput,

@@ -26,7 +26,7 @@ import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
 import { StationLegend } from '../shared/indoor/IndoorStationMarker'
-import {
+import type {
   FloorPlanWithRelations,
   IndoorStationWithRelations,
   IndoorStationType,

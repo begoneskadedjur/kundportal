@@ -13,12 +13,14 @@ import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailS
 import { FloorPlanService } from '../../services/floorPlanService'
 import { IndoorStationService } from '../../services/indoorStationService'
 
-import {
+import type {
   FloorPlanWithRelations,
   IndoorStationWithRelations,
   IndoorStationInspectionWithRelations,
   IndoorStationType,
-  IndoorStationStatus,
+  IndoorStationStatus
+} from '../../types/indoor'
+import {
   INDOOR_STATION_TYPE_CONFIG,
   INDOOR_STATION_STATUS_CONFIG
 } from '../../types/indoor'

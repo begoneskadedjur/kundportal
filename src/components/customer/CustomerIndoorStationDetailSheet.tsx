@@ -22,14 +22,16 @@ import {
   Box,
   Target
 } from 'lucide-react'
-import {
+import type {
   IndoorStationWithRelations,
   IndoorStationInspectionWithRelations,
   IndoorStationType,
+  InspectionStatus
+} from '../../types/indoor'
+import {
   INDOOR_STATION_TYPE_CONFIG,
   INDOOR_STATION_STATUS_CONFIG,
-  INSPECTION_STATUS_CONFIG,
-  InspectionStatus
+  INSPECTION_STATUS_CONFIG
 } from '../../types/indoor'
 
 interface CustomerIndoorStationDetailSheetProps {

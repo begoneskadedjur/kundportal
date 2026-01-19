@@ -15,8 +15,8 @@ import {
   SessionProgress,
   InspectionSummary
 } from '../types/inspectionSession'
-import { IndoorStationWithRelations, IndoorStationInspectionWithRelations } from '../types/indoor'
-import { InspectionStatus } from '../types/indoor'
+import type { IndoorStationWithRelations, IndoorStationInspectionWithRelations } from '../types/indoor'
+import type { InspectionStatus } from '../types/indoor'
 
 // ============================================
 // SESSION FUNCTIONS
