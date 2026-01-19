@@ -24,8 +24,10 @@ import {
 import { CustomerStationSummary } from '../../services/equipmentService'
 import { StationHealthBadge, StationHealthDetail, calculateHealthStatusWithPercentage } from '../shared/StationHealthBadge'
 import { EquipmentService } from '../../services/equipmentService'
+import { FloorPlanService } from '../../services/floorPlanService'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG, EQUIPMENT_STATUS_CONFIG } from '../../types/database'
+import { FloorPlanWithRelations } from '../../types/indoor'
 import { openInMapsApp } from '../../utils/equipmentMapUtils'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -57,11 +59,6 @@ interface CustomerDetails {
   billing_address: string | null
 }
 
-interface FloorPlan {
-  id: string
-  name: string
-  image_url: string | null
-}
 
 export function CustomerStationsModal({
   customer,
@@ -75,7 +72,7 @@ export function CustomerStationsModal({
   const [outdoorStations, setOutdoorStations] = useState<EquipmentPlacementWithRelations[]>([])
   const [indoorStations, setIndoorStations] = useState<any[]>([])
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails | null>(null)
-  const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([])
+  const [floorPlans, setFloorPlans] = useState<FloorPlanWithRelations[]>([])
 
   // Ladda data när modal öppnas
   useEffect(() => {
@@ -105,14 +102,12 @@ export function CustomerStationsModal({
         setCustomerDetails(customerData)
       }
 
-      // Hämta planritningar
-      const { data: floorPlanData, error: floorPlanError } = await supabase
-        .from('floor_plans')
-        .select('id, name, image_url')
-        .eq('customer_id', customer.customer_id)
-
-      if (!floorPlanError && floorPlanData) {
+      // Hämta planritningar med signerade URLs
+      try {
+        const floorPlanData = await FloorPlanService.getFloorPlansByCustomer(customer.customer_id)
         setFloorPlans(floorPlanData)
+      } catch (floorPlanError) {
+        console.error('Fel vid hämtning av planritningar:', floorPlanError)
       }
 
     } catch (error) {
@@ -327,36 +322,60 @@ export function CustomerStationsModal({
                     {/* Inomhus - Planritningar + stationslista */}
                     {activeView === 'indoor' && (
                       <div className="p-5 space-y-6">
-                        {/* Planritningar */}
+                        {/* Planritningar med stationsmarkörer */}
                         {floorPlans.length > 0 ? (
                           <div>
                             <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
                               <FileImage className="w-4 h-4" />
                               Planritningar ({floorPlans.length})
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-4">
                               {floorPlans.map(plan => {
                                 const stationsOnPlan = indoorStations.filter(s => s.floor_plan_id === plan.id)
                                 return (
                                   <div
                                     key={plan.id}
-                                    className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden hover:border-slate-600/50 transition-colors"
+                                    className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden"
                                   >
+                                    {/* Planritningsbild med markörer */}
                                     {plan.image_url ? (
-                                      <img
-                                        src={plan.image_url}
-                                        alt={plan.name}
-                                        className="w-full h-40 object-cover"
-                                      />
+                                      <div className="relative bg-slate-900 overflow-hidden">
+                                        {/* Container som matchar bildens aspektratio */}
+                                        <div className="relative w-full" style={{ paddingBottom: plan.image_height && plan.image_width ? `${(plan.image_height / plan.image_width) * 100}%` : '66.67%' }}>
+                                          <img
+                                            src={plan.image_url}
+                                            alt={plan.name}
+                                            className="absolute inset-0 w-full h-full object-contain"
+                                          />
+                                          {/* Stationsmarkörer */}
+                                          {stationsOnPlan.map(station => {
+                                            const TypeIcon = INDOOR_TYPE_ICONS[station.station_type] || Box
+                                            return (
+                                              <button
+                                                key={station.id}
+                                                onClick={() => onStationClick?.(station, 'indoor')}
+                                                className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 bg-cyan-500 border-2 border-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer z-10"
+                                                style={{
+                                                  left: `${station.position_x_percent}%`,
+                                                  top: `${station.position_y_percent}%`
+                                                }}
+                                                title={station.station_number || 'Station'}
+                                              >
+                                                <TypeIcon className="w-4 h-4 text-white" />
+                                              </button>
+                                            )
+                                          })}
+                                        </div>
+                                      </div>
                                     ) : (
                                       <div className="w-full h-40 bg-slate-800 flex items-center justify-center">
                                         <FileImage className="w-12 h-12 text-slate-600" />
                                       </div>
                                     )}
-                                    <div className="p-3">
+                                    <div className="p-3 border-t border-slate-700/50">
                                       <h4 className="font-medium text-white">{plan.name}</h4>
                                       <p className="text-xs text-slate-400 mt-1">
-                                        {stationsOnPlan.length} stationer
+                                        {stationsOnPlan.length} {stationsOnPlan.length === 1 ? 'station' : 'stationer'}
                                       </p>
                                     </div>
                                   </div>
