@@ -2,7 +2,8 @@
 
 import React from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle, LucideIcon } from 'lucide-react'
+import { CheckCircle } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 interface Step {
   id: number
