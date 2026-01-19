@@ -1,7 +1,7 @@
 // src/components/technician/AddStationWizard.tsx
-// 3-stegs wizard för att lägga till station: Kund → Typ → Placera
+// 3-stegs wizard för att lägga till station: Kund → Typ → Placera (Inomhus)
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X,
@@ -11,9 +11,30 @@ import {
   Building2,
   MapPin,
   Home,
-  Check
+  Check,
+  Upload,
+  Plus,
+  FileImage,
+  Crosshair,
+  Box,
+  Target
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
+import { FloorPlanService } from '../../services/floorPlanService'
+import { IndoorStationService } from '../../services/indoorStationService'
+import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
+import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
+import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
+import { StationLegend } from '../shared/indoor/IndoorStationMarker'
+import {
+  FloorPlanWithRelations,
+  IndoorStationWithRelations,
+  IndoorStationType,
+  PlacementMode,
+  CreateFloorPlanInput,
+  CreateIndoorStationInput
+} from '../../types/indoor'
+import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 type WizardStep = 1 | 2 | 3
@@ -39,6 +60,7 @@ export function AddStationWizard({
   preselectedCustomerId,
   technicianId
 }: AddStationWizardProps) {
+  const { profile } = useAuth()
   const [currentStep, setCurrentStep] = useState<WizardStep>(1)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(preselectedCustomerId || null)
   const [selectedCustomerName, setSelectedCustomerName] = useState<string>('')
@@ -49,6 +71,19 @@ export function AddStationWizard({
   const [customersWithStations, setCustomersWithStations] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [loadingCustomers, setLoadingCustomers] = useState(false)
+
+  // Inomhus-state (steg 3)
+  const [floorPlans, setFloorPlans] = useState<FloorPlanWithRelations[]>([])
+  const [selectedFloorPlan, setSelectedFloorPlan] = useState<FloorPlanWithRelations | null>(null)
+  const [stations, setStations] = useState<IndoorStationWithRelations[]>([])
+  const [loadingFloorPlans, setLoadingFloorPlans] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showTypeSelector, setShowTypeSelector] = useState(false)
+  const [showStationForm, setShowStationForm] = useState(false)
+  const [placementMode, setPlacementMode] = useState<PlacementMode>('view')
+  const [selectedStationType, setSelectedStationType] = useState<IndoorStationType | null>(null)
+  const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Ladda kunder när wizard öppnas
   useEffect(() => {
@@ -148,10 +183,124 @@ export function AddStationWizard({
 
   const handleTypeSelect = (type: 'outdoor' | 'indoor') => {
     setStationType(type)
-    // Direkt slutför och stäng wizard
-    onComplete(selectedCustomerId!, type)
-    handleClose()
+    if (type === 'outdoor') {
+      // För utomhus: Direkt slutför och stäng wizard
+      onComplete(selectedCustomerId!, type)
+      handleClose()
+    } else {
+      // För inomhus: Gå till steg 3 för planritningshantering
+      goToStep(3)
+      loadFloorPlans(selectedCustomerId!)
+    }
   }
+
+  // Ladda planritningar för kund
+  const loadFloorPlans = async (customerId: string) => {
+    setLoadingFloorPlans(true)
+    try {
+      const plans = await FloorPlanService.getFloorPlansByCustomer(customerId)
+      setFloorPlans(plans)
+      // Auto-välj första planritningen om den finns
+      if (plans.length > 0) {
+        setSelectedFloorPlan(plans[0])
+        loadStations(plans[0].id)
+      }
+    } catch (error) {
+      console.error('Fel vid hämtning av planritningar:', error)
+      toast.error('Kunde inte ladda planritningar')
+    } finally {
+      setLoadingFloorPlans(false)
+    }
+  }
+
+  // Ladda stationer för planritning
+  const loadStations = async (floorPlanId: string) => {
+    try {
+      const stationList = await IndoorStationService.getStationsByFloorPlan(floorPlanId)
+      setStations(stationList)
+    } catch (error) {
+      console.error('Fel vid hämtning av stationer:', error)
+    }
+  }
+
+  // Hantera klick på planritningsbild
+  const handleImageClick = useCallback((x: number, y: number) => {
+    if (placementMode === 'place' && selectedStationType) {
+      setPreviewPosition({ x, y })
+      setShowStationForm(true)
+    }
+  }, [placementMode, selectedStationType])
+
+  // Starta placeringsläge
+  const startPlacementMode = (type: IndoorStationType) => {
+    setSelectedStationType(type)
+    setPlacementMode('place')
+    setShowTypeSelector(false)
+  }
+
+  // Återställ placeringsläge
+  const resetPlacementMode = () => {
+    setPlacementMode('view')
+    setSelectedStationType(null)
+    setPreviewPosition(null)
+  }
+
+  // Hantera planritningsuppladdning
+  const handleUploadFloorPlan = async (input: CreateFloorPlanInput) => {
+    setIsSubmitting(true)
+    try {
+      const newPlan = await FloorPlanService.createFloorPlan(input, profile?.id)
+      toast.success('Planritning uppladdad!')
+      setShowUploadModal(false)
+      // Ladda om planritningar och välj den nya
+      await loadFloorPlans(selectedCustomerId!)
+      const updatedPlan = await FloorPlanService.getFloorPlanById(newPlan.id)
+      if (updatedPlan) {
+        setSelectedFloorPlan(updatedPlan)
+        setStations([])
+      }
+    } catch (error) {
+      console.error('Fel vid uppladdning:', error)
+      toast.error(error instanceof Error ? error.message : 'Kunde inte ladda upp planritning')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Skapa ny station
+  const handleCreateStation = async (input: CreateIndoorStationInput) => {
+    setIsSubmitting(true)
+    try {
+      await IndoorStationService.createStation(
+        input,
+        technicianId || profile?.technicians?.id
+      )
+      toast.success('Station placerad!')
+      setShowStationForm(false)
+      resetPlacementMode()
+      // Ladda om stationer
+      if (selectedFloorPlan) {
+        await loadStations(selectedFloorPlan.id)
+        // Uppdatera planritningens stationsantal
+        const updatedPlan = await FloorPlanService.getFloorPlanById(selectedFloorPlan.id)
+        if (updatedPlan) setSelectedFloorPlan(updatedPlan)
+      }
+    } catch (error) {
+      console.error('Fel vid skapande av station:', error)
+      toast.error(error instanceof Error ? error.message : 'Kunde inte skapa station')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Hantera val av planritning
+  const handleSelectFloorPlan = (plan: FloorPlanWithRelations) => {
+    setSelectedFloorPlan(plan)
+    loadStations(plan.id)
+  }
+
+  // Hämta byggnadsnamn för uppladdning
+  const existingBuildings = [...new Set(floorPlans.map(p => p.building_name).filter(Boolean))] as string[]
 
   const handleClose = () => {
     setCurrentStep(1)
@@ -159,6 +308,14 @@ export function AddStationWizard({
     setSelectedCustomerName('')
     setStationType(null)
     setSearchQuery('')
+    // Återställ inomhus-state
+    setFloorPlans([])
+    setSelectedFloorPlan(null)
+    setStations([])
+    setShowUploadModal(false)
+    setShowTypeSelector(false)
+    setShowStationForm(false)
+    resetPlacementMode()
     onClose()
   }
 
@@ -178,7 +335,11 @@ export function AddStationWizard({
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="w-full md:max-w-lg bg-slate-800 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
+          className={`w-full bg-slate-800 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col ${
+            currentStep === 3
+              ? 'md:max-w-4xl max-h-[95vh]'
+              : 'md:max-w-lg max-h-[85vh]'
+          }`}
         >
           {/* Header */}
           <div className="px-5 py-4 border-b border-slate-700 flex-shrink-0">
@@ -192,11 +353,16 @@ export function AddStationWizard({
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                 )}
-                <h2 className="text-lg font-semibold text-white">
-                  {currentStep === 1 && 'Välj kund'}
-                  {currentStep === 2 && 'Välj typ'}
-                  {currentStep === 3 && 'Placera station'}
-                </h2>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">
+                    {currentStep === 1 && 'Välj kund'}
+                    {currentStep === 2 && 'Välj typ'}
+                    {currentStep === 3 && 'Inomhusplacering'}
+                  </h2>
+                  {currentStep === 3 && selectedCustomerName && (
+                    <p className="text-sm text-slate-400">{selectedCustomerName}</p>
+                  )}
+                </div>
               </div>
               <button
                 onClick={handleClose}
@@ -379,6 +545,191 @@ export function AddStationWizard({
                       </div>
                     </button>
                   </div>
+                </motion.div>
+              )}
+
+              {/* Steg 3: Inomhusplacering */}
+              {currentStep === 3 && (
+                <motion.div
+                  key="step3"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="flex flex-col h-full"
+                >
+                  {loadingFloorPlans ? (
+                    <div className="flex items-center justify-center py-16">
+                      <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : floorPlans.length === 0 ? (
+                    // Inga planritningar - visa uppladdningsvy
+                    <div className="flex-1 flex flex-col items-center justify-center p-8">
+                      <div className="text-center max-w-sm">
+                        <Upload className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-white mb-2">Inga planritningar</h3>
+                        <p className="text-slate-400 text-sm mb-6">
+                          Ladda upp en planritning för att börja placera inomhusstationer hos {selectedCustomerName}.
+                        </p>
+                        <button
+                          onClick={() => setShowUploadModal(true)}
+                          className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl transition-colors inline-flex items-center gap-2"
+                        >
+                          <Upload className="w-5 h-5" />
+                          Ladda upp planritning
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Visa planritningar med stationsplacering
+                    <div className="flex flex-col h-full">
+                      {/* Planritningsval */}
+                      <div className="px-4 py-3 border-b border-slate-700/50 bg-slate-900/50 flex-shrink-0">
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                          {floorPlans.map((plan) => (
+                            <button
+                              key={plan.id}
+                              onClick={() => handleSelectFloorPlan(plan)}
+                              className={`
+                                flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap
+                                ${plan.id === selectedFloorPlan?.id
+                                  ? 'bg-cyan-600 text-white'
+                                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                                }
+                              `}
+                            >
+                              {plan.name}
+                              <span className={`ml-1.5 ${plan.id === selectedFloorPlan?.id ? 'text-cyan-200' : 'text-slate-500'}`}>
+                                ({plan.station_count || 0})
+                              </span>
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => setShowUploadModal(true)}
+                            className="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700/30 text-cyan-400 hover:bg-cyan-600/10 border border-dashed border-slate-600 hover:border-cyan-500 transition-all flex items-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" />
+                            Ny
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Planritningsvisare */}
+                      <div className="flex-1 min-h-0 relative">
+                        {selectedFloorPlan?.image_url ? (
+                          <FloorPlanViewer
+                            imageUrl={selectedFloorPlan.image_url}
+                            imageWidth={selectedFloorPlan.image_width}
+                            imageHeight={selectedFloorPlan.image_height}
+                            stations={stations}
+                            placementMode={placementMode}
+                            selectedType={selectedStationType}
+                            previewPosition={previewPosition}
+                            onImageClick={handleImageClick}
+                            onCancelPlacement={resetPlacementMode}
+                            height="calc(100vh - 380px)"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full">
+                            <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+
+                        {/* FAB för att lägga till station */}
+                        {placementMode === 'view' && selectedFloorPlan && (
+                          <button
+                            onClick={() => setShowTypeSelector(true)}
+                            className="absolute bottom-4 right-4 w-14 h-14 bg-cyan-600 hover:bg-cyan-500 text-white rounded-full shadow-lg shadow-cyan-600/30 flex items-center justify-center transition-all hover:scale-105 z-20"
+                          >
+                            <Plus className="w-6 h-6" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Legend och info */}
+                      {placementMode === 'view' && stations.length > 0 && (
+                        <div className="px-4 py-2 border-t border-slate-700/50 bg-slate-900/50 flex-shrink-0">
+                          <StationLegend />
+                        </div>
+                      )}
+
+                      {/* Placeringsindikator */}
+                      {placementMode === 'place' && (
+                        <div className="px-4 py-3 bg-cyan-600/20 border-t border-cyan-500/30 flex-shrink-0">
+                          <div className="flex items-center justify-between">
+                            <p className="text-cyan-300 text-sm">
+                              Klicka på planritningen för att placera stationen
+                            </p>
+                            <button
+                              onClick={resetPlacementMode}
+                              className="px-3 py-1 text-sm text-cyan-400 hover:text-white transition-colors"
+                            >
+                              Avbryt
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Modal: Ladda upp planritning */}
+                  {showUploadModal && selectedCustomerId && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
+                      <div className="relative bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <div className="p-4">
+                          <FloorPlanUploadForm
+                            customerId={selectedCustomerId}
+                            customerName={selectedCustomerName}
+                            existingBuildings={existingBuildings}
+                            onSubmit={handleUploadFloorPlan}
+                            onCancel={() => setShowUploadModal(false)}
+                            isSubmitting={isSubmitting}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bottom Sheet: Välj stationstyp */}
+                  {showTypeSelector && (
+                    <div className="fixed inset-0 z-[60] flex items-end md:items-center md:justify-center">
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowTypeSelector(false)} />
+                      <div className="relative w-full md:max-w-md md:mx-4 bg-slate-800 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-center pt-3 pb-1 md:hidden">
+                          <div className="w-10 h-1 bg-slate-600 rounded-full" />
+                        </div>
+                        <div className="p-4">
+                          <h3 className="text-lg font-semibold text-white mb-4">Ny station</h3>
+                          <StationTypeSelector
+                            selectedType={selectedStationType}
+                            onSelect={(type) => startPlacementMode(type)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bottom Sheet: Stationsformulär */}
+                  {showStationForm && previewPosition && selectedFloorPlan && (
+                    <div className="fixed inset-0 z-[60] flex items-end md:items-center md:justify-center">
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setShowStationForm(false); resetPlacementMode() }} />
+                      <div className="relative w-full md:max-w-md md:mx-4 bg-slate-800 rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-center pt-3 pb-1 md:hidden">
+                          <div className="w-10 h-1 bg-slate-600 rounded-full" />
+                        </div>
+                        <div className="p-4">
+                          <IndoorStationForm
+                            floorPlanId={selectedFloorPlan.id}
+                            position={previewPosition}
+                            existingStationNumbers={stations.map(s => s.station_number).filter(Boolean) as string[]}
+                            onSubmit={handleCreateStation}
+                            onCancel={() => { setShowStationForm(false); resetPlacementMode() }}
+                            isSubmitting={isSubmitting}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
