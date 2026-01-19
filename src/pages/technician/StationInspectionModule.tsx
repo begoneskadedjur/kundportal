@@ -1,5 +1,5 @@
 // src/pages/technician/StationInspectionModule.tsx
-// TEST 4: Direkt import type från indoor.ts
+// TEST 5: Importera INSPECTION_STATUS_CONFIG (runtime-konstant) från indoor.ts
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -21,8 +21,11 @@ import type {
   SessionProgress
 } from '../../types/inspectionSession'
 
-// TEST 4: Direkt import type från indoor.ts
+// Typer från indoor.ts
 import type { InspectionStatus } from '../../types/indoor'
+
+// TEST 5: Runtime-konstant från indoor.ts
+import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
 
 export default function StationInspectionModule() {
   const { caseId } = useParams<{ caseId: string }>()
@@ -33,8 +36,6 @@ export default function StationInspectionModule() {
   const [session, setSession] = useState<InspectionSessionWithRelations | null>(null)
   const [outdoorStations, setOutdoorStations] = useState<any[]>([])
   const [indoorStations, setIndoorStations] = useState<any[]>([])
-
-  // TEST 4: State med InspectionStatus typ
   const [selectedStatus, setSelectedStatus] = useState<InspectionStatus>('ok')
 
   useEffect(() => {
@@ -46,7 +47,8 @@ export default function StationInspectionModule() {
       }
 
       try {
-        console.log('TEST 4: Laddar med InspectionStatus typ...')
+        console.log('TEST 5: Laddar med INSPECTION_STATUS_CONFIG...')
+        console.log('TEST 5: CONFIG finns:', INSPECTION_STATUS_CONFIG)
 
         const { data, error: caseError } = await supabase
           .from('cases')
@@ -67,7 +69,6 @@ export default function StationInspectionModule() {
           ])
           setOutdoorStations(outdoor)
           setIndoorStations(indoor)
-          console.log('TEST 4: Stationer laddade', { outdoor: outdoor.length, indoor: indoor.length })
         }
 
       } catch (err) {
@@ -98,15 +99,15 @@ export default function StationInspectionModule() {
     }
   } : null
 
-  // TEST 4: Lokalt definierade statusval (inte importerade)
-  const STATUS_OPTIONS: { key: InspectionStatus; label: string }[] = [
-    { key: 'ok', label: 'OK' },
-    { key: 'activity', label: 'Aktivitet' },
-    { key: 'needs_service', label: 'Service' },
-    { key: 'replaced', label: 'Ersatt' }
-  ]
+  // TEST 5: Använd INSPECTION_STATUS_CONFIG för att bygga statusval
+  const STATUS_OPTIONS = (Object.keys(INSPECTION_STATUS_CONFIG) as InspectionStatus[]).map(key => ({
+    key,
+    label: INSPECTION_STATUS_CONFIG[key].label,
+    color: INSPECTION_STATUS_CONFIG[key].color,
+    icon: INSPECTION_STATUS_CONFIG[key].icon
+  }))
 
-  console.log('TEST 4: Render', { selectedStatus })
+  console.log('TEST 5: Render med CONFIG', { STATUS_OPTIONS })
 
   if (loading) {
     return (
@@ -137,26 +138,27 @@ export default function StationInspectionModule() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-white">TEST 4: import type indoor.ts</h1>
-            <p className="text-slate-400 text-sm">Direkt import type InspectionStatus</p>
+            <h1 className="text-xl font-bold text-white">TEST 5: INSPECTION_STATUS_CONFIG</h1>
+            <p className="text-slate-400 text-sm">Runtime-konstant från indoor.ts</p>
           </div>
         </div>
 
-        {/* Status selector TEST */}
+        {/* Status selector med CONFIG */}
         <div className="glass rounded-xl p-6 mb-4">
-          <h2 className="text-lg font-semibold text-white mb-4">Status (InspectionStatus typ)</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Status (från CONFIG)</h2>
           <div className="flex gap-2 flex-wrap">
             {STATUS_OPTIONS.map(opt => (
               <button
                 key={opt.key}
                 onClick={() => setSelectedStatus(opt.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
                   selectedStatus === opt.key
                     ? 'bg-green-500 text-white'
                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                 }`}
               >
-                {opt.label}
+                <span>{opt.icon}</span>
+                <span>{opt.label}</span>
               </button>
             ))}
           </div>
