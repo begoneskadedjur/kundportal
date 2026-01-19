@@ -1,0 +1,358 @@
+================================================================================
+         KARTLAGGNING: STATIONSUTPLACERING & KONTROLL - BeGone Kundportal
+================================================================================
+
+OVERSIKT
+--------
+Detta dokument kartlagger hela flodet for stationshantering i BeGone Kundportal
+- fran admin-konfiguration av stationstyper, genom teknikerns utplacering, till
+koordinatorns schemaläggning av kontrollarenden.
+
+
+================================================================================
+1. ADMIN: Stationstyper (/admin/settings/station-types)
+================================================================================
+
+SIDOR & KOMPONENTER
+-------------------
+Fil                                                          | Beskrivning
+-------------------------------------------------------------|------------------------
+src/pages/admin/settings/StationTypesPage.tsx                | Huvudsida for admin
+src/components/admin/settings/StationTypesSettings.tsx       | Huvudkomponent med lista och statistik
+src/components/admin/settings/StationTypeEditModal.tsx       | Modal for skapa/redigera stationstyp
+src/components/admin/settings/StationTypeCard.tsx            | Kort for varje stationstyp
+
+SERVICE
+-------
+Fil                                   | Beskrivning
+--------------------------------------|------------------------------------------------
+src/services/stationTypeService.ts    | CRUD for stationstyper, troskelvärdesberäkningar
+
+TYPER
+-----
+Fil                              | Beskrivning
+---------------------------------|----------------------------------------------
+src/types/stationTypes.ts        | StationType, MeasurementUnit, CalculatedStatus
+
+DATABASTABELL: station_types
+----------------------------
+id, code, name, description, prefix, color, icon,
+requires_serial_number, measurement_unit, measurement_label,
+threshold_warning, threshold_critical, threshold_direction,
+is_active, sort_order, created_at, updated_at
+
+FUNKTIONALITET
+--------------
+- Skapa nya stationstyper med kod, prefix, farg, ikon
+- Konfigurera matenheter (gram, st, ml, procent, kg)
+- Stalla in troskelvarden for automatisk statusberakning
+- Aktivera/inaktivera stationstyper
+- Stationstyper anvands av bade utomhus- och inomhusstationer
+
+
+================================================================================
+2. TEKNIKER: Utrustning/Stationer (/technician/equipment)
+================================================================================
+
+SIDOR & KOMPONENTER
+-------------------
+Fil                                                          | Beskrivning
+-------------------------------------------------------------|------------------------
+src/pages/technician/TechnicianEquipment.tsx                 | Huvudsida (680 rader)
+src/components/technician/AddStationWizard.tsx               | 3-stegs wizard (774 rader)
+src/components/technician/CustomerStationsModal.tsx          | Detaljerad kundvy (915 rader)
+src/components/technician/AllCustomersList.tsx               | Lista over kunder med stationer
+src/components/shared/equipment/EquipmentPlacementForm.tsx   | Formular for stationsplacering
+src/components/shared/equipment/EquipmentMap.tsx             | Interaktiv karta
+src/components/shared/equipment/MapLocationPicker.tsx        | Manuell kartpositionering
+
+INOMHUSKOMPONENTER
+------------------
+Fil                                                          | Beskrivning
+-------------------------------------------------------------|------------------------
+src/components/shared/indoor/IndoorStationForm.tsx           | Formular for inomhusstation
+src/components/shared/indoor/IndoorStationMarker.tsx         | Markor pa planritning
+src/components/shared/indoor/FloorPlanViewer.tsx             | Planritningsvisare
+src/components/shared/indoor/IndoorEquipmentView.tsx         | Listvy for inomhusstationer
+
+SERVICES
+--------
+Fil                                      | Beskrivning
+-----------------------------------------|-----------------------------------------------
+src/services/equipmentService.ts         | CRUD for utomhusstationer, foto, statistik
+src/services/indoorStationService.ts     | CRUD for inomhusstationer
+src/services/floorPlanService.ts         | Hantering av planritningar
+
+TYPER
+-----
+Fil                        | Beskrivning
+---------------------------|-------------------------------------------------------
+src/types/database.ts      | EquipmentPlacement, EquipmentType, EquipmentStatus
+src/types/indoor.ts        | IndoorStation, IndoorStationType, FloorPlan
+
+DATABASTABELLER
+---------------
+
+equipment_placements (Utomhusstationer):
+  id, customer_id, placed_by_technician_id, equipment_type,
+  station_type_id, station_number, serial_number,
+  latitude, longitude, comment, photo_path,
+  status, status_updated_at, status_updated_by,
+  placed_at, created_at, updated_at
+
+indoor_stations (Inomhusstationer):
+  id, floor_plan_id, station_type_id, station_number,
+  position_x, position_y, serial_number, comment,
+  status, placed_by_technician_id, placed_at, created_at, updated_at
+
+floor_plans (Planritningar):
+  id, customer_id, name, building_name, image_path,
+  sort_order, created_at, updated_at
+
+FLODE: LAGG TILL STATION
+------------------------
+1. Oppna AddStationWizard
+2. Steg 1: Valj kund (sokbar lista)
+3. Steg 2: Valj typ (Utomhus/Inomhus)
+4. Steg 3a (Utomhus): GPS-position -> EquipmentPlacementForm -> Spara
+4. Steg 3b (Inomhus): Valj planritning -> Klicka position -> IndoorStationForm -> Spara
+
+
+================================================================================
+3. KOORDINATOR: Schema (/koordinator/schema)
+================================================================================
+
+SIDOR & KOMPONENTER
+-------------------
+Fil                                                          | Beskrivning
+-------------------------------------------------------------|------------------------
+src/pages/coordinator/CoordinatorSchedule.tsx                | Huvudschemavy
+src/components/admin/coordinator/CreateCaseModal.tsx         | Modal for att skapa arenden
+src/components/admin/coordinator/CaseEditModal.tsx           | Redigera arenden
+
+ARENDETYPER SOM KAN SKAPAS
+--------------------------
+1. Private    - Privatkundarende (ClickUp)
+2. Business   - Foretagsarende (ClickUp)
+3. Contract   - Avtalsarende (intern)
+4. Inspection - Stationskontroll (intern) <-- FOKUS
+
+FLODE: SKAPA STATIONSKONTROLL
+-----------------------------
+1. Koordinator klickar "Nytt arende"
+2. Valjer typ "Stationskontroll"
+3. Valjer kund (endast kunder MED stationer visas)
+4. Om multisite: Valjer specifik site
+5. Valjer datum och tekniker
+6. System skapar:
+   - case (service_type: 'inspection')
+   - station_inspection_sessions
+
+DATABASTABELL: cases
+--------------------
+id, customer_id, site_id, case_number, title, description,
+status, service_type, pest_type,
+scheduled_start, scheduled_end,
+primary_technician_id, created_at, updated_at
+
+
+================================================================================
+4. INSPEKTIONSSESSIONER
+================================================================================
+
+SERVICES
+--------
+Fil                                         | Beskrivning
+--------------------------------------------|--------------------------------------------
+src/services/inspectionSessionService.ts    | Session-hantering, inspektioner, statistik
+
+TYPER
+-----
+Fil                                 | Beskrivning
+------------------------------------|-----------------------------------------------
+src/types/inspectionSession.ts      | StationInspectionSession, InspectionStatus
+
+DATABASTABELL: station_inspection_sessions
+------------------------------------------
+id, case_id, customer_id, technician_id,
+scheduled_at, started_at, completed_at,
+status ('scheduled' | 'in_progress' | 'completed' | 'cancelled'),
+total_outdoor_stations, total_indoor_stations,
+inspected_outdoor_stations, inspected_indoor_stations,
+notes, created_at, updated_at
+
+DATABASTABELLER: INSPEKTIONER
+-----------------------------
+
+outdoor_station_inspections:
+  id, station_id, session_id, status, findings,
+  photo_path, measurement_value, measurement_unit,
+  inspected_at, inspected_by
+
+indoor_station_inspections:
+  id, station_id, session_id, status, findings,
+  photo_path, measurement_value, measurement_unit,
+  inspected_at, inspected_by
+
+
+================================================================================
+5. TEKNIKER: Inspektionsmodul
+================================================================================
+
+SIDOR & KOMPONENTER
+-------------------
+Fil                                                          | Beskrivning
+-------------------------------------------------------------|------------------------
+src/pages/technician/StationInspectionModule.tsx             | Inspektionsvy (838 rader)
+
+FLODE: UTFORA INSPEKTION
+------------------------
+1. Tekniker oppnar arende med service_type='inspection'
+2. System hamtar inspektionssession via case_id
+3. Laddar stationer (utomhus + inomhus)
+4. Visar progress-bar och flikar (Utomhus/Inomhus)
+5. Tekniker klickar "Starta" -> session.status = 'in_progress'
+6. For varje station:
+   - Klicka pa station
+   - Valj status (OK/Aktivitet/Behover service/Ersatt)
+   - Ange matvarde (om tillampligt)
+   - Lagg till anteckningar
+   - Spara inspektion
+7. Session uppdateras: inspected_count++
+8. Nar klar: "Avsluta kontroll"
+   - session.status = 'completed'
+   - case.status = 'Avslutat'
+
+
+================================================================================
+6. DATAFLODESDIAGRAM
+================================================================================
+
++-------------------------------------------------------------------+
+|                         ADMIN                                      |
+|  /admin/settings/station-types                                     |
+|  +-------------------------------------------------------------+  |
+|  | StationTypesSettings -> StationTypeEditModal                 |  |
+|  |        |                                                     |  |
+|  |        v                                                     |  |
+|  | StationTypeService -> station_types (DB)                     |  |
+|  +-------------------------------------------------------------+  |
++-------------------------------------------------------------------+
+                              |
+                              v
++-------------------------------------------------------------------+
+|                        TEKNIKER                                    |
+|  /technician/equipment                                             |
+|  +-------------------------------------------------------------+  |
+|  | TechnicianEquipment -> AddStationWizard                      |  |
+|  |        |                                                     |  |
+|  |        v                                                     |  |
+|  | UTOMHUS: EquipmentPlacementForm -> equipmentService          |  |
+|  |        |                     -> equipment_placements (DB)    |  |
+|  |                                                              |  |
+|  | INOMHUS: FloorPlanViewer -> IndoorStationForm                |  |
+|  |        |                -> indoorStationService              |  |
+|  |                         -> indoor_stations (DB)              |  |
+|  +-------------------------------------------------------------+  |
++-------------------------------------------------------------------+
+                              |
+                              v
++-------------------------------------------------------------------+
+|                       KOORDINATOR                                  |
+|  /koordinator/schema                                               |
+|  +-------------------------------------------------------------+  |
+|  | CoordinatorSchedule -> CreateCaseModal                       |  |
+|  |        |                                                     |  |
+|  |        v                                                     |  |
+|  | Typ: "Stationskontroll"                                      |  |
+|  |        |                                                     |  |
+|  |        v                                                     |  |
+|  | -> cases (DB) + station_inspection_sessions (DB)             |  |
+|  +-------------------------------------------------------------+  |
++-------------------------------------------------------------------+
+                              |
+                              v
++-------------------------------------------------------------------+
+|                    TEKNIKER (Inspektion)                           |
+|  /technician/cases/:caseId/inspection                              |
+|  +-------------------------------------------------------------+  |
+|  | StationInspectionModule                                      |  |
+|  |        |                                                     |  |
+|  |        v                                                     |  |
+|  | inspectionSessionService                                     |  |
+|  |        |                                                     |  |
+|  |        v                                                     |  |
+|  | -> outdoor_station_inspections (DB)                          |  |
+|  | -> indoor_station_inspections (DB)                           |  |
+|  | -> station_inspection_sessions (uppdatering)                 |  |
+|  | -> cases (status: Avslutat)                                  |  |
+|  +-------------------------------------------------------------+  |
++-------------------------------------------------------------------+
+
+
+================================================================================
+7. SAMMANFATTNING AV DATABASTABELLER
+================================================================================
+
+Tabell                          | Beskrivning
+--------------------------------|-----------------------------------------------
+station_types                   | Konfigurerbara stationstyper
+equipment_placements            | Utomhusstationer (GPS)
+indoor_stations                 | Inomhusstationer (planritning)
+floor_plans                     | Planritningar for inomhus
+cases                           | Arenden (inkl. stationskontroll)
+station_inspection_sessions     | Inspektionssessioner
+outdoor_station_inspections     | Enskilda utomhusinspektioner
+indoor_station_inspections      | Enskilda inomhusinspektioner
+
+
+================================================================================
+8. VIKTIGA FILER (KOMPLETT LISTA)
+================================================================================
+
+SIDOR
+-----
+- src/pages/admin/settings/StationTypesPage.tsx
+- src/pages/technician/TechnicianEquipment.tsx
+- src/pages/technician/StationInspectionModule.tsx
+- src/pages/coordinator/CoordinatorSchedule.tsx
+
+ADMIN-KOMPONENTER
+-----------------
+- src/components/admin/settings/StationTypesSettings.tsx
+- src/components/admin/settings/StationTypeEditModal.tsx
+- src/components/admin/settings/StationTypeCard.tsx
+- src/components/admin/coordinator/CreateCaseModal.tsx
+
+TEKNIKER-KOMPONENTER
+--------------------
+- src/components/technician/AddStationWizard.tsx
+- src/components/technician/CustomerStationsModal.tsx
+- src/components/technician/AllCustomersList.tsx
+
+DELADE KOMPONENTER
+------------------
+- src/components/shared/equipment/EquipmentPlacementForm.tsx
+- src/components/shared/equipment/EquipmentMap.tsx
+- src/components/shared/indoor/IndoorStationForm.tsx
+- src/components/shared/indoor/FloorPlanViewer.tsx
+
+SERVICES
+--------
+- src/services/stationTypeService.ts
+- src/services/equipmentService.ts
+- src/services/indoorStationService.ts
+- src/services/floorPlanService.ts
+- src/services/inspectionSessionService.ts
+
+TYPER
+-----
+- src/types/stationTypes.ts
+- src/types/database.ts
+- src/types/indoor.ts
+- src/types/inspectionSession.ts
+
+
+================================================================================
+                              SLUT PA DOKUMENT
+================================================================================
