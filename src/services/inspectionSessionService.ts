@@ -308,7 +308,7 @@ export async function getOutdoorStationsForCustomer(
     .from('equipment_placements')
     .select(`
       *,
-      technician:technicians(id, name),
+      technician:technicians!equipment_placements_placed_by_technician_id_fkey(id, name),
       station_type_data:station_types(*)
     `)
     .eq('customer_id', customerId)
