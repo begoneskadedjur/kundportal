@@ -44,7 +44,7 @@ export function CollapsibleMapSection({
             <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center">
               <Building2 className="w-4 h-4 text-emerald-400" />
             </div>
-            <h3 className="text-lg font-semibold text-white">Översikt</h3>
+            <h3 className="text-lg font-semibold text-white">Utplacerat av mig</h3>
           </div>
 
           {/* Totalt */}
