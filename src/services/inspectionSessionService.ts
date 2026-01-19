@@ -168,7 +168,7 @@ export async function getOutdoorInspectionsForSession(
     .from('outdoor_station_inspections')
     .select(`
       *,
-      station:equipment_placements(id, station_number, station_type, equipment_type_code),
+      station:equipment_placements(id, serial_number, station_type_id, equipment_type),
       technician:technicians(id, name)
     `)
     .eq('session_id', sessionId)
@@ -313,7 +313,7 @@ export async function getOutdoorStationsForCustomer(
     `)
     .eq('customer_id', customerId)
     .eq('status', 'active')
-    .order('station_number', { ascending: true })
+    .order('serial_number', { ascending: true })
 
   if (error) {
     console.error('Error fetching outdoor stations:', error)
