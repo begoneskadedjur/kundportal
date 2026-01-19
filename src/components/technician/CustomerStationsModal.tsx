@@ -81,6 +81,18 @@ export function CustomerStationsModal({
     }
   }, [isOpen, customer?.customer_id])
 
+  // Blockera scroll på body när modal är öppen
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
+
   const loadAllData = async () => {
     if (!customer) return
 

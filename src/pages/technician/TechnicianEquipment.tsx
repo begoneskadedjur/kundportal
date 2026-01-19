@@ -352,8 +352,8 @@ export default function TechnicianEquipment() {
         </div>
       </header>
 
-      {/* Huvudinnehåll - enhetlig vy utan tabbar */}
-      <div className="max-w-7xl mx-auto">
+      {/* Huvudinnehåll */}
+      <div className="flex-grow max-w-screen-2xl mx-auto w-full p-4">
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <div className="text-center">
@@ -362,7 +362,7 @@ export default function TechnicianEquipment() {
             </div>
           </div>
         ) : (
-          <div className="p-4 space-y-6">
+          <div className="space-y-6">
             {/* Statistik + Karta sektion - ALLTID synlig */}
             <CollapsibleMapSection
               equipment={allEquipment}
