@@ -129,6 +129,7 @@ export interface IndoorStation {
   id: string;
   floor_plan_id: string;
   station_type: IndoorStationType;
+  station_type_id: string | null; // FK to station_types table
   station_number: string | null;
   position_x_percent: number;
   position_y_percent: number;
@@ -136,6 +137,7 @@ export interface IndoorStation {
   comment: string | null;
   photo_path: string | null;
   status: IndoorStationStatus;
+  calculated_status: 'ok' | 'warning' | 'critical'; // Status baserad på mätningar vs tröskelvärden
   status_updated_at: string | null;
   status_updated_by: string | null;
   placed_at: string;
@@ -176,7 +178,25 @@ export interface IndoorStationWithRelations extends IndoorStation {
     id: string;
     name: string;
   };
+  station_type_data?: {
+    id: string;
+    code: string;
+    name: string;
+    color: string;
+    icon: string;
+    prefix: string;
+    measurement_unit: string;
+    measurement_label: string | null;
+    threshold_warning: number | null;
+    threshold_critical: number | null;
+    threshold_direction: 'above' | 'below';
+  };
   latest_inspection?: IndoorStationInspection;
+  latest_measurement?: {
+    id: string;
+    value: number;
+    measured_at: string;
+  };
   inspection_count?: number;
   photo_url?: string; // Signed URL from storage
 }

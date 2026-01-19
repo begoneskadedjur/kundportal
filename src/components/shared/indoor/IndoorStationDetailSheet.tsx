@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronRight,
-  ClipboardList
+  ClipboardList,
+  Activity
 } from 'lucide-react'
 import {
   IndoorStationWithRelations,
@@ -27,6 +28,7 @@ import {
   INSPECTION_STATUS_CONFIG,
   InspectionStatus
 } from '../../../types/indoor'
+import { MeasurementStatusSection } from '../CalculatedStatusBadge'
 
 interface IndoorStationDetailSheetProps {
   station: IndoorStationWithRelations
@@ -113,6 +115,18 @@ export function IndoorStationDetailSheet({
               className="w-full h-40 object-cover"
             />
           </div>
+        )}
+
+        {/* Measurement status - visa om stationstypen har tröskelvärden */}
+        {station.station_type_data && (station.station_type_data.threshold_warning || station.station_type_data.threshold_critical) && (
+          <MeasurementStatusSection
+            calculatedStatus={station.calculated_status || 'ok'}
+            latestValue={station.latest_measurement?.value}
+            unit={station.station_type_data.measurement_unit}
+            warningThreshold={station.station_type_data.threshold_warning}
+            criticalThreshold={station.station_type_data.threshold_critical}
+            thresholdDirection={station.station_type_data.threshold_direction}
+          />
         )}
 
         {/* Details grid */}
@@ -285,6 +299,16 @@ export function IndoorStationCard({
   const typeConfig = INDOOR_STATION_TYPE_CONFIG[station.station_type]
   const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
 
+  // Visa calculated_status om aktiv station har warning/critical
+  const showCalculatedStatus = station.status === 'active' &&
+    station.calculated_status &&
+    station.calculated_status !== 'ok'
+
+  const calculatedStatusColors: Record<string, { bg: string; text: string }> = {
+    warning: { bg: 'bg-amber-500/20', text: 'text-amber-400' },
+    critical: { bg: 'bg-red-500/20', text: 'text-red-400' }
+  }
+
   return (
     <button
       onClick={onClick}
@@ -298,13 +322,22 @@ export function IndoorStationCard({
     >
       <div className="flex items-center gap-3">
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 relative"
           style={{ backgroundColor: typeConfig.color + '30' }}
         >
           <div
             className="w-4 h-4 rounded-full border border-white/50"
             style={{ backgroundColor: typeConfig.color }}
           />
+          {/* Calculated status indicator */}
+          {showCalculatedStatus && (
+            <div
+              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-slate-800 ${calculatedStatusColors[station.calculated_status]?.bg || ''}`}
+              style={{
+                backgroundColor: station.calculated_status === 'warning' ? '#f59e0b' : '#ef4444'
+              }}
+            />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white truncate">
@@ -314,9 +347,15 @@ export function IndoorStationCard({
             {station.location_description || `${station.position_x_percent.toFixed(0)}%, ${station.position_y_percent.toFixed(0)}%`}
           </p>
         </div>
-        <span className={`px-2 py-0.5 rounded text-xs ${statusConfig.bgColor} ${statusConfig.textColor}`}>
-          {statusConfig.label}
-        </span>
+        {showCalculatedStatus ? (
+          <span className={`px-2 py-0.5 rounded text-xs ${calculatedStatusColors[station.calculated_status]?.bg} ${calculatedStatusColors[station.calculated_status]?.text}`}>
+            {station.calculated_status === 'warning' ? 'Varning' : 'Kritisk'}
+          </span>
+        ) : (
+          <span className={`px-2 py-0.5 rounded text-xs ${statusConfig.bgColor} ${statusConfig.textColor}`}>
+            {statusConfig.label}
+          </span>
+        )}
       </div>
     </button>
   )

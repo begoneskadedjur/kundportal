@@ -457,7 +457,17 @@ const AdminDashboard: React.FC = () => {
                   tag="Tjänsteutbud"
                   iconColor="text-blue-400"
                 />
-                
+
+                <AdminDashboardCard
+                  href="/admin/settings/station-types"
+                  icon={Target}
+                  title="Stationstyper"
+                  description="Hantera stationstyper för fältplacering, Konfigurera tröskelvärden för statusberäkning"
+                  stats="Inomhus & Utomhus"
+                  tag="Inställningar"
+                  iconColor="text-emerald-400"
+                />
+
                 <AdminDashboardCard
                   href="/admin/organisation/register"
                   icon={Building2}

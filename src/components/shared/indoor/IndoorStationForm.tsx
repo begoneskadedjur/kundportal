@@ -1,8 +1,8 @@
 // src/components/shared/indoor/IndoorStationForm.tsx
 // Formulär för att skapa/redigera inomhusstationer
 
-import { useState, useRef } from 'react'
-import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2 } from 'lucide-react'
 import {
   IndoorStationType,
   IndoorStationWithRelations,
@@ -12,6 +12,8 @@ import {
   generateStationNumber
 } from '../../../types/indoor'
 import { MAX_STATION_PHOTO_SIZE, ALLOWED_PHOTO_TYPES } from '../../../services/indoorStationService'
+import { StationTypeService } from '../../../services/stationTypeService'
+import { StationType } from '../../../types/stationTypes'
 
 interface IndoorStationFormProps {
   floorPlanId: string
@@ -333,7 +335,17 @@ export function IndoorStationForm({
   )
 }
 
+// Ikon-mappning för stationstyper från DB
+const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
+  target: Target,
+  box: Box,
+  package: Package,
+  crosshair: Crosshair,
+  circle: Circle
+}
+
 // Kompakt version för typ-val i placeringsläge
+// Hämtar stationstyper dynamiskt från databasen
 export function StationTypeSelector({
   selectedType,
   onSelect
@@ -341,28 +353,104 @@ export function StationTypeSelector({
   selectedType: IndoorStationType | null
   onSelect: (type: IndoorStationType) => void
 }) {
-  // Ikon-mappning för stationstyper
-  const TYPE_ICONS: Record<IndoorStationType, React.ElementType> = {
-    mechanical_trap: Crosshair,
-    concrete_station: Box,
-    bait_station: Target
+  const [stationTypes, setStationTypes] = useState<StationType[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Hämta aktiva stationstyper från databasen
+  useEffect(() => {
+    const loadStationTypes = async () => {
+      try {
+        const types = await StationTypeService.getActiveStationTypes()
+        setStationTypes(types)
+      } catch (error) {
+        console.error('Fel vid hämtning av stationstyper:', error)
+        // Fallback till hårdkodade typer om DB-hämtning misslyckas
+        setStationTypes([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadStationTypes()
+  }, [])
+
+  // Fallback till hårdkodade typer om inga DB-typer finns
+  const typesToShow = stationTypes.length > 0 ? stationTypes : null
+
+  if (loading) {
+    return (
+      <div className="p-4 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+      </div>
+    )
   }
 
+  // Om inga DB-typer finns, använd hårdkodade (bakåtkompatibilitet)
+  if (!typesToShow) {
+    const TYPE_ICONS: Record<IndoorStationType, React.ElementType> = {
+      mechanical_trap: Crosshair,
+      concrete_station: Box,
+      bait_station: Target
+    }
+
+    return (
+      <div className="p-4 space-y-3">
+        <h3 className="text-lg font-semibold text-white">Välj stationstyp</h3>
+        <p className="text-sm text-slate-400">Välj vilken typ av station du vill placera</p>
+        <div className="flex flex-col gap-2 pt-2">
+          {(Object.keys(INDOOR_STATION_TYPE_CONFIG) as IndoorStationType[]).map((type) => {
+            const config = INDOOR_STATION_TYPE_CONFIG[type]
+            const Icon = TYPE_ICONS[type]
+            return (
+              <button
+                key={type}
+                onClick={() => onSelect(type)}
+                className={`
+                  w-full p-4 rounded-lg border-2 transition-all flex items-center gap-4 text-left min-h-[64px]
+                  ${selectedType === type
+                    ? 'border-emerald-500 bg-emerald-500/10'
+                    : 'border-slate-600 bg-slate-700/50 hover:border-slate-500 hover:bg-slate-700'
+                  }
+                `}
+              >
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: config.color }}
+                >
+                  <Icon className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className={`font-medium ${selectedType === type ? 'text-emerald-400' : 'text-white'}`}>
+                    {config.label}
+                  </p>
+                  {config.requiresSerialNumber && (
+                    <p className="text-xs text-slate-400">Kräver serienummer</p>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // Visa stationstyper från databasen
   return (
     <div className="p-4 space-y-3">
       <h3 className="text-lg font-semibold text-white">Välj stationstyp</h3>
       <p className="text-sm text-slate-400">Välj vilken typ av station du vill placera</p>
       <div className="flex flex-col gap-2 pt-2">
-        {(Object.keys(INDOOR_STATION_TYPE_CONFIG) as IndoorStationType[]).map((type) => {
-          const config = INDOOR_STATION_TYPE_CONFIG[type]
-          const Icon = TYPE_ICONS[type]
+        {typesToShow.map((stationType) => {
+          const Icon = STATION_TYPE_ICONS[stationType.icon] || Box
+          const isSelected = selectedType === stationType.code
+
           return (
             <button
-              key={type}
-              onClick={() => onSelect(type)}
+              key={stationType.id}
+              onClick={() => onSelect(stationType.code as IndoorStationType)}
               className={`
                 w-full p-4 rounded-lg border-2 transition-all flex items-center gap-4 text-left min-h-[64px]
-                ${selectedType === type
+                ${isSelected
                   ? 'border-emerald-500 bg-emerald-500/10'
                   : 'border-slate-600 bg-slate-700/50 hover:border-slate-500 hover:bg-slate-700'
                 }
@@ -370,16 +458,19 @@ export function StationTypeSelector({
             >
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: config.color }}
+                style={{ backgroundColor: stationType.color }}
               >
                 <Icon className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <p className={`font-medium ${selectedType === type ? 'text-emerald-400' : 'text-white'}`}>
-                  {config.label}
+                <p className={`font-medium ${isSelected ? 'text-emerald-400' : 'text-white'}`}>
+                  {stationType.name}
                 </p>
-                {config.requiresSerialNumber && (
+                {stationType.requires_serial_number && (
                   <p className="text-xs text-slate-400">Kräver serienummer</p>
+                )}
+                {stationType.description && (
+                  <p className="text-xs text-slate-500 mt-0.5">{stationType.description}</p>
                 )}
               </div>
             </button>

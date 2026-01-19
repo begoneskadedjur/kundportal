@@ -32,7 +32,20 @@ export class IndoorStationService {
         .from('indoor_stations')
         .select(`
           *,
-          technician:technicians!placed_by_technician_id(id, name)
+          technician:technicians!placed_by_technician_id(id, name),
+          station_type_data:station_types!station_type_id(
+            id,
+            code,
+            name,
+            color,
+            icon,
+            prefix,
+            measurement_unit,
+            measurement_label,
+            threshold_warning,
+            threshold_critical,
+            threshold_direction
+          )
         `)
         .eq('floor_plan_id', floorPlanId)
         .order('created_at', { ascending: false })
@@ -42,7 +55,7 @@ export class IndoorStationService {
         throw new Error(`Databasfel: ${error.message}`)
       }
 
-      // Lägg till signerade URLs och senaste inspektion
+      // Lägg till signerade URLs, senaste inspektion och mätning
       const stationsWithExtras = await Promise.all(
         (data || []).map(async (station) => {
           // Hämta senaste inspektion
@@ -59,10 +72,19 @@ export class IndoorStationService {
             .select('*', { count: 'exact', head: true })
             .eq('station_id', station.id)
 
+          // Hämta senaste mätning
+          const { data: measurements } = await supabase
+            .from('station_measurements')
+            .select('id, value, measured_at')
+            .eq('indoor_station_id', station.id)
+            .order('measured_at', { ascending: false })
+            .limit(1)
+
           return {
             ...station,
             latest_inspection: inspections?.[0] || null,
             inspection_count: count || 0,
+            latest_measurement: measurements?.[0] || null,
             photo_url: station.photo_path
               ? await this.getStationPhotoUrl(station.photo_path)
               : undefined
@@ -89,7 +111,20 @@ export class IndoorStationService {
         .select(`
           *,
           floor_plan:floor_plans!floor_plan_id(*),
-          technician:technicians!placed_by_technician_id(id, name)
+          technician:technicians!placed_by_technician_id(id, name),
+          station_type_data:station_types!station_type_id(
+            id,
+            code,
+            name,
+            color,
+            icon,
+            prefix,
+            measurement_unit,
+            measurement_label,
+            threshold_warning,
+            threshold_critical,
+            threshold_direction
+          )
         `)
         .eq('id', id)
         .single()
@@ -107,10 +142,19 @@ export class IndoorStationService {
         .eq('station_id', id)
         .order('inspected_at', { ascending: false })
 
+      // Hämta senaste mätning
+      const { data: measurements } = await supabase
+        .from('station_measurements')
+        .select('id, value, measured_at')
+        .eq('indoor_station_id', id)
+        .order('measured_at', { ascending: false })
+        .limit(1)
+
       return {
         ...data,
         latest_inspection: inspections?.[0] || null,
         inspection_count: count || 0,
+        latest_measurement: measurements?.[0] || null,
         photo_url: data.photo_path
           ? await this.getStationPhotoUrl(data.photo_path)
           : undefined

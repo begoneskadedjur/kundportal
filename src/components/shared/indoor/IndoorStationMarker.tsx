@@ -8,6 +8,8 @@ import {
   INDOOR_STATION_TYPE_CONFIG,
   INDOOR_STATION_STATUS_CONFIG
 } from '../../../types/indoor'
+import { CalculatedStatus } from '../../../types/stationTypes'
+import { CALCULATED_STATUS_CONFIG } from '../CalculatedStatusBadge'
 
 interface IndoorStationMarkerProps {
   station: IndoorStationWithRelations
@@ -109,8 +111,8 @@ export function IndoorStationMarker({
         )}
       </div>
 
-      {/* Status badge for non-active stations */}
-      {station.status !== 'active' && (
+      {/* Status badge for non-active stations OR calculated status warning/critical */}
+      {station.status !== 'active' ? (
         <div
           className={`
             absolute -bottom-1 -right-1 w-3 h-3 rounded-full border border-white
@@ -122,6 +124,14 @@ export function IndoorStationMarker({
               station.status === 'damaged' ? '#ef4444' :
               '#64748b'
           }}
+        />
+      ) : station.calculated_status && station.calculated_status !== 'ok' && (
+        <div
+          className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border border-white"
+          style={{
+            backgroundColor: CALCULATED_STATUS_CONFIG[station.calculated_status as CalculatedStatus]?.color || '#64748b'
+          }}
+          title={CALCULATED_STATUS_CONFIG[station.calculated_status as CalculatedStatus]?.label}
         />
       )}
 
