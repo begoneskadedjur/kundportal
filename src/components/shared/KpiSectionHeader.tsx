@@ -1,6 +1,8 @@
 // src/components/shared/KpiSectionHeader.tsx - Elegant sektionsrubrik för KPI-kort
 import React from 'react'
-import { LucideIcon } from 'lucide-react'
+import type { LucideProps } from 'lucide-react'
+
+type LucideIcon = React.ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & React.RefAttributes<SVGSVGElement>>
 
 interface KpiSectionHeaderProps {
   icon: LucideIcon
