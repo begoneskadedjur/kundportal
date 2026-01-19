@@ -1,11 +1,11 @@
 // src/pages/technician/StationInspectionModule.tsx
-// FULL VERSION - Ombyggd från grunden
+// STEG 5 DEBUG - Minimal StationCard utan INSPECTION_STATUS_CONFIG rendering
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   ArrowLeft,
   MapPin,
@@ -16,9 +16,7 @@ import {
   ChevronRight,
   Map,
   Grid3X3,
-  Play,
-  Check,
-  X
+  Play
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -28,9 +26,6 @@ import {
   getIndoorStationsForCustomer,
   getFloorPlansForCustomer,
   startInspectionSession,
-  completeInspectionSession,
-  createOutdoorInspection,
-  createIndoorInspection,
   calculateSessionProgress
 } from '../../services/inspectionSessionService'
 import {
@@ -38,8 +33,7 @@ import {
   InspectionTab,
   SessionProgress
 } from '../../types/inspectionSession'
-import { IndoorStationWithRelations } from '../../types/indoor'
-import { INSPECTION_STATUS_CONFIG, InspectionStatus } from '../../types/indoor'
+import { IndoorStationWithRelations, INSPECTION_STATUS_CONFIG, InspectionStatus } from '../../types/indoor'
 
 // ============================================
 // TYPES
@@ -72,6 +66,58 @@ interface InspectedStation {
 }
 
 // ============================================
+// MINIMAL STATION CARD - STEG 5
+// ============================================
+
+interface StationCardProps {
+  station: OutdoorStation
+  isInspected: boolean
+  onClick: () => void
+}
+
+function StationCard({ station, isInspected, onClick }: StationCardProps) {
+  // Enkel rendering utan INSPECTION_STATUS_CONFIG
+  const stationName = station.station_type_data?.name || station.equipment_type_code || 'Station'
+  const stationColor = station.station_type_data?.color || '#64748b'
+
+  return (
+    <motion.div
+      onClick={onClick}
+      className={`p-4 rounded-lg border cursor-pointer transition-all ${
+        isInspected
+          ? 'bg-green-900/20 border-green-500/30'
+          : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+      }`}
+      whileTap={{ scale: 0.98 }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: `${stationColor}20`, borderColor: stationColor, borderWidth: '2px' }}
+          >
+            <MapPin className="w-5 h-5" style={{ color: stationColor }} />
+          </div>
+          <div>
+            <div className="font-medium text-white">
+              {station.station_number || 'Utan nummer'}
+            </div>
+            <div className="text-sm text-slate-400">{stationName}</div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isInspected && (
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+          )}
+          <ChevronRight className="w-5 h-5 text-slate-500" />
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -89,23 +135,14 @@ export default function StationInspectionModule() {
   const [outdoorStations, setOutdoorStations] = useState<OutdoorStation[]>([])
   const [indoorStations, setIndoorStations] = useState<IndoorStationWithRelations[]>([])
   const [floorPlans, setFloorPlans] = useState<any[]>([])
-  const [selectedFloorPlanId, setSelectedFloorPlanId] = useState<string | null>(null)
   const [progress, setProgress] = useState<SessionProgress | null>(null)
 
-  // Inspekterade stationer (lokalt state för snabb UI)
+  // Inspekterade stationer
   const [inspectedOutdoor, setInspectedOutdoor] = useState<Map<string, InspectedStation>>(new Map())
-  const [inspectedIndoor, setInspectedIndoor] = useState<Map<string, InspectedStation>>(new Map())
 
-  // Aktiv station för formulär
-  const [selectedStation, setSelectedStation] = useState<{
-    station: OutdoorStation | IndoorStationWithRelations
-    type: 'outdoor' | 'indoor'
-  } | null>(null)
-  const [isFormOpen, setIsFormOpen] = useState(false)
-
-  // Avslutningsvy
-  const [isCompleting, setIsCompleting] = useState(false)
-  const [showCompletionDialog, setShowCompletionDialog] = useState(false)
+  // Debug info
+  console.log('STEG 5: Minimal StationCard')
+  console.log('INSPECTION_STATUS_CONFIG:', INSPECTION_STATUS_CONFIG)
 
   // ============================================
   // DATA LOADING
@@ -151,17 +188,12 @@ export default function StationInspectionModule() {
         setIndoorStations(indoor)
         setFloorPlans(plans)
 
-        // Sätt första planritningen som vald
-        if (plans.length > 0) {
-          setSelectedFloorPlanId(plans[0].id)
-        }
-
-        // Bestäm aktiv flik baserat på tillgängliga stationer
+        // Bestäm aktiv flik
         if (outdoor.length === 0 && indoor.length > 0) {
           setActiveTab('indoor')
         }
 
-        // Hämta progress om session finns
+        // Hämta progress
         if (sessionData) {
           const progressData = await calculateSessionProgress(sessionData.id)
           setProgress(progressData)
@@ -184,111 +216,16 @@ export default function StationInspectionModule() {
 
   const handleStartInspection = async () => {
     if (!session) return
-
     const updatedSession = await startInspectionSession(session.id)
     if (updatedSession) {
       setSession(prev => prev ? { ...prev, ...updatedSession } : null)
     }
   }
 
-  const handleStationClick = (station: OutdoorStation | IndoorStationWithRelations, type: 'outdoor' | 'indoor') => {
-    setSelectedStation({ station, type })
-    setIsFormOpen(true)
+  const handleStationClick = (station: OutdoorStation) => {
+    console.log('Station clicked:', station.id)
+    // Bara logga för nu
   }
-
-  const handleInspectionSubmit = async (status: InspectionStatus, findings?: string, measurementValue?: number) => {
-    if (!selectedStation || !session) return
-
-    const technicianId = profile?.technician_id
-
-    if (selectedStation.type === 'outdoor') {
-      const result = await createOutdoorInspection({
-        station_id: selectedStation.station.id,
-        session_id: session.id,
-        status,
-        findings,
-        measurement_value: measurementValue
-      }, technicianId)
-
-      if (result) {
-        setInspectedOutdoor(prev => {
-          const newMap = new Map(prev)
-          newMap.set(selectedStation.station.id, {
-            stationId: selectedStation.station.id,
-            status,
-            inspectedAt: new Date().toISOString()
-          })
-          return newMap
-        })
-      }
-    } else {
-      const result = await createIndoorInspection({
-        station_id: selectedStation.station.id,
-        session_id: session.id,
-        status,
-        findings,
-        measurement_value: measurementValue
-      }, technicianId)
-
-      if (result) {
-        setInspectedIndoor(prev => {
-          const newMap = new Map(prev)
-          newMap.set(selectedStation.station.id, {
-            stationId: selectedStation.station.id,
-            status,
-            inspectedAt: new Date().toISOString()
-          })
-          return newMap
-        })
-      }
-    }
-
-    // Uppdatera progress
-    if (session) {
-      const progressData = await calculateSessionProgress(session.id)
-      setProgress(progressData)
-    }
-
-    setIsFormOpen(false)
-    setSelectedStation(null)
-  }
-
-  const handleCompleteInspection = async () => {
-    if (!session || !caseId) return
-
-    setIsCompleting(true)
-
-    try {
-      // Avsluta sessionen
-      await completeInspectionSession(session.id)
-
-      // Uppdatera ärendestatus
-      await supabase
-        .from('cases')
-        .update({ status: 'Avslutat' })
-        .eq('id', caseId)
-
-      // Navigera tillbaka
-      navigate('/technician/schedule')
-    } catch (err) {
-      console.error('Error completing inspection:', err)
-    } finally {
-      setIsCompleting(false)
-    }
-  }
-
-  // ============================================
-  // COMPUTED VALUES
-  // ============================================
-
-  const totalStations = outdoorStations.length + indoorStations.length
-  const inspectedCount = inspectedOutdoor.size + inspectedIndoor.size
-  const progressPercent = totalStations > 0 ? Math.round((inspectedCount / totalStations) * 100) : 0
-
-  const filteredIndoorStations = useMemo(() => {
-    if (!selectedFloorPlanId) return indoorStations
-    return indoorStations.filter(s => s.floor_plan_id === selectedFloorPlanId)
-  }, [indoorStations, selectedFloorPlanId])
 
   // ============================================
   // RENDER
@@ -296,29 +233,19 @@ export default function StationInspectionModule() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <LoadingSpinner text="Laddar inspektionsdata..." />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <LoadingSpinner text="Laddar inspektion..." />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 p-4">
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400" />
-            <div>
-              <p className="text-red-400 font-medium">Fel vid laddning</p>
-              <p className="text-red-300 text-sm">{error}</p>
-            </div>
-          </div>
-          <Button
-            variant="secondary"
-            className="mt-4"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <p className="text-red-400">{error}</p>
+          <Button variant="outline" onClick={() => navigate(-1)} className="mt-4">
             Tillbaka
           </Button>
         </div>
@@ -326,531 +253,117 @@ export default function StationInspectionModule() {
     )
   }
 
+  const isSessionStarted = session?.status === 'in_progress' || session?.status === 'completed'
+
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 -ml-2 text-slate-400 hover:text-white"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex-1 text-center">
-              <h1 className="text-lg font-semibold text-white">Stationskontroll</h1>
-              <p className="text-sm text-slate-400">
-                {caseData?.customer?.company_name || 'Okänd kund'}
-              </p>
-            </div>
-            <div className="w-10" /> {/* Spacer */}
-          </div>
-
-          {/* Progress bar */}
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-sm mb-1">
-              <span className="text-slate-400">Progress</span>
-              <span className="text-cyan-400 font-medium">
-                {inspectedCount} / {totalStations} stationer ({progressPercent}%)
-              </span>
-            </div>
-            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-cyan-500 to-teal-500"
-                initial={{ width: 0 }}
-                animate={{ width: `${progressPercent}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Tab switcher */}
-        <div className="px-4 pb-3 flex gap-2">
-          <button
-            onClick={() => setActiveTab('outdoor')}
-            className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
-              activeTab === 'outdoor'
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                : 'bg-slate-800 text-slate-400 border border-transparent'
-            }`}
-          >
-            <Map className="w-4 h-4" />
-            Utomhus ({outdoorStations.length})
+      <div className="bg-slate-800/50 border-b border-slate-700 px-4 py-4">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="text-slate-400 hover:text-white">
+            <ArrowLeft className="w-6 h-6" />
           </button>
-          <button
-            onClick={() => setActiveTab('indoor')}
-            className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
-              activeTab === 'indoor'
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                : 'bg-slate-800 text-slate-400 border border-transparent'
-            }`}
-          >
-            <Grid3X3 className="w-4 h-4" />
-            Inomhus ({indoorStations.length})
-          </button>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="flex-1 overflow-y-auto">
-        {/* Status banner för ej startad session */}
-        {session?.status === 'scheduled' && (
-          <div className="px-4 py-3 bg-cyan-500/10 border-b border-cyan-500/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-cyan-400" />
-                <div>
-                  <p className="text-sm font-medium text-white">Kontroll ej startad</p>
-                  <p className="text-xs text-slate-400">Tryck på knappen för att börja</p>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={handleStartInspection}
-                className="bg-cyan-600 hover:bg-cyan-500"
-              >
-                <Play className="w-4 h-4 mr-1" />
-                Starta
-              </Button>
-            </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">Stationskontroll (STEG 5)</h1>
+            <p className="text-sm text-slate-400">
+              {caseData?.customer?.company_name || 'Laddar...'}
+            </p>
           </div>
-        )}
-
-        <AnimatePresence mode="wait">
-          {activeTab === 'outdoor' ? (
-            <motion.div
-              key="outdoor"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="p-4 space-y-3"
-            >
-              {outdoorStations.length === 0 ? (
-                <div className="text-center py-12">
-                  <MapPin className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">Inga utomhusstationer</p>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Denna kund har inga utomhusstationer registrerade
-                  </p>
-                </div>
-              ) : (
-                outdoorStations.map(station => (
-                  <StationCard
-                    key={station.id}
-                    station={station}
-                    type="outdoor"
-                    isInspected={inspectedOutdoor.has(station.id)}
-                    inspectionStatus={inspectedOutdoor.get(station.id)?.status}
-                    onClick={() => handleStationClick(station, 'outdoor')}
-                  />
-                ))
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="indoor"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="p-4 space-y-4"
-            >
-              {/* Planritningsväljare */}
-              {floorPlans.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {floorPlans.map(plan => (
-                    <button
-                      key={plan.id}
-                      onClick={() => setSelectedFloorPlanId(plan.id)}
-                      className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                        selectedFloorPlanId === plan.id
-                          ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {plan.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {indoorStations.length === 0 ? (
-                <div className="text-center py-12">
-                  <Building2 className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">Inga inomhusstationer</p>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Denna kund har inga inomhusstationer registrerade
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredIndoorStations.map(station => (
-                    <StationCard
-                      key={station.id}
-                      station={station}
-                      type="indoor"
-                      isInspected={inspectedIndoor.has(station.id)}
-                      inspectionStatus={inspectedIndoor.get(station.id)?.status}
-                      onClick={() => handleStationClick(station, 'indoor')}
-                    />
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-
-      {/* Footer med avsluta-knapp */}
-      {session?.status === 'in_progress' && (
-        <footer className="sticky bottom-0 z-40 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 px-4 py-4">
-          <Button
-            size="lg"
-            className="w-full bg-emerald-600 hover:bg-emerald-500"
-            onClick={() => setShowCompletionDialog(true)}
-            disabled={inspectedCount === 0}
-          >
-            <CheckCircle2 className="w-5 h-5 mr-2" />
-            Avsluta kontroll ({inspectedCount}/{totalStations})
-          </Button>
-        </footer>
-      )}
-
-      {/* Inspektionsformulär */}
-      <AnimatePresence>
-        {isFormOpen && selectedStation && (
-          <InspectionFormSheet
-            station={selectedStation.station}
-            type={selectedStation.type}
-            onClose={() => {
-              setIsFormOpen(false)
-              setSelectedStation(null)
-            }}
-            onSubmit={handleInspectionSubmit}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Bekräftelsedialog */}
-      <AnimatePresence>
-        {showCompletionDialog && (
-          <CompletionDialog
-            inspectedCount={inspectedCount}
-            totalStations={totalStations}
-            isLoading={isCompleting}
-            onConfirm={handleCompleteInspection}
-            onCancel={() => setShowCompletionDialog(false)}
-          />
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-// ============================================
-// STATION CARD COMPONENT
-// ============================================
-
-interface StationCardProps {
-  station: OutdoorStation | IndoorStationWithRelations
-  type: 'outdoor' | 'indoor'
-  isInspected: boolean
-  inspectionStatus?: InspectionStatus
-  onClick: () => void
-}
-
-function StationCard({ station, type, isInspected, inspectionStatus, onClick }: StationCardProps) {
-  // Hämta status config på ett säkert sätt
-  const statusConfig = inspectionStatus && INSPECTION_STATUS_CONFIG[inspectionStatus]
-    ? INSPECTION_STATUS_CONFIG[inspectionStatus]
-    : null
-
-  // Bestäm textfärg baserat på status
-  const getStatusTextColor = (status: InspectionStatus | undefined): string => {
-    if (!status) return 'text-slate-400'
-    switch (status) {
-      case 'ok': return 'text-green-400'
-      case 'activity': return 'text-amber-400'
-      case 'needs_service': return 'text-orange-400'
-      case 'replaced': return 'text-blue-400'
-      default: return 'text-slate-400'
-    }
-  }
-
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full p-4 rounded-xl text-left transition-all ${
-        isInspected
-          ? 'bg-emerald-500/10 border border-emerald-500/30'
-          : 'bg-slate-800/50 border border-slate-700/50 hover:border-slate-600'
-      }`}
-    >
-      <div className="flex items-center gap-4">
-        {/* Status indicator */}
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-          isInspected ? 'bg-emerald-500/20' : 'bg-slate-700/50'
-        }`}>
-          {isInspected ? (
-            <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-          ) : (
-            type === 'outdoor' ? (
-              <MapPin className="w-6 h-6 text-slate-400" />
-            ) : (
-              <Building2 className="w-6 h-6 text-slate-400" />
-            )
-          )}
         </div>
-
-        {/* Station info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-medium text-white truncate">
-              {station.station_number || 'Utan nummer'}
-            </h3>
-            {isInspected && statusConfig && (
-              <span className={`px-2 py-0.5 rounded text-xs ${statusConfig.bgColor} ${getStatusTextColor(inspectionStatus)}`}>
-                {statusConfig.label.split(' - ')[0]}
-              </span>
-            )}
-          </div>
-          <p className="text-sm text-slate-400 truncate">
-            {station.location_description || (type === 'indoor' ? (station as IndoorStationWithRelations).floor_plan?.name : 'Ingen platsbeskrivning')}
-          </p>
-        </div>
-
-        {/* Arrow */}
-        <ChevronRight className={`w-5 h-5 ${isInspected ? 'text-emerald-400' : 'text-slate-500'}`} />
       </div>
-    </button>
-  )
-}
 
-// ============================================
-// INSPECTION FORM SHEET
-// ============================================
+      {/* Debug Info */}
+      <div className="p-4 bg-blue-900/30 border-b border-blue-700">
+        <p className="text-blue-300 text-sm">
+          DEBUG STEG 5: Minimal StationCard utan INSPECTION_STATUS_CONFIG i rendering
+        </p>
+        <p className="text-blue-400 text-xs mt-1">
+          Outdoor: {outdoorStations.length} | Indoor: {indoorStations.length} | Session: {session?.status || 'ingen'}
+        </p>
+      </div>
 
-interface InspectionFormSheetProps {
-  station: OutdoorStation | IndoorStationWithRelations
-  type: 'outdoor' | 'indoor'
-  onClose: () => void
-  onSubmit: (status: InspectionStatus, findings?: string, measurementValue?: number) => void
-}
-
-function InspectionFormSheet({ station, type, onClose, onSubmit }: InspectionFormSheetProps) {
-  const [selectedStatus, setSelectedStatus] = useState<InspectionStatus | null>(null)
-  const [findings, setFindings] = useState('')
-  const [measurementValue, setMeasurementValue] = useState<string>('')
-
-  // Säker åtkomst till station_type_data
-  const stationTypeData = type === 'outdoor'
-    ? (station as OutdoorStation).station_type_data
-    : (station as IndoorStationWithRelations).station_type_data
-
-  const handleSubmit = () => {
-    if (!selectedStatus) return
-    onSubmit(
-      selectedStatus,
-      findings || undefined,
-      measurementValue ? parseFloat(measurementValue) : undefined
-    )
-  }
-
-  // Hämta status entries på ett säkert sätt
-  const statusEntries = Object.entries(INSPECTION_STATUS_CONFIG) as Array<[InspectionStatus, typeof INSPECTION_STATUS_CONFIG[InspectionStatus]]>
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/60"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: '100%' }}
-        animate={{ y: 0 }}
-        exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="absolute bottom-0 left-0 right-0 bg-slate-900 rounded-t-2xl max-h-[90vh] overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 bg-slate-700 rounded-full" />
-        </div>
-
-        {/* Header */}
-        <div className="px-4 pb-4 border-b border-slate-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white">
-                {station.station_number || 'Station'}
-              </h2>
-              <p className="text-sm text-slate-400">
-                {station.location_description || 'Registrera kontrollresultat'}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white rounded-lg"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      {/* Progress Bar */}
+      {progress && (
+        <div className="px-4 py-3 bg-slate-800/30 border-b border-slate-700">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-slate-400">Framsteg</span>
+            <span className="text-sm font-medium text-white">
+              {progress.inspectedCount} / {progress.totalCount}
+            </span>
           </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 space-y-6 overflow-y-auto max-h-[60vh]">
-          {/* Status buttons */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-3">
-              Kontrollresultat *
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {statusEntries.map(([status, config]) => (
-                <button
-                  key={status}
-                  onClick={() => setSelectedStatus(status)}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    selectedStatus === status
-                      ? 'border-cyan-500 bg-cyan-500/10'
-                      : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                  }`}
-                >
-                  <div className={`w-10 h-10 rounded-full ${config.bgColor} flex items-center justify-center mx-auto mb-2`}>
-                    <span className="text-xl">{config.icon}</span>
-                  </div>
-                  <p className={`text-sm font-medium ${selectedStatus === status ? 'text-cyan-400' : 'text-white'}`}>
-                    {config.label.split(' - ')[0]}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Measurement input (if applicable) */}
-          {stationTypeData?.measurement_unit && (
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Mätvärde ({stationTypeData.measurement_unit})
-              </label>
-              <input
-                type="number"
-                value={measurementValue}
-                onChange={e => setMeasurementValue(e.target.value)}
-                placeholder="T.ex. 15"
-                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-              />
-            </div>
-          )}
-
-          {/* Findings textarea */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Anteckningar (valfritt)
-            </label>
-            <textarea
-              value={findings}
-              onChange={e => setFindings(e.target.value)}
-              rows={3}
-              placeholder="Beskriv eventuella fynd eller observationer..."
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none"
+          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-green-500 transition-all duration-500"
+              style={{ width: `${progress.percentage}%` }}
             />
           </div>
         </div>
+      )}
 
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-800">
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={handleSubmit}
-            disabled={!selectedStatus}
-          >
-            <Check className="w-5 h-5 mr-2" />
-            Registrera kontroll
+      {/* Start Session Button */}
+      {session && session.status === 'scheduled' && (
+        <div className="p-4">
+          <Button onClick={handleStartInspection} className="w-full" size="lg">
+            <Play className="w-5 h-5 mr-2" />
+            Starta kontroll
           </Button>
         </div>
-      </motion.div>
-    </motion.div>
-  )
-}
+      )}
 
-// ============================================
-// COMPLETION DIALOG
-// ============================================
+      {/* Tab Navigation */}
+      <div className="flex border-b border-slate-700">
+        <button
+          onClick={() => setActiveTab('outdoor')}
+          className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 transition-colors ${
+            activeTab === 'outdoor'
+              ? 'text-green-400 border-b-2 border-green-400 bg-green-400/5'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Map className="w-5 h-5" />
+          <span>Utomhus ({outdoorStations.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('indoor')}
+          className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 transition-colors ${
+            activeTab === 'indoor'
+              ? 'text-green-400 border-b-2 border-green-400 bg-green-400/5'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Building2 className="w-5 h-5" />
+          <span>Inomhus ({indoorStations.length})</span>
+        </button>
+      </div>
 
-interface CompletionDialogProps {
-  inspectedCount: number
-  totalStations: number
-  isLoading: boolean
-  onConfirm: () => void
-  onCancel: () => void
-}
+      {/* Station List */}
+      <div className="p-4 space-y-3">
+        {activeTab === 'outdoor' && outdoorStations.length > 0 && (
+          outdoorStations.map(station => (
+            <StationCard
+              key={station.id}
+              station={station}
+              isInspected={inspectedOutdoor.has(station.id)}
+              onClick={() => handleStationClick(station)}
+            />
+          ))
+        )}
 
-function CompletionDialog({ inspectedCount, totalStations, isLoading, onConfirm, onCancel }: CompletionDialogProps) {
-  const allInspected = inspectedCount === totalStations
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={onCancel}
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-slate-900 rounded-2xl max-w-sm w-full overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="p-6 text-center">
-          <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${
-            allInspected ? 'bg-emerald-500/20' : 'bg-amber-500/20'
-          }`}>
-            {allInspected ? (
-              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-            ) : (
-              <AlertCircle className="w-8 h-8 text-amber-400" />
-            )}
+        {activeTab === 'outdoor' && outdoorStations.length === 0 && (
+          <div className="text-center py-8 text-slate-400">
+            <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p>Inga utomhusstationer hittades</p>
           </div>
-          <h3 className="text-xl font-semibold text-white mb-2">
-            Avsluta kontroll?
-          </h3>
-          <p className="text-slate-400">
-            {allInspected ? (
-              <>Alla {totalStations} stationer är kontrollerade.</>
-            ) : (
-              <>
-                Du har kontrollerat {inspectedCount} av {totalStations} stationer.
-                {' '}<span className="text-amber-400">{totalStations - inspectedCount} stationer kvarstår.</span>
-              </>
-            )}
-          </p>
-        </div>
+        )}
 
-        <div className="p-4 border-t border-slate-800 flex gap-3">
-          <Button
-            variant="secondary"
-            className="flex-1"
-            onClick={onCancel}
-            disabled={isLoading}
-          >
-            Avbryt
-          </Button>
-          <Button
-            className="flex-1 bg-emerald-600 hover:bg-emerald-500"
-            onClick={onConfirm}
-            loading={isLoading}
-          >
-            Avsluta
-          </Button>
-        </div>
-      </motion.div>
-    </motion.div>
+        {activeTab === 'indoor' && (
+          <div className="text-center py-8 text-slate-400">
+            <Building2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p>Inomhusvy kommer i nästa steg</p>
+            <p className="text-sm mt-2">{indoorStations.length} stationer hittades</p>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
