@@ -1,5 +1,5 @@
 // src/pages/technician/StationInspectionModule.tsx
-// TEST 3: Med typer från inspectionSession.ts
+// TEST 4: Direkt import type från indoor.ts
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -15,11 +15,14 @@ import {
   getIndoorStationsForCustomer
 } from '../../services/inspectionSessionService'
 
-// TEST 3: Importera typer från inspectionSession.ts
+// Typer från inspectionSession.ts
 import type {
   InspectionSessionWithRelations,
   SessionProgress
 } from '../../types/inspectionSession'
+
+// TEST 4: Direkt import type från indoor.ts
+import type { InspectionStatus } from '../../types/indoor'
 
 export default function StationInspectionModule() {
   const { caseId } = useParams<{ caseId: string }>()
@@ -27,10 +30,12 @@ export default function StationInspectionModule() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [caseData, setCaseData] = useState<any>(null)
-  // TEST 3: Använd typade states
   const [session, setSession] = useState<InspectionSessionWithRelations | null>(null)
   const [outdoorStations, setOutdoorStations] = useState<any[]>([])
   const [indoorStations, setIndoorStations] = useState<any[]>([])
+
+  // TEST 4: State med InspectionStatus typ
+  const [selectedStatus, setSelectedStatus] = useState<InspectionStatus>('ok')
 
   useEffect(() => {
     async function loadData() {
@@ -41,7 +46,7 @@ export default function StationInspectionModule() {
       }
 
       try {
-        console.log('TEST 3: Laddar data med typer...')
+        console.log('TEST 4: Laddar med InspectionStatus typ...')
 
         const { data, error: caseError } = await supabase
           .from('cases')
@@ -54,7 +59,6 @@ export default function StationInspectionModule() {
 
         const sessionData = await getInspectionSessionByCaseId(caseId)
         setSession(sessionData)
-        console.log('TEST 3: Session laddad', sessionData)
 
         if (sessionData?.customer_id) {
           const [outdoor, indoor] = await Promise.all([
@@ -63,7 +67,7 @@ export default function StationInspectionModule() {
           ])
           setOutdoorStations(outdoor)
           setIndoorStations(indoor)
-          console.log('TEST 3: Stationer laddade', { outdoor: outdoor.length, indoor: indoor.length })
+          console.log('TEST 4: Stationer laddade', { outdoor: outdoor.length, indoor: indoor.length })
         }
 
       } catch (err) {
@@ -77,7 +81,6 @@ export default function StationInspectionModule() {
     loadData()
   }, [caseId])
 
-  // TEST 3: Beräkna progress med typer
   const progress: SessionProgress | null = session ? {
     totalStations: session.total_outdoor_stations + session.total_indoor_stations,
     inspectedStations: session.inspected_outdoor_stations + session.inspected_indoor_stations,
@@ -95,7 +98,15 @@ export default function StationInspectionModule() {
     }
   } : null
 
-  console.log('TEST 3: Render', { progress })
+  // TEST 4: Lokalt definierade statusval (inte importerade)
+  const STATUS_OPTIONS: { key: InspectionStatus; label: string }[] = [
+    { key: 'ok', label: 'OK' },
+    { key: 'activity', label: 'Aktivitet' },
+    { key: 'needs_service', label: 'Service' },
+    { key: 'replaced', label: 'Ersatt' }
+  ]
+
+  console.log('TEST 4: Render', { selectedStatus })
 
   if (loading) {
     return (
@@ -126,32 +137,41 @@ export default function StationInspectionModule() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-white">TEST 3: Med typer</h1>
-            <p className="text-slate-400 text-sm">import type från inspectionSession.ts</p>
+            <h1 className="text-xl font-bold text-white">TEST 4: import type indoor.ts</h1>
+            <p className="text-slate-400 text-sm">Direkt import type InspectionStatus</p>
           </div>
+        </div>
+
+        {/* Status selector TEST */}
+        <div className="glass rounded-xl p-6 mb-4">
+          <h2 className="text-lg font-semibold text-white mb-4">Status (InspectionStatus typ)</h2>
+          <div className="flex gap-2 flex-wrap">
+            {STATUS_OPTIONS.map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setSelectedStatus(opt.key)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedStatus === opt.key
+                    ? 'bg-green-500 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-slate-400 mt-2">Vald status: {selectedStatus}</p>
         </div>
 
         {/* Progress */}
         {progress && (
           <div className="glass rounded-xl p-6 mb-4">
-            <h2 className="text-lg font-semibold text-white mb-4">Progress (typat)</h2>
-            <div className="text-slate-300">
-              <p>Total: {progress.totalStations} stationer</p>
-              <p>Inspekterade: {progress.inspectedStations}</p>
-              <p>Procent: {progress.percentComplete}%</p>
-              <p>Utomhus: {progress.outdoorProgress.inspected}/{progress.outdoorProgress.total}</p>
-              <p>Inomhus: {progress.indoorProgress.inspected}/{progress.indoorProgress.total}</p>
-            </div>
+            <h2 className="text-lg font-semibold text-white mb-4">Progress</h2>
+            <p className="text-slate-300">
+              {progress.inspectedStations}/{progress.totalStations} ({progress.percentComplete}%)
+            </p>
           </div>
         )}
-
-        {/* Session */}
-        <div className="glass rounded-xl p-6 mb-4">
-          <h2 className="text-lg font-semibold text-white mb-4">Session</h2>
-          <p className="text-slate-300">Kund: {session?.customer?.company_name}</p>
-          <p className="text-slate-300">Tekniker: {session?.technician?.name}</p>
-          <p className="text-slate-300">Status: {session?.status}</p>
-        </div>
 
         {/* Stationer */}
         <div className="glass rounded-xl p-6">
