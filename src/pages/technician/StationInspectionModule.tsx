@@ -14,13 +14,9 @@ import {
   Clock,
   AlertCircle,
   ChevronRight,
-  Camera,
-  FileText,
-  Activity,
   Map,
   Grid3X3,
   Play,
-  Square,
   Check,
   X
 } from 'lucide-react'
