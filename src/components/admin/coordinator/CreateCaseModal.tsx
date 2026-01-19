@@ -395,7 +395,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         return toast.error('Välj en kund först.');
       }
       searchAddress = customer.contact_address || customer.service_address || '';
-      searchPestType = 'Stationskontroll'; // Dummy-värde för API
+      searchPestType = 'Skadedjursavtal'; // Använd existerande kompetens för avtalskunder
 
       if (!searchAddress) {
         return toast.error('Kunden saknar adress. Ange adress manuellt.');
@@ -814,12 +814,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     <option value="">{caseType === 'inspection' ? 'Välj kund med stationer...' : 'Välj kund...'}</option>
                     {contractCustomers
                       .filter(c => {
-                        // Visa bara huvudkunder, inte multisite-enheter
-                        if (c.parent_customer_id) return false;
-                        // För stationskontroll: Visa endast kunder med stationer
+                        // För stationskontroll: Visa ALLA kunder med stationer (inkl. multisite-enheter)
                         if (caseType === 'inspection') {
                           return customersWithStations.has(c.id);
                         }
+                        // För andra ärendetyper: Visa bara huvudkunder, inte multisite-enheter
+                        if (c.parent_customer_id) return false;
                         return true;
                       })
                       .map(customer => (
