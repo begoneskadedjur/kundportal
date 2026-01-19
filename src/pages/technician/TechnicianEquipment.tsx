@@ -1,6 +1,6 @@
 // src/pages/technician/TechnicianEquipment.tsx
 // Omdesignad: Enhetlig vy utan utomhus/inomhus-tabbar
-// Visar alla avtalskunder med expanderbara rader
+// Visar kunder med utplacerade stationer (expanderbara rader)
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -64,7 +64,7 @@ export default function TechnicianEquipment() {
   // Hämta tekniker-ID från profil
   const technicianId = profile?.technician_id || ''
 
-  // Berakna statistik baserat pa teknikerns placeringar
+  // Beräkna statistik baserat på teknikerns placeringar
   const stats = useMemo(() => {
     const outdoorEquipment = allEquipment.filter(e => e.latitude && e.longitude)
     const byStatus: Record<string, number> = {}
@@ -72,20 +72,19 @@ export default function TechnicianEquipment() {
       byStatus[e.status] = (byStatus[e.status] || 0) + 1
     })
 
-    // Rakna totalt antal stationer fran alla kunder
+    // Räkna totalt antal stationer från alla kunder
     const totalIndoor = allCustomers.reduce((sum, c) => sum + c.indoor_count, 0)
-    const customersWithStations = allCustomers.filter(c => c.outdoor_count + c.indoor_count > 0).length
 
     return {
       total: outdoorEquipment.length + totalIndoor,
       outdoor: outdoorEquipment.length,
       indoor: totalIndoor,
       byStatus,
-      customerCount: customersWithStations
+      customerCount: allCustomers.length
     }
   }, [allEquipment, allCustomers])
 
-  // Hamta alla teknikerns placeringar och ALLA kunder vid mount
+  // Hämta alla teknikerns placeringar och kunder med stationer vid mount
   useEffect(() => {
     const fetchData = async () => {
       if (!technicianId) {
@@ -94,16 +93,16 @@ export default function TechnicianEquipment() {
       }
 
       try {
-        console.log('Hamtar all utrustning och kunder for tekniker:', technicianId)
+        console.log('Hämtar all utrustning och kunder för tekniker:', technicianId)
         const [equipmentData, customerData] = await Promise.all([
           EquipmentService.getEquipmentByTechnician(technicianId),
-          EquipmentService.getAllCustomersWithStationStats(technicianId)
+          EquipmentService.getCustomerStationSummaries(technicianId)
         ])
         setAllEquipment(equipmentData)
         setAllCustomers(customerData)
       } catch (error) {
-        console.error('Fel vid hamtning av utrustning:', error)
-        toast.error('Kunde inte hamta utrustning')
+        console.error('Fel vid hämtning av utrustning:', error)
+        toast.error('Kunde inte hämta utrustning')
       } finally {
         setLoading(false)
       }
@@ -133,7 +132,7 @@ export default function TechnicianEquipment() {
     try {
       const [equipmentData, customerData] = await Promise.all([
         EquipmentService.getEquipmentByTechnician(technicianId),
-        EquipmentService.getAllCustomersWithStationStats(technicianId)
+        EquipmentService.getCustomerStationSummaries(technicianId)
       ])
       setAllEquipment(equipmentData)
       setAllCustomers(customerData)
@@ -155,10 +154,10 @@ export default function TechnicianEquipment() {
     setEditingEquipment(null)
     setPreviewPosition(null)
     setIsFormOpen(true)
-    // For inomhus hanterars det i modalen via IndoorEquipmentView
+    // För inomhus hanteras det i modalen via IndoorEquipmentView
   }
 
-  // Hantera kundklick i listan - oppna full kundmodal
+  // Hantera kundklick i listan - öppna full kundmodal
   const handleOpenCustomerDetails = (customer: CustomerStationSummary) => {
     setSelectedCustomerForModal(customer)
   }
@@ -166,17 +165,17 @@ export default function TechnicianEquipment() {
   // Hantera stationsklick i modal
   const handleStationClick = (station: EquipmentPlacementWithRelations, type: 'outdoor' | 'indoor') => {
     if (type === 'outdoor') {
-      // Oppna redigeringsformular
+      // Öppna redigeringsformulär
       setEditingEquipment(station)
       setPreviewPosition({ lat: station.latitude, lng: station.longitude })
       setWizardCustomerId(station.customer_id)
       setIsFormOpen(true)
       setSelectedCustomerForModal(null)
     }
-    // For inomhus hanteras det i IndoorEquipmentView i modalen
+    // För inomhus hanteras det i IndoorEquipmentView i modalen
   }
 
-  // Hantera "Lagg till station" fran modal
+  // Hantera "Lägg till station" från modal
   const handleAddStationFromModal = (customerId: string, type: 'outdoor' | 'indoor') => {
     setSelectedCustomerForModal(null)
     setWizardCustomerId(customerId)
@@ -321,9 +320,9 @@ export default function TechnicianEquipment() {
     setPreviewPosition({ lat, lng })
   }
 
-  // Hantera klick pa karta for att oppna utrustning
+  // Hantera klick på karta för att öppna utrustning
   const handleEquipmentClick = (equipment: EquipmentPlacementWithRelations) => {
-    // Oppna kundmodalen med denna kunds stationer
+    // Öppna kundmodalen med denna kunds stationer
     const customerSummary = allCustomers.find(c => c.customer_id === equipment.customer_id)
     if (customerSummary) {
       setSelectedCustomerForModal(customerSummary)
@@ -377,7 +376,7 @@ export default function TechnicianEquipment() {
 
       </div>
 
-      {/* Huvudinnehall - enhetlig vy utan tabbar */}
+      {/* Huvudinnehåll - enhetlig vy utan tabbar */}
       <div className="max-w-7xl mx-auto">
         {loading ? (
           <div className="flex items-center justify-center py-24">
@@ -396,10 +395,10 @@ export default function TechnicianEquipment() {
               defaultExpanded={true}
             />
 
-            {/* Kundlista - visar ALLA kunder */}
+            {/* Kundlista - visar kunder med stationer */}
             <div>
               <h2 className="text-lg font-semibold text-white mb-4">
-                Alla avtalskunder
+                Kunder med stationer
               </h2>
               <AllCustomersList
                 customers={allCustomers}
@@ -419,7 +418,7 @@ export default function TechnicianEquipment() {
           onStationClick={handleStationClick}
         />
 
-        {/* Wizard for att lagga till station */}
+        {/* Wizard för att lägga till station */}
         <AddStationWizard
           isOpen={isWizardOpen}
           onClose={() => setIsWizardOpen(false)}
@@ -427,7 +426,7 @@ export default function TechnicianEquipment() {
           technicianId={technicianId}
         />
 
-        {/* Formular-modal */}
+        {/* Formulär-modal */}
         <AnimatePresence>
           {isFormOpen && (
             <motion.div
@@ -467,7 +466,7 @@ export default function TechnicianEquipment() {
                   </button>
                 </div>
 
-                {/* Formular */}
+                {/* Formulär */}
                 <div className="p-6">
                   <EquipmentPlacementForm
                     customerId={wizardCustomerId || ''}
@@ -492,7 +491,7 @@ export default function TechnicianEquipment() {
           )}
         </AnimatePresence>
 
-        {/* Bekraftelse-dialog for borttagning */}
+        {/* Bekräftelse-dialog för borttagning */}
         <AnimatePresence>
           {deleteConfirm && (
             <motion.div
@@ -551,7 +550,7 @@ export default function TechnicianEquipment() {
                     </div>
                   </button>
 
-                  {/* Forsvunnen */}
+                  {/* Försvunnen */}
                   <button
                     onClick={() => setDeleteType('missing')}
                     className={`w-full p-3 rounded-xl border text-left transition-all ${
@@ -569,8 +568,8 @@ export default function TechnicianEquipment() {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-white text-sm">Forsvunnen</p>
-                        <p className="text-xs text-slate-400">Kunde inte hittas pa platsen</p>
+                        <p className="font-medium text-white text-sm">Försvunnen</p>
+                        <p className="text-xs text-slate-400">Kunde inte hittas på platsen</p>
                       </div>
                     </div>
                   </button>
@@ -594,7 +593,7 @@ export default function TechnicianEquipment() {
                       </div>
                       <div>
                         <p className="font-medium text-white text-sm">Skadad & ur funktion</p>
-                        <p className="text-xs text-slate-400">Trasig, behover bytas</p>
+                        <p className="text-xs text-slate-400">Trasig, behöver bytas</p>
                       </div>
                     </div>
                   </button>
@@ -621,7 +620,7 @@ export default function TechnicianEquipment() {
                       </div>
                       <div>
                         <p className="font-medium text-red-400 text-sm">Radera permanent</p>
-                        <p className="text-xs text-slate-400">Tas bort helt, kan ej aterstallas</p>
+                        <p className="text-xs text-slate-400">Tas bort helt, kan ej återställas</p>
                       </div>
                     </div>
                   </button>
@@ -646,7 +645,7 @@ export default function TechnicianEquipment() {
                             : 'bg-slate-500 hover:bg-slate-600'
                     }`}
                   >
-                    {deleteType === 'permanent' ? 'Radera' : 'Bekrafta'}
+                    {deleteType === 'permanent' ? 'Radera' : 'Bekräfta'}
                   </button>
                 </div>
               </motion.div>
@@ -654,7 +653,7 @@ export default function TechnicianEquipment() {
           )}
         </AnimatePresence>
 
-        {/* Lightbox for fullskarmsvisning av foto */}
+        {/* Lightbox för fullskärmsvisning av foto */}
         <AnimatePresence>
           {lightboxImage && (
             <motion.div
@@ -687,7 +686,7 @@ export default function TechnicianEquipment() {
         </AnimatePresence>
       </div>
 
-      {/* FAB-knapp for ny placering */}
+      {/* FAB-knapp för ny placering */}
       <motion.button
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}

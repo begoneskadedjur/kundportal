@@ -1,7 +1,7 @@
 // src/components/technician/CustomerStationsModal.tsx
-// Fullstandig kunddetaljmodal med karta, stationslista och planritningar
+// Fullständig kunddetaljmodal med tabbar: Utomhus (karta) och Inomhus (planritningar)
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -16,12 +16,10 @@ import {
   Target,
   Clock,
   ChevronRight,
-  Map,
-  FileImage,
   Phone,
   Mail,
   Navigation,
-  ExternalLink
+  FileImage
 } from 'lucide-react'
 import { CustomerStationSummary } from '../../services/equipmentService'
 import { StationHealthBadge, StationHealthDetail, calculateHealthStatusWithPercentage } from '../shared/StationHealthBadge'
@@ -40,9 +38,9 @@ interface CustomerStationsModalProps {
   onStationClick?: (station: any, type: 'outdoor' | 'indoor') => void
 }
 
-type ViewType = 'overview' | 'map' | 'floorplans'
+type ViewType = 'outdoor' | 'indoor'
 
-// Ikonmappning for stationstyper
+// Ikonmappning för stationstyper
 const INDOOR_TYPE_ICONS: Record<string, React.ElementType> = {
   mechanical_trap: Crosshair,
   concrete_station: Box,
@@ -72,14 +70,14 @@ export function CustomerStationsModal({
   onAddStation,
   onStationClick
 }: CustomerStationsModalProps) {
-  const [activeView, setActiveView] = useState<ViewType>('overview')
+  const [activeView, setActiveView] = useState<ViewType>('outdoor')
   const [loading, setLoading] = useState(false)
   const [outdoorStations, setOutdoorStations] = useState<EquipmentPlacementWithRelations[]>([])
   const [indoorStations, setIndoorStations] = useState<any[]>([])
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails | null>(null)
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([])
 
-  // Ladda data nar modal oppnas
+  // Ladda data när modal öppnas
   useEffect(() => {
     if (isOpen && customer) {
       loadAllData()
@@ -91,12 +89,12 @@ export function CustomerStationsModal({
 
     setLoading(true)
     try {
-      // Hamta stationer
+      // Hämta stationer
       const { outdoor, indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
       setOutdoorStations(outdoor)
       setIndoorStations(indoor)
 
-      // Hamta kunddetaljer
+      // Hämta kunddetaljer
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .select('id, company_name, contact_person, contact_email, contact_phone, contact_address, billing_address')
@@ -107,7 +105,7 @@ export function CustomerStationsModal({
         setCustomerDetails(customerData)
       }
 
-      // Hamta planritningar
+      // Hämta planritningar
       const { data: floorPlanData, error: floorPlanError } = await supabase
         .from('floor_plans')
         .select('id, name, image_url')
@@ -125,7 +123,7 @@ export function CustomerStationsModal({
     }
   }
 
-  // Berakna halsostatus
+  // Beräkna hälsostatus
   const allStations = [...outdoorStations, ...indoorStations.map(s => ({ status: s.status }))]
   const healthInfo = calculateHealthStatusWithPercentage(allStations)
 
@@ -147,7 +145,7 @@ export function CustomerStationsModal({
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
           />
 
-          {/* Modal - storre for att rymma mer innehall */}
+          {/* Modal - större för att rymma mer innehåll */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -172,7 +170,7 @@ export function CustomerStationsModal({
                           {customer.customer_address}
                         </p>
                       )}
-                      {/* Kontaktinfo-snabblank */}
+                      {/* Kontaktinfo-snabblänkar */}
                       {customerDetails && (
                         <div className="flex items-center gap-3 mt-2">
                           {customerDetails.contact_phone && (
@@ -195,14 +193,11 @@ export function CustomerStationsModal({
                               Mejla
                             </a>
                           )}
-                          {customer.customer_address && (
+                          {customer.customer_address && outdoorStations.length > 0 && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                // Oppna i kartor
-                                if (outdoorStations.length > 0) {
-                                  openInMapsApp(outdoorStations[0].latitude, outdoorStations[0].longitude)
-                                }
+                                openInMapsApp(outdoorStations[0].latitude, outdoorStations[0].longitude)
                               }}
                               className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
                             >
@@ -222,59 +217,56 @@ export function CustomerStationsModal({
                   </button>
                 </div>
 
-                {/* Navigeringsflikar */}
+                {/* Hälsostatus */}
+                {totalStations > 0 && (
+                  <div className="mt-4 p-3 bg-slate-900/50 rounded-xl">
+                    <StationHealthDetail
+                      status={healthInfo.status}
+                      percentage={healthInfo.percentage}
+                      problematicCount={healthInfo.problematicCount}
+                      totalCount={totalStations}
+                    />
+                  </div>
+                )}
+
+                {/* Navigeringsflikar - Utomhus / Inomhus */}
                 <div className="mt-4 flex gap-2">
                   <button
-                    onClick={() => setActiveView('overview')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                      activeView === 'overview'
-                        ? 'bg-emerald-500 text-white'
+                    onClick={() => setActiveView('outdoor')}
+                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      activeView === 'outdoor'
+                        ? 'bg-blue-500 text-white'
                         : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
-                    <Building2 className="w-4 h-4" />
-                    Oversikt
+                    <MapPin className="w-4 h-4" />
+                    Utomhus
+                    <span className={`px-1.5 py-0.5 rounded text-xs ${
+                      activeView === 'outdoor' ? 'bg-blue-600' : 'bg-slate-600'
+                    }`}>
+                      {outdoorStations.length}
+                    </span>
                   </button>
-                  {outdoorStations.length > 0 && (
-                    <button
-                      onClick={() => setActiveView('map')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                        activeView === 'map'
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      <Map className="w-4 h-4" />
-                      Karta
-                      <span className={`px-1.5 py-0.5 rounded text-xs ${
-                        activeView === 'map' ? 'bg-emerald-600' : 'bg-slate-600'
-                      }`}>
-                        {outdoorStations.length}
-                      </span>
-                    </button>
-                  )}
-                  {floorPlans.length > 0 && (
-                    <button
-                      onClick={() => setActiveView('floorplans')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                        activeView === 'floorplans'
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      <FileImage className="w-4 h-4" />
-                      Planritningar
-                      <span className={`px-1.5 py-0.5 rounded text-xs ${
-                        activeView === 'floorplans' ? 'bg-emerald-600' : 'bg-slate-600'
-                      }`}>
-                        {floorPlans.length}
-                      </span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setActiveView('indoor')}
+                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      activeView === 'indoor'
+                        ? 'bg-cyan-500 text-white'
+                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <Home className="w-4 h-4" />
+                    Inomhus
+                    <span className={`px-1.5 py-0.5 rounded text-xs ${
+                      activeView === 'indoor' ? 'bg-cyan-600' : 'bg-slate-600'
+                    }`}>
+                      {indoorStations.length}
+                    </span>
+                  </button>
                 </div>
               </div>
 
-              {/* Innehall */}
+              {/* Innehåll */}
               <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="flex items-center justify-center py-16">
@@ -282,80 +274,111 @@ export function CustomerStationsModal({
                   </div>
                 ) : (
                   <>
-                    {/* Oversikt */}
-                    {activeView === 'overview' && (
-                      <div className="p-5 space-y-6">
-                        {/* Halsostatus */}
-                        {totalStations > 0 && (
-                          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                            <StationHealthDetail
-                              status={healthInfo.status}
-                              percentage={healthInfo.percentage}
-                              problematicCount={healthInfo.problematicCount}
-                              totalCount={totalStations}
-                            />
+                    {/* Utomhus - Karta + stationslista */}
+                    {activeView === 'outdoor' && (
+                      <div className="flex flex-col h-full">
+                        {outdoorStations.length > 0 ? (
+                          <>
+                            {/* Karta - fixad höjd */}
+                            <div className="h-[300px] md:h-[350px] flex-shrink-0">
+                              <EquipmentMap
+                                equipment={outdoorStations}
+                                onEquipmentClick={(eq) => onStationClick?.(eq, 'outdoor')}
+                                height="100%"
+                                showControls={true}
+                                readOnly={true}
+                                enableClustering={false}
+                              />
+                            </div>
+
+                            {/* Stationslista under kartan */}
+                            <div className="p-4 space-y-3">
+                              <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                                <MapPin className="w-4 h-4" />
+                                Utomhusstationer ({outdoorStations.length})
+                              </h3>
+                              <div className="space-y-2">
+                                {outdoorStations.map(station => (
+                                  <OutdoorStationCard
+                                    key={station.id}
+                                    station={station}
+                                    onClick={() => onStationClick?.(station, 'outdoor')}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                              <MapPin className="w-8 h-8 text-slate-500" />
+                            </div>
+                            <h3 className="text-lg font-medium text-white mb-2">
+                              Inga utomhusstationer
+                            </h3>
+                            <p className="text-slate-400 text-sm max-w-xs">
+                              Det finns inga utomhusstationer placerade hos denna kund ännu.
+                            </p>
                           </div>
                         )}
+                      </div>
+                    )}
 
-                        {/* Kundinformation */}
-                        {customerDetails && (
-                          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                            <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                              <Building2 className="w-4 h-4 text-blue-400" />
-                              Kundinformation
+                    {/* Inomhus - Planritningar + stationslista */}
+                    {activeView === 'indoor' && (
+                      <div className="p-5 space-y-6">
+                        {/* Planritningar */}
+                        {floorPlans.length > 0 ? (
+                          <div>
+                            <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                              <FileImage className="w-4 h-4" />
+                              Planritningar ({floorPlans.length})
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                              {customerDetails.contact_person && (
-                                <div>
-                                  <span className="text-slate-500">Kontaktperson:</span>
-                                  <span className="ml-2 text-white">{customerDetails.contact_person}</span>
-                                </div>
-                              )}
-                              {customerDetails.contact_phone && (
-                                <div>
-                                  <span className="text-slate-500">Telefon:</span>
-                                  <a href={`tel:${customerDetails.contact_phone}`} className="ml-2 text-blue-400 hover:text-blue-300">
-                                    {customerDetails.contact_phone}
-                                  </a>
-                                </div>
-                              )}
-                              {customerDetails.contact_email && (
-                                <div>
-                                  <span className="text-slate-500">E-post:</span>
-                                  <a href={`mailto:${customerDetails.contact_email}`} className="ml-2 text-blue-400 hover:text-blue-300">
-                                    {customerDetails.contact_email}
-                                  </a>
-                                </div>
-                              )}
-                              {customerDetails.contact_address && (
-                                <div className="md:col-span-2">
-                                  <span className="text-slate-500">Adress:</span>
-                                  <span className="ml-2 text-white">{customerDetails.contact_address}</span>
-                                </div>
-                              )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {floorPlans.map(plan => {
+                                const stationsOnPlan = indoorStations.filter(s => s.floor_plan_id === plan.id)
+                                return (
+                                  <div
+                                    key={plan.id}
+                                    className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden hover:border-slate-600/50 transition-colors"
+                                  >
+                                    {plan.image_url ? (
+                                      <img
+                                        src={plan.image_url}
+                                        alt={plan.name}
+                                        className="w-full h-40 object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-40 bg-slate-800 flex items-center justify-center">
+                                        <FileImage className="w-12 h-12 text-slate-600" />
+                                      </div>
+                                    )}
+                                    <div className="p-3">
+                                      <h4 className="font-medium text-white">{plan.name}</h4>
+                                      <p className="text-xs text-slate-400 mt-1">
+                                        {stationsOnPlan.length} stationer
+                                      </p>
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <FileImage className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                            <p className="text-slate-400">Inga planritningar uppladdade</p>
+                          </div>
                         )}
 
-                        {/* Stationslista */}
-                        <div>
-                          <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-emerald-400" />
-                            Alla stationer ({totalStations})
-                          </h3>
-
-                          {totalStations > 0 ? (
+                        {/* Inomhusstationslista */}
+                        {indoorStations.length > 0 ? (
+                          <div>
+                            <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                              <Home className="w-4 h-4" />
+                              Inomhusstationer ({indoorStations.length})
+                            </h3>
                             <div className="space-y-2">
-                              {/* Utomhusstationer */}
-                              {outdoorStations.map(station => (
-                                <OutdoorStationCard
-                                  key={station.id}
-                                  station={station}
-                                  onClick={() => onStationClick?.(station, 'outdoor')}
-                                />
-                              ))}
-
-                              {/* Inomhusstationer */}
                               {indoorStations.map(station => (
                                 <IndoorStationCard
                                   key={station.id}
@@ -364,68 +387,11 @@ export function CustomerStationsModal({
                                 />
                               ))}
                             </div>
-                          ) : (
-                            <div className="text-center py-8">
-                              <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <MapPin className="w-6 h-6 text-slate-500" />
-                              </div>
-                              <p className="text-slate-400 text-sm">
-                                Inga stationer utplacerade hos denna kund
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Kartvy */}
-                    {activeView === 'map' && outdoorStations.length > 0 && (
-                      <div className="h-full min-h-[400px]">
-                        <EquipmentMap
-                          equipment={outdoorStations}
-                          onEquipmentClick={(eq) => onStationClick?.(eq, 'outdoor')}
-                          height="100%"
-                          showControls={true}
-                          readOnly={true}
-                          enableClustering={false}
-                        />
-                      </div>
-                    )}
-
-                    {/* Planritningar */}
-                    {activeView === 'floorplans' && (
-                      <div className="p-5">
-                        {floorPlans.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {floorPlans.map(plan => (
-                              <div
-                                key={plan.id}
-                                className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden"
-                              >
-                                {plan.image_url ? (
-                                  <img
-                                    src={plan.image_url}
-                                    alt={plan.name}
-                                    className="w-full h-48 object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-48 bg-slate-800 flex items-center justify-center">
-                                    <FileImage className="w-12 h-12 text-slate-600" />
-                                  </div>
-                                )}
-                                <div className="p-3">
-                                  <h4 className="font-medium text-white">{plan.name}</h4>
-                                  <p className="text-xs text-slate-400 mt-1">
-                                    {indoorStations.filter(s => s.floor_plan_id === plan.id).length} stationer
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
                           </div>
                         ) : (
-                          <div className="text-center py-12">
-                            <FileImage className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                            <p className="text-slate-400">Inga planritningar uppladdade</p>
+                          <div className="text-center py-8">
+                            <Home className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                            <p className="text-slate-400">Inga inomhusstationer utplacerade</p>
                           </div>
                         )}
                       </div>
@@ -434,24 +400,29 @@ export function CustomerStationsModal({
                 )}
               </div>
 
-              {/* Footer med lagg till-knapp */}
+              {/* Footer med lägg till-knapp */}
               {onAddStation && (
-                <div className="px-5 py-4 border-t border-slate-700 bg-slate-800/50 flex gap-3">
+                <div className="px-5 py-4 border-t border-slate-700 bg-slate-800/50">
                   <button
-                    onClick={() => onAddStation(customer.customer_id, 'outdoor')}
-                    className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+                    onClick={() => onAddStation(customer.customer_id, activeView)}
+                    className={`w-full py-3 px-4 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
+                      activeView === 'outdoor'
+                        ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                        : 'bg-cyan-500 hover:bg-cyan-600 text-white'
+                    }`}
                   >
                     <Plus className="w-5 h-5" />
-                    <MapPin className="w-4 h-4" />
-                    Utomhusstation
-                  </button>
-                  <button
-                    onClick={() => onAddStation(customer.customer_id, 'indoor')}
-                    className="flex-1 py-3 px-4 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-5 h-5" />
-                    <Home className="w-4 h-4" />
-                    Inomhusstation
+                    {activeView === 'outdoor' ? (
+                      <>
+                        <MapPin className="w-4 h-4" />
+                        Lägg till utomhusstation
+                      </>
+                    ) : (
+                      <>
+                        <Home className="w-4 h-4" />
+                        Lägg till inomhusstation
+                      </>
+                    )}
                   </button>
                 </div>
               )}
@@ -502,7 +473,7 @@ function OutdoorStationCard({
           </div>
           <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
             <span>{typeConfig.label}</span>
-            <span>-</span>
+            <span>•</span>
             <Clock className="w-3 h-3" />
             <span>{format(new Date(station.placed_at), "d MMM yyyy", { locale: sv })}</span>
           </div>
@@ -533,7 +504,7 @@ function IndoorStationCard({
   }
 
   const typeLabels: Record<string, string> = {
-    mechanical_trap: 'Mekanisk falla',
+    mechanical_trap: 'Mekanisk fälla',
     concrete_station: 'Betongstation',
     bait_station: 'Betesstation'
   }
@@ -562,15 +533,12 @@ function IndoorStationCard({
             >
               {status.label}
             </span>
-            <span className="px-2 py-0.5 rounded-full text-xs bg-cyan-500/10 text-cyan-400">
-              Inomhus
-            </span>
           </div>
           <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
             <span>{typeLabels[station.station_type] || station.station_type}</span>
             {station.floor_plan?.name && (
               <>
-                <span>-</span>
+                <span>•</span>
                 <span>{station.floor_plan.name}</span>
               </>
             )}

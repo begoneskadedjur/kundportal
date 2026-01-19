@@ -1,5 +1,5 @@
 // src/components/technician/ExpandableCustomerRow.tsx
-// Expanderbar kundrad med stationsdetaljer - ersätter separata utomhus/inomhus-tabbar
+// Expanderbar kundrad med stationsdetaljer
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,34 +9,18 @@ import {
   Building2,
   MapPin,
   Home,
-  ChevronDown,
   ChevronRight,
-  Calendar,
   Clock,
   Box,
   Target,
   Crosshair,
   ExternalLink,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
   Loader2
 } from 'lucide-react'
 import { StationHealthBadge, HealthStatus } from '../shared/StationHealthBadge'
-import { EquipmentService } from '../../services/equipmentService'
+import { EquipmentService, CustomerStationSummary } from '../../services/equipmentService'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG, EQUIPMENT_STATUS_CONFIG } from '../../types/database'
 import toast from 'react-hot-toast'
-
-export interface CustomerStationSummary {
-  customer_id: string
-  customer_name: string
-  customer_address: string | null
-  outdoor_count: number
-  indoor_count: number
-  health_status: HealthStatus
-  latest_inspection_date: string | null
-  latest_inspector_name: string | null
-}
 
 interface ExpandableCustomerRowProps {
   customer: CustomerStationSummary
@@ -45,7 +29,7 @@ interface ExpandableCustomerRowProps {
   onToggleExpand: () => void
 }
 
-// Ikonmappning for stationstyper
+// Ikonmappning för stationstyper
 const INDOOR_TYPE_ICONS: Record<string, React.ElementType> = {
   mechanical_trap: Crosshair,
   concrete_station: Box,
@@ -53,7 +37,7 @@ const INDOOR_TYPE_ICONS: Record<string, React.ElementType> = {
 }
 
 const typeLabels: Record<string, string> = {
-  mechanical_trap: 'Mekanisk falla',
+  mechanical_trap: 'Mekanisk fälla',
   concrete_station: 'Betongstation',
   bait_station: 'Betesstation'
 }
@@ -72,7 +56,7 @@ export function ExpandableCustomerRow({
   const totalStations = customer.outdoor_count + customer.indoor_count
   const hasStations = totalStations > 0
 
-  // Ladda stationer nar raden expanderas
+  // Ladda stationer när raden expanderas
   useEffect(() => {
     if (isExpanded && !stationsLoaded && hasStations) {
       loadStations()
@@ -157,7 +141,7 @@ export function ExpandableCustomerRow({
               <span className="text-xs text-slate-500">Inga stationer</span>
             )}
 
-            {/* Halsostatus */}
+            {/* Hälsostatus */}
             {hasStations && (
               <StationHealthBadge status={customer.health_status} size="sm" />
             )}
@@ -165,7 +149,7 @@ export function ExpandableCustomerRow({
         </div>
       </div>
 
-      {/* Expanderat innehall */}
+      {/* Expanderat innehåll */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -192,7 +176,7 @@ export function ExpandableCustomerRow({
                     }}
                     className="px-4 py-2 bg-emerald-500/10 text-emerald-400 rounded-lg text-sm hover:bg-emerald-500/20 transition-colors"
                   >
-                    Lagg till station
+                    Lägg till station
                   </button>
                 </div>
               ) : loading ? (

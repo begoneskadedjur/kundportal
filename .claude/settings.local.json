@@ -85,7 +85,8 @@
       "Bash(npm install:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": [],
