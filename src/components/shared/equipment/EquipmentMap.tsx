@@ -47,6 +47,8 @@ interface EquipmentMapProps {
   readOnly?: boolean
   enableClustering?: boolean // Aktivera klustervisning för många markörer
   showNumbers?: boolean // Visa stationsnummer (1, 2, 3...) baserat på placeringsordning
+  inspectedStationIds?: Set<string> // IDs för inspekterade stationer (visas med grön bock)
+  highlightedStationId?: string | null // ID för station att highlighta (wizard-läge)
 }
 
 // Komponent för att hantera kartvy-uppdateringar
@@ -109,7 +111,9 @@ export function EquipmentMap({
   showControls = true,
   readOnly = false,
   enableClustering = true, // Aktiverat som standard
-  showNumbers = false // Visa stationsnummer, default av
+  showNumbers = false, // Visa stationsnummer, default av
+  inspectedStationIds, // IDs för inspekterade stationer
+  highlightedStationId // ID för station att highlighta (wizard-läge)
 }: EquipmentMapProps) {
   const mapRef = useRef<L.Map | null>(null)
   // State for den valda utrustningen som visas i detail-sheeten
@@ -334,7 +338,9 @@ export function EquipmentMap({
                   item.equipment_type,
                   item.status,
                   getEquipmentColor(item),
-                  showNumbers ? equipmentNumberMap.get(item.id) : undefined
+                  showNumbers ? equipmentNumberMap.get(item.id) : undefined,
+                  inspectedStationIds?.has(item.id),
+                  item.id === highlightedStationId
                 )}
                 eventHandlers={{
                   click: () => handleMarkerClick(item)
@@ -351,7 +357,9 @@ export function EquipmentMap({
                 item.equipment_type,
                 item.status,
                 getEquipmentColor(item),
-                showNumbers ? equipmentNumberMap.get(item.id) : undefined
+                showNumbers ? equipmentNumberMap.get(item.id) : undefined,
+                inspectedStationIds?.has(item.id),
+                item.id === highlightedStationId
               )}
               eventHandlers={{
                 click: () => handleMarkerClick(item)

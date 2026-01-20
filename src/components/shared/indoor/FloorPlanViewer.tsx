@@ -24,6 +24,8 @@ interface FloorPlanViewerProps {
   onCancelPlacement?: () => void
   height?: string
   showNumbers?: boolean // Visa stationsnummer (1, 2, 3...) baserat på placeringsordning
+  inspectedStationIds?: Set<string> // IDs för inspekterade stationer (visas med grön bock)
+  highlightedStationId?: string | null // ID för station att highlighta (wizard-läge)
 }
 
 // Hämta typkonfiguration - prioriterar dynamisk data
@@ -61,7 +63,9 @@ export function FloorPlanViewer({
   onImageClick,
   onCancelPlacement,
   height = 'calc(100vh - 200px)',
-  showNumbers = false
+  showNumbers = false,
+  inspectedStationIds,
+  highlightedStationId
 }: FloorPlanViewerProps) {
   const transformRef = useRef<ReactZoomPanPinchRef>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -264,6 +268,8 @@ export function FloorPlanViewer({
                 isSelected={station.id === selectedStationId}
                 onClick={() => onStationClick?.(station)}
                 displayNumber={showNumbers ? stationNumberMap.get(station.id) : undefined}
+                isInspected={inspectedStationIds?.has(station.id)}
+                isHighlighted={station.id === highlightedStationId}
               />
             ))}
 

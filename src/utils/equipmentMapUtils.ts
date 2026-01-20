@@ -23,12 +23,16 @@ export const MAX_ZOOM = 19 // Maximal zoom-nivå - OSM tiles fungerar upp till 1
  * @param status - Utrustningsstatus
  * @param customColor - Valfri färg från station_types-tabellen (prioriteras över legacy-config)
  * @param stationNumber - Valfritt nummer att visa i markören (1, 2, 3...)
+ * @param isInspected - Om stationen är inspekterad (visar grön bock-ring)
+ * @param isHighlighted - Om stationen är highlightad (wizard-läge, pulserar)
  */
 export const createEquipmentIcon = (
   type: string, // Ändrat från EquipmentType till string för dynamiska typer
   status: EquipmentStatus,
   customColor?: string, // Ny parameter för dynamisk färg från station_types
-  stationNumber?: number // Nummer att visa i markören
+  stationNumber?: number, // Nummer att visa i markören
+  isInspected?: boolean, // Om stationen är inspekterad
+  isHighlighted?: boolean // Om stationen är highlightad (wizard-läge)
 ): L.DivIcon => {
   // Prioritera customColor (från station_types), sedan legacy-config, sist fallback till slate-500
   const typeConfig = EQUIPMENT_TYPE_CONFIG[type as EquipmentType]
@@ -53,9 +57,12 @@ export const createEquipmentIcon = (
     borderColor = '#ef4444' // red-500
   }
 
-  // Innehåll i markören: nummer om aktivt och nummer finns, annars status-symbol
+  // Innehåll i markören: bock om inspekterad, nummer om aktivt och nummer finns, annars status-symbol
   let displayContent = ''
-  if (status === 'missing') {
+  if (isInspected) {
+    // Inspekterad: visa bock (checkmark) - använd Unicode för kryss-bock
+    displayContent = '✓'
+  } else if (status === 'missing') {
     displayContent = '?'
   } else if (status === 'removed') {
     displayContent = '✕'
@@ -70,39 +77,59 @@ export const createEquipmentIcon = (
   const visualSize = 28
   const touchSize = 44
 
+  // Extra styling för inspekterade stationer: grön ring
+  // Highlighted (wizard) stationer får pulsering + blå ring
+  let boxShadowStyle = '0 2px 6px rgba(0,0,0,0.35)'
+  if (isHighlighted) {
+    boxShadowStyle = '0 0 0 4px #3b82f6, 0 0 15px 5px rgba(59, 130, 246, 0.5), 0 2px 6px rgba(0,0,0,0.35)'
+  } else if (isInspected) {
+    boxShadowStyle = '0 0 0 3px #22c55e, 0 2px 6px rgba(0,0,0,0.35)'
+  }
+
+  // Bakgrundsfärg: om inspekterad, visa grön bakgrund
+  const bgColor = isInspected ? '#22c55e' : color
+
+  // Animation class för highlighted
+  const animationStyle = isHighlighted ? 'animation: pulse-highlight 1.5s ease-in-out infinite;' : ''
+
+  // Storlek: highlighted är lite större
+  const actualVisualSize = isHighlighted ? visualSize + 6 : visualSize
+  const actualTouchSize = isHighlighted ? touchSize + 6 : touchSize
+
   return L.divIcon({
-    className: 'equipment-marker',
+    className: `equipment-marker${isHighlighted ? ' equipment-marker-highlighted' : ''}`,
     html: `
       <div style="
-        width: ${touchSize}px;
-        height: ${touchSize}px;
+        width: ${actualTouchSize}px;
+        height: ${actualTouchSize}px;
         display: flex;
         align-items: center;
         justify-content: center;
       ">
         <div style="
-          background-color: ${color};
+          background-color: ${bgColor};
           opacity: ${opacity};
-          width: ${visualSize}px;
-          height: ${visualSize}px;
+          width: ${actualVisualSize}px;
+          height: ${actualVisualSize}px;
           border-radius: 50%;
-          border: 2px ${borderStyle} ${borderColor};
-          box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+          border: ${isHighlighted ? '3px' : '2px'} ${borderStyle} ${isHighlighted ? '#3b82f6' : isInspected ? '#16a34a' : borderColor};
+          box-shadow: ${boxShadowStyle};
           display: flex;
           align-items: center;
           justify-content: center;
           color: white;
           font-weight: bold;
-          font-size: ${stationNumber && stationNumber >= 100 ? '10px' : '12px'};
+          font-size: ${stationNumber && stationNumber >= 100 ? '10px' : isHighlighted ? '14px' : '12px'};
           text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+          ${animationStyle}
         ">
           ${displayContent}
         </div>
       </div>
     `,
-    iconSize: [touchSize, touchSize],
-    iconAnchor: [touchSize / 2, touchSize / 2],
-    popupAnchor: [0, -(visualSize / 2)]
+    iconSize: [actualTouchSize, actualTouchSize],
+    iconAnchor: [actualTouchSize / 2, actualTouchSize / 2],
+    popupAnchor: [0, -(actualVisualSize / 2)]
   })
 }
 
@@ -292,6 +319,21 @@ export const MARKER_CSS = `
     100% {
       box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
     }
+  }
+
+  @keyframes pulse-highlight {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 4px #3b82f6, 0 0 15px 5px rgba(59, 130, 246, 0.5);
+    }
+    50% {
+      transform: scale(1.1);
+      box-shadow: 0 0 0 6px #3b82f6, 0 0 25px 10px rgba(59, 130, 246, 0.7);
+    }
+  }
+
+  .equipment-marker-highlighted {
+    z-index: 1000 !important;
   }
 
   .equipment-marker {

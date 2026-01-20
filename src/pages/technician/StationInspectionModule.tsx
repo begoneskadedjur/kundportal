@@ -14,6 +14,8 @@ import {
   Check,
   X,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Camera,
   History,
   Map,
@@ -30,7 +32,10 @@ import {
   AlertTriangle,
   Calendar,
   Info,
-  ExternalLink
+  ExternalLink,
+  BarChart2,
+  Wand2,
+  SkipForward
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -55,7 +60,9 @@ import {
   uploadInspectionPhoto,
   getInspectionPhotoUrl,
   getLastInspectionSummary,
-  getStationsWithRecentActivity
+  getStationsWithRecentActivity,
+  getOutdoorInspectionsForSession,
+  getIndoorInspectionsForSession
 } from '../../services/inspectionSessionService'
 
 // Typer
@@ -145,6 +152,22 @@ export default function StationInspectionModule() {
   const [inspectedStationIds, setInspectedStationIds] = useState<Set<string>>(new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Sammanställningspanel state - spara inspektionsresultat per station
+  const [showSummary, setShowSummary] = useState(false)
+  const [inspectionResults, setInspectionResults] = useState<Map<string, {
+    status: InspectionStatus
+    findings: string | null
+    measurementValue: number | null
+    measurementUnit: string | null
+    hasPhoto: boolean
+    timestamp: string
+  }>>(new Map())
+
+  // Wizard-läge state
+  const [wizardMode, setWizardMode] = useState<'off' | 'outdoor' | 'indoor'>('off')
+  const [currentWizardStationId, setCurrentWizardStationId] = useState<string | null>(null)
+  const [wizardStationQueue, setWizardStationQueue] = useState<string[]>([])
+
   // Historik state
   const [showHistory, setShowHistory] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -206,6 +229,59 @@ export default function StationInspectionModule() {
         ])
         setLastInspection(lastInsp)
         setActivityStationIds(activityIds)
+
+        // ======================================================
+        // ÅTERUPPTAGANDE: Ladda befintliga inspektioner om sessionen är pågående
+        // ======================================================
+        if (sessionData.status === 'in_progress') {
+          const [existingOutdoor, existingIndoor] = await Promise.all([
+            getOutdoorInspectionsForSession(sessionData.id),
+            getIndoorInspectionsForSession(sessionData.id)
+          ])
+
+          // Populera inspectedStationIds och inspectionResults
+          const alreadyInspectedIds = new Set<string>()
+          const existingResults = new Map<string, {
+            status: InspectionStatus
+            findings: string | null
+            measurementValue: number | null
+            measurementUnit: string | null
+            hasPhoto: boolean
+            timestamp: string
+          }>()
+
+          // Utomhusinspektioner
+          existingOutdoor.forEach(insp => {
+            alreadyInspectedIds.add(insp.station_id)
+            existingResults.set(insp.station_id, {
+              status: insp.status as InspectionStatus,
+              findings: insp.findings,
+              measurementValue: insp.measurement_value,
+              measurementUnit: insp.measurement_unit,
+              hasPhoto: !!insp.photo_path,
+              timestamp: insp.inspected_at
+            })
+          })
+
+          // Inomhusinspektioner
+          existingIndoor.forEach(insp => {
+            alreadyInspectedIds.add(insp.station_id)
+            existingResults.set(insp.station_id, {
+              status: insp.status as InspectionStatus,
+              findings: insp.findings,
+              measurementValue: insp.measurement_value,
+              measurementUnit: insp.measurement_unit,
+              hasPhoto: !!insp.photo_path,
+              timestamp: insp.inspected_at
+            })
+          })
+
+          if (alreadyInspectedIds.size > 0) {
+            setInspectedStationIds(alreadyInspectedIds)
+            setInspectionResults(existingResults)
+            console.log(`Laddade ${alreadyInspectedIds.size} befintliga inspektioner för återupptagande`)
+          }
+        }
 
       } catch (err) {
         console.error('Error loading data:', err)
@@ -436,6 +512,164 @@ export default function StationInspectionModule() {
     }
   }, [indoorStations, handleSelectStation])
 
+  // ============================================
+  // WIZARD-LÄGE FUNKTIONER
+  // ============================================
+
+  // Starta outdoor wizard
+  const startOutdoorWizard = useCallback(() => {
+    if (session?.status !== 'in_progress') {
+      toast.error('Starta inspektionen först')
+      return
+    }
+
+    // Bygg kö av ej-inspekterade stationer, sorterade efter nummer
+    const uninspected = outdoorStations
+      .filter(s => !inspectedStationIds.has(s.id))
+      .sort((a, b) => {
+        const numA = outdoorNumberMap[a.id] || 999
+        const numB = outdoorNumberMap[b.id] || 999
+        return numA - numB
+      })
+
+    if (uninspected.length === 0) {
+      toast.success('Alla utomhusstationer är redan kontrollerade!')
+      return
+    }
+
+    const queue = uninspected.map(s => s.id)
+    setWizardStationQueue(queue)
+    setCurrentWizardStationId(queue[0])
+    setWizardMode('outdoor')
+
+    // Öppna första stationen för inspektion
+    const firstStation = outdoorStations.find(s => s.id === queue[0])
+    if (firstStation) {
+      handleSelectStation(firstStation)
+    }
+
+    toast.success(`Wizard startad! ${queue.length} stationer kvar.`)
+  }, [session?.status, outdoorStations, inspectedStationIds, outdoorNumberMap, handleSelectStation])
+
+  // Starta indoor wizard för vald planritning
+  const startIndoorWizard = useCallback(() => {
+    if (session?.status !== 'in_progress') {
+      toast.error('Starta inspektionen först')
+      return
+    }
+
+    if (!selectedFloorPlanId) {
+      toast.error('Välj en planritning först')
+      return
+    }
+
+    // Bygg kö av ej-inspekterade stationer på denna planritning
+    const uninspected = filteredIndoorStations
+      .filter(s => !inspectedStationIds.has(s.id))
+      .sort((a, b) => {
+        const numA = indoorNumberMap[a.id] || 999
+        const numB = indoorNumberMap[b.id] || 999
+        return numA - numB
+      })
+
+    if (uninspected.length === 0) {
+      toast.success('Alla inomhusstationer på denna planritning är redan kontrollerade!')
+      return
+    }
+
+    const queue = uninspected.map(s => s.id)
+    setWizardStationQueue(queue)
+    setCurrentWizardStationId(queue[0])
+    setWizardMode('indoor')
+
+    // Öppna första stationen för inspektion
+    const firstStation = indoorStations.find(s => s.id === queue[0])
+    if (firstStation) {
+      handleSelectStation(firstStation)
+    }
+
+    toast.success(`Wizard startad! ${queue.length} stationer kvar.`)
+  }, [session?.status, selectedFloorPlanId, filteredIndoorStations, inspectedStationIds, indoorNumberMap, indoorStations, handleSelectStation])
+
+  // Gå till nästa station i wizard
+  const wizardNextStation = useCallback(() => {
+    if (wizardMode === 'off' || wizardStationQueue.length === 0) return
+
+    // Hitta index för nuvarande station och gå till nästa
+    const currentIndex = wizardStationQueue.indexOf(currentWizardStationId || '')
+    const nextIndex = currentIndex + 1
+
+    if (nextIndex >= wizardStationQueue.length) {
+      // Wizard klar!
+      setWizardMode('off')
+      setCurrentWizardStationId(null)
+      setWizardStationQueue([])
+      toast.success('🎉 Alla stationer kontrollerade!')
+      return
+    }
+
+    const nextStationId = wizardStationQueue[nextIndex]
+    setCurrentWizardStationId(nextStationId)
+
+    // Öppna nästa station för inspektion
+    const stations = wizardMode === 'outdoor' ? outdoorStations : indoorStations
+    const nextStation = stations.find(s => s.id === nextStationId)
+    if (nextStation) {
+      handleSelectStation(nextStation)
+    }
+  }, [wizardMode, wizardStationQueue, currentWizardStationId, outdoorStations, indoorStations, handleSelectStation])
+
+  // Hoppa över station i wizard
+  const wizardSkipStation = useCallback(() => {
+    if (wizardMode === 'off') return
+
+    // Flytta aktuell station till slutet av kön
+    const currentId = currentWizardStationId
+    if (!currentId) return
+
+    setWizardStationQueue(prev => {
+      const withoutCurrent = prev.filter(id => id !== currentId)
+      return [...withoutCurrent, currentId]
+    })
+
+    // Gå till nästa (som nu är först i kön)
+    const newQueue = wizardStationQueue.filter(id => id !== currentId)
+    if (newQueue.length > 0) {
+      const nextId = newQueue[0]
+      setCurrentWizardStationId(nextId)
+      const stations = wizardMode === 'outdoor' ? outdoorStations : indoorStations
+      const nextStation = stations.find(s => s.id === nextId)
+      if (nextStation) {
+        handleSelectStation(nextStation)
+      }
+    }
+
+    toast('Station hoppades över')
+  }, [wizardMode, currentWizardStationId, wizardStationQueue, outdoorStations, indoorStations, handleSelectStation])
+
+  // Avsluta wizard
+  const stopWizard = useCallback(() => {
+    setWizardMode('off')
+    setCurrentWizardStationId(null)
+    setWizardStationQueue([])
+    setSelectedStation(null)
+    toast('Wizard avslutad')
+  }, [])
+
+  // Auto-progress till nästa efter lyckad inspektion (om wizard är aktiv)
+  useEffect(() => {
+    // Om en station just inspekterades och wizard är aktiv, gå till nästa
+    if (wizardMode !== 'off' && currentWizardStationId && inspectedStationIds.has(currentWizardStationId)) {
+      // Kort delay för att visa feedback innan vi går vidare
+      const timer = setTimeout(() => {
+        wizardNextStation()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [wizardMode, currentWizardStationId, inspectedStationIds, wizardNextStation])
+
+  // ============================================
+
   // Hantera fototagning/uppladdning
   const handlePhotoCapture = () => {
     fileInputRef.current?.click()
@@ -588,6 +822,20 @@ export default function StationInspectionModule() {
 
       // Markera som inspekterad
       setInspectedStationIds(prev => new Set(prev).add(selectedStation.id))
+
+      // Spara resultat till sammanställning
+      setInspectionResults(prev => {
+        const newMap = new Map(prev)
+        newMap.set(selectedStation.id, {
+          status: selectedStatus,
+          findings: inspectionNotes || null,
+          measurementValue: measurementValue ? parseFloat(measurementValue) : null,
+          measurementUnit: measurementUnit || null,
+          hasPhoto: !!photoPath,
+          timestamp: new Date().toISOString()
+        })
+        return newMap
+      })
 
       toast.success('Inspektion sparad!')
       setSelectedStation(null)
@@ -742,8 +990,177 @@ export default function StationInspectionModule() {
                   className="bg-green-500 h-2 rounded-full"
                 />
               </div>
+
+              {/* Återupptagande-info - visas om det redan finns inspekterade stationer vid sidladdning */}
+              {inspectedStationIds.size > 0 && session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 flex items-center gap-2"
+                >
+                  <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <span className="text-amber-200 text-sm">
+                    Du fortsätter en påbörjad inspektion. {inspectedStationIds.size} stationer är redan kontrollerade.
+                  </span>
+                </motion.div>
+              )}
+
+              {/* Sammanställningsknapp - visa endast om det finns inspekterade stationer */}
+              {inspectedStationIds.size > 0 && (
+                <button
+                  onClick={() => setShowSummary(!showSummary)}
+                  className="mt-2 flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+                >
+                  <BarChart2 className="w-4 h-4" />
+                  <span>Sammanställning ({inspectedStationIds.size} st)</span>
+                  {showSummary ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+              )}
             </div>
           )}
+
+          {/* Sammanställningspanel - kollapsbar */}
+          <AnimatePresence>
+            {session?.status === 'in_progress' && showSummary && inspectedStationIds.size > 0 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden mb-4"
+              >
+                <div className="bg-slate-800/50 rounded-xl p-4 max-h-64 overflow-y-auto">
+                  <h3 className="font-medium text-white mb-3 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                    Inspekterade stationer
+                  </h3>
+
+                  {/* Utomhus-sektion */}
+                  {(() => {
+                    const inspectedOutdoor = outdoorStations.filter(s => inspectedStationIds.has(s.id))
+                    if (inspectedOutdoor.length === 0) return null
+                    return (
+                      <div className="mb-3">
+                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          Utomhus ({inspectedOutdoor.length})
+                        </p>
+                        <div className="space-y-1.5">
+                          {inspectedOutdoor.map(station => {
+                            const result = inspectionResults.get(station.id)
+                            const stationNumber = outdoorNumberMap[station.id] || '?'
+                            return (
+                              <div key={station.id} className="flex items-center gap-2 text-sm bg-slate-900/50 rounded-lg px-3 py-2">
+                                <div
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                                  style={{ backgroundColor: '#22c55e' }}
+                                >
+                                  ✓
+                                </div>
+                                <span className="text-white">Station {stationNumber}</span>
+                                {result && (
+                                  <>
+                                    <span className="text-lg">{INSPECTION_STATUS_CONFIG[result.status]?.icon}</span>
+                                    {result.measurementValue !== null && (
+                                      <span className="text-slate-400 text-xs">
+                                        {result.measurementValue} {result.measurementUnit === 'gram' ? 'g' : result.measurementUnit}
+                                      </span>
+                                    )}
+                                    {result.hasPhoto && <Camera className="w-3.5 h-3.5 text-slate-500" />}
+                                    {result.findings && (
+                                      <span className="text-slate-400 text-xs truncate max-w-24" title={result.findings}>
+                                        "{result.findings}"
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Inomhus-sektion */}
+                  {(() => {
+                    const inspectedIndoor = indoorStations.filter(s => inspectedStationIds.has(s.id))
+                    if (inspectedIndoor.length === 0) return null
+                    return (
+                      <div>
+                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                          <Building2 className="w-3 h-3" />
+                          Inomhus ({inspectedIndoor.length})
+                        </p>
+                        <div className="space-y-1.5">
+                          {inspectedIndoor.map(station => {
+                            const result = inspectionResults.get(station.id)
+                            const stationNumber = indoorNumberMap[station.id] || '?'
+                            const floorPlan = floorPlans.find(fp => fp.id === station.floor_plan_id)
+                            return (
+                              <div key={station.id} className="flex items-center gap-2 text-sm bg-slate-900/50 rounded-lg px-3 py-2">
+                                <div
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                                  style={{ backgroundColor: '#22c55e' }}
+                                >
+                                  ✓
+                                </div>
+                                <span className="text-white">Station {stationNumber}</span>
+                                {floorPlan && (
+                                  <span className="text-slate-500 text-xs">({floorPlan.name})</span>
+                                )}
+                                {result && (
+                                  <>
+                                    <span className="text-lg">{INSPECTION_STATUS_CONFIG[result.status]?.icon}</span>
+                                    {result.measurementValue !== null && (
+                                      <span className="text-slate-400 text-xs">
+                                        {result.measurementValue} {result.measurementUnit === 'gram' ? 'g' : result.measurementUnit}
+                                      </span>
+                                    )}
+                                    {result.hasPhoto && <Camera className="w-3.5 h-3.5 text-slate-500" />}
+                                    {result.findings && (
+                                      <span className="text-slate-400 text-xs truncate max-w-24" title={result.findings}>
+                                        "{result.findings}"
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Statistik-sammanfattning */}
+                  <div className="mt-3 pt-3 border-t border-slate-700/50 grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <p className="text-lg font-bold text-green-400">
+                        {Array.from(inspectionResults.values()).filter(r => r.status === 'ok').length}
+                      </p>
+                      <p className="text-xs text-slate-500">OK</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-amber-400">
+                        {Array.from(inspectionResults.values()).filter(r => r.status === 'activity').length}
+                      </p>
+                      <p className="text-xs text-slate-500">Aktivitet</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-red-400">
+                        {Array.from(inspectionResults.values()).filter(r => r.status !== 'ok' && r.status !== 'activity').length}
+                      </p>
+                      <p className="text-xs text-slate-500">Övrigt</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Tabs - endast under aktiv inspektion */}
           {session?.status === 'in_progress' && (
@@ -964,8 +1381,42 @@ export default function StationInspectionModule() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
+              {/* Wizard-läge banner (visas när wizard är aktiv) */}
+              {wizardMode === 'outdoor' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-blue-600/20 border border-blue-500/30 rounded-xl p-4"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Wand2 className="w-5 h-5 text-blue-400" />
+                      <span className="font-medium text-white">Wizard-läge aktivt</span>
+                    </div>
+                    <button
+                      onClick={stopWizard}
+                      className="text-slate-400 hover:text-white text-sm"
+                    >
+                      Avsluta
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-slate-300">
+                      Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}
+                    </span>
+                    <button
+                      onClick={wizardSkipStation}
+                      className="flex items-center gap-1 text-slate-400 hover:text-white"
+                    >
+                      <SkipForward className="w-4 h-4" />
+                      Hoppa över
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
               {/* View mode toggle for outdoor */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex bg-slate-800 rounded-lg p-1">
                   <button
                     onClick={() => setOutdoorViewMode('map')}
@@ -990,9 +1441,17 @@ export default function StationInspectionModule() {
                     Lista
                   </button>
                 </div>
-                <p className="text-sm text-slate-500">
-                  {session?.status === 'in_progress' ? 'Klicka på station för att inspektera' : 'Starta för att inspektera'}
-                </p>
+
+                {/* Wizard start-knapp (dold om wizard redan är aktiv) */}
+                {wizardMode !== 'outdoor' && outdoorStations.length > 0 && (
+                  <button
+                    onClick={startOutdoorWizard}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <Wand2 className="w-4 h-4" />
+                    Starta wizard
+                  </button>
+                )}
               </div>
 
               {outdoorStations.length === 0 ? (
@@ -1011,6 +1470,8 @@ export default function StationInspectionModule() {
                     showNumbers={true}
                     enableClustering={false}
                     onEquipmentClick={handleOutdoorStationClick}
+                    inspectedStationIds={inspectedStationIds}
+                    highlightedStationId={wizardMode === 'outdoor' ? currentWizardStationId : null}
                   />
                 </div>
               ) : (
@@ -1087,38 +1548,85 @@ export default function StationInspectionModule() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
+              {/* Wizard-läge banner för inomhus */}
+              {wizardMode === 'indoor' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-blue-600/20 border border-blue-500/30 rounded-xl p-4"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Wand2 className="w-5 h-5 text-blue-400" />
+                      <span className="font-medium text-white">Wizard-läge aktivt</span>
+                    </div>
+                    <button
+                      onClick={stopWizard}
+                      className="text-slate-400 hover:text-white text-sm"
+                    >
+                      Avsluta
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-slate-300">
+                      Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}
+                    </span>
+                    <button
+                      onClick={wizardSkipStation}
+                      className="flex items-center gap-1 text-slate-400 hover:text-white"
+                    >
+                      <SkipForward className="w-4 h-4" />
+                      Hoppa över
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Floor plan selector med progress */}
               {floorPlans.length > 0 && (
-                <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                  {floorPlans.map((fp) => {
-                    // Räkna stationer och inspekterade per planritning
-                    const stationsOnPlan = indoorStations.filter(s => s.floor_plan_id === fp.id)
-                    const inspectedOnPlan = stationsOnPlan.filter(s => inspectedStationIds.has(s.id)).length
-                    const totalOnPlan = stationsOnPlan.length
-                    const allDone = totalOnPlan > 0 && inspectedOnPlan === totalOnPlan
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                    {floorPlans.map((fp) => {
+                      // Räkna stationer och inspekterade per planritning
+                      const stationsOnPlan = indoorStations.filter(s => s.floor_plan_id === fp.id)
+                      const inspectedOnPlan = stationsOnPlan.filter(s => inspectedStationIds.has(s.id)).length
+                      const totalOnPlan = stationsOnPlan.length
+                      const allDone = totalOnPlan > 0 && inspectedOnPlan === totalOnPlan
 
-                    return (
-                      <button
-                        key={fp.id}
-                        onClick={() => setSelectedFloorPlanId(fp.id)}
-                        className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                          selectedFloorPlanId === fp.id
-                            ? 'bg-green-500 text-white'
-                            : allDone
-                              ? 'bg-green-500/20 text-green-400 border border-green-500/50'
-                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          {allDone && <CheckCircle2 className="w-4 h-4" />}
-                          <span>{fp.building_name ? `${fp.building_name} - ` : ''}{fp.name}</span>
-                          <span className={`text-xs ${selectedFloorPlanId === fp.id ? 'text-white/70' : 'text-slate-500'}`}>
-                            {inspectedOnPlan}/{totalOnPlan}
-                          </span>
-                        </div>
-                      </button>
-                    )
-                  })}
+                      return (
+                        <button
+                          key={fp.id}
+                          onClick={() => setSelectedFloorPlanId(fp.id)}
+                          className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                            selectedFloorPlanId === fp.id
+                              ? 'bg-green-500 text-white'
+                              : allDone
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {allDone && <CheckCircle2 className="w-4 h-4" />}
+                            <span>{fp.building_name ? `${fp.building_name} - ` : ''}{fp.name}</span>
+                            <span className={`text-xs ${selectedFloorPlanId === fp.id ? 'text-white/70' : 'text-slate-500'}`}>
+                              {inspectedOnPlan}/{totalOnPlan}
+                            </span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Wizard start-knapp för inomhus */}
+                  {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && (
+                    <button
+                      onClick={startIndoorWizard}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors flex-shrink-0"
+                    >
+                      <Wand2 className="w-4 h-4" />
+                      Starta wizard
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1142,6 +1650,8 @@ export default function StationInspectionModule() {
                     onStationClick={handleIndoorStationClick}
                     height="calc(100vh - 320px)"
                     showNumbers={true}
+                    inspectedStationIds={inspectedStationIds}
+                    highlightedStationId={wizardMode === 'indoor' ? currentWizardStationId : null}
                   />
                 </div>
               )}

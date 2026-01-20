@@ -19,6 +19,8 @@ interface IndoorStationMarkerProps {
   onClick?: () => void
   size?: 'small' | 'medium' | 'large'
   displayNumber?: number // Visuellt nummer att visa i markören (1, 2, 3...)
+  isInspected?: boolean // Om stationen är inspekterad under pågående session
+  isHighlighted?: boolean // Om stationen är highlightad (wizard-läge)
 }
 
 // Hämta typ-konfiguration - prioritera dynamisk data från DB
@@ -57,10 +59,18 @@ export function IndoorStationMarker({
   isSelected = false,
   onClick,
   size = 'medium',
-  displayNumber
+  displayNumber,
+  isInspected = false,
+  isHighlighted = false
 }: IndoorStationMarkerProps) {
   const typeConfig = getTypeConfig(station)
   const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
+
+  // Om inspekterad: grön bakgrund istället för typfärg
+  const markerColor = isInspected ? '#22c55e' : typeConfig.color
+
+  // Storlek ökas för highlighted
+  const actualSize = isHighlighted ? 'large' : size
 
   // Storlek baserat på prop - ökade för bättre mobil touch (min 44px)
   const sizeClasses = {
@@ -109,7 +119,7 @@ export function IndoorStationMarker({
       className={`
         absolute cursor-pointer transition-all duration-200
         ${getOpacity(station.status)}
-        ${isSelected ? 'z-20 scale-125' : 'z-10 hover:scale-110'}
+        ${isHighlighted ? 'z-30 scale-125' : isSelected ? 'z-20 scale-125' : 'z-10 hover:scale-110'}
       `}
       style={{
         left: `${station.position_x_percent}%`,
@@ -126,28 +136,43 @@ export function IndoorStationMarker({
         <div className="absolute inset-0 -m-1 rounded-full border-2 border-white animate-pulse" />
       )}
 
+      {/* Highlighted ring (wizard-läge) - pulserar */}
+      {isHighlighted && (
+        <div className="absolute inset-0 -m-2 rounded-full border-4 border-blue-500 animate-ping" />
+      )}
+
       {/* Main marker */}
       <div
         className={`
-          ${sizeClasses[size]} rounded-full border-2 border-white shadow-lg
+          ${sizeClasses[actualSize]} rounded-full border-2 shadow-lg
           flex items-center justify-center
           ${isSelected ? 'ring-2 ring-teal-400 ring-offset-2 ring-offset-slate-900' : ''}
+          ${isInspected ? 'ring-2 ring-green-400' : ''}
+          ${isHighlighted ? 'ring-4 ring-blue-400 ring-offset-2 ring-offset-slate-900' : ''}
         `}
-        style={{ backgroundColor: typeConfig.color }}
-        title={`${typeConfig.label} - ${station.station_number || 'Utan nummer'}`}
+        style={{
+          backgroundColor: markerColor,
+          borderColor: isHighlighted ? '#3b82f6' : isInspected ? '#16a34a' : 'white',
+          boxShadow: isHighlighted
+            ? '0 0 0 4px #3b82f6, 0 0 15px 5px rgba(59, 130, 246, 0.5)'
+            : undefined
+        }}
+        title={`${typeConfig.label} - ${station.station_number || 'Utan nummer'}${isInspected ? ' (Inspekterad)' : ''}${isHighlighted ? ' (Aktuell)' : ''}`}
       >
-        {/* Station number or status symbol */}
-        {statusSymbol ? (
-          <span className={`text-white font-bold ${iconSize[size]}`}>
+        {/* Station number or status symbol - bock om inspekterad */}
+        {isInspected ? (
+          <span className={`text-white font-bold ${iconSize[actualSize]}`}>✓</span>
+        ) : statusSymbol ? (
+          <span className={`text-white font-bold ${iconSize[actualSize]}`}>
             {statusSymbol}
           </span>
         ) : displayNumber !== undefined ? (
           // Visa nummer om det finns (aktiv station med displayNumber)
-          <span className={`text-white font-bold ${displayNumber >= 100 ? 'text-[8px]' : iconSize[size]}`}>
+          <span className={`text-white font-bold ${displayNumber >= 100 ? 'text-[8px]' : iconSize[actualSize]}`}>
             {displayNumber}
           </span>
         ) : (
-          <StationIcon iconName={typeConfig.icon} className={`text-white ${iconSize[size]}`} />
+          <StationIcon iconName={typeConfig.icon} className={`text-white ${iconSize[actualSize]}`} />
         )}
       </div>
 
