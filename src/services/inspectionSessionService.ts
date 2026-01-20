@@ -32,7 +32,7 @@ export async function getInspectionSession(
     .from('station_inspection_sessions')
     .select(`
       *,
-      customer:customers(id, company_name, contact_address),
+      customer:customers(id, company_name, contact_address, contact_person, contact_phone, contact_email),
       technician:technicians(id, name)
     `)
     .eq('id', sessionId)
@@ -56,7 +56,7 @@ export async function getInspectionSessionByCaseId(
     .from('station_inspection_sessions')
     .select(`
       *,
-      customer:customers(id, company_name, contact_address),
+      customer:customers(id, company_name, contact_address, contact_person, contact_phone, contact_email),
       technician:technicians(id, name)
     `)
     .eq('case_id', caseId)
@@ -70,6 +70,109 @@ export async function getInspectionSessionByCaseId(
   }
 
   return data as InspectionSessionWithRelations | null
+}
+
+/**
+ * Hämta senaste inspektion för en kund (för att visa sammanfattning)
+ */
+export async function getLastInspectionSummary(
+  customerId: string,
+  excludeSessionId?: string
+): Promise<{
+  completed_at: string | null
+  technician_name: string | null
+  total_inspected: number
+  stations_with_activity: number
+} | null> {
+  // Hämta senaste avslutade session
+  let query = supabase
+    .from('station_inspection_sessions')
+    .select(`
+      id,
+      completed_at,
+      inspected_outdoor_stations,
+      inspected_indoor_stations,
+      technician:technicians(name)
+    `)
+    .eq('customer_id', customerId)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+
+  if (excludeSessionId) {
+    query = query.neq('id', excludeSessionId)
+  }
+
+  const { data: sessionData, error: sessionError } = await query.maybeSingle()
+
+  if (sessionError || !sessionData) {
+    return null
+  }
+
+  // Räkna stationer med aktivitet från den sessionen
+  const [outdoorActivity, indoorActivity] = await Promise.all([
+    supabase
+      .from('outdoor_station_inspections')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionData.id)
+      .eq('status', 'activity'),
+    supabase
+      .from('indoor_station_inspections')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionData.id)
+      .eq('status', 'activity')
+  ])
+
+  const activityCount = (outdoorActivity.count || 0) + (indoorActivity.count || 0)
+  const totalInspected = sessionData.inspected_outdoor_stations + sessionData.inspected_indoor_stations
+
+  return {
+    completed_at: sessionData.completed_at,
+    technician_name: (sessionData.technician as any)?.name || null,
+    total_inspected: totalInspected,
+    stations_with_activity: activityCount
+  }
+}
+
+/**
+ * Hämta stationer som hade aktivitet i senaste inspektionen (för varningsbadges)
+ */
+export async function getStationsWithRecentActivity(
+  customerId: string
+): Promise<Set<string>> {
+  // Hämta senaste avslutade session
+  const { data: sessionData } = await supabase
+    .from('station_inspection_sessions')
+    .select('id')
+    .eq('customer_id', customerId)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!sessionData) {
+    return new Set()
+  }
+
+  // Hämta stationer med aktivitet
+  const [outdoorActivity, indoorActivity] = await Promise.all([
+    supabase
+      .from('outdoor_station_inspections')
+      .select('station_id')
+      .eq('session_id', sessionData.id)
+      .eq('status', 'activity'),
+    supabase
+      .from('indoor_station_inspections')
+      .select('station_id')
+      .eq('session_id', sessionData.id)
+      .eq('status', 'activity')
+  ])
+
+  const activityStationIds = new Set<string>()
+  outdoorActivity.data?.forEach(i => activityStationIds.add(i.station_id))
+  indoorActivity.data?.forEach(i => activityStationIds.add(i.station_id))
+
+  return activityStationIds
 }
 
 /**

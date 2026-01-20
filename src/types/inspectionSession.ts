@@ -102,6 +102,12 @@ export interface InspectionSessionWithRelations extends StationInspectionSession
     id: string
     company_name: string
     contact_address: string | null
+    contact_person: string | null
+    contact_phone: string | null
+    contact_email: string | null
+    // GPS-koordinater för navigation
+    address_lat?: number | null
+    address_lng?: number | null
   }
   technician?: {
     id: string
@@ -112,6 +118,13 @@ export interface InspectionSessionWithRelations extends StationInspectionSession
     title: string
     case_number: string | null
   }
+  // Senaste inspektionsdata
+  lastInspection?: {
+    completed_at: string | null
+    technician_name: string | null
+    total_inspected: number
+    stations_with_activity: number
+  } | null
 }
 
 /**

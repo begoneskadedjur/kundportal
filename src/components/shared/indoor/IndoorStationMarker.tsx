@@ -62,17 +62,17 @@ export function IndoorStationMarker({
   const typeConfig = getTypeConfig(station)
   const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
 
-  // Storlek baserat på prop
+  // Storlek baserat på prop - ökade för bättre mobil touch (min 44px)
   const sizeClasses = {
-    small: 'w-5 h-5',
-    medium: 'w-7 h-7',
-    large: 'w-9 h-9'
+    small: 'w-8 h-8',    // 32px
+    medium: 'w-11 h-11', // 44px - Apple/Google minimum touch target
+    large: 'w-14 h-14'   // 56px
   }
 
   const iconSize = {
-    small: 'text-[10px]',
-    medium: 'text-xs',
-    large: 'text-sm'
+    small: 'text-xs',
+    medium: 'text-sm',
+    large: 'text-base'
   }
 
   // Opacity baserat på status

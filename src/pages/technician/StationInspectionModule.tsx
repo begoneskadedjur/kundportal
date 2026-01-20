@@ -23,7 +23,14 @@ import {
   Image as ImageIcon,
   Clock,
   User,
-  FileText
+  FileText,
+  Phone,
+  Navigation,
+  Copy,
+  AlertTriangle,
+  Calendar,
+  Info,
+  ExternalLink
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -46,7 +53,9 @@ import {
   createIndoorInspection,
   updateInspectionSession,
   uploadInspectionPhoto,
-  getInspectionPhotoUrl
+  getInspectionPhotoUrl,
+  getLastInspectionSummary,
+  getStationsWithRecentActivity
 } from '../../services/inspectionSessionService'
 
 // Typer
@@ -141,6 +150,15 @@ export default function StationInspectionModule() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [stationHistory, setStationHistory] = useState<InspectionHistoryItem[]>([])
 
+  // Senaste inspektion och aktivitetsstationer (för ankomstkort)
+  const [lastInspection, setLastInspection] = useState<{
+    completed_at: string | null
+    technician_name: string | null
+    total_inspected: number
+    stations_with_activity: number
+  } | null>(null)
+  const [activityStationIds, setActivityStationIds] = useState<Set<string>>(new Set())
+
   // Ladda data
   useEffect(() => {
     async function loadData() {
@@ -180,6 +198,14 @@ export default function StationInspectionModule() {
         if (plans.length > 0) {
           setSelectedFloorPlanId(plans[0].id)
         }
+
+        // Hämta senaste inspektion och aktivitetsstationer (för ankomstkort)
+        const [lastInsp, activityIds] = await Promise.all([
+          getLastInspectionSummary(sessionData.customer_id, sessionData.id),
+          getStationsWithRecentActivity(sessionData.customer_id)
+        ])
+        setLastInspection(lastInsp)
+        setActivityStationIds(activityIds)
 
       } catch (err) {
         console.error('Error loading data:', err)
@@ -631,13 +657,55 @@ export default function StationInspectionModule() {
   // Get current stations for list view
   const currentStations = activeTab === 'outdoor' ? outdoorStations : indoorStations
 
+  // Hjälpfunktioner för navigation och kontakt
+  const handleNavigate = () => {
+    const address = session?.customer?.contact_address
+    if (!address) {
+      toast.error('Ingen adress tillgänglig')
+      return
+    }
+    // Öppna Google Maps med adressen
+    const encodedAddress = encodeURIComponent(address)
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank')
+  }
+
+  const handleCopyAddress = async () => {
+    const address = session?.customer?.contact_address
+    if (!address) return
+    try {
+      await navigator.clipboard.writeText(address)
+      toast.success('Adress kopierad!')
+    } catch {
+      toast.error('Kunde inte kopiera adress')
+    }
+  }
+
+  const handleCall = () => {
+    const phone = session?.customer?.contact_phone
+    if (!phone) {
+      toast.error('Inget telefonnummer tillgängligt')
+      return
+    }
+    window.location.href = `tel:${phone}`
+  }
+
+  // Formatera datum
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '-'
+    return new Date(dateString).toLocaleDateString('sv-SE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="min-h-screen bg-slate-950"
     >
-      {/* Header */}
+      {/* Header - Kompakt för aktiv inspektion */}
       <div className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur border-b border-slate-800">
         <div className="max-w-4xl mx-auto p-4">
           <div className="flex items-center justify-between mb-4">
@@ -651,13 +719,7 @@ export default function StationInspectionModule() {
               </div>
             </div>
 
-            {/* Session status */}
-            {session?.status === 'scheduled' && (
-              <Button onClick={handleStartInspection} loading={isSubmitting}>
-                <Play className="w-4 h-4 mr-2" />
-                Starta
-              </Button>
-            )}
+            {/* Session status - bara visa när aktiv */}
             {session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
               <Button onClick={handleCompleteInspection} loading={isSubmitting}>
                 <Check className="w-4 h-4 mr-2" />
@@ -666,8 +728,8 @@ export default function StationInspectionModule() {
             )}
           </div>
 
-          {/* Progress */}
-          {progress && (
+          {/* Progress - endast under aktiv inspektion */}
+          {session?.status === 'in_progress' && progress && (
             <div className="mb-4">
               <div className="flex justify-between text-sm text-slate-400 mb-1">
                 <span>{progress.inspectedStations} av {progress.totalStations} stationer</span>
@@ -683,35 +745,215 @@ export default function StationInspectionModule() {
             </div>
           )}
 
-          {/* Tabs */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('outdoor')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === 'outdoor'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <MapPin className="w-4 h-4" />
-              Utomhus ({progress?.outdoorProgress.inspected || 0}/{outdoorStations.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('indoor')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === 'indoor'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <Building2 className="w-4 h-4" />
-              Inomhus ({progress?.indoorProgress.inspected || 0}/{indoorStations.length})
-            </button>
-          </div>
+          {/* Tabs - endast under aktiv inspektion */}
+          {session?.status === 'in_progress' && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab('outdoor')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'outdoor'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <MapPin className="w-4 h-4" />
+                Utomhus ({progress?.outdoorProgress.inspected || 0}/{outdoorStations.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('indoor')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'indoor'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                Inomhus ({progress?.indoorProgress.inspected || 0}/{indoorStations.length})
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Content */}
+      {/* ANKOMSTKORT - Visas innan inspektion har startats */}
+      {session?.status === 'scheduled' && (
+        <div className="max-w-4xl mx-auto p-4 space-y-4">
+          {/* Kundinformation */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass rounded-2xl p-5"
+          >
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-green-400" />
+              {session.customer?.company_name}
+            </h2>
+
+            {/* Adress med navigation */}
+            {session.customer?.contact_address && (
+              <div className="mb-4">
+                <div className="flex items-start gap-3 mb-2">
+                  <MapPin className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-slate-300">{session.customer.contact_address}</p>
+                </div>
+                <div className="flex gap-2 ml-8">
+                  <button
+                    onClick={handleNavigate}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-colors"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    Navigera hit
+                  </button>
+                  <button
+                    onClick={handleCopyAddress}
+                    className="flex items-center gap-2 px-3 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm transition-colors"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Kontaktperson */}
+            {(session.customer?.contact_person || session.customer?.contact_phone) && (
+              <div className="border-t border-slate-700/50 pt-4 mt-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Kontaktperson</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
+                      <User className="w-5 h-5 text-slate-400" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">
+                        {session.customer.contact_person || 'Ej angiven'}
+                      </p>
+                      {session.customer.contact_phone && (
+                        <p className="text-slate-400 text-sm">{session.customer.contact_phone}</p>
+                      )}
+                    </div>
+                  </div>
+                  {session.customer.contact_phone && (
+                    <button
+                      onClick={handleCall}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-medium transition-colors"
+                    >
+                      <Phone className="w-4 h-4" />
+                      Ring
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </motion.div>
+
+          {/* Senaste inspektion */}
+          {lastInspection && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="glass rounded-2xl p-5"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <History className="w-5 h-5 text-slate-400" />
+                <h3 className="font-medium text-white">Senaste inspektion</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Datum</p>
+                  <p className="text-white">{formatDate(lastInspection.completed_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Tekniker</p>
+                  <p className="text-white">{lastInspection.technician_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Kontrollerade</p>
+                  <p className="text-white">{lastInspection.total_inspected} stationer</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Med aktivitet</p>
+                  <p className={`font-medium ${lastInspection.stations_with_activity > 0 ? 'text-amber-400' : 'text-green-400'}`}>
+                    {lastInspection.stations_with_activity} stationer
+                  </p>
+                </div>
+              </div>
+
+              {/* Varning om aktivitet */}
+              {lastInspection.stations_with_activity > 0 && (
+                <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-200 text-sm font-medium">
+                      {lastInspection.stations_with_activity} stationer hade aktivitet
+                    </p>
+                    <p className="text-amber-200/70 text-xs mt-1">
+                      Dessa stationer är markerade med varningssymbol i listan
+                    </p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Översikt stationer */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="glass rounded-2xl p-5"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Info className="w-5 h-5 text-slate-400" />
+              <h3 className="font-medium text-white">Översikt</h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-slate-800/50 rounded-xl p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <MapPin className="w-5 h-5 text-blue-400" />
+                  <span className="text-2xl font-bold text-white">{outdoorStations.length}</span>
+                </div>
+                <p className="text-slate-400 text-sm">Utomhus</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-xl p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Building2 className="w-5 h-5 text-purple-400" />
+                  <span className="text-2xl font-bold text-white">{indoorStations.length}</span>
+                </div>
+                <p className="text-slate-400 text-sm">Inomhus</p>
+              </div>
+            </div>
+
+            {floorPlans.length > 0 && (
+              <p className="text-slate-500 text-sm">
+                {floorPlans.length} planritning{floorPlans.length !== 1 ? 'ar' : ''} tillgängliga
+              </p>
+            )}
+          </motion.div>
+
+          {/* Starta-knapp - stor och tydlig */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Button
+              onClick={handleStartInspection}
+              loading={isSubmitting}
+              fullWidth
+              className="py-4 text-lg"
+            >
+              <Play className="w-5 h-5 mr-2" />
+              Starta inspektion
+            </Button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Content - endast under aktiv inspektion */}
+      {session?.status === 'in_progress' && (
       <div className="max-w-4xl mx-auto p-4">
         <AnimatePresence mode="wait">
           {activeTab === 'outdoor' ? (
@@ -759,11 +1001,11 @@ export default function StationInspectionModule() {
                   <p className="text-slate-400">Inga utomhusstationer</p>
                 </div>
               ) : outdoorViewMode === 'map' ? (
-                // Map view
+                // Map view - ökad höjd för bättre mobil UX
                 <div className="glass rounded-xl overflow-hidden">
                   <EquipmentMap
                     equipment={outdoorEquipment}
-                    height="400px"
+                    height="calc(100vh - 280px)"
                     readOnly
                     showControls={true}
                     showNumbers={true}
@@ -778,6 +1020,7 @@ export default function StationInspectionModule() {
                     const isInspected = inspectedStationIds.has(station.id)
                     const stationNumber = outdoorNumberMap[station.id] || '?'
                     const typeName = station.station_type_data?.name || station.equipment_type || station.station_type
+                    const hadActivity = activityStationIds.has(station.id)
 
                     return (
                       <motion.button
@@ -788,7 +1031,7 @@ export default function StationInspectionModule() {
                           session?.status === 'in_progress'
                             ? 'hover:bg-slate-800/50 cursor-pointer'
                             : 'opacity-60 cursor-not-allowed'
-                        } ${isInspected ? 'border-l-4 border-green-500' : ''}`}
+                        } ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
                         whileHover={session?.status === 'in_progress' ? { scale: 1.01 } : {}}
                         whileTap={session?.status === 'in_progress' ? { scale: 0.99 } : {}}
                       >
@@ -796,6 +1039,16 @@ export default function StationInspectionModule() {
                           <div className="flex items-center gap-3">
                             {isInspected ? (
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
+                            ) : hadActivity ? (
+                              <div className="relative">
+                                <div
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                                  style={{ backgroundColor: station.station_type_data?.color || '#6b7280' }}
+                                >
+                                  {stationNumber}
+                                </div>
+                                <AlertTriangle className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-400" />
+                              </div>
                             ) : (
                               <div
                                 className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
@@ -807,7 +1060,14 @@ export default function StationInspectionModule() {
                               </div>
                             )}
                             <div>
-                              <p className="font-medium text-white">Station {stationNumber}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-white">Station {stationNumber}</p>
+                                {hadActivity && !isInspected && (
+                                  <span className="text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">
+                                    Aktivitet senast
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-sm text-slate-400">{typeName}</p>
                             </div>
                           </div>
@@ -827,22 +1087,38 @@ export default function StationInspectionModule() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
-              {/* Floor plan selector */}
+              {/* Floor plan selector med progress */}
               {floorPlans.length > 0 && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                  {floorPlans.map((fp) => (
-                    <button
-                      key={fp.id}
-                      onClick={() => setSelectedFloorPlanId(fp.id)}
-                      className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedFloorPlanId === fp.id
-                          ? 'bg-green-500 text-white'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      {fp.building_name ? `${fp.building_name} - ` : ''}{fp.name}
-                    </button>
-                  ))}
+                  {floorPlans.map((fp) => {
+                    // Räkna stationer och inspekterade per planritning
+                    const stationsOnPlan = indoorStations.filter(s => s.floor_plan_id === fp.id)
+                    const inspectedOnPlan = stationsOnPlan.filter(s => inspectedStationIds.has(s.id)).length
+                    const totalOnPlan = stationsOnPlan.length
+                    const allDone = totalOnPlan > 0 && inspectedOnPlan === totalOnPlan
+
+                    return (
+                      <button
+                        key={fp.id}
+                        onClick={() => setSelectedFloorPlanId(fp.id)}
+                        className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                          selectedFloorPlanId === fp.id
+                            ? 'bg-green-500 text-white'
+                            : allDone
+                              ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {allDone && <CheckCircle2 className="w-4 h-4" />}
+                          <span>{fp.building_name ? `${fp.building_name} - ` : ''}{fp.name}</span>
+                          <span className={`text-xs ${selectedFloorPlanId === fp.id ? 'text-white/70' : 'text-slate-500'}`}>
+                            {inspectedOnPlan}/{totalOnPlan}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
 
@@ -856,7 +1132,7 @@ export default function StationInspectionModule() {
                   <p className="text-slate-400">Välj en planritning ovan</p>
                 </div>
               ) : (
-                // Floor plan viewer
+                // Floor plan viewer - ökad höjd för bättre mobil UX
                 <div className="glass rounded-xl overflow-hidden">
                   <FloorPlanViewer
                     imageUrl={floorPlanImageUrl}
@@ -864,7 +1140,7 @@ export default function StationInspectionModule() {
                     selectedStationId={null}
                     placementMode="view"
                     onStationClick={handleIndoorStationClick}
-                    height="400px"
+                    height="calc(100vh - 320px)"
                     showNumbers={true}
                   />
                 </div>
@@ -880,6 +1156,7 @@ export default function StationInspectionModule() {
                     const isInspected = inspectedStationIds.has(station.id)
                     const stationNumber = indoorNumberMap[station.id] || '?'
                     const typeName = station.station_type_data?.name || station.station_type
+                    const hadActivity = activityStationIds.has(station.id)
 
                     return (
                       <motion.button
@@ -890,7 +1167,7 @@ export default function StationInspectionModule() {
                           session?.status === 'in_progress'
                             ? 'hover:bg-slate-800/50 cursor-pointer'
                             : 'opacity-60 cursor-not-allowed'
-                        } ${isInspected ? 'border-l-4 border-green-500' : ''}`}
+                        } ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
                         whileHover={session?.status === 'in_progress' ? { scale: 1.01 } : {}}
                         whileTap={session?.status === 'in_progress' ? { scale: 0.99 } : {}}
                       >
@@ -898,6 +1175,16 @@ export default function StationInspectionModule() {
                           <div className="flex items-center gap-3">
                             {isInspected ? (
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
+                            ) : hadActivity ? (
+                              <div className="relative">
+                                <div
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                                  style={{ backgroundColor: station.station_type_data?.color || '#6b7280' }}
+                                >
+                                  {stationNumber}
+                                </div>
+                                <AlertTriangle className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-400" />
+                              </div>
                             ) : (
                               <div
                                 className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
@@ -909,7 +1196,14 @@ export default function StationInspectionModule() {
                               </div>
                             )}
                             <div>
-                              <p className="font-medium text-white">Station {stationNumber}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-white">Station {stationNumber}</p>
+                                {hadActivity && !isInspected && (
+                                  <span className="text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">
+                                    Aktivitet senast
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-sm text-slate-400">{typeName}</p>
                             </div>
                           </div>
@@ -924,6 +1218,7 @@ export default function StationInspectionModule() {
           )}
         </AnimatePresence>
       </div>
+      )}
 
       {/* Inspection Modal */}
       <AnimatePresence>
