@@ -18,14 +18,19 @@ export const MAX_ZOOM = 20 // Maximal zoom-nivå för detaljerat arbete
  * Färg baseras på utrustningstyp, styling på status
  * Storlek: 28px för finare visning, men touch-target är 44px via padding
  * Stödjer både legacy-typer och dynamiska typer från station_types-tabellen
+ *
+ * @param type - Utrustningstyp (legacy eller dynamisk)
+ * @param status - Utrustningsstatus
+ * @param customColor - Valfri färg från station_types-tabellen (prioriteras över legacy-config)
  */
 export const createEquipmentIcon = (
   type: string, // Ändrat från EquipmentType till string för dynamiska typer
-  status: EquipmentStatus
+  status: EquipmentStatus,
+  customColor?: string // Ny parameter för dynamisk färg från station_types
 ): L.DivIcon => {
-  // Hämta färg från legacy-config, fallback till slate-500 för dynamiska typer
+  // Prioritera customColor (från station_types), sedan legacy-config, sist fallback till slate-500
   const typeConfig = EQUIPMENT_TYPE_CONFIG[type as EquipmentType]
-  const color = typeConfig?.color || '#6b7280'
+  const color = customColor || typeConfig?.color || '#6b7280'
 
   // Opacity och kantfärg baserat på status
   let opacity = 1

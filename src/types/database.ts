@@ -1731,6 +1731,20 @@ export interface EquipmentPlacementWithRelations extends EquipmentPlacement {
     id: string
     name: string
   }
+  // Dynamisk stationstypdata från station_types-tabellen
+  station_type_data?: {
+    id: string
+    code: string
+    name: string
+    color: string
+    icon: string
+    prefix: string
+    measurement_unit: string
+    measurement_label: string | null
+    threshold_warning: number | null
+    threshold_critical: number | null
+    threshold_direction: 'above' | 'below'
+  }
   photo_url?: string // Signed URL from storage
 }
 

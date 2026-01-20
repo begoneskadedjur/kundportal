@@ -273,7 +273,11 @@ export function EquipmentMap({
               <Marker
                 key={item.id}
                 position={[item.latitude, item.longitude]}
-                icon={createEquipmentIcon(item.equipment_type, item.status)}
+                icon={createEquipmentIcon(
+                  item.equipment_type,
+                  item.status,
+                  item.station_type_data?.color // Dynamisk färg från station_types
+                )}
                 eventHandlers={{
                   click: () => handleMarkerClick(item)
                 }}
@@ -285,7 +289,11 @@ export function EquipmentMap({
             <Marker
               key={item.id}
               position={[item.latitude, item.longitude]}
-              icon={createEquipmentIcon(item.equipment_type, item.status)}
+              icon={createEquipmentIcon(
+                item.equipment_type,
+                item.status,
+                item.station_type_data?.color // Dynamisk färg från station_types
+              )}
               eventHandlers={{
                 click: () => handleMarkerClick(item)
               }}
@@ -348,19 +356,48 @@ export function EquipmentMap({
         </div>
       )}
 
-      {/* Legend - z-index under modaler (z-50) */}
+      {/* Legend - dynamisk baserat på utrustning som visas på kartan */}
       <div className="absolute bottom-3 left-3 z-40 bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-3">
         <p className="text-xs font-semibold text-slate-700 mb-2">Utrustningstyper</p>
         <div className="flex flex-col gap-1">
-          {Object.entries(EQUIPMENT_TYPE_CONFIG).map(([key, config]) => (
-            <div key={key} className="flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: config.color }}
-              />
-              <span className="text-xs text-slate-600">{config.label}</span>
-            </div>
-          ))}
+          {/* Bygg legend dynamiskt från faktisk utrustning på kartan */}
+          {(() => {
+            // Samla unika typer med deras färger och etiketter
+            const typeMap = new Map<string, { color: string; label: string }>()
+            equipment.forEach(item => {
+              if (!typeMap.has(item.equipment_type)) {
+                // Prioritera dynamisk data, sedan legacy-config, sist fallback
+                const dynamicData = item.station_type_data
+                const legacyConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]
+                typeMap.set(item.equipment_type, {
+                  color: dynamicData?.color || legacyConfig?.color || '#6b7280',
+                  label: dynamicData?.name || legacyConfig?.label || item.equipment_type
+                })
+              }
+            })
+            // Om inga stationer finns, visa legacy-typer som fallback
+            if (typeMap.size === 0) {
+              return Object.entries(EQUIPMENT_TYPE_CONFIG).map(([key, config]) => (
+                <div key={key} className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: config.color }}
+                  />
+                  <span className="text-xs text-slate-600">{config.label}</span>
+                </div>
+              ))
+            }
+            // Visa typer som finns på kartan
+            return Array.from(typeMap.entries()).map(([key, { color, label }]) => (
+              <div key={key} className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-xs text-slate-600">{label}</span>
+              </div>
+            ))
+          })()}
         </div>
       </div>
 

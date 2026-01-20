@@ -30,7 +30,12 @@ export class EquipmentService {
         .from('equipment_placements')
         .select(`
           *,
-          technician:technicians!placed_by_technician_id(id, name)
+          technician:technicians!placed_by_technician_id(id, name),
+          station_type_data:station_types!station_type_id(
+            id, code, name, color, icon, prefix,
+            measurement_unit, measurement_label,
+            threshold_warning, threshold_critical, threshold_direction
+          )
         `)
         .eq('customer_id', customerId)
         .order('placed_at', { ascending: false })
@@ -70,7 +75,12 @@ export class EquipmentService {
         .from('equipment_placements')
         .select(`
           *,
-          customer:customers!customer_id(id, company_name, contact_address)
+          customer:customers!customer_id(id, company_name, contact_address),
+          station_type_data:station_types!station_type_id(
+            id, code, name, color, icon, prefix,
+            measurement_unit, measurement_label,
+            threshold_warning, threshold_critical, threshold_direction
+          )
         `)
         .eq('placed_by_technician_id', technicianId)
         .order('placed_at', { ascending: false })
@@ -108,7 +118,12 @@ export class EquipmentService {
         .select(`
           *,
           customer:customers!customer_id(id, company_name, contact_address),
-          technician:technicians!placed_by_technician_id(id, name)
+          technician:technicians!placed_by_technician_id(id, name),
+          station_type_data:station_types!station_type_id(
+            id, code, name, color, icon, prefix,
+            measurement_unit, measurement_label,
+            threshold_warning, threshold_critical, threshold_direction
+          )
         `)
         .order('placed_at', { ascending: false })
 
@@ -135,7 +150,12 @@ export class EquipmentService {
         .select(`
           *,
           customer:customers!customer_id(id, company_name, contact_address),
-          technician:technicians!placed_by_technician_id(id, name)
+          technician:technicians!placed_by_technician_id(id, name),
+          station_type_data:station_types!station_type_id(
+            id, code, name, color, icon, prefix,
+            measurement_unit, measurement_label,
+            threshold_warning, threshold_critical, threshold_direction
+          )
         `)
         .eq('id', id)
         .single()
@@ -793,7 +813,12 @@ export class EquipmentService {
         .from('equipment_placements')
         .select(`
           *,
-          technician:technicians!placed_by_technician_id(id, name)
+          technician:technicians!placed_by_technician_id(id, name),
+          station_type_data:station_types!station_type_id(
+            id, code, name, color, icon, prefix,
+            measurement_unit, measurement_label,
+            threshold_warning, threshold_critical, threshold_direction
+          )
         `)
         .eq('customer_id', customerId)
         .order('placed_at', { ascending: false })
