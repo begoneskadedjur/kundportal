@@ -16,11 +16,13 @@ import {
   MessageSquare,
   Ruler,
   Filter,
-  Search
+  Search,
+  Expand
 } from 'lucide-react'
 import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
 import type { IndoorStationInspectionWithRelations, InspectionStatus } from '../../types/indoor'
 import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
+import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
 
 type InspectionItem = {
   id: string
@@ -83,6 +85,10 @@ export function StationInspectionList({
   const [filterStatus, setFilterStatus] = useState<InspectionStatus | 'all'>('all')
   const [filterLocation, setFilterLocation] = useState<'all' | 'outdoor' | 'indoor'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Lightbox state
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+  const [lightboxInitialIndex, setLightboxInitialIndex] = useState(0)
 
   // Kombinera och transformera alla inspektioner
   const allInspections = useMemo(() => {
@@ -158,6 +164,30 @@ export function StationInspectionList({
     outdoor: allInspections.filter(i => i.location === 'outdoor').length,
     indoor: allInspections.filter(i => i.location === 'indoor').length
   }), [allInspections])
+
+  // Foton för lightbox (endast inspektioner med foton)
+  const photosForLightbox = useMemo(() => {
+    return filteredInspections
+      .filter(item => item.photoUrl)
+      .map(item => ({
+        url: item.photoUrl!,
+        stationNumber: item.stationNumber || formatStationType(item.stationType),
+        stationType: item.location,
+        status: item.status,
+        inspectedAt: item.inspectedAt,
+        findings: item.findings || undefined
+      }))
+  }, [filteredInspections])
+
+  // Öppna lightbox för en specifik bild
+  const openLightbox = (itemId: string) => {
+    const photoItems = filteredInspections.filter(item => item.photoUrl)
+    const index = photoItems.findIndex(item => item.id === itemId)
+    if (index !== -1) {
+      setLightboxInitialIndex(index)
+      setIsLightboxOpen(true)
+    }
+  }
 
   // Formatera datum
   const formatTime = (dateStr: string) => {
@@ -369,11 +399,19 @@ export function StationInspectionList({
                         {item.photoUrl && (
                           <div>
                             <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Foto</p>
-                            <img
-                              src={item.photoUrl}
-                              alt="Inspektionsfoto"
-                              className="max-w-full max-h-64 rounded-xl border border-slate-700/50 object-contain"
-                            />
+                            <div className="relative group cursor-pointer" onClick={() => openLightbox(item.id)}>
+                              <img
+                                src={item.photoUrl}
+                                alt="Inspektionsfoto"
+                                className="max-w-full max-h-64 rounded-xl border border-slate-700/50 object-contain transition-all group-hover:brightness-90"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="bg-black/60 backdrop-blur-sm px-3 py-2 rounded-lg flex items-center gap-2">
+                                  <Expand className="w-4 h-4 text-white" />
+                                  <span className="text-white text-sm font-medium">Visa fullskärm</span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         )}
 
@@ -418,6 +456,14 @@ export function StationInspectionList({
           </button>
         </div>
       )}
+
+      {/* Photo Lightbox */}
+      <InspectionPhotoLightbox
+        photos={photosForLightbox}
+        initialIndex={lightboxInitialIndex}
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+      />
     </div>
   )
 }

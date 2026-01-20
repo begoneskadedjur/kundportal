@@ -20,11 +20,13 @@ import {
   Sparkles,
   Home,
   Building2,
-  ClipboardCheck
+  ClipboardCheck,
+  History,
+  ChevronLeft
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService } from '../../services/floorPlanService'
-import { getCustomerInspectionOverview } from '../../services/inspectionSessionService'
+import { getCustomerInspectionOverview, getCompletedSessionsForCustomer, getOutdoorInspectionsForSession, getIndoorInspectionsForSession } from '../../services/inspectionSessionService'
 import {
   EquipmentPlacementWithRelations,
   EquipmentType,
@@ -41,6 +43,7 @@ import { EquipmentDetailSheet } from '../shared/equipment/EquipmentDetailSheet'
 import { CustomerIndoorEquipmentView } from './CustomerIndoorEquipmentView'
 import { InspectionSummaryCard } from './InspectionSummaryCard'
 import { StationInspectionList } from './StationInspectionList'
+import { InspectionHistoryList } from './InspectionHistoryList'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import { generateEquipmentPdf } from '../../utils/equipmentPdfGenerator'
 import toast from 'react-hot-toast'
@@ -109,6 +112,17 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   } | null>(null)
   const [inspectionLoading, setInspectionLoading] = useState(true)
 
+  // Historikdata
+  const [allSessions, setAllSessions] = useState<InspectionSessionWithRelations[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [selectedHistorySession, setSelectedHistorySession] = useState<InspectionSessionWithRelations | null>(null)
+  const [historyInspectionData, setHistoryInspectionData] = useState<{
+    outdoorInspections: OutdoorInspectionWithRelations[]
+    indoorInspections: IndoorStationInspectionWithRelations[]
+    statusCounts: { ok: number; activity: number; other: number }
+  } | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+
   // Hamta utrustning
   const fetchEquipment = useCallback(async () => {
     try {
@@ -157,6 +171,64 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     }
     fetchInspectionData()
   }, [customerId])
+
+  // Hämta alla sessioner för historik
+  useEffect(() => {
+    const fetchAllSessions = async () => {
+      try {
+        const sessions = await getCompletedSessionsForCustomer(customerId, 20)
+        setAllSessions(sessions)
+      } catch (error) {
+        console.error('Kunde inte hämta servicehistorik:', error)
+      }
+    }
+    fetchAllSessions()
+  }, [customerId])
+
+  // Hämta inspektionsdata för vald historisk session
+  const handleSelectHistorySession = async (session: InspectionSessionWithRelations) => {
+    // Om det är samma session som senaste, gå tillbaka till översikten
+    if (inspectionData?.session?.id === session.id) {
+      setSelectedHistorySession(null)
+      setShowHistory(false)
+      return
+    }
+
+    setHistoryLoading(true)
+    setSelectedHistorySession(session)
+    setShowHistory(false)
+
+    try {
+      const [outdoorInspections, indoorInspections] = await Promise.all([
+        getOutdoorInspectionsForSession(session.id),
+        getIndoorInspectionsForSession(session.id)
+      ])
+
+      const allInspections = [...outdoorInspections, ...indoorInspections]
+      const statusCounts = {
+        ok: allInspections.filter(i => i.status === 'ok').length,
+        activity: allInspections.filter(i => i.status === 'activity').length,
+        other: allInspections.filter(i => i.status !== 'ok' && i.status !== 'activity').length
+      }
+
+      setHistoryInspectionData({
+        outdoorInspections,
+        indoorInspections,
+        statusCounts
+      })
+    } catch (error) {
+      console.error('Kunde inte hämta inspektionsdetaljer:', error)
+      toast.error('Kunde inte ladda inspektionsdetaljer')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  // Gå tillbaka till senaste inspektion
+  const handleBackToLatest = () => {
+    setSelectedHistorySession(null)
+    setHistoryInspectionData(null)
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -418,23 +490,88 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
               </div>
             ) : inspectionData?.session ? (
               <>
-                {/* Sammanfattningskort */}
-                <InspectionSummaryCard
-                  session={inspectionData.session}
-                  statusCounts={inspectionData.statusCounts}
-                />
+                {/* Header med historik-knapp */}
+                <div className="flex items-center justify-between">
+                  {selectedHistorySession ? (
+                    <button
+                      onClick={handleBackToLatest}
+                      className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                      <span>Tillbaka till senaste</span>
+                    </button>
+                  ) : (
+                    <div /> // Spacer
+                  )}
 
-                {/* Inspektionslista */}
-                <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Inspekterade stationer</h3>
-                  <StationInspectionList
-                    outdoorInspections={inspectionData.outdoorInspections}
-                    indoorInspections={inspectionData.indoorInspections}
-                    onStationClick={(stationId, location) => {
-                      setActiveTab(location)
-                    }}
-                  />
+                  {allSessions.length > 1 && !showHistory && (
+                    <button
+                      onClick={() => setShowHistory(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 rounded-xl text-slate-300 text-sm font-medium transition-colors"
+                    >
+                      <History className="w-4 h-4" />
+                      Servicehistorik ({allSessions.length})
+                    </button>
+                  )}
                 </div>
+
+                {/* Historiklista */}
+                {showHistory && (
+                  <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white">Servicehistorik</h3>
+                      <button
+                        onClick={() => setShowHistory(false)}
+                        className="text-slate-400 hover:text-white text-sm"
+                      >
+                        Stäng
+                      </button>
+                    </div>
+                    <InspectionHistoryList
+                      sessions={allSessions}
+                      onSelectSession={handleSelectHistorySession}
+                      currentSessionId={inspectionData.session?.id}
+                    />
+                  </div>
+                )}
+
+                {/* Laddar historisk session */}
+                {historyLoading && (
+                  <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-12 text-center">
+                    <LoadingSpinner />
+                    <p className="text-slate-400 mt-4">Laddar inspektionsdetaljer...</p>
+                  </div>
+                )}
+
+                {/* Visa antingen vald historisk session eller senaste */}
+                {!showHistory && !historyLoading && (
+                  <>
+                    {/* Sammanfattningskort */}
+                    <InspectionSummaryCard
+                      session={selectedHistorySession || inspectionData.session}
+                      statusCounts={historyInspectionData?.statusCounts || inspectionData.statusCounts}
+                    />
+
+                    {/* Inspektionslista */}
+                    <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-white">Inspekterade stationer</h3>
+                        {selectedHistorySession && (
+                          <span className="px-2 py-1 bg-amber-500/20 text-amber-400 text-xs font-medium rounded">
+                            Historisk vy
+                          </span>
+                        )}
+                      </div>
+                      <StationInspectionList
+                        outdoorInspections={historyInspectionData?.outdoorInspections || inspectionData.outdoorInspections}
+                        indoorInspections={historyInspectionData?.indoorInspections || inspectionData.indoorInspections}
+                        onStationClick={(stationId, location) => {
+                          setActiveTab(location)
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-12 text-center">
