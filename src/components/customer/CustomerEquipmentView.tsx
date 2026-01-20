@@ -367,7 +367,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                   <h1 className="text-3xl md:text-4xl font-bold text-white">
                     Er Utrustning
                   </h1>
-                  <p className="text-slate-400">Oversikt over placerad skadedjursbekampning</p>
+                  <p className="text-slate-400">Översikt över placerad skadedjursbekämpning</p>
                 </div>
               </div>
 

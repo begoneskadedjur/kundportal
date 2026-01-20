@@ -215,32 +215,35 @@ export function StationInspectionList({
     })
   }
 
-  // Bygg stationsnamn för visning: [Nummer] Typ (Planritning/Utomhus)
+  // Bygg stationsnamn för visning: Typnamn (t.ex. "Betesstation", "Mekanisk fälla")
+  // Stationsnummer visas i undertexten
   const getStationDisplayName = (item: InspectionItem): string => {
+    // Primärt visa typnamnet från station_types (t.ex. "Betesstation")
+    return item.stationTypeName
+  }
+
+  // Bygg platsinfo med stationsnummer
+  const getLocationInfo = (item: InspectionItem): string => {
     const parts: string[] = []
 
-    // Lägg till nummer om det finns
+    // Lägg till stationsnummer först om det finns
     if (item.stationNumber) {
       parts.push(item.stationNumber)
     }
 
-    // Lägg till typnamn
-    parts.push(item.stationTypeName)
-
-    return parts.join(' - ')
-  }
-
-  // Bygg platsinfo
-  const getLocationInfo = (item: InspectionItem): string => {
+    // Lägg till plats
     if (item.location === 'outdoor') {
-      return 'Utomhus'
-    }
-    if (item.floorPlanName) {
-      return item.buildingName
+      parts.push('Utomhus')
+    } else if (item.floorPlanName) {
+      const floorPlanText = item.buildingName
         ? `${item.buildingName} - ${item.floorPlanName}`
         : item.floorPlanName
+      parts.push(floorPlanText)
+    } else {
+      parts.push('Inomhus')
     }
-    return 'Inomhus'
+
+    return parts.join(' · ')
   }
 
   if (allInspections.length === 0) {
@@ -345,17 +348,14 @@ export function StationInspectionList({
                       <StatusBadge status={item.status} />
                     </div>
                     <div className="flex items-center gap-3 text-sm text-slate-400">
-                      {item.location === 'outdoor' ? (
-                        <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1">
+                        {item.location === 'outdoor' ? (
                           <MapPin className="w-3.5 h-3.5" />
-                          Utomhus
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1">
+                        ) : (
                           <Home className="w-3.5 h-3.5" />
-                          {getLocationInfo(item)}
-                        </span>
-                      )}
+                        )}
+                        {getLocationInfo(item)}
+                      </span>
                       <span className="text-slate-500">•</span>
                       <span>{formatTime(item.inspectedAt)}</span>
                     </div>
