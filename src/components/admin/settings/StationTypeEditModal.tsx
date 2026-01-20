@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
-  Loader2
+  Loader2,
+  HelpCircle
 } from 'lucide-react'
 import { StationTypeService } from '../../../services/stationTypeService'
 import {
@@ -27,6 +28,16 @@ import {
   generateThresholdPreview
 } from '../../../types/stationTypes'
 import toast from 'react-hot-toast'
+import TooltipWrapper from '../../ui/TooltipWrapper'
+
+// Tooltip-komponenten för hjälptext
+function FieldTooltip({ content }: { content: string | React.ReactNode }) {
+  return (
+    <TooltipWrapper content={content} position="top" delay={100}>
+      <HelpCircle className="w-4 h-4 text-slate-500 hover:text-slate-300 cursor-help transition-colors" />
+    </TooltipWrapper>
+  )
+}
 
 // Tillgängliga färger
 const COLOR_OPTIONS = [
@@ -268,8 +279,9 @@ export function StationTypeEditModal({
 
             {/* Namn */}
             <div>
-              <label className="block text-sm font-medium text-white mb-1">
+              <label className="flex items-center gap-2 text-sm font-medium text-white mb-1">
                 Namn <span className="text-red-400">*</span>
+                <FieldTooltip content="Det synliga namnet på stationstypen som visas för tekniker och i rapporter. T.ex. 'Betesstation', 'Mekanisk fälla' eller 'Klisterfälla'." />
               </label>
               <input
                 type="text"
@@ -286,8 +298,16 @@ export function StationTypeEditModal({
             {/* Kod och Prefix */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-white mb-1">
+                <label className="flex items-center gap-2 text-sm font-medium text-white mb-1">
                   Kod <span className="text-red-400">*</span>
+                  <FieldTooltip content={
+                    <div>
+                      <p className="font-medium mb-1">Intern systemkod</p>
+                      <p>En unik identifierare som används internt i systemet. Genereras automatiskt från namnet.</p>
+                      <p className="mt-2 text-slate-400">Exempel: betesstation, mekanisk_falla</p>
+                      <p className="mt-1 text-amber-400 text-xs">Kan inte ändras efter att stationstypen skapats.</p>
+                    </div>
+                  } />
                 </label>
                 <input
                   type="text"
@@ -303,8 +323,21 @@ export function StationTypeEditModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white mb-1">
+                <label className="flex items-center gap-2 text-sm font-medium text-white mb-1">
                   Prefix <span className="text-red-400">*</span>
+                  <FieldTooltip content={
+                    <div>
+                      <p className="font-medium mb-1">Stationsnummerprefix</p>
+                      <p>1-3 tecken som läggs till framför stationsnumret för att identifiera stationstypen.</p>
+                      <p className="mt-2">Exempel på genererade stationsnummer:</p>
+                      <ul className="mt-1 text-slate-300 space-y-0.5">
+                        <li>• BS-001, BS-002 (Prefix: BS)</li>
+                        <li>• MF-001, MF-002 (Prefix: MF)</li>
+                        <li>• K-001, K-002 (Prefix: K)</li>
+                      </ul>
+                      <p className="mt-2 text-slate-400 text-xs">Genereras automatiskt från namnets initialer.</p>
+                    </div>
+                  } />
                 </label>
                 <input
                   type="text"
@@ -322,7 +355,10 @@ export function StationTypeEditModal({
 
             {/* Beskrivning */}
             <div>
-              <label className="block text-sm font-medium text-white mb-1">Beskrivning</label>
+              <label className="flex items-center gap-2 text-sm font-medium text-white mb-1">
+                Beskrivning
+                <FieldTooltip content="Valfri beskrivning som hjälper användare att förstå när denna stationstyp ska användas. Visas som hjälptext i systemet." />
+              </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -335,7 +371,10 @@ export function StationTypeEditModal({
             {/* Färg och Ikon */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-white mb-2">Färg</label>
+                <label className="flex items-center gap-2 text-sm font-medium text-white mb-2">
+                  Färg
+                  <FieldTooltip content="Färgen som används för att visualisera denna stationstyp på kartor och i listor. Välj en färg som gör det enkelt att skilja stationstyper åt." />
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {COLOR_OPTIONS.map((c) => (
                     <button
@@ -354,7 +393,10 @@ export function StationTypeEditModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white mb-2">Ikon</label>
+                <label className="flex items-center gap-2 text-sm font-medium text-white mb-2">
+                  Ikon
+                  <FieldTooltip content="Ikonen som visas för stationstypen i gränssnittet. Välj en ikon som representerar stationstypen visuellt." />
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {ICON_OPTIONS.map((i) => (
                     <button
@@ -383,18 +425,53 @@ export function StationTypeEditModal({
                 className="w-5 h-5 rounded bg-slate-900 border-slate-600 text-emerald-500 focus:ring-emerald-500"
               />
               <span className="text-white">Kräver serienummer</span>
+              <FieldTooltip content={
+                <div>
+                  <p className="font-medium mb-1">Serienummerkrav</p>
+                  <p>Om aktiverad måste tekniker ange ett serienummer när de placerar ut denna stationstyp.</p>
+                  <p className="mt-2 text-slate-400">Användbart för spårning av utrustning som elektroniska fällor eller dyrare enheter.</p>
+                </div>
+              } />
             </label>
           </div>
 
           {/* Tröskelvärden */}
           <div className="space-y-4 pt-4 border-t border-slate-700">
-            <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
-              Tröskelvärden
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+                Tröskelvärden
+              </h3>
+              <FieldTooltip content={
+                <div>
+                  <p className="font-medium mb-1">Automatiska statusnivåer</p>
+                  <p>Tröskelvärden används för att automatiskt beräkna stationens status baserat på mätvärden.</p>
+                  <p className="mt-2">Systemet visar:</p>
+                  <ul className="mt-1 space-y-0.5">
+                    <li className="text-emerald-400">• Grön (OK) - inom normala värden</li>
+                    <li className="text-amber-400">• Gul (Varning) - behöver uppmärksamhet</li>
+                    <li className="text-red-400">• Röd (Kritisk) - kräver åtgärd</li>
+                  </ul>
+                </div>
+              } />
+            </div>
 
             {/* Mätenhet */}
             <div>
-              <label className="block text-sm font-medium text-white mb-2">Mätenhet</label>
+              <label className="flex items-center gap-2 text-sm font-medium text-white mb-2">
+                Mätenhet
+                <FieldTooltip content={
+                  <div>
+                    <p className="font-medium mb-1">Enhet för mätning</p>
+                    <p>Välj vilken enhet som ska användas för att mäta stationens värden.</p>
+                    <ul className="mt-2 space-y-1 text-slate-300">
+                      <li>• <span className="text-white">st</span> - Antal (t.ex. fångade skadedjur)</li>
+                      <li>• <span className="text-white">gram</span> - Vikt (t.ex. beteförbrukning)</li>
+                      <li>• <span className="text-white">%</span> - Procent (t.ex. fyllnadsgrad)</li>
+                      <li>• <span className="text-white">ml</span> - Volym (t.ex. vätska)</li>
+                    </ul>
+                  </div>
+                } />
+              </label>
               <div className="flex flex-wrap gap-2">
                 {(Object.keys(MEASUREMENT_UNIT_CONFIG) as MeasurementUnit[]).map((unit) => (
                   <button
@@ -414,8 +491,20 @@ export function StationTypeEditModal({
 
             {/* Mätetikett */}
             <div>
-              <label className="block text-sm font-medium text-white mb-1">
+              <label className="flex items-center gap-2 text-sm font-medium text-white mb-1">
                 Etikett för mätning
+                <FieldTooltip content={
+                  <div>
+                    <p className="font-medium mb-1">Anpassad etikett</p>
+                    <p>En beskrivande text som visas bredvid mätfältet för teknikern.</p>
+                    <p className="mt-2 text-slate-400">Exempel:</p>
+                    <ul className="mt-1 text-slate-300">
+                      <li>• "Beteförbrukning (g)"</li>
+                      <li>• "Antal fångade"</li>
+                      <li>• "Fyllnadsgrad (%)"</li>
+                    </ul>
+                  </div>
+                } />
               </label>
               <input
                 type="text"
@@ -428,7 +517,25 @@ export function StationTypeEditModal({
 
             {/* Riktning */}
             <div>
-              <label className="block text-sm font-medium text-white mb-2">Riktning</label>
+              <label className="flex items-center gap-2 text-sm font-medium text-white mb-2">
+                Riktning
+                <FieldTooltip content={
+                  <div>
+                    <p className="font-medium mb-1">Tröskelriktning</p>
+                    <p>Bestämmer om höga eller låga värden är problematiska.</p>
+                    <div className="mt-2 space-y-2">
+                      <div>
+                        <p className="text-white">Över tröskeln är dåligt:</p>
+                        <p className="text-slate-400 text-xs">T.ex. beteförbrukning - hög förbrukning = skadedjursaktivitet</p>
+                      </div>
+                      <div>
+                        <p className="text-white">Under tröskeln är dåligt:</p>
+                        <p className="text-slate-400 text-xs">T.ex. betemängd - lite bete kvar = behöver fyllas på</p>
+                      </div>
+                    </div>
+                  </div>
+                } />
+              </label>
               <div className="space-y-2">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -458,8 +565,15 @@ export function StationTypeEditModal({
             {/* Tröskelvärden */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-amber-400 mb-1">
+                <label className="flex items-center gap-2 text-sm font-medium text-amber-400 mb-1">
                   Varningströskel (gul)
+                  <FieldTooltip content={
+                    <div>
+                      <p className="font-medium mb-1 text-amber-400">Varningsnivå</p>
+                      <p>När mätvärdet överskrider (eller underskrider, beroende på riktning) detta värde visas stationen med gul varningsstatus.</p>
+                      <p className="mt-2 text-slate-400">Kräver uppmärksamhet men är inte akut.</p>
+                    </div>
+                  } />
                 </label>
                 <div className="relative">
                   <input
@@ -481,8 +595,15 @@ export function StationTypeEditModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-red-400 mb-1">
+                <label className="flex items-center gap-2 text-sm font-medium text-red-400 mb-1">
                   Kritisk tröskel (röd)
+                  <FieldTooltip content={
+                    <div>
+                      <p className="font-medium mb-1 text-red-400">Kritisk nivå</p>
+                      <p>När mätvärdet överskrider (eller underskrider) detta värde visas stationen med röd kritisk status.</p>
+                      <p className="mt-2 text-slate-400">Kräver omedelbar åtgärd.</p>
+                    </div>
+                  } />
                 </label>
                 <div className="relative">
                   <input
