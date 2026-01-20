@@ -239,7 +239,9 @@ export function MapLocationPicker({
   }, [searchQuery, searchAddressInternal])
 
   // Bekräfta vald position
-  const handleConfirm = () => {
+  const handleConfirm = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
     onPositionSelect(markerPosition[0], markerPosition[1])
   }
 
@@ -344,6 +346,8 @@ export function MapLocationPicker({
         </button>
         <motion.button
           onClick={handleConfirm}
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="flex-1 px-4 py-3 bg-blue-600 rounded-lg text-white font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
