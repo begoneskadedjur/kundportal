@@ -156,6 +156,8 @@ export interface UpdateInspectionSessionInput {
   notes?: string
   total_outdoor_stations?: number
   total_indoor_stations?: number
+  inspected_outdoor_stations?: number
+  inspected_indoor_stations?: number
 }
 
 /**
