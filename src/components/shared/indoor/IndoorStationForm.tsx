@@ -420,7 +420,7 @@ export function StationTypeSelector({
   onSelect
 }: {
   selectedType: IndoorStationType | null
-  onSelect: (type: IndoorStationType) => void
+  onSelect: (type: IndoorStationType, typeData?: StationType) => void
 }) {
   const [stationTypes, setStationTypes] = useState<StationType[]>([])
   const [loading, setLoading] = useState(true)
@@ -517,7 +517,7 @@ export function StationTypeSelector({
           return (
             <button
               key={stationType.id}
-              onClick={() => onSelect(stationType.code as IndoorStationType)}
+              onClick={() => onSelect(stationType.code as IndoorStationType, stationType)}
               className={`
                 w-full p-4 rounded-lg border-2 transition-all flex items-center gap-4 text-left min-h-[64px]
                 ${isSelected

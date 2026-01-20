@@ -29,17 +29,38 @@ interface ExpandableCustomerRowProps {
   onToggleExpand: () => void
 }
 
-// Ikonmappning för stationstyper
+// Legacy ikonmappning för stationstyper (fallback)
 const INDOOR_TYPE_ICONS: Record<string, React.ElementType> = {
   mechanical_trap: Crosshair,
   concrete_station: Box,
-  bait_station: Target
+  bait_station: Target,
+  // Dynamiska ikoner
+  crosshair: Crosshair,
+  box: Box,
+  target: Target
 }
 
-const typeLabels: Record<string, string> = {
+const LEGACY_TYPE_LABELS: Record<string, string> = {
   mechanical_trap: 'Mekanisk fälla',
   concrete_station: 'Betongstation',
   bait_station: 'Betesstation'
+}
+
+// Hämta typ-info från station (prioriterar dynamisk data)
+function getStationTypeInfo(station: any) {
+  if (station.station_type_data) {
+    return {
+      label: station.station_type_data.name,
+      color: station.station_type_data.color,
+      icon: INDOOR_TYPE_ICONS[station.station_type_data.icon] || Box
+    }
+  }
+  // Fallback till legacy
+  return {
+    label: LEGACY_TYPE_LABELS[station.station_type] || station.station_type,
+    color: '#06b6d4', // cyan som default
+    icon: INDOOR_TYPE_ICONS[station.station_type] || Box
+  }
 }
 
 export function ExpandableCustomerRow({
@@ -239,7 +260,8 @@ export function ExpandableCustomerRow({
 
                     {/* Inomhusstationer */}
                     {indoorStations.map(station => {
-                      const TypeIcon = INDOOR_TYPE_ICONS[station.station_type] || Box
+                      const typeInfo = getStationTypeInfo(station)
+                      const TypeIcon = typeInfo.icon
                       const statusConfig: Record<string, { label: string; bgColor: string; textColor: string }> = {
                         active: { label: 'Aktiv', bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400' },
                         removed: { label: 'Borttagen', bgColor: 'bg-slate-500/20', textColor: 'text-slate-400' },
@@ -254,13 +276,16 @@ export function ExpandableCustomerRow({
                           key={station.id}
                           className="flex items-center gap-3 p-2 bg-slate-800/30 rounded-lg"
                         >
-                          <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 bg-cyan-500/20">
-                            <TypeIcon className="w-4 h-4 text-cyan-400" />
+                          <div
+                            className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: typeInfo.color + '20' }}
+                          >
+                            <TypeIcon className="w-4 h-4" style={{ color: typeInfo.color }} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium text-white truncate">
-                                {station.station_number || typeLabels[station.station_type] || 'Station'}
+                                {station.station_number || typeInfo.label || 'Station'}
                               </span>
                               <span
                                 className={`px-1.5 py-0.5 rounded text-xs ${status.bgColor} ${status.textColor}`}
@@ -269,7 +294,7 @@ export function ExpandableCustomerRow({
                               </span>
                             </div>
                             <p className="text-xs text-slate-500 truncate">
-                              {typeLabels[station.station_type] || station.station_type}
+                              {typeInfo.label}
                               {station.floor_plan?.name && ` - ${station.floor_plan.name}`}
                             </p>
                           </div>

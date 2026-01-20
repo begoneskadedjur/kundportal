@@ -34,6 +34,7 @@ import type {
   CreateFloorPlanInput,
   CreateIndoorStationInput
 } from '../../types/indoor'
+import type { StationType } from '../../types/stationTypes'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -82,6 +83,7 @@ export function AddStationWizard({
   const [showStationForm, setShowStationForm] = useState(false)
   const [placementMode, setPlacementMode] = useState<PlacementMode>('view')
   const [selectedStationType, setSelectedStationType] = useState<IndoorStationType | null>(null)
+  const [selectedTypeData, setSelectedTypeData] = useState<StationType | null>(null)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -232,8 +234,9 @@ export function AddStationWizard({
   }, [placementMode, selectedStationType])
 
   // Starta placeringsläge
-  const startPlacementMode = (type: IndoorStationType) => {
+  const startPlacementMode = (type: IndoorStationType, typeData?: StationType) => {
     setSelectedStationType(type)
+    setSelectedTypeData(typeData || null)
     setPlacementMode('place')
     setShowTypeSelector(false)
   }
@@ -242,6 +245,7 @@ export function AddStationWizard({
   const resetPlacementMode = () => {
     setPlacementMode('view')
     setSelectedStationType(null)
+    setSelectedTypeData(null)
     setPreviewPosition(null)
   }
 
@@ -623,6 +627,7 @@ export function AddStationWizard({
                             stations={stations}
                             placementMode={placementMode}
                             selectedType={selectedStationType}
+                            selectedTypeData={selectedTypeData}
                             previewPosition={previewPosition}
                             onImageClick={handleImageClick}
                             onCancelPlacement={resetPlacementMode}
@@ -702,7 +707,7 @@ export function AddStationWizard({
                           <h3 className="text-lg font-semibold text-white mb-4">Ny station</h3>
                           <StationTypeSelector
                             selectedType={selectedStationType}
-                            onSelect={(type) => startPlacementMode(type)}
+                            onSelect={(type, typeData) => startPlacementMode(type, typeData)}
                           />
                         </div>
                       </div>

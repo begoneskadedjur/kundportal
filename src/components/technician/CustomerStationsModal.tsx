@@ -42,6 +42,7 @@ import type {
   CreateFloorPlanInput,
   CreateIndoorStationInput
 } from '../../types/indoor'
+import type { StationType } from '../../types/stationTypes'
 import { openInMapsApp } from '../../utils/equipmentMapUtils'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -57,11 +58,38 @@ interface CustomerStationsModalProps {
 
 type ViewType = 'outdoor' | 'indoor'
 
-// Ikonmappning för stationstyper
+// Ikonmappning för stationstyper (legacy + dynamiska)
 const INDOOR_TYPE_ICONS: Record<string, React.ElementType> = {
   mechanical_trap: Crosshair,
   concrete_station: Box,
-  bait_station: Target
+  bait_station: Target,
+  // Dynamiska ikoner från station_types
+  crosshair: Crosshair,
+  box: Box,
+  target: Target
+}
+
+const LEGACY_TYPE_LABELS: Record<string, string> = {
+  mechanical_trap: 'Mekanisk fälla',
+  concrete_station: 'Betongstation',
+  bait_station: 'Betesstation'
+}
+
+// Hämta typ-info från station (prioriterar dynamisk data)
+function getStationTypeInfo(station: any) {
+  if (station.station_type_data) {
+    return {
+      label: station.station_type_data.name,
+      color: station.station_type_data.color,
+      icon: INDOOR_TYPE_ICONS[station.station_type_data.icon] || Box
+    }
+  }
+  // Fallback till legacy
+  return {
+    label: LEGACY_TYPE_LABELS[station.station_type] || station.station_type,
+    color: '#06b6d4', // cyan som default
+    icon: INDOOR_TYPE_ICONS[station.station_type] || Box
+  }
 }
 
 interface CustomerDetails {
@@ -95,6 +123,7 @@ export function CustomerStationsModal({
   const [floorPlanStations, setFloorPlanStations] = useState<IndoorStationWithRelations[]>([])
   const [placementMode, setPlacementMode] = useState<PlacementMode>('view')
   const [selectedStationType, setSelectedStationType] = useState<IndoorStationType | null>(null)
+  const [selectedTypeData, setSelectedTypeData] = useState<StationType | null>(null)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showTypeSelector, setShowTypeSelector] = useState(false)
@@ -183,8 +212,9 @@ export function CustomerStationsModal({
   }, [placementMode, selectedStationType])
 
   // Starta placeringsläge med vald stationstyp
-  const startPlacementMode = (type: IndoorStationType) => {
+  const startPlacementMode = (type: IndoorStationType, typeData?: StationType) => {
     setSelectedStationType(type)
+    setSelectedTypeData(typeData || null)
     setPlacementMode('place')
     setShowTypeSelector(false)
   }
@@ -193,6 +223,7 @@ export function CustomerStationsModal({
   const resetPlacementMode = () => {
     setPlacementMode('view')
     setSelectedStationType(null)
+    setSelectedTypeData(null)
     setPreviewPosition(null)
   }
 
@@ -534,6 +565,7 @@ export function CustomerStationsModal({
                                   stations={floorPlanStations}
                                   placementMode={placementMode}
                                   selectedType={selectedStationType}
+                                  selectedTypeData={selectedTypeData}
                                   previewPosition={previewPosition}
                                   onImageClick={handleImageClick}
                                   onCancelPlacement={resetPlacementMode}
@@ -621,17 +653,19 @@ export function CustomerStationsModal({
                                               />
                                               {/* Stationsmarkörer */}
                                               {stationsOnPlan.map(station => {
-                                                const TypeIcon = INDOOR_TYPE_ICONS[station.station_type] || Box
+                                                const typeInfo = getStationTypeInfo(station)
+                                                const TypeIcon = typeInfo.icon
                                                 return (
                                                   <button
                                                     key={station.id}
                                                     onClick={() => onStationClick?.(station, 'indoor')}
-                                                    className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 bg-cyan-500 border-2 border-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer z-10"
+                                                    className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 border-2 border-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer z-10"
                                                     style={{
                                                       left: `${station.position_x_percent}%`,
-                                                      top: `${station.position_y_percent}%`
+                                                      top: `${station.position_y_percent}%`,
+                                                      backgroundColor: typeInfo.color
                                                     }}
-                                                    title={station.station_number || 'Station'}
+                                                    title={station.station_number || typeInfo.label}
                                                   >
                                                     <TypeIcon className="w-4 h-4 text-white" />
                                                   </button>
@@ -760,7 +794,7 @@ export function CustomerStationsModal({
                   <h3 className="text-lg font-semibold text-white mb-4">Ny station</h3>
                   <StationTypeSelector
                     selectedType={selectedStationType}
-                    onSelect={(type) => startPlacementMode(type)}
+                    onSelect={(type, typeData) => startPlacementMode(type, typeData)}
                   />
                 </div>
               </div>
@@ -853,7 +887,8 @@ function IndoorStationCard({
   station: any
   onClick?: () => void
 }) {
-  const TypeIcon = INDOOR_TYPE_ICONS[station.station_type] || Box
+  const typeInfo = getStationTypeInfo(station)
+  const TypeIcon = typeInfo.icon
 
   const statusConfig: Record<string, { label: string; bgColor: string; textColor: string }> = {
     active: { label: 'Aktiv', bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400' },
@@ -861,12 +896,6 @@ function IndoorStationCard({
     damaged: { label: 'Skadad', bgColor: 'bg-red-500/20', textColor: 'text-red-400' },
     missing: { label: 'Saknas', bgColor: 'bg-amber-500/20', textColor: 'text-amber-400' },
     needs_service: { label: 'Service', bgColor: 'bg-orange-500/20', textColor: 'text-orange-400' }
-  }
-
-  const typeLabels: Record<string, string> = {
-    mechanical_trap: 'Mekanisk fälla',
-    concrete_station: 'Betongstation',
-    bait_station: 'Betesstation'
   }
 
   const status = statusConfig[station.status] || statusConfig.active
@@ -877,16 +906,19 @@ function IndoorStationCard({
       className="w-full text-left p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 hover:bg-slate-800/70 transition-all group"
     >
       <div className="flex items-center gap-3">
-        {/* Typikon */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-cyan-500/20">
-          <TypeIcon className="w-5 h-5 text-cyan-400" />
+        {/* Typikon med dynamisk färg */}
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: typeInfo.color + '20' }}
+        >
+          <TypeIcon className="w-5 h-5" style={{ color: typeInfo.color }} />
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-white truncate">
-              {station.station_number || typeLabels[station.station_type] || 'Station'}
+              {station.station_number || typeInfo.label || 'Station'}
             </span>
             <span
               className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.bgColor} ${status.textColor}`}
@@ -895,7 +927,7 @@ function IndoorStationCard({
             </span>
           </div>
           <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
-            <span>{typeLabels[station.station_type] || station.station_type}</span>
+            <span>{typeInfo.label}</span>
             {station.floor_plan?.name && (
               <>
                 <span>•</span>

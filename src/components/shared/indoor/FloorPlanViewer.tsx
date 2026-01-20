@@ -7,6 +7,7 @@ import { ZoomIn, ZoomOut, Maximize, Move, Plus, X } from 'lucide-react'
 import type { IndoorStationWithRelations, PlacementMode, IndoorStationType } from '../../../types/indoor'
 import { INDOOR_STATION_TYPE_CONFIG } from '../../../types/indoor'
 import { IndoorStationMarker } from './IndoorStationMarker'
+import type { StationType } from '../../../types/stationTypes'
 
 interface FloorPlanViewerProps {
   imageUrl: string
@@ -16,11 +17,35 @@ interface FloorPlanViewerProps {
   selectedStationId?: string | null
   placementMode: PlacementMode
   selectedType?: IndoorStationType | null
+  selectedTypeData?: StationType | null  // Dynamisk stationstypsdata från DB
   previewPosition?: { x: number; y: number } | null
   onStationClick?: (station: IndoorStationWithRelations) => void
   onImageClick?: (x: number, y: number) => void
   onCancelPlacement?: () => void
   height?: string
+}
+
+// Hämta typkonfiguration - prioriterar dynamisk data
+function getTypeConfig(selectedType: IndoorStationType | null | undefined, selectedTypeData: StationType | null | undefined) {
+  // Prioritera dynamisk data från databasen
+  if (selectedTypeData) {
+    return {
+      label: selectedTypeData.name,
+      color: selectedTypeData.color
+    }
+  }
+  // Fallback till legacy-config
+  if (selectedType && INDOOR_STATION_TYPE_CONFIG[selectedType]) {
+    return {
+      label: INDOOR_STATION_TYPE_CONFIG[selectedType].label,
+      color: INDOOR_STATION_TYPE_CONFIG[selectedType].color
+    }
+  }
+  // Default
+  return {
+    label: selectedType || 'Station',
+    color: '#10b981'
+  }
 }
 
 export function FloorPlanViewer({
@@ -29,6 +54,7 @@ export function FloorPlanViewer({
   selectedStationId,
   placementMode,
   selectedType,
+  selectedTypeData,
   previewPosition,
   onStationClick,
   onImageClick,
@@ -99,22 +125,25 @@ export function FloorPlanViewer({
         <div className="absolute top-0 left-0 right-0 z-20 bg-emerald-600/95 backdrop-blur-sm px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {placementMode === 'place' && selectedType && (
-                <>
-                  <div
-                    className="w-6 h-6 rounded-full border-2 border-white"
-                    style={{ backgroundColor: INDOOR_STATION_TYPE_CONFIG[selectedType].color }}
-                  />
-                  <div>
-                    <p className="text-white font-medium text-sm">
-                      Placera {INDOOR_STATION_TYPE_CONFIG[selectedType].label}
-                    </p>
-                    <p className="text-emerald-100 text-xs">
-                      Tryck på bilden för att välja position
-                    </p>
-                  </div>
-                </>
-              )}
+              {placementMode === 'place' && selectedType && (() => {
+                const typeConfig = getTypeConfig(selectedType, selectedTypeData)
+                return (
+                  <>
+                    <div
+                      className="w-6 h-6 rounded-full border-2 border-white"
+                      style={{ backgroundColor: typeConfig.color }}
+                    />
+                    <div>
+                      <p className="text-white font-medium text-sm">
+                        Placera {typeConfig.label}
+                      </p>
+                      <p className="text-emerald-100 text-xs">
+                        Tryck på bilden för att välja position
+                      </p>
+                    </div>
+                  </>
+                )
+              })()}
               {placementMode === 'move' && (
                 <div className="flex items-center gap-2">
                   <Move className="w-5 h-5 text-white" />
@@ -233,9 +262,7 @@ export function FloorPlanViewer({
                   <div
                     className="w-8 h-8 rounded-full border-3 border-white shadow-lg flex items-center justify-center"
                     style={{
-                      backgroundColor: selectedType
-                        ? INDOOR_STATION_TYPE_CONFIG[selectedType].color
-                        : '#10b981'
+                      backgroundColor: getTypeConfig(selectedType, selectedTypeData).color
                     }}
                   >
                     <Plus className="w-4 h-4 text-white" />

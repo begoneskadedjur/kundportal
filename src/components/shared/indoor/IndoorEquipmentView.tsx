@@ -25,6 +25,7 @@ import type {
   CreateIndoorStationInput,
   UpdateIndoorStationInput
 } from '../../../types/indoor'
+import type { StationType } from '../../../types/stationTypes'
 
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -50,6 +51,7 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
   const [modalType, setModalType] = useState<ModalType>('none')
   const [placementMode, setPlacementMode] = useState<PlacementMode>('view')
   const [selectedType, setSelectedType] = useState<IndoorStationType | null>(null)
+  const [selectedTypeData, setSelectedTypeData] = useState<StationType | null>(null)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -227,8 +229,9 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
   }
 
   // Starta placeringsläge
-  const startPlacementMode = (type: IndoorStationType) => {
+  const startPlacementMode = (type: IndoorStationType, typeData?: StationType) => {
     setSelectedType(type)
+    setSelectedTypeData(typeData || null)
     setPlacementMode('place')
     setModalType('none')
   }
@@ -243,6 +246,7 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
   const resetPlacementMode = () => {
     setPlacementMode('view')
     setSelectedType(null)
+    setSelectedTypeData(null)
     setPreviewPosition(null)
     setSelectedStation(null)
   }
@@ -326,6 +330,7 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
           selectedStationId={selectedStation?.id}
           placementMode={placementMode}
           selectedType={selectedType}
+          selectedTypeData={selectedTypeData}
           previewPosition={previewPosition}
           onStationClick={handleStationClick}
           onImageClick={handleImageClick}
@@ -375,7 +380,7 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
             <h3 className="text-lg font-semibold text-white mb-4">Ny station</h3>
             <StationTypeSelector
               selectedType={selectedType}
-              onSelect={(type) => startPlacementMode(type)}
+              onSelect={(type, typeData) => startPlacementMode(type, typeData)}
             />
           </div>
         </BottomSheet>
