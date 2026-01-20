@@ -252,7 +252,7 @@ export function MapLocationPicker({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
       {/* Instruktioner */}
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
         <p className="text-sm text-blue-400 flex items-start gap-2">
