@@ -19,10 +19,12 @@ import {
   List,
   Sparkles,
   Home,
-  Building2
+  Building2,
+  ClipboardCheck
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService } from '../../services/floorPlanService'
+import { getCustomerInspectionOverview } from '../../services/inspectionSessionService'
 import {
   EquipmentPlacementWithRelations,
   EquipmentType,
@@ -32,9 +34,13 @@ import {
   getEquipmentTypeLabel,
   getEquipmentStatusLabel
 } from '../../types/database'
+import type { InspectionSessionWithRelations, OutdoorInspectionWithRelations } from '../../types/inspectionSession'
+import type { IndoorStationInspectionWithRelations } from '../../types/indoor'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { EquipmentDetailSheet } from '../shared/equipment/EquipmentDetailSheet'
 import { CustomerIndoorEquipmentView } from './CustomerIndoorEquipmentView'
+import { InspectionSummaryCard } from './InspectionSummaryCard'
+import { StationInspectionList } from './StationInspectionList'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import { generateEquipmentPdf } from '../../utils/equipmentPdfGenerator'
 import toast from 'react-hot-toast'
@@ -90,9 +96,18 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentPlacementWithRelations | null>(null)
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
 
-  // Equipment type toggle (outdoor/indoor)
-  const [equipmentType, setEquipmentType] = useState<'outdoor' | 'indoor'>('outdoor')
+  // Equipment type toggle (outdoor/indoor/service)
+  const [activeTab, setActiveTab] = useState<'service' | 'outdoor' | 'indoor'>('service')
   const [indoorStationCount, setIndoorStationCount] = useState(0)
+
+  // Inspektionsdata
+  const [inspectionData, setInspectionData] = useState<{
+    session: InspectionSessionWithRelations | null
+    outdoorInspections: OutdoorInspectionWithRelations[]
+    indoorInspections: IndoorStationInspectionWithRelations[]
+    statusCounts: { ok: number; activity: number; other: number }
+  } | null>(null)
+  const [inspectionLoading, setInspectionLoading] = useState(true)
 
   // Hamta utrustning
   const fetchEquipment = useCallback(async () => {
@@ -125,6 +140,22 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
       }
     }
     fetchIndoorCount()
+  }, [customerId])
+
+  // Hämta inspektionsdata
+  useEffect(() => {
+    const fetchInspectionData = async () => {
+      setInspectionLoading(true)
+      try {
+        const data = await getCustomerInspectionOverview(customerId)
+        setInspectionData(data)
+      } catch (error) {
+        console.error('Kunde inte hämta inspektionsdata:', error)
+      } finally {
+        setInspectionLoading(false)
+      }
+    }
+    fetchInspectionData()
   }, [customerId])
 
   const handleRefresh = async () => {
@@ -321,13 +352,31 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {/* Equipment Type Toggle (Utomhus / Inomhus) */}
+        {/* Tab Toggle (Service / Utomhus / Inomhus) */}
         <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-4 mb-6">
           <div className="flex items-center gap-2 bg-slate-900/50 rounded-xl p-1 w-fit">
             <button
-              onClick={() => setEquipmentType('outdoor')}
+              onClick={() => setActiveTab('service')}
               className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                equipmentType === 'outdoor'
+                activeTab === 'service'
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+              }`}
+            >
+              <ClipboardCheck className="w-4 h-4" />
+              Senaste service
+              {inspectionData?.session && (
+                <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
+                  activeTab === 'service' ? 'bg-emerald-600' : 'bg-slate-700'
+                }`}>
+                  {inspectionData.statusCounts.ok + inspectionData.statusCounts.activity + inspectionData.statusCounts.other}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('outdoor')}
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
+                activeTab === 'outdoor'
                   ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
@@ -335,15 +384,15 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
               <MapPin className="w-4 h-4" />
               Utomhus
               <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
-                equipmentType === 'outdoor' ? 'bg-emerald-600' : 'bg-slate-700'
+                activeTab === 'outdoor' ? 'bg-emerald-600' : 'bg-slate-700'
               }`}>
                 {stats.total}
               </span>
             </button>
             <button
-              onClick={() => setEquipmentType('indoor')}
+              onClick={() => setActiveTab('indoor')}
               className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                equipmentType === 'indoor'
+                activeTab === 'indoor'
                   ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
@@ -351,7 +400,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
               <Home className="w-4 h-4" />
               Inomhus
               <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
-                equipmentType === 'indoor' ? 'bg-emerald-600' : 'bg-slate-700'
+                activeTab === 'indoor' ? 'bg-emerald-600' : 'bg-slate-700'
               }`}>
                 {indoorStationCount}
               </span>
@@ -359,13 +408,58 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
           </div>
         </div>
 
+        {/* Service Tab - Senaste inspektionsresultat */}
+        {activeTab === 'service' && (
+          <div className="space-y-6">
+            {inspectionLoading ? (
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-12 text-center">
+                <LoadingSpinner />
+                <p className="text-slate-400 mt-4">Laddar servicehistorik...</p>
+              </div>
+            ) : inspectionData?.session ? (
+              <>
+                {/* Sammanfattningskort */}
+                <InspectionSummaryCard
+                  session={inspectionData.session}
+                  statusCounts={inspectionData.statusCounts}
+                />
+
+                {/* Inspektionslista */}
+                <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Inspekterade stationer</h3>
+                  <StationInspectionList
+                    outdoorInspections={inspectionData.outdoorInspections}
+                    indoorInspections={inspectionData.indoorInspections}
+                    onStationClick={(stationId, location) => {
+                      setActiveTab(location)
+                    }}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-12 text-center">
+                <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <ClipboardCheck className="w-8 h-8 text-slate-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">Ingen servicehistorik</h3>
+                <p className="text-slate-400 max-w-md mx-auto">
+                  När en tekniker utför en stationskontroll kommer resultaten att visas här.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Indoor Equipment View */}
-        {equipmentType === 'indoor' ? (
+        {activeTab === 'indoor' && (
           <CustomerIndoorEquipmentView
             customerId={customerId}
             companyName={companyName}
           />
-        ) : (
+        )}
+
+        {/* Outdoor Equipment View */}
+        {activeTab === 'outdoor' && (
           <>
             {/* Controls Bar (för utomhus) */}
             <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-4 mb-6">

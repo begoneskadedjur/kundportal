@@ -176,6 +176,75 @@ export async function getStationsWithRecentActivity(
 }
 
 /**
+ * Hämta avslutade inspektionssessioner för en kund (för kundportalens Service & Utrustning-vy)
+ */
+export async function getCompletedSessionsForCustomer(
+  customerId: string,
+  limit: number = 10
+): Promise<InspectionSessionWithRelations[]> {
+  const { data, error } = await supabase
+    .from('station_inspection_sessions')
+    .select(`
+      *,
+      customer:customers(id, company_name, contact_address, contact_person, contact_phone, contact_email),
+      technician:technicians(id, name)
+    `)
+    .eq('customer_id', customerId)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('Error fetching completed sessions:', error)
+    return []
+  }
+
+  return (data || []) as InspectionSessionWithRelations[]
+}
+
+/**
+ * Hämta komplett inspektionsdata för kundportalen
+ * Returnerar senaste session med alla inspektionsresultat
+ */
+export async function getCustomerInspectionOverview(
+  customerId: string
+): Promise<{
+  session: InspectionSessionWithRelations | null
+  outdoorInspections: OutdoorInspectionWithRelations[]
+  indoorInspections: IndoorStationInspectionWithRelations[]
+  statusCounts: { ok: number; activity: number; other: number }
+} | null> {
+  // Hämta senaste avslutade session
+  const sessions = await getCompletedSessionsForCustomer(customerId, 1)
+  if (sessions.length === 0) {
+    return null
+  }
+
+  const session = sessions[0]
+
+  // Hämta alla inspektioner för denna session
+  const [outdoorInspections, indoorInspections] = await Promise.all([
+    getOutdoorInspectionsForSession(session.id),
+    getIndoorInspectionsForSession(session.id)
+  ])
+
+  // Räkna statusar
+  const allInspections = [...outdoorInspections, ...indoorInspections]
+  const statusCounts = {
+    ok: allInspections.filter(i => i.status === 'ok').length,
+    activity: allInspections.filter(i => i.status === 'activity').length,
+    other: allInspections.filter(i => i.status !== 'ok' && i.status !== 'activity').length
+  }
+
+  return {
+    session,
+    outdoorInspections: outdoorInspections as OutdoorInspectionWithRelations[],
+    indoorInspections: indoorInspections as IndoorStationInspectionWithRelations[],
+    statusCounts
+  }
+}
+
+/**
  * Skapa ny inspektionssession
  */
 export async function createInspectionSession(

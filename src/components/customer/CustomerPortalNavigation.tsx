@@ -1,6 +1,6 @@
 // src/components/customer/CustomerPortalNavigation.tsx - Navigation for Customer Portal
 import React from 'react'
-import { BarChart3, Home, LogOut, FileText, Building2, Receipt, MapPin } from 'lucide-react'
+import { BarChart3, Home, LogOut, FileText, Building2, Receipt, ClipboardCheck } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import Button from '../ui/Button'
@@ -83,8 +83,8 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
                 }
               `}
             >
-              <MapPin className="w-4 h-4" />
-              Utrustning
+              <ClipboardCheck className="w-4 h-4" />
+              Service & Utrustning
             </button>
 
             <button
