@@ -17,12 +17,14 @@ export const MAX_ZOOM = 20 // Maximal zoom-nivå för detaljerat arbete
  * Skapa anpassad ikon för utrustningsmarkör
  * Färg baseras på utrustningstyp, styling på status
  * Storlek: 28px för finare visning, men touch-target är 44px via padding
+ * Stödjer både legacy-typer och dynamiska typer från station_types-tabellen
  */
 export const createEquipmentIcon = (
-  type: EquipmentType,
+  type: string, // Ändrat från EquipmentType till string för dynamiska typer
   status: EquipmentStatus
 ): L.DivIcon => {
-  const typeConfig = EQUIPMENT_TYPE_CONFIG[type]
+  // Hämta färg från legacy-config, fallback till slate-500 för dynamiska typer
+  const typeConfig = EQUIPMENT_TYPE_CONFIG[type as EquipmentType]
   const color = typeConfig?.color || '#6b7280'
 
   // Opacity och kantfärg baserat på status

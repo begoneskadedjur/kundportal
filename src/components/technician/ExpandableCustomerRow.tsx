@@ -63,6 +63,22 @@ function getStationTypeInfo(station: any) {
   }
 }
 
+// Hämta typ-info för utomhusstation (med fallback för dynamiska typer)
+function getOutdoorTypeConfig(equipmentType: string) {
+  const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipmentType as keyof typeof EQUIPMENT_TYPE_CONFIG]
+  if (legacyConfig) {
+    return {
+      color: legacyConfig.color,
+      label: legacyConfig.label
+    }
+  }
+  // Dynamisk typ - använd grå som standardfärg
+  return {
+    color: '#6b7280',
+    label: equipmentType || 'Okänd typ'
+  }
+}
+
 export function ExpandableCustomerRow({
   customer,
   onOpenFullDetails,
@@ -225,8 +241,12 @@ export function ExpandableCustomerRow({
                   <div className="space-y-2">
                     {/* Utomhusstationer */}
                     {outdoorStations.map(station => {
-                      const typeConfig = EQUIPMENT_TYPE_CONFIG[station.equipment_type]
-                      const statusConfig = EQUIPMENT_STATUS_CONFIG[station.status]
+                      const typeConfig = getOutdoorTypeConfig(station.equipment_type)
+                      const statusConfig = EQUIPMENT_STATUS_CONFIG[station.status] || {
+                        bgColor: 'bg-slate-500/20',
+                        textColor: 'text-slate-400',
+                        label: station.status
+                      }
                       return (
                         <div
                           key={station.id}
@@ -234,7 +254,7 @@ export function ExpandableCustomerRow({
                         >
                           <div
                             className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: typeConfig.color + '20' }}
+                            style={{ backgroundColor: `${typeConfig.color}20` }}
                           >
                             <MapPin className="w-4 h-4" style={{ color: typeConfig.color }} />
                           </div>

@@ -828,6 +828,22 @@ export function CustomerStationsModal({
   )
 }
 
+// Hjälpfunktion för utomhusstationstyp med fallback för dynamiska typer
+function getOutdoorTypeConfig(equipmentType: string) {
+  const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipmentType as keyof typeof EQUIPMENT_TYPE_CONFIG]
+  if (legacyConfig) {
+    return {
+      color: legacyConfig.color,
+      label: legacyConfig.label
+    }
+  }
+  // Dynamisk typ - använd grå som standardfärg
+  return {
+    color: '#6b7280',
+    label: equipmentType || 'Okänd typ'
+  }
+}
+
 // Utomhusstationskort
 function OutdoorStationCard({
   station,
@@ -836,8 +852,12 @@ function OutdoorStationCard({
   station: EquipmentPlacementWithRelations
   onClick?: () => void
 }) {
-  const typeConfig = EQUIPMENT_TYPE_CONFIG[station.equipment_type]
-  const statusConfig = EQUIPMENT_STATUS_CONFIG[station.status]
+  const typeConfig = getOutdoorTypeConfig(station.equipment_type)
+  const statusConfig = EQUIPMENT_STATUS_CONFIG[station.status] || {
+    bgColor: 'bg-slate-500/20',
+    textColor: 'text-slate-400',
+    label: station.status
+  }
 
   return (
     <button
@@ -848,7 +868,7 @@ function OutdoorStationCard({
         {/* Typikon */}
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: typeConfig.color + '20' }}
+          style={{ backgroundColor: `${typeConfig.color}20` }}
         >
           <MapPin className="w-5 h-5" style={{ color: typeConfig.color }} />
         </div>

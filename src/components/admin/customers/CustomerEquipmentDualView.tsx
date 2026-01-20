@@ -23,10 +23,26 @@ interface CustomerEquipmentDualViewProps {
 }
 
 // Icons for equipment types
-const EQUIPMENT_TYPE_ICONS = {
+const EQUIPMENT_TYPE_ICONS: Record<string, React.ElementType> = {
   mechanical_trap: Crosshair,
   concrete_station: Box,
   bait_station: Target
+}
+
+// Hjälpfunktion för utomhusstationstyp med fallback för dynamiska typer
+function getTypeConfig(equipmentType: string) {
+  const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipmentType as keyof typeof EQUIPMENT_TYPE_CONFIG]
+  if (legacyConfig) {
+    return {
+      color: legacyConfig.color,
+      label: legacyConfig.label
+    }
+  }
+  // Dynamisk typ - använd grå som standardfärg
+  return {
+    color: '#6b7280',
+    label: equipmentType || 'Okänd typ'
+  }
 }
 
 export default function CustomerEquipmentDualView({
@@ -236,9 +252,12 @@ export default function CustomerEquipmentDualView({
             className="h-[300px] lg:h-[400px] overflow-y-auto p-3 space-y-2"
           >
             {equipment.map((item) => {
-              const Icon = EQUIPMENT_TYPE_ICONS[item.equipment_type as keyof typeof EQUIPMENT_TYPE_ICONS]
-              const typeConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type]
-              const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status]
+              const Icon = EQUIPMENT_TYPE_ICONS[item.equipment_type] || Box
+              const typeConfig = getTypeConfig(item.equipment_type)
+              const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status] || {
+                bgColor: 'bg-slate-500/20',
+                color: 'slate-400'
+              }
               const isSelected = selectedEquipmentId === item.id
 
               return (
