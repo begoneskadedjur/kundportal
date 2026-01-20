@@ -336,6 +336,7 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
           onImageClick={handleImageClick}
           onCancelPlacement={resetPlacementMode}
           height="calc(100vh - 250px)"
+          showNumbers={true}
         />
       ) : (
         <div className="flex-1 flex items-center justify-center">

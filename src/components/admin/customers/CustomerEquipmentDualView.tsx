@@ -238,6 +238,7 @@ export default function CustomerEquipmentDualView({
               readOnly={true}
               enableClustering={false}
               showControls={true}
+              showNumbers={true}
               onEquipmentClick={handleEquipmentClick}
             />
           </div>

@@ -210,6 +210,7 @@ export function CustomerEquipmentMap({ customerId, customerName }: CustomerEquip
             height="400px"
             readOnly
             showControls={false}
+            showNumbers={true}
           />
         </div>
       ) : (

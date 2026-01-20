@@ -343,7 +343,7 @@ export function ExpandableCustomerRow({
                     className="w-full py-2.5 mt-2 bg-emerald-500/10 text-emerald-400 rounded-lg text-sm font-medium hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-2"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    Se alla detaljer och karta
+                    Se karta & detaljer
                   </button>
                 </div>
               )}

@@ -515,6 +515,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                   showControls={true}
                   readOnly={true}
                   enableClustering={filteredEquipment.length >= 5}
+                  showNumbers={true}
                 />
               </motion.div>
             )}

@@ -22,11 +22,13 @@ export const MAX_ZOOM = 19 // Maximal zoom-nivå - OSM tiles fungerar upp till 1
  * @param type - Utrustningstyp (legacy eller dynamisk)
  * @param status - Utrustningsstatus
  * @param customColor - Valfri färg från station_types-tabellen (prioriteras över legacy-config)
+ * @param stationNumber - Valfritt nummer att visa i markören (1, 2, 3...)
  */
 export const createEquipmentIcon = (
   type: string, // Ändrat från EquipmentType till string för dynamiska typer
   status: EquipmentStatus,
-  customColor?: string // Ny parameter för dynamisk färg från station_types
+  customColor?: string, // Ny parameter för dynamisk färg från station_types
+  stationNumber?: number // Nummer att visa i markören
 ): L.DivIcon => {
   // Prioritera customColor (från station_types), sedan legacy-config, sist fallback till slate-500
   const typeConfig = EQUIPMENT_TYPE_CONFIG[type as EquipmentType]
@@ -51,16 +53,22 @@ export const createEquipmentIcon = (
     borderColor = '#ef4444' // red-500
   }
 
-  // Ikon-symbol baserat på status
-  let symbol = ''
-  if (status === 'missing') symbol = '?'
-  if (status === 'removed') symbol = '✕'
-  if (status === 'damaged') symbol = '!'
+  // Innehåll i markören: nummer om aktivt och nummer finns, annars status-symbol
+  let displayContent = ''
+  if (status === 'missing') {
+    displayContent = '?'
+  } else if (status === 'removed') {
+    displayContent = '✕'
+  } else if (status === 'damaged') {
+    displayContent = '!'
+  } else if (stationNumber !== undefined) {
+    // Aktiv station med nummer
+    displayContent = stationNumber.toString()
+  }
 
   // Visuell storlek: 28px, Touch-target: 44px (via osynlig padding)
   const visualSize = 28
   const touchSize = 44
-  const padding = (touchSize - visualSize) / 2
 
   return L.divIcon({
     className: 'equipment-marker',
@@ -85,10 +93,10 @@ export const createEquipmentIcon = (
           justify-content: center;
           color: white;
           font-weight: bold;
-          font-size: 12px;
+          font-size: ${stationNumber && stationNumber >= 100 ? '10px' : '12px'};
           text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         ">
-          ${symbol}
+          ${displayContent}
         </div>
       </div>
     `,

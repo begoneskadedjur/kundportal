@@ -46,6 +46,7 @@ interface EquipmentMapProps {
   showControls?: boolean
   readOnly?: boolean
   enableClustering?: boolean // Aktivera klustervisning för många markörer
+  showNumbers?: boolean // Visa stationsnummer (1, 2, 3...) baserat på placeringsordning
 }
 
 // Komponent för att hantera kartvy-uppdateringar
@@ -107,7 +108,8 @@ export function EquipmentMap({
   height = '400px',
   showControls = true,
   readOnly = false,
-  enableClustering = true // Aktiverat som standard
+  enableClustering = true, // Aktiverat som standard
+  showNumbers = false // Visa stationsnummer, default av
 }: EquipmentMapProps) {
   const mapRef = useRef<L.Map | null>(null)
   // State for den valda utrustningen som visas i detail-sheeten
@@ -146,6 +148,26 @@ export function EquipmentMap({
     // 3. Fallback till undefined (låt createEquipmentIcon hantera legacy/gray)
     return undefined
   }
+
+  // Skapa mappning från equipment ID till nummer (1, 2, 3...)
+  // Baserat på placed_at i stigande ordning (äldsta placering = nummer 1)
+  const equipmentNumberMap = useMemo(() => {
+    if (!showNumbers) return new Map<string, number>()
+
+    // Sortera efter placed_at ascending (äldsta först)
+    const sorted = [...equipment].sort((a, b) => {
+      const dateA = new Date(a.placed_at).getTime()
+      const dateB = new Date(b.placed_at).getTime()
+      return dateA - dateB
+    })
+
+    // Skapa mappning: ID → nummer
+    const map = new Map<string, number>()
+    sorted.forEach((item, index) => {
+      map.set(item.id, index + 1)
+    })
+    return map
+  }, [equipment, showNumbers])
 
   // Hantera klick pa en markör
   // I readOnly-läge med onEquipmentClick: Anropa bara callback (låt parent hantera UI)
@@ -311,7 +333,8 @@ export function EquipmentMap({
                 icon={createEquipmentIcon(
                   item.equipment_type,
                   item.status,
-                  getEquipmentColor(item) // Använder mappning från stationstyper
+                  getEquipmentColor(item),
+                  showNumbers ? equipmentNumberMap.get(item.id) : undefined
                 )}
                 eventHandlers={{
                   click: () => handleMarkerClick(item)
@@ -327,7 +350,8 @@ export function EquipmentMap({
               icon={createEquipmentIcon(
                 item.equipment_type,
                 item.status,
-                getEquipmentColor(item) // Använder mappning från stationstyper
+                getEquipmentColor(item),
+                showNumbers ? equipmentNumberMap.get(item.id) : undefined
               )}
               eventHandlers={{
                 click: () => handleMarkerClick(item)

@@ -18,6 +18,7 @@ interface IndoorStationMarkerProps {
   isSelected?: boolean
   onClick?: () => void
   size?: 'small' | 'medium' | 'large'
+  displayNumber?: number // Visuellt nummer att visa i markören (1, 2, 3...)
 }
 
 // Hämta typ-konfiguration - prioritera dynamisk data från DB
@@ -55,7 +56,8 @@ export function IndoorStationMarker({
   station,
   isSelected = false,
   onClick,
-  size = 'medium'
+  size = 'medium',
+  displayNumber
 }: IndoorStationMarkerProps) {
   const typeConfig = getTypeConfig(station)
   const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
@@ -138,6 +140,11 @@ export function IndoorStationMarker({
         {statusSymbol ? (
           <span className={`text-white font-bold ${iconSize[size]}`}>
             {statusSymbol}
+          </span>
+        ) : displayNumber !== undefined ? (
+          // Visa nummer om det finns (aktiv station med displayNumber)
+          <span className={`text-white font-bold ${displayNumber >= 100 ? 'text-[8px]' : iconSize[size]}`}>
+            {displayNumber}
           </span>
         ) : (
           <StationIcon iconName={typeConfig.icon} className={`text-white ${iconSize[size]}`} />

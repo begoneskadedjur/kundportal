@@ -482,6 +482,7 @@ export function CustomerStationsModal({
                                 showControls={true}
                                 readOnly={true}
                                 enableClustering={false}
+                                showNumbers={true}
                               />
                             </div>
 
@@ -571,6 +572,7 @@ export function CustomerStationsModal({
                                   onCancelPlacement={resetPlacementMode}
                                   onStationClick={(station) => onStationClick?.(station, 'indoor')}
                                   height="350px"
+                                  showNumbers={true}
                                 />
                               ) : (
                                 <div className="flex items-center justify-center h-full min-h-[300px]">
@@ -651,26 +653,36 @@ export function CustomerStationsModal({
                                                 alt={plan.name}
                                                 className="absolute inset-0 w-full h-full object-contain"
                                               />
-                                              {/* Stationsmarkörer */}
-                                              {stationsOnPlan.map(station => {
-                                                const typeInfo = getStationTypeInfo(station)
-                                                const TypeIcon = typeInfo.icon
-                                                return (
-                                                  <button
-                                                    key={station.id}
-                                                    onClick={() => onStationClick?.(station, 'indoor')}
-                                                    className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 border-2 border-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer z-10"
-                                                    style={{
-                                                      left: `${station.position_x_percent}%`,
-                                                      top: `${station.position_y_percent}%`,
-                                                      backgroundColor: typeInfo.color
-                                                    }}
-                                                    title={station.station_number || typeInfo.label}
-                                                  >
-                                                    <TypeIcon className="w-4 h-4 text-white" />
-                                                  </button>
+                                              {/* Stationsmarkörer - med numrering baserat på placeringsordning */}
+                                              {(() => {
+                                                // Sortera stationer efter placed_at (äldsta först = nummer 1)
+                                                const sortedStations = [...stationsOnPlan].sort((a, b) =>
+                                                  new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
                                                 )
-                                              })}
+                                                // Skapa mappning för nummer
+                                                const numberMap = new Map<string, number>()
+                                                sortedStations.forEach((s, idx) => numberMap.set(s.id, idx + 1))
+
+                                                return stationsOnPlan.map(station => {
+                                                  const typeInfo = getStationTypeInfo(station)
+                                                  const stationNumber = numberMap.get(station.id)
+                                                  return (
+                                                    <button
+                                                      key={station.id}
+                                                      onClick={() => onStationClick?.(station, 'indoor')}
+                                                      className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 border-2 border-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer z-10"
+                                                      style={{
+                                                        left: `${station.position_x_percent}%`,
+                                                        top: `${station.position_y_percent}%`,
+                                                        backgroundColor: typeInfo.color
+                                                      }}
+                                                      title={`#${stationNumber} - ${station.station_number || typeInfo.label}`}
+                                                    >
+                                                      <span className="text-white font-bold text-xs">{stationNumber}</span>
+                                                    </button>
+                                                  )
+                                                })
+                                              })()}
                                             </div>
                                           </div>
                                         ) : (

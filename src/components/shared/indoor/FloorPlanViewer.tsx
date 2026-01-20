@@ -1,7 +1,7 @@
 // src/components/shared/indoor/FloorPlanViewer.tsx
 // Bildvisare med zoom/pan för planritningar och stationsmarkörer
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch'
 import { ZoomIn, ZoomOut, Maximize, Move, Plus, X } from 'lucide-react'
 import type { IndoorStationWithRelations, PlacementMode, IndoorStationType } from '../../../types/indoor'
@@ -23,6 +23,7 @@ interface FloorPlanViewerProps {
   onImageClick?: (x: number, y: number) => void
   onCancelPlacement?: () => void
   height?: string
+  showNumbers?: boolean // Visa stationsnummer (1, 2, 3...) baserat på placeringsordning
 }
 
 // Hämta typkonfiguration - prioriterar dynamisk data
@@ -59,13 +60,34 @@ export function FloorPlanViewer({
   onStationClick,
   onImageClick,
   onCancelPlacement,
-  height = 'calc(100vh - 200px)'
+  height = 'calc(100vh - 200px)',
+  showNumbers = false
 }: FloorPlanViewerProps) {
   const transformRef = useRef<ReactZoomPanPinchRef>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null)
+
+  // Skapa mappning från station ID till nummer (1, 2, 3...)
+  // Baserat på placed_at i stigande ordning (äldsta placering = nummer 1)
+  const stationNumberMap = useMemo(() => {
+    if (!showNumbers) return new Map<string, number>()
+
+    // Sortera efter placed_at ascending (äldsta först)
+    const sorted = [...stations].sort((a, b) => {
+      const dateA = new Date(a.placed_at).getTime()
+      const dateB = new Date(b.placed_at).getTime()
+      return dateA - dateB
+    })
+
+    // Skapa mappning: ID → nummer
+    const map = new Map<string, number>()
+    sorted.forEach((station, index) => {
+      map.set(station.id, index + 1)
+    })
+    return map
+  }, [stations, showNumbers])
 
   // Hantera bildladdning
   const handleImageLoad = useCallback(() => {
@@ -241,6 +263,7 @@ export function FloorPlanViewer({
                 station={station}
                 isSelected={station.id === selectedStationId}
                 onClick={() => onStationClick?.(station)}
+                displayNumber={showNumbers ? stationNumberMap.get(station.id) : undefined}
               />
             ))}
 

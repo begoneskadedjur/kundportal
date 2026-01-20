@@ -284,6 +284,7 @@ export function CustomerIndoorEquipmentView({
             previewPosition={null}
             onStationClick={handleStationClick}
             height="500px"
+            showNumbers={true}
           />
         </div>
       ) : (
