@@ -133,9 +133,17 @@ export interface InspectionSessionWithRelations extends StationInspectionSession
 export interface OutdoorInspectionWithRelations extends OutdoorStationInspection {
   station?: {
     id: string
-    station_number: string | null
-    station_type: string | null
-    equipment_type_code: string | null
+    serial_number: string | null
+    station_type_id: string | null
+    equipment_type: string | null
+    station_type_data?: {
+      id: string
+      code: string
+      name: string
+      color: string
+      measurement_unit: string
+      measurement_label: string | null
+    }
   }
   technician?: {
     id: string

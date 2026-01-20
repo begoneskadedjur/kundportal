@@ -208,7 +208,30 @@ export interface IndoorStationInspectionWithRelations extends IndoorStationInspe
     id: string;
     name: string;
   };
+  station?: {
+    id: string;
+    station_number: string | null;
+    station_type: string;
+    station_type_id: string | null;
+    floor_plan?: {
+      id: string;
+      name: string;
+      building_name: string | null;
+    };
+    station_type_data?: {
+      id: string;
+      code: string;
+      name: string;
+      color: string;
+      measurement_unit: string;
+      measurement_label: string | null;
+    };
+  };
   photo_url?: string; // Signed URL from storage
+  // Utökade fält för visning
+  measurement_value?: number | null;
+  measurement_unit?: string | null;
+  session_id?: string | null;
 }
 
 // ============================================

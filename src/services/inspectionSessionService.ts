@@ -332,6 +332,7 @@ export async function completeInspectionSession(
 
 /**
  * Hämta utomhusinspektioner för en session
+ * Inkluderar station och stationstyp för fullständig visning
  */
 export async function getOutdoorInspectionsForSession(
   sessionId: string
@@ -340,7 +341,13 @@ export async function getOutdoorInspectionsForSession(
     .from('outdoor_station_inspections')
     .select(`
       *,
-      station:equipment_placements(id, serial_number, station_type_id, equipment_type),
+      station:equipment_placements(
+        id,
+        serial_number,
+        station_type_id,
+        equipment_type,
+        station_type_data:station_types(id, code, name, color, measurement_unit, measurement_label)
+      ),
       technician:technicians(id, name)
     `)
     .eq('session_id', sessionId)
@@ -415,6 +422,7 @@ export async function getLatestOutdoorInspection(
 
 /**
  * Hämta inomhusinspektioner för en session
+ * Inkluderar station, planritning och stationstyp för fullständig visning
  */
 export async function getIndoorInspectionsForSession(
   sessionId: string
@@ -423,7 +431,15 @@ export async function getIndoorInspectionsForSession(
     .from('indoor_station_inspections')
     .select(`
       *,
-      technician:technicians(id, name)
+      technician:technicians(id, name),
+      station:indoor_stations(
+        id,
+        station_number,
+        station_type,
+        station_type_id,
+        floor_plan:floor_plans(id, name, building_name),
+        station_type_data:station_types(id, code, name, color, measurement_unit, measurement_label)
+      )
     `)
     .eq('session_id', sessionId)
     .order('inspected_at', { ascending: false })

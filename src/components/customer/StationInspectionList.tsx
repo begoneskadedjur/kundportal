@@ -28,14 +28,18 @@ type InspectionItem = {
   id: string
   stationId: string
   stationNumber: string | null
-  stationType: string
+  stationTypeName: string // Riktigt namn från station_types (t.ex. "Betongstation")
+  stationTypeCode: string // Kod för fallback (t.ex. "betongstation")
   location: 'outdoor' | 'indoor'
+  floorPlanId?: string
   floorPlanName?: string
+  buildingName?: string
   status: InspectionStatus
   findings: string | null
   photoUrl: string | null
   measurementValue: number | null
   measurementUnit: string | null
+  measurementLabel: string | null // Etikett från station_types (t.ex. "Förbrukning (g)")
   inspectedAt: string
 }
 
@@ -96,35 +100,48 @@ export function StationInspectionList({
 
     // Lägg till utomhusinspektioner
     outdoorInspections.forEach(inspection => {
+      const station = inspection.station
+      const stationTypeData = station?.station_type_data
+
       items.push({
         id: inspection.id,
         stationId: inspection.station_id,
-        stationNumber: (inspection.station as any)?.serial_number || null,
-        stationType: (inspection.station as any)?.equipment_type || 'Utomhusstation',
+        stationNumber: station?.serial_number || null,
+        stationTypeName: stationTypeData?.name || 'Utomhusstation',
+        stationTypeCode: station?.equipment_type || 'outdoor',
         location: 'outdoor',
         status: inspection.status,
         findings: inspection.findings,
         photoUrl: inspection.photo_url || null,
         measurementValue: inspection.measurement_value,
         measurementUnit: inspection.measurement_unit,
+        measurementLabel: stationTypeData?.measurement_label || null,
         inspectedAt: inspection.inspected_at
       })
     })
 
     // Lägg till inomhusinspektioner
     indoorInspections.forEach(inspection => {
+      const station = inspection.station
+      const stationTypeData = station?.station_type_data
+      const floorPlan = station?.floor_plan
+
       items.push({
         id: inspection.id,
         stationId: inspection.station_id,
-        stationNumber: (inspection.station as any)?.station_number || null,
-        stationType: (inspection.station as any)?.station_type || 'Inomhusstation',
+        stationNumber: station?.station_number || null,
+        stationTypeName: stationTypeData?.name || 'Inomhusstation',
+        stationTypeCode: station?.station_type || 'indoor',
         location: 'indoor',
-        floorPlanName: (inspection.station as any)?.floor_plan?.name,
+        floorPlanId: floorPlan?.id,
+        floorPlanName: floorPlan?.name,
+        buildingName: floorPlan?.building_name || undefined,
         status: inspection.status,
         findings: inspection.findings,
         photoUrl: inspection.photo_url || null,
         measurementValue: inspection.measurement_value,
         measurementUnit: inspection.measurement_unit,
+        measurementLabel: stationTypeData?.measurement_label || null,
         inspectedAt: inspection.inspected_at
       })
     })
@@ -146,9 +163,10 @@ export function StationInspectionList({
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
         const matchesNumber = item.stationNumber?.toLowerCase().includes(query)
-        const matchesType = item.stationType.toLowerCase().includes(query)
+        const matchesType = item.stationTypeName.toLowerCase().includes(query)
         const matchesFloorPlan = item.floorPlanName?.toLowerCase().includes(query)
-        if (!matchesNumber && !matchesType && !matchesFloorPlan) return false
+        const matchesBuilding = item.buildingName?.toLowerCase().includes(query)
+        if (!matchesNumber && !matchesType && !matchesFloorPlan && !matchesBuilding) return false
       }
       return true
     })
@@ -171,7 +189,7 @@ export function StationInspectionList({
       .filter(item => item.photoUrl)
       .map(item => ({
         url: item.photoUrl!,
-        stationNumber: item.stationNumber || formatStationType(item.stationType),
+        stationNumber: item.stationNumber || item.stationTypeName,
         stationType: item.location,
         status: item.status,
         inspectedAt: item.inspectedAt,
@@ -197,16 +215,32 @@ export function StationInspectionList({
     })
   }
 
-  // Formatera stationstyp
-  const formatStationType = (type: string): string => {
-    const typeMap: Record<string, string> = {
-      mechanical_trap: 'Mekanisk fälla',
-      concrete_station: 'Betongstation',
-      bait_station: 'Betesstation',
-      rattrap: 'Råttfälla',
-      mousetrap: 'Musfälla'
+  // Bygg stationsnamn för visning: [Nummer] Typ (Planritning/Utomhus)
+  const getStationDisplayName = (item: InspectionItem): string => {
+    const parts: string[] = []
+
+    // Lägg till nummer om det finns
+    if (item.stationNumber) {
+      parts.push(item.stationNumber)
     }
-    return typeMap[type] || type
+
+    // Lägg till typnamn
+    parts.push(item.stationTypeName)
+
+    return parts.join(' - ')
+  }
+
+  // Bygg platsinfo
+  const getLocationInfo = (item: InspectionItem): string => {
+    if (item.location === 'outdoor') {
+      return 'Utomhus'
+    }
+    if (item.floorPlanName) {
+      return item.buildingName
+        ? `${item.buildingName} - ${item.floorPlanName}`
+        : item.floorPlanName
+    }
+    return 'Inomhus'
   }
 
   if (allInspections.length === 0) {
@@ -306,7 +340,7 @@ export function StationInspectionList({
                   <div className="flex-grow min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-medium text-white">
-                        {item.stationNumber || formatStationType(item.stationType)}
+                        {getStationDisplayName(item)}
                       </h4>
                       <StatusBadge status={item.status} />
                     </div>
@@ -319,7 +353,7 @@ export function StationInspectionList({
                       ) : (
                         <span className="flex items-center gap-1">
                           <Home className="w-3.5 h-3.5" />
-                          {item.floorPlanName || 'Inomhus'}
+                          {getLocationInfo(item)}
                         </span>
                       )}
                       <span className="text-slate-500">•</span>
@@ -374,7 +408,9 @@ export function StationInspectionList({
                               <Ruler className="w-4 h-4 text-teal-400" />
                             </div>
                             <div>
-                              <p className="text-xs text-slate-500 uppercase tracking-wide">Mätvärde</p>
+                              <p className="text-xs text-slate-500 uppercase tracking-wide">
+                                {item.measurementLabel || 'Mätvärde'}
+                              </p>
                               <p className="text-white font-medium">
                                 {item.measurementValue} {item.measurementUnit || 'st'}
                               </p>
