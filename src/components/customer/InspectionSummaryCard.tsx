@@ -24,12 +24,14 @@ export function InspectionSummaryCard({
   // Hämta teknikernamn - hantera olika format från Supabase
   const getTechnicianName = (): string => {
     const tech = session.technician
-    if (!tech) return 'Tekniker'
+    // Debug: logga vad vi får
+    console.log('Session technician data:', tech, 'Full session:', session)
+    if (!tech) return 'Okänd tekniker'
     // Supabase kan returnera antingen objekt direkt eller som array med ett element
     if (Array.isArray(tech)) {
-      return tech[0]?.name || 'Tekniker'
+      return tech[0]?.name || 'Okänd tekniker'
     }
-    return tech.name || 'Tekniker'
+    return tech.name || 'Okänd tekniker'
   }
   const technicianName = getTechnicianName()
 
