@@ -216,10 +216,30 @@ export default function StationInspectionModule() {
     return floorPlans.find(fp => fp.id === selectedFloorPlanId)
   }, [selectedFloorPlanId, floorPlans])
 
-  const floorPlanImageUrl = useMemo(() => {
-    if (!currentFloorPlan?.image_path) return ''
-    const { data } = supabase.storage.from('floor-plans').getPublicUrl(currentFloorPlan.image_path)
-    return data?.publicUrl || ''
+  const [floorPlanImageUrl, setFloorPlanImageUrl] = useState<string>('')
+
+  // Hämta signerad URL för planritning
+  useEffect(() => {
+    async function fetchSignedUrl() {
+      if (!currentFloorPlan?.image_path) {
+        setFloorPlanImageUrl('')
+        return
+      }
+
+      const { data, error } = await supabase.storage
+        .from('floor-plans')
+        .createSignedUrl(currentFloorPlan.image_path, 3600) // 1 timme
+
+      if (error) {
+        console.error('Fel vid hämtning av signerad URL:', error)
+        setFloorPlanImageUrl('')
+        return
+      }
+
+      setFloorPlanImageUrl(data.signedUrl)
+    }
+
+    fetchSignedUrl()
   }, [currentFloorPlan])
 
   // Filtrera inomhusstationer för vald planritning

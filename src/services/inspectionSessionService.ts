@@ -300,11 +300,13 @@ export async function createIndoorInspection(
 
 /**
  * Hämta alla utomhusstationer för en kund
+ * Matchar equipment_type mot station_types.code för att hämta mätfält
  */
 export async function getOutdoorStationsForCustomer(
   customerId: string
 ): Promise<any[]> {
-  const { data, error } = await supabase
+  // Hämta stationer
+  const { data: stations, error } = await supabase
     .from('equipment_placements')
     .select(`
       *,
@@ -320,11 +322,33 @@ export async function getOutdoorStationsForCustomer(
     return []
   }
 
-  return data || []
+  // Hämta alla station_types för att matcha equipment_type → code
+  const { data: stationTypes } = await supabase
+    .from('station_types')
+    .select('*')
+    .eq('is_active', true)
+
+  // Skapa map för snabb lookup
+  const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
+
+  // Berika stationer med station_type_data om den saknas (fallback på equipment_type)
+  return (stations || []).map(station => {
+    // Om station_type_data redan finns via foreign key, använd den
+    if (station.station_type_data) {
+      return station
+    }
+    // Annars matcha equipment_type mot station_types.code
+    const matchedType = typesByCode.get(station.equipment_type)
+    return {
+      ...station,
+      station_type_data: matchedType || null
+    }
+  })
 }
 
 /**
  * Hämta alla inomhusstationer för en kund (via floor_plans)
+ * Matchar station_type mot station_types.code för att hämta mätfält
  */
 export async function getIndoorStationsForCustomer(
   customerId: string
@@ -343,7 +367,7 @@ export async function getIndoorStationsForCustomer(
   const floorPlanIds = floorPlans.map(fp => fp.id)
 
   // Hämta stationer för dessa planritningar
-  const { data, error } = await supabase
+  const { data: stations, error } = await supabase
     .from('indoor_stations')
     .select(`
       *,
@@ -360,7 +384,28 @@ export async function getIndoorStationsForCustomer(
     return []
   }
 
-  return data as IndoorStationWithRelations[]
+  // Hämta alla station_types för att matcha station_type → code
+  const { data: stationTypes } = await supabase
+    .from('station_types')
+    .select('*')
+    .eq('is_active', true)
+
+  // Skapa map för snabb lookup
+  const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
+
+  // Berika stationer med station_type_data om den saknas (fallback på station_type)
+  return (stations || []).map(station => {
+    // Om station_type_data redan finns via foreign key, använd den
+    if (station.station_type_data) {
+      return station
+    }
+    // Annars matcha station_type mot station_types.code
+    const matchedType = typesByCode.get(station.station_type)
+    return {
+      ...station,
+      station_type_data: matchedType || null
+    }
+  }) as IndoorStationWithRelations[]
 }
 
 /**
