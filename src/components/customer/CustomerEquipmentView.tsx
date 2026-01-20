@@ -45,7 +45,7 @@ interface CustomerEquipmentViewProps {
 }
 
 // Ikon-komponent baserat pa utrustningstyp
-function EquipmentTypeIcon({ type, className = "w-5 h-5" }: { type: EquipmentType; className?: string }) {
+function EquipmentTypeIcon({ type, className = "w-5 h-5" }: { type: string; className?: string }) {
   switch (type) {
     case 'mechanical_trap':
       return <Crosshair className={className} />
@@ -55,6 +55,22 @@ function EquipmentTypeIcon({ type, className = "w-5 h-5" }: { type: EquipmentTyp
       return <Target className={className} />
     default:
       return <Box className={className} />
+  }
+}
+
+// Hjälpfunktion för att hämta typkonfiguration med fallback för dynamiska typer
+function getTypeConfig(equipmentType: string) {
+  const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipmentType]
+  if (legacyConfig) {
+    return {
+      color: legacyConfig.color,
+      label: legacyConfig.label
+    }
+  }
+  // Dynamisk typ - använd grå som standardfärg
+  return {
+    color: '#6b7280',
+    label: equipmentType || 'Okänd typ'
   }
 }
 
@@ -508,8 +524,13 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
               <div className="space-y-4">
                 <AnimatePresence>
                   {filteredEquipment.map((item, index) => {
-                    const typeConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type]
-                    const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status]
+                    const typeConfig = getTypeConfig(item.equipment_type)
+                    const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status] || {
+                      bgColor: 'bg-slate-500/20',
+                      borderColor: 'border-slate-500/30',
+                      color: 'slate-400',
+                      label: 'Okänd'
+                    }
                     const isExpanded = expandedId === item.id
 
                     return (

@@ -28,6 +28,23 @@ import {
 } from '../../../types/database'
 import { formatCoordinates, openInMapsApp } from '../../../utils/equipmentMapUtils'
 
+// Hjälpfunktion för att hämta typkonfiguration med fallback för dynamiska typer
+function getTypeConfig(equipment: EquipmentPlacementWithRelations) {
+  // Försök hämta från legacy-config först
+  const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipment.equipment_type]
+  if (legacyConfig) {
+    return {
+      color: legacyConfig.color,
+      label: legacyConfig.label
+    }
+  }
+  // Dynamisk typ - använd grå som standardfärg
+  return {
+    color: '#6b7280', // slate-500 som fallback
+    label: equipment.equipment_type || 'Okänd typ'
+  }
+}
+
 interface EquipmentDetailSheetProps {
   equipment: EquipmentPlacementWithRelations | null
   isOpen: boolean
@@ -103,8 +120,12 @@ export function EquipmentDetailSheet({
 
   if (!equipment) return null
 
-  const typeConfig = EQUIPMENT_TYPE_CONFIG[equipment.equipment_type]
-  const statusConfig = EQUIPMENT_STATUS_CONFIG[equipment.status]
+  const typeConfig = getTypeConfig(equipment)
+  const statusConfig = EQUIPMENT_STATUS_CONFIG[equipment.status] || {
+    bgColor: 'bg-slate-500/20',
+    borderColor: 'border-slate-500/30',
+    color: 'slate-400'
+  }
   const customerName = (equipment.customer as { company_name?: string } | undefined)?.company_name
 
   // Formatera datum

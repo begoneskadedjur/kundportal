@@ -38,10 +38,26 @@ interface EquipmentListProps {
   showFilters?: boolean
 }
 
-const EQUIPMENT_TYPE_ICONS = {
+const EQUIPMENT_TYPE_ICONS: Record<string, React.ElementType> = {
   mechanical_trap: Crosshair,
   concrete_station: Box,
   bait_station: Target
+}
+
+// Hjälpfunktion för att hämta typkonfiguration med fallback för dynamiska typer
+function getTypeConfig(equipmentType: string) {
+  const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipmentType]
+  if (legacyConfig) {
+    return {
+      color: legacyConfig.color,
+      label: legacyConfig.label
+    }
+  }
+  // Dynamisk typ - använd grå som standardfärg
+  return {
+    color: '#6b7280',
+    label: equipmentType || 'Okänd typ'
+  }
 }
 
 export function EquipmentList({
@@ -157,9 +173,12 @@ export function EquipmentList({
       <div className="space-y-3">
         <AnimatePresence>
           {filteredEquipment.map((item) => {
-            const Icon = EQUIPMENT_TYPE_ICONS[item.equipment_type]
-            const typeConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type]
-            const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status]
+            const Icon = EQUIPMENT_TYPE_ICONS[item.equipment_type] || Box
+            const typeConfig = getTypeConfig(item.equipment_type)
+            const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status] || {
+              bgColor: 'bg-slate-500/20',
+              color: 'slate-400'
+            }
             const isExpanded = expandedId === item.id
 
             return (
