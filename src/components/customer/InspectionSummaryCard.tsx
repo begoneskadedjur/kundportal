@@ -20,7 +20,18 @@ export function InspectionSummaryCard({
   onViewDetails
 }: InspectionSummaryCardProps) {
   const totalInspected = session.inspected_outdoor_stations + session.inspected_indoor_stations
-  const technicianName = (session.technician as any)?.name || 'Tekniker'
+
+  // Hämta teknikernamn - hantera olika format från Supabase
+  const getTechnicianName = (): string => {
+    const tech = session.technician
+    if (!tech) return 'Tekniker'
+    // Supabase kan returnera antingen objekt direkt eller som array med ett element
+    if (Array.isArray(tech)) {
+      return tech[0]?.name || 'Tekniker'
+    }
+    return tech.name || 'Tekniker'
+  }
+  const technicianName = getTechnicianName()
 
   // Formatera datum
   const formatDate = (dateStr: string | null) => {
