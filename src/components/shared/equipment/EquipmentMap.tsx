@@ -21,6 +21,8 @@ import {
   formatCoordinates,
   MARKER_CSS
 } from '../../../utils/equipmentMapUtils'
+import { StationTypeService } from '../../../services/stationTypeService'
+import type { StationType } from '../../../types/stationTypes'
 import { Navigation } from 'lucide-react'
 import { EquipmentDetailSheet } from './EquipmentDetailSheet'
 
@@ -111,6 +113,39 @@ export function EquipmentMap({
   // State for den valda utrustningen som visas i detail-sheeten
   const [selectedEquipmentData, setSelectedEquipmentData] = useState<EquipmentPlacementWithRelations | null>(null)
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
+
+  // Hämta stationstyper för att kunna matcha equipment_type → färg
+  const [stationTypes, setStationTypes] = useState<StationType[]>([])
+
+  useEffect(() => {
+    StationTypeService.getActiveStationTypes()
+      .then(types => setStationTypes(types))
+      .catch(err => console.error('Kunde inte hämta stationstyper:', err))
+  }, [])
+
+  // Skapa mappning från equipment_type (code) → färg
+  const typeColorMap = useMemo(() => {
+    const map = new Map<string, { color: string; name: string }>()
+    stationTypes.forEach(type => {
+      map.set(type.code, { color: type.color, name: type.name })
+    })
+    return map
+  }, [stationTypes])
+
+  // Hjälpfunktion för att hämta rätt färg för en utrustning
+  const getEquipmentColor = (item: EquipmentPlacementWithRelations): string | undefined => {
+    // 1. Prioritera station_type_data om det finns (via foreign key)
+    if (item.station_type_data?.color) {
+      return item.station_type_data.color
+    }
+    // 2. Matcha equipment_type mot station_types.code
+    const typeData = typeColorMap.get(item.equipment_type)
+    if (typeData?.color) {
+      return typeData.color
+    }
+    // 3. Fallback till undefined (låt createEquipmentIcon hantera legacy/gray)
+    return undefined
+  }
 
   // Hantera klick pa en markör
   // I readOnly-läge med onEquipmentClick: Anropa bara callback (låt parent hantera UI)
@@ -231,21 +266,21 @@ export function EquipmentMap({
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maxZoom={19}
+              maxZoom={MAX_ZOOM}
             />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Satellit">
             <TileLayer
               attribution='&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              maxZoom={20}
+              maxZoom={MAX_ZOOM}
             />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Hybrid">
             <TileLayer
               attribution='&copy; Esri'
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              maxZoom={20}
+              maxZoom={MAX_ZOOM}
             />
           </LayersControl.BaseLayer>
         </LayersControl>
@@ -276,7 +311,7 @@ export function EquipmentMap({
                 icon={createEquipmentIcon(
                   item.equipment_type,
                   item.status,
-                  item.station_type_data?.color // Dynamisk färg från station_types
+                  getEquipmentColor(item) // Använder mappning från stationstyper
                 )}
                 eventHandlers={{
                   click: () => handleMarkerClick(item)
@@ -292,7 +327,7 @@ export function EquipmentMap({
               icon={createEquipmentIcon(
                 item.equipment_type,
                 item.status,
-                item.station_type_data?.color // Dynamisk färg från station_types
+                getEquipmentColor(item) // Använder mappning från stationstyper
               )}
               eventHandlers={{
                 click: () => handleMarkerClick(item)
@@ -363,20 +398,21 @@ export function EquipmentMap({
           {/* Bygg legend dynamiskt från faktisk utrustning på kartan */}
           {(() => {
             // Samla unika typer med deras färger och etiketter
-            const typeMap = new Map<string, { color: string; label: string }>()
+            const legendMap = new Map<string, { color: string; label: string }>()
             equipment.forEach(item => {
-              if (!typeMap.has(item.equipment_type)) {
-                // Prioritera dynamisk data, sedan legacy-config, sist fallback
+              if (!legendMap.has(item.equipment_type)) {
+                // Prioritera: station_type_data → typeColorMap (från DB) → legacy-config → fallback
                 const dynamicData = item.station_type_data
+                const mappedData = typeColorMap.get(item.equipment_type)
                 const legacyConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]
-                typeMap.set(item.equipment_type, {
-                  color: dynamicData?.color || legacyConfig?.color || '#6b7280',
-                  label: dynamicData?.name || legacyConfig?.label || item.equipment_type
+                legendMap.set(item.equipment_type, {
+                  color: dynamicData?.color || mappedData?.color || legacyConfig?.color || '#6b7280',
+                  label: dynamicData?.name || mappedData?.name || legacyConfig?.label || item.equipment_type
                 })
               }
             })
             // Om inga stationer finns, visa legacy-typer som fallback
-            if (typeMap.size === 0) {
+            if (legendMap.size === 0) {
               return Object.entries(EQUIPMENT_TYPE_CONFIG).map(([key, config]) => (
                 <div key={key} className="flex items-center gap-2">
                   <div
@@ -388,7 +424,7 @@ export function EquipmentMap({
               ))
             }
             // Visa typer som finns på kartan
-            return Array.from(typeMap.entries()).map(([key, { color, label }]) => (
+            return Array.from(legendMap.entries()).map(([key, { color, label }]) => (
               <div key={key} className="flex items-center gap-2">
                 <div
                   className="w-3 h-3 rounded-full"

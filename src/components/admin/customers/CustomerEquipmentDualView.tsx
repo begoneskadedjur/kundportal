@@ -29,19 +29,27 @@ const EQUIPMENT_TYPE_ICONS: Record<string, React.ElementType> = {
   bait_station: Target
 }
 
-// Hjälpfunktion för utomhusstationstyp med fallback för dynamiska typer
-function getTypeConfig(equipmentType: string) {
-  const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipmentType as keyof typeof EQUIPMENT_TYPE_CONFIG]
+// Hjälpfunktion för utomhusstationstyp - använder station_type_data om tillgänglig
+function getTypeConfig(item: EquipmentPlacementWithRelations) {
+  // Prioritera dynamisk data från station_type_data
+  if (item.station_type_data) {
+    return {
+      color: item.station_type_data.color,
+      label: item.station_type_data.name
+    }
+  }
+  // Fallback till legacy-config
+  const legacyConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]
   if (legacyConfig) {
     return {
       color: legacyConfig.color,
       label: legacyConfig.label
     }
   }
-  // Dynamisk typ - använd grå som standardfärg
+  // Sista fallback - grå
   return {
     color: '#6b7280',
-    label: equipmentType || 'Okänd typ'
+    label: item.equipment_type || 'Okänd typ'
   }
 }
 
@@ -253,7 +261,7 @@ export default function CustomerEquipmentDualView({
           >
             {equipment.map((item) => {
               const Icon = EQUIPMENT_TYPE_ICONS[item.equipment_type] || Box
-              const typeConfig = getTypeConfig(item.equipment_type)
+              const typeConfig = getTypeConfig(item)
               const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status] || {
                 bgColor: 'bg-slate-500/20',
                 color: 'slate-400'

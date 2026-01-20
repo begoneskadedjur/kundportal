@@ -11,7 +11,7 @@ import {
 export const SWEDEN_CENTER: [number, number] = [59.3293, 18.0686]
 export const DEFAULT_ZOOM = 6
 export const DETAIL_ZOOM = 16 // Zoom-nivå när man fokuserar på en position (visar kvarter/hus utan tile-problem)
-export const MAX_ZOOM = 20 // Maximal zoom-nivå för detaljerat arbete
+export const MAX_ZOOM = 18 // Maximal zoom-nivå - OSM tiles fungerar säkert upp till 18
 
 /**
  * Skapa anpassad ikon för utrustningsmarkör

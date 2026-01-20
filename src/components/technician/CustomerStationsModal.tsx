@@ -828,19 +828,27 @@ export function CustomerStationsModal({
   )
 }
 
-// Hjälpfunktion för utomhusstationstyp med fallback för dynamiska typer
-function getOutdoorTypeConfig(equipmentType: string) {
-  const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipmentType as keyof typeof EQUIPMENT_TYPE_CONFIG]
+// Hjälpfunktion för utomhusstationstyp - använder station_type_data om tillgänglig
+function getOutdoorTypeConfig(station: EquipmentPlacementWithRelations) {
+  // Prioritera dynamisk data från station_type_data
+  if (station.station_type_data) {
+    return {
+      color: station.station_type_data.color,
+      label: station.station_type_data.name
+    }
+  }
+  // Fallback till legacy-config
+  const legacyConfig = EQUIPMENT_TYPE_CONFIG[station.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]
   if (legacyConfig) {
     return {
       color: legacyConfig.color,
       label: legacyConfig.label
     }
   }
-  // Dynamisk typ - använd grå som standardfärg
+  // Sista fallback - grå
   return {
     color: '#6b7280',
-    label: equipmentType || 'Okänd typ'
+    label: station.equipment_type || 'Okänd typ'
   }
 }
 
@@ -852,7 +860,7 @@ function OutdoorStationCard({
   station: EquipmentPlacementWithRelations
   onClick?: () => void
 }) {
-  const typeConfig = getOutdoorTypeConfig(station.equipment_type)
+  const typeConfig = getOutdoorTypeConfig(station)
   const statusConfig = EQUIPMENT_STATUS_CONFIG[station.status] || {
     bgColor: 'bg-slate-500/20',
     textColor: 'text-slate-400',

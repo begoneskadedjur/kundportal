@@ -310,12 +310,14 @@ export function MapLocationPicker({
         <MapContainer
           center={initialPosition ? [initialPosition.lat, initialPosition.lng] : SWEDEN_CENTER}
           zoom={initialPosition ? DETAIL_ZOOM : DEFAULT_ZOOM}
+          maxZoom={18}
           style={{ height: '100%', width: '100%' }}
           className="z-0"
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maxZoom={18}
           />
 
           <MapClickHandler onMapClick={handleMapClick} />
