@@ -249,29 +249,29 @@ export default function StationInspectionModule() {
   }, [indoorStations, selectedFloorPlanId])
 
   // Skapa nummermappning för outdoor stationer (baserat på placed_at, äldsta = 1)
-  const outdoorNumberMap = useMemo(() => {
+  const outdoorNumberMap = useMemo((): Record<string, number> => {
     const sorted = [...outdoorStations].sort((a, b) => {
       const dateA = new Date(a.placed_at || 0).getTime()
       const dateB = new Date(b.placed_at || 0).getTime()
       return dateA - dateB
     })
-    const map = new Map<string, number>()
+    const map: Record<string, number> = {}
     sorted.forEach((station, index) => {
-      map.set(station.id, index + 1)
+      map[station.id] = index + 1
     })
     return map
   }, [outdoorStations])
 
   // Skapa nummermappning för indoor stationer per planritning (baserat på placed_at)
-  const indoorNumberMap = useMemo(() => {
+  const indoorNumberMap = useMemo((): Record<string, number> => {
     const sorted = [...filteredIndoorStations].sort((a, b) => {
       const dateA = new Date(a.placed_at || 0).getTime()
       const dateB = new Date(b.placed_at || 0).getTime()
       return dateA - dateB
     })
-    const map = new Map<string, number>()
+    const map: Record<string, number> = {}
     sorted.forEach((station, index) => {
-      map.set(station.id, index + 1)
+      map[station.id] = index + 1
     })
     return map
   }, [filteredIndoorStations])
@@ -776,7 +776,7 @@ export default function StationInspectionModule() {
                 <div className="space-y-3">
                   {outdoorStations.map((station) => {
                     const isInspected = inspectedStationIds.has(station.id)
-                    const stationNumber = outdoorNumberMap.get(station.id) || '?'
+                    const stationNumber = outdoorNumberMap[station.id] || '?'
                     const typeName = station.station_type_data?.name || station.equipment_type || station.station_type
 
                     return (
@@ -878,7 +878,7 @@ export default function StationInspectionModule() {
                   </p>
                   {filteredIndoorStations.map((station) => {
                     const isInspected = inspectedStationIds.has(station.id)
-                    const stationNumber = indoorNumberMap.get(station.id) || '?'
+                    const stationNumber = indoorNumberMap[station.id] || '?'
                     const typeName = station.station_type_data?.name || station.station_type
 
                     return (
@@ -946,7 +946,7 @@ export default function StationInspectionModule() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-xl font-bold text-white">
-                    Station {outdoorNumberMap.get(selectedStation.id) || indoorNumberMap.get(selectedStation.id) || '?'}
+                    Station {outdoorNumberMap[selectedStation.id] || indoorNumberMap[selectedStation.id] || '?'}
                   </h2>
                   <p className="text-slate-400">
                     {selectedStation.station_type_data?.name || selectedStation.equipment_type || selectedStation.station_type}
