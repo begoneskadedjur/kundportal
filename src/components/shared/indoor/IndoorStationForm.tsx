@@ -15,7 +15,16 @@ import {
 } from '../../../types/indoor'
 import { MAX_STATION_PHOTO_SIZE, ALLOWED_PHOTO_TYPES } from '../../../services/indoorStationService'
 import { StationTypeService } from '../../../services/stationTypeService'
-import { StationType } from '../../../types/stationTypes'
+import type { StationType } from '../../../types/stationTypes'
+
+// Ikon-mappning för stationstyper från DB
+const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
+  target: Target,
+  box: Box,
+  package: Package,
+  crosshair: Crosshair,
+  circle: Circle
+}
 
 interface IndoorStationFormProps {
   floorPlanId: string
@@ -38,9 +47,13 @@ export function IndoorStationForm({
 }: IndoorStationFormProps) {
   const isEditing = !!existingStation
 
+  // Dynamiska stationstyper från DB
+  const [dynamicStationTypes, setDynamicStationTypes] = useState<StationType[]>([])
+  const [loadingTypes, setLoadingTypes] = useState(true)
+
   // Form state
   const [stationType, setStationType] = useState<IndoorStationType>(
-    existingStation?.station_type || 'mechanical_trap'
+    existingStation?.station_type || ''
   )
   const [stationNumber, setStationNumber] = useState(existingStation?.station_number || '')
   const [locationDescription, setLocationDescription] = useState(existingStation?.location_description || '')
@@ -51,11 +64,55 @@ export function IndoorStationForm({
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Hämta dynamiska stationstyper vid mount
+  useEffect(() => {
+    const loadStationTypes = async () => {
+      try {
+        const types = await StationTypeService.getActiveStationTypes()
+        setDynamicStationTypes(types)
+        // Sätt default-typ till första om ingen är vald och vi skapar ny
+        if (!isEditing && !stationType && types.length > 0) {
+          setStationType(types[0].code)
+        }
+      } catch (err) {
+        console.error('Fel vid hämtning av stationstyper:', err)
+      } finally {
+        setLoadingTypes(false)
+      }
+    }
+    loadStationTypes()
+  }, [isEditing])
+
+  // Hämta aktuell stationstyp-config (dynamisk eller legacy)
+  const getCurrentTypeConfig = (typeCode: string) => {
+    const dynamicType = dynamicStationTypes.find(t => t.code === typeCode)
+    if (dynamicType) {
+      return {
+        label: dynamicType.name,
+        color: dynamicType.color,
+        prefix: dynamicType.prefix,
+        requiresSerialNumber: dynamicType.requires_serial_number,
+        icon: dynamicType.icon
+      }
+    }
+    // Fallback till legacy-config
+    const legacyConfig = INDOOR_STATION_TYPE_CONFIG[typeCode]
+    if (legacyConfig) {
+      return {
+        ...legacyConfig,
+        icon: typeCode === 'mechanical_trap' ? 'crosshair' :
+              typeCode === 'concrete_station' ? 'box' : 'target'
+      }
+    }
+    return null
+  }
+
   // Auto-generera stationsnummer när typ ändras (bara för nya stationer)
   const handleTypeChange = (type: IndoorStationType) => {
     setStationType(type)
-    if (!isEditing && !stationNumber) {
-      const suggested = generateStationNumber(type, existingStationNumbers)
+    if (!isEditing) {
+      const config = getCurrentTypeConfig(type)
+      const suggested = generateStationNumber(type, existingStationNumbers, config?.prefix)
       setStationNumber(suggested)
     }
   }
@@ -95,10 +152,10 @@ export function IndoorStationForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validera serienummer för mekaniska fällor
-    const config = INDOOR_STATION_TYPE_CONFIG[stationType]
-    if (config.requiresSerialNumber && !stationNumber.trim()) {
-      setError('Serienummer krävs för mekaniska fällor')
+    // Validera serienummer
+    const config = getCurrentTypeConfig(stationType)
+    if (config?.requiresSerialNumber && !stationNumber.trim()) {
+      setError(`Serienummer krävs för ${config.label}`)
       return
     }
 
@@ -131,12 +188,21 @@ export function IndoorStationForm({
     }
   }
 
-  // Ikon-mappning för stationstyper
-  const TYPE_ICONS: Record<IndoorStationType, React.ElementType> = {
-    mechanical_trap: Crosshair,
-    concrete_station: Box,
-    bait_station: Target
-  }
+  // Aktuell typ-config för formulärvalidering
+  const currentTypeConfig = getCurrentTypeConfig(stationType)
+
+  // Bestäm vilka typer som ska visas (dynamiska om tillgängliga, annars legacy)
+  const typesToRender = dynamicStationTypes.length > 0
+    ? dynamicStationTypes
+    : Object.keys(INDOOR_STATION_TYPE_CONFIG).map(code => ({
+        code,
+        name: INDOOR_STATION_TYPE_CONFIG[code].label,
+        color: INDOOR_STATION_TYPE_CONFIG[code].color,
+        prefix: INDOOR_STATION_TYPE_CONFIG[code].prefix,
+        requires_serial_number: INDOOR_STATION_TYPE_CONFIG[code].requiresSerialNumber,
+        icon: code === 'mechanical_trap' ? 'crosshair' :
+              code === 'concrete_station' ? 'box' : 'target'
+      }))
 
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
@@ -168,43 +234,53 @@ export function IndoorStationForm({
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Stationstyp *
           </label>
-          <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(INDOOR_STATION_TYPE_CONFIG) as IndoorStationType[]).map((type) => {
-              const config = INDOOR_STATION_TYPE_CONFIG[type]
-              const Icon = TYPE_ICONS[type]
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => handleTypeChange(type)}
-                  className={`
-                    p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 min-h-[80px]
-                    ${stationType === type
-                      ? 'border-emerald-500 bg-emerald-500/10'
-                      : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
-                    }
-                  `}
-                >
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: config.color }}
+          {loadingTypes ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+            </div>
+          ) : (
+            <div className={`grid gap-2 ${typesToRender.length <= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              {typesToRender.map((typeItem) => {
+                const typeCode = 'code' in typeItem ? typeItem.code : typeItem
+                const typeName = 'name' in typeItem ? typeItem.name : typeItem
+                const typeColor = 'color' in typeItem ? typeItem.color : '#6b7280'
+                const typeIcon = 'icon' in typeItem ? typeItem.icon : 'box'
+                const Icon = STATION_TYPE_ICONS[typeIcon] || Box
+
+                return (
+                  <button
+                    key={typeCode}
+                    type="button"
+                    onClick={() => handleTypeChange(typeCode)}
+                    className={`
+                      p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 min-h-[80px]
+                      ${stationType === typeCode
+                        ? 'border-emerald-500 bg-emerald-500/10'
+                        : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                      }
+                    `}
                   >
-                    <Icon className="w-4 h-4 text-white" />
-                  </div>
-                  <span className={`text-xs text-center font-medium ${stationType === type ? 'text-emerald-400' : 'text-slate-300'}`}>
-                    {config.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: typeColor }}
+                    >
+                      <Icon className="w-4 h-4 text-white" />
+                    </div>
+                    <span className={`text-xs text-center font-medium ${stationType === typeCode ? 'text-emerald-400' : 'text-slate-300'}`}>
+                      {typeName}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
       {/* Station number */}
       <div>
         <label htmlFor="stationNumber" className="block text-sm font-medium text-slate-300 mb-2">
-          Stationsnummer {INDOOR_STATION_TYPE_CONFIG[stationType].requiresSerialNumber ? '*' : '(valfritt)'}
+          Stationsnummer {currentTypeConfig?.requiresSerialNumber ? '*' : '(valfritt)'}
         </label>
         <div className="relative">
           <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -213,9 +289,9 @@ export function IndoorStationForm({
             type="text"
             value={stationNumber}
             onChange={(e) => setStationNumber(e.target.value)}
-            placeholder={`T.ex. ${INDOOR_STATION_TYPE_CONFIG[stationType].prefix}-001`}
+            placeholder={`T.ex. ${currentTypeConfig?.prefix || 'ST'}-001`}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            required={INDOOR_STATION_TYPE_CONFIG[stationType].requiresSerialNumber}
+            required={currentTypeConfig?.requiresSerialNumber}
           />
         </div>
         <p className="mt-1 text-xs text-slate-500">
@@ -337,15 +413,6 @@ export function IndoorStationForm({
   )
 }
 
-// Ikon-mappning för stationstyper från DB
-const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
-  target: Target,
-  box: Box,
-  package: Package,
-  crosshair: Crosshair,
-  circle: Circle
-}
-
 // Kompakt version för typ-val i placeringsläge
 // Hämtar stationstyper dynamiskt från databasen
 export function StationTypeSelector({
@@ -388,7 +455,8 @@ export function StationTypeSelector({
 
   // Om inga DB-typer finns, använd hårdkodade (bakåtkompatibilitet)
   if (!typesToShow) {
-    const TYPE_ICONS: Record<IndoorStationType, React.ElementType> = {
+    // Lokal ikon-mappning för legacy-typer
+    const LEGACY_TYPE_ICONS: Record<string, React.ElementType> = {
       mechanical_trap: Crosshair,
       concrete_station: Box,
       bait_station: Target
@@ -399,9 +467,9 @@ export function StationTypeSelector({
         <h3 className="text-lg font-semibold text-white">Välj stationstyp</h3>
         <p className="text-sm text-slate-400">Välj vilken typ av station du vill placera</p>
         <div className="flex flex-col gap-2 pt-2">
-          {(Object.keys(INDOOR_STATION_TYPE_CONFIG) as IndoorStationType[]).map((type) => {
+          {Object.keys(INDOOR_STATION_TYPE_CONFIG).map((type) => {
             const config = INDOOR_STATION_TYPE_CONFIG[type]
-            const Icon = TYPE_ICONS[type]
+            const Icon = LEGACY_TYPE_ICONS[type] || Box
             return (
               <button
                 key={type}

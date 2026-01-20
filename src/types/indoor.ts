@@ -5,12 +5,14 @@
 // ENUMS & CONSTANTS
 // ============================================
 
-export type IndoorStationType = 'mechanical_trap' | 'bait_station' | 'concrete_station';
+// IndoorStationType är nu en dynamisk sträng som matchar 'code' från station_types tabellen
+export type IndoorStationType = string;
 export type IndoorStationStatus = 'active' | 'removed' | 'missing' | 'damaged';
 export type InspectionStatus = 'ok' | 'activity' | 'needs_service' | 'replaced';
 
-// Station type configuration (same colors as outdoor equipment)
-export const INDOOR_STATION_TYPE_CONFIG: Record<IndoorStationType, {
+// LEGACY: Hårdkodad konfiguration för bakåtkompatibilitet
+// OBS: Dessa används endast som fallback om inga dynamiska typer finns i databasen
+export const INDOOR_STATION_TYPE_CONFIG: Record<string, {
   label: string;
   color: string;
   bgColor: string;
@@ -295,13 +297,18 @@ export interface PlacementState {
 /**
  * Generate next station number for a floor plan
  * Format: {PREFIX}-{NNN} where PREFIX is based on station type
+ *
+ * @param stationType - Station type code (för legacy-kompatibilitet)
+ * @param existingNumbers - Existerande stationsnummer på planritningen
+ * @param customPrefix - Anpassat prefix från dynamisk stationstyp (övertrumfar lookup)
  */
 export function generateStationNumber(
   stationType: IndoorStationType,
-  existingNumbers: string[]
+  existingNumbers: string[],
+  customPrefix?: string
 ): string {
-  const config = INDOOR_STATION_TYPE_CONFIG[stationType];
-  const prefix = config.prefix;
+  // Använd anpassat prefix om det finns, annars fall tillbaka till legacy-config
+  const prefix = customPrefix || INDOOR_STATION_TYPE_CONFIG[stationType]?.prefix || 'ST';
 
   // Find existing numbers with this prefix
   const existingWithPrefix = existingNumbers
