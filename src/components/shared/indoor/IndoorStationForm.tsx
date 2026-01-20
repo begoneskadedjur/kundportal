@@ -277,27 +277,29 @@ export function IndoorStationForm({
         </div>
       )}
 
-      {/* Station number */}
-      <div>
-        <label htmlFor="stationNumber" className="block text-sm font-medium text-slate-300 mb-2">
-          Stationsnummer {currentTypeConfig?.requiresSerialNumber ? '*' : '(valfritt)'}
-        </label>
-        <div className="relative">
-          <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            id="stationNumber"
-            type="text"
-            value={stationNumber}
-            onChange={(e) => setStationNumber(e.target.value)}
-            placeholder={`T.ex. ${currentTypeConfig?.prefix || 'ST'}-001`}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            required={currentTypeConfig?.requiresSerialNumber}
-          />
+      {/* Station number - endast för typer som kräver serienummer */}
+      {currentTypeConfig?.requiresSerialNumber && (
+        <div>
+          <label htmlFor="stationNumber" className="block text-sm font-medium text-slate-300 mb-2">
+            Serienummer *
+          </label>
+          <div className="relative">
+            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              id="stationNumber"
+              type="text"
+              value={stationNumber}
+              onChange={(e) => setStationNumber(e.target.value)}
+              placeholder={`T.ex. ${currentTypeConfig?.prefix || 'ST'}-001`}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              required
+            />
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Ange serienummer för denna station
+          </p>
         </div>
-        <p className="mt-1 text-xs text-slate-500">
-          Auto-genererat förslag. Du kan ändra det.
-        </p>
-      </div>
+      )}
 
       {/* Location description */}
       <div>
