@@ -11,11 +11,15 @@ import {
 } from '../../../types/database'
 import { useGpsLocation } from '../../../hooks/useGpsLocation'
 import { MapLocationPicker } from './MapLocationPicker'
+import { StationTypeService } from '../../../services/stationTypeService'
+import type { StationType } from '../../../types/stationTypes'
 import {
   MapPin,
   Crosshair,
   Box,
   Target,
+  Package,
+  Circle,
   Camera,
   Loader2,
   AlertCircle,
@@ -26,6 +30,15 @@ import {
   Search,
   ChevronDown
 } from 'lucide-react'
+
+// Ikon-mappning för dynamiska stationstyper
+const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
+  crosshair: Crosshair,
+  box: Box,
+  target: Target,
+  package: Package,
+  circle: Circle
+}
 
 // Typ för kund i dropdown
 interface CustomerOption {
@@ -57,7 +70,8 @@ export interface FormData {
   photo?: File | null
 }
 
-const EQUIPMENT_TYPE_ICONS = {
+// Legacy-ikoner för bakåtkompatibilitet
+const LEGACY_EQUIPMENT_TYPE_ICONS: Record<string, React.ElementType> = {
   mechanical_trap: Crosshair,
   concrete_station: Box,
   bait_station: Target
@@ -77,6 +91,25 @@ export function EquipmentPlacementForm({
 }: EquipmentPlacementFormProps) {
   const isEditing = !!existingEquipment
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Dynamiska stationstyper från DB
+  const [dynamicStationTypes, setDynamicStationTypes] = useState<StationType[]>([])
+  const [loadingTypes, setLoadingTypes] = useState(true)
+
+  // Hämta dynamiska stationstyper vid mount
+  useEffect(() => {
+    const loadStationTypes = async () => {
+      try {
+        const types = await StationTypeService.getActiveStationTypes()
+        setDynamicStationTypes(types)
+      } catch (err) {
+        console.error('Fel vid hämtning av stationstyper:', err)
+      } finally {
+        setLoadingTypes(false)
+      }
+    }
+    loadStationTypes()
+  }, [])
 
   // State för sökbar kundväljare
   const [customerSearch, setCustomerSearch] = useState('')
@@ -158,6 +191,20 @@ export function EquipmentPlacementForm({
     photo: null
   })
 
+  // Uppdatera default typ till första dynamiska typen om vi skapar ny
+  useEffect(() => {
+    if (!isEditing && !loadingTypes && dynamicStationTypes.length > 0) {
+      // Kolla om nuvarande typ finns bland dynamiska typer
+      const currentTypeExists = dynamicStationTypes.some(t => t.code === formData.equipment_type)
+      if (!currentTypeExists) {
+        setFormData(prev => ({
+          ...prev,
+          equipment_type: dynamicStationTypes[0].code as EquipmentType
+        }))
+      }
+    }
+  }, [isEditing, loadingTypes, dynamicStationTypes])
+
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     existingEquipment?.photo_url || null
@@ -192,13 +239,33 @@ export function EquipmentPlacementForm({
     }
   }, [gpsLat, gpsLng, onLocationCapture])
 
+  // Hjälpfunktion för att kontrollera om aktuell typ kräver serienummer
+  const currentTypeRequiresSerial = useMemo(() => {
+    // Kolla dynamiska typer först
+    const dynamicType = dynamicStationTypes.find(t => t.code === formData.equipment_type)
+    if (dynamicType) {
+      return dynamicType.requires_serial_number
+    }
+    // Fallback till legacy-funktion
+    return requiresSerialNumber(formData.equipment_type)
+  }, [dynamicStationTypes, formData.equipment_type])
+
+  // Hämta aktuell stationstyps namn för felmeddelanden
+  const currentTypeName = useMemo(() => {
+    const dynamicType = dynamicStationTypes.find(t => t.code === formData.equipment_type)
+    if (dynamicType) {
+      return dynamicType.name
+    }
+    return EQUIPMENT_TYPE_CONFIG[formData.equipment_type]?.label || formData.equipment_type
+  }, [dynamicStationTypes, formData.equipment_type])
+
   // Validera formulär
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof FormData, string>> = {}
 
-    // Validera serienummer för mekaniska fällor
-    if (requiresSerialNumber(formData.equipment_type) && !formData.serial_number.trim()) {
-      newErrors.serial_number = 'Serienummer krävs för mekaniska fällor'
+    // Validera serienummer baserat på stationstyp
+    if (currentTypeRequiresSerial && !formData.serial_number.trim()) {
+      newErrors.serial_number = `Serienummer krävs för ${currentTypeName}`
     }
 
     // Validera koordinater
@@ -357,19 +424,24 @@ export function EquipmentPlacementForm({
         <label className="block text-sm font-medium text-slate-300 mb-3">
           Utrustningstyp *
         </label>
-        <div className="grid grid-cols-3 gap-3">
-          {(Object.entries(EQUIPMENT_TYPE_CONFIG) as [EquipmentType, typeof EQUIPMENT_TYPE_CONFIG[EquipmentType]][]).map(
-            ([type, config]) => {
-              const Icon = EQUIPMENT_TYPE_ICONS[type]
-              const isSelected = formData.equipment_type === type
+        {loadingTypes ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+          </div>
+        ) : dynamicStationTypes.length > 0 ? (
+          // Visa dynamiska stationstyper från databasen
+          <div className={`grid gap-3 ${dynamicStationTypes.length <= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            {dynamicStationTypes.map((stationType) => {
+              const Icon = STATION_TYPE_ICONS[stationType.icon] || LEGACY_EQUIPMENT_TYPE_ICONS[stationType.code] || Box
+              const isSelected = formData.equipment_type === stationType.code
 
               return (
                 <motion.button
-                  key={type}
+                  key={stationType.id}
                   type="button"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => setFormData(prev => ({ ...prev, equipment_type: type }))}
+                  onClick={() => setFormData(prev => ({ ...prev, equipment_type: stationType.code as EquipmentType }))}
                   className={`p-4 rounded-xl border-2 transition-all ${
                     isSelected
                       ? 'border-blue-500 bg-blue-500/10'
@@ -378,30 +450,65 @@ export function EquipmentPlacementForm({
                 >
                   <div
                     className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
-                    style={{ backgroundColor: config.color }}
+                    style={{ backgroundColor: stationType.color }}
                   >
                     <Icon className="w-5 h-5 text-white" />
                   </div>
-                  <p className={`text-sm font-medium ${isSelected ? 'text-blue-400' : 'text-slate-300'}`}>
-                    {config.label}
+                  <p className={`text-sm font-medium text-center ${isSelected ? 'text-blue-400' : 'text-slate-300'}`}>
+                    {stationType.name}
                   </p>
                 </motion.button>
               )
-            }
-          )}
-        </div>
+            })}
+          </div>
+        ) : (
+          // Fallback till hårdkodade typer om inga dynamiska finns
+          <div className="grid grid-cols-3 gap-3">
+            {(Object.entries(EQUIPMENT_TYPE_CONFIG) as [EquipmentType, typeof EQUIPMENT_TYPE_CONFIG[EquipmentType]][]).map(
+              ([type, config]) => {
+                const Icon = LEGACY_EQUIPMENT_TYPE_ICONS[type] || Box
+                const isSelected = formData.equipment_type === type
+
+                return (
+                  <motion.button
+                    key={type}
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setFormData(prev => ({ ...prev, equipment_type: type }))}
+                    className={`p-4 rounded-xl border-2 transition-all ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                    }`}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
+                      style={{ backgroundColor: config.color }}
+                    >
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                    <p className={`text-sm font-medium ${isSelected ? 'text-blue-400' : 'text-slate-300'}`}>
+                      {config.label}
+                    </p>
+                  </motion.button>
+                )
+              }
+            )}
+          </div>
+        )}
       </div>
 
       {/* Serienummer */}
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
-          Serienummer {requiresSerialNumber(formData.equipment_type) && '*'}
+          Serienummer {currentTypeRequiresSerial && '*'}
         </label>
         <input
           type="text"
           value={formData.serial_number}
           onChange={(e) => setFormData(prev => ({ ...prev, serial_number: e.target.value }))}
-          placeholder={requiresSerialNumber(formData.equipment_type)
+          placeholder={currentTypeRequiresSerial
             ? 'Ange serienummer'
             : 'Valfritt serienummer'}
           className={`w-full px-4 py-3 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
