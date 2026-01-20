@@ -153,15 +153,16 @@ export default function StationInspectionModule() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Sammanställningspanel state - spara inspektionsresultat per station
+  // OBS: Använder Record istället för Map för att undvika Vite/Terser minifieringsproblem
   const [showSummary, setShowSummary] = useState(false)
-  const [inspectionResults, setInspectionResults] = useState<Map<string, {
+  const [inspectionResults, setInspectionResults] = useState<Record<string, {
     status: InspectionStatus
     findings: string | null
     measurementValue: number | null
     measurementUnit: string | null
     hasPhoto: boolean
     timestamp: string
-  }>>(new Map())
+  }>>({})
 
   // Wizard-läge state
   const [wizardMode, setWizardMode] = useState<'off' | 'outdoor' | 'indoor'>('off')
@@ -241,45 +242,46 @@ export default function StationInspectionModule() {
 
           // Populera inspectedStationIds och inspectionResults
           const alreadyInspectedIds = new Set<string>()
-          const existingResults = new Map<string, {
+          const existingResults: Record<string, {
             status: InspectionStatus
             findings: string | null
             measurementValue: number | null
             measurementUnit: string | null
             hasPhoto: boolean
             timestamp: string
-          }>()
+          }> = {}
 
           // Utomhusinspektioner
           existingOutdoor.forEach(insp => {
             alreadyInspectedIds.add(insp.station_id)
-            existingResults.set(insp.station_id, {
+            existingResults[insp.station_id] = {
               status: insp.status as InspectionStatus,
               findings: insp.findings,
               measurementValue: insp.measurement_value,
               measurementUnit: insp.measurement_unit,
               hasPhoto: !!insp.photo_path,
               timestamp: insp.inspected_at
-            })
+            }
           })
 
           // Inomhusinspektioner
           existingIndoor.forEach(insp => {
             alreadyInspectedIds.add(insp.station_id)
-            existingResults.set(insp.station_id, {
+            existingResults[insp.station_id] = {
               status: insp.status as InspectionStatus,
               findings: insp.findings,
               measurementValue: insp.measurement_value,
               measurementUnit: insp.measurement_unit,
               hasPhoto: !!insp.photo_path,
               timestamp: insp.inspected_at
-            })
+            }
           })
 
-          if (alreadyInspectedIds.size > 0) {
+          const inspectedCount = Object.keys(existingResults).length
+          if (inspectedCount > 0) {
             setInspectedStationIds(alreadyInspectedIds)
             setInspectionResults(existingResults)
-            console.log(`Laddade ${alreadyInspectedIds.size} befintliga inspektioner för återupptagande`)
+            console.log(`Laddade ${inspectedCount} befintliga inspektioner för återupptagande`)
           }
         }
 
@@ -824,18 +826,17 @@ export default function StationInspectionModule() {
       setInspectedStationIds(prev => new Set(prev).add(selectedStation.id))
 
       // Spara resultat till sammanställning
-      setInspectionResults(prev => {
-        const newMap = new Map(prev)
-        newMap.set(selectedStation.id, {
+      setInspectionResults(prev => ({
+        ...prev,
+        [selectedStation.id]: {
           status: selectedStatus,
           findings: inspectionNotes || null,
           measurementValue: measurementValue ? parseFloat(measurementValue) : null,
           measurementUnit: measurementUnit || null,
           hasPhoto: !!photoPath,
           timestamp: new Date().toISOString()
-        })
-        return newMap
-      })
+        }
+      }))
 
       toast.success('Inspektion sparad!')
       setSelectedStation(null)
@@ -1050,7 +1051,7 @@ export default function StationInspectionModule() {
                         </p>
                         <div className="space-y-1.5">
                           {inspectedOutdoor.map(station => {
-                            const result = inspectionResults.get(station.id)
+                            const result = inspectionResults[station.id]
                             const stationNumber = outdoorNumberMap[station.id] || '?'
                             return (
                               <div key={station.id} className="flex items-center gap-2 text-sm bg-slate-900/50 rounded-lg px-3 py-2">
@@ -1097,7 +1098,7 @@ export default function StationInspectionModule() {
                         </p>
                         <div className="space-y-1.5">
                           {inspectedIndoor.map(station => {
-                            const result = inspectionResults.get(station.id)
+                            const result = inspectionResults[station.id]
                             const stationNumber = indoorNumberMap[station.id] || '?'
                             const floorPlan = floorPlans.find(fp => fp.id === station.floor_plan_id)
                             return (
@@ -1140,19 +1141,19 @@ export default function StationInspectionModule() {
                   <div className="mt-3 pt-3 border-t border-slate-700/50 grid grid-cols-3 gap-3 text-center">
                     <div>
                       <p className="text-lg font-bold text-green-400">
-                        {Array.from(inspectionResults.values()).filter(r => r.status === 'ok').length}
+                        {Object.values(inspectionResults).filter(r => r.status === 'ok').length}
                       </p>
                       <p className="text-xs text-slate-500">OK</p>
                     </div>
                     <div>
                       <p className="text-lg font-bold text-amber-400">
-                        {Array.from(inspectionResults.values()).filter(r => r.status === 'activity').length}
+                        {Object.values(inspectionResults).filter(r => r.status === 'activity').length}
                       </p>
                       <p className="text-xs text-slate-500">Aktivitet</p>
                     </div>
                     <div>
                       <p className="text-lg font-bold text-red-400">
-                        {Array.from(inspectionResults.values()).filter(r => r.status !== 'ok' && r.status !== 'activity').length}
+                        {Object.values(inspectionResults).filter(r => r.status !== 'ok' && r.status !== 'activity').length}
                       </p>
                       <p className="text-xs text-slate-500">Övrigt</p>
                     </div>
