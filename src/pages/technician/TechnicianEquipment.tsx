@@ -33,6 +33,7 @@ import { AddStationWizard } from '../../components/technician/AddStationWizard'
 interface Customer {
   id: string
   company_name: string
+  contact_address: string | null
 }
 
 export default function TechnicianEquipment() {

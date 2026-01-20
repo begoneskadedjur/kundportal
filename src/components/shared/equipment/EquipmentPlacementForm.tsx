@@ -44,6 +44,7 @@ const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
 interface CustomerOption {
   id: string
   company_name: string
+  contact_address?: string | null
 }
 
 interface EquipmentPlacementFormProps {
@@ -125,10 +126,13 @@ export function EquipmentPlacementForm({
     )
   }, [customers, customerSearch])
 
-  // Hitta vald kunds namn
-  const selectedCustomerName = useMemo(() => {
-    return customers.find(c => c.id === customerId)?.company_name || ''
+  // Hitta vald kund (namn och adress)
+  const selectedCustomer = useMemo(() => {
+    return customers.find(c => c.id === customerId)
   }, [customers, customerId])
+
+  const selectedCustomerName = selectedCustomer?.company_name || ''
+  const selectedCustomerAddress = selectedCustomer?.contact_address || null
 
   // Stäng dropdown vid klick utanför
   useEffect(() => {
@@ -545,6 +549,7 @@ export function EquipmentPlacementForm({
                     ? { lat: formData.latitude, lng: formData.longitude }
                     : null
                 }
+                initialAddress={selectedCustomerAddress}
                 onPositionSelect={handleMapPositionSelect}
                 onCancel={() => setShowMapPicker(false)}
                 height="350px"

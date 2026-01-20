@@ -486,11 +486,11 @@ export class EquipmentService {
   /**
    * Hämta alla kunder (för dropdown-val)
    */
-  static async getCustomersForDropdown(): Promise<{ id: string; company_name: string }[]> {
+  static async getCustomersForDropdown(): Promise<{ id: string; company_name: string; contact_address: string | null }[]> {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('id, company_name')
+        .select('id, company_name, contact_address')
         .eq('is_active', true)
         .order('company_name', { ascending: true })
 

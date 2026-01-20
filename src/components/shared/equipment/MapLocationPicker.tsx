@@ -52,6 +52,7 @@ const DETAIL_ZOOM = 17
 
 interface MapLocationPickerProps {
   initialPosition?: { lat: number; lng: number } | null
+  initialAddress?: string | null // Kundens adress för automatisk sökning
   onPositionSelect: (lat: number, lng: number) => void
   onCancel: () => void
   height?: string
@@ -131,6 +132,7 @@ function DraggableMarker({
 
 export function MapLocationPicker({
   initialPosition,
+  initialAddress,
   onPositionSelect,
   onCancel,
   height = '400px'
@@ -143,8 +145,50 @@ export function MapLocationPicker({
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null)
   const [mapZoom, setMapZoom] = useState<number | null>(null)
   const [isLocating, setIsLocating] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialAddress || '')
   const [isSearching, setIsSearching] = useState(false)
+  const [hasAutoSearched, setHasAutoSearched] = useState(false)
+
+  // Sök efter adress med Nominatim (OpenStreetMap) - useCallback för att kunna användas i useEffect
+  const searchAddressInternal = useCallback(async (query: string) => {
+    if (!query.trim()) return false
+
+    setIsSearching(true)
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=se&limit=1`,
+        {
+          headers: {
+            'Accept-Language': 'sv'
+          }
+        }
+      )
+      const results = await response.json()
+
+      if (results.length > 0) {
+        const lat = parseFloat(results[0].lat)
+        const lng = parseFloat(results[0].lon)
+        setMarkerPosition([lat, lng])
+        setMapCenter([lat, lng])
+        setMapZoom(DETAIL_ZOOM)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Sökfel:', error)
+      return false
+    } finally {
+      setIsSearching(false)
+    }
+  }, [])
+
+  // Automatisk sökning vid mount om initialAddress finns och ingen initialPosition
+  useEffect(() => {
+    if (initialAddress && !initialPosition && !hasAutoSearched) {
+      setHasAutoSearched(true)
+      searchAddressInternal(initialAddress)
+    }
+  }, [initialAddress, initialPosition, hasAutoSearched, searchAddressInternal])
 
   // Hantera kartklick - flytta markören dit
   const handleMapClick = useCallback((lat: number, lng: number) => {
@@ -186,38 +230,13 @@ export function MapLocationPicker({
     )
   }, [])
 
-  // Sök efter adress med Nominatim (OpenStreetMap)
+  // Sök efter adress - wrapper för användaren
   const searchAddress = useCallback(async () => {
-    if (!searchQuery.trim()) return
-
-    setIsSearching(true)
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=se&limit=1`,
-        {
-          headers: {
-            'Accept-Language': 'sv'
-          }
-        }
-      )
-      const results = await response.json()
-
-      if (results.length > 0) {
-        const lat = parseFloat(results[0].lat)
-        const lng = parseFloat(results[0].lon)
-        setMarkerPosition([lat, lng])
-        setMapCenter([lat, lng])
-        setMapZoom(DETAIL_ZOOM)
-      } else {
-        alert('Kunde inte hitta adressen. Prova en annan sökning.')
-      }
-    } catch (error) {
-      console.error('Sökfel:', error)
-      alert('Fel vid adresssökning. Försök igen.')
-    } finally {
-      setIsSearching(false)
+    const found = await searchAddressInternal(searchQuery)
+    if (!found && searchQuery.trim()) {
+      alert('Kunde inte hitta adressen. Prova en annan sökning.')
     }
-  }, [searchQuery])
+  }, [searchQuery, searchAddressInternal])
 
   // Bekräfta vald position
   const handleConfirm = () => {
