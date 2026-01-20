@@ -248,6 +248,34 @@ export default function StationInspectionModule() {
     return indoorStations.filter(s => s.floor_plan_id === selectedFloorPlanId)
   }, [indoorStations, selectedFloorPlanId])
 
+  // Skapa nummermappning för outdoor stationer (baserat på placed_at, äldsta = 1)
+  const outdoorNumberMap = useMemo(() => {
+    const sorted = [...outdoorStations].sort((a, b) => {
+      const dateA = new Date(a.placed_at || 0).getTime()
+      const dateB = new Date(b.placed_at || 0).getTime()
+      return dateA - dateB
+    })
+    const map = new Map<string, number>()
+    sorted.forEach((station, index) => {
+      map.set(station.id, index + 1)
+    })
+    return map
+  }, [outdoorStations])
+
+  // Skapa nummermappning för indoor stationer per planritning (baserat på placed_at)
+  const indoorNumberMap = useMemo(() => {
+    const sorted = [...filteredIndoorStations].sort((a, b) => {
+      const dateA = new Date(a.placed_at || 0).getTime()
+      const dateB = new Date(b.placed_at || 0).getTime()
+      return dateA - dateB
+    })
+    const map = new Map<string, number>()
+    sorted.forEach((station, index) => {
+      map.set(station.id, index + 1)
+    })
+    return map
+  }, [filteredIndoorStations])
+
   // Konvertera outdoor stations till EquipmentPlacementWithRelations format för kartan
   const outdoorEquipment: EquipmentPlacementWithRelations[] = useMemo(() => {
     return outdoorStations
@@ -748,7 +776,7 @@ export default function StationInspectionModule() {
                 <div className="space-y-3">
                   {outdoorStations.map((station) => {
                     const isInspected = inspectedStationIds.has(station.id)
-                    const stationName = station.serial_number || station.station_number || 'Unnamed'
+                    const stationNumber = outdoorNumberMap.get(station.id) || '?'
                     const typeName = station.station_type_data?.name || station.equipment_type || station.station_type
 
                     return (
@@ -770,16 +798,16 @@ export default function StationInspectionModule() {
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
                             ) : (
                               <div
-                                className="w-6 h-6 rounded-full border-2 border-slate-600"
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
                                 style={{
-                                  backgroundColor: station.station_type_data?.color
-                                    ? `${station.station_type_data.color}20`
-                                    : undefined
+                                  backgroundColor: station.station_type_data?.color || '#6b7280'
                                 }}
-                              />
+                              >
+                                {stationNumber}
+                              </div>
                             )}
                             <div>
-                              <p className="font-medium text-white">{stationName}</p>
+                              <p className="font-medium text-white">Station {stationNumber}</p>
                               <p className="text-sm text-slate-400">{typeName}</p>
                             </div>
                           </div>
@@ -850,7 +878,7 @@ export default function StationInspectionModule() {
                   </p>
                   {filteredIndoorStations.map((station) => {
                     const isInspected = inspectedStationIds.has(station.id)
-                    const stationName = station.station_number || station.serial_number || 'Unnamed'
+                    const stationNumber = indoorNumberMap.get(station.id) || '?'
                     const typeName = station.station_type_data?.name || station.station_type
 
                     return (
@@ -872,16 +900,16 @@ export default function StationInspectionModule() {
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
                             ) : (
                               <div
-                                className="w-6 h-6 rounded-full border-2 border-slate-600"
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
                                 style={{
-                                  backgroundColor: station.station_type_data?.color
-                                    ? `${station.station_type_data.color}20`
-                                    : undefined
+                                  backgroundColor: station.station_type_data?.color || '#6b7280'
                                 }}
-                              />
+                              >
+                                {stationNumber}
+                              </div>
                             )}
                             <div>
-                              <p className="font-medium text-white">{stationName}</p>
+                              <p className="font-medium text-white">Station {stationNumber}</p>
                               <p className="text-sm text-slate-400">{typeName}</p>
                             </div>
                           </div>
@@ -918,7 +946,7 @@ export default function StationInspectionModule() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-xl font-bold text-white">
-                    {selectedStation.serial_number || selectedStation.station_number || 'Station'}
+                    Station {outdoorNumberMap.get(selectedStation.id) || indoorNumberMap.get(selectedStation.id) || '?'}
                   </h2>
                   <p className="text-slate-400">
                     {selectedStation.station_type_data?.name || selectedStation.equipment_type || selectedStation.station_type}
