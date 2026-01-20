@@ -177,6 +177,7 @@ export async function getStationsWithRecentActivity(
 
 /**
  * Hämta avslutade inspektionssessioner för en kund (för kundportalens Service & Utrustning-vy)
+ * OBS: Hämtar teknikerinfo separat eftersom RLS kan blockera direkt join från kundkontext
  */
 export async function getCompletedSessionsForCustomer(
   customerId: string,
@@ -186,8 +187,7 @@ export async function getCompletedSessionsForCustomer(
     .from('station_inspection_sessions')
     .select(`
       *,
-      customer:customers(id, company_name, contact_address, contact_person, contact_phone, contact_email),
-      technician:technicians(id, name)
+      customer:customers(id, company_name, contact_address, contact_person, contact_phone, contact_email)
     `)
     .eq('customer_id', customerId)
     .eq('status', 'completed')
@@ -199,7 +199,32 @@ export async function getCompletedSessionsForCustomer(
     return []
   }
 
-  return (data || []) as InspectionSessionWithRelations[]
+  if (!data || data.length === 0) {
+    return []
+  }
+
+  // Hämta unika technician_ids
+  const technicianIds = [...new Set(data.map(s => s.technician_id).filter(Boolean))] as string[]
+
+  // Hämta teknikernamn separat (kan kräva annan RLS-policy eller vara öppen för läsning)
+  let techniciansMap = new Map<string, { id: string; name: string }>()
+
+  if (technicianIds.length > 0) {
+    const { data: technicians } = await supabase
+      .from('technicians')
+      .select('id, name')
+      .in('id', technicianIds)
+
+    if (technicians) {
+      techniciansMap = new Map(technicians.map(t => [t.id, t]))
+    }
+  }
+
+  // Kombinera sessioner med teknikerdata
+  return data.map(session => ({
+    ...session,
+    technician: session.technician_id ? techniciansMap.get(session.technician_id) || null : null
+  })) as InspectionSessionWithRelations[]
 }
 
 /**

@@ -24,8 +24,6 @@ export function InspectionSummaryCard({
   // Hämta teknikernamn - hantera olika format från Supabase
   const getTechnicianName = (): string => {
     const tech = session.technician
-    // Debug: logga vad vi får
-    console.log('Session technician data:', tech, 'Full session:', session)
     if (!tech) return 'Okänd tekniker'
     // Supabase kan returnera antingen objekt direkt eller som array med ett element
     if (Array.isArray(tech)) {
@@ -149,7 +147,6 @@ export function InspectionSummaryCard({
               <span className="text-xs text-slate-500 uppercase tracking-wide">Tekniker</span>
             </div>
             <p className="text-white font-medium text-sm">{technicianName}</p>
-            <p className="text-xs text-emerald-500 mt-0.5">BeGone</p>
           </div>
 
           {/* Antal inspekterade */}
