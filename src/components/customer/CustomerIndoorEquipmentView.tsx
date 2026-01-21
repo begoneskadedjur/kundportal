@@ -28,11 +28,15 @@ import {
 interface CustomerIndoorEquipmentViewProps {
   customerId: string
   companyName: string
+  targetFloorPlanId?: string | null
+  onFloorPlanNavigated?: () => void
 }
 
 export function CustomerIndoorEquipmentView({
   customerId,
-  companyName
+  companyName,
+  targetFloorPlanId,
+  onFloorPlanNavigated
 }: CustomerIndoorEquipmentViewProps) {
   // Data state
   const [floorPlans, setFloorPlans] = useState<FloorPlanWithRelations[]>([])
@@ -102,6 +106,17 @@ export function CustomerIndoorEquipmentView({
       setStations([])
     }
   }, [selectedFloorPlan?.id, loadStations])
+
+  // Navigera till target floor plan om angiven (från inspektionslistan)
+  useEffect(() => {
+    if (targetFloorPlanId && floorPlans.length > 0) {
+      const targetPlan = floorPlans.find(p => p.id === targetFloorPlanId)
+      if (targetPlan) {
+        setSelectedFloorPlan(targetPlan)
+        onFloorPlanNavigated?.()
+      }
+    }
+  }, [targetFloorPlanId, floorPlans, onFloorPlanNavigated])
 
   // Refresh
   const handleRefresh = async () => {

@@ -46,7 +46,7 @@ type InspectionItem = {
 interface StationInspectionListProps {
   outdoorInspections: OutdoorInspectionWithRelations[]
   indoorInspections: IndoorStationInspectionWithRelations[]
-  onStationClick?: (stationId: string, location: 'outdoor' | 'indoor') => void
+  onStationClick?: (stationId: string, location: 'outdoor' | 'indoor', floorPlanId?: string) => void
 }
 
 // Hjälpfunktion för att få statusikon
@@ -454,7 +454,7 @@ export function StationInspectionList({
                         {/* Visa på karta-knapp */}
                         {onStationClick && (
                           <button
-                            onClick={() => onStationClick(item.stationId, item.location)}
+                            onClick={() => onStationClick(item.stationId, item.location, item.floorPlanId)}
                             className="w-full py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
                           >
                             {item.location === 'outdoor' ? (
