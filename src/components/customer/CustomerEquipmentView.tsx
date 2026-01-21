@@ -25,6 +25,7 @@ import type { OutdoorInspectionWithRelations } from '../../types/inspectionSessi
 import type { IndoorStationWithRelations } from '../../types/indoor'
 import type { FloorPlanWithRelations } from '../../services/floorPlanService'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
+import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
 import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -389,13 +390,21 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                 <span className="text-sm text-slate-400">({stations.length} stationer)</span>
               </div>
 
-              {/* Planritningsbild om den finns */}
+              {/* Planritning med stationsmarkörer */}
               {plan.image_url && (
                 <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 overflow-hidden mb-4">
-                  <img
-                    src={plan.image_url}
-                    alt={plan.name}
-                    className="w-full max-h-[300px] object-contain bg-slate-900"
+                  <FloorPlanViewer
+                    imageUrl={plan.image_url}
+                    imageWidth={plan.image_width}
+                    imageHeight={plan.image_height}
+                    stations={stations}
+                    selectedStationId={null}
+                    placementMode="view"
+                    selectedType={null}
+                    previewPosition={null}
+                    onStationClick={handleIndoorStationClick}
+                    height="350px"
+                    showNumbers={true}
                   />
                 </div>
               )}
