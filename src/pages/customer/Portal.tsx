@@ -67,6 +67,11 @@ const CustomerPortal: React.FC = () => {
   const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
   const [dismissedNotification, setDismissedNotification] = useState(false)
 
+  // Navigering från Genomförda kontroller till Fällor & stationer med pulsering
+  const [highlightedStationId, setHighlightedStationId] = useState<string | null>(null)
+  const [highlightedStationType, setHighlightedStationType] = useState<'outdoor' | 'indoor' | null>(null)
+  const [highlightedFloorPlanId, setHighlightedFloorPlanId] = useState<string | null>(null)
+
   // Check multisite access and redirect if needed - KRITISK: Måste köras först
   useEffect(() => {
     // Vänta tills multisite-context har laddats
@@ -249,12 +254,31 @@ const CustomerPortal: React.FC = () => {
     )
   }
 
+  // Navigera till station på karta/planritning från Genomförda kontroller
+  const handleNavigateToStation = (stationId: string, type: 'outdoor' | 'indoor', floorPlanId?: string) => {
+    // Sätt highlighted state innan vi byter vy
+    setHighlightedStationId(stationId)
+    setHighlightedStationType(type)
+    setHighlightedFloorPlanId(floorPlanId || null)
+    // Byt till stations-vyn
+    setCurrentView('stations')
+    // Rensa highlighted efter 5 sekunder
+    setTimeout(() => {
+      setHighlightedStationId(null)
+      setHighlightedStationType(null)
+      setHighlightedFloorPlanId(null)
+    }, 5000)
+  }
+
   // Stations view component (Fällor & stationer)
   const renderStationsView = () => (
     customer ? (
       <CustomerEquipmentView
         customerId={customer.id}
         companyName={customer.company_name}
+        highlightedStationId={highlightedStationId}
+        highlightedStationType={highlightedStationType}
+        highlightedFloorPlanId={highlightedFloorPlanId}
       />
     ) : null
   )
@@ -265,6 +289,7 @@ const CustomerPortal: React.FC = () => {
       <InspectionSessionsView
         customerId={customer.id}
         companyName={customer.company_name}
+        onNavigateToStation={handleNavigateToStation}
       />
     ) : null
   )

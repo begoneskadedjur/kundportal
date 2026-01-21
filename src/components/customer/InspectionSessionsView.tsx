@@ -21,7 +21,8 @@ import {
   Clock,
   TrendingUp,
   ExternalLink,
-  X
+  X,
+  Eye
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService } from '../../services/floorPlanService'
@@ -42,11 +43,14 @@ import type { OutdoorInspectionWithRelations } from '../../types/inspectionSessi
 import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
 import { calculateStationStatus, CALCULATED_STATUS_CONFIG, MEASUREMENT_UNIT_CONFIG, type CalculatedStatus } from '../../types/stationTypes'
 import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
+import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
+import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
 import LoadingSpinner from '../shared/LoadingSpinner'
 
 interface InspectionSessionsViewProps {
   customerId: string
   companyName: string
+  onNavigateToStation?: (stationId: string, type: 'outdoor' | 'indoor', floorPlanId?: string) => void
 }
 
 // Utökad typ med senaste inspektion och mätvärde
@@ -70,6 +74,11 @@ interface StationWithLatestInspection {
     technicianName: string | null
   } | null
   calculatedStatus: CalculatedStatus
+  // Original data för detail sheets
+  originalOutdoorStation?: EquipmentPlacementWithRelations
+  originalIndoorStation?: IndoorStationWithRelations
+  floorPlanId?: string
+  floorPlanName?: string
 }
 
 // Sektion med stationer
@@ -81,7 +90,7 @@ interface StationSection {
   stations: StationWithLatestInspection[]
 }
 
-export function InspectionSessionsView({ customerId, companyName }: InspectionSessionsViewProps) {
+export function InspectionSessionsView({ customerId, companyName, onNavigateToStation }: InspectionSessionsViewProps) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [sections, setSections] = useState<StationSection[]>([])
@@ -93,6 +102,15 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
   const [lightboxPhotos, setLightboxPhotos] = useState<{ url: string; caption: string }[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+
+  // Detail sheet state
+  const [selectedOutdoorStation, setSelectedOutdoorStation] = useState<EquipmentPlacementWithRelations | null>(null)
+  const [outdoorInspections, setOutdoorInspections] = useState<OutdoorInspectionWithRelations[]>([])
+  const [isOutdoorDetailOpen, setIsOutdoorDetailOpen] = useState(false)
+
+  const [selectedIndoorStation, setSelectedIndoorStation] = useState<IndoorStationWithRelations | null>(null)
+  const [indoorInspections, setIndoorInspections] = useState<IndoorStationInspectionWithRelations[]>([])
+  const [isIndoorDetailOpen, setIsIndoorDetailOpen] = useState(false)
 
   // Sammanfattningsstatistik
   const [lastInspectionDate, setLastInspectionDate] = useState<string | null>(null)
@@ -161,7 +179,8 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
               measurementValue: latest.measurement_value,
               technicianName: latest.technician?.name || null
             } : null,
-            calculatedStatus
+            calculatedStatus,
+            originalOutdoorStation: station
           } as StationWithLatestInspection
         })
       )
@@ -216,7 +235,10 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
                 measurementValue: latest.measurement_value ?? null,
                 technicianName: latest.technician?.name || null
               } : null,
-              calculatedStatus
+              calculatedStatus,
+              originalIndoorStation: station,
+              floorPlanId: plan.id,
+              floorPlanName: plan.name
             } as StationWithLatestInspection
           })
         )
@@ -313,6 +335,48 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
     setLightboxPhotos([{ url: photoUrl, caption }])
     setLightboxIndex(0)
     setIsLightboxOpen(true)
+  }
+
+  // Öppna station detail sheet
+  const handleStationClick = async (station: StationWithLatestInspection) => {
+    if (station.originalOutdoorStation) {
+      setSelectedOutdoorStation(station.originalOutdoorStation)
+      const inspections = await getOutdoorInspectionsByStation(station.id)
+      setOutdoorInspections(inspections)
+      setIsOutdoorDetailOpen(true)
+    } else if (station.originalIndoorStation) {
+      setSelectedIndoorStation(station.originalIndoorStation)
+      const inspections = await IndoorStationService.getInspectionsByStation(station.id)
+      setIndoorInspections(inspections)
+      setIsIndoorDetailOpen(true)
+    }
+  }
+
+  // Stäng outdoor detail sheet
+  const handleCloseOutdoorDetail = () => {
+    setIsOutdoorDetailOpen(false)
+    setTimeout(() => {
+      setSelectedOutdoorStation(null)
+      setOutdoorInspections([])
+    }, 300)
+  }
+
+  // Stäng indoor detail sheet
+  const handleCloseIndoorDetail = () => {
+    setIsIndoorDetailOpen(false)
+    setTimeout(() => {
+      setSelectedIndoorStation(null)
+      setIndoorInspections([])
+    }, 300)
+  }
+
+  // Navigera till station på karta/planritning
+  const handleNavigateToStation = (station: StationWithLatestInspection, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onNavigateToStation) {
+      const type = station.originalOutdoorStation ? 'outdoor' : 'indoor'
+      onNavigateToStation(station.id, type, station.floorPlanId)
+    }
   }
 
   // Formatera datum
@@ -517,6 +581,7 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Kontrollerad</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Anteckning</th>
                           <th className="text-center px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Foto</th>
+                          <th className="px-4 py-2.5"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700/30">
@@ -536,7 +601,8 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
                           return (
                             <tr
                               key={station.id}
-                              className="hover:bg-slate-700/30 transition-colors"
+                              className="hover:bg-slate-700/30 transition-colors cursor-pointer"
+                              onClick={() => handleStationClick(station)}
                             >
                               <td className="px-4 py-2.5 text-white font-medium">
                                 {station.stationNumber || `#${index + 1}`}
@@ -602,10 +668,13 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
                               <td className="px-4 py-2.5 text-center">
                                 {station.latestInspection?.photoUrl ? (
                                   <button
-                                    onClick={() => openLightbox(
-                                      station.latestInspection!.photoUrl!,
-                                      `${station.stationNumber || station.stationType} - ${formatDate(station.latestInspection!.inspectedAt)}`
-                                    )}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openLightbox(
+                                        station.latestInspection!.photoUrl!,
+                                        `${station.stationNumber || station.stationType} - ${formatDate(station.latestInspection!.inspectedAt)}`
+                                      )
+                                    }}
                                     className="w-8 h-8 rounded-lg overflow-hidden bg-slate-700 mx-auto hover:ring-2 hover:ring-teal-500/50 transition-all"
                                   >
                                     <img
@@ -617,6 +686,35 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
                                 ) : (
                                   <span className="text-slate-600">-</span>
                                 )}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <div className="flex items-center gap-1">
+                                  {/* Visa på karta/planritning */}
+                                  {onNavigateToStation && (
+                                    <button
+                                      onClick={(e) => handleNavigateToStation(station, e)}
+                                      className="p-1.5 text-slate-500 hover:text-teal-400 hover:bg-teal-500/10 rounded-lg transition-all group"
+                                      title={station.originalOutdoorStation ? 'Visa på karta' : `Visa på ${station.floorPlanName || 'planritning'}`}
+                                    >
+                                      {station.originalOutdoorStation ? (
+                                        <MapPin className="w-4 h-4 group-hover:animate-pulse" />
+                                      ) : (
+                                        <Home className="w-4 h-4 group-hover:animate-pulse" />
+                                      )}
+                                    </button>
+                                  )}
+                                  {/* Öppna detaljer */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleStationClick(station)
+                                    }}
+                                    className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-600/50 rounded-lg transition-all"
+                                    title="Visa detaljer"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -657,6 +755,26 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
         isOpen={isLightboxOpen}
         onClose={() => setIsLightboxOpen(false)}
       />
+
+      {/* Outdoor Station Detail Sheet */}
+      {selectedOutdoorStation && (
+        <CustomerOutdoorStationDetailSheet
+          station={selectedOutdoorStation}
+          inspections={outdoorInspections}
+          isOpen={isOutdoorDetailOpen}
+          onClose={handleCloseOutdoorDetail}
+        />
+      )}
+
+      {/* Indoor Station Detail Sheet */}
+      {selectedIndoorStation && (
+        <CustomerIndoorStationDetailSheet
+          station={selectedIndoorStation}
+          inspections={indoorInspections}
+          isOpen={isIndoorDetailOpen}
+          onClose={handleCloseIndoorDetail}
+        />
+      )}
     </div>
   )
 }

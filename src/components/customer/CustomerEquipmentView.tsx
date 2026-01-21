@@ -35,11 +35,18 @@ import toast from 'react-hot-toast'
 interface CustomerEquipmentViewProps {
   customerId: string
   companyName: string
+  // Props för navigering från andra vyer (t.ex. Genomförda kontroller)
+  highlightedStationId?: string | null
+  highlightedStationType?: 'outdoor' | 'indoor' | null
+  highlightedFloorPlanId?: string | null
 }
 
 const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   customerId,
-  companyName
+  companyName,
+  highlightedStationId: externalHighlightedStationId,
+  highlightedStationType: externalHighlightedStationType,
+  highlightedFloorPlanId: externalHighlightedFloorPlanId
 }) => {
   // State
   const [equipment, setEquipment] = useState<EquipmentPlacementWithRelations[]>([])
@@ -98,6 +105,27 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Hantera extern navigering (från Genomförda kontroller)
+  useEffect(() => {
+    if (externalHighlightedStationId && externalHighlightedStationType) {
+      if (externalHighlightedStationType === 'outdoor') {
+        setHighlightedOutdoorStationId(externalHighlightedStationId)
+        // Scrolla till karta-sektionen
+        const mapSection = document.getElementById('outdoor-section')
+        if (mapSection) {
+          mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      } else if (externalHighlightedStationType === 'indoor' && externalHighlightedFloorPlanId) {
+        setHighlightedIndoorStationId(externalHighlightedStationId)
+        // Scrolla till rätt planritning
+        const planSection = document.getElementById(`floor-plan-${externalHighlightedFloorPlanId}`)
+        if (planSection) {
+          planSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }
+    }
+  }, [externalHighlightedStationId, externalHighlightedStationType, externalHighlightedFloorPlanId])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -291,7 +319,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
 
         {/* Sektion: Utomhus */}
         {equipment.length > 0 && (
-          <section className="mb-8">
+          <section id="outdoor-section" className="mb-8">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-emerald-400" />
@@ -397,7 +425,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
           if (stations.length === 0) return null
 
           return (
-            <section key={plan.id} className="mb-8">
+            <section key={plan.id} id={`floor-plan-${plan.id}`} className="mb-8">
               <div className="flex items-center gap-2 mb-3">
                 <Home className="w-5 h-5 text-blue-400" />
                 <h2 className="text-lg font-semibold text-white">
