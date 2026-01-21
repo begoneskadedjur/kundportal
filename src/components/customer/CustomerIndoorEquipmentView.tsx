@@ -142,6 +142,7 @@ export function CustomerIndoorEquipmentView({
   // Hantera stationsklick
   const handleStationClick = (station: IndoorStationWithRelations) => {
     setSelectedStation(station)
+    setHighlightedStationId(station.id)
     loadStationInspections(station.id)
     setIsDetailSheetOpen(true)
   }
@@ -149,6 +150,7 @@ export function CustomerIndoorEquipmentView({
   // Stäng detail sheet
   const handleCloseDetailSheet = () => {
     setIsDetailSheetOpen(false)
+    setHighlightedStationId(null)
     setTimeout(() => setSelectedStation(null), 300)
   }
 
