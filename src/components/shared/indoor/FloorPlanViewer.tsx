@@ -72,6 +72,7 @@ export function FloorPlanViewer({
   const containerRef = useRef<HTMLDivElement>(null)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null)
+  const [initialScale, setInitialScale] = useState(1)
 
   // Skapa mappning från station ID till nummer (1, 2, 3...)
   // Baserat på placed_at i stigande ordning (äldsta placering = nummer 1)
@@ -93,13 +94,33 @@ export function FloorPlanViewer({
     return map
   }, [stations, showNumbers])
 
-  // Hantera bildladdning
+  // Hantera bildladdning och beräkna optimal zoom
   const handleImageLoad = useCallback(() => {
-    if (imageRef.current) {
+    if (imageRef.current && containerRef.current) {
+      const imgWidth = imageRef.current.naturalWidth
+      const imgHeight = imageRef.current.naturalHeight
+
       setImageDimensions({
-        width: imageRef.current.naturalWidth,
-        height: imageRef.current.naturalHeight
+        width: imgWidth,
+        height: imgHeight
       })
+
+      // Beräkna optimal initial scale för att fylla containern bättre
+      const containerRect = containerRef.current.getBoundingClientRect()
+      const containerWidth = containerRect.width
+      const containerHeight = containerRect.height
+
+      // Beräkna hur mycket bilden måste skalas för att fylla containern
+      // Vi vill att bilden ska fylla så mycket som möjligt utan att bli för stor
+      const scaleX = containerWidth / imgWidth
+      const scaleY = containerHeight / imgHeight
+
+      // Använd den större skalan (cover-liknande) men begränsa till max 1.5
+      // Detta gör att bilden fyller containern bättre utan att bli för uppskalad
+      const coverScale = Math.max(scaleX, scaleY)
+      const optimalScale = Math.min(Math.max(coverScale, 1), 1.5)
+
+      setInitialScale(optimalScale)
       setImageLoaded(true)
     }
   }, [])
@@ -135,12 +156,22 @@ export function FloorPlanViewer({
     }
   }, [placementMode, onImageClick])
 
-  // Reset zoom vid bildändring
+  // Applicera initial zoom vid bildändring
   useEffect(() => {
-    if (imageLoaded && transformRef.current) {
-      transformRef.current.resetTransform()
+    if (imageLoaded && transformRef.current && initialScale > 1) {
+      // Använd setTimeout för att ge TransformWrapper tid att rendera
+      setTimeout(() => {
+        transformRef.current?.setTransform(0, 0, initialScale, 200, 'easeOut')
+      }, 100)
     }
-  }, [imageUrl, imageLoaded])
+  }, [imageUrl, imageLoaded, initialScale])
+
+  // Återställ till optimal zoom (inte 1, utan initialScale)
+  const handleResetZoom = useCallback(() => {
+    if (transformRef.current) {
+      transformRef.current.setTransform(0, 0, initialScale, 200, 'easeOut')
+    }
+  }, [initialScale])
 
   const isPlacementActive = placementMode === 'place' || placementMode === 'move'
 
@@ -209,7 +240,7 @@ export function FloorPlanViewer({
           <ZoomOut className="w-5 h-5" />
         </button>
         <button
-          onClick={() => transformRef.current?.resetTransform()}
+          onClick={handleResetZoom}
           className="p-2 bg-slate-800/90 hover:bg-slate-700 text-white rounded-lg shadow-lg backdrop-blur-sm transition-colors"
           title="Återställ zoom"
         >
@@ -221,7 +252,7 @@ export function FloorPlanViewer({
       <TransformWrapper
         ref={transformRef}
         initialScale={1}
-        minScale={0.5}
+        minScale={0.3}
         maxScale={4}
         centerOnInit
         limitToBounds={false}
