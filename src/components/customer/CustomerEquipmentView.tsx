@@ -59,6 +59,10 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   const [selectedIndoorStation, setSelectedIndoorStation] = useState<IndoorStationWithRelations | null>(null)
   const [isIndoorDetailSheetOpen, setIsIndoorDetailSheetOpen] = useState(false)
 
+  // Highlighted station (pulserar på karta/planritning)
+  const [highlightedOutdoorStationId, setHighlightedOutdoorStationId] = useState<string | null>(null)
+  const [highlightedIndoorStationId, setHighlightedIndoorStationId] = useState<string | null>(null)
+
   // Hämta all data
   const fetchData = useCallback(async () => {
     try {
@@ -122,8 +126,10 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     return Object.values(indoorStationsByPlan).reduce((sum, stations) => sum + stations.length, 0)
   }, [indoorStationsByPlan])
 
-  // Hantera klick på utomhusstation
+  // Hantera klick på utomhusstation (från tabell eller karta)
   const handleOutdoorStationClick = async (item: EquipmentPlacementWithRelations) => {
+    // Sätt highlighted för att visa pulsering på kartan
+    setHighlightedOutdoorStationId(item.id)
     setSelectedOutdoorStation(item)
     setIsOutdoorDetailSheetOpen(true)
     const inspections = await getOutdoorInspectionsByStation(item.id)
@@ -132,20 +138,24 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
 
   const handleCloseOutdoorDetailSheet = () => {
     setIsOutdoorDetailSheetOpen(false)
+    setHighlightedOutdoorStationId(null)
     setTimeout(() => {
       setSelectedOutdoorStation(null)
       setOutdoorStationInspections([])
     }, 300)
   }
 
-  // Hantera klick på inomhusstation
+  // Hantera klick på inomhusstation (från tabell eller planritning)
   const handleIndoorStationClick = (station: IndoorStationWithRelations) => {
+    // Sätt highlighted för att visa pulsering på planritningen
+    setHighlightedIndoorStationId(station.id)
     setSelectedIndoorStation(station)
     setIsIndoorDetailSheetOpen(true)
   }
 
   const handleCloseIndoorDetailSheet = () => {
     setIsIndoorDetailSheetOpen(false)
+    setHighlightedIndoorStationId(null)
     setTimeout(() => {
       setSelectedIndoorStation(null)
     }, 300)
@@ -304,6 +314,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                 readOnly={true}
                 enableClustering={equipment.length >= 10}
                 showNumbers={true}
+                highlightedStationId={highlightedOutdoorStationId}
               />
             </div>
 
@@ -390,7 +401,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                 <span className="text-sm text-slate-400">({stations.length} stationer)</span>
               </div>
 
-              {/* Planritning med stationsmarkörer */}
+              {/* Planritning med stationsmarkörer - fyller hela rutan */}
               {plan.image_url && (
                 <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 overflow-hidden mb-4">
                   <FloorPlanViewer
@@ -398,13 +409,14 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                     imageWidth={plan.image_width}
                     imageHeight={plan.image_height}
                     stations={stations}
-                    selectedStationId={null}
+                    selectedStationId={selectedIndoorStation?.id}
                     placementMode="view"
                     selectedType={null}
                     previewPosition={null}
                     onStationClick={handleIndoorStationClick}
-                    height="350px"
+                    height="450px"
                     showNumbers={true}
+                    highlightedStationId={highlightedIndoorStationId}
                   />
                 </div>
               )}
