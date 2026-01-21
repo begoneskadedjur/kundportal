@@ -506,23 +506,29 @@ export class IndoorStationService {
 
   /**
    * Hämta signerad URL för stationsfoto
+   * Avgör bucket baserat på path-prefix:
+   * - "indoor/" eller "outdoor/" → inspection-photos bucket (från StationInspectionModule)
+   * - Annars → indoor-station-photos bucket (äldre stationsfoton)
    */
   static async getStationPhotoUrl(photoPath: string): Promise<string | undefined> {
     try {
       if (!photoPath) return undefined
 
+      // Avgör bucket baserat på path-prefix
+      const isInspectionPhoto = photoPath.startsWith('indoor/') || photoPath.startsWith('outdoor/')
+      const bucket = isInspectionPhoto ? 'inspection-photos' : INDOOR_STATION_PHOTOS_BUCKET
+
       const { data, error } = await supabase.storage
-        .from(INDOOR_STATION_PHOTOS_BUCKET)
+        .from(bucket)
         .createSignedUrl(photoPath, 3600) // 1 timme
 
       if (error) {
-        console.error('Fel vid skapande av signerad URL:', error)
+        // Tyst fel - bilden kanske inte finns eller har raderats
         return undefined
       }
 
       return data.signedUrl
     } catch (error) {
-      console.error('IndoorStationService.getStationPhotoUrl fel:', error)
       return undefined
     }
   }
