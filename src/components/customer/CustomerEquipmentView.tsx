@@ -22,7 +22,7 @@ import {
   getEquipmentStatusLabel
 } from '../../types/database'
 import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
-import type { IndoorStationWithRelations } from '../../types/indoor'
+import type { IndoorStationWithRelations, IndoorStationInspectionWithRelations } from '../../types/indoor'
 import type { FloorPlanWithRelations } from '../../services/floorPlanService'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
@@ -57,6 +57,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
 
   // Inomhus detail sheet
   const [selectedIndoorStation, setSelectedIndoorStation] = useState<IndoorStationWithRelations | null>(null)
+  const [indoorStationInspections, setIndoorStationInspections] = useState<IndoorStationInspectionWithRelations[]>([])
   const [isIndoorDetailSheetOpen, setIsIndoorDetailSheetOpen] = useState(false)
 
   // Highlighted station (pulserar på karta/planritning)
@@ -146,11 +147,14 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   }
 
   // Hantera klick på inomhusstation (från tabell eller planritning)
-  const handleIndoorStationClick = (station: IndoorStationWithRelations) => {
+  const handleIndoorStationClick = async (station: IndoorStationWithRelations) => {
     // Sätt highlighted för att visa pulsering på planritningen
     setHighlightedIndoorStationId(station.id)
     setSelectedIndoorStation(station)
     setIsIndoorDetailSheetOpen(true)
+    // Hämta inspektionshistorik för stationen
+    const inspections = await IndoorStationService.getInspectionsByStation(station.id)
+    setIndoorStationInspections(inspections)
   }
 
   const handleCloseIndoorDetailSheet = () => {
@@ -158,6 +162,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     setHighlightedIndoorStationId(null)
     setTimeout(() => {
       setSelectedIndoorStation(null)
+      setIndoorStationInspections([])
     }, 300)
   }
 
@@ -522,7 +527,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
       {selectedIndoorStation && (
         <CustomerIndoorStationDetailSheet
           station={selectedIndoorStation}
-          inspections={[]}
+          inspections={indoorStationInspections}
           isOpen={isIndoorDetailSheetOpen}
           onClose={handleCloseIndoorDetailSheet}
         />

@@ -55,6 +55,15 @@ export class IndoorStationService {
         throw new Error(`Databasfel: ${error.message}`)
       }
 
+      // Hämta alla stationstyper för fallback-lookup (om station_type_id saknas)
+      const { data: allStationTypes } = await supabase
+        .from('station_types')
+        .select('id, code, name, color, icon, prefix, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction')
+        .eq('is_active', true)
+
+      // Skapa map för snabb lookup på code
+      const typesByCode = new Map(allStationTypes?.map(t => [t.code, t]) || [])
+
       // Lägg till signerade URLs, senaste inspektion och mätning
       const stationsWithExtras = await Promise.all(
         (data || []).map(async (station) => {
@@ -80,8 +89,18 @@ export class IndoorStationService {
             .order('measured_at', { ascending: false })
             .limit(1)
 
+          // Fallback: Om station_type_data saknas, matcha station_type mot station_types.code
+          let stationTypeData = station.station_type_data
+          if (!stationTypeData && station.station_type) {
+            const matchedType = typesByCode.get(station.station_type)
+            if (matchedType) {
+              stationTypeData = matchedType
+            }
+          }
+
           return {
             ...station,
+            station_type_data: stationTypeData,
             latest_inspection: inspections?.[0] || null,
             inspection_count: count || 0,
             latest_measurement: measurements?.[0] || null,
