@@ -72,7 +72,8 @@ export function FloorPlanViewer({
   const containerRef = useRef<HTMLDivElement>(null)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null)
-  const [initialScale, setInitialScale] = useState(1)
+  // Cover-dimensioner för att fylla containern kant-till-kant
+  const [coverDimensions, setCoverDimensions] = useState<{ width: number; height: number } | null>(null)
 
   // Skapa mappning från station ID till nummer (1, 2, 3...)
   // Baserat på placed_at i stigande ordning (äldsta placering = nummer 1)
@@ -94,7 +95,7 @@ export function FloorPlanViewer({
     return map
   }, [stations, showNumbers])
 
-  // Hantera bildladdning och beräkna optimal zoom
+  // Hantera bildladdning och beräkna cover-dimensioner för att fylla containern
   const handleImageLoad = useCallback(() => {
     if (imageRef.current && containerRef.current) {
       const imgWidth = imageRef.current.naturalWidth
@@ -105,22 +106,22 @@ export function FloorPlanViewer({
         height: imgHeight
       })
 
-      // Beräkna optimal initial scale för att fylla containern bättre
+      // Beräkna container-dimensioner
       const containerRect = containerRef.current.getBoundingClientRect()
       const containerWidth = containerRect.width
       const containerHeight = containerRect.height
 
-      // Beräkna hur mycket bilden måste skalas för att fylla containern
-      // Vi vill att bilden ska fylla så mycket som möjligt utan att bli för stor
+      // Beräkna cover-skala (större av de två) för att fylla hela containern
       const scaleX = containerWidth / imgWidth
       const scaleY = containerHeight / imgHeight
-
-      // Använd den större skalan (cover-liknande) men begränsa till max 1.5
-      // Detta gör att bilden fyller containern bättre utan att bli för uppskalad
       const coverScale = Math.max(scaleX, scaleY)
-      const optimalScale = Math.min(Math.max(coverScale, 1), 1.5)
 
-      setInitialScale(optimalScale)
+      // Beräkna dimensioner som fyller containern kant-till-kant
+      setCoverDimensions({
+        width: imgWidth * coverScale,
+        height: imgHeight * coverScale
+      })
+
       setImageLoaded(true)
     }
   }, [])
@@ -156,22 +157,12 @@ export function FloorPlanViewer({
     }
   }, [placementMode, onImageClick])
 
-  // Applicera initial zoom vid bildändring
-  useEffect(() => {
-    if (imageLoaded && transformRef.current && initialScale > 1) {
-      // Använd setTimeout för att ge TransformWrapper tid att rendera
-      setTimeout(() => {
-        transformRef.current?.setTransform(0, 0, initialScale, 200, 'easeOut')
-      }, 100)
-    }
-  }, [imageUrl, imageLoaded, initialScale])
-
-  // Återställ till optimal zoom (inte 1, utan initialScale)
+  // Återställ zoom till 1x och centrera
   const handleResetZoom = useCallback(() => {
     if (transformRef.current) {
-      transformRef.current.setTransform(0, 0, initialScale, 200, 'easeOut')
+      transformRef.current.resetTransform(200, 'easeOut')
     }
-  }, [initialScale])
+  }, [])
 
   const isPlacementActive = placementMode === 'place' || placementMode === 'move'
 
@@ -280,15 +271,18 @@ export function FloorPlanViewer({
             onClick={handleImageClick}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Floor plan image */}
+            {/* Floor plan image - fyller containern kant-till-kant */}
             <img
               ref={imageRef}
               src={imageUrl}
               alt="Planritning"
               onLoad={handleImageLoad}
-              className="max-w-full max-h-full object-contain select-none"
+              className="select-none"
               draggable={false}
-              style={{ maxHeight: height }}
+              style={coverDimensions ? {
+                width: coverDimensions.width,
+                height: coverDimensions.height,
+              } : undefined}
             />
 
             {/* Station markers */}
