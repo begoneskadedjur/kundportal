@@ -461,6 +461,7 @@ export class IndoorStationService {
 
   /**
    * Hämta inspektionshistorik för en station
+   * Inkluderar station_type_data för korrekt measurement_label
    */
   static async getInspectionsByStation(
     stationId: string,
@@ -471,6 +472,12 @@ export class IndoorStationService {
         .from('indoor_station_inspections')
         .select(`
           *,
+          station:indoor_stations(
+            id,
+            station_number,
+            station_type_id,
+            station_type
+          ),
           technician:technicians!inspected_by(id, name)
         `)
         .eq('station_id', stationId)
@@ -482,14 +489,38 @@ export class IndoorStationService {
         throw new Error(`Databasfel: ${error.message}`)
       }
 
-      // Lägg till signerade URLs för foton
+      if (!data || data.length === 0) {
+        return []
+      }
+
+      // Hämta alla station_types för att matcha station_type → code
+      const { data: stationTypes } = await supabase
+        .from('station_types')
+        .select('id, code, name, color, measurement_unit, measurement_label')
+        .eq('is_active', true)
+
+      // Skapa map för snabb lookup på code
+      const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
+
+      // Lägg till signerade URLs för foton OCH berika med station_type_data
       const inspectionsWithUrls = await Promise.all(
-        (data || []).map(async (inspection) => ({
-          ...inspection,
-          photo_url: inspection.photo_path
-            ? await this.getStationPhotoUrl(inspection.photo_path)
-            : undefined
-        }))
+        data.map(async (inspection) => {
+          // Berika station med station_type_data baserat på station_type
+          const station = inspection.station as any
+          if (station && station.station_type) {
+            const matchedType = typesByCode.get(station.station_type)
+            if (matchedType) {
+              station.station_type_data = matchedType
+            }
+          }
+
+          return {
+            ...inspection,
+            photo_url: inspection.photo_path
+              ? await this.getStationPhotoUrl(inspection.photo_path)
+              : undefined
+          }
+        })
       )
 
       return inspectionsWithUrls
