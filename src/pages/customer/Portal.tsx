@@ -18,7 +18,7 @@ import PremiumServiceRequest from '../../components/customer/PremiumServiceReque
 import ServiceActivityTimeline from '../../components/customer/ServiceActivityTimeline'
 import ServiceAssessmentSummary from '../../components/customer/ServiceAssessmentSummary'
 import PartnershipValueSection from '../../components/customer/PartnershipValueSection'
-import CustomerPortalNavigation, { CustomerPortalView } from '../../components/customer/CustomerPortalNavigation'
+import CustomerPortalLayout, { CustomerPortalView } from '../../components/customer/CustomerPortalLayout'
 import CustomerStatistics from '../../components/customer/CustomerStatistics'
 import SanitationReports from './SanitationReports'
 import PendingQuoteNotification from '../../components/customer/PendingQuoteNotification'
@@ -319,9 +319,9 @@ const CustomerPortal: React.FC = () => {
     </div>
   )
 
-  // Dashboard view component  
+  // Dashboard view component
   const renderDashboardView = () => (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div>
       {/* Premium Welcome Hero */}
       <PremiumWelcomeHero 
         customer={customer}
@@ -398,16 +398,16 @@ const CustomerPortal: React.FC = () => {
         />
       )}
 
-      {/* Floating Action Button for Service Requests */}
+      {/* Floating Action Button for Service Requests - positioned above mobile bottom nav */}
       <button
         onClick={() => setShowServiceRequest(true)}
-        className="fixed bottom-8 right-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full p-4 shadow-lg hover:shadow-emerald-500/25 transition-all duration-300 group"
+        className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full p-4 shadow-lg hover:shadow-emerald-500/25 transition-all duration-300 group z-30"
         title="Begär service"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
-        <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-slate-800 text-white px-3 py-1 rounded-lg text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-slate-800 text-white px-3 py-1 rounded-lg text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity hidden lg:block">
           Begär service
         </span>
       </button>
@@ -415,14 +415,11 @@ const CustomerPortal: React.FC = () => {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Navigation */}
-      <CustomerPortalNavigation
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        customerName={customer?.company_name || 'Okänd kund'}
-      />
-
+    <CustomerPortalLayout
+      currentView={currentView}
+      onViewChange={setCurrentView}
+      customerName={customer?.company_name || 'Okänd kund'}
+    >
       {/* Content based on current view */}
       {currentView === 'dashboard' && renderDashboardView()}
       {currentView === 'stations' && renderStationsView()}
@@ -430,7 +427,7 @@ const CustomerPortal: React.FC = () => {
       {currentView === 'statistics' && renderStatisticsView()}
       {currentView === 'reports' && renderReportsView()}
       {currentView === 'quotes' && renderQuotesView()}
-    </div>
+    </CustomerPortalLayout>
   )
 }
 
