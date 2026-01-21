@@ -45,14 +45,35 @@ export class EquipmentService {
         throw new Error(`Databasfel: ${error.message}`)
       }
 
-      // Lägg till signerade URLs för foton
+      // Hämta alla stationstyper för fallback-lookup (om station_type_id saknas)
+      const { data: allStationTypes } = await supabase
+        .from('station_types')
+        .select('id, code, name, color, icon, prefix, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction')
+        .eq('is_active', true)
+
+      // Skapa map för snabb lookup på code
+      const typesByCode = new Map(allStationTypes?.map(t => [t.code, t]) || [])
+
+      // Lägg till signerade URLs för foton och fallback för station_type_data
       const equipmentWithUrls = await Promise.all(
-        (data || []).map(async (equipment) => ({
-          ...equipment,
-          photo_url: equipment.photo_path
-            ? await this.getEquipmentPhotoUrl(equipment.photo_path)
-            : undefined
-        }))
+        (data || []).map(async (equipment) => {
+          // Fallback: Om station_type_data saknas, matcha equipment_type mot station_types.code
+          let stationTypeData = equipment.station_type_data
+          if (!stationTypeData && equipment.equipment_type) {
+            const matchedType = typesByCode.get(equipment.equipment_type)
+            if (matchedType) {
+              stationTypeData = matchedType
+            }
+          }
+
+          return {
+            ...equipment,
+            station_type_data: stationTypeData,
+            photo_url: equipment.photo_path
+              ? await this.getEquipmentPhotoUrl(equipment.photo_path)
+              : undefined
+          }
+        })
       )
 
       console.log('Utrustning hämtad:', equipmentWithUrls.length)
