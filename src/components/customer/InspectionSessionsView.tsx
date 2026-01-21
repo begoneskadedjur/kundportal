@@ -512,6 +512,7 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Nr</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Typ</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+                          <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Mätvärde avser</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Mätvärde</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Kontrollerad</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Anteckning</th>
@@ -564,6 +565,9 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
                                     Ej kontrollerad
                                   </span>
                                 )}
+                              </td>
+                              <td className="px-4 py-2.5 text-slate-300">
+                                {station.measurementLabel || '-'}
                               </td>
                               <td className="px-4 py-2.5">
                                 {measurementValue !== null && measurementValue !== undefined ? (
