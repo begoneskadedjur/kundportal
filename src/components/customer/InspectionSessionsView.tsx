@@ -22,7 +22,10 @@ import {
   TrendingUp,
   ExternalLink,
   X,
-  Eye
+  Eye,
+  History,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService } from '../../services/floorPlanService'
@@ -117,6 +120,12 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [lastTechnicianName, setLastTechnicianName] = useState<string | null>(null)
   const [totalStations, setTotalStations] = useState(0)
   const [statusCounts, setStatusCounts] = useState({ ok: 0, warning: 0, critical: 0, noInspection: 0 })
+
+  // Historik-sektion
+  const [showHistory, setShowHistory] = useState(false)
+  const [historySessions, setHistorySessions] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
 
   // Ladda all data
   const fetchData = useCallback(async () => {
@@ -302,6 +311,33 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const handleRefresh = async () => {
     setRefreshing(true)
     await fetchData()
+  }
+
+  // Ladda historiska sessioner (on-demand)
+  const loadHistorySessions = async () => {
+    if (historyLoaded || loadingHistory) return
+
+    setLoadingHistory(true)
+    try {
+      // Hämta de senaste 10 sessionerna (exkludera den senaste som redan visas)
+      const sessions = await getCompletedSessionsForCustomer(customerId, 11)
+      // Skippa första (den visas redan i sammanfattningen)
+      setHistorySessions(sessions.slice(1))
+      setHistoryLoaded(true)
+    } catch (error) {
+      console.error('Error loading history sessions:', error)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  // Toggle historik-sektion
+  const handleToggleHistory = () => {
+    const newShowHistory = !showHistory
+    setShowHistory(newShowHistory)
+    if (newShowHistory && !historyLoaded) {
+      loadHistorySessions()
+    }
   }
 
   // Filtrera stationer baserat på sökfråga och filter
@@ -507,6 +543,95 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               <p className="text-red-400 font-bold text-lg">{statusCounts.critical}</p>
             </div>
           </div>
+        </div>
+
+        {/* Kontrollhistorik - expanderbar sektion */}
+        <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 mb-6">
+          <button
+            onClick={handleToggleHistory}
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-700/30 transition-colors rounded-xl"
+          >
+            <div className="flex items-center gap-2">
+              <History className="w-5 h-5 text-purple-400" />
+              <span className="text-white font-medium">Kontrollhistorik</span>
+              {historySessions.length > 0 && (
+                <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full">
+                  {historySessions.length} tidigare besök
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {loadingHistory && (
+                <RefreshCw className="w-4 h-4 text-slate-400 animate-spin" />
+              )}
+              {showHistory ? (
+                <ChevronUp className="w-5 h-5 text-slate-400" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-slate-400" />
+              )}
+            </div>
+          </button>
+
+          {showHistory && (
+            <div className="px-4 pb-4 border-t border-slate-700/50">
+              {loadingHistory ? (
+                <div className="py-8 text-center">
+                  <RefreshCw className="w-6 h-6 text-slate-400 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">Laddar historik...</p>
+                </div>
+              ) : historySessions.length === 0 ? (
+                <div className="py-8 text-center">
+                  <History className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">Ingen tidigare historik tillgänglig</p>
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {historySessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="bg-slate-900/50 rounded-lg p-4 hover:bg-slate-900/70 transition-colors"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Calendar className="w-5 h-5 text-purple-400" />
+                          </div>
+                          <div>
+                            <p className="text-white font-medium">
+                              {session.completed_at ? formatDate(session.completed_at) : 'Okänt datum'}
+                            </p>
+                            <div className="flex items-center gap-2 text-sm text-slate-400">
+                              <User className="w-3.5 h-3.5" />
+                              <span>{session.technician?.name || 'Okänd tekniker'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-sm">
+                          {/* Statistik för sessionen */}
+                          <div className="flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <span className="text-slate-300">{session.inspection_summary?.ok || 0}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <AlertTriangle className="w-4 h-4 text-amber-400" />
+                            <span className="text-slate-300">{session.inspection_summary?.warning || 0}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <AlertTriangle className="w-4 h-4 text-red-400" />
+                            <span className="text-slate-300">{session.inspection_summary?.critical || 0}</span>
+                          </div>
+                          <div className="text-slate-500">
+                            {session.inspection_summary?.total || 0} st
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Filter och sök */}

@@ -424,14 +424,37 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
           const stations = indoorStationsByPlan[plan.id] || []
           if (stations.length === 0) return null
 
+          // Räkna stationstyper för denna planritning
+          const planTypeStats = new Map<string, { label: string; color: string; count: number }>()
+          stations.forEach(station => {
+            const typeName = station.station_type_data?.name || station.station_type || 'Okänd'
+            const typeColor = station.station_type_data?.color || '#6b7280'
+            if (planTypeStats.has(typeName)) {
+              planTypeStats.get(typeName)!.count++
+            } else {
+              planTypeStats.set(typeName, { label: typeName, color: typeColor, count: 1 })
+            }
+          })
+
           return (
             <section key={plan.id} id={`floor-plan-${plan.id}`} className="mb-8">
-              <div className="flex items-center gap-2 mb-3">
-                <Home className="w-5 h-5 text-blue-400" />
-                <h2 className="text-lg font-semibold text-white">
-                  {plan.building_name ? `${plan.building_name} - ` : ''}{plan.name}
-                </h2>
-                <span className="text-sm text-slate-400">({stations.length} stationer)</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Home className="w-5 h-5 text-blue-400" />
+                  <h2 className="text-lg font-semibold text-white">
+                    {plan.building_name ? `${plan.building_name} - ` : ''}{plan.name}
+                  </h2>
+                  <span className="text-sm text-slate-400">({stations.length} stationer)</span>
+                </div>
+                {/* Typräkning för planritningen */}
+                <div className="flex items-center gap-3">
+                  {Array.from(planTypeStats.entries()).map(([typeName, data]) => (
+                    <div key={typeName} className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.color }} />
+                      <span>{data.label}: {data.count}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Planritning med stationsmarkörer - fyller hela rutan */}
