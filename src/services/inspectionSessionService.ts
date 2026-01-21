@@ -465,6 +465,32 @@ export async function getLatestOutdoorInspection(
   return data as OutdoorInspectionWithRelations | null
 }
 
+/**
+ * Hämta alla utomhusinspektioner för en specifik station
+ * Sorterade efter datum, nyast först
+ */
+export async function getOutdoorInspectionsByStation(
+  stationId: string,
+  limit: number = 10
+): Promise<OutdoorInspectionWithRelations[]> {
+  const { data, error } = await supabase
+    .from('outdoor_station_inspections')
+    .select(`
+      *,
+      technician:technicians(id, name)
+    `)
+    .eq('station_id', stationId)
+    .order('inspected_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('Error fetching outdoor inspections for station:', error)
+    return []
+  }
+
+  return (data || []) as OutdoorInspectionWithRelations[]
+}
+
 // ============================================
 // INDOOR INSPECTION FUNCTIONS
 // ============================================

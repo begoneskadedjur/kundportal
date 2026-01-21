@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService } from '../../services/floorPlanService'
-import { getCustomerInspectionOverview, getCompletedSessionsForCustomer, getOutdoorInspectionsForSession, getIndoorInspectionsForSession } from '../../services/inspectionSessionService'
+import { getCustomerInspectionOverview, getCompletedSessionsForCustomer, getOutdoorInspectionsForSession, getIndoorInspectionsForSession, getOutdoorInspectionsByStation } from '../../services/inspectionSessionService'
 import {
   EquipmentPlacementWithRelations,
   EquipmentType,
@@ -39,8 +39,8 @@ import {
 import type { InspectionSessionWithRelations, OutdoorInspectionWithRelations } from '../../types/inspectionSession'
 import type { IndoorStationInspectionWithRelations } from '../../types/indoor'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
-import { EquipmentDetailSheet } from '../shared/equipment/EquipmentDetailSheet'
 import { CustomerIndoorEquipmentView } from './CustomerIndoorEquipmentView'
+import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
 import { InspectionSummaryCard } from './InspectionSummaryCard'
 import { StationInspectionList } from './StationInspectionList'
 import { InspectionHistoryList } from './InspectionHistoryList'
@@ -96,8 +96,6 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   const [filterType, setFilterType] = useState<EquipmentType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<EquipmentStatus | 'all'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentPlacementWithRelations | null>(null)
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
 
   // Equipment type toggle (outdoor/indoor/service)
   const [activeTab, setActiveTab] = useState<'service' | 'outdoor' | 'indoor'>('service')
@@ -126,6 +124,12 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   // Target floor plan och station för navigation från inspektionslistan
   const [targetFloorPlanId, setTargetFloorPlanId] = useState<string | null>(null)
   const [targetStationId, setTargetStationId] = useState<string | null>(null)
+
+  // Utomhus: highlighted station och inspektioner
+  const [highlightedOutdoorStationId, setHighlightedOutdoorStationId] = useState<string | null>(null)
+  const [selectedOutdoorStation, setSelectedOutdoorStation] = useState<EquipmentPlacementWithRelations | null>(null)
+  const [outdoorStationInspections, setOutdoorStationInspections] = useState<OutdoorInspectionWithRelations[]>([])
+  const [isOutdoorDetailSheetOpen, setIsOutdoorDetailSheetOpen] = useState(false)
 
   // Hamta utrustning
   const fetchEquipment = useCallback(async () => {
@@ -264,16 +268,24 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     }).length
   }), [equipment])
 
-  // Hantera klick pa markor i kartan
-  const handleEquipmentClick = (item: EquipmentPlacementWithRelations) => {
-    setSelectedEquipment(item)
-    setIsDetailSheetOpen(true)
+  // Hantera klick pa markor i kartan (utomhus)
+  const handleEquipmentClick = async (item: EquipmentPlacementWithRelations) => {
+    setSelectedOutdoorStation(item)
+    setHighlightedOutdoorStationId(item.id)
+    setIsOutdoorDetailSheetOpen(true)
+    // Hämta inspektioner för stationen
+    const inspections = await getOutdoorInspectionsByStation(item.id)
+    setOutdoorStationInspections(inspections)
   }
 
-  // Stang detail sheet
-  const handleCloseDetailSheet = () => {
-    setIsDetailSheetOpen(false)
-    setTimeout(() => setSelectedEquipment(null), 300)
+  // Stäng utomhus detail sheet
+  const handleCloseOutdoorDetailSheet = () => {
+    setIsOutdoorDetailSheetOpen(false)
+    setHighlightedOutdoorStationId(null)
+    setTimeout(() => {
+      setSelectedOutdoorStation(null)
+      setOutdoorStationInspections([])
+    }, 300)
   }
 
   // Formatera datum for kund (utan exakt tid)
@@ -570,9 +582,14 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                         outdoorInspections={historyInspectionData?.outdoorInspections || inspectionData.outdoorInspections}
                         indoorInspections={historyInspectionData?.indoorInspections || inspectionData.indoorInspections}
                         onStationClick={(stationId, location, floorPlanId) => {
-                          if (floorPlanId) {
+                          if (location === 'indoor' && floorPlanId) {
                             setTargetFloorPlanId(floorPlanId)
                             setTargetStationId(stationId)
+                          } else if (location === 'outdoor') {
+                            // Highlighta utomhusstation
+                            setHighlightedOutdoorStationId(stationId)
+                            // Auto-rensa highlight efter 5 sekunder
+                            setTimeout(() => setHighlightedOutdoorStationId(null), 5000)
                           }
                           setActiveTab(location)
                         }}
@@ -761,6 +778,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                   readOnly={true}
                   enableClustering={filteredEquipment.length >= 5}
                   showNumbers={true}
+                  highlightedStationId={highlightedOutdoorStationId}
                 />
               </motion.div>
             )}
@@ -920,13 +938,15 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
         )}
       </div>
 
-      {/* Equipment Detail Sheet - Customer-friendly version without technical details */}
-      <EquipmentDetailSheet
-        equipment={selectedEquipment}
-        isOpen={isDetailSheetOpen}
-        onClose={handleCloseDetailSheet}
-        readOnly={true}
-      />
+      {/* Customer Outdoor Station Detail Sheet - med inspektionshistorik */}
+      {selectedOutdoorStation && (
+        <CustomerOutdoorStationDetailSheet
+          station={selectedOutdoorStation}
+          inspections={outdoorStationInspections}
+          isOpen={isOutdoorDetailSheetOpen}
+          onClose={handleCloseOutdoorDetailSheet}
+        />
+      )}
     </div>
   )
 }
