@@ -56,9 +56,24 @@ export function CustomerIndoorStationDetailSheet({
 }: CustomerIndoorStationDetailSheetProps) {
   const [showAllInspections, setShowAllInspections] = useState(false)
 
-  const typeConfig = INDOOR_STATION_TYPE_CONFIG[station.station_type]
-  const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
-  const TypeIcon = TYPE_ICONS[station.station_type]
+  // Prioritera station_type_data (dynamisk från databas), fallback till legacy config
+  const dynamicTypeData = station.station_type_data
+  const legacyConfig = INDOOR_STATION_TYPE_CONFIG[station.station_type]
+
+  // Bygg typeConfig från antingen dynamisk data eller legacy, med säker fallback
+  const typeConfig = {
+    label: dynamicTypeData?.name || legacyConfig?.label || station.station_type || 'Station',
+    color: dynamicTypeData?.color || legacyConfig?.color || '#6b7280'
+  }
+
+  const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status] || {
+    label: station.status || 'Okänd',
+    bgColor: 'bg-slate-500/20',
+    textColor: 'text-slate-400'
+  }
+
+  // Välj ikon baserat på stationstyp, med fallback till Box
+  const TypeIcon = TYPE_ICONS[station.station_type as keyof typeof TYPE_ICONS] || Box
 
   // Visa max 3 inspektioner initialt, eller alla om expanderad
   const displayedInspections = showAllInspections ? inspections : inspections.slice(0, 3)
@@ -264,7 +279,10 @@ function InspectionCard({
   inspection: IndoorStationInspectionWithRelations
   isLatest?: boolean
 }) {
-  const statusConfig = INSPECTION_STATUS_CONFIG[inspection.status]
+  const statusConfig = INSPECTION_STATUS_CONFIG[inspection.status] || {
+    label: inspection.status || 'Okänd',
+    bgColor: 'bg-slate-500/20'
+  }
 
   // Ikon baserat på status
   const getStatusIcon = () => {
