@@ -468,15 +468,23 @@ export async function getLatestOutdoorInspection(
 /**
  * Hämta alla utomhusinspektioner för en specifik station
  * Sorterade efter datum, nyast först
+ * Inkluderar station_type_data för measurement_label
  */
 export async function getOutdoorInspectionsByStation(
   stationId: string,
   limit: number = 10
 ): Promise<OutdoorInspectionWithRelations[]> {
+  // Hämta inspektioner med stationsdata
   const { data, error } = await supabase
     .from('outdoor_station_inspections')
     .select(`
       *,
+      station:equipment_placements(
+        id,
+        serial_number,
+        station_type_id,
+        equipment_type
+      ),
       technician:technicians(id, name)
     `)
     .eq('station_id', stationId)
@@ -488,7 +496,30 @@ export async function getOutdoorInspectionsByStation(
     return []
   }
 
-  return (data || []) as OutdoorInspectionWithRelations[]
+  if (!data || data.length === 0) {
+    return []
+  }
+
+  // Hämta alla station_types för att matcha equipment_type → code
+  const { data: stationTypes } = await supabase
+    .from('station_types')
+    .select('id, code, name, color, measurement_unit, measurement_label')
+    .eq('is_active', true)
+
+  // Skapa map för snabb lookup på code
+  const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
+
+  // Berika inspektioner med station_type_data baserat på equipment_type
+  return data.map(inspection => {
+    const station = inspection.station as any
+    if (station && station.equipment_type) {
+      const matchedType = typesByCode.get(station.equipment_type)
+      if (matchedType) {
+        station.station_type_data = matchedType
+      }
+    }
+    return inspection as OutdoorInspectionWithRelations
+  })
 }
 
 // ============================================

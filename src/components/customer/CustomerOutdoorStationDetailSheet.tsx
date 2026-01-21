@@ -368,7 +368,7 @@ function OutdoorInspectionCard({
             )}
             {inspection.measurement_value !== null && inspection.measurement_value !== undefined && (
               <p className="text-xs text-slate-400 mt-0.5">
-                Mätning: {inspection.measurement_value} {inspection.measurement_unit || 'g'}
+                {inspection.station?.station_type_data?.measurement_label || 'Mätvärde'}: {inspection.measurement_value} {inspection.measurement_unit || 'st'}
               </p>
             )}
             <p className="text-xs text-slate-500 mt-1">

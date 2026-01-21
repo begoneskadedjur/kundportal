@@ -339,6 +339,11 @@ function InspectionCard({
             {inspection.findings && (
               <p className="text-xs text-slate-400 mt-0.5">{inspection.findings}</p>
             )}
+            {inspection.measurement_value !== null && inspection.measurement_value !== undefined && (
+              <p className="text-xs text-slate-400 mt-0.5">
+                {inspection.station?.station_type_data?.measurement_label || 'Mätvärde'}: {inspection.measurement_value} {inspection.measurement_unit || 'st'}
+              </p>
+            )}
             <p className="text-xs text-slate-500 mt-1">
               {inspection.technician?.name || 'BeGone tekniker'} • {format(new Date(inspection.inspected_at), "d MMM yyyy 'kl' HH:mm", { locale: sv })}
             </p>
