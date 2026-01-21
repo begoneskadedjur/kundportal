@@ -16,7 +16,6 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
-  Camera,
   ClipboardList,
   Crosshair,
   Box,
@@ -55,6 +54,7 @@ export function CustomerIndoorStationDetailSheet({
   onClose
 }: CustomerIndoorStationDetailSheetProps) {
   const [showAllInspections, setShowAllInspections] = useState(false)
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
 
   // Prioritera station_type_data (dynamisk från databas), fallback till legacy config
   const dynamicTypeData = station.station_type_data
@@ -162,7 +162,7 @@ export function CustomerIndoorStationDetailSheet({
                       <ClipboardList className="w-4 h-4 text-emerald-400" />
                       <h4 className="text-sm font-medium text-emerald-400">Senaste kontroll</h4>
                     </div>
-                    <InspectionCard inspection={latestInspection} isLatest />
+                    <InspectionCard inspection={latestInspection} isLatest onPhotoClick={setLightboxPhoto} />
                   </div>
                 )}
 
@@ -246,6 +246,7 @@ export function CustomerIndoorStationDetailSheet({
                           key={inspection.id}
                           inspection={inspection}
                           isLatest={index === 0 && !showAllInspections}
+                          onPhotoClick={setLightboxPhoto}
                         />
                       ))}
                     </div>
@@ -265,6 +266,29 @@ export function CustomerIndoorStationDetailSheet({
               </div>
             </div>
           </motion.div>
+
+          {/* Lightbox för inspektionsfoton */}
+          {lightboxPhoto && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setLightboxPhoto(null)}
+              className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
+            >
+              <img
+                src={lightboxPhoto}
+                alt="Inspektionsfoto"
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+              <button
+                onClick={() => setLightboxPhoto(null)}
+                className="absolute top-4 right-4 p-2 text-white/80 hover:text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </motion.div>
+          )}
         </>
       )}
     </AnimatePresence>
@@ -274,10 +298,12 @@ export function CustomerIndoorStationDetailSheet({
 // Inspektionskort-komponent
 function InspectionCard({
   inspection,
-  isLatest = false
+  isLatest = false,
+  onPhotoClick
 }: {
   inspection: IndoorStationInspectionWithRelations
   isLatest?: boolean
+  onPhotoClick?: (url: string) => void
 }) {
   const statusConfig = INSPECTION_STATUS_CONFIG[inspection.status] || {
     label: inspection.status || 'Okänd',
@@ -319,7 +345,16 @@ function InspectionCard({
           </div>
         </div>
         {inspection.photo_url && (
-          <Camera className="w-4 h-4 text-slate-500 flex-shrink-0" />
+          <button
+            onClick={() => onPhotoClick?.(inspection.photo_url!)}
+            className="w-16 h-16 rounded-lg overflow-hidden bg-slate-800 flex-shrink-0 hover:ring-2 hover:ring-emerald-500/50 transition-all"
+          >
+            <img
+              src={inspection.photo_url}
+              alt="Inspektionsfoto"
+              className="w-full h-full object-cover"
+            />
+          </button>
         )}
       </div>
     </div>
