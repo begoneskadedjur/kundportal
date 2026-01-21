@@ -18,12 +18,13 @@ import PremiumServiceRequest from '../../components/customer/PremiumServiceReque
 import ServiceActivityTimeline from '../../components/customer/ServiceActivityTimeline'
 import ServiceAssessmentSummary from '../../components/customer/ServiceAssessmentSummary'
 import PartnershipValueSection from '../../components/customer/PartnershipValueSection'
-import CustomerPortalNavigation from '../../components/customer/CustomerPortalNavigation'
+import CustomerPortalNavigation, { CustomerPortalView } from '../../components/customer/CustomerPortalNavigation'
 import CustomerStatistics from '../../components/customer/CustomerStatistics'
 import SanitationReports from './SanitationReports'
 import PendingQuoteNotification from '../../components/customer/PendingQuoteNotification'
 import QuoteListView from '../../components/customer/QuoteListView'
 import CustomerEquipmentView from '../../components/customer/CustomerEquipmentView'
+import InspectionSessionsView from '../../components/customer/InspectionSessionsView'
 
 // Customer type matching new database structure
 type Customer = {
@@ -62,7 +63,7 @@ const CustomerPortal: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showServiceRequest, setShowServiceRequest] = useState(false)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'equipment' | 'statistics' | 'reports' | 'quotes'>('dashboard')
+  const [currentView, setCurrentView] = useState<CustomerPortalView>('dashboard')
   const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
   const [dismissedNotification, setDismissedNotification] = useState(false)
 
@@ -248,10 +249,20 @@ const CustomerPortal: React.FC = () => {
     )
   }
 
-  // Equipment view component
-  const renderEquipmentView = () => (
+  // Stations view component (Fällor & stationer)
+  const renderStationsView = () => (
     customer ? (
       <CustomerEquipmentView
+        customerId={customer.id}
+        companyName={customer.company_name}
+      />
+    ) : null
+  )
+
+  // Inspections view component (Genomförda kontroller)
+  const renderInspectionsView = () => (
+    customer ? (
+      <InspectionSessionsView
         customerId={customer.id}
         companyName={customer.company_name}
       />
@@ -389,7 +400,8 @@ const CustomerPortal: React.FC = () => {
 
       {/* Content based on current view */}
       {currentView === 'dashboard' && renderDashboardView()}
-      {currentView === 'equipment' && renderEquipmentView()}
+      {currentView === 'stations' && renderStationsView()}
+      {currentView === 'inspections' && renderInspectionsView()}
       {currentView === 'statistics' && renderStatisticsView()}
       {currentView === 'reports' && renderReportsView()}
       {currentView === 'quotes' && renderQuotesView()}

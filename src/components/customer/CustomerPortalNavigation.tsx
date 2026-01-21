@@ -1,13 +1,16 @@
 // src/components/customer/CustomerPortalNavigation.tsx - Navigation for Customer Portal
 import React from 'react'
-import { BarChart3, Home, LogOut, FileText, Building2, Receipt, ClipboardCheck } from 'lucide-react'
+import { BarChart3, Home, LogOut, FileText, Building2, Receipt, ClipboardCheck, MapPin } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import Button from '../ui/Button'
 
+// Uppdaterade vyer: equipment → stations (Fällor & stationer), inspections (Genomförda kontroller)
+export type CustomerPortalView = 'dashboard' | 'stations' | 'inspections' | 'statistics' | 'reports' | 'quotes'
+
 interface CustomerPortalNavigationProps {
-  currentView: 'dashboard' | 'equipment' | 'statistics' | 'reports' | 'quotes'
-  onViewChange: (view: 'dashboard' | 'equipment' | 'statistics' | 'reports' | 'quotes') => void
+  currentView: CustomerPortalView
+  onViewChange: (view: CustomerPortalView) => void
   customerName: string
 }
 
@@ -74,17 +77,31 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
             </button>
 
             <button
-              onClick={() => onViewChange('equipment')}
+              onClick={() => onViewChange('stations')}
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
-                ${currentView === 'equipment'
+                ${currentView === 'stations'
                   ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}
             >
+              <MapPin className="w-4 h-4" />
+              Fällor & stationer
+            </button>
+
+            <button
+              onClick={() => onViewChange('inspections')}
+              className={`
+                px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
+                ${currentView === 'inspections'
+                  ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/25'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                }
+              `}
+            >
               <ClipboardCheck className="w-4 h-4" />
-              Service & Utrustning
+              Genomförda kontroller
             </button>
 
             <button
