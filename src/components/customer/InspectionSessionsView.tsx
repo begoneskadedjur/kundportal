@@ -28,6 +28,7 @@ import {
   getOutdoorInspectionsForSession,
   getIndoorInspectionsForSession
 } from '../../services/inspectionSessionService'
+import { useDebounce } from '../../hooks/useDebounce'
 import type { InspectionSessionWithRelations, OutdoorInspectionWithRelations } from '../../types/inspectionSession'
 import type { IndoorStationInspectionWithRelations, InspectionStatus } from '../../types/indoor'
 import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
@@ -62,6 +63,7 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
   const [sessions, setSessions] = useState<SessionWithInspections[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedSearchQuery = useDebounce(searchQuery, 300) // Debounce 300ms för prestanda
   const [showOnlyIssues, setShowOnlyIssues] = useState(false)
   const [lightboxPhotos, setLightboxPhotos] = useState<{ url: string; caption: string }[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(0)
@@ -188,9 +190,9 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
     let filteredOutdoor = outdoor
     let filteredIndoor = indoor
 
-    // Sök
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
+    // Sök - använd debouncerad sökfråga för prestanda
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase()
       filteredOutdoor = filteredOutdoor.filter(i =>
         i.station?.serial_number?.toLowerCase().includes(query) ||
         i.findings?.toLowerCase().includes(query)
@@ -371,7 +373,7 @@ export function InspectionSessionsView({ customerId, companyName }: InspectionSe
                 index={index}
                 onToggle={() => toggleSession(index)}
                 filterInspections={filterInspections}
-                searchQuery={searchQuery}
+                searchQuery={debouncedSearchQuery}
                 showOnlyIssues={showOnlyIssues}
                 onPhotoClick={openLightbox}
               />

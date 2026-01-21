@@ -1,41 +1,32 @@
-// src/components/customer/CustomerEquipmentView.tsx - Premium kundanpassad utrustningsvy
+// src/components/customer/CustomerEquipmentView.tsx - Kompakt kundanpassad utrustningsvy
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { format } from 'date-fns'
+import { sv } from 'date-fns/locale'
 import {
   MapPin,
   Shield,
-  Calendar,
-  Box,
-  Target,
-  Crosshair,
-  ChevronDown,
-  ChevronUp,
-  FileDown,
   RefreshCw,
-  Image as ImageIcon,
-  MessageSquare,
-  Filter,
-  Map,
-  List,
+  FileDown,
   Home,
-  Building2
+  Camera,
+  MessageSquare,
+  ExternalLink
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService } from '../../services/floorPlanService'
+import { IndoorStationService } from '../../services/indoorStationService'
 import { getOutdoorInspectionsByStation } from '../../services/inspectionSessionService'
 import {
   EquipmentPlacementWithRelations,
-  EquipmentType,
-  EquipmentStatus,
-  EQUIPMENT_TYPE_CONFIG,
   EQUIPMENT_STATUS_CONFIG,
-  getEquipmentTypeLabel,
   getEquipmentStatusLabel
 } from '../../types/database'
 import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
+import type { IndoorStationWithRelations } from '../../types/indoor'
+import type { FloorPlanWithRelations } from '../../services/floorPlanService'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
-import { CustomerIndoorEquipmentView } from './CustomerIndoorEquipmentView'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
+import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import { generateEquipmentPdf } from '../../utils/equipmentPdfGenerator'
 import toast from 'react-hot-toast'
@@ -45,73 +36,53 @@ interface CustomerEquipmentViewProps {
   companyName: string
 }
 
-// Ikon-komponent baserat pa utrustningstyp
-function EquipmentTypeIcon({ type, className = "w-5 h-5" }: { type: string; className?: string }) {
-  switch (type) {
-    case 'mechanical_trap':
-      return <Crosshair className={className} />
-    case 'concrete_station':
-      return <Box className={className} />
-    case 'bait_station':
-      return <Target className={className} />
-    default:
-      return <Box className={className} />
-  }
-}
-
-// Hjälpfunktion för att hämta typkonfiguration med fallback för dynamiska typer
-function getTypeConfig(equipmentType: string) {
-  const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipmentType]
-  if (legacyConfig) {
-    return {
-      color: legacyConfig.color,
-      label: legacyConfig.label
-    }
-  }
-  // Dynamisk typ - använd grå som standardfärg
-  return {
-    color: '#6b7280',
-    label: equipmentType || 'Okänd typ'
-  }
-}
-
 const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   customerId,
   companyName
 }) => {
   // State
   const [equipment, setEquipment] = useState<EquipmentPlacementWithRelations[]>([])
+  const [floorPlans, setFloorPlans] = useState<FloorPlanWithRelations[]>([])
+  const [indoorStationsByPlan, setIndoorStationsByPlan] = useState<Record<string, IndoorStationWithRelations[]>>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'map' | 'list'>('map')
-  const [filterType, setFilterType] = useState<EquipmentType | 'all'>('all')
-  const [filterStatus, setFilterStatus] = useState<EquipmentStatus | 'all'>('all')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
-  // Equipment type toggle (outdoor/indoor)
-  const [activeTab, setActiveTab] = useState<'outdoor' | 'indoor'>('outdoor')
-  const [indoorStationCount, setIndoorStationCount] = useState(0)
-
-  // Target floor plan och station för navigation
-  const [targetFloorPlanId, setTargetFloorPlanId] = useState<string | null>(null)
-  const [targetStationId, setTargetStationId] = useState<string | null>(null)
-
-  // Utomhus: highlighted station och inspektioner
-  const [highlightedOutdoorStationId, setHighlightedOutdoorStationId] = useState<string | null>(null)
+  // Utomhus detail sheet
   const [selectedOutdoorStation, setSelectedOutdoorStation] = useState<EquipmentPlacementWithRelations | null>(null)
   const [outdoorStationInspections, setOutdoorStationInspections] = useState<OutdoorInspectionWithRelations[]>([])
   const [isOutdoorDetailSheetOpen, setIsOutdoorDetailSheetOpen] = useState(false)
 
-  // Hamta utrustning
-  const fetchEquipment = useCallback(async () => {
+  // Inomhus detail sheet
+  const [selectedIndoorStation, setSelectedIndoorStation] = useState<IndoorStationWithRelations | null>(null)
+  const [isIndoorDetailSheetOpen, setIsIndoorDetailSheetOpen] = useState(false)
+
+  // Hämta all data
+  const fetchData = useCallback(async () => {
     try {
       setError(null)
-      const data = await EquipmentService.getEquipmentByCustomer(customerId)
-      setEquipment(data)
+
+      // Hämta utomhusstationer och planritningar parallellt
+      const [outdoorData, floorPlanData] = await Promise.all([
+        EquipmentService.getEquipmentByCustomer(customerId),
+        FloorPlanService.getFloorPlansByCustomer(customerId)
+      ])
+
+      setEquipment(outdoorData)
+      setFloorPlans(floorPlanData)
+
+      // Hämta inomhusstationer för varje planritning
+      const indoorData: Record<string, IndoorStationWithRelations[]> = {}
+      for (const plan of floorPlanData) {
+        const stations = await IndoorStationService.getStationsByFloorPlan(plan.id)
+        indoorData[plan.id] = stations
+      }
+      setIndoorStationsByPlan(indoorData)
+
     } catch (err) {
-      console.error('Fel vid hamtning av utrustning:', err)
-      setError('Kunde inte hamta utrustningsdata. Forsok igen senare.')
+      console.error('Fel vid hämtning av utrustning:', err)
+      setError('Kunde inte hämta utrustningsdata. Försök igen senare.')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -119,85 +90,72 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   }, [customerId])
 
   useEffect(() => {
-    fetchEquipment()
-  }, [fetchEquipment])
-
-  // Hämta antal inomhusstationer för kombinerad statistik
-  useEffect(() => {
-    const fetchIndoorCount = async () => {
-      try {
-        const floorPlans = await FloorPlanService.getFloorPlansByCustomer(customerId)
-        const totalIndoor = floorPlans.reduce((sum, fp) => sum + (fp.station_count || 0), 0)
-        setIndoorStationCount(totalIndoor)
-      } catch (error) {
-        console.error('Kunde inte hämta inomhusstationer:', error)
-      }
-    }
-    fetchIndoorCount()
-  }, [customerId])
+    fetchData()
+  }, [fetchData])
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    await fetchEquipment()
+    await fetchData()
   }
 
-  // Filtrerad utrustning
-  const filteredEquipment = useMemo(() => {
-    return equipment.filter(item => {
-      if (filterType !== 'all' && item.equipment_type !== filterType) return false
-      if (filterStatus !== 'all' && item.status !== filterStatus) return false
-      return true
+  // Räkna stationstyper dynamiskt (använd station_type_data)
+  const typeStats = useMemo(() => {
+    const stats = new Map<string, { label: string; color: string; count: number }>()
+
+    equipment.forEach(item => {
+      const typeName = item.station_type_data?.name || item.equipment_type || 'Okänd'
+      const typeColor = item.station_type_data?.color || '#6b7280'
+
+      if (stats.has(typeName)) {
+        stats.get(typeName)!.count++
+      } else {
+        stats.set(typeName, { label: typeName, color: typeColor, count: 1 })
+      }
     })
-  }, [equipment, filterType, filterStatus])
 
-  // Statistik
-  const stats = useMemo(() => ({
-    total: equipment.length,
-    active: equipment.filter(e => e.status === 'active').length,
-    byType: {
-      mechanical_trap: equipment.filter(e => e.equipment_type === 'mechanical_trap').length,
-      concrete_station: equipment.filter(e => e.equipment_type === 'concrete_station').length,
-      bait_station: equipment.filter(e => e.equipment_type === 'bait_station').length
-    },
-    recentlyPlaced: equipment.filter(e => {
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-      return new Date(e.placed_at) >= thirtyDaysAgo
-    }).length
-  }), [equipment])
+    return stats
+  }, [equipment])
 
-  // Hantera klick pa markor i kartan (utomhus)
-  const handleEquipmentClick = async (item: EquipmentPlacementWithRelations) => {
+  // Total inomhusstationer
+  const totalIndoorStations = useMemo(() => {
+    return Object.values(indoorStationsByPlan).reduce((sum, stations) => sum + stations.length, 0)
+  }, [indoorStationsByPlan])
+
+  // Hantera klick på utomhusstation
+  const handleOutdoorStationClick = async (item: EquipmentPlacementWithRelations) => {
     setSelectedOutdoorStation(item)
-    setHighlightedOutdoorStationId(item.id)
     setIsOutdoorDetailSheetOpen(true)
-    // Hämta inspektioner för stationen
     const inspections = await getOutdoorInspectionsByStation(item.id)
     setOutdoorStationInspections(inspections)
   }
 
-  // Stäng utomhus detail sheet
   const handleCloseOutdoorDetailSheet = () => {
     setIsOutdoorDetailSheetOpen(false)
-    setHighlightedOutdoorStationId(null)
     setTimeout(() => {
       setSelectedOutdoorStation(null)
       setOutdoorStationInspections([])
     }, 300)
   }
 
-  // Formatera datum for kund (utan exakt tid)
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('sv-SE', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    })
+  // Hantera klick på inomhusstation
+  const handleIndoorStationClick = (station: IndoorStationWithRelations) => {
+    setSelectedIndoorStation(station)
+    setIsIndoorDetailSheetOpen(true)
   }
 
-  // PDF-export med professionell BeGone-branding
-  const [exporting, setExporting] = useState(false)
+  const handleCloseIndoorDetailSheet = () => {
+    setIsIndoorDetailSheetOpen(false)
+    setTimeout(() => {
+      setSelectedIndoorStation(null)
+    }, 300)
+  }
 
+  // Formatera datum
+  const formatDate = (dateStr: string) => {
+    return format(new Date(dateStr), "d MMM yyyy", { locale: sv })
+  }
+
+  // PDF-export
   const handleExportPDF = async () => {
     if (equipment.length === 0) {
       toast.error('Ingen utrustning att exportera')
@@ -208,7 +166,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     try {
       await generateEquipmentPdf({
         customerName: companyName,
-        equipment: filteredEquipment
+        equipment
       })
       toast.success('PDF exporterad!')
     } catch (error) {
@@ -225,7 +183,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
         <div className="text-center">
           <LoadingSpinner />
-          <p className="text-white mt-4">Laddar er utrustningsoversikt...</p>
+          <p className="text-white mt-4">Laddar stationsöversikt...</p>
         </div>
       </div>
     )
@@ -235,18 +193,16 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-        <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-8 max-w-md text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <MapPin className="w-8 h-8 text-red-400" />
-          </div>
-          <h2 className="text-xl font-semibold text-white mb-2">Kunde inte ladda utrustning</h2>
-          <p className="text-slate-400 mb-6">{error}</p>
+        <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-6 max-w-md text-center">
+          <MapPin className="w-10 h-10 text-red-400 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-white mb-2">Kunde inte ladda data</h2>
+          <p className="text-slate-400 mb-4 text-sm">{error}</p>
           <button
             onClick={handleRefresh}
-            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors"
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors"
           >
             <RefreshCw className="w-4 h-4 inline mr-2" />
-            Forsok igen
+            Försök igen
           </button>
         </div>
       </div>
@@ -255,459 +211,299 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900/95 to-emerald-900/10">
-          <div className="absolute inset-0 opacity-50" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='60' height='60' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 60 0 L 0 0 0 60' fill='none' stroke='rgba(255,255,255,0.02)' stroke-width='1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)'/%3E%3C/svg%3E")`
-          }}></div>
-        </div>
-
-        {/* Animated gradient orbs */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-
-        {/* Hero Content */}
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            {/* Left side - Title */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                  <MapPin className="w-6 h-6 text-emerald-400" />
-                </div>
-                <div>
-                  <h1 className="text-3xl md:text-4xl font-bold text-white">
-                    Fällor & stationer
-                  </h1>
-                  <p className="text-slate-400">Översikt över er placerade skadedjursbekämpning</p>
-                </div>
-              </div>
-
-              {/* Company badge */}
-              <div className="flex items-center gap-2 bg-slate-800/50 backdrop-blur px-4 py-2 rounded-lg border border-slate-700/50 w-fit">
-                <Shield className="w-4 h-4 text-emerald-500" />
-                <span className="text-slate-300 font-medium">{companyName}</span>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Kompakt Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+              <MapPin className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Fällor & stationer</h1>
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{companyName}</span>
               </div>
             </div>
+          </div>
 
-            {/* Right side - Refresh button */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 rounded-xl text-slate-300 text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                {refreshing ? 'Uppdaterar...' : 'Uppdatera'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {/* Sammanfattningskort */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Totalt</p>
-            <p className="text-2xl font-bold text-white">{stats.total + indoorStationCount}</p>
-            <p className="text-xs text-slate-400">stationer</p>
-          </div>
-          <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Utomhus</p>
-            </div>
-            <p className="text-2xl font-bold text-white">{stats.total}</p>
-          </div>
-          <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Home className="w-3.5 h-3.5 text-blue-400" />
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Inomhus</p>
-            </div>
-            <p className="text-2xl font-bold text-white">{indoorStationCount}</p>
-          </div>
-          <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Aktiva</p>
-            <p className="text-2xl font-bold text-emerald-400">{stats.active}</p>
-            <p className="text-xs text-slate-400">av {stats.total} utomhus</p>
-          </div>
-        </div>
-
-        {/* Tab Toggle (Utomhus / Inomhus) */}
-        <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-4 mb-6">
-          <div className="flex items-center gap-2 bg-slate-900/50 rounded-xl p-1 w-fit">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setActiveTab('outdoor')}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                activeTab === 'outdoor'
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-              }`}
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 rounded-lg text-slate-300 text-sm transition-colors disabled:opacity-50"
             >
-              <MapPin className="w-4 h-4" />
-              Utomhus
-              <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
-                activeTab === 'outdoor' ? 'bg-emerald-600' : 'bg-slate-700'
-              }`}>
-                {stats.total}
-              </span>
+              <RefreshCw className={`w-4 h-4 inline mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Uppdatera
             </button>
             <button
-              onClick={() => setActiveTab('indoor')}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                activeTab === 'indoor'
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-              }`}
+              onClick={handleExportPDF}
+              disabled={exporting || equipment.length === 0}
+              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-sm transition-colors disabled:opacity-50"
             >
-              <Home className="w-4 h-4" />
-              Inomhus
-              <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
-                activeTab === 'indoor' ? 'bg-emerald-600' : 'bg-slate-700'
-              }`}>
-                {indoorStationCount}
-              </span>
+              <FileDown className="w-4 h-4 inline mr-1.5" />
+              {exporting ? 'Exporterar...' : 'PDF'}
             </button>
           </div>
         </div>
 
-        {/* Indoor Equipment View */}
-        {activeTab === 'indoor' && (
-          <CustomerIndoorEquipmentView
-            customerId={customerId}
-            companyName={companyName}
-            targetFloorPlanId={targetFloorPlanId}
-            targetStationId={targetStationId}
-            onFloorPlanNavigated={() => {
-              setTargetFloorPlanId(null)
-              setTargetStationId(null)
-            }}
-          />
-        )}
-
-        {/* Outdoor Equipment View */}
-        {activeTab === 'outdoor' && (
-          <>
-            {/* Controls Bar (för utomhus) */}
-            <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-4 mb-6">
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                {/* View Toggle */}
-                <div className="flex items-center gap-2 bg-slate-900/50 rounded-xl p-1">
-                  <button
-                    onClick={() => setViewMode('map')}
-                    className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                      viewMode === 'map'
-                        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                    }`}
-                  >
-                    <Map className="w-4 h-4" />
-                    Karta
-                  </button>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                      viewMode === 'list'
-                        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                    }`}
-                  >
-                    <List className="w-4 h-4" />
-                    Lista
-                  </button>
-                </div>
-
-                {/* Filters */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-slate-400" />
-                <span className="text-sm text-slate-400">Filter:</span>
-              </div>
-
-              {/* Type filter */}
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as EquipmentType | 'all')}
-                className="px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-              >
-                <option value="all">Alla typer</option>
-                {Object.entries(EQUIPMENT_TYPE_CONFIG).map(([type, config]) => (
-                  <option key={type} value={type}>
-                    {config.label} ({stats.byType[type as EquipmentType]})
-                  </option>
-                ))}
-              </select>
-
-              {/* Status filter */}
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as EquipmentStatus | 'all')}
-                className="px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-              >
-                <option value="all">Alla statusar</option>
-                {Object.entries(EQUIPMENT_STATUS_CONFIG).map(([status, config]) => (
-                  <option key={status} value={status}>
-                    {config.label}
-                  </option>
-                ))}
-              </select>
-
-              {/* Result count */}
-              <span className="text-sm text-slate-500">
-                {filteredEquipment.length} av {equipment.length}
-              </span>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                Uppdatera
-              </button>
-              <button
-                onClick={handleExportPDF}
-                disabled={exporting || equipment.length === 0}
-                className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {exporting ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <FileDown className="w-4 h-4" />
-                )}
-                {exporting ? 'Exporterar...' : 'Exportera PDF'}
-              </button>
-            </div>
+        {/* Kompakta sammanfattningskort */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="bg-slate-800/50 backdrop-blur rounded-lg border border-slate-700/50 p-3">
+            <p className="text-xs text-slate-500 uppercase">Totalt</p>
+            <p className="text-xl font-bold text-white">{equipment.length + totalIndoorStations}</p>
           </div>
-
-          {/* Equipment type legend */}
-          <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-slate-700/50">
-            {Object.entries(EQUIPMENT_TYPE_CONFIG).map(([type, config]) => {
-              const count = stats.byType[type as EquipmentType]
-              return (
-                <div key={type} className="flex items-center gap-2">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: config.color }}
-                  >
-                    <EquipmentTypeIcon type={type as EquipmentType} className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">{config.label}</p>
-                    <p className="text-xs text-slate-400">{count} st</p>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="bg-slate-800/50 backdrop-blur rounded-lg border border-slate-700/50 p-3">
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3 h-3 text-emerald-400" />
+              <p className="text-xs text-slate-500 uppercase">Utomhus</p>
+            </div>
+            <p className="text-xl font-bold text-white">{equipment.length}</p>
+          </div>
+          <div className="bg-slate-800/50 backdrop-blur rounded-lg border border-slate-700/50 p-3">
+            <div className="flex items-center gap-1.5">
+              <Home className="w-3 h-3 text-blue-400" />
+              <p className="text-xs text-slate-500 uppercase">Inomhus</p>
+            </div>
+            <p className="text-xl font-bold text-white">{totalIndoorStations}</p>
+          </div>
+          <div className="bg-slate-800/50 backdrop-blur rounded-lg border border-slate-700/50 p-3">
+            <p className="text-xs text-slate-500 uppercase">Planritningar</p>
+            <p className="text-xl font-bold text-white">{floorPlans.length}</p>
           </div>
         </div>
 
-        {/* Empty state */}
-        {equipment.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-12 text-center"
-          >
-            <div className="w-20 h-20 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <MapPin className="w-10 h-10 text-slate-500" />
+        {/* Sektion: Utomhus */}
+        {equipment.length > 0 && (
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-400" />
+                Utomhus
+                <span className="text-sm font-normal text-slate-400">({equipment.length} stationer)</span>
+              </h2>
+              {/* Typräkning */}
+              <div className="flex items-center gap-3">
+                {Array.from(typeStats.entries()).map(([typeName, data]) => (
+                  <div key={typeName} className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.color }} />
+                    <span>{data.label}: {data.count}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">Ingen utrustning placerad</h3>
-            <p className="text-slate-400 max-w-md mx-auto">
-              Nar var tekniker placerar utrustning hos er kommer den att visas har med exakta positioner pa kartan.
-            </p>
-          </motion.div>
-        ) : (
-          <>
-            {/* Map View */}
-            {viewMode === 'map' && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 overflow-hidden"
-              >
-                <EquipmentMap
-                  equipment={filteredEquipment}
-                  onEquipmentClick={handleEquipmentClick}
-                  height="500px"
-                  showControls={true}
-                  readOnly={true}
-                  enableClustering={filteredEquipment.length >= 5}
-                  showNumbers={true}
-                  highlightedStationId={highlightedOutdoorStationId}
-                />
-              </motion.div>
-            )}
 
-            {/* List View */}
-            {viewMode === 'list' && (
-              <div className="space-y-4">
-                <AnimatePresence>
-                  {filteredEquipment.map((item, index) => {
-                    const typeConfig = getTypeConfig(item.equipment_type)
-                    const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status] || {
-                      bgColor: 'bg-slate-500/20',
-                      borderColor: 'border-slate-500/30',
-                      color: 'slate-400',
-                      label: 'Okänd'
-                    }
-                    const isExpanded = expandedId === item.id
+            {/* Karta */}
+            <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 overflow-hidden mb-4">
+              <EquipmentMap
+                equipment={equipment}
+                onEquipmentClick={handleOutdoorStationClick}
+                height="350px"
+                showControls={true}
+                readOnly={true}
+                enableClustering={equipment.length >= 10}
+                showNumbers={true}
+              />
+            </div>
 
-                    return (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 overflow-hidden hover:border-slate-600/50 transition-colors"
-                      >
-                        {/* Main row */}
-                        <button
-                          onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                          className="w-full p-5 flex items-center gap-4 text-left"
+            {/* Tabell utomhus */}
+            <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-900/50 border-b border-slate-700/50">
+                      <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Nr</th>
+                      <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Typ</th>
+                      <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+                      <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Placerad</th>
+                      <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Kommentar</th>
+                      <th className="text-center px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Foto</th>
+                      <th className="px-4 py-2.5"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/30">
+                    {equipment.map((item, index) => {
+                      const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status] || {
+                        bgColor: 'bg-slate-500/20',
+                        color: 'slate-400'
+                      }
+                      return (
+                        <tr
+                          key={item.id}
+                          className="hover:bg-slate-700/30 transition-colors cursor-pointer"
+                          onClick={() => handleOutdoorStationClick(item)}
                         >
-                          {/* Equipment type icon */}
-                          <div
-                            className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: typeConfig.color }}
-                          >
-                            <EquipmentTypeIcon type={item.equipment_type} className="w-7 h-7 text-white" />
-                          </div>
-
-                          {/* Info */}
-                          <div className="flex-grow min-w-0">
-                            <div className="flex items-center gap-3 mb-1">
-                              <h3 className="text-lg font-semibold text-white">
-                                {getEquipmentTypeLabel(item.equipment_type)}
-                              </h3>
-                              <span
-                                className={`px-3 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} border ${statusConfig.borderColor}`}
-                                style={{ color: statusConfig.color }}
-                              >
-                                {getEquipmentStatusLabel(item.status)}
+                          <td className="px-4 py-2.5 text-white font-medium">{index + 1}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: item.station_type_data?.color || '#6b7280' }}
+                              />
+                              <span className="text-slate-300">
+                                {item.station_type_data?.name || item.equipment_type || 'Okänd'}
                               </span>
                             </div>
-                            <p className="text-sm text-slate-400">
-                              Placerad {formatDate(item.placed_at)}
-                            </p>
-                          </div>
-
-                          {/* Indicators */}
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            {item.photo_url && (
-                              <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                <ImageIcon className="w-4 h-4 text-blue-400" />
-                              </div>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-0.5 rounded text-xs ${statusConfig.bgColor}`} style={{ color: statusConfig.color }}>
+                              {getEquipmentStatusLabel(item.status)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-400">{formatDate(item.placed_at)}</td>
+                          <td className="px-4 py-2.5 text-slate-400 max-w-[200px] truncate">
+                            {item.comment || '-'}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            {item.photo_url ? (
+                              <Camera className="w-4 h-4 text-blue-400 mx-auto" />
+                            ) : (
+                              <span className="text-slate-600">-</span>
                             )}
-                            {item.comment && (
-                              <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                                <MessageSquare className="w-4 h-4 text-purple-400" />
-                              </div>
-                            )}
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                              isExpanded ? 'bg-emerald-500/20' : 'bg-slate-700/50'
-                            }`}>
-                              {isExpanded ? (
-                                <ChevronUp className="w-5 h-5 text-emerald-400" />
-                              ) : (
-                                <ChevronDown className="w-5 h-5 text-slate-400" />
-                              )}
-                            </div>
-                          </div>
-                        </button>
-
-                        {/* Expanded content */}
-                        <AnimatePresence>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.2 }}
-                              className="border-t border-slate-700/50"
-                            >
-                              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Left column - Details */}
-                                <div className="space-y-4">
-                                  {/* Placement date */}
-                                  <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                      <Calendar className="w-5 h-5 text-amber-400" />
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Placeringsdatum</p>
-                                      <p className="text-white mt-0.5">{formatDate(item.placed_at)}</p>
-                                    </div>
-                                  </div>
-
-                                  {/* Comment */}
-                                  {item.comment && (
-                                    <div className="flex items-start gap-3">
-                                      <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <MessageSquare className="w-5 h-5 text-purple-400" />
-                                      </div>
-                                      <div>
-                                        <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Teknikerns anteckning</p>
-                                        <p className="text-slate-300 mt-0.5 whitespace-pre-wrap">{item.comment}</p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Right column - Photo */}
-                                {item.photo_url && (
-                                  <div>
-                                    <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Foto</p>
-                                    <img
-                                      src={item.photo_url}
-                                      alt="Utrustningsfoto"
-                                      className="w-full max-w-sm rounded-xl border border-slate-700/50 cursor-pointer hover:opacity-90 transition-opacity"
-                                      onClick={() => handleEquipmentClick(item)}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Action button */}
-                              <div className="px-5 pb-5">
-                                <button
-                                  onClick={() => handleEquipmentClick(item)}
-                                  className="w-full md:w-auto px-6 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
-                                >
-                                  <MapPin className="w-4 h-4" />
-                                  Visa pa karta
-                                </button>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                    )
-                  })}
-                </AnimatePresence>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ExternalLink className="w-4 h-4 text-slate-500 hover:text-emerald-400" />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </>
+            </div>
+          </section>
         )}
-          </>
+
+        {/* Sektion: Inomhus - per planritning */}
+        {floorPlans.map((plan) => {
+          const stations = indoorStationsByPlan[plan.id] || []
+          if (stations.length === 0) return null
+
+          return (
+            <section key={plan.id} className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <Home className="w-5 h-5 text-blue-400" />
+                <h2 className="text-lg font-semibold text-white">
+                  {plan.building_name ? `${plan.building_name} - ` : ''}{plan.name}
+                </h2>
+                <span className="text-sm text-slate-400">({stations.length} stationer)</span>
+              </div>
+
+              {/* Planritningsbild om den finns */}
+              {plan.image_url && (
+                <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 overflow-hidden mb-4">
+                  <img
+                    src={plan.image_url}
+                    alt={plan.name}
+                    className="w-full max-h-[300px] object-contain bg-slate-900"
+                  />
+                </div>
+              )}
+
+              {/* Tabell för planritning */}
+              <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-900/50 border-b border-slate-700/50">
+                        <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Nr</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Typ</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Placerad</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Plats</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Kommentar</th>
+                        <th className="text-center px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Foto</th>
+                        <th className="px-4 py-2.5"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/30">
+                      {stations.map((station) => {
+                        const statusConfig = {
+                          active: { bgColor: 'bg-emerald-500/20', color: '#10b981', label: 'Aktiv' },
+                          inactive: { bgColor: 'bg-slate-500/20', color: '#6b7280', label: 'Inaktiv' },
+                          needs_service: { bgColor: 'bg-amber-500/20', color: '#f59e0b', label: 'Behöver service' },
+                          removed: { bgColor: 'bg-red-500/20', color: '#ef4444', label: 'Borttagen' }
+                        }[station.status] || { bgColor: 'bg-slate-500/20', color: '#6b7280', label: station.status }
+
+                        return (
+                          <tr
+                            key={station.id}
+                            className="hover:bg-slate-700/30 transition-colors cursor-pointer"
+                            onClick={() => handleIndoorStationClick(station)}
+                          >
+                            <td className="px-4 py-2.5 text-white font-medium">{station.station_number || '-'}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: station.station_type_data?.color || '#6b7280' }}
+                                />
+                                <span className="text-slate-300">
+                                  {station.station_type_data?.name || station.station_type || 'Okänd'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className={`px-2 py-0.5 rounded text-xs ${statusConfig.bgColor}`} style={{ color: statusConfig.color }}>
+                                {statusConfig.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-400">{formatDate(station.placed_at)}</td>
+                            <td className="px-4 py-2.5 text-slate-400 max-w-[150px] truncate">
+                              {station.location_description || '-'}
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-400 max-w-[150px] truncate">
+                              {station.comment || '-'}
+                            </td>
+                            <td className="px-4 py-2.5 text-center">
+                              {station.photo_url ? (
+                                <Camera className="w-4 h-4 text-blue-400 mx-auto" />
+                              ) : (
+                                <span className="text-slate-600">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <ExternalLink className="w-4 h-4 text-slate-500 hover:text-blue-400" />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          )
+        })}
+
+        {/* Tom state */}
+        {equipment.length === 0 && floorPlans.length === 0 && (
+          <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-12 text-center">
+            <MapPin className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">Ingen utrustning placerad</h3>
+            <p className="text-slate-400 text-sm">
+              När vår tekniker placerar utrustning hos er kommer den att visas här.
+            </p>
+          </div>
         )}
       </div>
 
-      {/* Customer Outdoor Station Detail Sheet - med inspektionshistorik */}
+      {/* Detail Sheets */}
       {selectedOutdoorStation && (
         <CustomerOutdoorStationDetailSheet
           station={selectedOutdoorStation}
           inspections={outdoorStationInspections}
           isOpen={isOutdoorDetailSheetOpen}
           onClose={handleCloseOutdoorDetailSheet}
+        />
+      )}
+
+      {selectedIndoorStation && (
+        <CustomerIndoorStationDetailSheet
+          station={selectedIndoorStation}
+          inspections={[]}
+          isOpen={isIndoorDetailSheetOpen}
+          onClose={handleCloseIndoorDetailSheet}
         />
       )}
     </div>
