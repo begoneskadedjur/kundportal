@@ -123,8 +123,9 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   } | null>(null)
   const [historyLoading, setHistoryLoading] = useState(false)
 
-  // Target floor plan för navigation från inspektionslistan
+  // Target floor plan och station för navigation från inspektionslistan
   const [targetFloorPlanId, setTargetFloorPlanId] = useState<string | null>(null)
+  const [targetStationId, setTargetStationId] = useState<string | null>(null)
 
   // Hamta utrustning
   const fetchEquipment = useCallback(async () => {
@@ -571,6 +572,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                         onStationClick={(stationId, location, floorPlanId) => {
                           if (floorPlanId) {
                             setTargetFloorPlanId(floorPlanId)
+                            setTargetStationId(stationId)
                           }
                           setActiveTab(location)
                         }}
@@ -599,7 +601,11 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
             customerId={customerId}
             companyName={companyName}
             targetFloorPlanId={targetFloorPlanId}
-            onFloorPlanNavigated={() => setTargetFloorPlanId(null)}
+            targetStationId={targetStationId}
+            onFloorPlanNavigated={() => {
+              setTargetFloorPlanId(null)
+              setTargetStationId(null)
+            }}
           />
         )}
 

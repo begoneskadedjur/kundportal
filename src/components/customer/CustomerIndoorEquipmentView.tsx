@@ -29,6 +29,7 @@ interface CustomerIndoorEquipmentViewProps {
   customerId: string
   companyName: string
   targetFloorPlanId?: string | null
+  targetStationId?: string | null
   onFloorPlanNavigated?: () => void
 }
 
@@ -36,6 +37,7 @@ export function CustomerIndoorEquipmentView({
   customerId,
   companyName,
   targetFloorPlanId,
+  targetStationId,
   onFloorPlanNavigated
 }: CustomerIndoorEquipmentViewProps) {
   // Data state
@@ -51,6 +53,7 @@ export function CustomerIndoorEquipmentView({
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
   const [filterType, setFilterType] = useState<IndoorStationType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<IndoorStationStatus | 'all'>('all')
+  const [highlightedStationId, setHighlightedStationId] = useState<string | null>(null)
 
   // Hämta planritningar
   const loadFloorPlans = useCallback(async () => {
@@ -107,16 +110,24 @@ export function CustomerIndoorEquipmentView({
     }
   }, [selectedFloorPlan?.id, loadStations])
 
-  // Navigera till target floor plan om angiven (från inspektionslistan)
+  // Navigera till target floor plan och highlighta station (från inspektionslistan)
   useEffect(() => {
     if (targetFloorPlanId && floorPlans.length > 0) {
       const targetPlan = floorPlans.find(p => p.id === targetFloorPlanId)
       if (targetPlan) {
         setSelectedFloorPlan(targetPlan)
+        // Highlighta stationen om angiven
+        if (targetStationId) {
+          setHighlightedStationId(targetStationId)
+          // Ta bort highlight efter 5 sekunder
+          const timer = setTimeout(() => setHighlightedStationId(null), 5000)
+          onFloorPlanNavigated?.()
+          return () => clearTimeout(timer)
+        }
         onFloorPlanNavigated?.()
       }
     }
-  }, [targetFloorPlanId, floorPlans, onFloorPlanNavigated])
+  }, [targetFloorPlanId, targetStationId, floorPlans, onFloorPlanNavigated])
 
   // Refresh
   const handleRefresh = async () => {
@@ -294,6 +305,7 @@ export function CustomerIndoorEquipmentView({
             imageHeight={selectedFloorPlan.image_height}
             stations={filteredStations}
             selectedStationId={selectedStation?.id}
+            highlightedStationId={highlightedStationId}
             placementMode="view"
             selectedType={null}
             previewPosition={null}
