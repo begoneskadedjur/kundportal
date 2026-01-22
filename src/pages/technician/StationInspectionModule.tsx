@@ -178,6 +178,9 @@ export default function StationInspectionModule() {
   // Foto lightbox
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
 
+  // Bekräftelsedialog för att avsluta inspektion
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
+
   // Senaste inspektion och aktivitetsstationer (för ankomstkort)
   const [lastInspection, setLastInspection] = useState<{
     completed_at: string | null
@@ -1145,9 +1148,9 @@ export default function StationInspectionModule() {
 
             {/* Session status - bara visa när aktiv */}
             {session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
-              <Button onClick={handleCompleteInspection} loading={isSubmitting}>
-                <Check className="w-4 h-4 mr-2" />
-                Avsluta
+              <Button onClick={() => setShowCompleteConfirm(true)} loading={isSubmitting}>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Markera som färdig
               </Button>
             )}
           </div>
@@ -1860,6 +1863,73 @@ export default function StationInspectionModule() {
             >
               <X className="w-6 h-6 text-white" />
             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bekräftelsedialog för att avsluta inspektion */}
+      <AnimatePresence>
+        {showCompleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+            onClick={() => setShowCompleteConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-slate-800 rounded-xl p-5 max-w-sm w-full shadow-xl border border-slate-700"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-amber-500/20 rounded-full">
+                  <AlertTriangle className="w-6 h-6 text-amber-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Markera som färdig?</h3>
+              </div>
+
+              <p className="text-slate-300 mb-2">
+                Har du inspekterat alla stationer?
+              </p>
+
+              {progress && (
+                <div className="bg-slate-900/50 rounded-lg p-3 mb-4 text-sm">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Utomhus:</span>
+                    <span className={progress.outdoor.inspected === progress.outdoor.total ? 'text-green-400' : 'text-amber-400'}>
+                      {progress.outdoor.inspected}/{progress.outdoor.total}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Inomhus:</span>
+                    <span className={progress.indoor.inspected === progress.indoor.total ? 'text-green-400' : 'text-amber-400'}>
+                      {progress.indoor.inspected}/{progress.indoor.total}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowCompleteConfirm(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCompleteConfirm(false)
+                    handleCompleteInspection()
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  Ja, markera färdig
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
