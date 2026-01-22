@@ -183,6 +183,12 @@ export default function StationInspectionModule() {
   } | null>(null)
   const [activityStationIds, setActivityStationIds] = useState<Set<string>>(new Set())
 
+  // Auto-start: Om inspektion sparas före manuell start, starta sessionen automatiskt
+  const [shouldAutoStartOnSave, setShouldAutoStartOnSave] = useState(false)
+
+  // Expanderad planritning för förhandsvisning på ankomstsidan
+  const [expandedFloorPlan, setExpandedFloorPlan] = useState<any | null>(null)
+
   // Ladda data
   useEffect(() => {
     async function loadData() {
@@ -483,11 +489,18 @@ export default function StationInspectionModule() {
   }
 
   // Välj station (från karta, planritning eller lista)
+  // Tillåter klick även under 'scheduled' - auto-start vid första sparning
   const handleSelectStation = useCallback((station: StationData) => {
-    if (session?.status !== 'in_progress') {
-      toast.error('Starta inspektionen först')
+    if (session?.status === 'completed') {
+      toast.error('Denna inspektion är redan avslutad')
       return
     }
+
+    // Om session inte är startad, markera för auto-start vid första sparning
+    if (session?.status === 'scheduled') {
+      setShouldAutoStartOnSave(true)
+    }
+
     setSelectedStation(station)
     setSelectedStatus('ok')
     setInspectionNotes('')
@@ -767,6 +780,22 @@ export default function StationInspectionModule() {
     try {
       setIsSubmitting(true)
 
+      // Auto-starta session om det är första inspektionen (innan manuell start)
+      let currentSession = session
+      if (shouldAutoStartOnSave && session.status === 'scheduled') {
+        const updated = await startInspectionSession(session.id)
+        if (updated) {
+          currentSession = { ...session, status: 'in_progress', started_at: new Date().toISOString() }
+          setSession(currentSession)
+          setShouldAutoStartOnSave(false)
+          toast.success('Inspektion startad!')
+        } else {
+          toast.error('Kunde inte starta inspektionen')
+          setIsSubmitting(false)
+          return
+        }
+      }
+
       let photoPath: string | null = null
 
       // Ladda upp foto om det finns
@@ -789,7 +818,7 @@ export default function StationInspectionModule() {
 
       const inspectionData = {
         station_id: selectedStation.id,
-        session_id: session.id,
+        session_id: currentSession.id,
         status: selectedStatus,
         findings: inspectionNotes || undefined,
         photo_path: photoPath || undefined,
@@ -798,27 +827,27 @@ export default function StationInspectionModule() {
       }
 
       if (isOutdoor) {
-        await createOutdoorInspection(inspectionData, session.technician_id || undefined)
+        await createOutdoorInspection(inspectionData, currentSession.technician_id || undefined)
 
         // Uppdatera session count
-        await updateInspectionSession(session.id, {
-          inspected_outdoor_stations: session.inspected_outdoor_stations + 1
+        await updateInspectionSession(currentSession.id, {
+          inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
         })
 
         setSession({
-          ...session,
-          inspected_outdoor_stations: session.inspected_outdoor_stations + 1
+          ...currentSession,
+          inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
         })
       } else {
-        await createIndoorInspection(inspectionData, session.technician_id || undefined)
+        await createIndoorInspection(inspectionData, currentSession.technician_id || undefined)
 
-        await updateInspectionSession(session.id, {
-          inspected_indoor_stations: session.inspected_indoor_stations + 1
+        await updateInspectionSession(currentSession.id, {
+          inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
         })
 
         setSession({
-          ...session,
-          inspected_indoor_stations: session.inspected_indoor_stations + 1
+          ...currentSession,
+          inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
         })
       }
 
@@ -1264,58 +1293,82 @@ export default function StationInspectionModule() {
             )}
           </motion.div>
 
-          {/* Senaste inspektion */}
-          {lastInspection && (
+          {/* Interaktiv karta med utomhusstationer */}
+          {outdoorStations.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="glass rounded-2xl p-5"
+              className="glass rounded-2xl overflow-hidden"
             >
-              <div className="flex items-center gap-2 mb-3">
-                <History className="w-5 h-5 text-slate-400" />
-                <h3 className="font-medium text-white">Senaste inspektion</h3>
+              <div className="p-4 border-b border-slate-700/50">
+                <h3 className="font-medium text-white flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-blue-400" />
+                  Utomhusstationer ({outdoorStations.length})
+                </h3>
+                <p className="text-slate-400 text-xs mt-1">Klicka på en station för att se historik eller utföra kontroll</p>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Datum</p>
-                  <p className="text-white">{formatDate(lastInspection.completed_at)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Tekniker</p>
-                  <p className="text-white">{lastInspection.technician_name || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Kontrollerade</p>
-                  <p className="text-white">{lastInspection.total_inspected} stationer</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Med aktivitet</p>
-                  <p className={`font-medium ${lastInspection.stations_with_activity > 0 ? 'text-amber-400' : 'text-green-400'}`}>
-                    {lastInspection.stations_with_activity} stationer
-                  </p>
-                </div>
+              <div className="h-[250px]">
+                <EquipmentMap
+                  equipment={outdoorStations as unknown as EquipmentPlacementWithRelations[]}
+                  selectedId={null}
+                  onEquipmentClick={(eq) => {
+                    const station = outdoorStations.find(s => s.id === eq.id)
+                    if (station) handleSelectStation(station)
+                  }}
+                  showNumbers={true}
+                  height="250px"
+                />
               </div>
-
-              {/* Varning om aktivitet */}
-              {lastInspection.stations_with_activity > 0 && (
-                <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-amber-200 text-sm font-medium">
-                      {lastInspection.stations_with_activity} stationer hade aktivitet
-                    </p>
-                    <p className="text-amber-200/70 text-xs mt-1">
-                      Dessa stationer är markerade med varningssymbol i listan
-                    </p>
-                  </div>
-                </div>
-              )}
             </motion.div>
           )}
 
-          {/* Översikt stationer */}
+          {/* Interaktivt planritningsgalleri */}
+          {floorPlans.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="glass rounded-2xl p-4"
+            >
+              <h3 className="font-medium text-white mb-3 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-purple-400" />
+                Planritningar ({floorPlans.length})
+              </h3>
+              <p className="text-slate-400 text-xs mb-3">Klicka för att expandera och se stationer</p>
+
+              {/* Miniatyrgalleri - horisontell scroll */}
+              <div className="overflow-x-auto pb-2 -mx-4 px-4">
+                <div className="flex gap-3">
+                  {floorPlans.map(plan => {
+                    const stationCount = indoorStations.filter(s => s.floor_plan_id === plan.id).length
+                    return (
+                      <button
+                        key={plan.id}
+                        onClick={() => setExpandedFloorPlan(plan)}
+                        className="flex-shrink-0 w-64 group"
+                      >
+                        <div className="aspect-video rounded-xl overflow-hidden relative border-2 border-transparent group-hover:border-purple-500/50 transition-colors">
+                          <img
+                            src={plan.image_url}
+                            alt={plan.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                          <div className="absolute bottom-2 left-3 right-3">
+                            <p className="text-white font-medium text-sm truncate">{plan.name}</p>
+                            <p className="text-slate-300 text-xs">{stationCount} stationer</p>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Kombinerad översikt + senaste inspektion */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1327,47 +1380,117 @@ export default function StationInspectionModule() {
               <h3 className="font-medium text-white">Översikt</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Antal stationer */}
               <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <MapPin className="w-5 h-5 text-blue-400" />
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <MapPin className="w-4 h-4 text-blue-400" />
                   <span className="text-2xl font-bold text-white">{outdoorStations.length}</span>
                 </div>
                 <p className="text-slate-400 text-sm">Utomhus</p>
               </div>
               <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Building2 className="w-5 h-5 text-purple-400" />
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <Building2 className="w-4 h-4 text-purple-400" />
                   <span className="text-2xl font-bold text-white">{indoorStations.length}</span>
                 </div>
                 <p className="text-slate-400 text-sm">Inomhus</p>
               </div>
             </div>
 
-            {floorPlans.length > 0 && (
-              <p className="text-slate-500 text-sm">
-                {floorPlans.length} planritning{floorPlans.length !== 1 ? 'ar' : ''} tillgängliga
-              </p>
+            {/* Senaste inspektion - kompakt */}
+            {lastInspection && (
+              <div className="mt-4 pt-4 border-t border-slate-700/50">
+                <div className="flex justify-between items-center text-sm mb-2">
+                  <span className="text-slate-400 flex items-center gap-2">
+                    <History className="w-4 h-4" />
+                    Senaste kontroll:
+                  </span>
+                  <span className="text-white">{formatDate(lastInspection.completed_at)}</span>
+                </div>
+                {lastInspection.stations_with_activity > 0 && (
+                  <div className="flex items-center gap-2 text-amber-400 text-sm bg-amber-500/10 px-3 py-2 rounded-lg">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>{lastInspection.stations_with_activity} stationer hade aktivitet</span>
+                  </div>
+                )}
+              </div>
             )}
           </motion.div>
 
-          {/* Starta-knapp - stor och tydlig */}
+          {/* Starta-knapp - stor och tydlig med gradient */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <Button
+            <button
               onClick={handleStartInspection}
-              loading={isSubmitting}
-              fullWidth
-              className="py-4 text-lg"
+              disabled={isSubmitting}
+              className="w-full py-5 bg-gradient-to-r from-emerald-600 to-emerald-500
+                         hover:from-emerald-500 hover:to-emerald-400
+                         disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed
+                         text-white text-lg font-semibold rounded-2xl
+                         flex items-center justify-center gap-3
+                         shadow-lg shadow-emerald-500/25
+                         transition-all duration-300"
             >
-              <Play className="w-5 h-5 mr-2" />
-              Starta inspektion
-            </Button>
+              {isSubmitting ? (
+                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Play className="w-6 h-6" />
+                  Starta inspektion
+                  <span className="bg-white/20 px-3 py-1 rounded-full text-sm">
+                    {outdoorStations.length + indoorStations.length} stationer
+                  </span>
+                </>
+              )}
+            </button>
           </motion.div>
         </div>
+      )}
+
+      {/* Modal för expanderad planritning */}
+      {expandedFloorPlan && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-black/90 flex flex-col"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 bg-slate-900/80 backdrop-blur-sm">
+            <div>
+              <h3 className="text-white font-medium">{expandedFloorPlan.name}</h3>
+              <p className="text-slate-400 text-sm">
+                {indoorStations.filter(s => s.floor_plan_id === expandedFloorPlan.id).length} stationer
+              </p>
+            </div>
+            <button
+              onClick={() => setExpandedFloorPlan(null)}
+              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Planritning med stationer */}
+          <div className="flex-1">
+            <FloorPlanViewer
+              imageUrl={expandedFloorPlan.image_url}
+              stations={indoorStations.filter(s => s.floor_plan_id === expandedFloorPlan.id)}
+              selectedStationId={null}
+              placementMode="view"
+              onStationClick={(station) => {
+                setExpandedFloorPlan(null)
+                handleSelectStation(station)
+              }}
+              showNumbers={true}
+              height="calc(100vh - 80px)"
+            />
+          </div>
+        </motion.div>
       )}
 
       {/* Content - endast under aktiv inspektion */}
