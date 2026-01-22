@@ -77,6 +77,34 @@ import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
 import type { IndoorStationWithRelations } from '../../types/indoor'
 
+// Hjälpfunktion för att bestämma färg baserat på mätvärde och tröskelvärden
+// direction: 'above' = värden över tröskel är dåliga (standard för förbrukning)
+// direction: 'below' = värden under tröskel är dåliga
+function getMeasurementColor(
+  value: number | null | undefined,
+  warningThreshold: number | null | undefined,
+  criticalThreshold: number | null | undefined,
+  direction: string | null | undefined = 'above'
+): 'green' | 'amber' | 'red' | 'default' {
+  if (value === null || value === undefined) return 'default'
+
+  const isAbove = direction !== 'below'
+
+  if (criticalThreshold !== null && criticalThreshold !== undefined) {
+    if (isAbove ? value >= criticalThreshold : value <= criticalThreshold) {
+      return 'red'
+    }
+  }
+
+  if (warningThreshold !== null && warningThreshold !== undefined) {
+    if (isAbove ? value >= warningThreshold : value <= warningThreshold) {
+      return 'amber'
+    }
+  }
+
+  return 'green'
+}
+
 // Lokal typ för station (både indoor och outdoor)
 interface StationData {
   id: string
@@ -1874,14 +1902,14 @@ export default function StationInspectionModule() {
                 <div className="bg-slate-900/50 rounded-lg p-3 mb-4 text-sm">
                   <div className="flex justify-between text-slate-400">
                     <span>Utomhus:</span>
-                    <span className={progress.outdoor.inspected === progress.outdoor.total ? 'text-green-400' : 'text-amber-400'}>
-                      {progress.outdoor.inspected}/{progress.outdoor.total}
+                    <span className={progress.outdoorProgress.inspected === progress.outdoorProgress.total ? 'text-green-400' : 'text-amber-400'}>
+                      {progress.outdoorProgress.inspected}/{progress.outdoorProgress.total}
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-400">
                     <span>Inomhus:</span>
-                    <span className={progress.indoor.inspected === progress.indoor.total ? 'text-green-400' : 'text-amber-400'}>
-                      {progress.indoor.inspected}/{progress.indoor.total}
+                    <span className={progress.indoorProgress.inspected === progress.indoorProgress.total ? 'text-green-400' : 'text-amber-400'}>
+                      {progress.indoorProgress.inspected}/{progress.indoorProgress.total}
                     </span>
                   </div>
                 </div>
@@ -2039,11 +2067,25 @@ export default function StationInspectionModule() {
                               <span className="text-slate-300">
                                 {INSPECTION_STATUS_CONFIG[item.status]?.label || item.status}
                               </span>
-                              {item.measurement_value !== null && (
-                                <span className="text-amber-400 font-mono">
-                                  {item.measurement_value}g
-                                </span>
-                              )}
+                              {item.measurement_value !== null && (() => {
+                                const histColor = getMeasurementColor(
+                                  item.measurement_value,
+                                  selectedStation?.station_type_data?.threshold_warning,
+                                  selectedStation?.station_type_data?.threshold_critical,
+                                  selectedStation?.station_type_data?.threshold_direction
+                                )
+                                const histColorClass = {
+                                  green: 'text-green-400',
+                                  amber: 'text-amber-400',
+                                  red: 'text-red-400',
+                                  default: 'text-slate-300'
+                                }[histColor]
+                                return (
+                                  <span className={`${histColorClass} font-mono`}>
+                                    {item.measurement_value}g
+                                  </span>
+                                )
+                              })()}
                             </div>
                             <div className="flex items-center gap-2">
                               {item.technician && (
@@ -2108,44 +2150,60 @@ export default function StationInspectionModule() {
               </div>
 
               {/* Measurement field - dynamic based on station type */}
-              {selectedStation.station_type_data?.measurement_label && (
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    {selectedStation.station_type_data.measurement_label}
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={measurementValue}
-                      onChange={(e) => setMeasurementValue(e.target.value)}
-                      placeholder="0"
-                      step="0.1"
-                      min="0"
-                      className="flex-1 bg-slate-800 border border-slate-600 rounded-xl p-3 text-white placeholder-slate-500 focus:outline-none focus:border-green-500"
-                    />
-                    <span className="text-slate-400 text-sm">
-                      {selectedStation.station_type_data.measurement_unit === 'gram' ? 'g' :
-                       selectedStation.station_type_data.measurement_unit === 'st' ? 'st' :
-                       selectedStation.station_type_data.measurement_unit || ''}
-                    </span>
-                  </div>
-                  {/* Threshold indicators */}
-                  {(selectedStation.station_type_data.threshold_warning || selectedStation.station_type_data.threshold_critical) && (
-                    <div className="mt-2 flex items-center gap-4 text-xs">
-                      {selectedStation.station_type_data.threshold_warning && (
-                        <span className="text-amber-400">
-                          Varning: {selectedStation.station_type_data.threshold_warning}
-                        </span>
-                      )}
-                      {selectedStation.station_type_data.threshold_critical && (
-                        <span className="text-red-400">
-                          Kritisk: {selectedStation.station_type_data.threshold_critical}
-                        </span>
-                      )}
+              {selectedStation.station_type_data?.measurement_label && (() => {
+                const numValue = measurementValue ? parseFloat(measurementValue) : null
+                const color = getMeasurementColor(
+                  numValue,
+                  selectedStation.station_type_data?.threshold_warning,
+                  selectedStation.station_type_data?.threshold_critical,
+                  selectedStation.station_type_data?.threshold_direction
+                )
+                const inputColorClass = {
+                  green: 'border-green-500 text-green-400',
+                  amber: 'border-amber-500 text-amber-400',
+                  red: 'border-red-500 text-red-400',
+                  default: 'border-slate-600 text-white'
+                }[color]
+
+                return (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      {selectedStation.station_type_data.measurement_label}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={measurementValue}
+                        onChange={(e) => setMeasurementValue(e.target.value)}
+                        placeholder="0"
+                        step="0.1"
+                        min="0"
+                        className={`flex-1 bg-slate-800 border rounded-xl p-3 placeholder-slate-500 focus:outline-none focus:ring-1 ${inputColorClass}`}
+                      />
+                      <span className="text-slate-400 text-sm">
+                        {selectedStation.station_type_data.measurement_unit === 'gram' ? 'g' :
+                         selectedStation.station_type_data.measurement_unit === 'st' ? 'st' :
+                         selectedStation.station_type_data.measurement_unit || ''}
+                      </span>
                     </div>
-                  )}
-                </div>
-              )}
+                    {/* Threshold indicators */}
+                    {(selectedStation.station_type_data.threshold_warning || selectedStation.station_type_data.threshold_critical) && (
+                      <div className="mt-2 flex items-center gap-4 text-xs">
+                        {selectedStation.station_type_data.threshold_warning && (
+                          <span className="text-amber-400">
+                            Varning: {selectedStation.station_type_data.threshold_warning}
+                          </span>
+                        )}
+                        {selectedStation.station_type_data.threshold_critical && (
+                          <span className="text-red-400">
+                            Kritisk: {selectedStation.station_type_data.threshold_critical}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Photo capture */}
               <div className="mb-6">
