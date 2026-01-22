@@ -124,9 +124,6 @@ interface InspectionHistoryItem {
   } | null
 }
 
-// ViewMode för utomhus
-type OutdoorViewMode = 'map' | 'list'
-
 export default function StationInspectionModule() {
   const { caseId } = useParams<{ caseId: string }>()
   const navigate = useNavigate()
@@ -140,7 +137,6 @@ export default function StationInspectionModule() {
   const [indoorStations, setIndoorStations] = useState<StationData[]>([])
   const [floorPlans, setFloorPlans] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'outdoor' | 'indoor'>('outdoor')
-  const [outdoorViewMode, setOutdoorViewMode] = useState<OutdoorViewMode>('map')
   const [selectedFloorPlanId, setSelectedFloorPlanId] = useState<string | null>(null)
 
   // Inspektionsmodal state
@@ -175,6 +171,12 @@ export default function StationInspectionModule() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [stationHistory, setStationHistory] = useState<InspectionHistoryItem[]>([])
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
+
+  // Snabb-OK bekräftelsedialog
+  const [quickOkStation, setQuickOkStation] = useState<StationData | null>(null)
+
+  // Foto lightbox
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
 
   // Senaste inspektion och aktivitetsstationer (för ankomstkort)
   const [lastInspection, setLastInspection] = useState<{
@@ -950,11 +952,16 @@ export default function StationInspectionModule() {
     }
   }
 
-  // Snabb-OK: Spara station som OK direkt utan att öppna modal
-  const handleQuickOk = async (station: StationData, e: React.MouseEvent) => {
+  // Snabb-OK: Visa bekräftelsedialog
+  const handleQuickOk = (station: StationData, e: React.MouseEvent) => {
     e.stopPropagation() // Förhindra att modalen öppnas
-
     if (!session || session.status === 'completed') return
+    setQuickOkStation(station) // Visa bekräftelsedialog
+  }
+
+  // Bekräfta snabb-OK: Faktiskt spara
+  const confirmQuickOk = async () => {
+    if (!quickOkStation || !session) return
 
     try {
       // Auto-starta session om det behövs
@@ -967,14 +974,15 @@ export default function StationInspectionModule() {
           toast.success('Inspektion startad!')
         } else {
           toast.error('Kunde inte starta inspektionen')
+          setQuickOkStation(null)
           return
         }
       }
 
-      const isOutdoor = outdoorStations.some(s => s.id === station.id)
+      const isOutdoor = outdoorStations.some(s => s.id === quickOkStation.id)
 
       const inspectionData = {
-        station_id: station.id,
+        station_id: quickOkStation.id,
         session_id: currentSession.id,
         status: 'ok' as InspectionStatus,
       }
@@ -999,10 +1007,10 @@ export default function StationInspectionModule() {
         })
       }
 
-      setInspectedStationIds(prev => new Set(prev).add(station.id))
+      setInspectedStationIds(prev => new Set(prev).add(quickOkStation.id))
       setInspectionResults(prev => ({
         ...prev,
-        [station.id]: {
+        [quickOkStation.id]: {
           status: 'ok',
           findings: null,
           measurementValue: null,
@@ -1013,9 +1021,11 @@ export default function StationInspectionModule() {
       }))
 
       toast.success('Station markerad som OK')
+      setQuickOkStation(null) // Stäng dialog
     } catch (err) {
       console.error('Error quick-OK inspection:', err)
       toast.error('Kunde inte spara')
+      setQuickOkStation(null)
     }
   }
 
@@ -1426,35 +1436,9 @@ export default function StationInspectionModule() {
                 </motion.div>
               )}
 
-              {/* View mode toggle for outdoor */}
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex bg-slate-800 rounded-lg p-1">
-                  <button
-                    onClick={() => setOutdoorViewMode('map')}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
-                      outdoorViewMode === 'map'
-                        ? 'bg-green-500 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Map className="w-4 h-4" />
-                    Karta
-                  </button>
-                  <button
-                    onClick={() => setOutdoorViewMode('list')}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
-                      outdoorViewMode === 'list'
-                        ? 'bg-green-500 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <List className="w-4 h-4" />
-                    Lista
-                  </button>
-                </div>
-
-                {/* Wizard start-knapp (dold om wizard redan är aktiv) */}
-                {wizardMode !== 'outdoor' && outdoorStations.length > 0 && (
+              {/* Wizard start-knapp (dold om wizard redan är aktiv) */}
+              {wizardMode !== 'outdoor' && outdoorStations.length > 0 && (
+                <div className="flex justify-end">
                   <button
                     onClick={startOutdoorWizard}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
@@ -1462,105 +1446,108 @@ export default function StationInspectionModule() {
                     <Wand2 className="w-4 h-4" />
                     Starta wizard
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
               {outdoorStations.length === 0 ? (
                 <div className="glass rounded-xl p-8 text-center">
                   <MapPin className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                   <p className="text-slate-400">Inga utomhusstationer</p>
                 </div>
-              ) : outdoorViewMode === 'map' ? (
-                // Map view - ökad höjd för bättre mobil UX
-                <div className="glass rounded-xl overflow-hidden">
-                  <EquipmentMap
-                    equipment={outdoorEquipment}
-                    height="min(55vh, 450px)"
-                    readOnly
-                    showControls={true}
-                    showNumbers={true}
-                    enableClustering={false}
-                    onEquipmentClick={handleOutdoorStationClick}
-                    inspectedStationIds={inspectedStationIds}
-                    highlightedStationId={wizardMode === 'outdoor' ? currentWizardStationId : null}
-                  />
-                </div>
               ) : (
-                // List view
-                <div className="space-y-3">
-                  {outdoorStations.map((station) => {
-                    const isInspected = inspectedStationIds.has(station.id)
-                    const stationNumber = outdoorNumberMap[station.id] || '?'
-                    const typeName = station.station_type_data?.name || station.equipment_type || station.station_type
-                    const hadActivity = activityStationIds.has(station.id)
+                <>
+                  {/* Karta */}
+                  <div className="glass rounded-xl overflow-hidden">
+                    <EquipmentMap
+                      equipment={outdoorEquipment}
+                      height="min(55vh, 450px)"
+                      readOnly
+                      showControls={true}
+                      showNumbers={true}
+                      enableClustering={false}
+                      onEquipmentClick={handleOutdoorStationClick}
+                      inspectedStationIds={inspectedStationIds}
+                      highlightedStationId={wizardMode === 'outdoor' ? currentWizardStationId : null}
+                    />
+                  </div>
 
-                    return (
-                      <motion.button
-                        key={station.id}
-                        onClick={() => handleSelectStation(station)}
-                        disabled={session?.status === 'completed'}
-                        className={`w-full glass rounded-xl p-4 text-left transition-all ${
-                          session?.status !== 'completed'
-                            ? 'hover:bg-slate-800/50 cursor-pointer'
-                            : 'opacity-60 cursor-not-allowed'
-                        } ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
-                        whileHover={session?.status !== 'completed' ? { scale: 1.01 } : {}}
-                        whileTap={session?.status !== 'completed' ? { scale: 0.99 } : {}}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {isInspected ? (
-                              <CheckCircle2 className="w-6 h-6 text-green-500" />
-                            ) : hadActivity ? (
-                              <div className="relative">
+                  {/* Lista under kartan */}
+                  <div className="space-y-3 mt-4">
+                    <p className="text-sm text-slate-400 px-1">{outdoorStations.length} utomhusstationer</p>
+                    {outdoorStations.map((station) => {
+                      const isInspected = inspectedStationIds.has(station.id)
+                      const stationNumber = outdoorNumberMap[station.id] || '?'
+                      const typeName = station.station_type_data?.name || station.equipment_type || station.station_type
+                      const hadActivity = activityStationIds.has(station.id)
+
+                      return (
+                        <motion.button
+                          key={station.id}
+                          onClick={() => handleSelectStation(station)}
+                          disabled={session?.status === 'completed'}
+                          className={`w-full glass rounded-xl p-4 text-left transition-all ${
+                            session?.status !== 'completed'
+                              ? 'hover:bg-slate-800/50 cursor-pointer'
+                              : 'opacity-60 cursor-not-allowed'
+                          } ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
+                          whileHover={session?.status !== 'completed' ? { scale: 1.01 } : {}}
+                          whileTap={session?.status !== 'completed' ? { scale: 0.99 } : {}}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {isInspected ? (
+                                <CheckCircle2 className="w-6 h-6 text-green-500" />
+                              ) : hadActivity ? (
+                                <div className="relative">
+                                  <div
+                                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                                    style={{ backgroundColor: station.station_type_data?.color || '#6b7280' }}
+                                  >
+                                    {stationNumber}
+                                  </div>
+                                  <AlertTriangle className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-400" />
+                                </div>
+                              ) : (
                                 <div
                                   className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                  style={{ backgroundColor: station.station_type_data?.color || '#6b7280' }}
+                                  style={{
+                                    backgroundColor: station.station_type_data?.color || '#6b7280'
+                                  }}
                                 >
                                   {stationNumber}
                                 </div>
-                                <AlertTriangle className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-400" />
+                              )}
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-white">Station {stationNumber}</p>
+                                  {hadActivity && !isInspected && (
+                                    <span className="text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">
+                                      Aktivitet senast
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-slate-400">{typeName}</p>
                               </div>
-                            ) : (
-                              <div
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                style={{
-                                  backgroundColor: station.station_type_data?.color || '#6b7280'
-                                }}
-                              >
-                                {stationNumber}
-                              </div>
-                            )}
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-white">Station {stationNumber}</p>
-                                {hadActivity && !isInspected && (
-                                  <span className="text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">
-                                    Aktivitet senast
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-slate-400">{typeName}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {/* Snabb-OK-knapp */}
+                              {!isInspected && session?.status !== 'completed' && (
+                                <button
+                                  onClick={(e) => handleQuickOk(station, e)}
+                                  className="p-2 bg-green-500/20 hover:bg-green-500/40 text-green-400 rounded-lg transition-colors"
+                                  title="Markera som OK"
+                                >
+                                  <Check className="w-5 h-5" />
+                                </button>
+                              )}
+                              <ChevronRight className="w-5 h-5 text-slate-500" />
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {/* Snabb-OK-knapp */}
-                            {!isInspected && session?.status !== 'completed' && (
-                              <button
-                                onClick={(e) => handleQuickOk(station, e)}
-                                className="p-2 bg-green-500/20 hover:bg-green-500/40 text-green-400 rounded-lg transition-colors"
-                                title="Markera som OK"
-                              >
-                                <Check className="w-5 h-5" />
-                              </button>
-                            )}
-                            <ChevronRight className="w-5 h-5 text-slate-500" />
-                          </div>
-                        </div>
-                      </motion.button>
-                    )
-                  })}
-                </div>
+                        </motion.button>
+                      )
+                    })}
+                  </div>
+                </>
               )}
             </motion.div>
           ) : (
@@ -1813,6 +1800,70 @@ export default function StationInspectionModule() {
       </div>
       )}
 
+      {/* Snabb-OK bekräftelsedialog */}
+      <AnimatePresence>
+        {quickOkStation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+            onClick={() => setQuickOkStation(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-800 rounded-xl p-5 max-w-xs w-full shadow-xl border border-slate-700"
+            >
+              <p className="text-white text-center mb-4">
+                Markera <span className="font-bold text-green-400">Station {outdoorNumberMap[quickOkStation.id] || indoorNumberMap[quickOkStation.id] || '?'}</span> som OK?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setQuickOkStation(null)}
+                  className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button
+                  onClick={confirmQuickOk}
+                  className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  OK
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Foto lightbox */}
+      <AnimatePresence>
+        {lightboxPhoto && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+            onClick={() => setLightboxPhoto(null)}
+          >
+            <img
+              src={lightboxPhoto}
+              alt="Foto"
+              className="max-w-full max-h-full object-contain"
+            />
+            <button
+              onClick={() => setLightboxPhoto(null)}
+              className="absolute top-4 right-4 p-2 bg-slate-800/50 hover:bg-slate-700 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6 text-white" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Inspection Modal */}
       <AnimatePresence>
         {selectedStation && (
@@ -1926,7 +1977,10 @@ export default function StationInspectionModule() {
                                   src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/inspection-photos/${item.photo_path}`}
                                   alt="Tidigare foto"
                                   className="w-24 h-24 object-cover rounded-lg mt-2 cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => window.open(`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/inspection-photos/${item.photo_path}`, '_blank')}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setLightboxPhoto(`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/inspection-photos/${item.photo_path}`)
+                                  }}
                                 />
                               )}
                             </div>
