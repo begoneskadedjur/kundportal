@@ -606,14 +606,9 @@ export default function StationInspectionModule() {
     setCurrentWizardStationId(queue[0])
     setWizardMode('outdoor')
 
-    // Öppna första stationen för inspektion
-    const firstStation = outdoorStations.find(s => s.id === queue[0])
-    if (firstStation) {
-      handleSelectStation(firstStation)
-    }
-
-    toast.success(`Wizard startad! ${queue.length} stationer kvar.`)
-  }, [session?.status, outdoorStations, inspectedStationIds, outdoorNumberMap, handleSelectStation])
+    // Stationen pulserar nu - teknikern klickar själv på den
+    toast.success(`Wizard startad! Klicka på den pulserande stationen.`)
+  }, [session?.status, outdoorStations, inspectedStationIds, outdoorNumberMap])
 
   // Starta indoor wizard för vald planritning
   const startIndoorWizard = useCallback(() => {
@@ -646,14 +641,9 @@ export default function StationInspectionModule() {
     setCurrentWizardStationId(queue[0])
     setWizardMode('indoor')
 
-    // Öppna första stationen för inspektion
-    const firstStation = indoorStations.find(s => s.id === queue[0])
-    if (firstStation) {
-      handleSelectStation(firstStation)
-    }
-
-    toast.success(`Wizard startad! ${queue.length} stationer kvar.`)
-  }, [session?.status, selectedFloorPlanId, filteredIndoorStations, inspectedStationIds, indoorNumberMap, indoorStations, handleSelectStation])
+    // Stationen pulserar nu - teknikern klickar själv på den
+    toast.success(`Wizard startad! Klicka på den pulserande stationen.`)
+  }, [session?.status, selectedFloorPlanId, filteredIndoorStations, inspectedStationIds, indoorNumberMap])
 
   // Gå till nästa station i wizard
   const wizardNextStation = useCallback(() => {
@@ -674,14 +664,8 @@ export default function StationInspectionModule() {
 
     const nextStationId = wizardStationQueue[nextIndex]
     setCurrentWizardStationId(nextStationId)
-
-    // Öppna nästa station för inspektion
-    const stations = wizardMode === 'outdoor' ? outdoorStations : indoorStations
-    const nextStation = stations.find(s => s.id === nextStationId)
-    if (nextStation) {
-      handleSelectStation(nextStation)
-    }
-  }, [wizardMode, wizardStationQueue, currentWizardStationId, outdoorStations, indoorStations, handleSelectStation])
+    // Stationen pulserar nu - teknikern klickar själv på den
+  }, [wizardMode, wizardStationQueue, currentWizardStationId])
 
   // Gå till föregående station i wizard
   const wizardPrevStation = useCallback(() => {
@@ -697,14 +681,8 @@ export default function StationInspectionModule() {
 
     const prevStationId = wizardStationQueue[prevIndex]
     setCurrentWizardStationId(prevStationId)
-
-    // Öppna föregående station för inspektion
-    const stations = wizardMode === 'outdoor' ? outdoorStations : indoorStations
-    const prevStation = stations.find(s => s.id === prevStationId)
-    if (prevStation) {
-      handleSelectStation(prevStation)
-    }
-  }, [wizardMode, wizardStationQueue, currentWizardStationId, outdoorStations, indoorStations, handleSelectStation])
+    // Stationen pulserar nu - teknikern klickar själv på den
+  }, [wizardMode, wizardStationQueue, currentWizardStationId])
 
   // Hoppa över station i wizard
   const wizardSkipStation = useCallback(() => {
@@ -724,15 +702,11 @@ export default function StationInspectionModule() {
     if (newQueue.length > 0) {
       const nextId = newQueue[0]
       setCurrentWizardStationId(nextId)
-      const stations = wizardMode === 'outdoor' ? outdoorStations : indoorStations
-      const nextStation = stations.find(s => s.id === nextId)
-      if (nextStation) {
-        handleSelectStation(nextStation)
-      }
+      // Stationen pulserar nu - teknikern klickar själv på den
     }
 
     toast('Station hoppades över')
-  }, [wizardMode, currentWizardStationId, wizardStationQueue, outdoorStations, indoorStations, handleSelectStation])
+  }, [wizardMode, currentWizardStationId, wizardStationQueue])
 
   // Avsluta wizard
   const stopWizard = useCallback(() => {
@@ -2082,7 +2056,7 @@ export default function StationInspectionModule() {
                   <div className="space-y-2">
                     {stationHistory.slice(0, 5).map((item) => {
                       const isExpanded = expandedHistoryId === item.id
-                      const hasDetails = item.findings || item.photo_path || item.technician
+                      const hasDetails = item.findings || item.photo_url || item.technician
 
                       return (
                         <div key={item.id} className="bg-slate-900/50 rounded-lg overflow-hidden">
@@ -2125,14 +2099,14 @@ export default function StationInspectionModule() {
                                   "{item.findings}"
                                 </p>
                               )}
-                              {item.photo_path && (
+                              {item.photo_url && (
                                 <img
-                                  src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/inspection-photos/${item.photo_path}`}
+                                  src={item.photo_url}
                                   alt="Tidigare foto"
                                   className="w-24 h-24 object-cover rounded-lg mt-2 cursor-pointer hover:opacity-80 transition-opacity"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    setLightboxPhoto(`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/inspection-photos/${item.photo_path}`)
+                                    setLightboxPhoto(item.photo_url)
                                   }}
                                 />
                               )}

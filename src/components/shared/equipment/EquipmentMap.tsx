@@ -79,6 +79,31 @@ function MapViewUpdater({
   return null
 }
 
+// Komponent för att centrera kartan på highlighted station (wizard-läge)
+function HighlightedStationCenterer({
+  equipment,
+  highlightedStationId
+}: {
+  equipment: EquipmentPlacementWithRelations[]
+  highlightedStationId?: string | null
+}) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (highlightedStationId) {
+      const station = equipment.find(e => e.id === highlightedStationId)
+      if (station && station.latitude && station.longitude) {
+        // Smooth pan till stationen
+        map.flyTo([station.latitude, station.longitude], Math.max(map.getZoom(), 17), {
+          duration: 0.5
+        })
+      }
+    }
+  }, [highlightedStationId, equipment, map])
+
+  return null
+}
+
 // Komponent för att hantera kartklick
 function MapClickHandler({
   onMapClick,
@@ -313,6 +338,7 @@ export function EquipmentMap({
 
         <MapViewUpdater equipment={equipment} previewPosition={previewPosition} />
         <MapClickHandler onMapClick={onMapClick} readOnly={readOnly} />
+        <HighlightedStationCenterer equipment={equipment} highlightedStationId={highlightedStationId} />
 
         {/* Befintlig utrustning - med eller utan klustring */}
         {/* Key tvingar omrendering när equipment ändras (t.ex. efter borttagning) */}

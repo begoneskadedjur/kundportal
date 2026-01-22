@@ -164,6 +164,33 @@ export function FloorPlanViewer({
     }
   }, [])
 
+  // Auto-centrera på highlighted station (wizard-läge)
+  useEffect(() => {
+    if (!highlightedStationId || !imageLoaded || !coverDimensions || !containerRef.current) return
+
+    const station = stations.find(s => s.id === highlightedStationId)
+    if (!station) return
+
+    // Stationens position är i procent av bilden
+    const stationX = (station.position_x / 100) * coverDimensions.width
+    const stationY = (station.position_y / 100) * coverDimensions.height
+
+    // Hämta container-dimensioner
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const containerCenterX = containerRect.width / 2
+    const containerCenterY = containerRect.height / 2
+
+    // Beräkna translation för att centrera stationen
+    // Vi vill att stationen ska hamna i mitten av containern
+    const translateX = containerCenterX - stationX
+    const translateY = containerCenterY - stationY
+
+    // Använd setTransform för att panorera till stationen
+    if (transformRef.current) {
+      transformRef.current.setTransform(translateX, translateY, 1, 300, 'easeOut')
+    }
+  }, [highlightedStationId, imageLoaded, coverDimensions, stations])
+
   const isPlacementActive = placementMode === 'place' || placementMode === 'move'
 
   return (
