@@ -171,23 +171,34 @@ export function FloorPlanViewer({
     const station = stations.find(s => s.id === highlightedStationId)
     if (!station) return
 
-    // Stationens position är i procent av bilden
-    const stationX = (station.position_x / 100) * coverDimensions.width
-    const stationY = (station.position_y / 100) * coverDimensions.height
-
     // Hämta container-dimensioner
     const containerRect = containerRef.current.getBoundingClientRect()
-    const containerCenterX = containerRect.width / 2
-    const containerCenterY = containerRect.height / 2
+    const containerWidth = containerRect.width
+    const containerHeight = containerRect.height
 
-    // Beräkna translation för att centrera stationen
-    // Vi vill att stationen ska hamna i mitten av containern
-    const translateX = containerCenterX - stationX
-    const translateY = containerCenterY - stationY
+    // Zooma in lite för bättre synlighet (1.5x)
+    const targetScale = 1.5
 
-    // Använd setTransform för att panorera till stationen
+    // Stationens position i pixlar på den skalade bilden
+    const stationX = (station.position_x / 100) * coverDimensions.width * targetScale
+    const stationY = (station.position_y / 100) * coverDimensions.height * targetScale
+
+    // Beräkna translation för att centrera stationen i containern
+    // Bilden är centrerad i containern, så vi måste ta hänsyn till offset
+    const scaledImageWidth = coverDimensions.width * targetScale
+    const scaledImageHeight = coverDimensions.height * targetScale
+
+    // Offset för centrering av bilden i containern
+    const imageOffsetX = (containerWidth - scaledImageWidth) / 2
+    const imageOffsetY = (containerHeight - scaledImageHeight) / 2
+
+    // Beräkna translation så att stationen hamnar i mitten
+    const translateX = (containerWidth / 2) - stationX + imageOffsetX
+    const translateY = (containerHeight / 2) - stationY + imageOffsetY
+
+    // Använd setTransform för att panorera till stationen med animation
     if (transformRef.current) {
-      transformRef.current.setTransform(translateX, translateY, 1, 300, 'easeOut')
+      transformRef.current.setTransform(translateX, translateY, targetScale, 500, 'easeOut')
     }
   }, [highlightedStationId, imageLoaded, coverDimensions, stations])
 
