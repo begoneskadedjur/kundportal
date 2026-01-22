@@ -576,8 +576,8 @@ export default function StationInspectionModule() {
 
   // Starta outdoor wizard
   const startOutdoorWizard = useCallback(() => {
-    if (session?.status !== 'in_progress') {
-      toast.error('Starta inspektionen först')
+    if (session?.status === 'completed') {
+      toast.error('Inspektionen är avslutad')
       return
     }
 
@@ -611,8 +611,8 @@ export default function StationInspectionModule() {
 
   // Starta indoor wizard för vald planritning
   const startIndoorWizard = useCallback(() => {
-    if (session?.status !== 'in_progress') {
-      toast.error('Starta inspektionen först')
+    if (session?.status === 'completed') {
+      toast.error('Inspektionen är avslutad')
       return
     }
 
