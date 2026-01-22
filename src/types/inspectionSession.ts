@@ -125,6 +125,13 @@ export interface InspectionSessionWithRelations extends StationInspectionSession
     total_inspected: number
     stations_with_activity: number
   } | null
+  // Sammanfattning av statusar (för historikvisning)
+  inspection_summary?: {
+    ok: number
+    warning: number
+    critical: number
+    total: number
+  } | null
 }
 
 /**

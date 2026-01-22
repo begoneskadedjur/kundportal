@@ -32,7 +32,10 @@ import { FloorPlanService } from '../../services/floorPlanService'
 import { IndoorStationService } from '../../services/indoorStationService'
 import {
   getCompletedSessionsForCustomer,
+  getCompletedSessionsWithSummary,
   getOutdoorInspectionsByStation,
+  getOutdoorInspectionsForSession,
+  getIndoorInspectionsForSession,
 } from '../../services/inspectionSessionService'
 import { useDebounce } from '../../hooks/useDebounce'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
@@ -42,7 +45,7 @@ import type {
   IndoorStationInspectionWithRelations,
   InspectionStatus
 } from '../../types/indoor'
-import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
+import type { OutdoorInspectionWithRelations, InspectionSessionWithRelations } from '../../types/inspectionSession'
 import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
 import { calculateStationStatus, CALCULATED_STATUS_CONFIG, MEASUREMENT_UNIT_CONFIG, type CalculatedStatus } from '../../types/stationTypes'
 import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
@@ -123,9 +126,15 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
 
   // Historik-sektion
   const [showHistory, setShowHistory] = useState(false)
-  const [historySessions, setHistorySessions] = useState<any[]>([])
+  const [historySessions, setHistorySessions] = useState<InspectionSessionWithRelations[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
+
+  // Modal för historik-detaljer
+  const [selectedHistorySession, setSelectedHistorySession] = useState<InspectionSessionWithRelations | null>(null)
+  const [loadingHistoryDetail, setLoadingHistoryDetail] = useState(false)
+  const [historyDetailSections, setHistoryDetailSections] = useState<StationSection[]>([])
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
 
   // Ladda all data
   const fetchData = useCallback(async () => {
@@ -319,8 +328,8 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
 
     setLoadingHistory(true)
     try {
-      // Hämta de senaste 10 sessionerna (exkludera den senaste som redan visas)
-      const sessions = await getCompletedSessionsForCustomer(customerId, 11)
+      // Hämta de senaste 10 sessionerna med sammanfattning (exkludera den senaste som redan visas)
+      const sessions = await getCompletedSessionsWithSummary(customerId, 11)
       // Skippa första (den visas redan i sammanfattningen)
       setHistorySessions(sessions.slice(1))
       setHistoryLoaded(true)
@@ -338,6 +347,165 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     if (newShowHistory && !historyLoaded) {
       loadHistorySessions()
     }
+  }
+
+  // Öppna historisk session i modal
+  const handleOpenHistorySession = async (session: InspectionSessionWithRelations) => {
+    setSelectedHistorySession(session)
+    setIsHistoryModalOpen(true)
+    setLoadingHistoryDetail(true)
+
+    try {
+      // Hämta inspektionsdata för denna session
+      const [outdoorInspections, indoorInspections] = await Promise.all([
+        getOutdoorInspectionsForSession(session.id),
+        getIndoorInspectionsForSession(session.id)
+      ])
+
+      // Omvandla till StationSection-format
+      const detailSections: StationSection[] = []
+
+      // Utomhussektioner
+      if (outdoorInspections.length > 0) {
+        const outdoorStations: StationWithLatestInspection[] = outdoorInspections.map(insp => {
+          const station = insp.station as any
+          const stationTypeData = station?.station_type_data
+          const measurementValue = insp.measurement_value
+
+          let calculatedStatus: CalculatedStatus = 'ok'
+          if (stationTypeData && measurementValue !== null) {
+            calculatedStatus = calculateStationStatus(
+              {
+                ...stationTypeData,
+                description: null,
+                requires_serial_number: false,
+                is_active: true,
+                threshold_warning: stationTypeData.threshold_warning ?? null,
+                threshold_critical: stationTypeData.threshold_critical ?? null,
+                threshold_direction: stationTypeData.threshold_direction ?? 'above'
+              },
+              measurementValue
+            )
+          }
+
+          return {
+            id: station?.id || insp.id,
+            stationNumber: station?.serial_number || 'Okänd',
+            stationType: stationTypeData?.name || station?.equipment_type || 'Okänd typ',
+            typeColor: stationTypeData?.color || '#6b7280',
+            measurementLabel: stationTypeData?.measurement_label || null,
+            measurementUnit: stationTypeData?.measurement_unit || 'numeric',
+            thresholdWarning: stationTypeData?.threshold_warning ?? null,
+            thresholdCritical: stationTypeData?.threshold_critical ?? null,
+            thresholdDirection: stationTypeData?.threshold_direction ?? 'above',
+            latestInspection: {
+              id: insp.id,
+              inspectedAt: insp.inspected_at,
+              status: insp.status as InspectionStatus,
+              findings: insp.findings,
+              photoUrl: insp.photo_url,
+              measurementValue: insp.measurement_value,
+              technicianName: insp.technician?.name || null
+            },
+            calculatedStatus
+          }
+        })
+
+        detailSections.push({
+          id: 'outdoor',
+          name: 'Utomhus',
+          icon: 'outdoor',
+          stations: outdoorStations
+        })
+      }
+
+      // Inomhussektioner - gruppera per planritning
+      if (indoorInspections.length > 0) {
+        const byFloorPlan = new Map<string, typeof indoorInspections>()
+
+        indoorInspections.forEach(insp => {
+          const station = insp.station as any
+          const floorPlan = station?.floor_plan
+          const planId = floorPlan?.id || 'unknown'
+          if (!byFloorPlan.has(planId)) {
+            byFloorPlan.set(planId, [])
+          }
+          byFloorPlan.get(planId)!.push(insp)
+        })
+
+        byFloorPlan.forEach((planInspections, planId) => {
+          const firstInsp = planInspections[0]
+          const floorPlan = (firstInsp.station as any)?.floor_plan
+
+          const indoorStations: StationWithLatestInspection[] = planInspections.map(insp => {
+            const station = insp.station as any
+            const stationTypeData = station?.station_type_data
+            const measurementValue = insp.measurement_value
+
+            let calculatedStatus: CalculatedStatus = 'ok'
+            if (stationTypeData && measurementValue !== null) {
+              calculatedStatus = calculateStationStatus(
+                {
+                  ...stationTypeData,
+                  description: null,
+                  requires_serial_number: false,
+                  is_active: true,
+                  threshold_warning: stationTypeData.threshold_warning ?? null,
+                  threshold_critical: stationTypeData.threshold_critical ?? null,
+                  threshold_direction: stationTypeData.threshold_direction ?? 'above'
+                },
+                measurementValue
+              )
+            }
+
+            return {
+              id: station?.id || insp.id,
+              stationNumber: station?.station_number?.toString() || 'Okänd',
+              stationType: stationTypeData?.name || station?.station_type || 'Okänd typ',
+              typeColor: stationTypeData?.color || '#6b7280',
+              measurementLabel: stationTypeData?.measurement_label || null,
+              measurementUnit: stationTypeData?.measurement_unit || 'numeric',
+              thresholdWarning: stationTypeData?.threshold_warning ?? null,
+              thresholdCritical: stationTypeData?.threshold_critical ?? null,
+              thresholdDirection: stationTypeData?.threshold_direction ?? 'above',
+              latestInspection: {
+                id: insp.id,
+                inspectedAt: insp.inspected_at,
+                status: insp.status as InspectionStatus,
+                findings: insp.findings,
+                photoUrl: insp.photo_url,
+                measurementValue: insp.measurement_value ?? null,
+                technicianName: insp.technician?.name || null
+              },
+              calculatedStatus,
+              floorPlanId: floorPlan?.id,
+              floorPlanName: floorPlan?.name
+            }
+          })
+
+          detailSections.push({
+            id: planId,
+            name: floorPlan?.name || 'Okänd planritning',
+            icon: 'indoor',
+            buildingName: floorPlan?.building_name,
+            stations: indoorStations
+          })
+        })
+      }
+
+      setHistoryDetailSections(detailSections)
+    } catch (error) {
+      console.error('Error loading history session details:', error)
+    } finally {
+      setLoadingHistoryDetail(false)
+    }
+  }
+
+  // Stäng historikmodal
+  const handleCloseHistoryModal = () => {
+    setIsHistoryModalOpen(false)
+    setSelectedHistorySession(null)
+    setHistoryDetailSections([])
   }
 
   // Filtrera stationer baserat på sökfråga och filter
@@ -587,17 +755,18 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               ) : (
                 <div className="mt-4 space-y-3">
                   {historySessions.map((session) => (
-                    <div
+                    <button
                       key={session.id}
-                      className="bg-slate-900/50 rounded-lg p-4 hover:bg-slate-900/70 transition-colors"
+                      onClick={() => handleOpenHistorySession(session)}
+                      className="w-full text-left bg-slate-900/50 rounded-lg p-4 hover:bg-slate-900/70 transition-colors cursor-pointer group"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-500/30 transition-colors">
                             <Calendar className="w-5 h-5 text-purple-400" />
                           </div>
                           <div>
-                            <p className="text-white font-medium">
+                            <p className="text-white font-medium group-hover:text-purple-300 transition-colors">
                               {session.completed_at ? formatDate(session.completed_at) : 'Okänt datum'}
                             </p>
                             <div className="flex items-center gap-2 text-sm text-slate-400">
@@ -624,9 +793,10 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                           <div className="text-slate-500">
                             {session.inspection_summary?.total || 0} st
                           </div>
+                          <Eye className="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition-colors ml-2" />
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -899,6 +1069,165 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           isOpen={isIndoorDetailOpen}
           onClose={handleCloseIndoorDetail}
         />
+      )}
+
+      {/* Historik-modal */}
+      {isHistoryModalOpen && selectedHistorySession && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={handleCloseHistoryModal}
+        >
+          <div
+            className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <History className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold">
+                    Kontroll {selectedHistorySession.completed_at ? formatDate(selectedHistorySession.completed_at) : 'Okänt datum'}
+                  </h3>
+                  <p className="text-sm text-slate-400">
+                    Tekniker: {selectedHistorySession.technician?.name || 'Okänd'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseHistoryModal}
+                className="p-2 rounded-lg hover:bg-slate-700 transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {loadingHistoryDetail ? (
+                <div className="py-12 text-center">
+                  <RefreshCw className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-3" />
+                  <p className="text-slate-400">Laddar inspektionsdetaljer...</p>
+                </div>
+              ) : historyDetailSections.length === 0 ? (
+                <div className="py-12 text-center">
+                  <ClipboardCheck className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400">Inga inspektionsdata hittades</p>
+                </div>
+              ) : (
+                <>
+                  {/* Sammanfattning */}
+                  <div className="grid grid-cols-4 gap-3 mb-6">
+                    <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs text-slate-500 uppercase">OK</span>
+                      </div>
+                      <p className="text-emerald-400 font-bold text-lg">
+                        {selectedHistorySession.inspection_summary?.ok || 0}
+                      </p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs text-slate-500 uppercase">Varning</span>
+                      </div>
+                      <p className="text-amber-400 font-bold text-lg">
+                        {selectedHistorySession.inspection_summary?.warning || 0}
+                      </p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <AlertTriangle className="w-4 h-4 text-red-400" />
+                        <span className="text-xs text-slate-500 uppercase">Kritisk</span>
+                      </div>
+                      <p className="text-red-400 font-bold text-lg">
+                        {selectedHistorySession.inspection_summary?.critical || 0}
+                      </p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <ClipboardCheck className="w-4 h-4 text-slate-400" />
+                        <span className="text-xs text-slate-500 uppercase">Totalt</span>
+                      </div>
+                      <p className="text-white font-bold text-lg">
+                        {selectedHistorySession.inspection_summary?.total || 0}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sektioner med stationer */}
+                  <div className="space-y-4">
+                    {historyDetailSections.map((section) => (
+                      <div key={section.id} className="bg-slate-900/30 rounded-xl border border-slate-700/50">
+                        <div className="flex items-center gap-2 p-3 border-b border-slate-700/50">
+                          {section.icon === 'outdoor' ? (
+                            <MapPin className="w-4 h-4 text-teal-400" />
+                          ) : (
+                            <Home className="w-4 h-4 text-blue-400" />
+                          )}
+                          <span className="text-white font-medium">{section.name}</span>
+                          {section.buildingName && (
+                            <span className="text-slate-500">({section.buildingName})</span>
+                          )}
+                          <span className="text-slate-500 text-sm ml-auto">
+                            {section.stations.length} stationer
+                          </span>
+                        </div>
+                        <div className="divide-y divide-slate-700/30">
+                          {section.stations.map((station) => {
+                            const statusConfig = CALCULATED_STATUS_CONFIG[station.calculatedStatus]
+                            return (
+                              <div key={station.id} className="flex items-center justify-between p-3">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-3 h-3 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: station.typeColor }}
+                                  />
+                                  <div>
+                                    <span className="text-white text-sm">
+                                      {station.stationNumber || '-'}
+                                    </span>
+                                    <span className="text-slate-500 text-sm ml-2">
+                                      {station.stationType}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  {station.latestInspection?.measurementValue !== null && (
+                                    <div className="flex items-center gap-1.5">
+                                      <div
+                                        className="w-2 h-2 rounded-full"
+                                        style={{ backgroundColor: statusConfig.color }}
+                                      />
+                                      <span className="text-white text-sm font-medium">
+                                        {station.latestInspection?.measurementValue}
+                                      </span>
+                                      {station.measurementLabel && (
+                                        <span className="text-slate-500 text-xs">
+                                          {station.measurementLabel}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {station.latestInspection?.photoUrl && (
+                                    <Camera className="w-4 h-4 text-slate-500" />
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

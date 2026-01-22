@@ -228,6 +228,134 @@ export async function getCompletedSessionsForCustomer(
 }
 
 /**
+ * Hämta sammanfattning av inspektionsstatusar för en session
+ * Beräknar ok/warning/critical baserat på tröskelvärden
+ */
+export async function getSessionInspectionSummary(
+  sessionId: string
+): Promise<{ ok: number; warning: number; critical: number; total: number }> {
+  // Hämta alla inspektioner för sessionen
+  const [{ data: outdoorInspections }, { data: indoorInspections }] = await Promise.all([
+    supabase
+      .from('outdoor_station_inspections')
+      .select(`
+        id,
+        measurement_value,
+        station:equipment_placements(equipment_type)
+      `)
+      .eq('session_id', sessionId),
+    supabase
+      .from('indoor_station_inspections')
+      .select(`
+        id,
+        measurement_value,
+        station:indoor_stations(station_type)
+      `)
+      .eq('session_id', sessionId)
+  ])
+
+  // Hämta alla stationstyper med tröskelvärden
+  const { data: stationTypes } = await supabase
+    .from('station_types')
+    .select('id, code, threshold_warning, threshold_critical, threshold_direction')
+    .eq('is_active', true)
+
+  const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
+
+  // Räkna statusar med tröskelvärdesberäkning
+  const counts = { ok: 0, warning: 0, critical: 0, total: 0 }
+
+  // Räkna outdoor
+  outdoorInspections?.forEach(insp => {
+    counts.total++
+    const station = insp.station as any
+    const stationType = station?.equipment_type ? typesByCode.get(station.equipment_type) : null
+    const measurementValue = insp.measurement_value
+
+    if (measurementValue === null || !stationType) {
+      counts.ok++
+      return
+    }
+
+    const status = calculateStatusFromThresholds(
+      measurementValue,
+      stationType.threshold_warning,
+      stationType.threshold_critical,
+      stationType.threshold_direction
+    )
+    counts[status]++
+  })
+
+  // Räkna indoor
+  indoorInspections?.forEach(insp => {
+    counts.total++
+    const station = insp.station as any
+    const stationType = station?.station_type ? typesByCode.get(station.station_type) : null
+    const measurementValue = insp.measurement_value
+
+    if (measurementValue === null || !stationType) {
+      counts.ok++
+      return
+    }
+
+    const status = calculateStatusFromThresholds(
+      measurementValue,
+      stationType.threshold_warning,
+      stationType.threshold_critical,
+      stationType.threshold_direction
+    )
+    counts[status]++
+  })
+
+  return counts
+}
+
+/**
+ * Hjälpfunktion för att beräkna status från tröskelvärden
+ */
+function calculateStatusFromThresholds(
+  value: number,
+  warningThreshold: number | null,
+  criticalThreshold: number | null,
+  direction: string | null
+): 'ok' | 'warning' | 'critical' {
+  if (warningThreshold === null && criticalThreshold === null) {
+    return 'ok'
+  }
+
+  if (direction === 'above') {
+    if (criticalThreshold !== null && value >= criticalThreshold) return 'critical'
+    if (warningThreshold !== null && value >= warningThreshold) return 'warning'
+  } else {
+    if (criticalThreshold !== null && value <= criticalThreshold) return 'critical'
+    if (warningThreshold !== null && value <= warningThreshold) return 'warning'
+  }
+
+  return 'ok'
+}
+
+/**
+ * Hämta avslutade sessioner med sammanfattning för historikvisning
+ */
+export async function getCompletedSessionsWithSummary(
+  customerId: string,
+  limit: number = 10
+): Promise<InspectionSessionWithRelations[]> {
+  const sessions = await getCompletedSessionsForCustomer(customerId, limit)
+
+  // Hämta sammanfattning för varje session parallellt
+  const summaries = await Promise.all(
+    sessions.map(session => getSessionInspectionSummary(session.id))
+  )
+
+  // Kombinera sessioner med sammanfattningar
+  return sessions.map((session, index) => ({
+    ...session,
+    inspection_summary: summaries[index]
+  }))
+}
+
+/**
  * Hämta komplett inspektionsdata för kundportalen
  * Returnerar senaste session med alla inspektionsresultat
  */
