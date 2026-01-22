@@ -19,6 +19,7 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
+import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ReportModal from '../../components/admin/technicians/ReportModal'
 import { BeGoneCaseRow } from '../../types/database' // NYTT: Importerar den centrala typen
@@ -165,7 +166,9 @@ export default function TechnicianSchedule() {
   const [selectedDate, setSelectedDate] = useState<string>(toDateString(new Date()));
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false);
+  const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<ScheduleCaseType | null>(null);
+  const [selectedInspectionCase, setSelectedInspectionCase] = useState<ScheduleCaseType | null>(null);
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES));
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState<'agenda' | 'month'>('agenda');
@@ -286,8 +289,9 @@ export default function TechnicianSchedule() {
 
   const handleOpenModal = (caseData: ScheduleCaseType) => {
     if (caseData.case_type === 'inspection') {
-      // Navigera till inspektionsmodulen för stationskontroll
-      navigate(`/technician/inspection/${caseData.id}`);
+      // Öppna InspectionCaseModal istället för direkt navigation
+      setSelectedInspectionCase(caseData);
+      setIsInspectionModalOpen(true);
     } else if (caseData.case_type === 'contract') {
       setSelectedCase(caseData);
       setIsEditContractModalOpen(true);
@@ -300,11 +304,14 @@ export default function TechnicianSchedule() {
   const handleUpdateSuccess = (updatedCase?: any) => {
     // Om inget updatedCase skickades = ärendet har raderats
     // Ta bort det från listan och stäng modalen
-    if (!updatedCase && selectedCase) {
-      setCases(prevCases => prevCases.filter(c => c.id !== selectedCase.id));
+    if (!updatedCase && (selectedCase || selectedInspectionCase)) {
+      const caseIdToRemove = selectedCase?.id || selectedInspectionCase?.id;
+      setCases(prevCases => prevCases.filter(c => c.id !== caseIdToRemove));
       setIsEditModalOpen(false);
       setIsEditContractModalOpen(false);
+      setIsInspectionModalOpen(false);
       setSelectedCase(null);
+      setSelectedInspectionCase(null);
       return;
     }
 
@@ -429,7 +436,18 @@ export default function TechnicianSchedule() {
         onSuccess={handleUpdateSuccess}
         caseData={selectedCase}
       />
-      
+
+      {/* Modal för stationskontroll-ärenden */}
+      <InspectionCaseModal
+        isOpen={isInspectionModalOpen}
+        onClose={() => {
+          setIsInspectionModalOpen(false);
+          setSelectedInspectionCase(null);
+        }}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedInspectionCase}
+      />
+
       <FilterPanel isOpen={isFilterPanelOpen} onClose={() => setIsFilterPanelOpen(false)} activeStatuses={activeStatuses} setActiveStatuses={setActiveStatuses} />
       {profile?.technician_id && (<ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} technicianId={profile.technician_id} onOpenCase={handleOpenCaseFromReport as any} />)}
     </>

@@ -15,6 +15,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 // Modaler
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal';
+import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal';
 import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal';
 import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal';
 import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal';
@@ -56,8 +57,10 @@ export default function CoordinatorSchedule() {
 
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
   const [selectedContractCase, setSelectedContractCase] = useState<Case | null>(null);
+  const [selectedInspectionCase, setSelectedInspectionCase] = useState<Case | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false);
+  const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
@@ -243,8 +246,15 @@ export default function CoordinatorSchedule() {
       // För avtalsärenden, hitta det ursprungliga Case-objektet
       const contractCase = contractCases.find(c => c.id === caseData.id);
       if (contractCase) {
-        setSelectedContractCase(contractCase);
-        setIsEditContractModalOpen(true);
+        // Kolla om det är ett stationskontroll-ärende
+        if (contractCase.service_type === 'inspection') {
+          setSelectedInspectionCase(contractCase);
+          setIsInspectionModalOpen(true);
+        } else {
+          // Vanligt avtalsärende (servicebesök)
+          setSelectedContractCase(contractCase);
+          setIsEditContractModalOpen(true);
+        }
       }
     } else {
       // För ClickUp-ärenden, använd standard EditCaseModal
@@ -294,10 +304,12 @@ export default function CoordinatorSchedule() {
     }
   };
 
-  const handleUpdateSuccess = () => { 
-    setIsEditModalOpen(false); 
+  const handleUpdateSuccess = () => {
+    setIsEditModalOpen(false);
     setIsEditContractModalOpen(false);
-    fetchData(); 
+    setIsInspectionModalOpen(false);
+    setSelectedInspectionCase(null);
+    fetchData();
   };
   
   const handleCreateSuccess = () => { 
@@ -422,6 +434,17 @@ export default function CoordinatorSchedule() {
         }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedContractCase}
+      />
+
+      {/* Inspection Modal för stationskontroll-ärenden */}
+      <InspectionCaseModal
+        isOpen={isInspectionModalOpen}
+        onClose={() => {
+          setIsInspectionModalOpen(false);
+          setSelectedInspectionCase(null);
+        }}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedInspectionCase}
       />
       
       {/* Create Modal för nya/schemaläggning */}
