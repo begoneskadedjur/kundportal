@@ -14,6 +14,7 @@ import {
   Check,
   X,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   ChevronUp,
   Camera,
@@ -490,7 +491,7 @@ export default function StationInspectionModule() {
 
   // Välj station (från karta, planritning eller lista)
   // Tillåter klick även under 'scheduled' - auto-start vid första sparning
-  const handleSelectStation = useCallback((station: StationData) => {
+  const handleSelectStation = useCallback(async (station: StationData) => {
     if (session?.status === 'completed') {
       toast.error('Denna inspektion är redan avslutad')
       return
@@ -507,9 +508,51 @@ export default function StationInspectionModule() {
     setMeasurementValue('')
     setPhotoFile(null)
     setPhotoPreview(null)
-    setShowHistory(false)
+    setShowHistory(true) // Visa historik inline automatiskt
     setStationHistory([])
-  }, [session?.status])
+    setHistoryLoading(true)
+
+    // Ladda historik automatiskt
+    try {
+      const isOutdoor = outdoorStations.some(s => s.id === station.id)
+      const tableName = isOutdoor ? 'outdoor_station_inspections' : 'indoor_station_inspections'
+
+      const { data, error } = await supabase
+        .from(tableName)
+        .select(`
+          id,
+          inspected_at,
+          status,
+          findings,
+          photo_path,
+          measurement_value,
+          measurement_unit,
+          technician:technicians(id, name)
+        `)
+        .eq('station_id', station.id)
+        .order('inspected_at', { ascending: false })
+        .limit(5)
+
+      if (error) throw error
+
+      // Hämta foto-URLs
+      const historyWithPhotos = await Promise.all(
+        (data || []).map(async (item: any) => {
+          let photoUrl = null
+          if (item.photo_path) {
+            photoUrl = await getInspectionPhotoUrl(item.photo_path)
+          }
+          return { ...item, photo_url: photoUrl }
+        })
+      )
+
+      setStationHistory(historyWithPhotos)
+    } catch (err) {
+      console.error('Error loading history:', err)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [session?.status, outdoorStations])
 
   // Hantera klick på outdoor station (från kartan)
   const handleOutdoorStationClick = useCallback((equipment: EquipmentPlacementWithRelations) => {
@@ -631,6 +674,29 @@ export default function StationInspectionModule() {
     const nextStation = stations.find(s => s.id === nextStationId)
     if (nextStation) {
       handleSelectStation(nextStation)
+    }
+  }, [wizardMode, wizardStationQueue, currentWizardStationId, outdoorStations, indoorStations, handleSelectStation])
+
+  // Gå till föregående station i wizard
+  const wizardPrevStation = useCallback(() => {
+    if (wizardMode === 'off' || wizardStationQueue.length === 0) return
+
+    const currentIndex = wizardStationQueue.indexOf(currentWizardStationId || '')
+    const prevIndex = currentIndex - 1
+
+    if (prevIndex < 0) {
+      toast('Du är på första stationen')
+      return
+    }
+
+    const prevStationId = wizardStationQueue[prevIndex]
+    setCurrentWizardStationId(prevStationId)
+
+    // Öppna föregående station för inspektion
+    const stations = wizardMode === 'outdoor' ? outdoorStations : indoorStations
+    const prevStation = stations.find(s => s.id === prevStationId)
+    if (prevStation) {
+      handleSelectStation(prevStation)
     }
   }, [wizardMode, wizardStationQueue, currentWizardStationId, outdoorStations, indoorStations, handleSelectStation])
 
@@ -1192,309 +1258,36 @@ export default function StationInspectionModule() {
             )}
           </AnimatePresence>
 
-          {/* Tabs - endast under aktiv inspektion */}
-          {session?.status === 'in_progress' && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTab('outdoor')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'outdoor'
-                    ? 'bg-green-500 text-white'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                <MapPin className="w-4 h-4" />
-                Utomhus ({progress?.outdoorProgress.inspected || 0}/{outdoorStations.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('indoor')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'indoor'
-                    ? 'bg-green-500 text-white'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                <Building2 className="w-4 h-4" />
-                Inomhus ({progress?.indoorProgress.inspected || 0}/{indoorStations.length})
-              </button>
-            </div>
-          )}
+          {/* Tabs - visas alltid */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('outdoor')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'outdoor'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+              Utomhus ({inspectedStationIds.size > 0 ? outdoorStations.filter(s => inspectedStationIds.has(s.id)).length : 0}/{outdoorStations.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('indoor')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'indoor'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              Inomhus ({inspectedStationIds.size > 0 ? indoorStations.filter(s => inspectedStationIds.has(s.id)).length : 0}/{indoorStations.length})
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ANKOMSTKORT - Visas innan inspektion har startats */}
-      {session?.status === 'scheduled' && (
-        <div className="max-w-4xl mx-auto p-4 space-y-4">
-          {/* Kundinformation */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-2xl p-5"
-          >
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-green-400" />
-              {session.customer?.company_name}
-            </h2>
-
-            {/* Adress med navigation */}
-            {session.customer?.contact_address && (
-              <div className="mb-4">
-                <div className="flex items-start gap-3 mb-2">
-                  <MapPin className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-slate-300">{session.customer.contact_address}</p>
-                </div>
-                <div className="flex gap-2 ml-8">
-                  <button
-                    onClick={handleNavigate}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-colors"
-                  >
-                    <Navigation className="w-4 h-4" />
-                    Navigera hit
-                  </button>
-                  <button
-                    onClick={handleCopyAddress}
-                    className="flex items-center gap-2 px-3 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm transition-colors"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Kontaktperson */}
-            {(session.customer?.contact_person || session.customer?.contact_phone) && (
-              <div className="border-t border-slate-700/50 pt-4 mt-4">
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Kontaktperson</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                      <User className="w-5 h-5 text-slate-400" />
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">
-                        {session.customer.contact_person || 'Ej angiven'}
-                      </p>
-                      {session.customer.contact_phone && (
-                        <p className="text-slate-400 text-sm">{session.customer.contact_phone}</p>
-                      )}
-                    </div>
-                  </div>
-                  {session.customer.contact_phone && (
-                    <button
-                      onClick={handleCall}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-medium transition-colors"
-                    >
-                      <Phone className="w-4 h-4" />
-                      Ring
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </motion.div>
-
-          {/* Interaktiv karta med utomhusstationer */}
-          {outdoorStations.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="glass rounded-2xl overflow-hidden"
-            >
-              <div className="p-4 border-b border-slate-700/50">
-                <h3 className="font-medium text-white flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-blue-400" />
-                  Utomhusstationer ({outdoorStations.length})
-                </h3>
-                <p className="text-slate-400 text-xs mt-1">Klicka på en station för att se historik eller utföra kontroll</p>
-              </div>
-              <div className="h-[250px]">
-                <EquipmentMap
-                  equipment={outdoorStations as unknown as EquipmentPlacementWithRelations[]}
-                  selectedId={null}
-                  onEquipmentClick={(eq) => {
-                    const station = outdoorStations.find(s => s.id === eq.id)
-                    if (station) handleSelectStation(station)
-                  }}
-                  showNumbers={true}
-                  height="250px"
-                />
-              </div>
-            </motion.div>
-          )}
-
-          {/* Interaktivt planritningsgalleri */}
-          {floorPlans.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="glass rounded-2xl p-4"
-            >
-              <h3 className="font-medium text-white mb-3 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-purple-400" />
-                Planritningar ({floorPlans.length})
-              </h3>
-              <p className="text-slate-400 text-xs mb-3">Klicka för att expandera och se stationer</p>
-
-              {/* Miniatyrgalleri - horisontell scroll */}
-              <div className="overflow-x-auto pb-2 -mx-4 px-4">
-                <div className="flex gap-3">
-                  {floorPlans.map(plan => {
-                    const stationCount = indoorStations.filter(s => s.floor_plan_id === plan.id).length
-                    return (
-                      <button
-                        key={plan.id}
-                        onClick={() => setExpandedFloorPlan(plan)}
-                        className="flex-shrink-0 w-64 group"
-                      >
-                        <div className="aspect-video rounded-xl overflow-hidden relative border-2 border-transparent group-hover:border-purple-500/50 transition-colors">
-                          <img
-                            src={plan.image_url}
-                            alt={plan.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                          <div className="absolute bottom-2 left-3 right-3">
-                            <p className="text-white font-medium text-sm truncate">{plan.name}</p>
-                            <p className="text-slate-300 text-xs">{stationCount} stationer</p>
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Kombinerad översikt + senaste inspektion */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="glass rounded-2xl p-5"
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <Info className="w-5 h-5 text-slate-400" />
-              <h3 className="font-medium text-white">Översikt</h3>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Antal stationer */}
-              <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <MapPin className="w-4 h-4 text-blue-400" />
-                  <span className="text-2xl font-bold text-white">{outdoorStations.length}</span>
-                </div>
-                <p className="text-slate-400 text-sm">Utomhus</p>
-              </div>
-              <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <Building2 className="w-4 h-4 text-purple-400" />
-                  <span className="text-2xl font-bold text-white">{indoorStations.length}</span>
-                </div>
-                <p className="text-slate-400 text-sm">Inomhus</p>
-              </div>
-            </div>
-
-            {/* Senaste inspektion - kompakt */}
-            {lastInspection && (
-              <div className="mt-4 pt-4 border-t border-slate-700/50">
-                <div className="flex justify-between items-center text-sm mb-2">
-                  <span className="text-slate-400 flex items-center gap-2">
-                    <History className="w-4 h-4" />
-                    Senaste kontroll:
-                  </span>
-                  <span className="text-white">{formatDate(lastInspection.completed_at)}</span>
-                </div>
-                {lastInspection.stations_with_activity > 0 && (
-                  <div className="flex items-center gap-2 text-amber-400 text-sm bg-amber-500/10 px-3 py-2 rounded-lg">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>{lastInspection.stations_with_activity} stationer hade aktivitet</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </motion.div>
-
-          {/* Starta-knapp - stor och tydlig med gradient */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <button
-              onClick={handleStartInspection}
-              disabled={isSubmitting}
-              className="w-full py-5 bg-gradient-to-r from-emerald-600 to-emerald-500
-                         hover:from-emerald-500 hover:to-emerald-400
-                         disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed
-                         text-white text-lg font-semibold rounded-2xl
-                         flex items-center justify-center gap-3
-                         shadow-lg shadow-emerald-500/25
-                         transition-all duration-300"
-            >
-              {isSubmitting ? (
-                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Play className="w-6 h-6" />
-                  Starta inspektion
-                  <span className="bg-white/20 px-3 py-1 rounded-full text-sm">
-                    {outdoorStations.length + indoorStations.length} stationer
-                  </span>
-                </>
-              )}
-            </button>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Modal för expanderad planritning */}
-      {expandedFloorPlan && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-black/90 flex flex-col"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 bg-slate-900/80 backdrop-blur-sm">
-            <div>
-              <h3 className="text-white font-medium">{expandedFloorPlan.name}</h3>
-              <p className="text-slate-400 text-sm">
-                {indoorStations.filter(s => s.floor_plan_id === expandedFloorPlan.id).length} stationer
-              </p>
-            </div>
-            <button
-              onClick={() => setExpandedFloorPlan(null)}
-              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Planritning med stationer */}
-          <div className="flex-1">
-            <FloorPlanViewer
-              imageUrl={expandedFloorPlan.image_url}
-              stations={indoorStations.filter(s => s.floor_plan_id === expandedFloorPlan.id)}
-              selectedStationId={null}
-              placementMode="view"
-              onStationClick={(station) => {
-                setExpandedFloorPlan(null)
-                handleSelectStation(station)
-              }}
-              showNumbers={true}
-              height="calc(100vh - 80px)"
-            />
-          </div>
-        </motion.div>
-      )}
-
-      {/* Content - endast under aktiv inspektion */}
-      {session?.status === 'in_progress' && (
+      {/* Main content - visas alltid (sessionen startas automatiskt vid första sparning) */}
+      {session && (
       <div className="max-w-4xl mx-auto p-4">
         <AnimatePresence mode="wait">
           {activeTab === 'outdoor' ? (
@@ -1524,16 +1317,33 @@ export default function StationInspectionModule() {
                       Avsluta
                     </button>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-slate-300">
-                      Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}
-                    </span>
+                  <div className="flex items-center justify-between gap-2 text-sm">
                     <button
-                      onClick={wizardSkipStation}
-                      className="flex items-center gap-1 text-slate-400 hover:text-white"
+                      onClick={wizardPrevStation}
+                      disabled={wizardStationQueue.indexOf(currentWizardStationId || '') === 0}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
                     >
-                      <SkipForward className="w-4 h-4" />
-                      Hoppa över
+                      <ChevronLeft className="w-4 h-4" />
+                      Föregående
+                    </button>
+                    <div className="flex items-center gap-3">
+                      <span className="text-slate-300 font-medium">
+                        Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}
+                      </span>
+                      <button
+                        onClick={wizardSkipStation}
+                        className="flex items-center gap-1 text-slate-400 hover:text-white"
+                      >
+                        <SkipForward className="w-4 h-4" />
+                        Hoppa över
+                      </button>
+                    </div>
+                    <button
+                      onClick={wizardNextStation}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+                    >
+                      Nästa
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </motion.div>
@@ -1588,7 +1398,7 @@ export default function StationInspectionModule() {
                 <div className="glass rounded-xl overflow-hidden">
                   <EquipmentMap
                     equipment={outdoorEquipment}
-                    height="calc(100vh - 280px)"
+                    height="calc(100vh - 350px)"
                     readOnly
                     showControls={true}
                     showNumbers={true}
@@ -1691,66 +1501,107 @@ export default function StationInspectionModule() {
                       Avsluta
                     </button>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-slate-300">
-                      Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}
-                    </span>
+                  <div className="flex items-center justify-between gap-2 text-sm">
                     <button
-                      onClick={wizardSkipStation}
-                      className="flex items-center gap-1 text-slate-400 hover:text-white"
+                      onClick={wizardPrevStation}
+                      disabled={wizardStationQueue.indexOf(currentWizardStationId || '') === 0}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
                     >
-                      <SkipForward className="w-4 h-4" />
-                      Hoppa över
+                      <ChevronLeft className="w-4 h-4" />
+                      Föregående
+                    </button>
+                    <div className="flex items-center gap-3">
+                      <span className="text-slate-300 font-medium">
+                        Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}
+                      </span>
+                      <button
+                        onClick={wizardSkipStation}
+                        className="flex items-center gap-1 text-slate-400 hover:text-white"
+                      >
+                        <SkipForward className="w-4 h-4" />
+                        Hoppa över
+                      </button>
+                    </div>
+                    <button
+                      onClick={wizardNextStation}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+                    >
+                      Nästa
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </motion.div>
               )}
 
-              {/* Floor plan selector med progress */}
+              {/* Floor plan selector med progress - liggande miniatyrer */}
               {floorPlans.length > 0 && (
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-400">Planritningar</span>
+                    {/* Wizard start-knapp för inomhus */}
+                    {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && (
+                      <button
+                        onClick={startIndoorWizard}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <Wand2 className="w-4 h-4" />
+                        Starta wizard
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-2">
                     {floorPlans.map((fp) => {
                       // Räkna stationer och inspekterade per planritning
                       const stationsOnPlan = indoorStations.filter(s => s.floor_plan_id === fp.id)
                       const inspectedOnPlan = stationsOnPlan.filter(s => inspectedStationIds.has(s.id)).length
                       const totalOnPlan = stationsOnPlan.length
                       const allDone = totalOnPlan > 0 && inspectedOnPlan === totalOnPlan
+                      const isSelected = selectedFloorPlanId === fp.id
 
                       return (
                         <button
                           key={fp.id}
                           onClick={() => setSelectedFloorPlanId(fp.id)}
-                          className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                            selectedFloorPlanId === fp.id
-                              ? 'bg-green-500 text-white'
+                          className={`flex-shrink-0 w-36 rounded-xl overflow-hidden transition-all ${
+                            isSelected
+                              ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-slate-900'
                               : allDone
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/50'
-                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                ? 'ring-1 ring-green-500/50'
+                                : 'hover:ring-1 hover:ring-slate-600'
                           }`}
                         >
-                          <div className="flex items-center gap-2">
-                            {allDone && <CheckCircle2 className="w-4 h-4" />}
-                            <span>{fp.building_name ? `${fp.building_name} - ` : ''}{fp.name}</span>
-                            <span className={`text-xs ${selectedFloorPlanId === fp.id ? 'text-white/70' : 'text-slate-500'}`}>
-                              {inspectedOnPlan}/{totalOnPlan}
-                            </span>
+                          {/* Liggande aspect ratio för thumbnail */}
+                          <div className={`aspect-[16/10] relative ${
+                            isSelected ? 'bg-green-500/20' : 'bg-slate-800'
+                          }`}>
+                            <Building2 className="w-8 h-8 text-slate-600 absolute inset-0 m-auto" />
+                            {/* Progress overlay */}
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/90 to-transparent p-2">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className={isSelected ? 'text-green-400' : 'text-slate-300'}>
+                                  {inspectedOnPlan}/{totalOnPlan}
+                                </span>
+                                {allDone && <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />}
+                              </div>
+                            </div>
+                          </div>
+                          {/* Label under thumbnail */}
+                          <div className={`p-2 text-left ${
+                            isSelected ? 'bg-green-500/20' : 'bg-slate-800'
+                          }`}>
+                            <p className={`text-xs font-medium truncate ${
+                              isSelected ? 'text-green-400' : 'text-slate-300'
+                            }`}>
+                              {fp.building_name ? `${fp.building_name}` : fp.name}
+                            </p>
+                            {fp.building_name && fp.name && (
+                              <p className="text-xs text-slate-500 truncate">{fp.name}</p>
+                            )}
                           </div>
                         </button>
                       )
                     })}
                   </div>
-
-                  {/* Wizard start-knapp för inomhus */}
-                  {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && (
-                    <button
-                      onClick={startIndoorWizard}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors flex-shrink-0"
-                    >
-                      <Wand2 className="w-4 h-4" />
-                      Starta wizard
-                    </button>
-                  )}
                 </div>
               )}
 
@@ -1772,7 +1623,7 @@ export default function StationInspectionModule() {
                     selectedStationId={null}
                     placementMode="view"
                     onStationClick={handleIndoorStationClick}
-                    height="calc(100vh - 320px)"
+                    height="calc(100vh - 380px)"
                     showNumbers={true}
                     inspectedStationIds={inspectedStationIds}
                     highlightedStationId={wizardMode === 'indoor' ? currentWizardStationId : null}
@@ -1872,7 +1723,7 @@ export default function StationInspectionModule() {
               className="w-full max-w-lg glass rounded-2xl p-6 max-h-[90vh] overflow-y-auto"
             >
               {/* Header */}
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-xl font-bold text-white">
                     Station {outdoorNumberMap[selectedStation.id] || indoorNumberMap[selectedStation.id] || '?'}
@@ -1881,93 +1732,48 @@ export default function StationInspectionModule() {
                     {selectedStation.station_type_data?.name || selectedStation.equipment_type || selectedStation.station_type}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleLoadHistory}
-                    className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-                    title="Visa historik"
-                  >
-                    <History className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => setSelectedStation(null)}
-                    className="p-2 rounded-lg hover:bg-slate-700"
-                  >
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => setSelectedStation(null)}
+                  className="p-2 rounded-lg hover:bg-slate-700"
+                >
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
               </div>
 
-              {/* History Panel */}
-              <AnimatePresence>
-                {showHistory && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="mb-6 overflow-hidden"
-                  >
-                    <div className="bg-slate-800/50 rounded-xl p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-medium text-white flex items-center gap-2">
-                          <History className="w-4 h-4" />
-                          Inspektionshistorik
-                        </h3>
-                        <button
-                          onClick={() => setShowHistory(false)}
-                          className="text-slate-400 hover:text-white"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+              {/* History Panel - visas inline automatiskt */}
+              {historyLoading ? (
+                <div className="mb-4 bg-slate-800/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs text-slate-400">Laddar historik...</span>
+                  </div>
+                </div>
+              ) : stationHistory.length > 0 ? (
+                <div className="mb-4 bg-slate-800/50 rounded-lg p-3">
+                  <h4 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1">
+                    <History className="w-3 h-3" />
+                    Senaste inspektioner
+                  </h4>
+                  <div className="space-y-2">
+                    {stationHistory.slice(0, 3).map((item) => (
+                      <div key={item.id} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span>{INSPECTION_STATUS_CONFIG[item.status]?.icon}</span>
+                          <span className="text-slate-300">
+                            {INSPECTION_STATUS_CONFIG[item.status]?.label || item.status}
+                          </span>
+                          {item.measurement_value !== null && (
+                            <span className="text-amber-400">({item.measurement_value} {item.measurement_unit})</span>
+                          )}
+                        </div>
+                        <span className="text-slate-500">
+                          {new Date(item.inspected_at).toLocaleDateString('sv-SE')}
+                        </span>
                       </div>
-
-                      {historyLoading ? (
-                        <div className="flex items-center justify-center py-4">
-                          <div className="w-6 h-6 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
-                        </div>
-                      ) : stationHistory.length === 0 ? (
-                        <p className="text-slate-500 text-sm text-center py-4">
-                          Ingen tidigare historik
-                        </p>
-                      ) : (
-                        <div className="space-y-3 max-h-48 overflow-y-auto">
-                          {stationHistory.map((item) => (
-                            <div key={item.id} className="bg-slate-900/50 rounded-lg p-3">
-                              <div className="flex items-start justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg">{INSPECTION_STATUS_CONFIG[item.status]?.icon}</span>
-                                  <span className="text-sm font-medium text-white">
-                                    {INSPECTION_STATUS_CONFIG[item.status]?.label || item.status}
-                                  </span>
-                                </div>
-                                <span className="text-xs text-slate-500">
-                                  {new Date(item.inspected_at).toLocaleDateString('sv-SE')}
-                                </span>
-                              </div>
-                              {item.measurement_value !== null && (
-                                <p className="text-sm text-slate-400 mb-1">
-                                  Mätvärde: {item.measurement_value} {item.measurement_unit}
-                                </p>
-                              )}
-                              {item.findings && (
-                                <p className="text-sm text-slate-400 mb-1">
-                                  {item.findings}
-                                </p>
-                              )}
-                              {item.technician && (
-                                <p className="text-xs text-slate-500 flex items-center gap-1">
-                                  <User className="w-3 h-3" />
-                                  {item.technician.name}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               {/* Status selector */}
               <div className="mb-6">

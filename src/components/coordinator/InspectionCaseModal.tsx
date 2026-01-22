@@ -479,14 +479,14 @@ export default function InspectionCaseModal({
   // Modal footer
   const modalFooter = (
     <div className="flex flex-col sm:flex-row justify-between gap-3 p-6 bg-slate-800/50">
-      {/* Starta inspektion - endast för tekniker */}
+      {/* Gå till inspektion - endast för tekniker */}
       {isTechnician && (
         <Button
           onClick={handleStartInspection}
           className="bg-cyan-500 hover:bg-cyan-600 order-first sm:order-none"
         >
           <Play className="w-4 h-4 mr-2" />
-          Starta inspektion
+          Gå till inspektion
         </Button>
       )}
 
