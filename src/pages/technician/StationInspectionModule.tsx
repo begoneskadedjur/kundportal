@@ -36,7 +36,8 @@ import {
   ExternalLink,
   BarChart2,
   Wand2,
-  SkipForward
+  SkipForward,
+  Unlock
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -63,7 +64,8 @@ import {
   getLastInspectionSummary,
   getStationsWithRecentActivity,
   getOutdoorInspectionsForSession,
-  getIndoorInspectionsForSession
+  getIndoorInspectionsForSession,
+  reopenInspectionSession
 } from '../../services/inspectionSessionService'
 
 // Typer
@@ -180,6 +182,9 @@ export default function StationInspectionModule() {
 
   // Bekräftelsedialog för att avsluta inspektion
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
+
+  // Bekräftelsedialog för att låsa upp avslutad inspektion
+  const [showReopenConfirm, setShowReopenConfirm] = useState(false)
 
   // Senaste inspektion och aktivitetsstationer (för ankomstkort)
   const [lastInspection, setLastInspection] = useState<{
@@ -498,11 +503,6 @@ export default function StationInspectionModule() {
   // Välj station (från karta, planritning eller lista)
   // Tillåter klick även under 'scheduled' - auto-start vid första sparning
   const handleSelectStation = useCallback(async (station: StationData) => {
-    if (session?.status === 'completed') {
-      toast.error('Denna inspektion är redan avslutad')
-      return
-    }
-
     // Om session inte är startad, markera för auto-start vid första sparning
     if (session?.status === 'scheduled') {
       setShouldAutoStartOnSave(true)
@@ -1050,6 +1050,25 @@ export default function StationInspectionModule() {
     }
   }
 
+  // Lås upp avslutad inspektion för korrigering
+  const handleReopenInspection = async () => {
+    if (!session) return
+
+    try {
+      setIsSubmitting(true)
+      const updated = await reopenInspectionSession(session.id)
+      if (updated) {
+        setSession({ ...session, ...updated })
+        toast.success('Inspektionen är nu öppen för korrigering')
+      }
+    } catch (err) {
+      toast.error('Kunde inte öppna inspektionen')
+    } finally {
+      setIsSubmitting(false)
+      setShowReopenConfirm(false)
+    }
+  }
+
   // Statusval
   const STATUS_OPTIONS = (Object.keys(INSPECTION_STATUS_CONFIG) as InspectionStatus[]).map(key => ({
     key,
@@ -1153,11 +1172,36 @@ export default function StationInspectionModule() {
                 Markera som färdig
               </Button>
             )}
+
+            {/* Lås upp-knapp för avslutade inspektioner */}
+            {session?.status === 'completed' && (
+              <Button
+                onClick={() => setShowReopenConfirm(true)}
+                loading={isSubmitting}
+                className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10 bg-transparent"
+              >
+                <Unlock className="w-4 h-4 mr-2" />
+                Lås upp
+              </Button>
+            )}
           </div>
 
-          {/* Progress - endast under aktiv inspektion */}
-          {session?.status === 'in_progress' && progress && (
+          {/* Progress - visa för både in_progress och completed */}
+          {session && progress && (
             <div className="mb-4">
+              {/* Avslutad-badge */}
+              {session.status === 'completed' && (
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-400" />
+                  <span className="text-green-400 font-medium">Inspektion avslutad</span>
+                  {session.completed_at && (
+                    <span className="text-slate-500 text-sm">
+                      {new Date(session.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })} kl {new Date(session.completed_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-between text-sm text-slate-400 mb-1">
                 <span>{progress.inspectedStations} av {progress.totalStations} stationer</span>
                 <span>{progress.percentComplete}%</span>
@@ -1204,7 +1248,7 @@ export default function StationInspectionModule() {
 
           {/* Sammanställningspanel - kollapsbar */}
           <AnimatePresence>
-            {session?.status === 'in_progress' && showSummary && inspectedStationIds.size > 0 && (
+            {showSummary && inspectedStationIds.size > 0 && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
@@ -1487,14 +1531,9 @@ export default function StationInspectionModule() {
                         <motion.button
                           key={station.id}
                           onClick={() => handleSelectStation(station)}
-                          disabled={session?.status === 'completed'}
-                          className={`w-full glass rounded-xl p-4 text-left transition-all ${
-                            session?.status !== 'completed'
-                              ? 'hover:bg-slate-800/50 cursor-pointer'
-                              : 'opacity-60 cursor-not-allowed'
-                          } ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
-                          whileHover={session?.status !== 'completed' ? { scale: 1.01 } : {}}
-                          whileTap={session?.status !== 'completed' ? { scale: 0.99 } : {}}
+                          className={`w-full glass rounded-xl p-4 text-left transition-all hover:bg-slate-800/50 cursor-pointer ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -1733,14 +1772,9 @@ export default function StationInspectionModule() {
                       <motion.button
                         key={station.id}
                         onClick={() => handleSelectStation(station)}
-                        disabled={session?.status === 'completed'}
-                        className={`w-full glass rounded-xl p-4 text-left transition-all ${
-                          session?.status !== 'completed'
-                            ? 'hover:bg-slate-800/50 cursor-pointer'
-                            : 'opacity-60 cursor-not-allowed'
-                        } ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
-                        whileHover={session?.status !== 'completed' ? { scale: 1.01 } : {}}
-                        whileTap={session?.status !== 'completed' ? { scale: 0.99 } : {}}
+                        className={`w-full glass rounded-xl p-4 text-left transition-all hover:bg-slate-800/50 cursor-pointer ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -1934,6 +1968,53 @@ export default function StationInspectionModule() {
         )}
       </AnimatePresence>
 
+      {/* Bekräftelsedialog för att låsa upp inspektion */}
+      <AnimatePresence>
+        {showReopenConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+            onClick={() => setShowReopenConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-slate-800 rounded-xl p-5 max-w-sm w-full shadow-xl border border-slate-700"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-amber-500/20 rounded-full">
+                  <Unlock className="w-6 h-6 text-amber-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Lås upp inspektion?</h3>
+              </div>
+
+              <p className="text-slate-300 mb-4">
+                Du kan sedan korrigera eller lägga till inspektioner på stationer.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowReopenConfirm(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button
+                  onClick={handleReopenInspection}
+                  className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  Ja, lås upp
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Inspection Modal */}
       <AnimatePresence>
         {selectedStation && (
@@ -1966,16 +2047,18 @@ export default function StationInspectionModule() {
                     onClick={() => setSelectedStation(null)}
                     className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
                   >
-                    Avbryt
+                    {session?.status === 'completed' ? 'Stäng' : 'Avbryt'}
                   </button>
-                  <Button
-                    size="sm"
-                    onClick={handleSaveInspection}
-                    loading={isSubmitting}
-                  >
-                    <Check className="w-4 h-4 mr-1" />
-                    Spara
-                  </Button>
+                  {session?.status !== 'completed' && (
+                    <Button
+                      size="sm"
+                      onClick={handleSaveInspection}
+                      loading={isSubmitting}
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Spara
+                    </Button>
+                  )}
                 </div>
               </div>
 

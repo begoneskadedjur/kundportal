@@ -173,7 +173,7 @@ export interface CreateInspectionSessionInput {
 export interface UpdateInspectionSessionInput {
   status?: InspectionSessionStatus
   started_at?: string
-  completed_at?: string
+  completed_at?: string | null
   notes?: string
   total_outdoor_stations?: number
   total_indoor_stations?: number

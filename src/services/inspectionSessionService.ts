@@ -351,6 +351,18 @@ export async function completeInspectionSession(
   return updateInspectionSession(sessionId, updateData)
 }
 
+/**
+ * Öppna upp en avslutad inspektionssession för korrigering
+ */
+export async function reopenInspectionSession(
+  sessionId: string
+): Promise<StationInspectionSession | null> {
+  return updateInspectionSession(sessionId, {
+    status: 'in_progress',
+    completed_at: null
+  })
+}
+
 // ============================================
 // OUTDOOR INSPECTION FUNCTIONS
 // ============================================
