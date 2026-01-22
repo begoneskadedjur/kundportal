@@ -520,8 +520,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : customer;
         const customerName = customerForTitle?.company_name || 'Okänd kund';
 
-        // Auto-generera titel för stationskontroll
-        const inspectionTitle = `Stationskontroll - ${customerName}`;
+        // Använd manuellt inmatad titel eller auto-generera
+        const inspectionTitle = formData.title?.trim() || `Stationskontroll - ${customerName}`;
 
         // Skapa case-ärende först
         const caseData = {
@@ -537,12 +537,16 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           scheduled_end: formData.due_date,
           primary_technician_id: formData.primary_assignee_id,
           primary_technician_name: formData.primary_assignee_name || null,
+          secondary_technician_id: formData.secondary_assignee_id || null,
+          tertiary_technician_id: formData.tertiary_assignee_id || null,
           contact_person: formData.kontaktperson || customer?.contact_person || null,
           contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
           contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
+          organization_number: formData.org_nr || customer?.organization_number || null,
           address: formData.adress ? { formatted_address: formData.adress } : null,
           price: null,
-          case_number: `INS-${Date.now().toString().slice(-6)}`
+          case_number: `INS-${Date.now().toString().slice(-6)}`,
+          send_confirmation: formData.skicka_bokningsbekraftelse || 'Nej'
         };
 
         // Skapa case
@@ -874,6 +878,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       <Zap className="text-cyan-400"/>Intelligent Bokning
                     </h3>
 
+                    {/* Adress (hämtas från kund) */}
+                    <Input
+                      label="Adress"
+                      name="adress"
+                      placeholder="Fullständig adress..."
+                      value={typeof formData.adress === 'string' ? formData.adress : ''}
+                      onChange={handleChange}
+                    />
+
                     {/* Sökparametrar för bokningsassistent */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -972,13 +985,58 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <ClipboardCheck className="w-5 h-5 text-cyan-400" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-white text-lg">Bokningsdetaljer</h3>
-                        <p className="text-sm text-slate-400">Tid och tekniker för stationskontroll</p>
+                        <h3 className="font-semibold text-white text-lg">Bokning & Detaljer</h3>
+                        <p className="text-sm text-slate-400">Verifiera kundinfo och välj tid för stationskontroll</p>
                       </div>
                     </div>
 
-                    {/* Tid och tekniker */}
+                    {/* Kund & Kontakt */}
                     <div className="space-y-4">
+                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <User size={16}/> Kund & Kontakt
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input
+                          label="Kontaktperson"
+                          name="kontaktperson"
+                          value={formData.kontaktperson || ''}
+                          onChange={handleChange}
+                        />
+                        <Input
+                          label="Telefonnummer"
+                          name="telefon_kontaktperson"
+                          value={formData.telefon_kontaktperson || ''}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      <Input
+                        type="email"
+                        label="E-post Kontaktperson"
+                        name="e_post_kontaktperson"
+                        value={formData.e_post_kontaktperson || ''}
+                        onChange={handleChange}
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input
+                          label="Organisationsnummer"
+                          name="org_nr"
+                          value={formData.org_nr || ''}
+                          onChange={handleChange}
+                        />
+                        <Input
+                          label="Beställare"
+                          name="bestallare"
+                          value={formData.bestallare || ''}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bokning & Team */}
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <Users size={16}/> Bokning & Team
+                      </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label>
@@ -1016,7 +1074,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           />
                         </div>
                       </div>
-
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">Ansvarig tekniker *</label>
                         <select
@@ -1024,7 +1081,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           value={formData.primary_assignee_id || ''}
                           onChange={handleChange}
                           required
-                          className="w-full px-3 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-base"
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
                         >
                           <option value="" disabled>Välj tekniker...</option>
                           {technicians.map(t => (
@@ -1032,22 +1089,82 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           ))}
                         </select>
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Extra tekniker (valfri)</label>
+                        <select
+                          name="secondary_assignee_id"
+                          value={formData.secondary_assignee_id || ''}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                        >
+                          <option value="">Ingen vald</option>
+                          {technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.tertiary_assignee_id).map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Extra tekniker 2 (valfri)</label>
+                        <select
+                          name="tertiary_assignee_id"
+                          value={formData.tertiary_assignee_id || ''}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                        >
+                          <option value="">Ingen vald</option>
+                          {technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.secondary_assignee_id).map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
-                    {/* Anteckningar */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        <FileText size={14} className="inline mr-1" />
-                        Anteckningar till tekniker (valfritt)
-                      </label>
-                      <textarea
-                        name="description"
-                        value={formData.description || ''}
+                    {/* Ärendeinformation */}
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <Briefcase size={16}/> Ärendeinformation
+                      </h4>
+                      <Input
+                        label="Ärendetitel (valfritt - auto-genereras annars)"
+                        name="title"
+                        value={formData.title || ''}
                         onChange={handleChange}
-                        rows={3}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-base"
-                        placeholder="T.ex. portkod, speciella instruktioner..."
+                        placeholder="Stationskontroll - [Kundnamn]"
                       />
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          <FileText size={14} className="inline mr-1" />
+                          Anteckningar till tekniker (valfritt)
+                        </label>
+                        <textarea
+                          name="description"
+                          value={formData.description || ''}
+                          onChange={handleChange}
+                          rows={3}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-base"
+                          placeholder="T.ex. portkod, speciella instruktioner..."
+                        />
+                      </div>
+                    </div>
+
+                    {/* Utskick */}
+                    <div className="space-y-4">
+                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <MapPin size={16}/> Utskick
+                      </h4>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Skicka bokningsbekräftelse?</label>
+                        <select
+                          name="skicka_bokningsbekraftelse"
+                          value={formData.skicka_bokningsbekraftelse || 'Nej'}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                        >
+                          <option value="Nej">Nej</option>
+                          <option value="JA - Första Klockslaget">JA - Första Klockslaget</option>
+                          <option value="JA - Tidsspann">JA - Tidsspann</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Info-ruta */}
