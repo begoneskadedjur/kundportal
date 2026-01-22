@@ -358,23 +358,27 @@ export async function getCompletedSessionsWithSummary(
 /**
  * Hämta senaste inspektionsvärden per station för en kund
  * Används för att jämföra historiska värden mot nuvarande
+ * Returnerar både värden och sessionsdatum
  */
 export async function getLatestInspectionValuesForCustomer(
   customerId: string
-): Promise<Map<string, { value: number | null; status: 'ok' | 'warning' | 'critical' }>> {
+): Promise<{
+  values: Map<string, { value: number | null; status: 'ok' | 'warning' | 'critical' }>
+  sessionDate: string | null
+}> {
   // Hämta senaste avslutade session
   const sessions = await getCompletedSessionsForCustomer(customerId, 1)
   if (sessions.length === 0) {
-    return new Map()
+    return { values: new Map(), sessionDate: null }
   }
 
-  const sessionId = sessions[0].id
+  const session = sessions[0]
   const valueMap = new Map<string, { value: number | null; status: 'ok' | 'warning' | 'critical' }>()
 
   // Hämta inspektioner
   const [outdoorInspections, indoorInspections] = await Promise.all([
-    getOutdoorInspectionsForSession(sessionId),
-    getIndoorInspectionsForSession(sessionId)
+    getOutdoorInspectionsForSession(session.id),
+    getIndoorInspectionsForSession(session.id)
   ])
 
   // Bearbeta outdoor
@@ -419,7 +423,7 @@ export async function getLatestInspectionValuesForCustomer(
     }
   })
 
-  return valueMap
+  return { values: valueMap, sessionDate: session.completed_at }
 }
 
 /**

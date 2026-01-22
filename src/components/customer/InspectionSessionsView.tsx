@@ -142,6 +142,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [historyDetailSections, setHistoryDetailSections] = useState<StationSection[]>([])
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [latestComparisonData, setLatestComparisonData] = useState<Map<string, { value: number | null; status: 'ok' | 'warning' | 'critical' }>>(new Map())
+  const [latestSessionDate, setLatestSessionDate] = useState<string | null>(null)
 
   // Ladda all data
   const fetchData = useCallback(async () => {
@@ -364,13 +365,15 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
 
     try {
       // Hämta inspektionsdata för denna session OCH senaste kontrollens data för jämförelse
-      const [outdoorInspections, indoorInspections, comparisonData] = await Promise.all([
+      const [outdoorInspections, indoorInspections, comparisonResult] = await Promise.all([
         getOutdoorInspectionsForSession(session.id),
         getIndoorInspectionsForSession(session.id),
         getLatestInspectionValuesForCustomer(customerId)
       ])
 
+      const comparisonData = comparisonResult.values
       setLatestComparisonData(comparisonData)
+      setLatestSessionDate(comparisonResult.sessionDate)
 
       // Omvandla till StationSection-format
       const detailSections: StationSection[] = []
@@ -1214,122 +1217,137 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                     )
                   })()}
 
-                  {/* Sektioner med stationer */}
+                  {/* Sektioner med stationer - Tabellformat */}
                   <div className="space-y-4">
-                    {historyDetailSections.map((section) => (
-                      <div key={section.id} className="bg-slate-900/30 rounded-xl border border-slate-700/50">
-                        <div className="flex items-center gap-2 p-3 border-b border-slate-700/50">
-                          {section.icon === 'outdoor' ? (
-                            <MapPin className="w-4 h-4 text-teal-400" />
-                          ) : (
-                            <Home className="w-4 h-4 text-blue-400" />
-                          )}
-                          <span className="text-white font-medium">{section.name}</span>
-                          {section.buildingName && (
-                            <span className="text-slate-500">({section.buildingName})</span>
-                          )}
-                          <span className="text-slate-500 text-sm ml-auto">
-                            {section.stations.length} stationer
-                          </span>
-                        </div>
-                        <div className="divide-y divide-slate-700/30">
-                          {section.stations.map((station) => {
-                            const statusConfig = CALCULATED_STATUS_CONFIG[station.calculatedStatus]
-                            const histValue = station.latestInspection?.measurementValue
-                            const currentValue = station.comparisonValue
-                            const hasBothValues = histValue !== null && histValue !== undefined && currentValue !== null && currentValue !== undefined
-                            const diff = hasBothValues ? currentValue - histValue : null
-                            const comparisonStatusConfig = station.comparisonStatus ? CALCULATED_STATUS_CONFIG[station.comparisonStatus] : null
+                    {historyDetailSections.map((section) => {
+                      // Formatera datum för kolumnrubriker
+                      const histDate = selectedHistorySession?.completed_at
+                        ? format(new Date(selectedHistorySession.completed_at), 'd MMM', { locale: sv })
+                        : 'Då'
+                      const currentDate = latestSessionDate
+                        ? format(new Date(latestSessionDate), 'd MMM', { locale: sv })
+                        : 'Nu'
 
-                            return (
-                              <div key={station.id} className="flex items-center justify-between p-3 gap-2">
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                  <div
-                                    className="w-3 h-3 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: station.typeColor }}
-                                  />
-                                  <div className="min-w-0">
-                                    <span className="text-white text-sm">
-                                      {station.stationNumber || '-'}
-                                    </span>
-                                    <span className="text-slate-500 text-sm ml-2 truncate">
-                                      {station.stationType}
-                                    </span>
-                                  </div>
-                                </div>
+                      return (
+                        <div key={section.id} className="bg-slate-900/30 rounded-xl border border-slate-700/50 overflow-hidden">
+                          <div className="flex items-center gap-2 p-3 border-b border-slate-700/50 bg-slate-900/50">
+                            {section.icon === 'outdoor' ? (
+                              <MapPin className="w-4 h-4 text-teal-400" />
+                            ) : (
+                              <Home className="w-4 h-4 text-blue-400" />
+                            )}
+                            <span className="text-white font-medium">
+                              {section.buildingName ? `${section.buildingName} - ` : ''}{section.name}
+                            </span>
+                            <span className="text-slate-500 text-sm ml-auto">
+                              ({section.stations.length} stationer)
+                            </span>
+                          </div>
 
-                                {/* Värden: Historiskt -> Senaste med trend */}
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  {/* Historiskt värde (denna kontroll) */}
-                                  {histValue !== null && histValue !== undefined && (
-                                    <div className="flex items-center gap-1">
-                                      <div
-                                        className="w-2 h-2 rounded-full"
-                                        style={{ backgroundColor: statusConfig.color }}
-                                      />
-                                      <span className="text-slate-400 text-sm">
-                                        {histValue}
-                                      </span>
-                                    </div>
-                                  )}
+                          {/* Tabell */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-slate-800/50 border-b border-slate-700/50">
+                                  <th className="text-left px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Nr</th>
+                                  <th className="text-left px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Typ</th>
+                                  <th className="text-right px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wide">{histDate}</th>
+                                  <th className="text-right px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wide">{currentDate}</th>
+                                  <th className="text-right px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Förändring</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-700/30">
+                                {section.stations.map((station, index) => {
+                                  const statusConfig = CALCULATED_STATUS_CONFIG[station.calculatedStatus]
+                                  const histValue = station.latestInspection?.measurementValue
+                                  const currentValue = station.comparisonValue
+                                  const hasBothValues = histValue !== null && histValue !== undefined && currentValue !== null && currentValue !== undefined
+                                  const diff = hasBothValues ? currentValue - histValue : null
+                                  const percentChange = hasBothValues && histValue !== 0
+                                    ? Math.round(((currentValue - histValue) / Math.abs(histValue)) * 100)
+                                    : null
+                                  const comparisonStatusConfig = station.comparisonStatus ? CALCULATED_STATUS_CONFIG[station.comparisonStatus] : null
 
-                                  {/* Pil och trend */}
-                                  {hasBothValues && (
-                                    <>
-                                      <span className="text-slate-600">→</span>
+                                  // Avgör om förändringen är bra eller dålig
+                                  const isGoodChange = diff !== null && diff !== 0 && (
+                                    station.thresholdDirection === 'above' ? diff < 0 : diff > 0
+                                  )
+                                  const isBadChange = diff !== null && diff !== 0 && !isGoodChange
 
-                                      {/* Senaste värde */}
-                                      <div className="flex items-center gap-1">
-                                        <div
-                                          className="w-2 h-2 rounded-full"
-                                          style={{ backgroundColor: comparisonStatusConfig?.color || '#6b7280' }}
-                                        />
-                                        <span className="text-white text-sm font-medium">
-                                          {currentValue}
-                                        </span>
-                                      </div>
-
-                                      {/* Differens med trend-ikon */}
-                                      {diff !== null && diff !== 0 && (
-                                        <div className={`flex items-center gap-0.5 text-xs ${
-                                          station.thresholdDirection === 'above'
-                                            ? diff > 0 ? 'text-red-400' : 'text-emerald-400'
-                                            : diff < 0 ? 'text-red-400' : 'text-emerald-400'
-                                        }`}>
-                                          {station.thresholdDirection === 'above' ? (
-                                            diff > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />
-                                          ) : (
-                                            diff < 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />
-                                          )}
-                                          <span>{diff > 0 ? '+' : ''}{diff}</span>
+                                  return (
+                                    <tr key={station.id} className="hover:bg-slate-800/30 transition-colors">
+                                      <td className="px-4 py-2.5 text-white font-medium">
+                                        {station.stationNumber || `#${index + 1}`}
+                                      </td>
+                                      <td className="px-4 py-2.5">
+                                        <div className="flex items-center gap-2">
+                                          <div
+                                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                            style={{ backgroundColor: station.typeColor }}
+                                          />
+                                          <span className="text-slate-300">{station.stationType}</span>
                                         </div>
-                                      )}
-                                      {diff === 0 && (
-                                        <div className="flex items-center gap-0.5 text-xs text-slate-500">
-                                          <Minus className="w-3 h-3" />
-                                          <span>0</span>
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-
-                                  {/* Om bara historiskt värde finns */}
-                                  {histValue !== null && histValue !== undefined && !hasBothValues && station.measurementLabel && (
-                                    <span className="text-slate-500 text-xs">
-                                      {station.measurementLabel}
-                                    </span>
-                                  )}
-
-                                  {station.latestInspection?.photoUrl && (
-                                    <Camera className="w-4 h-4 text-slate-500 ml-1" />
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          })}
+                                      </td>
+                                      <td className="px-4 py-2.5 text-right">
+                                        {histValue !== null && histValue !== undefined ? (
+                                          <div className="flex items-center justify-end gap-1.5">
+                                            <div
+                                              className="w-2.5 h-2.5 rounded-full"
+                                              style={{ backgroundColor: statusConfig.color }}
+                                            />
+                                            <span className="text-slate-300">{histValue}</span>
+                                          </div>
+                                        ) : (
+                                          <span className="text-slate-500">-</span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-2.5 text-right">
+                                        {currentValue !== null && currentValue !== undefined ? (
+                                          <div className="flex items-center justify-end gap-1.5">
+                                            <div
+                                              className="w-2.5 h-2.5 rounded-full"
+                                              style={{ backgroundColor: comparisonStatusConfig?.color || '#6b7280' }}
+                                            />
+                                            <span className="text-white font-medium">{currentValue}</span>
+                                          </div>
+                                        ) : (
+                                          <span className="text-slate-500">-</span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-2.5 text-right">
+                                        {hasBothValues && diff !== null ? (
+                                          <div className={`flex items-center justify-end gap-1 ${
+                                            diff === 0 ? 'text-slate-500' :
+                                            isGoodChange ? 'text-emerald-400' : 'text-red-400'
+                                          }`}>
+                                            {diff !== 0 && (
+                                              isGoodChange
+                                                ? <TrendingDown className="w-3.5 h-3.5" />
+                                                : <TrendingUp className="w-3.5 h-3.5" />
+                                            )}
+                                            {diff === 0 && <Minus className="w-3.5 h-3.5" />}
+                                            <span className="font-medium">
+                                              {diff > 0 ? '+' : ''}{diff}
+                                            </span>
+                                            {percentChange !== null && percentChange !== 0 && (
+                                              <span className="text-xs opacity-75">
+                                                ({percentChange > 0 ? '+' : ''}{percentChange}%)
+                                              </span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <span className="text-slate-500">-</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </>
               )}
