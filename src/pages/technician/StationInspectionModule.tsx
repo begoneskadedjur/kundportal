@@ -1387,6 +1387,13 @@ export default function StationInspectionModule() {
                       Avsluta
                     </button>
                   </div>
+                  {/* Progress bar */}
+                  <div className="w-full h-1.5 bg-slate-700 rounded-full mb-3">
+                    <div
+                      className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                      style={{ width: `${((wizardStationQueue.indexOf(currentWizardStationId || '') + 1) / wizardStationQueue.length) * 100}%` }}
+                    />
+                  </div>
                   <div className="flex items-center justify-between gap-2 text-sm">
                     <button
                       onClick={wizardPrevStation}
@@ -1468,7 +1475,7 @@ export default function StationInspectionModule() {
                 <div className="glass rounded-xl overflow-hidden">
                   <EquipmentMap
                     equipment={outdoorEquipment}
-                    height="calc(100vh - 350px)"
+                    height="min(55vh, 450px)"
                     readOnly
                     showControls={true}
                     showNumbers={true}
@@ -1583,6 +1590,13 @@ export default function StationInspectionModule() {
                       Avsluta
                     </button>
                   </div>
+                  {/* Progress bar */}
+                  <div className="w-full h-1.5 bg-slate-700 rounded-full mb-3">
+                    <div
+                      className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                      style={{ width: `${((wizardStationQueue.indexOf(currentWizardStationId || '') + 1) / wizardStationQueue.length) * 100}%` }}
+                    />
+                  </div>
                   <div className="flex items-center justify-between gap-2 text-sm">
                     <button
                       onClick={wizardPrevStation}
@@ -1644,7 +1658,7 @@ export default function StationInspectionModule() {
                         <button
                           key={fp.id}
                           onClick={() => setSelectedFloorPlanId(fp.id)}
-                          className={`flex-shrink-0 w-36 rounded-xl overflow-hidden transition-all ${
+                          className={`flex-shrink-0 w-44 rounded-xl overflow-hidden transition-all ${
                             isSelected
                               ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-slate-900'
                               : allDone
@@ -1656,7 +1670,7 @@ export default function StationInspectionModule() {
                           <div className={`aspect-[16/10] relative ${
                             isSelected ? 'bg-green-500/20' : 'bg-slate-800'
                           }`}>
-                            <Building2 className="w-8 h-8 text-slate-600 absolute inset-0 m-auto" />
+                            <Building2 className="w-10 h-10 text-slate-600 absolute inset-0 m-auto" />
                             {/* Progress overlay */}
                             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/90 to-transparent p-2">
                               <div className="flex items-center justify-between text-xs">
@@ -1705,7 +1719,7 @@ export default function StationInspectionModule() {
                     selectedStationId={null}
                     placementMode="view"
                     onStationClick={handleIndoorStationClick}
-                    height="calc(100vh - 380px)"
+                    height="min(55vh, 450px)"
                     showNumbers={true}
                     inspectedStationIds={inspectedStationIds}
                     highlightedStationId={wizardMode === 'indoor' ? currentWizardStationId : null}
