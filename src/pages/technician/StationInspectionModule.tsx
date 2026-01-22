@@ -174,6 +174,7 @@ export default function StationInspectionModule() {
   const [showHistory, setShowHistory] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [stationHistory, setStationHistory] = useState<InspectionHistoryItem[]>([])
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
 
   // Senaste inspektion och aktivitetsstationer (för ankomstkort)
   const [lastInspection, setLastInspection] = useState<{
@@ -949,6 +950,75 @@ export default function StationInspectionModule() {
     }
   }
 
+  // Snabb-OK: Spara station som OK direkt utan att öppna modal
+  const handleQuickOk = async (station: StationData, e: React.MouseEvent) => {
+    e.stopPropagation() // Förhindra att modalen öppnas
+
+    if (!session || session.status === 'completed') return
+
+    try {
+      // Auto-starta session om det behövs
+      let currentSession = session
+      if (session.status === 'scheduled') {
+        const updated = await startInspectionSession(session.id)
+        if (updated) {
+          currentSession = { ...session, status: 'in_progress', started_at: new Date().toISOString() }
+          setSession(currentSession)
+          toast.success('Inspektion startad!')
+        } else {
+          toast.error('Kunde inte starta inspektionen')
+          return
+        }
+      }
+
+      const isOutdoor = outdoorStations.some(s => s.id === station.id)
+
+      const inspectionData = {
+        station_id: station.id,
+        session_id: currentSession.id,
+        status: 'ok' as InspectionStatus,
+      }
+
+      if (isOutdoor) {
+        await createOutdoorInspection(inspectionData, currentSession.technician_id || undefined)
+        await updateInspectionSession(currentSession.id, {
+          inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
+        })
+        setSession({
+          ...currentSession,
+          inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
+        })
+      } else {
+        await createIndoorInspection(inspectionData, currentSession.technician_id || undefined)
+        await updateInspectionSession(currentSession.id, {
+          inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
+        })
+        setSession({
+          ...currentSession,
+          inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
+        })
+      }
+
+      setInspectedStationIds(prev => new Set(prev).add(station.id))
+      setInspectionResults(prev => ({
+        ...prev,
+        [station.id]: {
+          status: 'ok',
+          findings: null,
+          measurementValue: null,
+          measurementUnit: null,
+          hasPhoto: false,
+          timestamp: new Date().toISOString()
+        }
+      }))
+
+      toast.success('Station markerad som OK')
+    } catch (err) {
+      console.error('Error quick-OK inspection:', err)
+      toast.error('Kunde inte spara')
+    }
+  }
+
   // Avsluta inspektion
   const handleCompleteInspection = async () => {
     if (!session) return
@@ -1466,7 +1536,19 @@ export default function StationInspectionModule() {
                               <p className="text-sm text-slate-400">{typeName}</p>
                             </div>
                           </div>
-                          <ChevronRight className="w-5 h-5 text-slate-500" />
+                          <div className="flex items-center gap-2">
+                            {/* Snabb-OK-knapp */}
+                            {!isInspected && session?.status !== 'completed' && (
+                              <button
+                                onClick={(e) => handleQuickOk(station, e)}
+                                className="p-2 bg-green-500/20 hover:bg-green-500/40 text-green-400 rounded-lg transition-colors"
+                                title="Markera som OK"
+                              >
+                                <Check className="w-5 h-5" />
+                              </button>
+                            )}
+                            <ChevronRight className="w-5 h-5 text-slate-500" />
+                          </div>
                         </div>
                       </motion.button>
                     )
@@ -1692,7 +1774,19 @@ export default function StationInspectionModule() {
                               <p className="text-sm text-slate-400">{typeName}</p>
                             </div>
                           </div>
-                          <ChevronRight className="w-5 h-5 text-slate-500" />
+                          <div className="flex items-center gap-2">
+                            {/* Snabb-OK-knapp */}
+                            {!isInspected && session?.status !== 'completed' && (
+                              <button
+                                onClick={(e) => handleQuickOk(station, e)}
+                                className="p-2 bg-green-500/20 hover:bg-green-500/40 text-green-400 rounded-lg transition-colors"
+                                title="Markera som OK"
+                              >
+                                <Check className="w-5 h-5" />
+                              </button>
+                            )}
+                            <ChevronRight className="w-5 h-5 text-slate-500" />
+                          </div>
                         </div>
                       </motion.button>
                     )
@@ -1720,27 +1814,40 @@ export default function StationInspectionModule() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 100, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg glass rounded-2xl p-6 max-h-[90vh] overflow-y-auto"
+              className="w-full max-w-lg glass rounded-2xl max-h-[90vh] flex flex-col overflow-hidden"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
+              {/* Sticky Header med actions */}
+              <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-700 p-4 flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-white">
+                  <h2 className="text-lg font-bold text-white">
                     Station {outdoorNumberMap[selectedStation.id] || indoorNumberMap[selectedStation.id] || '?'}
                   </h2>
-                  <p className="text-slate-400">
+                  <p className="text-sm text-slate-400">
                     {selectedStation.station_type_data?.name || selectedStation.equipment_type || selectedStation.station_type}
                   </p>
                 </div>
-                <button
-                  onClick={() => setSelectedStation(null)}
-                  className="p-2 rounded-lg hover:bg-slate-700"
-                >
-                  <X className="w-5 h-5 text-slate-400" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedStation(null)}
+                    className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+                  >
+                    Avbryt
+                  </button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveInspection}
+                    loading={isSubmitting}
+                  >
+                    <Check className="w-4 h-4 mr-1" />
+                    Spara
+                  </Button>
+                </div>
               </div>
 
-              {/* History Panel - visas inline automatiskt */}
+              {/* Scrollbart innehåll */}
+              <div className="flex-1 overflow-y-auto p-6">
+
+              {/* History Panel - expanderbar med findings/foto/tekniker */}
               {historyLoading ? (
                 <div className="mb-4 bg-slate-800/50 rounded-lg p-3">
                   <div className="flex items-center gap-2">
@@ -1755,22 +1862,64 @@ export default function StationInspectionModule() {
                     Senaste inspektioner
                   </h4>
                   <div className="space-y-2">
-                    {stationHistory.slice(0, 3).map((item) => (
-                      <div key={item.id} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span>{INSPECTION_STATUS_CONFIG[item.status]?.icon}</span>
-                          <span className="text-slate-300">
-                            {INSPECTION_STATUS_CONFIG[item.status]?.label || item.status}
-                          </span>
-                          {item.measurement_value !== null && (
-                            <span className="text-amber-400">({item.measurement_value} {item.measurement_unit})</span>
+                    {stationHistory.slice(0, 5).map((item) => {
+                      const isExpanded = expandedHistoryId === item.id
+                      const hasDetails = item.findings || item.photo_path || item.technician
+
+                      return (
+                        <div key={item.id} className="bg-slate-900/50 rounded-lg overflow-hidden">
+                          {/* Klickbar rubrikrad */}
+                          <button
+                            onClick={() => hasDetails && setExpandedHistoryId(isExpanded ? null : item.id)}
+                            className={`w-full flex items-center justify-between p-2 text-xs ${
+                              hasDetails ? 'hover:bg-slate-800/50 cursor-pointer' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{INSPECTION_STATUS_CONFIG[item.status]?.icon}</span>
+                              <span className="text-slate-300">
+                                {INSPECTION_STATUS_CONFIG[item.status]?.label || item.status}
+                              </span>
+                              {item.measurement_value !== null && (
+                                <span className="text-amber-400 font-mono">
+                                  {item.measurement_value}g
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {item.technician && (
+                                <span className="text-slate-500 text-[10px]">{item.technician.name}</span>
+                              )}
+                              <span className="text-slate-600">
+                                {new Date(item.inspected_at).toLocaleDateString('sv-SE')}
+                              </span>
+                              {hasDetails && (
+                                <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Expanderad sektion */}
+                          {isExpanded && (
+                            <div className="px-2 pb-2 space-y-2 border-t border-slate-700/50">
+                              {item.findings && (
+                                <p className="text-xs text-slate-400 italic mt-2">
+                                  "{item.findings}"
+                                </p>
+                              )}
+                              {item.photo_path && (
+                                <img
+                                  src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/inspection-photos/${item.photo_path}`}
+                                  alt="Tidigare foto"
+                                  className="w-24 h-24 object-cover rounded-lg mt-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => window.open(`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/inspection-photos/${item.photo_path}`, '_blank')}
+                                />
+                              )}
+                            </div>
                           )}
                         </div>
-                        <span className="text-slate-500">
-                          {new Date(item.inspected_at).toLocaleDateString('sv-SE')}
-                        </span>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               ) : null}
@@ -1876,7 +2025,7 @@ export default function StationInspectionModule() {
               </div>
 
               {/* Notes */}
-              <div className="mb-6">
+              <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Anteckningar (valfritt)
                 </label>
@@ -1889,24 +2038,7 @@ export default function StationInspectionModule() {
                 />
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  fullWidth
-                  onClick={() => setSelectedStation(null)}
-                >
-                  Avbryt
-                </Button>
-                <Button
-                  fullWidth
-                  onClick={handleSaveInspection}
-                  loading={isSubmitting}
-                >
-                  <Check className="w-4 h-4 mr-2" />
-                  Spara
-                </Button>
-              </div>
+              </div>{/* Slut på scrollbart innehåll */}
             </motion.div>
           </motion.div>
         )}
