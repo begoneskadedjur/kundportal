@@ -356,6 +356,73 @@ export async function getCompletedSessionsWithSummary(
 }
 
 /**
+ * Hämta senaste inspektionsvärden per station för en kund
+ * Används för att jämföra historiska värden mot nuvarande
+ */
+export async function getLatestInspectionValuesForCustomer(
+  customerId: string
+): Promise<Map<string, { value: number | null; status: 'ok' | 'warning' | 'critical' }>> {
+  // Hämta senaste avslutade session
+  const sessions = await getCompletedSessionsForCustomer(customerId, 1)
+  if (sessions.length === 0) {
+    return new Map()
+  }
+
+  const sessionId = sessions[0].id
+  const valueMap = new Map<string, { value: number | null; status: 'ok' | 'warning' | 'critical' }>()
+
+  // Hämta inspektioner
+  const [outdoorInspections, indoorInspections] = await Promise.all([
+    getOutdoorInspectionsForSession(sessionId),
+    getIndoorInspectionsForSession(sessionId)
+  ])
+
+  // Bearbeta outdoor
+  outdoorInspections.forEach(insp => {
+    const station = insp.station as any
+    if (station?.id) {
+      const stationType = station.station_type_data
+      const value = insp.measurement_value
+      let status: 'ok' | 'warning' | 'critical' = 'ok'
+
+      if (value !== null && stationType) {
+        status = calculateStatusFromThresholds(
+          value,
+          stationType.threshold_warning,
+          stationType.threshold_critical,
+          stationType.threshold_direction
+        )
+      }
+
+      valueMap.set(station.id, { value, status })
+    }
+  })
+
+  // Bearbeta indoor
+  indoorInspections.forEach(insp => {
+    const station = insp.station as any
+    if (station?.id) {
+      const stationType = station.station_type_data
+      const value = insp.measurement_value
+      let status: 'ok' | 'warning' | 'critical' = 'ok'
+
+      if (value !== null && stationType) {
+        status = calculateStatusFromThresholds(
+          value,
+          stationType.threshold_warning,
+          stationType.threshold_critical,
+          stationType.threshold_direction
+        )
+      }
+
+      valueMap.set(station.id, { value, status })
+    }
+  })
+
+  return valueMap
+}
+
+/**
  * Hämta komplett inspektionsdata för kundportalen
  * Returnerar senaste session med alla inspektionsresultat
  */
@@ -528,10 +595,10 @@ export async function getOutdoorInspectionsForSession(
     return []
   }
 
-  // Hämta alla station_types för att matcha equipment_type → code
+  // Hämta alla station_types för att matcha equipment_type → code (inkl tröskelvärden)
   const { data: stationTypes } = await supabase
     .from('station_types')
-    .select('id, code, name, color, measurement_unit, measurement_label')
+    .select('id, code, name, color, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction')
     .eq('is_active', true)
 
   // Skapa map för snabb lookup på code
@@ -700,10 +767,10 @@ export async function getIndoorInspectionsForSession(
     return []
   }
 
-  // Hämta alla station_types för att matcha station_type → code
+  // Hämta alla station_types för att matcha station_type → code (inkl tröskelvärden)
   const { data: stationTypes } = await supabase
     .from('station_types')
-    .select('id, code, name, color, measurement_unit, measurement_label')
+    .select('id, code, name, color, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction')
     .eq('is_active', true)
 
   // Skapa map för snabb lookup på code

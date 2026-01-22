@@ -20,6 +20,8 @@ import {
   Camera,
   Clock,
   TrendingUp,
+  TrendingDown,
+  Minus,
   ExternalLink,
   X,
   Eye,
@@ -36,6 +38,7 @@ import {
   getOutdoorInspectionsByStation,
   getOutdoorInspectionsForSession,
   getIndoorInspectionsForSession,
+  getLatestInspectionValuesForCustomer,
 } from '../../services/inspectionSessionService'
 import { useDebounce } from '../../hooks/useDebounce'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
@@ -85,6 +88,9 @@ interface StationWithLatestInspection {
   originalIndoorStation?: IndoorStationWithRelations
   floorPlanId?: string
   floorPlanName?: string
+  // Jämförelsevärden mot senaste kontrollen
+  comparisonValue?: number | null
+  comparisonStatus?: 'ok' | 'warning' | 'critical'
 }
 
 // Sektion med stationer
@@ -135,6 +141,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [loadingHistoryDetail, setLoadingHistoryDetail] = useState(false)
   const [historyDetailSections, setHistoryDetailSections] = useState<StationSection[]>([])
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [latestComparisonData, setLatestComparisonData] = useState<Map<string, { value: number | null; status: 'ok' | 'warning' | 'critical' }>>(new Map())
 
   // Ladda all data
   const fetchData = useCallback(async () => {
@@ -356,11 +363,14 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     setLoadingHistoryDetail(true)
 
     try {
-      // Hämta inspektionsdata för denna session
-      const [outdoorInspections, indoorInspections] = await Promise.all([
+      // Hämta inspektionsdata för denna session OCH senaste kontrollens data för jämförelse
+      const [outdoorInspections, indoorInspections, comparisonData] = await Promise.all([
         getOutdoorInspectionsForSession(session.id),
-        getIndoorInspectionsForSession(session.id)
+        getIndoorInspectionsForSession(session.id),
+        getLatestInspectionValuesForCustomer(customerId)
       ])
+
+      setLatestComparisonData(comparisonData)
 
       // Omvandla till StationSection-format
       const detailSections: StationSection[] = []
@@ -371,6 +381,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           const station = insp.station as any
           const stationTypeData = station?.station_type_data
           const measurementValue = insp.measurement_value
+          const stationId = station?.id || insp.id
 
           let calculatedStatus: CalculatedStatus = 'ok'
           if (stationTypeData && measurementValue !== null) {
@@ -388,10 +399,13 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             )
           }
 
+          // Hämta jämförelsevärden från senaste kontrollen
+          const comparison = comparisonData.get(stationId)
+
           return {
-            id: station?.id || insp.id,
-            stationNumber: station?.serial_number || 'Okänd',
-            stationType: stationTypeData?.name || station?.equipment_type || 'Okänd typ',
+            id: stationId,
+            stationNumber: station?.serial_number || station?.equipment_type || '-',
+            stationType: stationTypeData?.name || station?.equipment_type || '-',
             typeColor: stationTypeData?.color || '#6b7280',
             measurementLabel: stationTypeData?.measurement_label || null,
             measurementUnit: stationTypeData?.measurement_unit || 'numeric',
@@ -407,7 +421,9 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               measurementValue: insp.measurement_value,
               technicianName: insp.technician?.name || null
             },
-            calculatedStatus
+            calculatedStatus,
+            comparisonValue: comparison?.value ?? null,
+            comparisonStatus: comparison?.status
           }
         })
 
@@ -441,6 +457,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             const station = insp.station as any
             const stationTypeData = station?.station_type_data
             const measurementValue = insp.measurement_value
+            const stationId = station?.id || insp.id
 
             let calculatedStatus: CalculatedStatus = 'ok'
             if (stationTypeData && measurementValue !== null) {
@@ -458,10 +475,13 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               )
             }
 
+            // Hämta jämförelsevärden från senaste kontrollen
+            const comparison = comparisonData.get(stationId)
+
             return {
-              id: station?.id || insp.id,
-              stationNumber: station?.station_number?.toString() || 'Okänd',
-              stationType: stationTypeData?.name || station?.station_type || 'Okänd typ',
+              id: stationId,
+              stationNumber: station?.station_number?.toString() || '-',
+              stationType: stationTypeData?.name || station?.station_type || '-',
               typeColor: stationTypeData?.color || '#6b7280',
               measurementLabel: stationTypeData?.measurement_label || null,
               measurementUnit: stationTypeData?.measurement_unit || 'numeric',
@@ -479,7 +499,9 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               },
               calculatedStatus,
               floorPlanId: floorPlan?.id,
-              floorPlanName: floorPlan?.name
+              floorPlanName: floorPlan?.name,
+              comparisonValue: comparison?.value ?? null,
+              comparisonStatus: comparison?.status
             }
           })
 
@@ -1118,45 +1140,79 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                 </div>
               ) : (
                 <>
-                  {/* Sammanfattning */}
-                  <div className="grid grid-cols-4 gap-3 mb-6">
-                    <div className="bg-slate-900/50 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        <span className="text-xs text-slate-500 uppercase">OK</span>
+                  {/* Sammanfattning med jämförelse mot senaste */}
+                  {(() => {
+                    const histOk = selectedHistorySession.inspection_summary?.ok || 0
+                    const histWarning = selectedHistorySession.inspection_summary?.warning || 0
+                    const histCritical = selectedHistorySession.inspection_summary?.critical || 0
+                    const histTotal = selectedHistorySession.inspection_summary?.total || 0
+
+                    // Beräkna nuvarande statusar från comparisonData
+                    let currentOk = 0, currentWarning = 0, currentCritical = 0
+                    latestComparisonData.forEach(data => {
+                      if (data.status === 'ok') currentOk++
+                      else if (data.status === 'warning') currentWarning++
+                      else if (data.status === 'critical') currentCritical++
+                    })
+
+                    const okDiff = currentOk - histOk
+                    const warningDiff = currentWarning - histWarning
+                    const criticalDiff = currentCritical - histCritical
+
+                    const renderDiff = (diff: number, isGoodWhenPositive: boolean) => {
+                      if (diff === 0) return null
+                      const isPositive = diff > 0
+                      const isGood = isGoodWhenPositive ? isPositive : !isPositive
+                      return (
+                        <div className={`flex items-center gap-0.5 text-xs ${isGood ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                          <span>{isPositive ? '+' : ''}{diff}</span>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div className="grid grid-cols-4 gap-3 mb-6">
+                        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <span className="text-xs text-slate-500 uppercase">OK</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-2">
+                            <p className="text-emerald-400 font-bold text-lg">{histOk}</p>
+                            {latestComparisonData.size > 0 && renderDiff(okDiff, true)}
+                          </div>
+                        </div>
+                        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <AlertTriangle className="w-4 h-4 text-amber-400" />
+                            <span className="text-xs text-slate-500 uppercase">Varning</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-2">
+                            <p className="text-amber-400 font-bold text-lg">{histWarning}</p>
+                            {latestComparisonData.size > 0 && renderDiff(warningDiff, false)}
+                          </div>
+                        </div>
+                        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <AlertTriangle className="w-4 h-4 text-red-400" />
+                            <span className="text-xs text-slate-500 uppercase">Kritisk</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-2">
+                            <p className="text-red-400 font-bold text-lg">{histCritical}</p>
+                            {latestComparisonData.size > 0 && renderDiff(criticalDiff, false)}
+                          </div>
+                        </div>
+                        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <ClipboardCheck className="w-4 h-4 text-slate-400" />
+                            <span className="text-xs text-slate-500 uppercase">Totalt</span>
+                          </div>
+                          <p className="text-white font-bold text-lg">{histTotal}</p>
+                        </div>
                       </div>
-                      <p className="text-emerald-400 font-bold text-lg">
-                        {selectedHistorySession.inspection_summary?.ok || 0}
-                      </p>
-                    </div>
-                    <div className="bg-slate-900/50 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <AlertTriangle className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs text-slate-500 uppercase">Varning</span>
-                      </div>
-                      <p className="text-amber-400 font-bold text-lg">
-                        {selectedHistorySession.inspection_summary?.warning || 0}
-                      </p>
-                    </div>
-                    <div className="bg-slate-900/50 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <AlertTriangle className="w-4 h-4 text-red-400" />
-                        <span className="text-xs text-slate-500 uppercase">Kritisk</span>
-                      </div>
-                      <p className="text-red-400 font-bold text-lg">
-                        {selectedHistorySession.inspection_summary?.critical || 0}
-                      </p>
-                    </div>
-                    <div className="bg-slate-900/50 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <ClipboardCheck className="w-4 h-4 text-slate-400" />
-                        <span className="text-xs text-slate-500 uppercase">Totalt</span>
-                      </div>
-                      <p className="text-white font-bold text-lg">
-                        {selectedHistorySession.inspection_summary?.total || 0}
-                      </p>
-                    </div>
-                  </div>
+                    )
+                  })()}
 
                   {/* Sektioner med stationer */}
                   <div className="space-y-4">
@@ -1179,41 +1235,93 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                         <div className="divide-y divide-slate-700/30">
                           {section.stations.map((station) => {
                             const statusConfig = CALCULATED_STATUS_CONFIG[station.calculatedStatus]
+                            const histValue = station.latestInspection?.measurementValue
+                            const currentValue = station.comparisonValue
+                            const hasBothValues = histValue !== null && histValue !== undefined && currentValue !== null && currentValue !== undefined
+                            const diff = hasBothValues ? currentValue - histValue : null
+                            const comparisonStatusConfig = station.comparisonStatus ? CALCULATED_STATUS_CONFIG[station.comparisonStatus] : null
+
                             return (
-                              <div key={station.id} className="flex items-center justify-between p-3">
-                                <div className="flex items-center gap-3">
+                              <div key={station.id} className="flex items-center justify-between p-3 gap-2">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
                                   <div
                                     className="w-3 h-3 rounded-full flex-shrink-0"
                                     style={{ backgroundColor: station.typeColor }}
                                   />
-                                  <div>
+                                  <div className="min-w-0">
                                     <span className="text-white text-sm">
                                       {station.stationNumber || '-'}
                                     </span>
-                                    <span className="text-slate-500 text-sm ml-2">
+                                    <span className="text-slate-500 text-sm ml-2 truncate">
                                       {station.stationType}
                                     </span>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  {station.latestInspection?.measurementValue !== null && (
-                                    <div className="flex items-center gap-1.5">
+
+                                {/* Värden: Historiskt -> Senaste med trend */}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {/* Historiskt värde (denna kontroll) */}
+                                  {histValue !== null && histValue !== undefined && (
+                                    <div className="flex items-center gap-1">
                                       <div
                                         className="w-2 h-2 rounded-full"
                                         style={{ backgroundColor: statusConfig.color }}
                                       />
-                                      <span className="text-white text-sm font-medium">
-                                        {station.latestInspection?.measurementValue}
+                                      <span className="text-slate-400 text-sm">
+                                        {histValue}
                                       </span>
-                                      {station.measurementLabel && (
-                                        <span className="text-slate-500 text-xs">
-                                          {station.measurementLabel}
-                                        </span>
-                                      )}
                                     </div>
                                   )}
+
+                                  {/* Pil och trend */}
+                                  {hasBothValues && (
+                                    <>
+                                      <span className="text-slate-600">→</span>
+
+                                      {/* Senaste värde */}
+                                      <div className="flex items-center gap-1">
+                                        <div
+                                          className="w-2 h-2 rounded-full"
+                                          style={{ backgroundColor: comparisonStatusConfig?.color || '#6b7280' }}
+                                        />
+                                        <span className="text-white text-sm font-medium">
+                                          {currentValue}
+                                        </span>
+                                      </div>
+
+                                      {/* Differens med trend-ikon */}
+                                      {diff !== null && diff !== 0 && (
+                                        <div className={`flex items-center gap-0.5 text-xs ${
+                                          station.thresholdDirection === 'above'
+                                            ? diff > 0 ? 'text-red-400' : 'text-emerald-400'
+                                            : diff < 0 ? 'text-red-400' : 'text-emerald-400'
+                                        }`}>
+                                          {station.thresholdDirection === 'above' ? (
+                                            diff > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />
+                                          ) : (
+                                            diff < 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />
+                                          )}
+                                          <span>{diff > 0 ? '+' : ''}{diff}</span>
+                                        </div>
+                                      )}
+                                      {diff === 0 && (
+                                        <div className="flex items-center gap-0.5 text-xs text-slate-500">
+                                          <Minus className="w-3 h-3" />
+                                          <span>0</span>
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {/* Om bara historiskt värde finns */}
+                                  {histValue !== null && histValue !== undefined && !hasBothValues && station.measurementLabel && (
+                                    <span className="text-slate-500 text-xs">
+                                      {station.measurementLabel}
+                                    </span>
+                                  )}
+
                                   {station.latestInspection?.photoUrl && (
-                                    <Camera className="w-4 h-4 text-slate-500" />
+                                    <Camera className="w-4 h-4 text-slate-500 ml-1" />
                                   )}
                                 </div>
                               </div>
