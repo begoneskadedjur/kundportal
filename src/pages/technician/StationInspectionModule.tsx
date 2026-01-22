@@ -1421,14 +1421,14 @@ export default function StationInspectionModule() {
                       <motion.button
                         key={station.id}
                         onClick={() => handleSelectStation(station)}
-                        disabled={session?.status !== 'in_progress'}
+                        disabled={session?.status === 'completed'}
                         className={`w-full glass rounded-xl p-4 text-left transition-all ${
-                          session?.status === 'in_progress'
+                          session?.status !== 'completed'
                             ? 'hover:bg-slate-800/50 cursor-pointer'
                             : 'opacity-60 cursor-not-allowed'
                         } ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
-                        whileHover={session?.status === 'in_progress' ? { scale: 1.01 } : {}}
-                        whileTap={session?.status === 'in_progress' ? { scale: 0.99 } : {}}
+                        whileHover={session?.status !== 'completed' ? { scale: 1.01 } : {}}
+                        whileTap={session?.status !== 'completed' ? { scale: 0.99 } : {}}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -1647,14 +1647,14 @@ export default function StationInspectionModule() {
                       <motion.button
                         key={station.id}
                         onClick={() => handleSelectStation(station)}
-                        disabled={session?.status !== 'in_progress'}
+                        disabled={session?.status === 'completed'}
                         className={`w-full glass rounded-xl p-4 text-left transition-all ${
-                          session?.status === 'in_progress'
+                          session?.status !== 'completed'
                             ? 'hover:bg-slate-800/50 cursor-pointer'
                             : 'opacity-60 cursor-not-allowed'
                         } ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
-                        whileHover={session?.status === 'in_progress' ? { scale: 1.01 } : {}}
-                        whileTap={session?.status === 'in_progress' ? { scale: 0.99 } : {}}
+                        whileHover={session?.status !== 'completed' ? { scale: 1.01 } : {}}
+                        whileTap={session?.status !== 'completed' ? { scale: 0.99 } : {}}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
