@@ -35,7 +35,6 @@ import {
   Info,
   ExternalLink,
   BarChart2,
-  Wand2,
   SkipForward,
   Unlock
 } from 'lucide-react'
@@ -607,7 +606,7 @@ export default function StationInspectionModule() {
     setWizardMode('outdoor')
 
     // Stationen pulserar nu - teknikern klickar själv på den
-    toast.success(`Wizard startad! Klicka på den pulserande stationen.`)
+    toast.success(`Guide startad! Klicka på den pulserande stationen.`)
   }, [session?.status, outdoorStations, inspectedStationIds, outdoorNumberMap])
 
   // Starta indoor wizard för vald planritning
@@ -642,7 +641,7 @@ export default function StationInspectionModule() {
     setWizardMode('indoor')
 
     // Stationen pulserar nu - teknikern klickar själv på den
-    toast.success(`Wizard startad! Klicka på den pulserande stationen.`)
+    toast.success(`Guide startad! Klicka på den pulserande stationen.`)
   }, [session?.status, selectedFloorPlanId, filteredIndoorStations, inspectedStationIds, indoorNumberMap])
 
   // Gå till nästa station i wizard
@@ -714,7 +713,7 @@ export default function StationInspectionModule() {
     setCurrentWizardStationId(null)
     setWizardStationQueue([])
     setSelectedStation(null)
-    toast('Wizard avslutad')
+    toast('Guide avslutad')
   }, [])
 
   // Auto-progress till nästa efter lyckad inspektion (om wizard är aktiv)
@@ -1399,73 +1398,57 @@ export default function StationInspectionModule() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
-              {/* Wizard-läge banner (visas när wizard är aktiv) */}
+              {/* Guidat läge - visar vilken station som är näst */}
               {wizardMode === 'outdoor' && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-blue-600/20 border border-blue-500/30 rounded-xl p-4"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Wand2 className="w-5 h-5 text-blue-400" />
-                      <span className="font-medium text-white">Wizard-läge aktivt</span>
+                <div className="flex items-center justify-between bg-slate-800/80 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-sm text-slate-300">
+                      <Navigation className="w-4 h-4 text-cyan-400" />
+                      <span>Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}</span>
                     </div>
-                    <button
-                      onClick={stopWizard}
-                      className="text-slate-400 hover:text-white text-sm"
-                    >
-                      Avsluta
-                    </button>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="w-full h-1.5 bg-slate-700 rounded-full mb-3">
-                    <div
-                      className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                      style={{ width: `${((wizardStationQueue.indexOf(currentWizardStationId || '') + 1) / wizardStationQueue.length) * 100}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <button
-                      onClick={wizardPrevStation}
-                      disabled={wizardStationQueue.indexOf(currentWizardStationId || '') === 0}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      Föregående
-                    </button>
-                    <div className="flex items-center gap-3">
-                      <span className="text-slate-300 font-medium">
-                        Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}
-                      </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={wizardPrevStation}
+                        disabled={wizardStationQueue.indexOf(currentWizardStationId || '') === 0}
+                        className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded transition-colors"
+                        title="Föregående"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={wizardSkipStation}
-                        className="flex items-center gap-1 text-slate-400 hover:text-white"
+                        className="p-1.5 text-slate-400 hover:text-white rounded transition-colors"
+                        title="Hoppa över"
                       >
                         <SkipForward className="w-4 h-4" />
-                        Hoppa över
+                      </button>
+                      <button
+                        onClick={wizardNextStation}
+                        className="p-1.5 text-slate-400 hover:text-white rounded transition-colors"
+                        title="Nästa"
+                      >
+                        <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
-                    <button
-                      onClick={wizardNextStation}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
-                    >
-                      Nästa
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
                   </div>
-                </motion.div>
+                  <button
+                    onClick={stopWizard}
+                    className="text-xs text-slate-500 hover:text-slate-300"
+                  >
+                    Avsluta
+                  </button>
+                </div>
               )}
 
-              {/* Wizard start-knapp (dold om wizard redan är aktiv) */}
+              {/* Knapp för att starta guidat läge */}
               {wizardMode !== 'outdoor' && outdoorStations.length > 0 && (
                 <div className="flex justify-end">
                   <button
                     onClick={startOutdoorWizard}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
                   >
-                    <Wand2 className="w-4 h-4" />
-                    Starta wizard
+                    <Navigation className="w-4 h-4" />
+                    Starta guide
                   </button>
                 </div>
               )}
@@ -1574,77 +1557,61 @@ export default function StationInspectionModule() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
-              {/* Wizard-läge banner för inomhus */}
+              {/* Guidat läge för inomhus */}
               {wizardMode === 'indoor' && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-blue-600/20 border border-blue-500/30 rounded-xl p-4"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Wand2 className="w-5 h-5 text-blue-400" />
-                      <span className="font-medium text-white">Wizard-läge aktivt</span>
+                <div className="flex items-center justify-between bg-slate-800/80 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-sm text-slate-300">
+                      <Navigation className="w-4 h-4 text-cyan-400" />
+                      <span>Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}</span>
                     </div>
-                    <button
-                      onClick={stopWizard}
-                      className="text-slate-400 hover:text-white text-sm"
-                    >
-                      Avsluta
-                    </button>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="w-full h-1.5 bg-slate-700 rounded-full mb-3">
-                    <div
-                      className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                      style={{ width: `${((wizardStationQueue.indexOf(currentWizardStationId || '') + 1) / wizardStationQueue.length) * 100}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <button
-                      onClick={wizardPrevStation}
-                      disabled={wizardStationQueue.indexOf(currentWizardStationId || '') === 0}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      Föregående
-                    </button>
-                    <div className="flex items-center gap-3">
-                      <span className="text-slate-300 font-medium">
-                        Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}
-                      </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={wizardPrevStation}
+                        disabled={wizardStationQueue.indexOf(currentWizardStationId || '') === 0}
+                        className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded transition-colors"
+                        title="Föregående"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={wizardSkipStation}
-                        className="flex items-center gap-1 text-slate-400 hover:text-white"
+                        className="p-1.5 text-slate-400 hover:text-white rounded transition-colors"
+                        title="Hoppa över"
                       >
                         <SkipForward className="w-4 h-4" />
-                        Hoppa över
+                      </button>
+                      <button
+                        onClick={wizardNextStation}
+                        className="p-1.5 text-slate-400 hover:text-white rounded transition-colors"
+                        title="Nästa"
+                      >
+                        <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
-                    <button
-                      onClick={wizardNextStation}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
-                    >
-                      Nästa
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
                   </div>
-                </motion.div>
+                  <button
+                    onClick={stopWizard}
+                    className="text-xs text-slate-500 hover:text-slate-300"
+                  >
+                    Avsluta
+                  </button>
+                </div>
               )}
 
-              {/* Floor plan selector med progress - liggande miniatyrer */}
+              {/* Planritningsväljare med progress - liggande miniatyrer */}
               {floorPlans.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-400">Planritningar</span>
-                    {/* Wizard start-knapp för inomhus */}
+                    {/* Knapp för att starta guidat läge för inomhus */}
                     {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && (
                       <button
                         onClick={startIndoorWizard}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
                       >
-                        <Wand2 className="w-4 h-4" />
-                        Starta wizard
+                        <Navigation className="w-4 h-4" />
+                        Starta guide
                       </button>
                     )}
                   </div>

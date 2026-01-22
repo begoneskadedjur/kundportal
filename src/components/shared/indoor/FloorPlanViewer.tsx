@@ -164,43 +164,16 @@ export function FloorPlanViewer({
     }
   }, [])
 
-  // Auto-centrera på highlighted station (wizard-läge)
+  // Återställ vy när highlighted station ändras (guidat läge)
+  // Ingen auto-zoom - låt den pulserande markören visa vägen istället
   useEffect(() => {
-    if (!highlightedStationId || !imageLoaded || !coverDimensions || !containerRef.current) return
+    if (!highlightedStationId || !imageLoaded) return
 
-    const station = stations.find(s => s.id === highlightedStationId)
-    if (!station) return
-
-    // Hämta container-dimensioner
-    const containerRect = containerRef.current.getBoundingClientRect()
-    const containerWidth = containerRect.width
-    const containerHeight = containerRect.height
-
-    // Zooma in lite för bättre synlighet (1.5x)
-    const targetScale = 1.5
-
-    // Stationens position i pixlar på den skalade bilden
-    const stationX = (station.position_x / 100) * coverDimensions.width * targetScale
-    const stationY = (station.position_y / 100) * coverDimensions.height * targetScale
-
-    // Beräkna translation för att centrera stationen i containern
-    // Bilden är centrerad i containern, så vi måste ta hänsyn till offset
-    const scaledImageWidth = coverDimensions.width * targetScale
-    const scaledImageHeight = coverDimensions.height * targetScale
-
-    // Offset för centrering av bilden i containern
-    const imageOffsetX = (containerWidth - scaledImageWidth) / 2
-    const imageOffsetY = (containerHeight - scaledImageHeight) / 2
-
-    // Beräkna translation så att stationen hamnar i mitten
-    const translateX = (containerWidth / 2) - stationX + imageOffsetX
-    const translateY = (containerHeight / 2) - stationY + imageOffsetY
-
-    // Använd setTransform för att panorera till stationen med animation
+    // Återställ till normalvy så alla stationer syns
     if (transformRef.current) {
-      transformRef.current.setTransform(translateX, translateY, targetScale, 500, 'easeOut')
+      transformRef.current.resetTransform(300, 'easeOut')
     }
-  }, [highlightedStationId, imageLoaded, coverDimensions, stations])
+  }, [highlightedStationId, imageLoaded])
 
   const isPlacementActive = placementMode === 'place' || placementMode === 'move'
 
