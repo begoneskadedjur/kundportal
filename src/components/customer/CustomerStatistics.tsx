@@ -1,12 +1,12 @@
 // src/components/customer/CustomerStatistics.tsx - Comprehensive Customer Statistics Dashboard
 import React, { useEffect, useState, useMemo } from 'react'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -16,12 +16,12 @@ import {
   AreaChart,
   Area
 } from 'recharts'
-import { 
-  TrendingUp, 
-  Calendar, 
-  CheckCircle, 
-  Clock, 
-  Target, 
+import {
+  TrendingUp,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Target,
   Download,
   Filter,
   BarChart3,
@@ -30,8 +30,10 @@ import {
   Bug,
   MapPin,
   CreditCard,
-  AlertTriangle
+  AlertTriangle,
+  Crosshair
 } from 'lucide-react'
+import EquipmentStatisticsSection from './EquipmentStatisticsSection'
 import { supabase } from '../../lib/supabase'
 import { isCompletedStatus, getCustomerStatusDisplay } from '../../types/database'
 import { formatCurrency } from '../../utils/formatters'
@@ -74,6 +76,7 @@ interface CaseData {
 }
 
 type TimePeriod = '30d' | '3m' | '6m' | '1y' | 'all'
+type StatisticsTab = 'cases' | 'equipment'
 
 interface StatCard {
   title: string
@@ -99,6 +102,7 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1y')
   const [animatedValues, setAnimatedValues] = useState<{ [key: string]: number }>({})
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<StatisticsTab>('cases')
 
   // Fetch cases data
   useEffect(() => {
@@ -632,344 +636,382 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
       {/* Header */}
       <div className="bg-slate-800/50 backdrop-blur border-b border-slate-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <BarChart3 className="w-7 h-7 text-purple-400" />
-                Statistik & Insikter
-              </h1>
-              <p className="text-slate-400 mt-1">
-                Omfattande analys av era serviceärenden och trends
-              </p>
+          <div className="flex flex-col gap-4">
+            {/* Title and Controls */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <BarChart3 className="w-7 h-7 text-purple-400" />
+                  Statistik & Insikter
+                </h1>
+                <p className="text-slate-400 mt-1">
+                  Omfattande analys av era serviceärenden och utrustning
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Time Period Selector */}
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-slate-400" />
+                  <select
+                    value={selectedPeriod}
+                    onChange={(e) => setSelectedPeriod(e.target.value as TimePeriod)}
+                    className="bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    {periodOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Export Buttons - Only show for cases tab */}
+                {activeTab === 'cases' && (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={exportToPDF}
+                      variant="secondary"
+                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 transition-all duration-200"
+                      disabled={pdfLoading || filteredCases.length === 0}
+                      aria-label={pdfLoading ? "Genererar PDF-rapport" : "Ladda ner PDF-rapport"}
+                      title={filteredCases.length === 0 ? "Inga ärenden att exportera" : "Exportera statistik som PDF"}
+                    >
+                      {pdfLoading ? (
+                        <>
+                          <LoadingSpinner size="sm" className="mr-2" />
+                          Genererar...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4 mr-2" />
+                          PDF
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={exportToCSV}
+                      variant="secondary"
+                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 transition-all duration-200"
+                      disabled={filteredCases.length === 0 || pdfLoading}
+                      aria-label="Ladda ner CSV-rapport"
+                      title={filteredCases.length === 0 ? "Inga ärenden att exportera" : "Exportera statistik som CSV"}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      CSV
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Time Period Selector */}
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-slate-400" />
-                <select
-                  value={selectedPeriod}
-                  onChange={(e) => setSelectedPeriod(e.target.value as TimePeriod)}
-                  className="bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  {periodOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Export Buttons */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={exportToPDF}
-                  variant="secondary"
-                  className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 transition-all duration-200"
-                  disabled={pdfLoading || filteredCases.length === 0}
-                  aria-label={pdfLoading ? "Genererar PDF-rapport" : "Ladda ner PDF-rapport"}
-                  title={filteredCases.length === 0 ? "Inga ärenden att exportera" : "Exportera statistik som PDF"}
-                >
-                  {pdfLoading ? (
-                    <>
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      Genererar...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4 mr-2" />
-                      PDF
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={exportToCSV}
-                  variant="secondary"
-                  className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 transition-all duration-200"
-                  disabled={filteredCases.length === 0 || pdfLoading}
-                  aria-label="Ladda ner CSV-rapport"
-                  title={filteredCases.length === 0 ? "Inga ärenden att exportera" : "Exportera statistik som CSV"}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  CSV
-                </Button>
-              </div>
+            {/* Tab Navigation */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab('cases')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+                  activeTab === 'cases'
+                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+                    : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                <Bug className="w-4 h-4" />
+                Ärenden
+              </button>
+              <button
+                onClick={() => setActiveTab('equipment')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+                  activeTab === 'equipment'
+                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+                    : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                <Crosshair className="w-4 h-4" />
+                Utrustning & Mätvärden
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {statCards.map((card, index) => {
-            const colors = getColorClasses(card.color)
-            
-            return (
-              <div
-                key={card.title}
-                className={`
-                  relative group bg-slate-800/50 backdrop-blur border ${colors.border} 
-                  rounded-xl p-6 transition-all duration-300 ${colors.hover} 
-                  hover:shadow-lg ${colors.glow} hover:-translate-y-1
-                `}
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div className={`absolute inset-0 ${colors.bg} rounded-xl opacity-50 group-hover:opacity-70 transition-opacity`}></div>
-                
-                <div className="relative">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`p-3 ${colors.bg} rounded-lg border ${colors.border}`}>
-                      <div className={colors.icon}>{card.icon}</div>
-                    </div>
-                    
-                    {card.trend && (
-                      <div className={`flex items-center gap-1 text-xs ${
-                        card.trend === 'up' ? 'text-green-400' : 
-                        card.trend === 'down' ? 'text-red-400' : 
-                        'text-slate-400'
-                      }`}>
-                        {card.trend === 'up' && (
-                          <TrendingUp className="w-3 h-3" />
-                        )}
-                        {card.trendValue && <span>{card.trendValue}</span>}
+      {/* Main Content - Conditional based on active tab */}
+      {activeTab === 'cases' ? (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {statCards.map((card, index) => {
+              const colors = getColorClasses(card.color)
+
+              return (
+                <div
+                  key={card.title}
+                  className={`
+                    relative group bg-slate-800/50 backdrop-blur border ${colors.border}
+                    rounded-xl p-6 transition-all duration-300 ${colors.hover}
+                    hover:shadow-lg ${colors.glow} hover:-translate-y-1
+                  `}
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <div className={`absolute inset-0 ${colors.bg} rounded-xl opacity-50 group-hover:opacity-70 transition-opacity`}></div>
+
+                  <div className="relative">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className={`p-3 ${colors.bg} rounded-lg border ${colors.border}`}>
+                        <div className={colors.icon}>{card.icon}</div>
                       </div>
+
+                      {card.trend && (
+                        <div className={`flex items-center gap-1 text-xs ${
+                          card.trend === 'up' ? 'text-green-400' :
+                          card.trend === 'down' ? 'text-red-400' :
+                          'text-slate-400'
+                        }`}>
+                          {card.trend === 'up' && (
+                            <TrendingUp className="w-3 h-3" />
+                          )}
+                          {card.trendValue && <span>{card.trendValue}</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-slate-400 text-sm font-medium mb-2">{card.title}</p>
+
+                    <p className="text-2xl font-bold text-white mb-1 font-mono">
+                      {card.value}
+                    </p>
+
+                    {card.subtitle && (
+                      <p className="text-xs text-slate-500">{card.subtitle}</p>
                     )}
                   </div>
-                  
-                  <p className="text-slate-400 text-sm font-medium mb-2">{card.title}</p>
-                  
-                  <p className="text-2xl font-bold text-white mb-1 font-mono">
-                    {card.value}
-                  </p>
-                  
-                  {card.subtitle && (
-                    <p className="text-xs text-slate-500">{card.subtitle}</p>
-                  )}
+
+                  <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${colors.bg} transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300`}></div>
                 </div>
+              )
+            })}
+          </div>
 
-                <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${colors.bg} transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300`}></div>
+          {/* Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Status Distribution - Pie Chart */}
+            <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+                <PieChartIcon className="w-5 h-5 text-blue-400" />
+                Ärendestatus Fördelning
+              </h3>
+
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #475569',
+                        borderRadius: '8px',
+                        color: '#e2e8f0'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            )
-          })}
-        </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Status Distribution - Pie Chart */}
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-              <PieChartIcon className="w-5 h-5 text-blue-400" />
-              Ärendestatus Fördelning
-            </h3>
-            
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      border: '1px solid #475569',
-                      borderRadius: '8px',
-                      color: '#e2e8f0'
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {statusData.map((entry, index) => (
+                  <div key={entry.name} className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: entry.color }}
+                    />
+                    <span className="text-sm text-slate-300 truncate">
+                      {entry.name} ({entry.value})
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {statusData.map((entry, index) => (
-                <div key={entry.name} className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: entry.color }}
-                  />
-                  <span className="text-sm text-slate-300 truncate">
-                    {entry.name} ({entry.value})
-                  </span>
+            {/* Monthly Trends - Line Chart */}
+            <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+                <TrendingUp className="w-5 h-5 text-purple-400" />
+                Månatliga Trends
+              </h3>
+
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyTrendData}>
+                    <defs>
+                      <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                      </linearGradient>
+                      <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
+                    <YAxis stroke="#9ca3af" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #475569',
+                        borderRadius: '8px',
+                        color: '#e2e8f0'
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="skapade"
+                      stroke="#8b5cf6"
+                      fillOpacity={1}
+                      fill="url(#colorCreated)"
+                      name="Skapade"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="avslutade"
+                      stroke="#10b981"
+                      fillOpacity={1}
+                      fill="url(#colorCompleted)"
+                      name="Avslutade"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Pest Trends Over Time - Line Chart */}
+            <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+                <Bug className="w-5 h-5 text-green-400" />
+                Skadedjurstrender Över Tid
+              </h3>
+              <p className="text-slate-400 text-sm mb-4">
+                Visar utvecklingen av olika skadedjurstyper över tid - hjälper identifiera säsongsmönster
+              </p>
+
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={pestTrendsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
+                    <YAxis stroke="#9ca3af" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #475569',
+                        borderRadius: '8px',
+                        color: '#e2e8f0'
+                      }}
+                    />
+                    {Object.entries(statistics.pestTypeCounts)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 4)
+                      .map(([pestType], index) => {
+                        const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444']
+                        return (
+                          <Line
+                            key={pestType}
+                            type="monotone"
+                            dataKey={pestType}
+                            stroke={colors[index % colors.length]}
+                            strokeWidth={2}
+                            dot={{ fill: colors[index % colors.length], strokeWidth: 2 }}
+                            name={pestType}
+                          />
+                        )
+                      })}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* Technical Assessment by Pest Type - New Chart */}
+          <div className="grid grid-cols-1 gap-8 mt-8">
+            <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                Teknisk Bedömning per Skadedjur
+              </h3>
+              <p className="text-slate-400 text-sm mb-4">
+                Genomsnittlig aktivitetsnivå (0-3) och situationsbedömning (1-5) för olika skadedjurstyper
+              </p>
+
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={pestAssessmentData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                    <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 5]} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1e293b',
+                        border: '1px solid #475569',
+                        borderRadius: '8px',
+                        color: '#e2e8f0'
+                      }}
+                      formatter={(value, name) => {
+                        if (name === 'aktivitetsnivå') {
+                          return [`${value}/3`, 'Aktivitetsnivå']
+                        }
+                        if (name === 'situationsbedömning') {
+                          return [`${value}/5`, 'Situationsbedömning']
+                        }
+                        return [value, name]
+                      }}
+                    />
+                    <Bar
+                      dataKey="aktivitetsnivå"
+                      fill="#f59e0b"
+                      name="Aktivitetsnivå (0-3)"
+                      radius={[2, 2, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="situationsbedömning"
+                      fill="#ef4444"
+                      name="Situationsbedömning (1-5)"
+                      radius={[2, 2, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legend */}
+              <div className="flex items-center justify-center gap-6 mt-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-amber-500 rounded"></div>
+                  <span className="text-sm text-slate-300">Aktivitetsnivå (0=Ingen, 3=Hög)</span>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Monthly Trends - Line Chart */}
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-              <TrendingUp className="w-5 h-5 text-purple-400" />
-              Månatliga Trends
-            </h3>
-            
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyTrendData}>
-                  <defs>
-                    <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
-                    </linearGradient>
-                    <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      border: '1px solid #475569',
-                      borderRadius: '8px',
-                      color: '#e2e8f0'
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="skapade"
-                    stroke="#8b5cf6"
-                    fillOpacity={1}
-                    fill="url(#colorCreated)"
-                    name="Skapade"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="avslutade"
-                    stroke="#10b981"
-                    fillOpacity={1}
-                    fill="url(#colorCompleted)"
-                    name="Avslutade"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Pest Trends Over Time - Line Chart */}
-          <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-              <Bug className="w-5 h-5 text-green-400" />
-              Skadedjurstrender Över Tid
-            </h3>
-            <p className="text-slate-400 text-sm mb-4">
-              Visar utvecklingen av olika skadedjurstyper över tid - hjälper identifiera säsongsmönster
-            </p>
-            
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={pestTrendsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      border: '1px solid #475569',
-                      borderRadius: '8px',
-                      color: '#e2e8f0'
-                    }}
-                  />
-                  {Object.entries(statistics.pestTypeCounts)
-                    .sort(([,a], [,b]) => b - a)
-                    .slice(0, 4)
-                    .map(([pestType], index) => {
-                      const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444']
-                      return (
-                        <Line
-                          key={pestType}
-                          type="monotone"
-                          dataKey={pestType}
-                          stroke={colors[index % colors.length]}
-                          strokeWidth={2}
-                          dot={{ fill: colors[index % colors.length], strokeWidth: 2 }}
-                          name={pestType}
-                        />
-                      )
-                    })}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Technical Assessment by Pest Type - New Chart */}
-        <div className="grid grid-cols-1 gap-8 mt-8">
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
-              Teknisk Bedömning per Skadedjur
-            </h3>
-            <p className="text-slate-400 text-sm mb-4">
-              Genomsnittlig aktivitetsnivå (0-3) och situationsbedömning (1-5) för olika skadedjurstyper
-            </p>
-            
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pestAssessmentData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 5]} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      border: '1px solid #475569',
-                      borderRadius: '8px',
-                      color: '#e2e8f0'
-                    }}
-                    formatter={(value, name) => {
-                      if (name === 'aktivitetsnivå') {
-                        return [`${value}/3`, 'Aktivitetsnivå']
-                      }
-                      if (name === 'situationsbedömning') {
-                        return [`${value}/5`, 'Situationsbedömning']
-                      }
-                      return [value, name]
-                    }}
-                  />
-                  <Bar 
-                    dataKey="aktivitetsnivå" 
-                    fill="#f59e0b" 
-                    name="Aktivitetsnivå (0-3)"
-                    radius={[2, 2, 0, 0]}
-                  />
-                  <Bar 
-                    dataKey="situationsbedömning" 
-                    fill="#ef4444" 
-                    name="Situationsbedömning (1-5)"
-                    radius={[2, 2, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-6 mt-4">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-amber-500 rounded"></div>
-                <span className="text-sm text-slate-300">Aktivitetsnivå (0=Ingen, 3=Hög)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-red-500 rounded"></div>
-                <span className="text-sm text-slate-300">Situationsbedömning (1=Utmärkt, 5=Kritisk)</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-500 rounded"></div>
+                  <span className="text-sm text-slate-300">Situationsbedömning (1=Utmärkt, 5=Kritisk)</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <EquipmentStatisticsSection
+          customerId={customer.id}
+          timePeriod={selectedPeriod}
+        />
+      )}
     </div>
   )
 }
