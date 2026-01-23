@@ -548,7 +548,14 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
             primary_technician_name: selectedCase.primary_technician_name,
             address: selectedCase.address,
             description: selectedCase.description,
-            recommendations: selectedCase.recommendations
+            recommendations: selectedCase.recommendations,
+            // Nya fält från cases-tabellen
+            work_report: selectedCase.work_report,
+            materials_used: selectedCase.materials_used,
+            time_spent_minutes: selectedCase.time_spent_minutes,
+            service_type: selectedCase.service_type,
+            priority: selectedCase.priority,
+            work_started_at: selectedCase.work_started_at
           }}
         />
       )}

@@ -1,13 +1,13 @@
 // src/components/customer/CaseDetailsModal.tsx - Med kunduppgifter för PDF
 import { useEffect, useState } from 'react'
-import { 
-  X, 
-  Calendar, 
-  Clock, 
-  User, 
-  MapPin, 
-  DollarSign, 
-  FileText, 
+import {
+  X,
+  Calendar,
+  Clock,
+  User,
+  MapPin,
+  DollarSign,
+  FileText,
   Images,
   AlertCircle,
   Bug,
@@ -18,7 +18,9 @@ import {
   Phone,
   FileDown,
   Flag,
-  Lightbulb
+  Lightbulb,
+  Package,
+  Wrench
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -46,6 +48,13 @@ interface CaseDetailsModalProps {
     address?: { formatted_address?: string }
     description?: string
     recommendations?: string
+    // Nya fält från cases-tabellen
+    work_report?: string
+    materials_used?: string
+    time_spent_minutes?: number
+    service_type?: string
+    priority?: string
+    work_started_at?: string
   }
 }
 
@@ -369,6 +378,16 @@ export default function CaseDetailsModal({
                         </span>
                       </div>
                     )}
+                    {/* Tjänstetyp */}
+                    {fallbackData.service_type && (
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        fallbackData.service_type === 'inspection'
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      }`}>
+                        {fallbackData.service_type === 'inspection' ? 'Inspektion' : 'Rutinbesök'}
+                      </span>
+                    )}
                   </div>
 
                   {fallbackData.completed_date && (
@@ -486,6 +505,46 @@ export default function CaseDetailsModal({
 
                   {/* Höger kolumn */}
                   <div className="space-y-4">
+                    {/* Arbetsrapport */}
+                    {fallbackData.work_report && fallbackData.work_report.trim() !== '' && (
+                      <div className="space-y-3">
+                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                          <Wrench className="w-4 h-4 text-blue-400" />
+                          Arbetsrapport
+                        </h4>
+                        <div className="p-4 bg-slate-800/50 rounded-lg">
+                          <p className="text-white whitespace-pre-wrap">{fallbackData.work_report}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Material använt */}
+                    {fallbackData.materials_used && fallbackData.materials_used.trim() !== '' && (
+                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <Package className="w-5 h-5 text-purple-400" />
+                        <div>
+                          <p className="text-sm text-slate-400">Material använt</p>
+                          <p className="text-white font-medium">{fallbackData.materials_used}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tid spenderad */}
+                    {fallbackData.time_spent_minutes !== undefined && fallbackData.time_spent_minutes > 0 && (
+                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <Clock className="w-5 h-5 text-cyan-400" />
+                        <div>
+                          <p className="text-sm text-slate-400">Tid spenderad</p>
+                          <p className="text-white font-medium">
+                            {Math.floor(fallbackData.time_spent_minutes / 60) > 0
+                              ? `${Math.floor(fallbackData.time_spent_minutes / 60)}h ${fallbackData.time_spent_minutes % 60}min`
+                              : `${fallbackData.time_spent_minutes} min`
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Rekommendationer */}
                     {fallbackData.recommendations && (
                       <div className="space-y-3">
@@ -500,19 +559,6 @@ export default function CaseDetailsModal({
                         </div>
                       </div>
                     )}
-
-                    {/* Info om att detaljerad data saknas */}
-                    <div className="p-4 bg-slate-800/30 border border-slate-700/50 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-slate-400 mt-0.5" />
-                        <div>
-                          <p className="text-sm text-slate-400">
-                            Detta ärende har begränsad detaljinformation.
-                            Kontakta oss om du har frågor om ärendet.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
