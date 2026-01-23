@@ -64,7 +64,8 @@ import {
   getStationsWithRecentActivity,
   getOutdoorInspectionsForSession,
   getIndoorInspectionsForSession,
-  reopenInspectionSession
+  reopenInspectionSession,
+  updateCaseStatusToCompleted
 } from '../../services/inspectionSessionService'
 
 // Typer
@@ -1041,6 +1042,10 @@ export default function StationInspectionModule() {
       setIsSubmitting(true)
       const updated = await completeInspectionSession(session.id)
       if (updated) {
+        // Uppdatera även ärendets status till "Avslutat" om case_id finns
+        if (session.case_id) {
+          await updateCaseStatusToCompleted(session.case_id)
+        }
         toast.success('Inspektion avslutad!')
         navigate(-1)
       }
