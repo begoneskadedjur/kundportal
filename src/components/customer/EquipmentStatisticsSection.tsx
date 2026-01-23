@@ -5,11 +5,14 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   AreaChart,
   Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Legend
 } from 'recharts'
 import {
   Target,
@@ -22,8 +25,7 @@ import {
   RefreshCw,
   Activity,
   ChevronRight,
-  MousePointerClick,
-  CheckCircle2
+  MousePointerClick
 } from 'lucide-react'
 import {
   getCompletedSessionsWithSummary,
@@ -35,14 +37,16 @@ import { FloorPlanService } from '../../services/floorPlanService'
 import { IndoorStationService } from '../../services/indoorStationService'
 import {
   calculateStatusDistributionOverTime,
-  calculateAveragesByStationType,
   calculateStationTrends,
   calculateIndoorStationTrends,
   calculateStationKPIs,
   filterSessionsByTimePeriod,
   aggregateStatusByMonth,
+  calculateMeasurementTrendsOverTime,
+  aggregateMeasurementsByMonth,
   type TimePeriod,
-  type StationTrendData
+  type StationTrendData,
+  type StationTypeInfo
 } from '../../utils/equipmentStatisticsUtils'
 import { CALCULATED_STATUS_CONFIG } from '../../types/stationTypes'
 import { StationHistoryModal } from './StationHistoryModal'
@@ -65,6 +69,7 @@ export function EquipmentStatisticsSection({
   const [indoorTotal, setIndoorTotal] = useState(0)
   const [outdoorNumberMap, setOutdoorNumberMap] = useState<Map<string, number>>(new Map())
   const [indoorStationTrends, setIndoorStationTrends] = useState<StationTrendData[]>([])
+  const [allSessionInspections, setAllSessionInspections] = useState<Map<string, any[]>>(new Map())
 
   // Modal state
   const [selectedStation, setSelectedStation] = useState<StationTrendData | null>(null)
@@ -138,6 +143,19 @@ export function EquipmentStatisticsSection({
             setPreviousOutdoorInspections(prevOutdoor)
           }
         }
+
+        // Hämta inspektioner för alla sessioner (för trendgraf)
+        const inspMap = new Map<string, any[]>()
+        const sessionsToFetch = sessionsData.slice(0, 20) // Max 20 sessioner för prestanda
+        for (const session of sessionsToFetch) {
+          try {
+            const inspections = await getOutdoorInspectionsForSession(session.id)
+            inspMap.set(session.id, inspections)
+          } catch {
+            inspMap.set(session.id, [])
+          }
+        }
+        setAllSessionInspections(inspMap)
       } catch (error) {
         console.error('Error fetching equipment statistics:', error)
       } finally {
@@ -166,10 +184,18 @@ export function EquipmentStatisticsSection({
     return statusOverTime
   }, [statusOverTime])
 
-  // Beräkna genomsnitt per stationstyp med jämförelse mot föregående period
-  const averagesByType = useMemo(() => {
-    return calculateAveragesByStationType(latestOutdoorInspections, previousOutdoorInspections)
-  }, [latestOutdoorInspections, previousOutdoorInspections])
+  // Beräkna mätvärden per stationstyp över tid
+  const measurementTrends = useMemo(() => {
+    return calculateMeasurementTrendsOverTime(filteredSessions, allSessionInspections)
+  }, [filteredSessions, allSessionInspections])
+
+  // Aggregera mätvärden per månad om det finns mer än 12 datapunkter
+  const measurementChartData = useMemo(() => {
+    if (measurementTrends.data.length > 12) {
+      return aggregateMeasurementsByMonth(measurementTrends.data, measurementTrends.stationTypes)
+    }
+    return measurementTrends.data
+  }, [measurementTrends])
 
   // Beräkna trender per outdoor-station
   const outdoorStationTrends = useMemo(() => {
@@ -336,113 +362,68 @@ export function EquipmentStatisticsSection({
           )}
         </div>
 
-        {/* Mätvärden per stationstyp - Kort-baserad design */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-              <Activity className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Mätvärden per typ</h3>
-              <p className="text-sm text-slate-400">Jämförelse med föregående kontroll</p>
-            </div>
-          </div>
+        {/* Mätvärden över tid - LineChart */}
+        <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-3">
+            <Activity className="w-5 h-5 text-cyan-400" />
+            Mätvärden över tid
+          </h3>
+          <p className="text-sm text-slate-400 mb-4">
+            Genomsnittligt mätvärde per stationstyp vid varje kontroll
+          </p>
 
-          {averagesByType.length > 0 ? (
-            <div className="space-y-3">
-              {averagesByType.map((item, index) => {
-                const unitLabel = item.measurementUnit === 'gram' ? 'g' : item.measurementUnit === 'st' ? '' : item.measurementUnit
-                const statusBgClass = item.status === 'ok'
-                  ? 'bg-emerald-500/10 border-emerald-500/20'
-                  : item.status === 'warning'
-                    ? 'bg-amber-500/10 border-amber-500/20'
-                    : 'bg-red-500/10 border-red-500/20'
-                const statusTextClass = item.status === 'ok'
-                  ? 'text-emerald-400'
-                  : item.status === 'warning'
-                    ? 'text-amber-400'
-                    : 'text-red-400'
-
-                // Bestäm om trenden är positiv eller negativ baserat på thresholdDirection
-                // Om direction är "above" (högre = sämre) så är en minskning bra
-                // Om direction är "below" (lägre = sämre) så är en ökning bra
-                const isPositiveChange = item.change !== null && (
-                  (item.thresholdDirection === 'above' && item.change < 0) ||
-                  (item.thresholdDirection === 'below' && item.change > 0)
-                )
-                const isNegativeChange = item.change !== null && (
-                  (item.thresholdDirection === 'above' && item.change > 0) ||
-                  (item.thresholdDirection === 'below' && item.change < 0)
-                )
-
-                return (
-                  <div
-                    key={index}
-                    className={`p-4 border rounded-xl ${statusBgClass} transition-all hover:scale-[1.01]`}
-                  >
-                    <div className="flex items-center justify-between">
-                      {/* Vänster: Typ och mätvärdesetikett */}
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: item.stationTypeColor }}
-                        />
-                        <div>
-                          <p className="text-sm font-medium text-white">{item.stationType}</p>
-                          <p className="text-xs text-slate-400">{item.measurementLabel || 'Mätvärde'}</p>
-                        </div>
-                      </div>
-
-                      {/* Mitt: Nuvarande värde med status */}
-                      <div className="text-center">
-                        <div className="flex items-center gap-2">
-                          {item.status === 'ok' && <CheckCircle2 className={`w-4 h-4 ${statusTextClass}`} />}
-                          {item.status === 'warning' && <AlertTriangle className={`w-4 h-4 ${statusTextClass}`} />}
-                          {item.status === 'critical' && <AlertTriangle className={`w-4 h-4 ${statusTextClass}`} />}
-                          <span className={`text-xl font-bold ${statusTextClass}`}>
-                            {item.avgValue}{unitLabel}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          {item.status === 'ok' ? 'OK' : item.status === 'warning' ? 'Varning' : 'Kritisk'}
-                        </p>
-                      </div>
-
-                      {/* Höger: Förändring jämfört med föregående */}
-                      <div className="text-right min-w-[80px]">
-                        {item.change !== null ? (
-                          <>
-                            <div className={`flex items-center justify-end gap-1 text-sm font-medium ${
-                              isPositiveChange ? 'text-emerald-400' :
-                              isNegativeChange ? 'text-red-400' :
-                              'text-slate-400'
-                            }`}>
-                              {item.changeDirection === 'up' && <TrendingUp className="w-4 h-4" />}
-                              {item.changeDirection === 'down' && <TrendingDown className="w-4 h-4" />}
-                              {item.changeDirection === 'stable' && <Minus className="w-4 h-4" />}
-                              <span>
-                                {item.change > 0 ? '+' : ''}{item.change}{unitLabel}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-500">
-                              från {item.previousAvgValue}{unitLabel}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-xs text-slate-500">Ingen tidigare data</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+          {measurementChartData.length > 0 && measurementTrends.stationTypes.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={measurementChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis
+                    dataKey="dateFormatted"
+                    stroke="#9ca3af"
+                    fontSize={12}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #475569',
+                      borderRadius: '8px',
+                      color: '#e2e8f0'
+                    }}
+                    formatter={(value: number, name: string) => {
+                      const type = measurementTrends.stationTypes.find(t => t.code === name)
+                      const unit = type?.measurementUnit === 'gram' ? 'g' : type?.measurementUnit === 'st' ? '' : type?.measurementUnit || ''
+                      const label = type?.measurementLabel || type?.name || name
+                      return [`${value}${unit}`, label]
+                    }}
+                  />
+                  <Legend
+                    formatter={(value: string) => {
+                      const type = measurementTrends.stationTypes.find(t => t.code === value)
+                      return type?.measurementLabel || type?.name || value
+                    }}
+                  />
+                  {measurementTrends.stationTypes.map((type) => (
+                    <Line
+                      key={type.code}
+                      type="monotone"
+                      dataKey={type.code}
+                      stroke={type.color}
+                      strokeWidth={2}
+                      dot={{ fill: type.color, strokeWidth: 0, r: 4 }}
+                      activeDot={{ r: 6, stroke: type.color, strokeWidth: 2, fill: '#1e293b' }}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-slate-700/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Activity className="w-8 h-8 text-slate-600" />
-              </div>
-              <p className="text-slate-400">Ingen mätdata tillgänglig</p>
+            <div className="h-64 flex items-center justify-center text-slate-500">
+              Ingen mätdata tillgänglig för vald period
             </div>
           )}
         </div>

@@ -469,3 +469,150 @@ export function aggregateStatusByMonth(
       total: Math.round(values.total / values.count)
     }))
 }
+
+/**
+ * Metadata för stationstyper i trendgrafen
+ */
+export interface StationTypeInfo {
+  code: string
+  name: string
+  color: string
+  measurementUnit: string
+  measurementLabel: string | null
+}
+
+/**
+ * Datapunkt för mätvärden över tid
+ */
+export interface MeasurementTrendDataPoint {
+  date: string
+  dateFormatted: string
+  [stationTypeCode: string]: number | string | null
+}
+
+/**
+ * Beräkna mätvärden per stationstyp över tid
+ * Returnerar data i format lämpligt för Recharts LineChart
+ */
+export function calculateMeasurementTrendsOverTime(
+  sessions: InspectionSessionWithRelations[],
+  inspectionsMap: Map<string, OutdoorInspectionWithRelations[]>
+): { data: MeasurementTrendDataPoint[], stationTypes: StationTypeInfo[] } {
+  // Samla alla unika stationstyper
+  const stationTypeMap = new Map<string, StationTypeInfo>()
+
+  // Bygg datapunkter per session
+  const dataPoints: MeasurementTrendDataPoint[] = []
+
+  const completedSessions = sessions
+    .filter(s => s.completed_at)
+    .sort((a, b) => new Date(a.completed_at!).getTime() - new Date(b.completed_at!).getTime())
+
+  for (const session of completedSessions) {
+    const inspections = inspectionsMap.get(session.id) || []
+    if (inspections.length === 0) continue
+
+    const date = new Date(session.completed_at!)
+    const dataPoint: MeasurementTrendDataPoint = {
+      date: session.completed_at!,
+      dateFormatted: date.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+    }
+
+    // Gruppera inspektioner per stationstyp och beräkna genomsnitt
+    const typeValues = new Map<string, number[]>()
+
+    for (const insp of inspections) {
+      if (insp.measurement_value === null) continue
+
+      const station = insp.station as any
+      const stationTypeData = station?.station_type_data
+      const typeCode = stationTypeData?.code || station?.equipment_type || 'unknown'
+
+      // Registrera stationstyp om den inte finns
+      if (!stationTypeMap.has(typeCode)) {
+        stationTypeMap.set(typeCode, {
+          code: typeCode,
+          name: stationTypeData?.name || typeCode,
+          color: stationTypeData?.color || '#6b7280',
+          measurementUnit: stationTypeData?.measurement_unit || 'st',
+          measurementLabel: stationTypeData?.measurement_label ?? null
+        })
+      }
+
+      // Samla värden per typ
+      if (!typeValues.has(typeCode)) {
+        typeValues.set(typeCode, [])
+      }
+      typeValues.get(typeCode)!.push(insp.measurement_value)
+    }
+
+    // Beräkna genomsnitt för varje stationstyp
+    for (const [typeCode, values] of typeValues) {
+      const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length * 10) / 10
+      dataPoint[typeCode] = avg
+    }
+
+    // Bara lägg till om det finns minst ett mätvärde
+    if (Object.keys(dataPoint).length > 2) {
+      dataPoints.push(dataPoint)
+    }
+  }
+
+  return {
+    data: dataPoints,
+    stationTypes: Array.from(stationTypeMap.values())
+  }
+}
+
+/**
+ * Aggregera mätvärden per månad (för långsiktig data)
+ */
+export function aggregateMeasurementsByMonth(
+  data: MeasurementTrendDataPoint[],
+  stationTypes: StationTypeInfo[]
+): MeasurementTrendDataPoint[] {
+  if (data.length === 0) return []
+
+  const monthlyMap = new Map<string, { values: Map<string, number[]> }>()
+
+  data.forEach(d => {
+    const date = new Date(d.date)
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+
+    if (!monthlyMap.has(monthKey)) {
+      monthlyMap.set(monthKey, { values: new Map() })
+    }
+
+    const current = monthlyMap.get(monthKey)!
+
+    // Samla värden per stationstyp
+    for (const type of stationTypes) {
+      const value = d[type.code]
+      if (typeof value === 'number') {
+        if (!current.values.has(type.code)) {
+          current.values.set(type.code, [])
+        }
+        current.values.get(type.code)!.push(value)
+      }
+    }
+  })
+
+  // Returnera månadsgenomsnitt
+  return Array.from(monthlyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([monthKey, { values }]) => {
+      const point: MeasurementTrendDataPoint = {
+        date: monthKey + '-01',
+        dateFormatted: new Date(monthKey + '-01').toLocaleDateString('sv-SE', {
+          month: 'short',
+          year: '2-digit'
+        })
+      }
+
+      for (const [typeCode, typeValues] of values) {
+        point[typeCode] = Math.round(typeValues.reduce((a, b) => a + b, 0) / typeValues.length * 10) / 10
+      }
+
+      return point
+    })
+}
