@@ -555,7 +555,9 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
             time_spent_minutes: selectedCase.time_spent_minutes,
             service_type: selectedCase.service_type,
             priority: selectedCase.priority,
-            work_started_at: selectedCase.work_started_at
+            work_started_at: selectedCase.work_started_at,
+            // Filer/foton
+            files: selectedCase.files
           }}
         />
       )}

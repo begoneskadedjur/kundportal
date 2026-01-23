@@ -55,6 +55,14 @@ interface CaseDetailsModalProps {
     service_type?: string
     priority?: string
     work_started_at?: string
+    // Filer/foton
+    files?: Array<{
+      name: string
+      url: string
+      type: string
+      size: number
+      uploaded_at: string
+    }> | null
   }
 }
 
@@ -556,6 +564,57 @@ export default function CaseDetailsModal({
                           <p className="text-slate-200 whitespace-pre-wrap leading-relaxed">
                             {fallbackData.recommendations}
                           </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Filer och bilder */}
+                    {fallbackData.files && fallbackData.files.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                          <Images className="w-4 h-4 text-indigo-400" />
+                          Bilder & Filer ({fallbackData.files.length})
+                        </h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {fallbackData.files.map((file, index) => {
+                            const isImage = file.type.startsWith('image/')
+                            return (
+                              <div
+                                key={index}
+                                className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700"
+                              >
+                                {isImage ? (
+                                  <img
+                                    src={file.url}
+                                    alt={file.name}
+                                    className="w-full h-24 object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-24 flex items-center justify-center">
+                                    <FileText className="w-8 h-8 text-slate-400" />
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                  <a
+                                    href={file.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+                                  >
+                                    <Eye className="w-4 h-4 text-white" />
+                                  </a>
+                                  <a
+                                    href={file.url}
+                                    download={file.name}
+                                    className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+                                  >
+                                    <Download className="w-4 h-4 text-white" />
+                                  </a>
+                                </div>
+                                <p className="text-xs text-slate-400 p-2 truncate">{file.name}</p>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )}
