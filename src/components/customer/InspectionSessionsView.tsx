@@ -91,6 +91,10 @@ interface StationWithLatestInspection {
   // Jämförelsevärden mot senaste kontrollen
   comparisonValue?: number | null
   comparisonStatus?: 'ok' | 'warning' | 'critical'
+  // Trend jämfört med föregående inspektion
+  previousValue?: number | null
+  trend?: number | null
+  trendDirection?: 'up' | 'down' | 'stable'
 }
 
 // Sektion med stationer
@@ -174,10 +178,12 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         outdoorStations.map(async (station) => {
           const inspections = await getOutdoorInspectionsByStation(station.id)
           const latest = inspections.length > 0 ? inspections[0] : null
+          const previous = inspections.length > 1 ? inspections[1] : null
 
           // Beräkna status baserat på tröskelvärden
           const stationType = station.station_type_data
           const measurementValue = latest?.measurement_value ?? null
+          const previousValue = previous?.measurement_value ?? null
           let calculatedStatus: CalculatedStatus = 'ok'
 
           if (stationType && measurementValue !== null) {
@@ -193,6 +199,15 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               } as any,
               measurementValue
             )
+          }
+
+          // Beräkna trend
+          let trend: number | null = null
+          let trendDirection: 'up' | 'down' | 'stable' = 'stable'
+          if (measurementValue !== null && previousValue !== null) {
+            trend = measurementValue - previousValue
+            if (trend > 0) trendDirection = 'up'
+            else if (trend < 0) trendDirection = 'down'
           }
 
           return {
@@ -215,7 +230,10 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               technicianName: latest.technician?.name || null
             } : null,
             calculatedStatus,
-            originalOutdoorStation: station
+            originalOutdoorStation: station,
+            previousValue,
+            trend,
+            trendDirection
           } as StationWithLatestInspection
         })
       )
@@ -237,12 +255,14 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         // Hämta senaste inspektion för varje inomhusstation
         const stationsWithInspections = await Promise.all(
           stations.map(async (station) => {
-            const inspections = await IndoorStationService.getInspectionsByStation(station.id)
+            const inspections = await IndoorStationService.getInspectionsByStation(station.id, 2)
             const latest = inspections.length > 0 ? inspections[0] : null
+            const previous = inspections.length > 1 ? inspections[1] : null
 
             // Beräkna status baserat på tröskelvärden
             const stationType = station.station_type_data
             const measurementValue = latest?.measurement_value ?? null
+            const previousValue = previous?.measurement_value ?? null
             let calculatedStatus: CalculatedStatus = 'ok'
 
             if (stationType && measurementValue !== null) {
@@ -258,6 +278,15 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                 } as any,
                 measurementValue
               )
+            }
+
+            // Beräkna trend
+            let trend: number | null = null
+            let trendDirection: 'up' | 'down' | 'stable' = 'stable'
+            if (measurementValue !== null && previousValue !== null) {
+              trend = measurementValue - previousValue
+              if (trend > 0) trendDirection = 'up'
+              else if (trend < 0) trendDirection = 'down'
             }
 
             return {
@@ -282,7 +311,10 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               calculatedStatus,
               originalIndoorStation: station,
               floorPlanId: plan.id,
-              floorPlanName: plan.name
+              floorPlanName: plan.name,
+              previousValue,
+              trend,
+              trendDirection
             } as StationWithLatestInspection
           })
         )
@@ -944,6 +976,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Mätvärde avser</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Mätvärde</th>
+                          <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Trend</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Kontrollerad</th>
                           <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Anteckning</th>
                           <th className="text-center px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Foto</th>
@@ -1017,6 +1050,24 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                                     </span>
                                     <span className="text-slate-400 text-xs">
                                       {MEASUREMENT_UNIT_CONFIG[station.measurementUnit as keyof typeof MEASUREMENT_UNIT_CONFIG]?.shortLabel || station.measurementUnit}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-500">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2.5 text-right">
+                                {station.trend !== null && station.trend !== undefined ? (
+                                  <div className={`flex items-center justify-end gap-1 ${
+                                    station.trendDirection === 'down' ? 'text-emerald-400' :
+                                    station.trendDirection === 'up' ? 'text-red-400' :
+                                    'text-slate-500'
+                                  }`}>
+                                    {station.trendDirection === 'down' && <TrendingDown className="w-4 h-4" />}
+                                    {station.trendDirection === 'up' && <TrendingUp className="w-4 h-4" />}
+                                    {station.trendDirection === 'stable' && <Minus className="w-4 h-4" />}
+                                    <span className="font-medium">
+                                      {station.trend > 0 ? '+' : ''}{station.trend}
                                     </span>
                                   </div>
                                 ) : (

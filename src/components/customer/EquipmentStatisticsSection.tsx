@@ -19,13 +19,8 @@ import {
   TreePine,
   Home,
   AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   RefreshCw,
-  Activity,
-  ChevronRight,
-  MousePointerClick
+  Activity
 } from 'lucide-react'
 import {
   getCompletedSessionsWithSummary,
@@ -37,20 +32,14 @@ import { FloorPlanService } from '../../services/floorPlanService'
 import { IndoorStationService } from '../../services/indoorStationService'
 import {
   calculateStatusDistributionOverTime,
-  calculateStationTrends,
-  calculateIndoorStationTrends,
   calculateStationKPIs,
   filterSessionsByTimePeriod,
   aggregateStatusByMonth,
   calculateMeasurementTrendsOverTime,
   aggregateMeasurementsByMonth,
   ensureVisibleColor,
-  type TimePeriod,
-  type StationTrendData,
-  type StationTypeInfo
+  type TimePeriod
 } from '../../utils/equipmentStatisticsUtils'
-import { CALCULATED_STATUS_CONFIG } from '../../types/stationTypes'
-import { StationHistoryModal } from './StationHistoryModal'
 
 interface EquipmentStatisticsSectionProps {
   customerId: string
@@ -64,17 +53,10 @@ export function EquipmentStatisticsSection({
   const [loading, setLoading] = useState(true)
   const [sessions, setSessions] = useState<any[]>([])
   const [latestOutdoorInspections, setLatestOutdoorInspections] = useState<any[]>([])
-  const [previousOutdoorInspections, setPreviousOutdoorInspections] = useState<any[]>([])
   const [latestIndoorInspections, setLatestIndoorInspections] = useState<any[]>([])
   const [outdoorTotal, setOutdoorTotal] = useState(0)
   const [indoorTotal, setIndoorTotal] = useState(0)
-  const [outdoorNumberMap, setOutdoorNumberMap] = useState<Map<string, number>>(new Map())
-  const [indoorStationTrends, setIndoorStationTrends] = useState<StationTrendData[]>([])
   const [allSessionInspections, setAllSessionInspections] = useState<Map<string, any[]>>(new Map())
-
-  // Modal state
-  const [selectedStation, setSelectedStation] = useState<StationTrendData | null>(null)
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
 
   // Hämta data
   useEffect(() => {
@@ -86,66 +68,28 @@ export function EquipmentStatisticsSection({
         const sessionsData = await getCompletedSessionsWithSummary(customerId, 100)
         setSessions(sessionsData)
 
-        // Hämta alla outdoor-stationer för nummermappning
+        // Hämta alla outdoor-stationer
         const outdoorStations = await EquipmentService.getEquipmentByCustomer(customerId)
         setOutdoorTotal(outdoorStations.length)
 
-        // Skapa nummermappning baserat på placed_at
-        const numberMap = new Map<string, number>()
-        const sortedOutdoor = [...outdoorStations].sort((a, b) =>
-          new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
-        )
-        sortedOutdoor.forEach((station, index) => {
-          numberMap.set(station.id, index + 1)
-        })
-        setOutdoorNumberMap(numberMap)
-
-        // Hämta indoor-stationer med inspektioner för trendberäkning
+        // Hämta indoor-stationer
         const floorPlans = await FloorPlanService.getFloorPlansByCustomer(customerId)
         let indoorCount = 0
-        const allIndoorTrends: StationTrendData[] = []
-
         for (const plan of floorPlans) {
           const stations = await IndoorStationService.getStationsByFloorPlan(plan.id)
           indoorCount += stations.length
-
-          // Hämta inspektioner för varje station för trendberäkning
-          const inspectionsMap = new Map<string, any[]>()
-          for (const station of stations) {
-            try {
-              const inspections = await IndoorStationService.getInspectionsByStation(station.id, 2)
-              inspectionsMap.set(station.id, inspections)
-            } catch {
-              inspectionsMap.set(station.id, [])
-            }
-          }
-
-          // Beräkna trends för detta plans stationer
-          const planTrends = calculateIndoorStationTrends(
-            stations,
-            inspectionsMap,
-            plan.name || 'Inomhus'
-          )
-          allIndoorTrends.push(...planTrends)
         }
-
         setIndoorTotal(indoorCount)
-        setIndoorStationTrends(allIndoorTrends)
 
-        // Hämta inspektioner för senaste och näst senaste sessionen
+        // Hämta inspektioner för senaste sessionen (för KPI-beräkning)
         if (sessionsData.length > 0) {
           const latestOutdoor = await getOutdoorInspectionsForSession(sessionsData[0].id)
           const latestIndoor = await getIndoorInspectionsForSession(sessionsData[0].id)
           setLatestOutdoorInspections(latestOutdoor)
           setLatestIndoorInspections(latestIndoor)
-
-          if (sessionsData.length > 1) {
-            const prevOutdoor = await getOutdoorInspectionsForSession(sessionsData[1].id)
-            setPreviousOutdoorInspections(prevOutdoor)
-          }
         }
 
-        // Hämta inspektioner för alla sessioner (för trendgraf)
+        // Hämta inspektioner för alla sessioner (för mätvärdes-trendgraf)
         const inspMap = new Map<string, any[]>()
         const sessionsToFetch = sessionsData.slice(0, 20) // Max 20 sessioner för prestanda
         for (const session of sessionsToFetch) {
@@ -198,20 +142,6 @@ export function EquipmentStatisticsSection({
     return measurementTrends.data
   }, [measurementTrends])
 
-  // Beräkna trender per outdoor-station
-  const outdoorStationTrends = useMemo(() => {
-    return calculateStationTrends(
-      latestOutdoorInspections,
-      previousOutdoorInspections,
-      outdoorNumberMap
-    )
-  }, [latestOutdoorInspections, previousOutdoorInspections, outdoorNumberMap])
-
-  // Kombinera outdoor och indoor trends
-  const allStationTrends = useMemo(() => {
-    return [...outdoorStationTrends, ...indoorStationTrends]
-  }, [outdoorStationTrends, indoorStationTrends])
-
   // Beräkna KPIs
   const kpis = useMemo(() => {
     return calculateStationKPIs(
@@ -221,12 +151,6 @@ export function EquipmentStatisticsSection({
       indoorTotal
     )
   }, [latestOutdoorInspections, latestIndoorInspections, outdoorTotal, indoorTotal])
-
-  // Öppna stationshistorik-modal
-  const openStationHistory = (station: StationTrendData) => {
-    setSelectedStation(station)
-    setIsHistoryModalOpen(true)
-  }
 
   if (loading) {
     return (
@@ -431,141 +355,6 @@ export function EquipmentStatisticsSection({
           )}
         </div>
       </div>
-
-      {/* Stationstabell med trender */}
-      <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-white flex items-center gap-3">
-              <Target className="w-5 h-5 text-teal-400" />
-              Stationer med trend
-            </h3>
-            <p className="text-sm text-slate-400 mt-1">
-              Förändring jämfört med föregående kontroll
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <MousePointerClick className="w-4 h-4" />
-            Klicka för historik
-          </div>
-        </div>
-
-        {allStationTrends.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-900/50 border-b border-slate-700">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Nr</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Typ</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Område</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Senaste</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Trend</th>
-                  <th className="text-center px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
-                  <th className="w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {allStationTrends.map((station, index) => {
-                  const statusConfig = CALCULATED_STATUS_CONFIG[station.currentStatus]
-
-                  return (
-                    <tr
-                      key={station.stationId}
-                      className="hover:bg-slate-700/30 transition-colors cursor-pointer group"
-                      onClick={() => openStationHistory(station)}
-                    >
-                      <td className="px-4 py-3 text-white font-medium">
-                        <div className="flex items-center gap-2">
-                          {station.locationType === 'indoor' ? (
-                            <Home className="w-3.5 h-3.5 text-blue-400" />
-                          ) : (
-                            <TreePine className="w-3.5 h-3.5 text-teal-400" />
-                          )}
-                          {station.stationNumber || `#${index + 1}`}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: station.stationTypeColor }}
-                          />
-                          <span className="text-slate-300">{station.stationType}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-400">{station.area}</td>
-                      <td className="px-4 py-3 text-right text-white">
-                        {station.latestValue !== null
-                          ? `${station.latestValue}${station.measurementUnit === 'gram' ? 'g' : station.measurementUnit === 'st' ? '' : station.measurementUnit}`
-                          : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {station.trend !== null ? (
-                          <div className={`flex items-center justify-end gap-1 ${
-                            station.trendDirection === 'down' ? 'text-emerald-400' :
-                            station.trendDirection === 'up' ? 'text-red-400' :
-                            'text-slate-500'
-                          }`}>
-                            {station.trendDirection === 'down' && <TrendingDown className="w-4 h-4" />}
-                            {station.trendDirection === 'up' && <TrendingUp className="w-4 h-4" />}
-                            {station.trendDirection === 'stable' && <Minus className="w-4 h-4" />}
-                            <span className="font-medium">
-                              {station.trend > 0 ? '+' : ''}{station.trend}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center">
-                          <div
-                            className={`w-3 h-3 rounded-full ${
-                              station.currentStatus === 'ok' ? 'bg-emerald-500' :
-                              station.currentStatus === 'warning' ? 'bg-amber-500' :
-                              station.currentStatus === 'critical' ? 'bg-red-500' :
-                              'bg-slate-500'
-                            }`}
-                            title={statusConfig?.label || station.currentStatus}
-                          />
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="py-8 text-center text-slate-500">
-            Ingen stationsdata tillgänglig
-          </div>
-        )}
-      </div>
-
-      {/* Station History Modal */}
-      {selectedStation && (
-        <StationHistoryModal
-          isOpen={isHistoryModalOpen}
-          onClose={() => {
-            setIsHistoryModalOpen(false)
-            setSelectedStation(null)
-          }}
-          stationId={selectedStation.stationId}
-          locationType={selectedStation.locationType}
-          stationName={selectedStation.stationNumber || 'Station'}
-          stationType={selectedStation.stationType}
-          stationTypeColor={selectedStation.stationTypeColor}
-          thresholdWarning={selectedStation.thresholdWarning}
-          thresholdCritical={selectedStation.thresholdCritical}
-          thresholdDirection={selectedStation.thresholdDirection}
-          measurementUnit={selectedStation.measurementUnit}
-          measurementLabel={selectedStation.measurementLabel}
-        />
-      )}
     </div>
   )
 }
