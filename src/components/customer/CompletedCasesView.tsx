@@ -536,6 +536,20 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
             setIsModalOpen(false)
             setSelectedCase(null)
           }}
+          fallbackData={{
+            case_number: selectedCase.case_number,
+            title: selectedCase.title,
+            pest_type: selectedCase.pest_type,
+            status: selectedCase.status,
+            pest_level: selectedCase.pest_level,
+            problem_rating: selectedCase.problem_rating,
+            price: selectedCase.price,
+            completed_date: selectedCase.completed_date,
+            primary_technician_name: selectedCase.primary_technician_name,
+            address: selectedCase.address,
+            description: selectedCase.description,
+            recommendations: selectedCase.recommendations
+          }}
         />
       )}
     </div>

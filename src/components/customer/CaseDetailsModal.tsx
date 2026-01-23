@@ -32,6 +32,21 @@ interface CaseDetailsModalProps {
   clickupTaskId: string
   isOpen: boolean
   onClose: () => void
+  // Fallback-data när clickupTaskId saknas
+  fallbackData?: {
+    case_number?: string
+    title?: string
+    pest_type?: string
+    status?: string
+    pest_level?: number | null
+    problem_rating?: number | null
+    price?: number | null
+    completed_date?: string
+    primary_technician_name?: string
+    address?: { formatted_address?: string }
+    description?: string
+    recommendations?: string
+  }
 }
 
 interface TaskDetails {
@@ -76,24 +91,40 @@ interface CustomerInfo {
   contact_person: string
 }
 
-export default function CaseDetailsModal({ 
-  caseId, 
-  clickupTaskId, 
-  isOpen, 
-  onClose 
+export default function CaseDetailsModal({
+  caseId,
+  clickupTaskId,
+  isOpen,
+  onClose,
+  fallbackData
 }: CaseDetailsModalProps) {
   const [taskDetails, setTaskDetails] = useState<TaskDetails | null>(null)
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [useFallback, setUseFallback] = useState(false)
   const { profile } = useAuth()
 
   useEffect(() => {
-    if (isOpen && clickupTaskId) {
-      fetchTaskDetails()
-      fetchCustomerInfo()
+    if (isOpen) {
+      // Om vi har clickupTaskId, försök hämta från ClickUp
+      if (clickupTaskId) {
+        setUseFallback(false)
+        fetchTaskDetails()
+        fetchCustomerInfo()
+      } else if (fallbackData) {
+        // Använd fallback-data från cases-tabellen
+        setUseFallback(true)
+        setLoading(false)
+        fetchCustomerInfo()
+      } else {
+        // Varken ClickUp-ID eller fallback - visa felmeddelande
+        setUseFallback(true)
+        setError('Ärendedetaljer saknas')
+        setLoading(false)
+      }
     }
-  }, [isOpen, clickupTaskId])
+  }, [isOpen, clickupTaskId, fallbackData])
 
   const fetchTaskDetails = async () => {
     setLoading(true)
@@ -256,6 +287,15 @@ export default function CaseDetailsModal({
   const filesField = getFieldValue('filer')
   const caseTypeField = getFieldValue('ärende')
 
+  // Avgör vad som ska visas i header
+  const displayTitle = useFallback
+    ? (fallbackData?.title || 'Ärendedetaljer')
+    : (taskDetails?.task_info.name || 'Laddar ärende...')
+
+  const displayCaseNumber = useFallback
+    ? fallbackData?.case_number
+    : taskDetails?.task_id
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -264,11 +304,11 @@ export default function CaseDetailsModal({
           <div className="flex items-center justify-between p-6 border-b border-white/10">
             <div>
               <h2 className="text-2xl font-bold text-white">
-                {taskDetails?.task_info.name || 'Laddar ärende...'}
+                {displayTitle}
               </h2>
-              {taskDetails && (
+              {displayCaseNumber && (
                 <p className="text-slate-400 text-sm mt-1">
-                  Ärende #{taskDetails.task_id}
+                  Ärende #{displayCaseNumber}
                 </p>
               )}
               {/* Visa kundinfo i header om tillgänglig */}
@@ -278,12 +318,12 @@ export default function CaseDetailsModal({
                 </p>
               )}
             </div>
-            
+
             <div className="flex items-center gap-2">
               {/* PDF-rapport knapp med förbättrad loading state */}
               {taskDetails && (
                 <Button
-                  variant="secondary" 
+                  variant="secondary"
                   size="sm"
                   onClick={handleGeneratePDF}
                   className="flex items-center gap-2"
@@ -293,7 +333,7 @@ export default function CaseDetailsModal({
                   {loading ? 'Genererar...' : 'Ladda ner rapport'}
                 </Button>
               )}
-              
+
               <Button variant="ghost" size="sm" onClick={onClose}>
                 <X className="w-5 h-5" />
               </Button>
@@ -308,10 +348,173 @@ export default function CaseDetailsModal({
               </div>
             )}
 
-            {error && (
+            {error && !useFallback && (
               <div className="flex items-center justify-center py-12 text-red-400">
                 <AlertCircle className="w-5 h-5 mr-2" />
                 {error}
+              </div>
+            )}
+
+            {/* Fallback-vy när ClickUp-data saknas */}
+            {useFallback && fallbackData && !error && (
+              <div className="space-y-6">
+                {/* Status och datum */}
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-4">
+                    {fallbackData.status && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-400">Status:</span>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium text-white ${getStatusColor(fallbackData.status)}`}>
+                          {fallbackData.status.toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {fallbackData.completed_date && (
+                    <div className="text-sm text-slate-400">
+                      Slutfört: {new Date(fallbackData.completed_date).toLocaleDateString('sv-SE', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Beskrivning */}
+                {fallbackData.description && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-white">Beskrivning</h3>
+                    <div className="p-4 bg-slate-800/50 rounded-lg">
+                      <p className="text-white whitespace-pre-wrap">{fallbackData.description}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Grid med information */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Vänster kolumn */}
+                  <div className="space-y-4">
+                    {/* Adress */}
+                    {fallbackData.address?.formatted_address && (
+                      <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <MapPin className="w-5 h-5 text-red-400 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm text-slate-400 mb-1">Adress</p>
+                          <p className="text-white font-medium">{fallbackData.address.formatted_address}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Skadedjur */}
+                    {fallbackData.pest_type && (
+                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <Bug className="w-5 h-5 text-orange-400" />
+                        <div>
+                          <p className="text-sm text-slate-400">Skadedjur</p>
+                          <p className="text-white font-medium">{fallbackData.pest_type}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Aktivitetsnivå */}
+                    {fallbackData.pest_level !== null && fallbackData.pest_level !== undefined && (
+                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <AlertCircle className={`w-5 h-5 ${
+                          fallbackData.pest_level >= 3 ? 'text-red-400' :
+                          fallbackData.pest_level >= 2 ? 'text-amber-400' : 'text-emerald-400'
+                        }`} />
+                        <div>
+                          <p className="text-sm text-slate-400">Aktivitetsnivå</p>
+                          <p className={`font-medium ${
+                            fallbackData.pest_level >= 3 ? 'text-red-400' :
+                            fallbackData.pest_level >= 2 ? 'text-amber-400' : 'text-emerald-400'
+                          }`}>
+                            {fallbackData.pest_level === 0 ? 'Ingen' :
+                             fallbackData.pest_level === 1 ? 'Låg' :
+                             fallbackData.pest_level === 2 ? 'Medium' : 'Hög'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Situationsbedömning */}
+                    {fallbackData.problem_rating !== null && fallbackData.problem_rating !== undefined && (
+                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <Flag className={`w-5 h-5 ${
+                          fallbackData.problem_rating >= 4 ? 'text-red-400' :
+                          fallbackData.problem_rating >= 3 ? 'text-amber-400' : 'text-emerald-400'
+                        }`} />
+                        <div>
+                          <p className="text-sm text-slate-400">Situationsbedömning</p>
+                          <p className={`font-medium ${
+                            fallbackData.problem_rating >= 4 ? 'text-red-400' :
+                            fallbackData.problem_rating >= 3 ? 'text-amber-400' : 'text-emerald-400'
+                          }`}>
+                            {fallbackData.problem_rating === 1 ? 'Utmärkt' :
+                             fallbackData.problem_rating === 2 ? 'Bra' :
+                             fallbackData.problem_rating === 3 ? 'Acceptabel' :
+                             fallbackData.problem_rating === 4 ? 'Problem' : 'Kritisk'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pris */}
+                    {fallbackData.price && fallbackData.price > 0 && (
+                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <DollarSign className="w-5 h-5 text-green-400" />
+                        <div>
+                          <p className="text-sm text-slate-400">Kostnad</p>
+                          <p className="text-white font-medium text-xl">{fallbackData.price} kr</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tekniker */}
+                    {fallbackData.primary_technician_name && (
+                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <User className="w-5 h-5 text-blue-400" />
+                        <div>
+                          <p className="text-sm text-slate-400">Ansvarig tekniker</p>
+                          <p className="text-white font-medium">{fallbackData.primary_technician_name}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Höger kolumn */}
+                  <div className="space-y-4">
+                    {/* Rekommendationer */}
+                    {fallbackData.recommendations && (
+                      <div className="space-y-3">
+                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                          <Lightbulb className="w-4 h-4 text-amber-400" />
+                          Rekommenderade åtgärder
+                        </h4>
+                        <div className="p-4 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-lg">
+                          <p className="text-slate-200 whitespace-pre-wrap leading-relaxed">
+                            {fallbackData.recommendations}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Info om att detaljerad data saknas */}
+                    <div className="p-4 bg-slate-800/30 border border-slate-700/50 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-slate-400 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-slate-400">
+                            Detta ärende har begränsad detaljinformation.
+                            Kontakta oss om du har frågor om ärendet.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
