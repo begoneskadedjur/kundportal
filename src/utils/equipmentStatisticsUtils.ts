@@ -44,6 +44,11 @@ export interface StationTrendData {
   trendDirection: 'up' | 'down' | 'stable'
   currentStatus: CalculatedStatus
   measurementUnit: string
+  locationType: 'indoor' | 'outdoor'
+  floorPlanName?: string
+  thresholdWarning: number | null
+  thresholdCritical: number | null
+  thresholdDirection: 'above' | 'below'
 }
 
 /**
@@ -192,7 +197,71 @@ export function calculateStationTrends(
       trend,
       trendDirection,
       currentStatus,
-      measurementUnit: stationTypeData?.measurement_unit || 'st'
+      measurementUnit: stationTypeData?.measurement_unit || 'st',
+      locationType: 'outdoor' as const,
+      thresholdWarning: stationTypeData?.threshold_warning ?? null,
+      thresholdCritical: stationTypeData?.threshold_critical ?? null,
+      thresholdDirection: stationTypeData?.threshold_direction ?? 'above'
+    }
+  })
+}
+
+/**
+ * Beräkna trend för indoor-stationer baserat på inspektioner
+ */
+export function calculateIndoorStationTrends(
+  stations: any[],
+  inspectionsMap: Map<string, any[]>,
+  floorPlanName: string
+): StationTrendData[] {
+  return stations.map((station, index) => {
+    const stationTypeData = station.station_type_data
+    const inspections = inspectionsMap.get(station.id) || []
+
+    // Sortera inspektioner efter datum (nyast först)
+    const sortedInspections = [...inspections].sort(
+      (a, b) => new Date(b.inspected_at || b.created_at).getTime() - new Date(a.inspected_at || a.created_at).getTime()
+    )
+
+    const latestInsp = sortedInspections[0]
+    const previousInsp = sortedInspections[1]
+
+    const latestValue = latestInsp?.measurement_value ?? null
+    const previousValue = previousInsp?.measurement_value ?? null
+
+    let trend: number | null = null
+    let trendDirection: 'up' | 'down' | 'stable' = 'stable'
+
+    if (latestValue !== null && previousValue !== null) {
+      trend = latestValue - previousValue
+      if (trend > 0) trendDirection = 'up'
+      else if (trend < 0) trendDirection = 'down'
+    }
+
+    const currentStatus = calculateStatus(
+      latestValue,
+      stationTypeData?.threshold_warning ?? null,
+      stationTypeData?.threshold_critical ?? null,
+      stationTypeData?.threshold_direction ?? 'above'
+    )
+
+    return {
+      stationId: station.id,
+      stationNumber: station.station_number?.toString() || `I${index + 1}`,
+      stationType: stationTypeData?.name || 'Okänd',
+      stationTypeColor: stationTypeData?.color || '#6b7280',
+      area: floorPlanName,
+      latestValue,
+      previousValue,
+      trend,
+      trendDirection,
+      currentStatus,
+      measurementUnit: stationTypeData?.measurement_unit || 'st',
+      locationType: 'indoor' as const,
+      floorPlanName,
+      thresholdWarning: stationTypeData?.threshold_warning ?? null,
+      thresholdCritical: stationTypeData?.threshold_critical ?? null,
+      thresholdDirection: stationTypeData?.threshold_direction ?? 'above'
     }
   })
 }
