@@ -1350,15 +1350,27 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                     })}
                   </div>
 
-                  {/* Sammanfattningskort - Total förändring */}
+                  {/* Sammanfattningskort - Förändring per kategori */}
                   {latestComparisonData.size > 0 && (() => {
-                    // Beräkna totaler för alla stationer
-                    let totalHistValue = 0
-                    let totalCurrentValue = 0
-                    let stationsWithBothValues = 0
-                    let improvedStations = 0
-                    let worsenedStations = 0
-                    let unchangedStations = 0
+                    // Gruppera stationer per mätlabel (t.ex. "Förbrukning", "Antal dödade")
+                    const categoryStats = new Map<string, {
+                      label: string
+                      unit: string
+                      unitShort: string
+                      totalHistValue: number
+                      totalCurrentValue: number
+                      stationCount: number
+                      improved: number
+                      worsened: number
+                      unchanged: number
+                      thresholdDirection: 'above' | 'below'
+                    }>()
+
+                    // Övergripande räknare
+                    let totalImproved = 0
+                    let totalWorsened = 0
+                    let totalUnchanged = 0
+                    let totalStationsWithBothValues = 0
 
                     historyDetailSections.forEach(section => {
                       section.stations.forEach(station => {
@@ -1366,30 +1378,51 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                         const currentValue = station.comparisonValue
 
                         if (histValue !== null && histValue !== undefined && currentValue !== null && currentValue !== undefined) {
-                          totalHistValue += histValue
-                          totalCurrentValue += currentValue
-                          stationsWithBothValues++
+                          // Använd measurementLabel eller stationType som kategori
+                          const categoryKey = station.measurementLabel || station.stationType || 'Övrigt'
+                          const unitConfig = MEASUREMENT_UNIT_CONFIG[station.measurementUnit as keyof typeof MEASUREMENT_UNIT_CONFIG] || MEASUREMENT_UNIT_CONFIG.st
+
+                          if (!categoryStats.has(categoryKey)) {
+                            categoryStats.set(categoryKey, {
+                              label: categoryKey,
+                              unit: station.measurementUnit,
+                              unitShort: unitConfig.shortLabel,
+                              totalHistValue: 0,
+                              totalCurrentValue: 0,
+                              stationCount: 0,
+                              improved: 0,
+                              worsened: 0,
+                              unchanged: 0,
+                              thresholdDirection: station.thresholdDirection
+                            })
+                          }
+
+                          const stats = categoryStats.get(categoryKey)!
+                          stats.totalHistValue += histValue
+                          stats.totalCurrentValue += currentValue
+                          stats.stationCount++
+                          totalStationsWithBothValues++
 
                           const diff = currentValue - histValue
                           const isGood = station.thresholdDirection === 'above' ? diff < 0 : diff > 0
 
                           if (diff === 0) {
-                            unchangedStations++
+                            stats.unchanged++
+                            totalUnchanged++
                           } else if (isGood) {
-                            improvedStations++
+                            stats.improved++
+                            totalImproved++
                           } else {
-                            worsenedStations++
+                            stats.worsened++
+                            totalWorsened++
                           }
                         }
                       })
                     })
 
-                    const totalDiff = totalCurrentValue - totalHistValue
-                    const totalPercentChange = totalHistValue !== 0
-                      ? Math.round(((totalCurrentValue - totalHistValue) / Math.abs(totalHistValue)) * 100)
-                      : null
+                    if (totalStationsWithBothValues === 0) return null
 
-                    if (stationsWithBothValues === 0) return null
+                    const categories = Array.from(categoryStats.values())
 
                     return (
                       <div className="mt-6 pt-6 border-t border-slate-700">
@@ -1397,67 +1430,110 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                           <TrendingUp className="w-4 h-4 text-purple-400" />
                           Sammanfattning av förändring
                         </h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                          {/* Total förändring */}
-                          <div className="bg-slate-900/50 rounded-lg p-3">
-                            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">Total förändring</div>
-                            <div className={`flex items-center gap-2 ${
-                              totalDiff === 0 ? 'text-slate-300' :
-                              totalDiff < 0 ? 'text-emerald-400' : 'text-red-400'
-                            }`}>
-                              {totalDiff !== 0 && (
-                                totalDiff < 0
-                                  ? <TrendingDown className="w-4 h-4" />
-                                  : <TrendingUp className="w-4 h-4" />
-                              )}
-                              {totalDiff === 0 && <Minus className="w-4 h-4" />}
-                              <span className="font-bold text-lg">
-                                {totalDiff > 0 ? '+' : ''}{totalDiff}
-                              </span>
-                              {totalPercentChange !== null && totalPercentChange !== 0 && (
-                                <span className="text-xs opacity-75">
-                                  ({totalPercentChange > 0 ? '+' : ''}{totalPercentChange}%)
-                                </span>
-                              )}
-                            </div>
-                          </div>
 
-                          {/* Förbättrade stationer */}
-                          <div className="bg-slate-900/50 rounded-lg p-3">
-                            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">Förbättrade</div>
-                            <div className="flex items-center gap-2 text-emerald-400">
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span className="font-bold text-lg">{improvedStations}</span>
-                              <span className="text-xs text-slate-500">
-                                av {stationsWithBothValues}
-                              </span>
-                            </div>
-                          </div>
+                        {/* Per kategori */}
+                        <div className="space-y-4 mb-4">
+                          {categories.map(cat => {
+                            const diff = cat.totalCurrentValue - cat.totalHistValue
+                            const percentChange = cat.totalHistValue !== 0
+                              ? Math.round(((cat.totalCurrentValue - cat.totalHistValue) / Math.abs(cat.totalHistValue)) * 100)
+                              : null
+                            // För "above" threshold direction är lägre värden bra (t.ex. förbrukning)
+                            // För "below" threshold direction är högre värden bra
+                            const isGoodChange = cat.thresholdDirection === 'above' ? diff < 0 : diff > 0
 
-                          {/* Försämrade stationer */}
-                          <div className="bg-slate-900/50 rounded-lg p-3">
-                            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">Försämrade</div>
-                            <div className="flex items-center gap-2 text-red-400">
-                              <AlertTriangle className="w-4 h-4" />
-                              <span className="font-bold text-lg">{worsenedStations}</span>
-                              <span className="text-xs text-slate-500">
-                                av {stationsWithBothValues}
-                              </span>
-                            </div>
-                          </div>
+                            return (
+                              <div key={cat.label} className="bg-slate-900/30 rounded-lg p-4 border border-slate-700/50">
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="text-white font-medium">{cat.label}</span>
+                                  <span className="text-xs text-slate-500">{cat.stationCount} stationer</span>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                  {/* Total förändring för kategorin */}
+                                  <div className="bg-slate-800/50 rounded-lg p-2.5">
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Förändring</div>
+                                    <div className={`flex items-center gap-1.5 ${
+                                      diff === 0 ? 'text-slate-300' :
+                                      isGoodChange ? 'text-emerald-400' : 'text-red-400'
+                                    }`}>
+                                      {diff !== 0 && (
+                                        isGoodChange
+                                          ? <TrendingDown className="w-3.5 h-3.5" />
+                                          : <TrendingUp className="w-3.5 h-3.5" />
+                                      )}
+                                      {diff === 0 && <Minus className="w-3.5 h-3.5" />}
+                                      <span className="font-bold">
+                                        {diff > 0 ? '+' : ''}{diff}{cat.unitShort}
+                                      </span>
+                                      {percentChange !== null && percentChange !== 0 && (
+                                        <span className="text-[10px] opacity-75">
+                                          ({percentChange > 0 ? '+' : ''}{percentChange}%)
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
 
-                          {/* Oförändrade stationer */}
-                          <div className="bg-slate-900/50 rounded-lg p-3">
-                            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">Oförändrade</div>
-                            <div className="flex items-center gap-2 text-slate-300">
-                              <Minus className="w-4 h-4" />
-                              <span className="font-bold text-lg">{unchangedStations}</span>
-                              <span className="text-xs text-slate-500">
-                                av {stationsWithBothValues}
-                              </span>
-                            </div>
-                          </div>
+                                  {/* Förbättrade */}
+                                  <div className="bg-slate-800/50 rounded-lg p-2.5">
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Förbättrade</div>
+                                    <div className="flex items-center gap-1.5 text-emerald-400">
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span className="font-bold">{cat.improved}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Försämrade */}
+                                  <div className="bg-slate-800/50 rounded-lg p-2.5">
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Försämrade</div>
+                                    <div className="flex items-center gap-1.5 text-red-400">
+                                      <AlertTriangle className="w-3.5 h-3.5" />
+                                      <span className="font-bold">{cat.worsened}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Oförändrade */}
+                                  <div className="bg-slate-800/50 rounded-lg p-2.5">
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Oförändrade</div>
+                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                      <Minus className="w-3.5 h-3.5" />
+                                      <span className="font-bold">{cat.unchanged}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
+
+                        {/* Övergripande totaler */}
+                        {categories.length > 1 && (
+                          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-700/50">
+                            <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                              <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">Totalt förbättrade</div>
+                              <div className="flex items-center justify-center gap-2 text-emerald-400">
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span className="font-bold text-lg">{totalImproved}</span>
+                                <span className="text-xs text-slate-500">av {totalStationsWithBothValues}</span>
+                              </div>
+                            </div>
+                            <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                              <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">Totalt försämrade</div>
+                              <div className="flex items-center justify-center gap-2 text-red-400">
+                                <AlertTriangle className="w-4 h-4" />
+                                <span className="font-bold text-lg">{totalWorsened}</span>
+                                <span className="text-xs text-slate-500">av {totalStationsWithBothValues}</span>
+                              </div>
+                            </div>
+                            <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                              <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">Totalt oförändrade</div>
+                              <div className="flex items-center justify-center gap-2 text-slate-300">
+                                <Minus className="w-4 h-4" />
+                                <span className="font-bold text-lg">{totalUnchanged}</span>
+                                <span className="text-xs text-slate-500">av {totalStationsWithBothValues}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )
                   })()}
