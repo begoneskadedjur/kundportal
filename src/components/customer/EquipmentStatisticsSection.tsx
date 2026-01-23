@@ -12,7 +12,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine
+  Cell
 } from 'recharts'
 import {
   Target,
@@ -342,19 +342,29 @@ export function EquipmentStatisticsSection({
         <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
             <BarChart3 className="w-5 h-5 text-blue-400" />
-            Genomsnittligt mätvärde per typ
+            Genomsnitt per stationstyp
           </h3>
           <p className="text-sm text-slate-400 mb-4">
-            Genomsnitt vid senaste kontrollen
+            Genomsnitt vid senaste kontrollen (färg visar status mot tröskelvärden)
           </p>
 
           {averagesByType.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={averagesByType}>
+                <BarChart data={averagesByType} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="stationType" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <XAxis type="number" stroke="#9ca3af" fontSize={12} />
+                  <YAxis
+                    type="category"
+                    dataKey="stationType"
+                    stroke="#9ca3af"
+                    fontSize={12}
+                    width={100}
+                    tickFormatter={(value, index) => {
+                      const item = averagesByType.find(a => a.stationType === value)
+                      return item?.measurementLabel || value
+                    }}
+                  />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#1e293b',
@@ -363,39 +373,50 @@ export function EquipmentStatisticsSection({
                       color: '#e2e8f0'
                     }}
                     formatter={(value: number, name: string, props: any) => {
-                      const unit = props.payload.measurementUnit || 'st'
-                      return [`${value} ${unit}`, 'Genomsnitt']
+                      const item = props.payload
+                      const unit = item.measurementUnit === 'gram' ? 'g' : item.measurementUnit === 'st' ? '' : item.measurementUnit
+                      const label = item.measurementLabel || 'Värde'
+                      const statusText = item.status === 'ok' ? 'OK' : item.status === 'warning' ? 'Varning' : 'Kritisk'
+                      return [`${value}${unit} (${statusText})`, label]
+                    }}
+                    labelFormatter={(label) => {
+                      const item = averagesByType.find(a => a.stationType === label)
+                      return `${label}${item?.measurementLabel ? ` - ${item.measurementLabel}` : ''}`
                     }}
                   />
                   <Bar
                     dataKey="avgValue"
-                    fill="#8b5cf6"
-                    radius={[4, 4, 0, 0]}
+                    radius={[0, 4, 4, 0]}
                     name="Genomsnitt"
-                  />
-                  {/* Visa tröskelvärden som reference lines om de finns */}
-                  {averagesByType[0]?.thresholdWarning && (
-                    <ReferenceLine
-                      y={averagesByType[0].thresholdWarning}
-                      stroke="#f59e0b"
-                      strokeDasharray="3 3"
-                      label={{ value: 'Varning', fill: '#f59e0b', fontSize: 10 }}
-                    />
-                  )}
-                  {averagesByType[0]?.thresholdCritical && (
-                    <ReferenceLine
-                      y={averagesByType[0].thresholdCritical}
-                      stroke="#ef4444"
-                      strokeDasharray="3 3"
-                      label={{ value: 'Kritisk', fill: '#ef4444', fontSize: 10 }}
-                    />
-                  )}
+                  >
+                    {averagesByType.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.statusColor} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
             <div className="h-64 flex items-center justify-center text-slate-500">
               Ingen data tillgänglig
+            </div>
+          )}
+
+          {/* Legend för statusfärger */}
+          {averagesByType.length > 0 && (
+            <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-slate-700">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                <span className="text-xs text-slate-400">OK</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                <span className="text-xs text-slate-400">Varning</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <span className="text-xs text-slate-400">Kritisk</span>
+              </div>
             </div>
           )}
         </div>
@@ -489,9 +510,13 @@ export function EquipmentStatisticsSection({
                       <td className="px-4 py-3">
                         <div className="flex justify-center">
                           <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: statusConfig.color }}
-                            title={statusConfig.label}
+                            className={`w-3 h-3 rounded-full ${
+                              station.currentStatus === 'ok' ? 'bg-emerald-500' :
+                              station.currentStatus === 'warning' ? 'bg-amber-500' :
+                              station.currentStatus === 'critical' ? 'bg-red-500' :
+                              'bg-slate-500'
+                            }`}
+                            title={statusConfig?.label || station.currentStatus}
                           />
                         </div>
                       </td>

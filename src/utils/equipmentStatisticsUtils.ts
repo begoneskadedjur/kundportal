@@ -26,7 +26,11 @@ export interface StationTypeAverageData {
   count: number
   thresholdWarning: number | null
   thresholdCritical: number | null
+  thresholdDirection: 'above' | 'below'
   measurementUnit: string
+  measurementLabel: string | null
+  status: 'ok' | 'warning' | 'critical'
+  statusColor: string
 }
 
 /**
@@ -110,7 +114,9 @@ export function calculateAveragesByStationType(
     color: string
     thresholdWarning: number | null
     thresholdCritical: number | null
+    thresholdDirection: 'above' | 'below'
     measurementUnit: string
+    measurementLabel: string | null
   }>()
 
   inspections.forEach(insp => {
@@ -125,24 +131,38 @@ export function calculateAveragesByStationType(
           color: stationTypeData?.color || '#6b7280',
           thresholdWarning: stationTypeData?.threshold_warning ?? null,
           thresholdCritical: stationTypeData?.threshold_critical ?? null,
-          measurementUnit: stationTypeData?.measurement_unit || 'st'
+          thresholdDirection: stationTypeData?.threshold_direction ?? 'above',
+          measurementUnit: stationTypeData?.measurement_unit || 'st',
+          measurementLabel: stationTypeData?.measurement_label ?? null
         })
       }
       typeMap.get(typeName)!.values.push(insp.measurement_value)
     }
   })
 
-  return Array.from(typeMap.entries()).map(([stationType, data]) => ({
-    stationType,
-    stationTypeColor: data.color,
-    avgValue: data.values.length > 0
+  return Array.from(typeMap.entries()).map(([stationType, data]) => {
+    const avgValue = data.values.length > 0
       ? Math.round(data.values.reduce((a, b) => a + b, 0) / data.values.length * 10) / 10
-      : 0,
-    count: data.values.length,
-    thresholdWarning: data.thresholdWarning,
-    thresholdCritical: data.thresholdCritical,
-    measurementUnit: data.measurementUnit
-  }))
+      : 0
+
+    // Beräkna status baserat på genomsnitt och tröskelvärden
+    const status = calculateStatus(avgValue, data.thresholdWarning, data.thresholdCritical, data.thresholdDirection)
+    const statusColor = status === 'ok' ? '#22c55e' : status === 'warning' ? '#f59e0b' : '#ef4444'
+
+    return {
+      stationType,
+      stationTypeColor: data.color,
+      avgValue,
+      count: data.values.length,
+      thresholdWarning: data.thresholdWarning,
+      thresholdCritical: data.thresholdCritical,
+      thresholdDirection: data.thresholdDirection,
+      measurementUnit: data.measurementUnit,
+      measurementLabel: data.measurementLabel,
+      status,
+      statusColor
+    }
+  })
 }
 
 /**
