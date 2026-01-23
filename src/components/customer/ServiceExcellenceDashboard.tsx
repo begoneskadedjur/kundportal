@@ -1,7 +1,6 @@
 // src/components/customer/ServiceExcellenceDashboard.tsx - Premium KPI Cards
 import React, { useEffect, useState } from 'react'
-import { TrendingUp, Calendar, CreditCard, CheckCircle } from 'lucide-react'
-import { formatCurrency } from '../../utils/formatters'
+import { Calendar, CheckCircle, ClipboardCheck, Briefcase } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { isCompletedStatus } from '../../types/database'
 
@@ -27,56 +26,106 @@ interface KpiCard {
 const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({ customer }) => {
   const [animatedValues, setAnimatedValues] = useState<{ [key: string]: number }>({})
   const [activeCasesCount, setActiveCasesCount] = useState<number>(0)
+  const [completedInspectionsCount, setCompletedInspectionsCount] = useState<number>(0)
+  const [nextInspection, setNextInspection] = useState<string | null>(null)
   const [nextVisit, setNextVisit] = useState<string | null>(null)
 
-  // Fetch active cases count and next scheduled visit
+  // Fetch active cases count, completed inspections and next scheduled visits
   useEffect(() => {
-    const fetchCasesData = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase
+        // Fetch cases
+        const { data: casesData, error: casesError } = await supabase
           .from('cases')
-          .select('status, scheduled_start, scheduled_end')
+          .select('status, scheduled_start, scheduled_end, service_type')
           .eq('customer_id', customer.id)
-        
-        if (error) throw error
-        
-        // Count cases that are not completed
-        const activeCount = data?.filter(caseItem => !isCompletedStatus(caseItem.status)).length || 0
+
+        if (casesError) throw casesError
+
+        // Count active cases - EXCLUDE inspection type (INS-ärenden)
+        const activeCount = casesData?.filter(caseItem =>
+          !isCompletedStatus(caseItem.status) &&
+          caseItem.service_type !== 'inspection'
+        ).length || 0
         setActiveCasesCount(activeCount)
 
-        // Find next scheduled visit using scheduled_start (earliest upcoming date)
-        const upcomingVisits = data
-          ?.filter(caseItem => caseItem.scheduled_start)
-          ?.map(caseItem => ({ 
-            start: new Date(caseItem.scheduled_start!), 
-            end: caseItem.scheduled_end ? new Date(caseItem.scheduled_end) : null 
+        // Find next scheduled inspection (service_type = 'inspection')
+        const upcomingInspections = casesData
+          ?.filter(caseItem => caseItem.scheduled_start && caseItem.service_type === 'inspection')
+          ?.map(caseItem => ({
+            start: new Date(caseItem.scheduled_start!),
+            end: caseItem.scheduled_end ? new Date(caseItem.scheduled_end) : null
           }))
           ?.filter(visit => visit.start > new Date())
           ?.sort((a, b) => a.start.getTime() - b.start.getTime())
 
-        // Set the next visit with both start and end times
+        if (upcomingInspections && upcomingInspections.length > 0) {
+          const nextInspData = upcomingInspections[0]
+          setNextInspection(JSON.stringify({
+            start: nextInspData.start.toISOString(),
+            end: nextInspData.end?.toISOString() || null
+          }))
+        } else {
+          setNextInspection(null)
+        }
+
+        // Find next scheduled visit (non-inspection)
+        const upcomingVisits = casesData
+          ?.filter(caseItem => caseItem.scheduled_start && caseItem.service_type !== 'inspection')
+          ?.map(caseItem => ({
+            start: new Date(caseItem.scheduled_start!),
+            end: caseItem.scheduled_end ? new Date(caseItem.scheduled_end) : null
+          }))
+          ?.filter(visit => visit.start > new Date())
+          ?.sort((a, b) => a.start.getTime() - b.start.getTime())
+
         if (upcomingVisits && upcomingVisits.length > 0) {
           const nextVisitData = upcomingVisits[0]
-          setNextVisit(JSON.stringify({ 
-            start: nextVisitData.start.toISOString(), 
-            end: nextVisitData.end?.toISOString() || null 
+          setNextVisit(JSON.stringify({
+            start: nextVisitData.start.toISOString(),
+            end: nextVisitData.end?.toISOString() || null
           }))
         } else {
           setNextVisit(null)
         }
+
+        // Fetch completed inspections count from station_inspection_sessions
+        const { count: inspCount, error: inspError } = await supabase
+          .from('station_inspection_sessions')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'completed')
+          .in('case_id',
+            casesData?.filter(c => c.service_type === 'inspection').map(c => c.status) || []
+          )
+
+        // Alternative: count via cases table
+        const { data: inspSessions, error: sessError } = await supabase
+          .from('station_inspection_sessions')
+          .select(`
+            id,
+            status,
+            case:cases!inner(customer_id)
+          `)
+          .eq('status', 'completed')
+          .eq('cases.customer_id', customer.id)
+
+        if (!sessError && inspSessions) {
+          setCompletedInspectionsCount(inspSessions.length)
+        }
       } catch (error) {
-        console.error('Error fetching cases data:', error)
+        console.error('Error fetching data:', error)
         setActiveCasesCount(0)
+        setCompletedInspectionsCount(0)
+        setNextInspection(null)
         setNextVisit(null)
       }
     }
 
-    fetchCasesData()
+    fetchData()
   }, [customer.id])
 
   // Animate numbers on mount
   useEffect(() => {
-    const annualValue = customer.annual_value || 0
     const duration = 1500 // 1.5 seconds
     const steps = 60
     const stepDuration = duration / steps
@@ -86,12 +135,10 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
       currentStep++
       const progress = currentStep / steps
       const easeOutQuart = 1 - Math.pow(1 - progress, 4)
-      
+
       setAnimatedValues({
-        annual: Math.floor(annualValue * easeOutQuart),
-        quality: Math.floor(92 * easeOutQuart),
-        cases: Math.floor(activeCasesCount * easeOutQuart),
-        visits: Math.floor(12 * easeOutQuart) // Placeholder
+        inspections: Math.floor(completedInspectionsCount * easeOutQuart),
+        cases: Math.floor(activeCasesCount * easeOutQuart)
       })
 
       if (currentStep >= steps) {
@@ -100,7 +147,7 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
     }, stepDuration)
 
     return () => clearInterval(interval)
-  }, [customer.annual_value, activeCasesCount])
+  }, [activeCasesCount, completedInspectionsCount])
 
   const formatNextVisitDate = (dateString: string | null) => {
     if (!dateString) return { value: 'Ej schemalagt', subtitle: 'Kontakta för bokning' }
@@ -140,30 +187,29 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
     }
   }
 
+  const nextInspectionDisplay = formatNextVisitDate(nextInspection)
   const nextVisitDisplay = formatNextVisitDate(nextVisit)
 
   const kpiCards: KpiCard[] = [
     {
-      title: 'Service Quality Score',
-      value: `${animatedValues.quality || 0}%`,
-      subtitle: 'Excellent performance',
-      icon: <TrendingUp className="w-5 h-5" />,
-      trend: 'up',
-      trendValue: '+2%',
+      title: 'Genomförda kontroller',
+      value: animatedValues.inspections || completedInspectionsCount,
+      subtitle: completedInspectionsCount === 1 ? 'Stationskontroll' : 'Stationskontroller',
+      icon: <CheckCircle className="w-5 h-5" />,
       color: 'emerald'
     },
     {
-      title: 'Årspremie',
-      value: formatCurrency(animatedValues.annual || 0),
-      subtitle: customer.contract_type || 'Premium avtal',
-      icon: <CreditCard className="w-5 h-5" />,
+      title: 'Nästa kontroll',
+      value: nextInspectionDisplay.value,
+      subtitle: nextInspectionDisplay.subtitle,
+      icon: <ClipboardCheck className="w-5 h-5" />,
       color: 'blue'
     },
     {
       title: 'Aktiva ärenden',
       value: activeCasesCount,
       subtitle: activeCasesCount === 1 ? 'Aktivt ärende' : 'Aktiva ärenden',
-      icon: <CheckCircle className="w-5 h-5" />,
+      icon: <Briefcase className="w-5 h-5" />,
       trend: activeCasesCount > 0 ? 'stable' : undefined,
       color: 'purple'
     },

@@ -1,8 +1,9 @@
 // src/components/customer/RelationshipShowcase.tsx - Contact Persons Display
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { User, Mail, Phone, Building2, Clock, Copy, CheckCircle } from 'lucide-react'
 import Card from '../ui/Card'
 import toast from 'react-hot-toast'
+import { supabase } from '../../lib/supabase'
 
 interface RelationshipShowcaseProps {
   customer: {
@@ -21,6 +22,7 @@ interface RelationshipShowcaseProps {
 
 const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer }) => {
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null)
+  const [accountManagerName, setAccountManagerName] = useState<string | null>(null)
 
   const copyToClipboard = (text: string, type: string) => {
     navigator.clipboard.writeText(text)
@@ -29,17 +31,43 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
     setTimeout(() => setCopiedEmail(null), 2000)
   }
 
-  // Format name from email if no name provided
-  const formatNameFromEmail = (email: string | null) => {
-    if (!email) return 'Ej tilldelad'
-    const name = email.split('@')[0]
-    return name.split('.').map(part => 
-      part.charAt(0).toUpperCase() + part.slice(1)
-    ).join(' ')
-  }
+  // Fetch display_name from profiles based on account_manager_email
+  useEffect(() => {
+    const fetchAccountManagerName = async () => {
+      if (!customer.account_manager_email) {
+        setAccountManagerName(null)
+        return
+      }
 
-  const accountManager = customer.assigned_account_manager || 
-    (customer.account_manager_email ? formatNameFromEmail(customer.account_manager_email) : null)
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('email', customer.account_manager_email)
+          .single()
+
+        if (!error && data?.display_name) {
+          setAccountManagerName(data.display_name)
+        } else {
+          // Fallback to formatting from email
+          const name = customer.account_manager_email.split('@')[0]
+          setAccountManagerName(name.split('.').map(part =>
+            part.charAt(0).toUpperCase() + part.slice(1)
+          ).join(' '))
+        }
+      } catch {
+        // Fallback to formatting from email
+        const name = customer.account_manager_email.split('@')[0]
+        setAccountManagerName(name.split('.').map(part =>
+          part.charAt(0).toUpperCase() + part.slice(1)
+        ).join(' '))
+      }
+    }
+
+    fetchAccountManagerName()
+  }, [customer.account_manager_email])
+
+  const accountManager = accountManagerName || customer.assigned_account_manager
 
   return (
     <div className="space-y-6">
