@@ -160,6 +160,15 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         setLastTechnicianName(sessionsData[0].technician?.name || null)
       }
 
+      // Skapa nummermappning för outdoor-stationer baserat på placed_at (samma som kartan)
+      const outdoorNumberMap = new Map<string, number>()
+      const sortedOutdoor = [...outdoorStations].sort((a, b) =>
+        new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
+      )
+      sortedOutdoor.forEach((station, index) => {
+        outdoorNumberMap.set(station.id, index + 1)
+      })
+
       // Hämta senaste inspektion för varje utomhusstation
       const outdoorWithInspections = await Promise.all(
         outdoorStations.map(async (station) => {
@@ -188,7 +197,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
 
           return {
             id: station.id,
-            stationNumber: station.serial_number,
+            stationNumber: outdoorNumberMap.get(station.id)?.toString() || null,
             stationType: stationType?.name || station.equipment_type || 'Okänd',
             typeColor: stationType?.color || '#6b7280',
             measurementLabel: stationType?.measurement_label || null,
@@ -215,6 +224,15 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
       const indoorSections: StationSection[] = []
       for (const plan of floorPlanData) {
         const stations = await IndoorStationService.getStationsByFloorPlan(plan.id)
+
+        // Skapa nummermappning för denna planritnings stationer baserat på placed_at (samma som planritningen)
+        const indoorNumberMap = new Map<string, number>()
+        const sortedIndoor = [...stations].sort((a, b) =>
+          new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
+        )
+        sortedIndoor.forEach((station, index) => {
+          indoorNumberMap.set(station.id, index + 1)
+        })
 
         // Hämta senaste inspektion för varje inomhusstation
         const stationsWithInspections = await Promise.all(
@@ -244,7 +262,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
 
             return {
               id: station.id,
-              stationNumber: station.station_number,
+              stationNumber: indoorNumberMap.get(station.id)?.toString() || null,
               stationType: stationType?.name || station.station_type || 'Okänd',
               typeColor: stationType?.color || '#6b7280',
               measurementLabel: stationType?.measurement_label || null,
@@ -364,16 +382,41 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     setLoadingHistoryDetail(true)
 
     try {
-      // Hämta inspektionsdata för denna session OCH senaste kontrollens data för jämförelse
-      const [outdoorInspections, indoorInspections, comparisonResult] = await Promise.all([
+      // Hämta inspektionsdata för denna session, alla stationer (för nummermappning), OCH senaste kontrollens data för jämförelse
+      const [outdoorInspections, indoorInspections, comparisonResult, allOutdoorStations, allFloorPlans] = await Promise.all([
         getOutdoorInspectionsForSession(session.id),
         getIndoorInspectionsForSession(session.id),
-        getLatestInspectionValuesForCustomer(customerId)
+        getLatestInspectionValuesForCustomer(customerId),
+        EquipmentService.getEquipmentByCustomer(customerId),
+        FloorPlanService.getFloorPlansByCustomer(customerId)
       ])
 
       const comparisonData = comparisonResult.values
       setLatestComparisonData(comparisonData)
       setLatestSessionDate(comparisonResult.sessionDate)
+
+      // Skapa nummermappning för outdoor-stationer baserat på placed_at (samma som kartan)
+      const outdoorNumberMap = new Map<string, number>()
+      const sortedOutdoor = [...allOutdoorStations].sort((a, b) =>
+        new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
+      )
+      sortedOutdoor.forEach((station, index) => {
+        outdoorNumberMap.set(station.id, index + 1)
+      })
+
+      // Skapa nummermappning för indoor-stationer per planritning
+      const indoorNumberMaps = new Map<string, Map<string, number>>()
+      for (const plan of allFloorPlans) {
+        const stations = await IndoorStationService.getStationsByFloorPlan(plan.id)
+        const indoorNumberMap = new Map<string, number>()
+        const sortedIndoor = [...stations].sort((a, b) =>
+          new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
+        )
+        sortedIndoor.forEach((station, index) => {
+          indoorNumberMap.set(station.id, index + 1)
+        })
+        indoorNumberMaps.set(plan.id, indoorNumberMap)
+      }
 
       // Omvandla till StationSection-format
       const detailSections: StationSection[] = []
@@ -407,7 +450,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
 
           return {
             id: stationId,
-            stationNumber: station?.serial_number || null,
+            stationNumber: outdoorNumberMap.get(stationId)?.toString() || null,
             stationType: stationTypeData?.name || station?.equipment_type || '-',
             typeColor: stationTypeData?.color || '#6b7280',
             measurementLabel: stationTypeData?.measurement_label || null,
@@ -481,9 +524,12 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             // Hämta jämförelsevärden från senaste kontrollen
             const comparison = comparisonData.get(stationId)
 
+            // Hämta nummermappning för denna planritning
+            const indoorNumberMap = indoorNumberMaps.get(planId)
+
             return {
               id: stationId,
-              stationNumber: station?.station_number?.toString() || '-',
+              stationNumber: indoorNumberMap?.get(stationId)?.toString() || null,
               stationType: stationTypeData?.name || station?.station_type || '-',
               typeColor: stationTypeData?.color || '#6b7280',
               measurementLabel: stationTypeData?.measurement_label || null,
