@@ -44,6 +44,7 @@ import {
   aggregateStatusByMonth,
   calculateMeasurementTrendsOverTime,
   aggregateMeasurementsByMonth,
+  ensureVisibleColor,
   type TimePeriod,
   type StationTrendData,
   type StationTypeInfo
@@ -406,18 +407,20 @@ export function EquipmentStatisticsSection({
                       return type?.measurementLabel || type?.name || value
                     }}
                   />
-                  {measurementTrends.stationTypes.map((type) => (
+                  {measurementTrends.stationTypes.map((type) => {
+                    const visibleColor = ensureVisibleColor(type.color)
+                    return (
                     <Line
                       key={type.code}
                       type="monotone"
                       dataKey={type.code}
-                      stroke={type.color}
+                      stroke={visibleColor}
                       strokeWidth={2}
-                      dot={{ fill: type.color, strokeWidth: 0, r: 4 }}
-                      activeDot={{ r: 6, stroke: type.color, strokeWidth: 2, fill: '#1e293b' }}
+                      dot={{ fill: visibleColor, strokeWidth: 0, r: 4 }}
+                      activeDot={{ r: 6, stroke: visibleColor, strokeWidth: 2, fill: '#1e293b' }}
                       connectNulls
                     />
-                  ))}
+                  )})}
                 </LineChart>
               </ResponsiveContainer>
             </div>

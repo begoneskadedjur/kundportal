@@ -482,6 +482,34 @@ export interface StationTypeInfo {
 }
 
 /**
+ * Justera färg så den syns mot mörk bakgrund
+ * Om färgen är för mörk (låg ljusstyrka), gör den ljusare
+ */
+export function ensureVisibleColor(hexColor: string): string {
+  // Konvertera hex till RGB
+  const hex = hexColor.replace('#', '')
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+
+  // Beräkna relativ luminans (perceptuell ljusstyrka)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+  // Om färgen är för mörk (luminans < 0.4), gör den ljusare
+  if (luminance < 0.4) {
+    // Öka ljusstyrkan genom att blanda med vitt
+    const factor = 0.6 // Hur mycket vi ska ljusa upp
+    const newR = Math.round(r + (255 - r) * factor)
+    const newG = Math.round(g + (255 - g) * factor)
+    const newB = Math.round(b + (255 - b) * factor)
+
+    return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`
+  }
+
+  return hexColor
+}
+
+/**
  * Datapunkt för mätvärden över tid
  */
 export interface MeasurementTrendDataPoint {
