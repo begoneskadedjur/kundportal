@@ -23,6 +23,9 @@ export interface StationTypeAverageData {
   stationType: string
   stationTypeColor: string
   avgValue: number
+  previousAvgValue: number | null
+  change: number | null
+  changeDirection: 'up' | 'down' | 'stable'
   count: number
   thresholdWarning: number | null
   thresholdCritical: number | null
@@ -30,6 +33,7 @@ export interface StationTypeAverageData {
   measurementUnit: string
   measurementLabel: string | null
   status: 'ok' | 'warning' | 'critical'
+  previousStatus: 'ok' | 'warning' | 'critical' | null
   statusColor: string
 }
 
@@ -104,12 +108,14 @@ export function calculateStatusDistributionOverTime(
 }
 
 /**
- * Beräkna genomsnittliga mätvärden per stationstyp
+ * Beräkna genomsnittliga mätvärden per stationstyp med jämförelse mot föregående period
  */
 export function calculateAveragesByStationType(
-  inspections: OutdoorInspectionWithRelations[]
+  currentInspections: OutdoorInspectionWithRelations[],
+  previousInspections: OutdoorInspectionWithRelations[] = []
 ): StationTypeAverageData[] {
-  const typeMap = new Map<string, {
+  // Bygg map för nuvarande period
+  const currentTypeMap = new Map<string, {
     values: number[]
     color: string
     thresholdWarning: number | null
@@ -119,14 +125,14 @@ export function calculateAveragesByStationType(
     measurementLabel: string | null
   }>()
 
-  inspections.forEach(insp => {
+  currentInspections.forEach(insp => {
     const station = insp.station as any
     const stationTypeData = station?.station_type_data
     const typeName = stationTypeData?.name || station?.equipment_type || 'Okänd'
 
     if (insp.measurement_value !== null) {
-      if (!typeMap.has(typeName)) {
-        typeMap.set(typeName, {
+      if (!currentTypeMap.has(typeName)) {
+        currentTypeMap.set(typeName, {
           values: [],
           color: stationTypeData?.color || '#6b7280',
           thresholdWarning: stationTypeData?.threshold_warning ?? null,
@@ -136,23 +142,59 @@ export function calculateAveragesByStationType(
           measurementLabel: stationTypeData?.measurement_label ?? null
         })
       }
-      typeMap.get(typeName)!.values.push(insp.measurement_value)
+      currentTypeMap.get(typeName)!.values.push(insp.measurement_value)
     }
   })
 
-  return Array.from(typeMap.entries()).map(([stationType, data]) => {
+  // Bygg map för föregående period
+  const previousTypeMap = new Map<string, number[]>()
+  previousInspections.forEach(insp => {
+    const station = insp.station as any
+    const stationTypeData = station?.station_type_data
+    const typeName = stationTypeData?.name || station?.equipment_type || 'Okänd'
+
+    if (insp.measurement_value !== null) {
+      if (!previousTypeMap.has(typeName)) {
+        previousTypeMap.set(typeName, [])
+      }
+      previousTypeMap.get(typeName)!.push(insp.measurement_value)
+    }
+  })
+
+  return Array.from(currentTypeMap.entries()).map(([stationType, data]) => {
     const avgValue = data.values.length > 0
       ? Math.round(data.values.reduce((a, b) => a + b, 0) / data.values.length * 10) / 10
       : 0
 
+    // Beräkna föregående periods genomsnitt
+    const previousValues = previousTypeMap.get(stationType) || []
+    const previousAvgValue = previousValues.length > 0
+      ? Math.round(previousValues.reduce((a, b) => a + b, 0) / previousValues.length * 10) / 10
+      : null
+
+    // Beräkna förändring
+    let change: number | null = null
+    let changeDirection: 'up' | 'down' | 'stable' = 'stable'
+    if (previousAvgValue !== null) {
+      change = Math.round((avgValue - previousAvgValue) * 10) / 10
+      if (change > 0) changeDirection = 'up'
+      else if (change < 0) changeDirection = 'down'
+    }
+
     // Beräkna status baserat på genomsnitt och tröskelvärden
     const status = calculateStatus(avgValue, data.thresholdWarning, data.thresholdCritical, data.thresholdDirection)
+    const previousStatus = previousAvgValue !== null
+      ? calculateStatus(previousAvgValue, data.thresholdWarning, data.thresholdCritical, data.thresholdDirection)
+      : null
     const statusColor = status === 'ok' ? '#22c55e' : status === 'warning' ? '#f59e0b' : '#ef4444'
 
     return {
       stationType,
       stationTypeColor: data.color,
       avgValue,
+      previousAvgValue,
+      change,
+      changeDirection,
       count: data.values.length,
       thresholdWarning: data.thresholdWarning,
       thresholdCritical: data.thresholdCritical,
@@ -160,6 +202,7 @@ export function calculateAveragesByStationType(
       measurementUnit: data.measurementUnit,
       measurementLabel: data.measurementLabel,
       status,
+      previousStatus,
       statusColor
     }
   })

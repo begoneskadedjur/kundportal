@@ -5,14 +5,11 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  Cell
+  ResponsiveContainer
 } from 'recharts'
 import {
   Target,
@@ -23,9 +20,10 @@ import {
   TrendingDown,
   Minus,
   RefreshCw,
-  BarChart3,
+  Activity,
   ChevronRight,
-  MousePointerClick
+  MousePointerClick,
+  CheckCircle2
 } from 'lucide-react'
 import {
   getCompletedSessionsWithSummary,
@@ -168,10 +166,10 @@ export function EquipmentStatisticsSection({
     return statusOverTime
   }, [statusOverTime])
 
-  // Beräkna genomsnitt per stationstyp
+  // Beräkna genomsnitt per stationstyp med jämförelse mot föregående period
   const averagesByType = useMemo(() => {
-    return calculateAveragesByStationType(latestOutdoorInspections)
-  }, [latestOutdoorInspections])
+    return calculateAveragesByStationType(latestOutdoorInspections, previousOutdoorInspections)
+  }, [latestOutdoorInspections, previousOutdoorInspections])
 
   // Beräkna trender per outdoor-station
   const outdoorStationTrends = useMemo(() => {
@@ -338,85 +336,113 @@ export function EquipmentStatisticsSection({
           )}
         </div>
 
-        {/* Mätvärden per stationstyp */}
-        <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
-            Genomsnitt per stationstyp
-          </h3>
-          <p className="text-sm text-slate-400 mb-4">
-            Genomsnitt vid senaste kontrollen (färg visar status mot tröskelvärden)
-          </p>
+        {/* Mätvärden per stationstyp - Kort-baserad design */}
+        <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+              <Activity className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Mätvärden per typ</h3>
+              <p className="text-sm text-slate-400">Jämförelse med föregående kontroll</p>
+            </div>
+          </div>
 
           {averagesByType.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={averagesByType} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis type="number" stroke="#9ca3af" fontSize={12} />
-                  <YAxis
-                    type="category"
-                    dataKey="stationType"
-                    stroke="#9ca3af"
-                    fontSize={12}
-                    width={100}
-                    tickFormatter={(value, index) => {
-                      const item = averagesByType.find(a => a.stationType === value)
-                      return item?.measurementLabel || value
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #475569',
-                      borderRadius: '8px',
-                      color: '#e2e8f0'
-                    }}
-                    formatter={(value: number, name: string, props: any) => {
-                      const item = props.payload
-                      const unit = item.measurementUnit === 'gram' ? 'g' : item.measurementUnit === 'st' ? '' : item.measurementUnit
-                      const label = item.measurementLabel || 'Värde'
-                      const statusText = item.status === 'ok' ? 'OK' : item.status === 'warning' ? 'Varning' : 'Kritisk'
-                      return [`${value}${unit} (${statusText})`, label]
-                    }}
-                    labelFormatter={(label) => {
-                      const item = averagesByType.find(a => a.stationType === label)
-                      return `${label}${item?.measurementLabel ? ` - ${item.measurementLabel}` : ''}`
-                    }}
-                  />
-                  <Bar
-                    dataKey="avgValue"
-                    radius={[0, 4, 4, 0]}
-                    name="Genomsnitt"
+            <div className="space-y-3">
+              {averagesByType.map((item, index) => {
+                const unitLabel = item.measurementUnit === 'gram' ? 'g' : item.measurementUnit === 'st' ? '' : item.measurementUnit
+                const statusBgClass = item.status === 'ok'
+                  ? 'bg-emerald-500/10 border-emerald-500/20'
+                  : item.status === 'warning'
+                    ? 'bg-amber-500/10 border-amber-500/20'
+                    : 'bg-red-500/10 border-red-500/20'
+                const statusTextClass = item.status === 'ok'
+                  ? 'text-emerald-400'
+                  : item.status === 'warning'
+                    ? 'text-amber-400'
+                    : 'text-red-400'
+
+                // Bestäm om trenden är positiv eller negativ baserat på thresholdDirection
+                // Om direction är "above" (högre = sämre) så är en minskning bra
+                // Om direction är "below" (lägre = sämre) så är en ökning bra
+                const isPositiveChange = item.change !== null && (
+                  (item.thresholdDirection === 'above' && item.change < 0) ||
+                  (item.thresholdDirection === 'below' && item.change > 0)
+                )
+                const isNegativeChange = item.change !== null && (
+                  (item.thresholdDirection === 'above' && item.change > 0) ||
+                  (item.thresholdDirection === 'below' && item.change < 0)
+                )
+
+                return (
+                  <div
+                    key={index}
+                    className={`p-4 border rounded-xl ${statusBgClass} transition-all hover:scale-[1.01]`}
                   >
-                    {averagesByType.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.statusColor} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                    <div className="flex items-center justify-between">
+                      {/* Vänster: Typ och mätvärdesetikett */}
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: item.stationTypeColor }}
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-white">{item.stationType}</p>
+                          <p className="text-xs text-slate-400">{item.measurementLabel || 'Mätvärde'}</p>
+                        </div>
+                      </div>
+
+                      {/* Mitt: Nuvarande värde med status */}
+                      <div className="text-center">
+                        <div className="flex items-center gap-2">
+                          {item.status === 'ok' && <CheckCircle2 className={`w-4 h-4 ${statusTextClass}`} />}
+                          {item.status === 'warning' && <AlertTriangle className={`w-4 h-4 ${statusTextClass}`} />}
+                          {item.status === 'critical' && <AlertTriangle className={`w-4 h-4 ${statusTextClass}`} />}
+                          <span className={`text-xl font-bold ${statusTextClass}`}>
+                            {item.avgValue}{unitLabel}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {item.status === 'ok' ? 'OK' : item.status === 'warning' ? 'Varning' : 'Kritisk'}
+                        </p>
+                      </div>
+
+                      {/* Höger: Förändring jämfört med föregående */}
+                      <div className="text-right min-w-[80px]">
+                        {item.change !== null ? (
+                          <>
+                            <div className={`flex items-center justify-end gap-1 text-sm font-medium ${
+                              isPositiveChange ? 'text-emerald-400' :
+                              isNegativeChange ? 'text-red-400' :
+                              'text-slate-400'
+                            }`}>
+                              {item.changeDirection === 'up' && <TrendingUp className="w-4 h-4" />}
+                              {item.changeDirection === 'down' && <TrendingDown className="w-4 h-4" />}
+                              {item.changeDirection === 'stable' && <Minus className="w-4 h-4" />}
+                              <span>
+                                {item.change > 0 ? '+' : ''}{item.change}{unitLabel}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              från {item.previousAvgValue}{unitLabel}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-slate-500">Ingen tidigare data</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           ) : (
-            <div className="h-64 flex items-center justify-center text-slate-500">
-              Ingen data tillgänglig
-            </div>
-          )}
-
-          {/* Legend för statusfärger */}
-          {averagesByType.length > 0 && (
-            <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-slate-700">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                <span className="text-xs text-slate-400">OK</span>
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-slate-700/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Activity className="w-8 h-8 text-slate-600" />
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                <span className="text-xs text-slate-400">Varning</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <span className="text-xs text-slate-400">Kritisk</span>
-              </div>
+              <p className="text-slate-400">Ingen mätdata tillgänglig</p>
             </div>
           )}
         </div>
