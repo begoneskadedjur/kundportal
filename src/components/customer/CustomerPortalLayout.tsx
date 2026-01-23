@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react'
 import {
-  BarChart3,
+  Briefcase,
   Home,
   LogOut,
   FileText,
@@ -19,7 +19,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
 
-export type CustomerPortalView = 'dashboard' | 'stations' | 'inspections' | 'statistics' | 'reports' | 'quotes'
+export type CustomerPortalView = 'dashboard' | 'stations' | 'inspections' | 'cases' | 'reports' | 'quotes'
 
 interface NavItem {
   id: CustomerPortalView
@@ -56,12 +56,12 @@ const navItems: NavItem[] = [
     activeBg: 'bg-teal-500/20'
   },
   {
-    id: 'statistics',
-    label: 'Statistik',
-    shortLabel: 'Statistik',
-    icon: BarChart3,
-    activeColor: 'text-purple-400',
-    activeBg: 'bg-purple-500/20'
+    id: 'cases',
+    label: 'Genomförda ärenden',
+    shortLabel: 'Ärenden',
+    icon: Briefcase,
+    activeColor: 'text-cyan-400',
+    activeBg: 'bg-cyan-500/20'
   },
   {
     id: 'reports',

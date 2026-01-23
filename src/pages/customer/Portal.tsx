@@ -19,7 +19,7 @@ import ServiceActivityTimeline from '../../components/customer/ServiceActivityTi
 import ServiceAssessmentSummary from '../../components/customer/ServiceAssessmentSummary'
 import PartnershipValueSection from '../../components/customer/PartnershipValueSection'
 import CustomerPortalLayout, { CustomerPortalView } from '../../components/customer/CustomerPortalLayout'
-import CustomerStatistics from '../../components/customer/CustomerStatistics'
+import CompletedCasesView from '../../components/customer/CompletedCasesView'
 import SanitationReports from './SanitationReports'
 import PendingQuoteNotification from '../../components/customer/PendingQuoteNotification'
 import QuoteListView from '../../components/customer/QuoteListView'
@@ -294,9 +294,14 @@ const CustomerPortal: React.FC = () => {
     ) : null
   )
 
-  // Statistics view component
-  const renderStatisticsView = () => (
-    <CustomerStatistics customer={customer} />
+  // Cases view component (Genomförda ärenden)
+  const renderCasesView = () => (
+    customer ? (
+      <CompletedCasesView
+        customerId={customer.id}
+        companyName={customer.company_name}
+      />
+    ) : null
   )
 
   // Reports view component
@@ -424,7 +429,7 @@ const CustomerPortal: React.FC = () => {
       {currentView === 'dashboard' && renderDashboardView()}
       {currentView === 'stations' && renderStationsView()}
       {currentView === 'inspections' && renderInspectionsView()}
-      {currentView === 'statistics' && renderStatisticsView()}
+      {currentView === 'cases' && renderCasesView()}
       {currentView === 'reports' && renderReportsView()}
       {currentView === 'quotes' && renderQuotesView()}
     </CustomerPortalLayout>
