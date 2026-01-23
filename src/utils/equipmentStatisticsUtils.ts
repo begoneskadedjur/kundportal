@@ -286,3 +286,51 @@ export function filterSessionsByTimePeriod(
     return sessionDate >= cutoffDate
   })
 }
+
+/**
+ * Aggregera statusfördelning per månad (för långsiktig data med 12+ datapunkter)
+ * Returnerar månadsgenomsnitt istället för individuella sessioner
+ */
+export function aggregateStatusByMonth(
+  data: StatusDistributionData[]
+): StatusDistributionData[] {
+  if (data.length === 0) return []
+
+  const monthlyMap = new Map<string, {
+    ok: number
+    warning: number
+    critical: number
+    total: number
+    count: number
+  }>()
+
+  data.forEach(d => {
+    const date = new Date(d.date)
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+
+    if (!monthlyMap.has(monthKey)) {
+      monthlyMap.set(monthKey, { ok: 0, warning: 0, critical: 0, total: 0, count: 0 })
+    }
+    const current = monthlyMap.get(monthKey)!
+    current.ok += d.ok
+    current.warning += d.warning
+    current.critical += d.critical
+    current.total += d.total
+    current.count++
+  })
+
+  // Returnera månadsgenomsnitt, sorterat kronologiskt
+  return Array.from(monthlyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([monthKey, values]) => ({
+      date: monthKey + '-01',
+      dateFormatted: new Date(monthKey + '-01').toLocaleDateString('sv-SE', {
+        month: 'short',
+        year: '2-digit'
+      }),
+      ok: Math.round(values.ok / values.count),
+      warning: Math.round(values.warning / values.count),
+      critical: Math.round(values.critical / values.count),
+      total: Math.round(values.total / values.count)
+    }))
+}

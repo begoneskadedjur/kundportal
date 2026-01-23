@@ -40,6 +40,7 @@ import {
   calculateStationTrends,
   calculateStationKPIs,
   filterSessionsByTimePeriod,
+  aggregateStatusByMonth,
   type TimePeriod,
   type StationTrendData
 } from '../../utils/equipmentStatisticsUtils'
@@ -70,8 +71,8 @@ export function EquipmentStatisticsSection({
       try {
         setLoading(true)
 
-        // Hämta sessioner med sammanfattning
-        const sessionsData = await getCompletedSessionsWithSummary(customerId, 50)
+        // Hämta sessioner med sammanfattning (100 för att stödja 8+ års historik)
+        const sessionsData = await getCompletedSessionsWithSummary(customerId, 100)
         setSessions(sessionsData)
 
         // Hämta alla outdoor-stationer för nummermappning
@@ -129,6 +130,14 @@ export function EquipmentStatisticsSection({
     return calculateStatusDistributionOverTime(filteredSessions)
   }, [filteredSessions])
 
+  // Aggregera per månad om det finns mer än 12 datapunkter (för läsbarhet)
+  const chartData = useMemo(() => {
+    if (statusOverTime.length > 12) {
+      return aggregateStatusByMonth(statusOverTime)
+    }
+    return statusOverTime
+  }, [statusOverTime])
+
   // Beräkna genomsnitt per stationstyp
   const averagesByType = useMemo(() => {
     return calculateAveragesByStationType(latestOutdoorInspections)
@@ -162,7 +171,7 @@ export function EquipmentStatisticsSection({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* KPI-kort */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {/* Totalt antal stationer */}
@@ -228,7 +237,7 @@ export function EquipmentStatisticsSection({
           {statusOverTime.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={statusOverTime}>
+                <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorOk" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8} />
