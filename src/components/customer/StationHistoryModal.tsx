@@ -40,6 +40,7 @@ interface StationHistoryModalProps {
   thresholdCritical: number | null
   thresholdDirection?: 'above' | 'below'
   measurementUnit: string
+  measurementLabel: string | null
 }
 
 interface HistoryDataPoint {
@@ -60,7 +61,8 @@ export function StationHistoryModal({
   thresholdWarning,
   thresholdCritical,
   thresholdDirection = 'above',
-  measurementUnit
+  measurementUnit,
+  measurementLabel
 }: StationHistoryModalProps) {
   const [loading, setLoading] = useState(true)
   const [historyData, setHistoryData] = useState<HistoryDataPoint[]>([])
@@ -230,7 +232,7 @@ export function StationHistoryModal({
               <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-purple-400" />
-                  Mätvärden över tid
+                  {measurementLabel || 'Mätvärden'} över tid
                 </h3>
 
                 <div className="h-64">
@@ -253,15 +255,15 @@ export function StationHistoryModal({
                           borderRadius: '8px',
                           color: '#e2e8f0'
                         }}
-                        formatter={(value: number) => [`${value}${unitLabel}`, 'Mätvärde']}
+                        formatter={(value: number) => [`${value}${unitLabel}`, measurementLabel || 'Mätvärde']}
                       />
                       <Line
                         type="monotone"
                         dataKey="value"
-                        stroke={stationTypeColor}
-                        strokeWidth={2}
-                        dot={{ fill: stationTypeColor, strokeWidth: 0, r: 4 }}
-                        activeDot={{ r: 6, stroke: stationTypeColor, strokeWidth: 2 }}
+                        stroke="#22d3ee"
+                        strokeWidth={3}
+                        dot={{ fill: '#22d3ee', strokeWidth: 0, r: 5 }}
+                        activeDot={{ r: 7, stroke: '#22d3ee', strokeWidth: 2, fill: '#0891b2' }}
                       />
                       {/* Tröskelvärden */}
                       {thresholdWarning !== null && (
@@ -308,7 +310,7 @@ export function StationHistoryModal({
                     <thead className="sticky top-0 bg-slate-800">
                       <tr className="border-b border-slate-700">
                         <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Datum</th>
-                        <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase">Mätvärde</th>
+                        <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase">{measurementLabel || 'Mätvärde'}</th>
                         <th className="text-center px-4 py-3 text-xs font-medium text-slate-400 uppercase">Status</th>
                       </tr>
                     </thead>

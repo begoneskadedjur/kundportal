@@ -528,6 +528,7 @@ export function EquipmentStatisticsSection({
           thresholdCritical={selectedStation.thresholdCritical}
           thresholdDirection={selectedStation.thresholdDirection}
           measurementUnit={selectedStation.measurementUnit}
+          measurementLabel={selectedStation.measurementLabel}
         />
       )}
     </div>

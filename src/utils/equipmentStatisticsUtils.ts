@@ -44,6 +44,7 @@ export interface StationTrendData {
   trendDirection: 'up' | 'down' | 'stable'
   currentStatus: CalculatedStatus
   measurementUnit: string
+  measurementLabel: string | null
   locationType: 'indoor' | 'outdoor'
   floorPlanName?: string
   thresholdWarning: number | null
@@ -198,6 +199,7 @@ export function calculateStationTrends(
       trendDirection,
       currentStatus,
       measurementUnit: stationTypeData?.measurement_unit || 'st',
+      measurementLabel: stationTypeData?.measurement_label ?? null,
       locationType: 'outdoor' as const,
       thresholdWarning: stationTypeData?.threshold_warning ?? null,
       thresholdCritical: stationTypeData?.threshold_critical ?? null,
@@ -257,6 +259,7 @@ export function calculateIndoorStationTrends(
       trendDirection,
       currentStatus,
       measurementUnit: stationTypeData?.measurement_unit || 'st',
+      measurementLabel: stationTypeData?.measurement_label ?? null,
       locationType: 'indoor' as const,
       floorPlanName,
       thresholdWarning: stationTypeData?.threshold_warning ?? null,
