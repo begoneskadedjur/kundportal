@@ -159,7 +159,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
             </Button>
 
             {showFilterDropdown && (
-              <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-10">
+              <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
                 {filterOptions.map(option => (
                   <button
                     key={option.value}
