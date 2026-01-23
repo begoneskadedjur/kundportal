@@ -95,15 +95,9 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
 
             {/* Email */}
             {customer.account_manager_email && (
-              <div className="flex items-center p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
+              <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
                 <span className="text-sm text-slate-400 w-20 flex-shrink-0">E-post</span>
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <a 
-                    href={`mailto:${customer.account_manager_email}`}
-                    className="text-emerald-400 hover:text-emerald-300 transition-colors truncate flex-1 text-right"
-                  >
-                    {customer.account_manager_email}
-                  </a>
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => copyToClipboard(customer.account_manager_email!, 'E-post')}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-700 rounded flex-shrink-0"
@@ -115,6 +109,12 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
                       <Copy className="w-4 h-4 text-slate-400" />
                     )}
                   </button>
+                  <a
+                    href={`mailto:${customer.account_manager_email}`}
+                    className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    {customer.account_manager_email}
+                  </a>
                 </div>
               </div>
             )}
@@ -153,16 +153,9 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
 
           <div className="space-y-3">
             {/* Support Email */}
-            <div className="flex items-center p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
+            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
               <span className="text-sm text-slate-400 w-20 flex-shrink-0">E-post</span>
-              <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                <a 
-                  href="mailto:info@begone.se"
-                  className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 text-right"
-                >
-                  <Mail className="w-3 h-3 flex-shrink-0" />
-                  <span>info@begone.se</span>
-                </a>
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => copyToClipboard('info@begone.se', 'E-post')}
                   className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-700 rounded flex-shrink-0"
@@ -174,6 +167,13 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
                     <Copy className="w-4 h-4 text-slate-400" />
                   )}
                 </button>
+                <a
+                  href="mailto:info@begone.se"
+                  className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                >
+                  <Mail className="w-3 h-3 flex-shrink-0" />
+                  <span>info@begone.se</span>
+                </a>
               </div>
             </div>
 
