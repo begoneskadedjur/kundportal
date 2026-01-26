@@ -298,44 +298,59 @@ export default async function handler(
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
-  // 🧪 FIX v5: Bygg parties som array literal direkt (undvik .push() bug)
-  console.log('🧪 FIX v5 - Building parties as array literal')
-  console.log('🧪 recipient:', JSON.stringify(recipient))
+  // 🔬 DIAGNOSTIK v6: Identifiera varför participants blir tom
+  console.log('🔬 DIAGNOSTIK v6 - Undersöker root cause')
+  console.log('HANDLER VERSION:', '2026-01-26-v6')
 
-  // Bygg parties direkt som array literal - UNDVIK .push()!
+  // Kolla om JSON.stringify är patchad
+  console.log('🔬 JSON.stringify native?', JSON.stringify.toString().includes('[native code]'))
+  console.log('🔬 Object.prototype.toJSON:', (Object.prototype as any).toJSON)
+  console.log('🔬 Array.prototype.toJSON:', (Array.prototype as any).toJSON)
+
+  // Bygg participant som plain object med template literals (som utvecklarna föreslog)
+  const participant = {
+    name: `${recipient.name}`,
+    email: `${recipient.email}`,
+    _permissions: { 'contract:update': !!sendForSigning },
+    signatory: !!sendForSigning,
+    delivery_channel: 'email' as const,
+  }
+
+  // Diagnostik på participant-objektet
+  console.log('🔬 participant ctor:', participant?.constructor?.name)
+  console.log('🔬 Object.keys(participant):', Object.keys(participant))
+  console.log('🔬 Has own "email"?', Object.prototype.hasOwnProperty.call(participant, 'email'))
+  console.log('🔬 email descriptor:', JSON.stringify(Object.getOwnPropertyDescriptor(participant, 'email')))
+  console.log('🔬 name descriptor:', JSON.stringify(Object.getOwnPropertyDescriptor(participant, 'name')))
+  console.log('🔬 JSON.stringify(participant):', JSON.stringify(participant))
+
+  // Bygg parties
   const parties = partyType === 'individual'
     ? [
         {
           type: 'individual' as const,
           country_code: 'SE' as const,
-          participant: {
-            name: String(recipient.name),
-            email: String(recipient.email),
-            _permissions: { 'contract:update': Boolean(sendForSigning) },
-            signatory: Boolean(sendForSigning),
-            delivery_channel: 'email' as const
-          }
+          participant: participant
         }
       ]
     : [
         {
           type: 'company' as const,
           country_code: 'SE' as const,
-          name: String(recipient.company_name),
-          identification_number: String(recipient.organization_number),
-          participants: [
-            {
-              name: String(recipient.name),
-              email: String(recipient.email),
-              _permissions: { 'contract:update': Boolean(sendForSigning) },
-              signatory: Boolean(sendForSigning),
-              delivery_channel: 'email' as const
-            }
-          ]
+          name: `${recipient.company_name}`,
+          identification_number: `${recipient.organization_number}`,
+          participants: [participant]
         }
       ]
 
-  console.log('🧪 Parties efter literal build:', JSON.stringify(parties, null, 2))
+  // Diagnostik på parties efter byggnad
+  const p0 = (parties as any)[0]?.participants?.[0] ?? (parties as any)[0]?.participant
+  console.log('🔬 p0 ctor:', p0?.constructor?.name)
+  console.log('🔬 Object.keys(p0):', Object.keys(p0 || {}))
+  console.log('🔬 p0.name direct:', p0?.name)
+  console.log('🔬 p0.email direct:', p0?.email)
+
+  console.log('🔬 Parties efter build:', JSON.stringify(parties, null, 2))
 
   // Förbered produktgrupper om produkter finns
   let productGroups: any[] = []
