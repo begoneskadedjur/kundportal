@@ -1,6 +1,6 @@
 // src/components/coordinator/PendingRequestsModal.tsx - Modal för väntande förfrågningar
-import React, { useState } from 'react'
-import { X, Calendar, AlertCircle, Clock, Building2, Phone, Mail, User, MapPin } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, Calendar, AlertCircle, Clock, Building2, Phone, Mail, User, MapPin, Image as ImageIcon } from 'lucide-react'
 import { usePendingCases } from '../../hooks/usePendingCases'
 import { Case, serviceTypeConfig, priorityConfig } from '../../types/cases'
 import Button from '../ui/Button'
@@ -8,6 +8,7 @@ import LoadingSpinner from '../shared/LoadingSpinner'
 import Modal from '../ui/Modal'
 import { formatDistanceToNow } from 'date-fns'
 import { sv } from 'date-fns/locale'
+import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
 
 interface PendingRequestsModalProps {
   isOpen: boolean
@@ -22,6 +23,35 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
 }) => {
   const { pendingCases, loading, error, urgentCount, oldRequestsCount, totalCount } = usePendingCases()
   const [expandedCase, setExpandedCase] = useState<string | null>(null)
+  const [caseImages, setCaseImages] = useState<Record<string, CaseImageWithUrl[]>>({})
+  const [loadingImages, setLoadingImages] = useState(false)
+
+  // Hämta bilder för alla väntande ärenden
+  useEffect(() => {
+    const fetchImages = async () => {
+      if (!isOpen || pendingCases.length === 0) return
+
+      setLoadingImages(true)
+      const imagesMap: Record<string, CaseImageWithUrl[]> = {}
+
+      for (const caseItem of pendingCases) {
+        try {
+          // cases-tabellen är för avtalskunder (private)
+          const images = await CaseImageService.getCaseImages(caseItem.id, 'private')
+          if (images.length > 0) {
+            imagesMap[caseItem.id] = images
+          }
+        } catch (err) {
+          // Ignorera fel för enskilda ärenden
+        }
+      }
+
+      setCaseImages(imagesMap)
+      setLoadingImages(false)
+    }
+
+    fetchImages()
+  }, [isOpen, pendingCases])
 
   // Check if a request is old (>24h)
   const isOldRequest = (createdAt: string) => {
@@ -180,6 +210,34 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
                       <p className="text-sm text-slate-300 mb-3 line-clamp-2">
                         {caseItem.description}
                       </p>
+                    )}
+
+                    {/* Bilder från kund */}
+                    {caseImages[caseItem.id]?.length > 0 && (
+                      <div className="mb-3">
+                        <div className="flex items-center gap-1 mb-2">
+                          <ImageIcon className="w-3 h-3 text-slate-500" />
+                          <span className="text-xs text-slate-400">
+                            {caseImages[caseItem.id].length} bild{caseImages[caseItem.id].length > 1 ? 'er' : ''} från kund
+                          </span>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          {caseImages[caseItem.id].slice(0, 4).map((img) => (
+                            <img
+                              key={img.id}
+                              src={img.url}
+                              alt="Kundens bild"
+                              className="w-16 h-16 object-cover rounded-lg border border-slate-700 hover:border-emerald-500 cursor-pointer transition-colors"
+                              onClick={() => window.open(img.url, '_blank')}
+                            />
+                          ))}
+                          {caseImages[caseItem.id].length > 4 && (
+                            <div className="w-16 h-16 bg-slate-700 rounded-lg flex items-center justify-center text-sm text-slate-400">
+                              +{caseImages[caseItem.id].length - 4}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     )}
 
                     {/* Contact & Address Info */}

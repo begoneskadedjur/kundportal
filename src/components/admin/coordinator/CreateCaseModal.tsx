@@ -10,6 +10,7 @@ import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import { useClickUpSync } from '../../../hooks/useClickUpSync';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
+import { CaseImageService, CaseImageWithUrl } from '../../../services/caseImageService';
 import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard';
 
 import Modal from '../../ui/Modal';
@@ -70,6 +71,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [numberOfTechnicians, setNumberOfTechnicians] = useState(1);
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
+  const [existingImages, setExistingImages] = useState<CaseImageWithUrl[]>([]);
 
   // ClickUp sync hook
   const { syncAfterCreate } = useClickUpSync();
@@ -81,6 +83,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setSearchStartDate(new Date()); setNumberOfTechnicians(1); setSelectedTechnicianIds([]);
     setSelectedContractCustomer(null);
     setSelectedSiteId(null);
+    setExistingImages([]);
     // Städa upp bildförhandsvisningar
     setSelectedImages(prev => {
       prev.forEach(img => URL.revokeObjectURL(img.preview));
@@ -226,6 +229,26 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       }
     }
   }, [isOpen, initialCaseData, handleReset]);
+
+  // Hämta befintliga bilder från kund om vi öppnar ett befintligt ärende
+  useEffect(() => {
+    const fetchExistingImages = async () => {
+      if (!isOpen || !initialCaseData?.id) {
+        setExistingImages([]);
+        return;
+      }
+
+      try {
+        // cases-tabellen är för avtalskunder (private)
+        const images = await CaseImageService.getCaseImages(initialCaseData.id, 'private');
+        setExistingImages(images);
+      } catch (err) {
+        console.error('Kunde inte hämta befintliga bilder:', err);
+      }
+    };
+
+    fetchExistingImages();
+  }, [isOpen, initialCaseData?.id]);
 
   // Identifiera och hantera multisite vs vanliga kunder när data är laddad
   useEffect(() => {
@@ -1396,6 +1419,31 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
                         <ImageIcon size={16} className="text-cyan-400" /> Bilder (valfritt)
                       </h4>
+
+                      {/* Visa befintliga bilder från kund */}
+                      {existingImages.length > 0 && (
+                        <div className="mb-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                          <div className="flex items-center gap-2 mb-3">
+                            <ImageIcon size={14} className="text-emerald-400" />
+                            <span className="text-sm text-emerald-400 font-medium">
+                              {existingImages.length} bild{existingImages.length > 1 ? 'er' : ''} från kund
+                            </span>
+                          </div>
+                          <div className="flex gap-2 flex-wrap">
+                            {existingImages.map((img) => (
+                              <img
+                                key={img.id}
+                                src={img.url}
+                                alt="Kundens bild"
+                                className="w-20 h-20 object-cover rounded-lg border border-slate-600 hover:border-emerald-500 cursor-pointer transition-colors"
+                                onClick={() => window.open(img.url, '_blank')}
+                                title="Klicka för att öppna i ny flik"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <p className="text-sm text-slate-400">
                         Lägg till bilder som dokumenterar ärendet. Kategorisera som "Före", "Efter" eller "Övrigt".
                       </p>

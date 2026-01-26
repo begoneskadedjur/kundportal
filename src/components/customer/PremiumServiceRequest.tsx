@@ -1,6 +1,6 @@
 // src/components/customer/PremiumServiceRequest.tsx - Service Request Modal
-import React, { useState } from 'react'
-import { X, AlertCircle, Calendar, MessageSquare, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info } from 'lucide-react'
+import React, { useState, useMemo } from 'react'
+import { X, AlertCircle, Calendar, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Trash2 } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import toast from 'react-hot-toast'
@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
+import { CaseImageService } from '../../services/caseImageService'
 
 // Generate case number for customer cases
 const generateCaseNumber = async (): Promise<string> => {
@@ -135,9 +136,32 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
 
       if (error) throw error
 
+      // Ladda upp bilder om det finns några
+      if (data && files.length > 0) {
+        let uploadedCount = 0
+        for (const file of files) {
+          try {
+            await CaseImageService.uploadCaseImage(
+              data.id,
+              'private', // cases-tabellen är för avtalskunder
+              file,
+              ['general'],
+              undefined,
+              profile?.id
+            )
+            uploadedCount++
+          } catch (uploadError) {
+            console.error('Fel vid bilduppladdning:', uploadError)
+          }
+        }
+        if (uploadedCount > 0) {
+          console.log(`${uploadedCount}/${files.length} bilder uppladdade`)
+        }
+      }
+
       setSubmitting(false)
       setSubmitted(true)
-      
+
       toast.success('Serviceförfrågan skickad!')
       
       // Reset and close after animation
@@ -379,11 +403,41 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Bifoga bilder (valfritt)
               </label>
+
+              {/* Visa valda bilder med preview */}
+              {files.length > 0 && (
+                <div className="mb-3 grid grid-cols-4 gap-2">
+                  {files.map((file, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`Bild ${index + 1}`}
+                        className="w-full h-20 object-cover rounded-lg border border-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFiles(files.filter((_, i) => i !== index))}
+                        className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-3 h-3 text-white" />
+                      </button>
+                      <span className="absolute bottom-1 left-1 text-xs text-white bg-black/60 px-1 rounded">
+                        {(file.size / 1024).toFixed(0)} KB
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="relative">
                 <input
                   type="file"
                   multiple
-                  onChange={handleFileChange}
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setFiles(prev => [...prev, ...Array.from(e.target.files!)])
+                    }
+                  }}
                   className="hidden"
                   id="file-upload"
                   accept="image/*"
@@ -394,8 +448,8 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                 >
                   <Upload className="w-5 h-5 text-slate-400" />
                   <span className="text-slate-400">
-                    {files.length > 0 
-                      ? `${files.length} bild(er) valda` 
+                    {files.length > 0
+                      ? 'Lägg till fler bilder'
                       : 'Klicka för att ladda upp bilder'}
                   </span>
                 </label>
