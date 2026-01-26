@@ -340,8 +340,10 @@ export default async function handler(
 
   const parties: any[] = []
 
-  // 🔧 FIX: Bygg participant INLINE för att undvika runtime-problem med objektreferenser
-  // Tidigare kod med separat `participant`-variabel orsakade tom array `[{}]` i Vercel runtime
+  // 🔧 FIX v3: Bygg participant INLINE för att undvika runtime-problem
+  // CACHE BUST: 2026-01-26 14:30
+  console.log('🚀 INLINE FIX ACTIVE - Building participant directly in parties.push()')
+  console.log('📊 Values being used:', { recipientName, recipientEmail, sendForSigning })
 
   if (partyType === 'individual') {
     // STRUKTUR FÖR PRIVATPERSON - använder 'participant' (singular)
