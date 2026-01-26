@@ -185,7 +185,11 @@ export default function EventLogCard({ maxEntries = 10, title = 'Händelselogg' 
                           <span> • </span>
                         )}
                         {entry.metadata.address && (
-                          <span className="truncate">{entry.metadata.address}</span>
+                          <span className="truncate">
+                            {typeof entry.metadata.address === 'string'
+                              ? entry.metadata.address
+                              : entry.metadata.address.formatted_address || 'Okänd adress'}
+                          </span>
                         )}
                       </div>
                     )}
