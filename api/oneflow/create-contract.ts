@@ -340,50 +340,38 @@ export default async function handler(
 
   const parties: any[] = []
 
-  // 🔧 Build participant object explicitly to ensure all properties are set
-  const participant = {
-    name: recipientName,
-    email: recipientEmail,
-    _permissions: {
-      'contract:update': Boolean(sendForSigning)
-    },
-    signatory: Boolean(sendForSigning),
-    delivery_channel: 'email' as const
-  }
-
-  // 🔍 DEBUG - Log participant object BEFORE adding to parties
-  console.log('🔍 DEBUG - Built participant object:', JSON.stringify(participant, null, 2))
-
-  // Double-check participant has required fields
-  if (!participant.name || !participant.email) {
-    console.error('❌ CRITICAL: Participant missing required fields after construction:', {
-      participantName: participant.name,
-      participantEmail: participant.email,
-      participantNameType: typeof participant.name,
-      participantEmailType: typeof participant.email
-    })
-    return res.status(400).json({
-      error: 'Datafel',
-      message: 'Participant-objekt saknar namn eller email efter konstruktion',
-      debug: { participant, recipientName, recipientEmail }
-    })
-  }
+  // 🔧 FIX: Bygg participant INLINE för att undvika runtime-problem med objektreferenser
+  // Tidigare kod med separat `participant`-variabel orsakade tom array `[{}]` i Vercel runtime
 
   if (partyType === 'individual') {
-    // KORRIGERAD STRUKTUR FÖR PRIVATPERSON ENLIGT DOKUMENTATION
-    // Använder ett 'participant'-objekt (singular).
+    // STRUKTUR FÖR PRIVATPERSON - använder 'participant' (singular)
     parties.push({
       type: 'individual',
-      participant: participant
+      participant: {
+        name: recipientName,
+        email: recipientEmail,
+        _permissions: {
+          'contract:update': Boolean(sendForSigning)
+        },
+        signatory: Boolean(sendForSigning),
+        delivery_channel: 'email'
+      }
     })
   } else {
-    // KORREKT STRUKTUR FÖR FÖRETAG (BEVARAD)
-    // Använder en 'participants'-array (plural).
+    // STRUKTUR FÖR FÖRETAG - använder 'participants' array (plural)
     parties.push({
       type: 'company',
       name: recipientCompanyName,
       identification_number: recipientOrgNumber,
-      participants: [participant]
+      participants: [{
+        name: recipientName,
+        email: recipientEmail,
+        _permissions: {
+          'contract:update': Boolean(sendForSigning)
+        },
+        signatory: Boolean(sendForSigning),
+        delivery_channel: 'email'
+      }]
     })
   }
 
