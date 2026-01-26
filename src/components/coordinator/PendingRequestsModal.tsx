@@ -306,7 +306,7 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
         caseItem={caseToDecline}
         onDeclined={() => {
           setCaseToDecline(null)
-          // Real-time subscription hanterar uppdatering av listan automatiskt
+          onClose() // Stäng väntande förfrågningar-modalen också
         }}
       />
     </Modal>
