@@ -1,6 +1,6 @@
 // src/components/coordinator/PendingRequestsModal.tsx - Modal för väntande förfrågningar
 import React, { useState, useEffect } from 'react'
-import { X, Calendar, AlertCircle, Clock, Building2, Phone, Mail, User, MapPin, Image as ImageIcon } from 'lucide-react'
+import { X, Calendar, AlertCircle, Clock, Building2, Phone, Mail, User, MapPin, Image as ImageIcon, XCircle } from 'lucide-react'
 import { usePendingCases } from '../../hooks/usePendingCases'
 import { Case, serviceTypeConfig, priorityConfig } from '../../types/cases'
 import Button from '../ui/Button'
@@ -9,6 +9,7 @@ import Modal from '../ui/Modal'
 import { formatDistanceToNow } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
+import DeclineCaseConfirmDialog from './DeclineCaseConfirmDialog'
 
 interface PendingRequestsModalProps {
   isOpen: boolean
@@ -25,6 +26,7 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
   const [expandedCase, setExpandedCase] = useState<string | null>(null)
   const [caseImages, setCaseImages] = useState<Record<string, CaseImageWithUrl[]>>({})
   const [loadingImages, setLoadingImages] = useState(false)
+  const [caseToDecline, setCaseToDecline] = useState<Case | null>(null)
 
   // Hämta bilder för alla väntande ärenden
   useEffect(() => {
@@ -269,15 +271,26 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
                       </div>
                     )}
 
-                    {/* Action Button */}
-                    <Button
-                      onClick={() => handleSchedule(caseItem)}
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
-                      size="sm"
-                    >
-                      <Calendar className="w-4 h-4 mr-2" />
-                      Schemalägg
-                    </Button>
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleSchedule(caseItem)}
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
+                        size="sm"
+                      >
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Schemalägg
+                      </Button>
+                      <Button
+                        onClick={() => setCaseToDecline(caseItem)}
+                        variant="outline"
+                        className="text-red-400 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50"
+                        size="sm"
+                      >
+                        <XCircle className="w-4 h-4 mr-1" />
+                        Avvisa
+                      </Button>
+                    </div>
                   </div>
                 )
               })}
@@ -285,6 +298,17 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
           </>
         )}
       </div>
+
+      {/* Avvisa-dialog */}
+      <DeclineCaseConfirmDialog
+        isOpen={!!caseToDecline}
+        onClose={() => setCaseToDecline(null)}
+        caseItem={caseToDecline}
+        onDeclined={() => {
+          setCaseToDecline(null)
+          // Real-time subscription hanterar uppdatering av listan automatiskt
+        }}
+      />
     </Modal>
   )
 }
