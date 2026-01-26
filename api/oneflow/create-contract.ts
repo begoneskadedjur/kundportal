@@ -15,12 +15,12 @@ interface ContractRequestBody {
   sendForSigning: boolean
   partyType: 'company' | 'individual'
   documentType: 'offer' | 'contract'
-  // 🆕 NYTT: Dynamisk användare från frontend
+  // NYTT: Dynamisk användare från frontend
   senderEmail?: string
   senderName?: string
-  // 🆕 NYTT: Case ID för koppling
+  // NYTT: Case ID för koppling
   caseId?: string
-  // 🆕 NYTT: Produkter
+  // NYTT: Produkter
   selectedProducts?: Array<{
     product: {
       id: string
@@ -47,7 +47,7 @@ interface ContractRequestBody {
   }>
 }
 
-// 🆕 FÄLTMAPPNING FÖR OLIKA DOKUMENTTYPER
+// FÄLTMAPPNING FÖR OLIKA DOKUMENTTYPER
 const FIELD_MAPPING = {
   // Avtal → Offert mappning
   contract_to_offer: {
@@ -66,7 +66,7 @@ const FIELD_MAPPING = {
   }
 }
 
-// 🆕 BYGG DATAFÄLT BASERAT PÅ DOKUMENTTYP
+// BYGG DATAFÄLT BASERAT PÅ DOKUMENTTYP
 function buildDataFieldsForDocument(
   contractData: Record<string, string>, 
   documentType: 'offer' | 'contract',
@@ -108,7 +108,7 @@ function buildDataFieldsForDocument(
 }
 
 
-// 🆕 KONVERTERA PRODUKTER TILL ONEFLOW-FORMAT
+// KONVERTERA PRODUKTER TILL ONEFLOW-FORMAT
 function convertProductsToOneflow(
   selectedProducts: ContractRequestBody['selectedProducts'],
   partyType: 'company' | 'individual'
@@ -118,14 +118,6 @@ function convertProductsToOneflow(
   price_1: {
     base_amount: { amount: string }
     discount_amount: { amount: string }
-    amount: { amount: string }
-    discount_percent: string
-  }
-  price_2: {
-    base_amount: { amount: string }
-    discount_amount: { amount: string }
-    amount: { amount: string }
-    discount_percent: string
   }
   quantity: {
     type: string
@@ -172,11 +164,9 @@ function convertProductsToOneflow(
         oneflowQuantityType = 'multiple_choice'
       }
       
-      // Sätt korrekt prisstruktur för Oneflow - KORREKT PRISFORMAT
-      const finalPriceString = Math.round(basePrice).toString() // Slutpris efter rabatt i SEK
+      const finalPriceString = Math.round(basePrice).toString()
       const discountAmountString = discountAmount > 0 ? Math.round(discountAmount).toString() : "0"
-      const discountPercentString = (pricing?.discountPercent || 0).toString()
-      
+
       return {
         name: product.name,
         description: product.description,
@@ -184,20 +174,16 @@ function convertProductsToOneflow(
           base_amount: { amount: finalPriceString },
           discount_amount: { amount: discountAmountString }
         },
-        price_2: {
-          base_amount: { amount: finalPriceString },
-          discount_amount: { amount: discountAmountString }
-        },
         quantity: {
           type: oneflowQuantityType,
           amount: quantity
         },
-        counterparty_lock: false // Kunderna kan inte redigera produkter
+        counterparty_lock: false
       }
     })
 }
 
-// 🆕 VALIDERA ANVÄNDARRÄTTIGHETER
+// VALIDERA ANVÄNDARRÄTTIGHETER
 async function validateUserPermissions(senderEmail: string) {
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL!,
@@ -259,15 +245,11 @@ export default async function handler(
     caseId
   } = req.body as ContractRequestBody
 
-  // 📋 Logga mottagen recipient för debugging
-  console.log('📋 Mottagen recipient:', JSON.stringify(recipient, null, 2))
-
-  // 🆕 VALIDERA ANVÄNDAREN FÖRST
+  // Validera användaren
   let validatedUser
   try {
     if (senderEmail) {
       validatedUser = await validateUserPermissions(senderEmail)
-      console.log(`✅ Användare validerad: ${validatedUser.displayName} (${senderEmail})`)
     }
   } catch (validationError: any) {
     console.error('❌ Användarvalidering misslyckades:', validationError.message)
@@ -292,75 +274,43 @@ export default async function handler(
   }
 
   const documentTypeText = documentType === 'offer' ? 'offert' : 'kontrakt'
-  console.log(`🔧 Skapar ${documentTypeText} från: info@begone.se`)
-  console.log(`👤 Skapad av: ${creatorName} (${creatorEmail})`)
+  console.log(`Skapar ${documentTypeText} för ${recipient.name} (${recipient.email})`)
 
-  // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
-  // 🔧 FIX v7: Tvinga deep clone genom JSON round-trip
-  console.log('🚀 FIX v7 ACTIVE - Force deep clone via JSON round-trip')
-  console.log('HANDLER VERSION:', '2026-01-26-v7')
-
-  // Bygg participant data som plain objekt
+  // Bygg participant-objekt
   const participantData = {
-    name: String(recipient.name),
-    email: String(recipient.email),
+    name: recipient.name,
+    email: recipient.email,
     _permissions: { 'contract:update': !!sendForSigning },
     signatory: !!sendForSigning,
     delivery_channel: 'email'
   }
 
-  console.log('📊 participantData before clone:', JSON.stringify(participantData))
-
-  // Bygg parties-struktur
-  let partiesRaw: any[]
-  if (partyType === 'individual') {
-    partiesRaw = [{
-      type: 'individual',
-      country_code: 'SE',
-      participant: participantData
-    }]
-  } else {
-    partiesRaw = [{
-      type: 'company',
-      country_code: 'SE',
-      name: String(recipient.company_name),
-      identification_number: String(recipient.organization_number),
-      participants: [participantData]
-    }]
-  }
-
-  console.log('📊 partiesRaw before clone:', JSON.stringify(partiesRaw))
-
-  // 🔧 KRITISK FIX: Tvinga deep clone via JSON round-trip
-  const partiesCloned = JSON.parse(JSON.stringify(partiesRaw))
-
-  console.log('📊 partiesCloned after clone:', JSON.stringify(partiesCloned))
-
-  // Verifiera att data finns
-  const clonedParticipant = partiesCloned[0]?.participants?.[0] ?? partiesCloned[0]?.participant
-  console.log('🔬 clonedParticipant.name:', clonedParticipant?.name)
-  console.log('🔬 clonedParticipant.email:', clonedParticipant?.email)
-
-  // Använd den klonade versionen
-  const parties = partiesCloned
+  // Bygg parties-struktur baserat på kundtyp
+  const parties = partyType === 'individual'
+    ? [{
+        type: 'individual',
+        country_code: 'SE',
+        participant: participantData
+      }]
+    : [{
+        type: 'company',
+        country_code: 'SE',
+        name: recipient.company_name,
+        identification_number: recipient.organization_number,
+        participants: [participantData]
+      }]
 
   // Förbered produktgrupper om produkter finns
   let productGroups: any[] = []
   if (selectedProducts && selectedProducts.length > 0) {
-    console.log(`🛒 Förbereder ${selectedProducts.length} produkter för kontraktet...`)
-    
     const oneflowProducts = convertProductsToOneflow(selectedProducts, partyType)
-    
     if (oneflowProducts.length > 0) {
       productGroups = [{
         products: oneflowProducts,
-        configuration: {
-          hide_price_summation: false
-        }
+        configuration: { hide_price_summation: false }
       }]
-      console.log(`✅ ${oneflowProducts.length} produkter förberedda för skapande`)
     }
   }
 
@@ -371,12 +321,9 @@ export default async function handler(
     parties
   }
 
-  // Lägg till produktgrupper om vi har några
   if (productGroups.length > 0) {
     createPayload.product_groups = productGroups
   }
-
-  console.log('Skickar följande create payload till Oneflow:', JSON.stringify(createPayload, null, 2))
 
   try {
     const createResponse = await fetch(
@@ -386,7 +333,7 @@ export default async function handler(
         headers: {
           'Content-Type': 'application/json',
           'x-oneflow-api-token': token,
-          'x-oneflow-user-email': userEmail, // 🆕 ANVÄND DYNAMISK EMAIL
+          'x-oneflow-user-email': userEmail, // ANVÄND DYNAMISK EMAIL
           Accept: 'application/json',
         },
         body: JSON.stringify(createPayload),
@@ -400,12 +347,10 @@ export default async function handler(
       return res.status(createResponse.status).json(createdContract)
     }
 
-    console.log(`✅ ${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} skapat framgångsrikt:`, createdContract.id)
+    console.log(`${documentTypeText} skapat:`, createdContract.id)
 
     if (sendForSigning) {
-      console.log('🚀 Publicerar kontrakt för signering...')
-      
-      // 🆕 PERSONALISERAT MEDDELANDE BASERAT PÅ DOKUMENTTYP
+      // Personaliserat meddelande baserat på dokumenttyp
       const isOffer = documentType === 'offer'
       const publishPayload = {
         subject: `${isOffer ? 'Offert' : 'Avtal'} från BeGone Skadedjur & Sanering AB`,
@@ -419,7 +364,7 @@ export default async function handler(
           headers: {
             'Content-Type': 'application/json',
             'x-oneflow-api-token': token,
-            'x-oneflow-user-email': userEmail, // 🆕 ANVÄND DYNAMISK EMAIL
+            'x-oneflow-user-email': userEmail,
             Accept: 'application/json',
           },
           body: JSON.stringify(publishPayload),
@@ -428,16 +373,15 @@ export default async function handler(
 
       if (!publishResponse.ok) {
         const publishError = await publishResponse.json()
-        console.error(`⚠️ ${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} skapat men kunde inte publiceras:`, JSON.stringify(publishError, null, 2))
-        
-        return res.status(200).json({ 
+        console.error(`${documentTypeText} skapat men kunde inte publiceras:`, publishError)
+        return res.status(200).json({
           contract: createdContract,
-          warning: `${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} skapat men kunde inte skickas ${isOffer ? 'för granskning' : 'för signering'} automatiskt`,
-          publishError: publishError
+          warning: `${documentTypeText} skapat men kunde inte skickas automatiskt`,
+          publishError
         })
       }
 
-      console.log(`✅ ${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} publicerat och skickat för ${isOffer ? 'granskning' : 'signering'}`)
+      console.log(`${documentTypeText} publicerat för ${isOffer ? 'granskning' : 'signering'}`)
     }
 
     // Spara creator info i databasen
@@ -456,9 +400,7 @@ export default async function handler(
     // Lägg till source_id och source_type om caseId finns
     if (caseId) {
       updateData.source_id = caseId
-      // Bestäm source_type baserat på case-typ (kan utökas med mer logik senare)
-      updateData.source_type = 'legacy_case' // Använd legacy_case för cases-tabellen
-      console.log(`🔗 Kopplar offert till ärende: ${caseId}`)
+      updateData.source_type = 'legacy_case'
     }
     
     const { error: updateError } = await supabase
@@ -467,85 +409,50 @@ export default async function handler(
       .eq('oneflow_contract_id', createdContract.id)
     
     if (updateError) {
-      console.error('⚠️ Kunde inte uppdatera creator info:', updateError)
-    } else {
-      console.log('✅ Creator info sparad i databasen')
+      console.error('Kunde inte uppdatera creator info:', updateError)
     }
-    
-    // Deklarera customerId i rätt scope
+
+    // Identifiera och koppla kund för offerten
     let customerId = null
-    
-    // NYTT: Identifiera och koppla kund för offerten
     if (documentType === 'offer' || documentType === 'contract') {
-      
-      console.log('🔍 Söker efter befintlig kund för:', {
-        company: recipient.company_name,
-        email: recipient.email,
-        org: recipient.organization_number
-      })
-      
-      // Sök efter befintlig kund
-      // 1. Baserat på organisationsnummer
+      // Sök efter befintlig kund - prioritet: org.nr > email > företagsnamn
       if (recipient.organization_number) {
         const { data: customerByOrg } = await supabase
           .from('customers')
           .select('id')
           .eq('organization_number', recipient.organization_number)
           .single()
-        
-        if (customerByOrg) {
-          customerId = customerByOrg.id
-          console.log('✅ Kund hittad via org.nr:', customerId)
-        }
+        if (customerByOrg) customerId = customerByOrg.id
       }
-      
-      // 2. Om inte hittat, sök på email
+
       if (!customerId && recipient.email) {
         const { data: customerByEmail } = await supabase
           .from('customers')
           .select('id')
           .eq('contact_email', recipient.email)
           .single()
-        
-        if (customerByEmail) {
-          customerId = customerByEmail.id
-          console.log('✅ Kund hittad via email:', customerId)
-        }
+        if (customerByEmail) customerId = customerByEmail.id
       }
-      
-      // 3. Om inte hittat, sök på företagsnamn
+
       if (!customerId && recipient.company_name) {
         const { data: customerByName } = await supabase
           .from('customers')
           .select('id')
           .eq('company_name', recipient.company_name)
           .single()
-        
-        if (customerByName) {
-          customerId = customerByName.id
-          console.log('✅ Kund hittad via företagsnamn:', customerId)
-        }
+        if (customerByName) customerId = customerByName.id
       }
-      
-      // Uppdatera kontraktet med customer_id
+
+      // Koppla kund till kontraktet om hittad
       if (customerId) {
         const { error: customerLinkError } = await supabase
           .from('contracts')
-          .update({ 
-            customer_id: customerId,
-            updated_at: new Date().toISOString()
-          })
+          .update({ customer_id: customerId, updated_at: new Date().toISOString() })
           .eq('oneflow_contract_id', createdContract.id)
-        
+
         if (customerLinkError) {
-          console.error('⚠️ Kunde inte koppla kund:', customerLinkError)
-        } else {
-          console.log('✅ Offert/avtal kopplat till kund:', customerId)
+          console.error('Kunde inte koppla kund:', customerLinkError)
         }
-      } else {
-        console.log('⚠️ Ingen befintlig kund hittades för:', recipient.company_name)
-        // För offerter: Vi skapar INTE ny kund här
-        // Kund skapas endast när avtal signeras (i webhook.ts)
       }
     }
     
