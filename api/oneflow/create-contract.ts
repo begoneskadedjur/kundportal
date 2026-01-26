@@ -298,63 +298,44 @@ export default async function handler(
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
-  // 🧪 TEST: Hårdkodad parties för att verifiera att API:t fungerar
-  // Ta bort detta efter test!
-  const testName = recipient.name
-  const testEmail = recipient.email
-  const testCompany = recipient.company_name
-  const testOrgNr = recipient.organization_number
+  // 🧪 FIX v5: Bygg parties som array literal direkt (undvik .push() bug)
+  console.log('🧪 FIX v5 - Building parties as array literal')
+  console.log('🧪 recipient:', JSON.stringify(recipient))
 
-  console.log('🧪 TEST VARIABLER:', { testName, testEmail, testCompany, testOrgNr })
-  console.log('🧪 RECIPIENT DIREKT:', recipient)
-  console.log('🧪 typeof recipient:', typeof recipient)
-  console.log('🧪 recipient.name direkt:', recipient.name)
-  console.log('🧪 JSON recipient:', JSON.stringify(recipient))
+  // Bygg parties direkt som array literal - UNDVIK .push()!
+  const parties = partyType === 'individual'
+    ? [
+        {
+          type: 'individual' as const,
+          country_code: 'SE' as const,
+          participant: {
+            name: String(recipient.name),
+            email: String(recipient.email),
+            _permissions: { 'contract:update': Boolean(sendForSigning) },
+            signatory: Boolean(sendForSigning),
+            delivery_channel: 'email' as const
+          }
+        }
+      ]
+    : [
+        {
+          type: 'company' as const,
+          country_code: 'SE' as const,
+          name: String(recipient.company_name),
+          identification_number: String(recipient.organization_number),
+          participants: [
+            {
+              name: String(recipient.name),
+              email: String(recipient.email),
+              _permissions: { 'contract:update': Boolean(sendForSigning) },
+              signatory: Boolean(sendForSigning),
+              delivery_channel: 'email' as const
+            }
+          ]
+        }
+      ]
 
-  const parties = []
-
-  if (partyType === 'individual') {
-    parties.push({
-      type: 'individual',
-      country_code: 'SE',
-      participant: {
-        name: testName,
-        email: testEmail,
-        _permissions: {
-          'contract:update': sendForSigning
-        },
-        signatory: sendForSigning,
-        delivery_channel: 'email'
-      }
-    })
-  } else {
-    // 🧪 HÅRDKODAD TEST - använd exakt samma struktur som dokumentationen
-    const participantObject = {
-      name: testName,
-      email: testEmail,
-      _permissions: {
-        'contract:update': sendForSigning
-      },
-      signatory: sendForSigning,
-      delivery_channel: 'email'
-    }
-
-    console.log('🧪 participantObject före push:', JSON.stringify(participantObject))
-
-    const partyObject = {
-      type: 'company',
-      country_code: 'SE',
-      name: testCompany,
-      identification_number: testOrgNr,
-      participants: [participantObject]
-    }
-
-    console.log('🧪 partyObject före push:', JSON.stringify(partyObject))
-
-    parties.push(partyObject)
-  }
-
-  console.log('Parties struktur:', JSON.stringify(parties, null, 2))
+  console.log('🧪 Parties efter literal build:', JSON.stringify(parties, null, 2))
 
   // Förbered produktgrupper om produkter finns
   let productGroups: any[] = []
