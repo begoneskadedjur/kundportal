@@ -317,7 +317,7 @@ export default async function handler(
     })
   }
 
-  const parties = []
+  const parties: any[] = []
 
   if (partyType === 'individual') {
     // KORRIGERAD STRUKTUR FÖR PRIVATPERSON ENLIGT DOKUMENTATION
