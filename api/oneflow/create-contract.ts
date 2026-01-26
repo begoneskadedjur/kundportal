@@ -298,59 +298,53 @@ export default async function handler(
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
-  // 🔬 DIAGNOSTIK v6: Identifiera varför participants blir tom
-  console.log('🔬 DIAGNOSTIK v6 - Undersöker root cause')
-  console.log('HANDLER VERSION:', '2026-01-26-v6')
+  // 🔧 FIX v7: Tvinga deep clone genom JSON round-trip
+  console.log('🚀 FIX v7 ACTIVE - Force deep clone via JSON round-trip')
+  console.log('HANDLER VERSION:', '2026-01-26-v7')
 
-  // Kolla om JSON.stringify är patchad
-  console.log('🔬 JSON.stringify native?', JSON.stringify.toString().includes('[native code]'))
-  console.log('🔬 Object.prototype.toJSON:', (Object.prototype as any).toJSON)
-  console.log('🔬 Array.prototype.toJSON:', (Array.prototype as any).toJSON)
-
-  // Bygg participant som plain object med template literals (som utvecklarna föreslog)
-  const participant = {
-    name: `${recipient.name}`,
-    email: `${recipient.email}`,
+  // Bygg participant data som plain objekt
+  const participantData = {
+    name: String(recipient.name),
+    email: String(recipient.email),
     _permissions: { 'contract:update': !!sendForSigning },
     signatory: !!sendForSigning,
-    delivery_channel: 'email' as const,
+    delivery_channel: 'email'
   }
 
-  // Diagnostik på participant-objektet
-  console.log('🔬 participant ctor:', participant?.constructor?.name)
-  console.log('🔬 Object.keys(participant):', Object.keys(participant))
-  console.log('🔬 Has own "email"?', Object.prototype.hasOwnProperty.call(participant, 'email'))
-  console.log('🔬 email descriptor:', JSON.stringify(Object.getOwnPropertyDescriptor(participant, 'email')))
-  console.log('🔬 name descriptor:', JSON.stringify(Object.getOwnPropertyDescriptor(participant, 'name')))
-  console.log('🔬 JSON.stringify(participant):', JSON.stringify(participant))
+  console.log('📊 participantData before clone:', JSON.stringify(participantData))
 
-  // Bygg parties
-  const parties = partyType === 'individual'
-    ? [
-        {
-          type: 'individual' as const,
-          country_code: 'SE' as const,
-          participant: participant
-        }
-      ]
-    : [
-        {
-          type: 'company' as const,
-          country_code: 'SE' as const,
-          name: `${recipient.company_name}`,
-          identification_number: `${recipient.organization_number}`,
-          participants: [participant]
-        }
-      ]
+  // Bygg parties-struktur
+  let partiesRaw: any[]
+  if (partyType === 'individual') {
+    partiesRaw = [{
+      type: 'individual',
+      country_code: 'SE',
+      participant: participantData
+    }]
+  } else {
+    partiesRaw = [{
+      type: 'company',
+      country_code: 'SE',
+      name: String(recipient.company_name),
+      identification_number: String(recipient.organization_number),
+      participants: [participantData]
+    }]
+  }
 
-  // Diagnostik på parties efter byggnad
-  const p0 = (parties as any)[0]?.participants?.[0] ?? (parties as any)[0]?.participant
-  console.log('🔬 p0 ctor:', p0?.constructor?.name)
-  console.log('🔬 Object.keys(p0):', Object.keys(p0 || {}))
-  console.log('🔬 p0.name direct:', p0?.name)
-  console.log('🔬 p0.email direct:', p0?.email)
+  console.log('📊 partiesRaw before clone:', JSON.stringify(partiesRaw))
 
-  console.log('🔬 Parties efter build:', JSON.stringify(parties, null, 2))
+  // 🔧 KRITISK FIX: Tvinga deep clone via JSON round-trip
+  const partiesCloned = JSON.parse(JSON.stringify(partiesRaw))
+
+  console.log('📊 partiesCloned after clone:', JSON.stringify(partiesCloned))
+
+  // Verifiera att data finns
+  const clonedParticipant = partiesCloned[0]?.participants?.[0] ?? partiesCloned[0]?.participant
+  console.log('🔬 clonedParticipant.name:', clonedParticipant?.name)
+  console.log('🔬 clonedParticipant.email:', clonedParticipant?.email)
+
+  // Använd den klonade versionen
+  const parties = partiesCloned
 
   // Förbered produktgrupper om produkter finns
   let productGroups: any[] = []
