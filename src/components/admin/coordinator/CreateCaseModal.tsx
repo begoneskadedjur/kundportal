@@ -223,12 +223,26 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       setNumberOfTechnicians(assignedCount > 0 ? assignedCount : 1);
     } else if (isOpen) {
       handleReset();
-      if (technicians.length > 0) {
-        const defaultSelectedTechnicians = technicians.filter(tech => tech.role === 'Skadedjurstekniker');
-        setSelectedTechnicianIds(defaultSelectedTechnicians.map(t => t.id));
-      }
     }
   }, [isOpen, initialCaseData, handleReset]);
+
+  // Separat useEffect för tekniker-förval - hanterar timing-problem med asynkron laddning
+  useEffect(() => {
+    // Endast förvälja om modalen är öppen, tekniker finns, och inga redan är valda
+    if (!isOpen || technicians.length === 0 || selectedTechnicianIds.length > 0) {
+      return;
+    }
+
+    // Kontrollera om det finns tilldelade tekniker i initialCaseData
+    const hasTechniciansInData = initialCaseData?.primary_assignee_id ||
+                                  (initialCaseData as any)?.primary_technician_id;
+
+    // Om inga tekniker är tilldelade, förvälja Skadedjurstekniker
+    if (!hasTechniciansInData) {
+      const defaultSelectedTechnicians = technicians.filter(tech => tech.role === 'Skadedjurstekniker');
+      setSelectedTechnicianIds(defaultSelectedTechnicians.map(t => t.id));
+    }
+  }, [isOpen, technicians, selectedTechnicianIds.length, initialCaseData]);
 
   // Hämta befintliga bilder från kund om vi öppnar ett befintligt ärende
   useEffect(() => {
