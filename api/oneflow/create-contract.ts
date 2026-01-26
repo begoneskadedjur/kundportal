@@ -340,43 +340,50 @@ export default async function handler(
 
   const parties: any[] = []
 
-  // 🔧 FIX v3: Bygg participant INLINE för att undvika runtime-problem
-  // CACHE BUST: 2026-01-26 14:30
-  console.log('🚀 INLINE FIX ACTIVE - Building participant directly in parties.push()')
-  console.log('📊 Values being used:', { recipientName, recipientEmail, sendForSigning })
+  // 🔧 FIX v4: Bygg participant med Object.assign för att tvinga värdekopiering
+  console.log('🚀 FIX v4 ACTIVE - Using Object.assign for participant')
+  console.log('📊 Raw values:', { recipientName, recipientEmail, sendForSigning })
 
   if (partyType === 'individual') {
     // STRUKTUR FÖR PRIVATPERSON - använder 'participant' (singular)
-    parties.push({
-      type: 'individual',
-      country_code: 'SE',
-      participant: {
-        name: recipientName,
-        email: recipientEmail,
-        _permissions: {
-          'contract:update': Boolean(sendForSigning)
-        },
-        signatory: Boolean(sendForSigning),
-        delivery_channel: 'email'
-      }
+    const participantObj = Object.assign({}, {
+      'name': '' + recipientName,
+      'email': '' + recipientEmail,
+      '_permissions': { 'contract:update': sendForSigning === true },
+      'signatory': sendForSigning === true,
+      'delivery_channel': 'email'
     })
+
+    console.log('🔍 DEBUG participantObj (individual):', JSON.stringify(participantObj))
+
+    const partyObj = Object.assign({}, {
+      'type': 'individual',
+      'country_code': 'SE',
+      'participant': participantObj
+    })
+
+    parties.push(partyObj)
   } else {
     // STRUKTUR FÖR FÖRETAG - använder 'participants' array (plural)
-    parties.push({
-      type: 'company',
-      country_code: 'SE',
-      name: recipientCompanyName,
-      identification_number: recipientOrgNumber,
-      participants: [{
-        name: recipientName,
-        email: recipientEmail,
-        _permissions: {
-          'contract:update': Boolean(sendForSigning)
-        },
-        signatory: Boolean(sendForSigning),
-        delivery_channel: 'email'
-      }]
+    const participantObj = Object.assign({}, {
+      'name': '' + recipientName,
+      'email': '' + recipientEmail,
+      '_permissions': { 'contract:update': sendForSigning === true },
+      'signatory': sendForSigning === true,
+      'delivery_channel': 'email'
     })
+
+    console.log('🔍 DEBUG participantObj (company):', JSON.stringify(participantObj))
+
+    const partyObj = Object.assign({}, {
+      'type': 'company',
+      'country_code': 'SE',
+      'name': '' + recipientCompanyName,
+      'identification_number': '' + recipientOrgNumber,
+      'participants': [participantObj]
+    })
+
+    parties.push(partyObj)
   }
 
   // 🔍 DEBUG - Logga parties direkt efter att de byggts
