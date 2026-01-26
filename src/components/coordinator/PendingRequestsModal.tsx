@@ -10,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
 import DeclineCaseConfirmDialog from './DeclineCaseConfirmDialog'
+import ImageLightbox from '../shared/ImageLightbox'
 
 interface PendingRequestsModalProps {
   isOpen: boolean
@@ -27,6 +28,15 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
   const [caseImages, setCaseImages] = useState<Record<string, CaseImageWithUrl[]>>({})
   const [loadingImages, setLoadingImages] = useState(false)
   const [caseToDecline, setCaseToDecline] = useState<Case | null>(null)
+  const [lightboxImages, setLightboxImages] = useState<{ url: string; alt?: string }[]>([])
+  const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+
+  const openLightbox = (images: CaseImageWithUrl[], index: number) => {
+    setLightboxImages(images.map(img => ({ url: img.url, alt: 'Kundens bild' })))
+    setLightboxIndex(index)
+    setLightboxOpen(true)
+  }
 
   // Hämta bilder för alla väntande ärenden
   useEffect(() => {
@@ -224,19 +234,22 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
                           </span>
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                          {caseImages[caseItem.id].slice(0, 4).map((img) => (
+                          {caseImages[caseItem.id].slice(0, 4).map((img, imgIndex) => (
                             <img
                               key={img.id}
                               src={img.url}
                               alt="Kundens bild"
                               className="w-16 h-16 object-cover rounded-lg border border-slate-700 hover:border-emerald-500 cursor-pointer transition-colors"
-                              onClick={() => window.open(img.url, '_blank')}
+                              onClick={() => openLightbox(caseImages[caseItem.id], imgIndex)}
                             />
                           ))}
                           {caseImages[caseItem.id].length > 4 && (
-                            <div className="w-16 h-16 bg-slate-700 rounded-lg flex items-center justify-center text-sm text-slate-400">
+                            <button
+                              onClick={() => openLightbox(caseImages[caseItem.id], 4)}
+                              className="w-16 h-16 bg-slate-700 rounded-lg flex items-center justify-center text-sm text-slate-400 hover:bg-slate-600 transition-colors cursor-pointer"
+                            >
                               +{caseImages[caseItem.id].length - 4}
-                            </div>
+                            </button>
                           )}
                         </div>
                       </div>
@@ -308,6 +321,14 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
           setCaseToDecline(null)
           onClose() // Stäng väntande förfrågningar-modalen också
         }}
+      />
+
+      {/* Bildvisare/Lightbox */}
+      <ImageLightbox
+        images={lightboxImages}
+        initialIndex={lightboxIndex}
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
       />
     </Modal>
   )
