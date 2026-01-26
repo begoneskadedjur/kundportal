@@ -298,17 +298,28 @@ export default async function handler(
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
+  // 🧪 TEST: Hårdkodad parties för att verifiera att API:t fungerar
+  // Ta bort detta efter test!
+  const testName = recipient.name
+  const testEmail = recipient.email
+  const testCompany = recipient.company_name
+  const testOrgNr = recipient.organization_number
+
+  console.log('🧪 TEST VARIABLER:', { testName, testEmail, testCompany, testOrgNr })
+  console.log('🧪 RECIPIENT DIREKT:', recipient)
+  console.log('🧪 typeof recipient:', typeof recipient)
+  console.log('🧪 recipient.name direkt:', recipient.name)
+  console.log('🧪 JSON recipient:', JSON.stringify(recipient))
+
   const parties = []
 
   if (partyType === 'individual') {
-    // KORRIGERAD STRUKTUR FÖR PRIVATPERSON ENLIGT DOKUMENTATION
-    // Använder ett 'participant'-objekt (singular).
     parties.push({
       type: 'individual',
       country_code: 'SE',
       participant: {
-        name: recipient.name,
-        email: recipient.email,
+        name: testName,
+        email: testEmail,
         _permissions: {
           'contract:update': sendForSigning
         },
@@ -317,25 +328,30 @@ export default async function handler(
       }
     })
   } else {
-    // KORREKT STRUKTUR FÖR FÖRETAG (BEVARAD)
-    // Använder en 'participants'-array (plural).
-    parties.push({
+    // 🧪 HÅRDKODAD TEST - använd exakt samma struktur som dokumentationen
+    const participantObject = {
+      name: testName,
+      email: testEmail,
+      _permissions: {
+        'contract:update': sendForSigning
+      },
+      signatory: sendForSigning,
+      delivery_channel: 'email'
+    }
+
+    console.log('🧪 participantObject före push:', JSON.stringify(participantObject))
+
+    const partyObject = {
       type: 'company',
       country_code: 'SE',
-      name: recipient.company_name,
-      identification_number: recipient.organization_number,
-      participants: [
-        {
-          name: recipient.name,
-          email: recipient.email,
-          _permissions: {
-            'contract:update': sendForSigning
-          },
-          signatory: sendForSigning,
-          delivery_channel: 'email'
-        }
-      ]
-    })
+      name: testCompany,
+      identification_number: testOrgNr,
+      participants: [participantObject]
+    }
+
+    console.log('🧪 partyObject före push:', JSON.stringify(partyObject))
+
+    parties.push(partyObject)
   }
 
   console.log('Parties struktur:', JSON.stringify(parties, null, 2))
