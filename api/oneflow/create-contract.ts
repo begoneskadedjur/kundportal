@@ -355,6 +355,9 @@ export default async function handler(
     })
   }
 
+  // 🔍 DEBUG - Logga parties direkt efter att de byggts
+  console.log('🔍 DEBUG - parties efter push:', JSON.stringify(parties, null, 2))
+
   // Förbered produktgrupper om produkter finns
   let productGroups: any[] = []
   if (selectedProducts && selectedProducts.length > 0) {
