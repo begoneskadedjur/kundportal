@@ -298,11 +298,32 @@ export default async function handler(
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
-  // 🔧 Fallback: Om recipient.name/email är tomma, hämta från contractData
-  const recipientName = recipient?.name || contractData?.Kontaktperson || ''
-  const recipientEmail = recipient?.email || contractData?.['e-post-kontaktperson'] || ''
-  const recipientCompanyName = recipient?.company_name || contractData?.foretag || ''
-  const recipientOrgNumber = recipient?.organization_number || contractData?.['org-nr'] || ''
+  // 🔧 Explicit type coercion to ensure values are strings (fixes empty participant bug)
+  const recipientName = String(recipient?.name || contractData?.Kontaktperson || '').trim()
+  const recipientEmail = String(recipient?.email || contractData?.['e-post-kontaktperson'] || '').trim()
+  const recipientCompanyName = String(recipient?.company_name || contractData?.foretag || '').trim()
+  const recipientOrgNumber = String(recipient?.organization_number || contractData?.['org-nr'] || '').trim()
+
+  // Enhanced debug logging to catch empty values
+  console.log('🔍 DEBUG - Extracted recipient values:', JSON.stringify({
+    recipientName,
+    recipientEmail,
+    recipientCompanyName,
+    recipientOrgNumber,
+    types: {
+      name: typeof recipientName,
+      email: typeof recipientEmail
+    },
+    lengths: {
+      name: recipientName.length,
+      email: recipientEmail.length
+    },
+    rawRecipient: recipient,
+    rawContractData: {
+      Kontaktperson: contractData?.Kontaktperson,
+      'e-post-kontaktperson': contractData?.['e-post-kontaktperson']
+    }
+  }, null, 2))
 
   console.log('👤 Recipient namn:', recipientName)
   console.log('📧 Recipient email:', recipientEmail)
@@ -319,20 +340,41 @@ export default async function handler(
 
   const parties: any[] = []
 
+  // 🔧 Build participant object explicitly to ensure all properties are set
+  const participant = {
+    name: recipientName,
+    email: recipientEmail,
+    _permissions: {
+      'contract:update': Boolean(sendForSigning)
+    },
+    signatory: Boolean(sendForSigning),
+    delivery_channel: 'email' as const
+  }
+
+  // 🔍 DEBUG - Log participant object BEFORE adding to parties
+  console.log('🔍 DEBUG - Built participant object:', JSON.stringify(participant, null, 2))
+
+  // Double-check participant has required fields
+  if (!participant.name || !participant.email) {
+    console.error('❌ CRITICAL: Participant missing required fields after construction:', {
+      participantName: participant.name,
+      participantEmail: participant.email,
+      participantNameType: typeof participant.name,
+      participantEmailType: typeof participant.email
+    })
+    return res.status(400).json({
+      error: 'Datafel',
+      message: 'Participant-objekt saknar namn eller email efter konstruktion',
+      debug: { participant, recipientName, recipientEmail }
+    })
+  }
+
   if (partyType === 'individual') {
     // KORRIGERAD STRUKTUR FÖR PRIVATPERSON ENLIGT DOKUMENTATION
     // Använder ett 'participant'-objekt (singular).
     parties.push({
       type: 'individual',
-      participant: {
-        name: recipientName,
-        email: recipientEmail,
-        _permissions: {
-          'contract:update': sendForSigning
-        },
-        signatory: sendForSigning,
-        delivery_channel: 'email'
-      }
+      participant: participant
     })
   } else {
     // KORREKT STRUKTUR FÖR FÖRETAG (BEVARAD)
@@ -341,17 +383,7 @@ export default async function handler(
       type: 'company',
       name: recipientCompanyName,
       identification_number: recipientOrgNumber,
-      participants: [
-        {
-          name: recipientName,
-          email: recipientEmail,
-          _permissions: {
-            'contract:update': sendForSigning
-          },
-          signatory: sendForSigning,
-          delivery_channel: 'email'
-        }
-      ]
+      participants: [participant]
     })
   }
 
