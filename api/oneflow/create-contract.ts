@@ -298,96 +298,47 @@ export default async function handler(
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
-  // 🔧 Explicit type coercion to ensure values are strings (fixes empty participant bug)
-  const recipientName = String(recipient?.name || contractData?.Kontaktperson || '').trim()
-  const recipientEmail = String(recipient?.email || contractData?.['e-post-kontaktperson'] || '').trim()
-  const recipientCompanyName = String(recipient?.company_name || contractData?.foretag || '').trim()
-  const recipientOrgNumber = String(recipient?.organization_number || contractData?.['org-nr'] || '').trim()
-
-  // Enhanced debug logging to catch empty values
-  console.log('🔍 DEBUG - Extracted recipient values:', JSON.stringify({
-    recipientName,
-    recipientEmail,
-    recipientCompanyName,
-    recipientOrgNumber,
-    types: {
-      name: typeof recipientName,
-      email: typeof recipientEmail
-    },
-    lengths: {
-      name: recipientName.length,
-      email: recipientEmail.length
-    },
-    rawRecipient: recipient,
-    rawContractData: {
-      Kontaktperson: contractData?.Kontaktperson,
-      'e-post-kontaktperson': contractData?.['e-post-kontaktperson']
-    }
-  }, null, 2))
-
-  console.log('👤 Recipient namn:', recipientName)
-  console.log('📧 Recipient email:', recipientEmail)
-  console.log('🏢 Företag:', recipientCompanyName)
-
-  // Validera att vi har nödvändig data
-  if (!recipientName || !recipientEmail) {
-    console.error('❌ Saknar mottagaruppgifter:', { recipientName, recipientEmail })
-    return res.status(400).json({
-      error: 'Saknar kontaktuppgifter',
-      message: 'Kontaktperson och e-postadress krävs för att skapa kontrakt'
-    })
-  }
-
-  const parties: any[] = []
-
-  // 🔧 FIX v4: Bygg participant med Object.assign för att tvinga värdekopiering
-  console.log('🚀 FIX v4 ACTIVE - Using Object.assign for participant')
-  console.log('📊 Raw values:', { recipientName, recipientEmail, sendForSigning })
+  const parties = []
 
   if (partyType === 'individual') {
-    // STRUKTUR FÖR PRIVATPERSON - använder 'participant' (singular)
-    const participantObj = Object.assign({}, {
-      'name': '' + recipientName,
-      'email': '' + recipientEmail,
-      '_permissions': { 'contract:update': sendForSigning === true },
-      'signatory': sendForSigning === true,
-      'delivery_channel': 'email'
+    // KORRIGERAD STRUKTUR FÖR PRIVATPERSON ENLIGT DOKUMENTATION
+    // Använder ett 'participant'-objekt (singular).
+    parties.push({
+      type: 'individual',
+      country_code: 'SE',
+      participant: {
+        name: recipient.name,
+        email: recipient.email,
+        _permissions: {
+          'contract:update': sendForSigning
+        },
+        signatory: sendForSigning,
+        delivery_channel: 'email'
+      }
     })
-
-    console.log('🔍 DEBUG participantObj (individual):', JSON.stringify(participantObj))
-
-    const partyObj = Object.assign({}, {
-      'type': 'individual',
-      'country_code': 'SE',
-      'participant': participantObj
-    })
-
-    parties.push(partyObj)
   } else {
-    // STRUKTUR FÖR FÖRETAG - använder 'participants' array (plural)
-    const participantObj = Object.assign({}, {
-      'name': '' + recipientName,
-      'email': '' + recipientEmail,
-      '_permissions': { 'contract:update': sendForSigning === true },
-      'signatory': sendForSigning === true,
-      'delivery_channel': 'email'
+    // KORREKT STRUKTUR FÖR FÖRETAG (BEVARAD)
+    // Använder en 'participants'-array (plural).
+    parties.push({
+      type: 'company',
+      country_code: 'SE',
+      name: recipient.company_name,
+      identification_number: recipient.organization_number,
+      participants: [
+        {
+          name: recipient.name,
+          email: recipient.email,
+          _permissions: {
+            'contract:update': sendForSigning
+          },
+          signatory: sendForSigning,
+          delivery_channel: 'email'
+        }
+      ]
     })
-
-    console.log('🔍 DEBUG participantObj (company):', JSON.stringify(participantObj))
-
-    const partyObj = Object.assign({}, {
-      'type': 'company',
-      'country_code': 'SE',
-      'name': '' + recipientCompanyName,
-      'identification_number': '' + recipientOrgNumber,
-      'participants': [participantObj]
-    })
-
-    parties.push(partyObj)
   }
 
-  // 🔍 DEBUG - Logga parties direkt efter att de byggts
-  console.log('🔍 DEBUG - parties efter push:', JSON.stringify(parties, null, 2))
+  console.log('Parties struktur:', JSON.stringify(parties, null, 2))
 
   // Förbered produktgrupper om produkter finns
   let productGroups: any[] = []
