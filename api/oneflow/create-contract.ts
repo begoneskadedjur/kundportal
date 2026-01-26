@@ -259,6 +259,9 @@ export default async function handler(
     caseId
   } = req.body as ContractRequestBody
 
+  // 📋 Logga mottagen recipient för debugging
+  console.log('📋 Mottagen recipient:', JSON.stringify(recipient, null, 2))
+
   // 🆕 VALIDERA ANVÄNDAREN FÖRST
   let validatedUser
   try {
@@ -295,6 +298,25 @@ export default async function handler(
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
+  // 🔧 Fallback: Om recipient.name/email är tomma, hämta från contractData
+  const recipientName = recipient?.name || contractData?.Kontaktperson || ''
+  const recipientEmail = recipient?.email || contractData?.['e-post-kontaktperson'] || ''
+  const recipientCompanyName = recipient?.company_name || contractData?.foretag || ''
+  const recipientOrgNumber = recipient?.organization_number || contractData?.['org-nr'] || ''
+
+  console.log('👤 Recipient namn:', recipientName)
+  console.log('📧 Recipient email:', recipientEmail)
+  console.log('🏢 Företag:', recipientCompanyName)
+
+  // Validera att vi har nödvändig data
+  if (!recipientName || !recipientEmail) {
+    console.error('❌ Saknar mottagaruppgifter:', { recipientName, recipientEmail })
+    return res.status(400).json({
+      error: 'Saknar kontaktuppgifter',
+      message: 'Kontaktperson och e-postadress krävs för att skapa kontrakt'
+    })
+  }
+
   const parties = []
 
   if (partyType === 'individual') {
@@ -303,8 +325,8 @@ export default async function handler(
     parties.push({
       type: 'individual',
       participant: {
-        name: recipient.name,
-        email: recipient.email,
+        name: recipientName,
+        email: recipientEmail,
         _permissions: {
           'contract:update': sendForSigning
         },
@@ -317,12 +339,12 @@ export default async function handler(
     // Använder en 'participants'-array (plural).
     parties.push({
       type: 'company',
-      name: recipient.company_name,
-      identification_number: recipient.organization_number,
+      name: recipientCompanyName,
+      identification_number: recipientOrgNumber,
       participants: [
         {
-          name: recipient.name,
-          email: recipient.email,
+          name: recipientName,
+          email: recipientEmail,
           _permissions: {
             'contract:update': sendForSigning
           },
