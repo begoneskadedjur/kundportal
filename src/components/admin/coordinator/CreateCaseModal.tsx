@@ -239,8 +239,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       }
 
       try {
-        // cases-tabellen är för avtalskunder (private)
-        const images = await CaseImageService.getCaseImages(initialCaseData.id, 'private');
+        // cases-tabellen är för avtalskunder (contract)
+        const images = await CaseImageService.getCaseImages(initialCaseData.id, 'contract');
         setExistingImages(images);
       } catch (err) {
         console.error('Kunde inte hämta befintliga bilder:', err);

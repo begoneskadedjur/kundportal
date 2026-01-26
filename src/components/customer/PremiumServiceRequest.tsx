@@ -143,7 +143,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
           try {
             await CaseImageService.uploadCaseImage(
               data.id,
-              'private', // cases-tabellen är för avtalskunder
+              'contract', // cases-tabellen är för avtalskunder
               file,
               ['general'],
               undefined,

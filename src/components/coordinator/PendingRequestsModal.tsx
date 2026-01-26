@@ -37,7 +37,7 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
       for (const caseItem of pendingCases) {
         try {
           // cases-tabellen är för avtalskunder (private)
-          const images = await CaseImageService.getCaseImages(caseItem.id, 'private')
+          const images = await CaseImageService.getCaseImages(caseItem.id, 'contract')
           if (images.length > 0) {
             imagesMap[caseItem.id] = images
           }
