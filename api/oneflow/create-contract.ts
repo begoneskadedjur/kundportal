@@ -349,6 +349,7 @@ export default async function handler(
     // STRUKTUR FÖR PRIVATPERSON - använder 'participant' (singular)
     parties.push({
       type: 'individual',
+      country_code: 'SE',
       participant: {
         name: recipientName,
         email: recipientEmail,
@@ -363,6 +364,7 @@ export default async function handler(
     // STRUKTUR FÖR FÖRETAG - använder 'participants' array (plural)
     parties.push({
       type: 'company',
+      country_code: 'SE',
       name: recipientCompanyName,
       identification_number: recipientOrgNumber,
       participants: [{
