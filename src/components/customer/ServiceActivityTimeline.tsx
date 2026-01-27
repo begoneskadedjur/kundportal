@@ -132,6 +132,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
   }
 
   return (
+    <>
     <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
       <div className="p-6">
         {/* Header */}
@@ -347,41 +348,43 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
         </div>
       </div>
 
-      {/* Case Details Modal */}
-      {selectedCase && (
-        <CaseDetailsModal
-          caseId={selectedCase.id}
-          clickupTaskId={selectedCase.clickup_task_id || ''}
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false)
-            setSelectedCase(null)
-          }}
-          fallbackData={{
-            case_number: selectedCase.case_number,
-            title: selectedCase.title,
-            pest_type: selectedCase.pest_type,
-            status: selectedCase.status,
-            pest_level: selectedCase.pest_level,
-            problem_rating: selectedCase.problem_rating,
-            price: selectedCase.price,
-            completed_date: selectedCase.completed_date,
-            primary_technician_name: selectedCase.primary_technician_name,
-            address: selectedCase.address,
-            description: selectedCase.description,
-            recommendations: selectedCase.recommendations,
-            case_type: selectedCase.case_type,
-            work_report: selectedCase.work_report,
-            materials_used: selectedCase.materials_used,
-            time_spent_minutes: selectedCase.time_spent_minutes,
-            service_type: selectedCase.service_type,
-            priority: selectedCase.priority,
-            work_started_at: selectedCase.work_started_at,
-            files: selectedCase.files
-          }}
-        />
-      )}
     </Card>
+
+    {/* Case Details Modal - UTANFÖR Card för korrekt overlay */}
+    {selectedCase && (
+      <CaseDetailsModal
+        caseId={selectedCase.id}
+        clickupTaskId={selectedCase.clickup_task_id || ''}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelectedCase(null)
+        }}
+        fallbackData={{
+          case_number: selectedCase.case_number,
+          title: selectedCase.title,
+          pest_type: selectedCase.pest_type,
+          status: selectedCase.status,
+          pest_level: selectedCase.pest_level,
+          problem_rating: selectedCase.problem_rating,
+          price: selectedCase.price,
+          completed_date: selectedCase.completed_date,
+          primary_technician_name: selectedCase.primary_technician_name,
+          address: selectedCase.address,
+          description: selectedCase.description,
+          recommendations: selectedCase.recommendations,
+          case_type: selectedCase.case_type,
+          work_report: selectedCase.work_report,
+          materials_used: selectedCase.materials_used,
+          time_spent_minutes: selectedCase.time_spent_minutes,
+          service_type: selectedCase.service_type,
+          priority: selectedCase.priority,
+          work_started_at: selectedCase.work_started_at,
+          files: selectedCase.files
+        }}
+      />
+    )}
+  </>
   )
 }
 

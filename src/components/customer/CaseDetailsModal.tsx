@@ -29,6 +29,7 @@ import CasePreparationsSection from '../shared/CasePreparationsSection'
 import { generatePDFReport } from '../../utils/pdfReportGenerator'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
 
 interface CaseDetailsModalProps {
   caseId: string
@@ -122,10 +123,15 @@ export default function CaseDetailsModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [useFallback, setUseFallback] = useState(false)
+  const [caseImages, setCaseImages] = useState<CaseImageWithUrl[]>([])
+  const [loadingImages, setLoadingImages] = useState(false)
   const { profile } = useAuth()
 
   useEffect(() => {
     if (isOpen) {
+      // Hämta bilder för alla ärenden
+      fetchCaseImages()
+
       // Om vi har clickupTaskId, försök hämta från ClickUp
       if (clickupTaskId) {
         setUseFallback(false)
@@ -188,6 +194,26 @@ export default function CaseDetailsModal({
       })
     } catch (error) {
       console.error('Error fetching customer info:', error)
+    }
+  }
+
+  const fetchCaseImages = async () => {
+    if (!caseId) return
+    setLoadingImages(true)
+    try {
+      // Försök hämta som contract först, sen business, sen private
+      let images = await CaseImageService.getCaseImages(caseId, 'contract')
+      if (images.length === 0) {
+        images = await CaseImageService.getCaseImages(caseId, 'business')
+      }
+      if (images.length === 0) {
+        images = await CaseImageService.getCaseImages(caseId, 'private')
+      }
+      setCaseImages(images)
+    } catch (error) {
+      console.error('Error fetching case images:', error)
+    } finally {
+      setLoadingImages(false)
     }
   }
 
@@ -574,8 +600,65 @@ export default function CaseDetailsModal({
                       </div>
                     )}
 
-                    {/* Filer och bilder */}
-                    {fallbackData.files && fallbackData.files.length > 0 && (
+                    {/* Använda preparat - endast läsläge för kunder */}
+                    {caseId && fallbackData?.service_type !== 'inspection' && (
+                      <CasePreparationsSection
+                        caseId={caseId}
+                        caseType="contract"
+                        pestType={fallbackData?.pest_type || null}
+                        isReadOnly={true}
+                      />
+                    )}
+
+                    {/* Bilder från case_images (teknikerns bilder) */}
+                    {caseImages.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                          <Images className="w-4 h-4 text-indigo-400" />
+                          Bilder ({caseImages.length})
+                        </h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {caseImages.map((image) => (
+                            <div
+                              key={image.id}
+                              className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700"
+                            >
+                              <img
+                                src={image.url}
+                                alt={image.original_name}
+                                className="w-full h-24 object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <a
+                                  href={image.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+                                >
+                                  <Eye className="w-4 h-4 text-white" />
+                                </a>
+                                <a
+                                  href={image.url}
+                                  download={image.original_name}
+                                  className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+                                >
+                                  <Download className="w-4 h-4 text-white" />
+                                </a>
+                              </div>
+                              {image.tags && image.tags.length > 0 && (
+                                <span className="absolute top-2 left-2 px-2 py-0.5 text-xs bg-black/60 text-white rounded">
+                                  {image.tags[0] === 'before' ? 'Före' : image.tags[0] === 'after' ? 'Efter' : 'Övrigt'}
+                                </span>
+                              )}
+                              <p className="text-xs text-slate-400 p-2 truncate">{image.original_name}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Filer och bilder från fallback (om inga case_images) */}
+                    {caseImages.length === 0 && fallbackData.files && fallbackData.files.length > 0 && (
                       <div className="space-y-3">
                         <h4 className="text-md font-semibold text-white flex items-center gap-2">
                           <Images className="w-4 h-4 text-indigo-400" />
