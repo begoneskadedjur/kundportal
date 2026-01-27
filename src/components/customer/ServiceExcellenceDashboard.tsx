@@ -37,7 +37,7 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
         // Fetch cases
         const { data: casesData, error: casesError } = await supabase
           .from('cases')
-          .select('status, scheduled_start, scheduled_end, service_type')
+          .select('id, status, scheduled_start, scheduled_end, service_type')
           .eq('customer_id', customer.id)
 
         if (casesError) throw casesError

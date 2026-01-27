@@ -1,6 +1,6 @@
 // src/components/customer/ServiceActivityTimeline.tsx - Service Activity Timeline
 import React, { useState, useEffect } from 'react'
-import { Clock, CheckCircle, Calendar, Filter, ChevronDown, ChevronRight, Eye, Info, Wrench, XCircle, FileText, Star } from 'lucide-react'
+import { Clock, CheckCircle, Calendar, Filter, ChevronDown, ChevronRight, Eye, Info, Wrench, XCircle, FileText, Star, AlertCircle } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
