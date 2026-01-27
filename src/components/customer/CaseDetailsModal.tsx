@@ -25,6 +25,7 @@ import {
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import CasePreparationsSection from '../shared/CasePreparationsSection'
 import { generatePDFReport } from '../../utils/pdfReportGenerator'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -47,7 +48,8 @@ interface CaseDetailsModalProps {
     primary_technician_name?: string
     address?: { formatted_address?: string }
     description?: string
-    recommendations?: string
+    recommendations?: string | null
+    case_type?: 'private' | 'business' | 'contract'
     // Nya fält från cases-tabellen
     work_report?: string
     materials_used?: string
@@ -790,7 +792,7 @@ export default function CaseDetailsModal({
                     )}
 
                     {/* Rekommendationer från tekniker - endast för avtalsärenden */}
-                    {caseData?.case_type === 'contract' && caseData?.recommendations && (
+                    {fallbackData?.recommendations && (
                       <div className="space-y-3">
                         <h4 className="text-md font-semibold text-white flex items-center gap-2">
                           <Lightbulb className="w-4 h-4 text-amber-400" />
@@ -804,9 +806,9 @@ export default function CaseDetailsModal({
                             <div className="flex-1">
                               <h5 className="text-white font-medium mb-2">Våra rekommendationer för dig</h5>
                               <p className="text-slate-200 whitespace-pre-wrap leading-relaxed">
-                                {caseData.recommendations}
+                                {fallbackData.recommendations}
                               </p>
-                              
+
                               {/* Call-to-action */}
                               <div className="mt-4 pt-3 border-t border-amber-500/20">
                                 <div className="flex items-center justify-between">
@@ -825,6 +827,16 @@ export default function CaseDetailsModal({
                           </div>
                         </div>
                       </div>
+                    )}
+
+                    {/* Använda preparat - endast läsläge för kunder */}
+                    {caseId && fallbackData?.pest_type !== 'Inspektion' && (
+                      <CasePreparationsSection
+                        caseId={caseId}
+                        caseType="contract"
+                        pestType={fallbackData?.pest_type || null}
+                        isReadOnly={true}
+                      />
                     )}
 
                     {/* Filer och bilder */}

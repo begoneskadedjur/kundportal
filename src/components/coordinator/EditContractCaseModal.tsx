@@ -25,6 +25,7 @@ import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
 import { toSwedishISOString } from '../../utils/dateHelpers'
 import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
+import CasePreparationsSection from '../shared/CasePreparationsSection'
 
 // Radering av ärenden
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
@@ -1539,6 +1540,18 @@ export default function EditContractCaseModal({
                   disabled={isCustomerView}
                 />
               </div>
+
+              {/* Använda preparat - Visas INTE för Inspektion/kontrollrunda */}
+              {caseData?.id && formData.pest_type !== 'Inspektion' && (
+                <CasePreparationsSection
+                  caseId={caseData.id}
+                  caseType="contract"
+                  pestType={formData.pest_type || null}
+                  technicianId={formData.primary_technician_id || null}
+                  technicianName={formData.primary_technician_name || null}
+                  isReadOnly={isCustomerView}
+                />
+              )}
 
               {/* Bilder sektion */}
               {caseData?.id && (

@@ -39,6 +39,16 @@ interface CustomerInfo {
   contact_person: string
 }
 
+// Interface för preparatanvändning i rapport
+export interface PreparationUsageForReport {
+  name: string
+  category: string
+  quantity: number
+  unit: string
+  dosage: string | null
+  registration_number: string | null
+}
+
 // BeGone Professional Color Palette (optimerad för print och digital)
 const beGoneColors = {
   // Huvudfärger
@@ -287,7 +297,8 @@ const drawSectionHeader = (
 export const generatePDFReport = async (
   taskDetails: TaskDetails,
   customerInfo?: CustomerInfo,
-  caseImages?: CaseImageWithUrl[]
+  caseImages?: CaseImageWithUrl[],
+  preparationsUsed?: PreparationUsageForReport[]
 ): Promise<void> => {
   try {
     const pdf = new jsPDF()
@@ -786,6 +797,65 @@ export const generatePDFReport = async (
       }
 
       yPosition += treatmentCardHeight + spacing.md // Minska section-avstånd
+    }
+
+    // === ANVÄNDA PREPARAT ===
+    if (preparationsUsed && preparationsUsed.length > 0) {
+      // Sidbrytning om nödvändigt
+      if (yPosition > pageHeight - 100) {
+        pdf.addPage()
+        yPosition = spacing.xl
+      }
+
+      yPosition = drawSectionHeader(pdf, 'ANVÄNDA PREPARAT', margins.left, yPosition, contentWidth, 'primary')
+
+      // Beräkna höjd baserat på antal preparat
+      const rowHeight = 16
+      const headerRowHeight = 20
+      const prepCardHeight = headerRowHeight + (preparationsUsed.length * rowHeight) + spacing.md
+
+      drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, prepCardHeight, {
+        backgroundColor: 'light',
+        shadow: true
+      })
+
+      cardY = yPosition + spacing.sm
+
+      // Tabell-headers
+      pdf.setFont(undefined, typography.label.weight)
+      pdf.setTextColor(...beGoneColors.mediumGray)
+      pdf.setFontSize(typography.label.size)
+      pdf.text('PREPARAT', margins.left + spacing.sm, cardY)
+      pdf.text('MÄNGD', margins.left + contentWidth * 0.55, cardY)
+      pdf.text('REG.NR', margins.left + contentWidth * 0.75, cardY)
+
+      cardY += headerRowHeight
+
+      // Separator-linje under headers
+      pdf.setDrawColor(...beGoneColors.divider)
+      pdf.setLineWidth(0.3)
+      pdf.line(margins.left + spacing.sm, cardY - 8, margins.left + contentWidth - spacing.sm, cardY - 8)
+
+      // Preparatrader
+      pdf.setFont(undefined, typography.body.weight)
+      pdf.setTextColor(...beGoneColors.darkGray)
+      pdf.setFontSize(typography.body.size)
+
+      preparationsUsed.forEach((prep) => {
+        // Preparatnamn
+        pdf.text(prep.name, margins.left + spacing.sm, cardY)
+
+        // Mängd med enhet
+        const quantityText = `${prep.quantity} ${prep.unit}`
+        pdf.text(quantityText, margins.left + contentWidth * 0.55, cardY)
+
+        // Registreringsnummer
+        pdf.text(prep.registration_number || '-', margins.left + contentWidth * 0.75, cardY)
+
+        cardY += rowHeight
+      })
+
+      yPosition += prepCardHeight + spacing.md
     }
 
     // === EKONOMISK SAMMANFATTNING ===

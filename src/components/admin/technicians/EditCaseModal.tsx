@@ -28,6 +28,9 @@ import TechnicianDropdown from '../TechnicianDropdown'
 // Bildhantering - med draft-läge
 import CaseImageGallery, { CaseImageGalleryRef } from '../../shared/CaseImageGallery'
 
+// Preparatanvändning
+import CasePreparationsSection from '../../shared/CasePreparationsSection'
+
 // Kommunikation
 import { CommunicationSlidePanel } from '../../communication'
 import { CaseType } from '../../../types/communication'
@@ -1371,6 +1374,20 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   <p>• Ge rekommendationer för framtida förebyggande åtgärder</p>
                   <p>• Notera eventuella uppföljningsbehov</p>
                 </div>
+              </div>
+            )}
+
+            {/* Använda preparat - Visas INTE för Inspektion */}
+            {currentCase && formData.skadedjur !== 'Inspektion' && (
+              <div className="pt-6 border-t border-slate-700">
+                <CasePreparationsSection
+                  caseId={currentCase.id}
+                  caseType={currentCase.case_type === 'private' ? 'private' : 'business'}
+                  pestType={formData.skadedjur || null}
+                  technicianId={currentCase.primary_assignee_id || null}
+                  technicianName={currentCase.primary_assignee_name || null}
+                  isReadOnly={false}
+                />
               </div>
             )}
 
