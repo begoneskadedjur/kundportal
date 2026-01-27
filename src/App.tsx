@@ -27,6 +27,7 @@ import TechnicianCommissions from './pages/admin/TechnicianCommissions';
 import SalesOpportunities from './pages/admin/SalesOpportunities';
 import ProductManagementPage from './pages/admin/ProductManagement';
 import StationTypesPage from './pages/admin/settings/StationTypesPage';
+import PreparationsPage from './pages/admin/settings/PreparationsPage';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import ImageBank from './pages/admin/ImageBank';
@@ -230,6 +231,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <StationTypesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/settings/preparations"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <PreparationsPage />
                 </ProtectedRoute>
               }
             />

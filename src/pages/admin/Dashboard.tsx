@@ -28,6 +28,7 @@ import {
   Receipt,
   Image as ImageIcon,
   Megaphone,
+  Beaker,
   BookOpen,
   Bell,
   MessageSquareText
@@ -466,6 +467,16 @@ const AdminDashboard: React.FC = () => {
                   stats="Inomhus & Utomhus"
                   tag="Inställningar"
                   iconColor="text-emerald-400"
+                />
+
+                <AdminDashboardCard
+                  href="/admin/settings/preparations"
+                  icon={Beaker}
+                  title="Preparat"
+                  description="Hantera bekämpningsmedel och produkter, Koppla preparat till skadedjurstyper"
+                  stats="Biocidprodukter"
+                  tag="Inställningar"
+                  iconColor="text-blue-400"
                 />
 
                 <AdminDashboardCard
