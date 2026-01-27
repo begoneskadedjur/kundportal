@@ -215,12 +215,16 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       try {
         const { data: customer, error } = await supabase
           .from('customers')
-          .select('company_name, org_number, contact_person')
+          .select('company_name, organization_number, contact_person')
           .eq('company_name', caseData.foretag)
           .single()
 
         if (!error && customer) {
-          customerInfo = customer
+          customerInfo = {
+            company_name: customer.company_name,
+            org_number: customer.organization_number || '',
+            contact_person: customer.contact_person
+          }
         } else {
           throw new Error('Customer not found')
         }

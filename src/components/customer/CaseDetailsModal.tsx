@@ -172,7 +172,7 @@ export default function CaseDetailsModal({
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('company_name, org_number, contact_person')
+        .select('company_name, organization_number, contact_person')
         .eq('id', profile.customer_id)
         .single()
 
@@ -181,7 +181,11 @@ export default function CaseDetailsModal({
         return
       }
 
-      setCustomerInfo(data)
+      setCustomerInfo({
+        company_name: data.company_name,
+        org_number: data.organization_number,
+        contact_person: data.contact_person
+      })
     } catch (error) {
       console.error('Error fetching customer info:', error)
     }
