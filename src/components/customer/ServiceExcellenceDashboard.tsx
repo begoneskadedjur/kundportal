@@ -90,13 +90,14 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
         }
 
         // Fetch completed inspections count from station_inspection_sessions
-        const { count: inspCount, error: inspError } = await supabase
-          .from('station_inspection_sessions')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'completed')
-          .in('case_id',
-            casesData?.filter(c => c.service_type === 'inspection').map(c => c.status) || []
-          )
+        const inspectionCaseIds = casesData?.filter(c => c.service_type === 'inspection').map(c => c.id) || []
+        const { count: inspCount, error: inspError } = inspectionCaseIds.length > 0
+          ? await supabase
+              .from('station_inspection_sessions')
+              .select('id', { count: 'exact', head: true })
+              .eq('status', 'completed')
+              .in('case_id', inspectionCaseIds)
+          : { count: 0, error: null }
 
         // Alternative: count via cases table
         const { data: inspSessions, error: sessError } = await supabase

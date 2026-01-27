@@ -44,7 +44,7 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
           .from('profiles')
           .select('display_name')
           .eq('email', customer.account_manager_email)
-          .single()
+          .maybeSingle()
 
         if (!error && data?.display_name) {
           setAccountManagerName(data.display_name)
