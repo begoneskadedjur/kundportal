@@ -118,7 +118,7 @@ const ProfessionalAssessment: React.FC<ProfessionalAssessmentProps> = ({
         </div>
         <div className="flex-1">
           <h5 className="text-sm font-semibold text-amber-400 mb-3 flex items-center gap-2">
-            Professionell bedömning & rekommendationer
+            Bedömning & rekommendationer
           </h5>
           
           {/* Assessment Results */}
@@ -186,7 +186,7 @@ const ProfessionalAssessment: React.FC<ProfessionalAssessmentProps> = ({
             <div className="bg-slate-800/20 border border-slate-700/30 rounded-lg p-3">
               <h6 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2">
                 <Lightbulb className="w-4 h-4 text-amber-400" />
-                Våra professionella rekommendationer för er
+                Våra rekommendationer för er
               </h6>
               <div className="prose prose-slate prose-sm max-w-none">
                 <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
@@ -197,7 +197,7 @@ const ProfessionalAssessment: React.FC<ProfessionalAssessmentProps> = ({
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-slate-500 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 bg-slate-500 rounded-full"></span>
-                    Baserat på vår professionella bedömning av situationen
+                    Baserat på vår bedömning av situationen
                   </p>
                   {assessment_date && (
                     <p className="text-xs text-slate-500">

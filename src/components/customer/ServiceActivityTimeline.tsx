@@ -1,6 +1,6 @@
 // src/components/customer/ServiceActivityTimeline.tsx - Service Activity Timeline
 import React, { useState, useEffect } from 'react'
-import { Clock, CheckCircle, AlertCircle, Calendar, Filter, ChevronDown, Eye, Info, Wrench, XCircle, FileText, Star } from 'lucide-react'
+import { Clock, CheckCircle, Calendar, Filter, ChevronDown, Eye, Info, Wrench, XCircle, FileText, Star } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
@@ -9,7 +9,7 @@ import { Case, serviceTypeConfig } from '../../types/cases'
 import { STATUS_CONFIG, ClickUpStatus, getStatusColor } from '../../types/database'
 import ServiceRequestStatus from './ServiceRequestStatus'
 import LoadingSpinner from '../shared/LoadingSpinner'
-import ProfessionalAssessment from './ProfessionalAssessment'
+import CaseDetailsModal from './CaseDetailsModal'
 import toast from 'react-hot-toast'
 
 interface ServiceActivityTimelineProps {
@@ -24,7 +24,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | ClickUpStatus>('all')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
-  const [expandedCase, setExpandedCase] = useState<string | null>(null)
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
 
   // Fetch cases from database
   useEffect(() => {
@@ -216,8 +216,6 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
           {/* Cases */}
           <div className="space-y-6">
             {filteredCases.map((caseItem, index) => {
-              const isExpanded = expandedCase === caseItem.id
-              
               // Get status config from database types
               const status = caseItem.status as ClickUpStatus
               const statusColor = getStatusColor(status)
@@ -308,83 +306,14 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                         {caseItem.description}
                       </p>
 
-                      {/* Expand/Collapse Button */}
+                      {/* View Details Button - Opens Modal */}
                       <button
-                        onClick={() => setExpandedCase(isExpanded ? null : caseItem.id)}
+                        onClick={() => setSelectedCaseId(caseItem.id)}
                         className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
                       >
                         <Eye className="w-3 h-3" />
-                        <span>{isExpanded ? 'Dölj detaljer' : 'Visa detaljer'}</span>
+                        <span>Visa detaljer</span>
                       </button>
-
-                      {/* Expanded Content */}
-                      {isExpanded && (
-                        <div className="mt-4 pt-4 border-t border-slate-700/50 space-y-3">
-                          {/* Work Report */}
-                          {caseItem.work_report && (
-                            <div>
-                              <h5 className="text-xs font-medium text-slate-400 mb-1">Arbetsrapport</h5>
-                              <p className="text-sm text-slate-300 bg-slate-800/50 p-3 rounded">
-                                {caseItem.work_report}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Materials/Products Used - Safety Information */}
-                          {caseItem.materials_used && (
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                              <div className="flex items-start gap-2">
-                                <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                                <div>
-                                  <h5 className="text-xs font-medium text-amber-400 mb-1">Använda preparat & säkerhetsinformation</h5>
-                                  <p className="text-sm text-slate-300 whitespace-pre-wrap">
-                                    {caseItem.materials_used}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Professional Assessment & Recommendations */}
-                          <ProfessionalAssessment 
-                            assessment={{
-                              pest_level: caseItem.pest_level,
-                              problem_rating: caseItem.problem_rating,
-                              recommendations: caseItem.recommendations,
-                              assessment_date: caseItem.assessment_date,
-                              assessed_by: caseItem.assessed_by
-                            }}
-                          />
-
-                          {/* Technician Info */}
-                          {caseItem.primary_technician_name && (
-                            <div className="flex items-center gap-3 text-xs text-slate-500">
-                              <div className="w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center">
-                                <span className="text-[10px] text-slate-300 font-medium">
-                                  {caseItem.primary_technician_name.split(' ').map(n => n[0]).join('')}
-                                </span>
-                              </div>
-                              <span>Tekniker: {caseItem.primary_technician_name}</span>
-                              {caseItem.completed_date && (
-                                <>
-                                  <div className="w-1 h-1 bg-slate-600 rounded-full"></div>
-                                  <span>Slutfört: {formatDate(caseItem.completed_date)}</span>
-                                </>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Price (if visible to customer and has value) - Only show if price > 0 */}
-                          {caseItem.price && caseItem.price > 0 && caseItem.status === 'Avslutat' && (
-                            <div className="flex items-center justify-between pt-3 border-t border-slate-700/50">
-                              <span className="text-sm text-slate-400">Kostnad</span>
-                              <span className="text-sm font-medium text-white">
-                                {caseItem.price.toLocaleString('sv-SE')} kr
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -411,6 +340,14 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
           )}
         </div>
       </div>
+
+      {/* Case Details Modal */}
+      {selectedCaseId && (
+        <CaseDetailsModal
+          caseId={selectedCaseId}
+          onClose={() => setSelectedCaseId(null)}
+        />
+      )}
     </Card>
   )
 }
