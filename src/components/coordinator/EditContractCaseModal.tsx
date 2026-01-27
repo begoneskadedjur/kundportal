@@ -26,6 +26,7 @@ import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGe
 import { toSwedishISOString } from '../../utils/dateHelpers'
 import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
 import CasePreparationsSection from '../shared/CasePreparationsSection'
+import CustomerAcknowledgmentIndicator from '../shared/CustomerAcknowledgmentIndicator'
 
 // Radering av ärenden
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
@@ -1700,6 +1701,16 @@ export default function EditContractCaseModal({
                             </div>
                           )}
                         </div>
+                      )}
+
+                      {/* Customer Acknowledgment Indicator - endast för kritiska ärenden */}
+                      {(formData.pest_level !== undefined && formData.pest_level >= 3 ||
+                        formData.problem_rating !== undefined && formData.problem_rating >= 4) && caseData?.id && (
+                        <CustomerAcknowledgmentIndicator
+                          caseId={caseData.id}
+                          pestLevel={formData.pest_level}
+                          problemRating={formData.problem_rating}
+                        />
                       )}
 
                       {/* Context-Aware Quick Recommendations */}
