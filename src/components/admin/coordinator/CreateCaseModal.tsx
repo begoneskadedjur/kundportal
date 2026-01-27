@@ -650,10 +650,19 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           actualCustomerId = selectedSiteId;
         }
 
+        // Hämta kundnamn för titeln (site eller huvudkund)
+        const customerForTitle = selectedSiteId
+          ? contractCustomers.find(c => c.id === selectedSiteId)
+          : customer;
+        const customerName = customerForTitle?.company_name || 'Okänd kund';
+
+        // Använd manuellt inmatad titel eller auto-generera från kundnamn
+        const contractTitle = formData.title?.trim() || customerName;
+
         const caseData = {
           customer_id: actualCustomerId, // Använd rätt customer_id (site eller huvudkund)
           site_id: customer?.is_multisite ? selectedSiteId : null,
-          title: formData.title!.trim(),
+          title: contractTitle,
           description: formData.description || '',
           status: 'Bokad', // Korrekt svensk status som används i systemet
           priority: formData.priority || 'normal',
