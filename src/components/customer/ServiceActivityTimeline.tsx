@@ -1,6 +1,6 @@
 // src/components/customer/ServiceActivityTimeline.tsx - Service Activity Timeline
 import React, { useState, useEffect } from 'react'
-import { Clock, CheckCircle, Calendar, Filter, ChevronDown, Eye, Info, Wrench, XCircle, FileText, Star } from 'lucide-react'
+import { Clock, CheckCircle, Calendar, Filter, ChevronDown, ChevronRight, Eye, Info, Wrench, XCircle, FileText, Star } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
@@ -252,17 +252,20 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                     {status === 'Stängt - slasklogg' && <XCircle className="w-5 h-5 text-red-400 relative z-10" />}
                   </div>
 
-                  {/* Content with glass morphism */}
+                  {/* Content with glass morphism - Clickable card */}
                   <div className="flex-1 pb-6">
-                    <div className="relative overflow-hidden rounded-xl transition-all duration-300 group-hover:scale-[1.02]">
+                    <div
+                      onClick={() => setSelectedCaseId(caseItem.id)}
+                      className="relative overflow-hidden rounded-xl transition-all duration-300 cursor-pointer group-hover:scale-[1.02]"
+                    >
                       {/* Glass morphism background */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-slate-800/60 via-slate-900/70 to-slate-900/80 backdrop-blur-sm" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-slate-800/60 via-slate-900/70 to-slate-900/80 backdrop-blur-sm group-hover:from-slate-800/80 group-hover:via-slate-800/70 transition-all" />
                       <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5" />
-                      
+
                       {/* Border glow */}
-                      <div className="absolute inset-0 rounded-xl border border-purple-500/20 group-hover:border-purple-500/30 transition-colors" />
+                      <div className="absolute inset-0 rounded-xl border border-purple-500/20 group-hover:border-purple-500/40 transition-colors" />
                       <div className="absolute inset-0 rounded-xl border border-white/5" />
-                      
+
                       {/* Content */}
                       <div className="relative z-10 p-4">
                       {/* Header */}
@@ -302,18 +305,17 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                       </div>
 
                       {/* Description */}
-                      <p className="text-sm text-slate-300 mb-3 line-clamp-2">
+                      <p className="text-sm text-slate-300 line-clamp-2">
                         {caseItem.description}
                       </p>
 
-                      {/* View Details Button - Opens Modal */}
-                      <button
-                        onClick={() => setSelectedCaseId(caseItem.id)}
-                        className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
-                      >
-                        <Eye className="w-3 h-3" />
-                        <span>Visa detaljer</span>
-                      </button>
+                      {/* Arrow indicator - shows card is clickable */}
+                      <div className="flex items-center justify-end mt-3 pt-3 border-t border-slate-700/30">
+                        <span className="text-xs text-slate-500 group-hover:text-slate-300 transition-colors mr-2">
+                          Visa detaljer
+                        </span>
+                        <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                      </div>
                     </div>
                   </div>
                 </div>
