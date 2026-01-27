@@ -1,5 +1,5 @@
 // src/components/customer/CaseDetailsModal.tsx - Med kunduppgifter för PDF
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   X,
   Calendar,
@@ -26,10 +26,16 @@ import Button from '../ui/Button'
 import Card from '../ui/Card'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import CasePreparationsSection from '../shared/CasePreparationsSection'
+import CustomerAssessmentPanel from './CustomerAssessmentPanel'
+import CriticalAcknowledgmentBanner from './CriticalAcknowledgmentBanner'
+import CloseWarningDialog from './CloseWarningDialog'
 import { generatePDFReport } from '../../utils/pdfReportGenerator'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
+import { useAcknowledgment } from '../../hooks/useAcknowledgment'
+import { requiresAcknowledgment } from '../../types/acknowledgment'
+import toast from 'react-hot-toast'
 
 interface CaseDetailsModalProps {
   caseId: string
@@ -125,7 +131,62 @@ export default function CaseDetailsModal({
   const [useFallback, setUseFallback] = useState(false)
   const [caseImages, setCaseImages] = useState<CaseImageWithUrl[]>([])
   const [loadingImages, setLoadingImages] = useState(false)
+  const [showCloseWarning, setShowCloseWarning] = useState(false)
   const { profile } = useAuth()
+
+  // Hook för läskvitton
+  const {
+    acknowledgment,
+    loading: acknowledgmentLoading,
+    hasAcknowledged,
+    acknowledge
+  } = useAcknowledgment({
+    caseId: caseId,
+    userId: profile?.id,
+    userEmail: profile?.email,
+    userName: profile?.display_name
+  })
+
+  // Avgör om ärende kräver bekräftelse
+  const needsAcknowledgment = requiresAcknowledgment(
+    fallbackData?.pest_level ?? null,
+    fallbackData?.problem_rating ?? null
+  )
+
+  // Handle acknowledgment
+  const handleAcknowledge = useCallback(async () => {
+    try {
+      await acknowledge(
+        fallbackData?.pest_level ?? null,
+        fallbackData?.problem_rating ?? null
+      )
+      toast.success('Tack för din bekräftelse!')
+    } catch (error) {
+      console.error('Error acknowledging case:', error)
+      toast.error('Kunde inte spara bekräftelse')
+    }
+  }, [acknowledge, fallbackData?.pest_level, fallbackData?.problem_rating])
+
+  // Handle close with soft block
+  const handleClose = useCallback(() => {
+    // Om det krävs bekräftelse och användaren inte har bekräftat, visa varning
+    if (needsAcknowledgment && !hasAcknowledged) {
+      setShowCloseWarning(true)
+    } else {
+      onClose()
+    }
+  }, [needsAcknowledgment, hasAcknowledged, onClose])
+
+  // Bekräfta stängning utan bekräftelse
+  const handleConfirmClose = useCallback(() => {
+    setShowCloseWarning(false)
+    onClose()
+  }, [onClose])
+
+  // Gå tillbaka till ärendet
+  const handleGoBack = useCallback(() => {
+    setShowCloseWarning(false)
+  }, [])
 
   useEffect(() => {
     if (isOpen) {
@@ -383,7 +444,7 @@ export default function CaseDetailsModal({
                 </Button>
               )}
 
-              <Button variant="ghost" size="sm" onClick={onClose}>
+              <Button variant="ghost" size="sm" onClick={handleClose}>
                 <X className="w-5 h-5" />
               </Button>
             </div>
@@ -441,6 +502,24 @@ export default function CaseDetailsModal({
                   )}
                 </div>
 
+                {/* Situationsöversikt - Trafikljussystem */}
+                {(fallbackData.pest_level !== null || fallbackData.problem_rating !== null) && (
+                  <CustomerAssessmentPanel
+                    pestLevel={fallbackData.pest_level ?? null}
+                    problemRating={fallbackData.problem_rating ?? null}
+                    recommendations={fallbackData.recommendations ?? null}
+                  />
+                )}
+
+                {/* Läskvitto för kritiska ärenden */}
+                {needsAcknowledgment && (
+                  <CriticalAcknowledgmentBanner
+                    acknowledgment={acknowledgment}
+                    loading={acknowledgmentLoading}
+                    onAcknowledge={handleAcknowledge}
+                  />
+                )}
+
                 {/* Beskrivning */}
                 {fallbackData.description && (
                   <div className="space-y-3">
@@ -477,48 +556,6 @@ export default function CaseDetailsModal({
                       </div>
                     )}
 
-                    {/* Aktivitetsnivå */}
-                    {fallbackData.pest_level !== null && fallbackData.pest_level !== undefined && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <AlertCircle className={`w-5 h-5 ${
-                          fallbackData.pest_level >= 3 ? 'text-red-400' :
-                          fallbackData.pest_level >= 2 ? 'text-amber-400' : 'text-emerald-400'
-                        }`} />
-                        <div>
-                          <p className="text-sm text-slate-400">Aktivitetsnivå</p>
-                          <p className={`font-medium ${
-                            fallbackData.pest_level >= 3 ? 'text-red-400' :
-                            fallbackData.pest_level >= 2 ? 'text-amber-400' : 'text-emerald-400'
-                          }`}>
-                            {fallbackData.pest_level === 0 ? 'Ingen' :
-                             fallbackData.pest_level === 1 ? 'Låg' :
-                             fallbackData.pest_level === 2 ? 'Medium' : 'Hög'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Situationsbedömning */}
-                    {fallbackData.problem_rating !== null && fallbackData.problem_rating !== undefined && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <Flag className={`w-5 h-5 ${
-                          fallbackData.problem_rating >= 4 ? 'text-red-400' :
-                          fallbackData.problem_rating >= 3 ? 'text-amber-400' : 'text-emerald-400'
-                        }`} />
-                        <div>
-                          <p className="text-sm text-slate-400">Situationsbedömning</p>
-                          <p className={`font-medium ${
-                            fallbackData.problem_rating >= 4 ? 'text-red-400' :
-                            fallbackData.problem_rating >= 3 ? 'text-amber-400' : 'text-emerald-400'
-                          }`}>
-                            {fallbackData.problem_rating === 1 ? 'Utmärkt' :
-                             fallbackData.problem_rating === 2 ? 'Bra' :
-                             fallbackData.problem_rating === 3 ? 'Acceptabel' :
-                             fallbackData.problem_rating === 4 ? 'Problem' : 'Kritisk'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
 
                     {/* Pris */}
                     {fallbackData.price && fallbackData.price > 0 && (
@@ -580,21 +617,6 @@ export default function CaseDetailsModal({
                               ? `${Math.floor(fallbackData.time_spent_minutes / 60)}h ${fallbackData.time_spent_minutes % 60}min`
                               : `${fallbackData.time_spent_minutes} min`
                             }
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Rekommendationer */}
-                    {fallbackData.recommendations && (
-                      <div className="space-y-3">
-                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                          <Lightbulb className="w-4 h-4 text-amber-400" />
-                          Rekommenderade åtgärder
-                        </h4>
-                        <div className="p-4 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-lg">
-                          <p className="text-slate-200 whitespace-pre-wrap leading-relaxed">
-                            {fallbackData.recommendations}
                           </p>
                         </div>
                       </div>
@@ -993,10 +1015,10 @@ export default function CaseDetailsModal({
                 <Phone className="w-4 h-4" />
                 <span>Har du frågor? Ring oss på <a href="tel:010-280-44-10" className="text-blue-400 hover:text-blue-300">010 280 44 10</a></span>
               </div>
-              
+
               <Button
                 variant="secondary"
-                onClick={onClose}
+                onClick={handleClose}
                 className="px-6"
               >
                 Stäng
@@ -1005,6 +1027,14 @@ export default function CaseDetailsModal({
           </div>
         </Card>
       </div>
+
+      {/* Close Warning Dialog - visas när användaren försöker stänga utan bekräftelse */}
+      <CloseWarningDialog
+        isOpen={showCloseWarning}
+        onClose={() => setShowCloseWarning(false)}
+        onConfirmClose={handleConfirmClose}
+        onGoBack={handleGoBack}
+      />
     </div>
   )
 }
