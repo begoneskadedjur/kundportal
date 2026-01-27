@@ -24,7 +24,8 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | ClickUpStatus>('all')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
+  const [selectedCase, setSelectedCase] = useState<Case | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Fetch cases from database
   useEffect(() => {
@@ -255,7 +256,10 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                   {/* Content with glass morphism - Clickable card */}
                   <div className="flex-1 pb-6">
                     <div
-                      onClick={() => setSelectedCaseId(caseItem.id)}
+                      onClick={() => {
+                        setSelectedCase(caseItem)
+                        setIsModalOpen(true)
+                      }}
                       className="relative overflow-hidden rounded-xl transition-all duration-300 cursor-pointer group-hover:scale-[1.02]"
                     >
                       {/* Glass morphism background */}
@@ -344,10 +348,37 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
       </div>
 
       {/* Case Details Modal */}
-      {selectedCaseId && (
+      {selectedCase && (
         <CaseDetailsModal
-          caseId={selectedCaseId}
-          onClose={() => setSelectedCaseId(null)}
+          caseId={selectedCase.id}
+          clickupTaskId={selectedCase.clickup_task_id || ''}
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false)
+            setSelectedCase(null)
+          }}
+          fallbackData={{
+            case_number: selectedCase.case_number,
+            title: selectedCase.title,
+            pest_type: selectedCase.pest_type,
+            status: selectedCase.status,
+            pest_level: selectedCase.pest_level,
+            problem_rating: selectedCase.problem_rating,
+            price: selectedCase.price,
+            completed_date: selectedCase.completed_date,
+            primary_technician_name: selectedCase.primary_technician_name,
+            address: selectedCase.address,
+            description: selectedCase.description,
+            recommendations: selectedCase.recommendations,
+            case_type: selectedCase.case_type,
+            work_report: selectedCase.work_report,
+            materials_used: selectedCase.materials_used,
+            time_spent_minutes: selectedCase.time_spent_minutes,
+            service_type: selectedCase.service_type,
+            priority: selectedCase.priority,
+            work_started_at: selectedCase.work_started_at,
+            files: selectedCase.files
+          }}
         />
       )}
     </Card>
