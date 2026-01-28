@@ -3,12 +3,11 @@
 import React from 'react'
 import { Activity, AlertTriangle, CheckCircle, Info, Shield, AlertCircle } from 'lucide-react'
 import {
-  AssessmentLevel,
-  PEST_LEVEL_CONFIG,
-  PROBLEM_RATING_CONFIG,
   getOverallAssessmentLevel,
   requiresAcknowledgment
 } from '../../types/acknowledgment'
+import AssessmentScaleBar from '../shared/AssessmentScaleBar'
+import ReassuranceMessage from '../shared/ReassuranceMessage'
 
 interface CustomerAssessmentPanelProps {
   pestLevel: number | null
@@ -28,9 +27,6 @@ const CustomerAssessmentPanel: React.FC<CustomerAssessmentPanelProps> = ({
 
   const overallLevel = getOverallAssessmentLevel(pestLevel, problemRating)
   const needsAcknowledgment = requiresAcknowledgment(pestLevel, problemRating)
-
-  const pestConfig = pestLevel !== null ? PEST_LEVEL_CONFIG[pestLevel] : null
-  const problemConfig = problemRating !== null ? PROBLEM_RATING_CONFIG[problemRating] : null
 
   // Övergripande konfiguration baserat på nivå
   const overallConfig = {
@@ -63,42 +59,6 @@ const CustomerAssessmentPanel: React.FC<CustomerAssessmentPanelProps> = ({
     }
   }[overallLevel]
 
-  // Progress bar för visualisering
-  const ProgressBar: React.FC<{
-    value: number
-    max: number
-    config: typeof pestConfig
-  }> = ({ value, max, config }) => {
-    if (!config) return null
-    const percentage = (value / max) * 100
-
-    const barColorClass = {
-      ok: 'bg-emerald-500',
-      warning: 'bg-amber-500',
-      critical: 'bg-red-500'
-    }[config.level]
-
-    return (
-      <div className="relative h-2 bg-slate-700/50 rounded-full overflow-hidden">
-        <div
-          className={`absolute left-0 top-0 h-full ${barColorClass} rounded-full transition-all duration-500`}
-          style={{ width: `${percentage}%` }}
-        />
-        {/* Indikatorpunkter */}
-        <div className="absolute inset-0 flex justify-between px-0.5">
-          {Array.from({ length: max + 1 }).map((_, i) => (
-            <div
-              key={i}
-              className={`w-1.5 h-1.5 rounded-full my-auto ${
-                i <= value ? 'bg-white/40' : 'bg-slate-600/50'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className={`rounded-xl border ${overallConfig.borderColor} bg-gradient-to-br ${overallConfig.bgGradient} overflow-hidden`}>
       {/* Header */}
@@ -130,34 +90,32 @@ const CustomerAssessmentPanel: React.FC<CustomerAssessmentPanelProps> = ({
         </div>
       </div>
 
-      {/* Bedömningskort */}
+      {/* Bedömningskort med segmenterade skalor */}
       <div className="p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           {/* Skadedjursnivå */}
-          {pestConfig && pestLevel !== null && (
-            <div className={`p-4 rounded-lg border ${pestConfig.borderColor} ${pestConfig.bgColor}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-400">Skadedjursnivå</span>
-                <span className={`text-lg font-bold ${pestConfig.textColor}`}>{pestLevel}/3</span>
-              </div>
-              <ProgressBar value={pestLevel} max={3} config={pestConfig} />
-              <p className={`mt-2 text-sm font-medium ${pestConfig.textColor}`}>
-                {pestConfig.label}
-              </p>
+          {pestLevel !== null && (
+            <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+              <AssessmentScaleBar
+                type="pest"
+                value={pestLevel}
+                size="md"
+                showLabels={true}
+                showTitle={true}
+              />
             </div>
           )}
 
           {/* Övergripande problembild */}
-          {problemConfig && problemRating !== null && (
-            <div className={`p-4 rounded-lg border ${problemConfig.borderColor} ${problemConfig.bgColor}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-400">Övergripande status</span>
-                <span className={`text-lg font-bold ${problemConfig.textColor}`}>{problemRating}/5</span>
-              </div>
-              <ProgressBar value={problemRating} max={5} config={problemConfig} />
-              <p className={`mt-2 text-sm font-medium ${problemConfig.textColor}`}>
-                {problemConfig.label}
-              </p>
+          {problemRating !== null && (
+            <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+              <AssessmentScaleBar
+                type="problem"
+                value={problemRating}
+                size="md"
+                showLabels={true}
+                showTitle={true}
+              />
             </div>
           )}
         </div>
@@ -190,7 +148,16 @@ const CustomerAssessmentPanel: React.FC<CustomerAssessmentPanelProps> = ({
           </div>
         )}
 
-        {/* Kritisk varning */}
+        {/* Lugnande meddelande för varning/kritisk */}
+        {(overallLevel === 'warning' || overallLevel === 'critical') && (
+          <div className="mt-4">
+            <ReassuranceMessage
+              level={overallLevel === 'critical' ? 'critical' : 'warning'}
+            />
+          </div>
+        )}
+
+        {/* Kritisk varning - bekräftelse krävs */}
         {needsAcknowledgment && (
           <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
             <div className="flex items-center gap-2">

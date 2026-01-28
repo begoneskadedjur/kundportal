@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Case } from '../../types/cases'
 import ProfessionalAssessment from './ProfessionalAssessment'
+import ReassuranceMessage from '../shared/ReassuranceMessage'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import toast from 'react-hot-toast'
 
@@ -180,7 +181,7 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
         </div>
 
         {/* Summary Statistics */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-4">
           {/* Critical Cases */}
           <div className="text-center p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
@@ -208,6 +209,16 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
             <p className="text-xs text-green-300">OK</p>
           </div>
         </div>
+
+        {/* Lugnande meddelande för kritiska/varning-situationer */}
+        {(summary.criticalCases > 0 || summary.warningCases > 0) && (
+          <div className="mb-6">
+            <ReassuranceMessage
+              level={summary.criticalCases > 0 ? 'critical' : 'warning'}
+              compact={true}
+            />
+          </div>
+        )}
 
         {/* Latest Assessment Preview */}
         {summary.latestAssessment && (

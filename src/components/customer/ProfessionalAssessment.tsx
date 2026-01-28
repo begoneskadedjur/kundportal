@@ -1,6 +1,8 @@
 // src/components/customer/ProfessionalAssessment.tsx - Professional Assessment Display Component
 import React from 'react'
 import { Lightbulb, AlertTriangle } from 'lucide-react'
+import AssessmentScaleBar from '../shared/AssessmentScaleBar'
+import ReassuranceMessage from '../shared/ReassuranceMessage'
 
 // Types for assessment display
 export type PestLevel = 0 | 1 | 2 | 3
@@ -121,61 +123,61 @@ const ProfessionalAssessment: React.FC<ProfessionalAssessmentProps> = ({
             Bedömning & rekommendationer
           </h5>
           
-          {/* Assessment Results */}
-          {(pest_level !== null && pest_level !== undefined) || 
+          {/* Assessment Results med segmenterade skalor */}
+          {(pest_level !== null && pest_level !== undefined) ||
            (problem_rating !== null && problem_rating !== undefined) ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-              {(pest_level !== null && pest_level !== undefined) && (() => {
-                const pestDisplay = getPestLevelDisplay(pest_level)
-                return (
-                  <div className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg transition-colors hover:bg-slate-800/50">
-                    <div className="text-xl">{pestDisplay.emoji}</div>
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-slate-400">Skadedjursnivå</p>
-                      <p className="text-sm font-bold text-white leading-tight">{pestDisplay.label}</p>
-                      <p className="text-xs text-slate-500">{pestDisplay.desc}</p>
-                    </div>
-                  </div>
-                )
-              })()}
-              
-              {(problem_rating !== null && problem_rating !== undefined) && (() => {
-                const problemDisplay = getProblemRatingDisplay(problem_rating)
-                return (
-                  <div className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg transition-colors hover:bg-slate-800/50">
-                    <div className="text-xl font-bold text-white">{problem_rating}</div>
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-slate-400">Övergripande status</p>
-                      <p className="text-sm font-bold text-white leading-tight">{problemDisplay.label}</p>
-                      <p className="text-xs text-slate-500">{problemDisplay.desc}</p>
-                    </div>
-                  </div>
-                )
-              })()}
+              {(pest_level !== null && pest_level !== undefined) && (
+                <div className="p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg">
+                  <AssessmentScaleBar
+                    type="pest"
+                    value={pest_level}
+                    size="sm"
+                    showLabels={true}
+                    showTitle={true}
+                  />
+                </div>
+              )}
+
+              {(problem_rating !== null && problem_rating !== undefined) && (
+                <div className="p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg">
+                  <AssessmentScaleBar
+                    type="problem"
+                    value={problem_rating}
+                    size="sm"
+                    showLabels={true}
+                    showTitle={true}
+                  />
+                </div>
+              )}
             </div>
           ) : null}
           
           {/* Overall Status Indicator */}
           {(() => {
             if (!status) return null
-            
+
             const statusColors = {
               critical: 'bg-red-500/10 border-red-500/30 text-red-400',
-              warning: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400', 
+              warning: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
               ok: 'bg-green-500/10 border-green-500/30 text-green-400'
             }
-            
+
             return (
-              <div className={`p-4 rounded-lg border mb-4 transition-colors ${statusColors[status.level]}`}>
-                <p className="font-semibold text-sm flex items-center gap-3">
-                  <span className="text-lg">{status.emoji}</span>
-                  <span className="leading-tight">{status.text}</span>
-                </p>
-                {status.level === 'critical' && (
-                  <p className="text-xs mt-2 opacity-90 leading-relaxed">
-                    <AlertTriangle className="w-3 h-3 inline mr-1" />
-                    Denna bedömning kräver er uppmärksamhet och eventuellt samarbete för att lösa problemet effektivt.
+              <div className="mb-4 space-y-3">
+                <div className={`p-4 rounded-lg border transition-colors ${statusColors[status.level]}`}>
+                  <p className="font-semibold text-sm flex items-center gap-3">
+                    <span className="text-lg">{status.emoji}</span>
+                    <span className="leading-tight">{status.text}</span>
                   </p>
+                </div>
+
+                {/* Lugnande meddelande för varning/kritiska nivåer */}
+                {(status.level === 'warning' || status.level === 'critical') && (
+                  <ReassuranceMessage
+                    level={status.level === 'critical' ? 'critical' : 'warning'}
+                    compact={true}
+                  />
                 )}
               </div>
             )
