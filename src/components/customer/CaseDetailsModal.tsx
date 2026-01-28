@@ -1,5 +1,6 @@
 // src/components/customer/CaseDetailsModal.tsx - Med kunduppgifter för PDF
 import { useEffect, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   X,
   Calendar,
@@ -406,8 +407,10 @@ export default function CaseDetailsModal({
     ? fallbackData?.case_number
     : taskDetails?.task_id
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  // Använd Portal för att rendera modalen direkt på body
+  // Detta säkerställer att modalen alltid visas ovanför alla andra element
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto">
         <Card className="relative">
           {/* Header */}
@@ -1035,6 +1038,7 @@ export default function CaseDetailsModal({
         onConfirmClose={handleConfirmClose}
         onGoBack={handleGoBack}
       />
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -14,7 +14,8 @@ import {
   Search,
   Filter,
   Eye,
-  Bug
+  Bug,
+  User
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDebounce } from '../../hooks/useDebounce'
@@ -194,6 +195,7 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                     <th className="text-center px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Skadedjursnivå</th>
                     <th className="text-center px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Övergripande status</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Skadedjur</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Tekniker</th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Kostnad</th>
                     <th className="text-center px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide"></th>
                   </tr>
@@ -270,6 +272,14 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                           <div className="flex items-center gap-2">
                             <Bug className="w-4 h-4 text-slate-500" />
                             <span className="text-slate-300">{caseItem.pest_type || '-'}</span>
+                          </div>
+                        </td>
+
+                        {/* Tekniker */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-slate-500" />
+                            <span className="text-slate-300">{caseItem.primary_technician_name || caseItem.technician_name || '-'}</span>
                           </div>
                         </td>
 
