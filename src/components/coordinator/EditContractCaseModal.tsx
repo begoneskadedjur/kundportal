@@ -1017,9 +1017,10 @@ export default function EditContractCaseModal({
       }
 
       toast.success('Ärende uppdaterat!')
-      onSuccess?.()
       // Refresha data istället för att stänga - tekniker kan nu boka återbesök direkt
       await refreshCaseData()
+      // Skicka med uppdaterad data så parent-komponenten vet att det INTE är en radering
+      onSuccess?.(localCaseData)
     } catch (error) {
       console.error('Error updating case:', error)
       toast.error('Kunde inte uppdatera ärendet')
