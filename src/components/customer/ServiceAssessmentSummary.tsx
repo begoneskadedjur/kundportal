@@ -1,12 +1,11 @@
 // src/components/customer/ServiceAssessmentSummary.tsx - Service Assessment Summary Card
 import React, { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle, Clock, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle, Clock, ChevronRight, Eye, AlertCircle } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Case } from '../../types/cases'
-import ProfessionalAssessment from './ProfessionalAssessment'
 import ReassuranceMessage from '../shared/ReassuranceMessage'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import toast from 'react-hot-toast'
@@ -14,6 +13,7 @@ import toast from 'react-hot-toast'
 interface ServiceAssessmentSummaryProps {
   customerId: string
   className?: string
+  onOpenCaseDetails?: (caseId: string) => void
 }
 
 interface AssessmentSummary {
@@ -24,16 +24,17 @@ interface AssessmentSummary {
   warningCases: number
   okCases: number
   recentTrend: 'improving' | 'stable' | 'worsening' | null
+  unacknowledgedCriticalCases: Case[]
 }
 
-const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({ 
-  customerId, 
-  className = '' 
+const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
+  customerId,
+  className = '',
+  onOpenCaseDetails
 }) => {
   const { profile } = useAuth()
   const [summary, setSummary] = useState<AssessmentSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showDetails, setShowDetails] = useState(false)
 
   useEffect(() => {
     if (profile?.customer_id) {
@@ -45,6 +46,7 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
     if (!profile?.customer_id) return
 
     try {
+      // Hämta alla ärenden
       const { data: cases, error } = await supabase
         .from('cases')
         .select('*')
@@ -53,29 +55,47 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
 
       if (error) throw error
 
-      // Calculate summary statistics
-      const casesWithAssessments = cases?.filter(c => 
-        (c.pest_level !== null && c.pest_level !== undefined) || 
+      // Beräkna statistik
+      const casesWithAssessments = cases?.filter(c =>
+        (c.pest_level !== null && c.pest_level !== undefined) ||
         (c.problem_rating !== null && c.problem_rating !== undefined)
       ) || []
 
-      const criticalCases = casesWithAssessments.filter(c => 
-        (c.pest_level && c.pest_level >= 3) || 
+      // Identifiera kritiska ärenden
+      const criticalCasesList = casesWithAssessments.filter(c =>
+        (c.pest_level && c.pest_level >= 3) ||
         (c.problem_rating && c.problem_rating >= 4)
+      )
+
+      const warningCases = casesWithAssessments.filter(c =>
+        !((c.pest_level && c.pest_level >= 3) || (c.problem_rating && c.problem_rating >= 4)) &&
+        ((c.pest_level === 2) || (c.problem_rating === 3))
       ).length
 
-      const warningCases = casesWithAssessments.filter(c => 
-        (c.pest_level === 2) || (c.problem_rating === 3)
-      ).length
-
-      const okCases = casesWithAssessments.filter(c => 
-        ((c.pest_level !== null && c.pest_level !== undefined) || 
+      const okCases = casesWithAssessments.filter(c =>
+        ((c.pest_level !== null && c.pest_level !== undefined) ||
          (c.problem_rating !== null && c.problem_rating !== undefined)) &&
         !((c.pest_level && c.pest_level >= 3) || (c.problem_rating && c.problem_rating >= 4)) &&
         !(c.pest_level === 2 || c.problem_rating === 3)
       ).length
 
-      // Get latest assessment and trend
+      // Hämta bekräftelser för kritiska ärenden
+      let unacknowledgedCriticalCases: Case[] = []
+
+      if (criticalCasesList.length > 0 && profile?.id) {
+        const criticalCaseIds = criticalCasesList.map(c => c.id)
+
+        const { data: acknowledgments } = await supabase
+          .from('case_acknowledgments')
+          .select('case_id')
+          .in('case_id', criticalCaseIds)
+          .eq('user_id', profile.id)
+
+        const acknowledgedCaseIds = new Set(acknowledgments?.map(a => a.case_id) || [])
+        unacknowledgedCriticalCases = criticalCasesList.filter(c => !acknowledgedCaseIds.has(c.id))
+      }
+
+      // Senaste bedömning och trend
       const latestAssessment = casesWithAssessments.length > 0 ? casesWithAssessments[0] : null
       const recentTrend = latestAssessment?.pest_level_trend || null
 
@@ -83,16 +103,47 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
         latestAssessment,
         totalCases: cases?.length || 0,
         casesWithAssessments: casesWithAssessments.length,
-        criticalCases,
+        criticalCases: criticalCasesList.length,
         warningCases,
         okCases,
-        recentTrend
+        recentTrend,
+        unacknowledgedCriticalCases
       })
     } catch (error: any) {
       console.error('Error fetching assessment summary:', error)
       toast.error('Kunde inte hämta bedömningsöversikt')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Hjälpfunktion för att avgöra status-nivå
+  const getCaseStatusLevel = (caseItem: Case): 'critical' | 'warning' | 'ok' => {
+    if ((caseItem.pest_level && caseItem.pest_level >= 3) ||
+        (caseItem.problem_rating && caseItem.problem_rating >= 4)) {
+      return 'critical'
+    }
+    if (caseItem.pest_level === 2 || caseItem.problem_rating === 3) {
+      return 'warning'
+    }
+    return 'ok'
+  }
+
+  // Status-emoji baserat på nivå
+  const getStatusEmoji = (level: 'critical' | 'warning' | 'ok') => {
+    switch (level) {
+      case 'critical': return '🔴'
+      case 'warning': return '🟡'
+      case 'ok': return '🟢'
+    }
+  }
+
+  // Status-text baserat på nivå
+  const getStatusText = (level: 'critical' | 'warning' | 'ok') => {
+    switch (level) {
+      case 'critical': return 'Kritisk'
+      case 'warning': return 'Varning'
+      case 'ok': return 'OK'
     }
   }
 
@@ -114,17 +165,17 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
             <span className="text-lg">🚦</span>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Servicebedömningar</h3>
-            <p className="text-sm text-slate-400">Professionella utvärderingar av er situation</p>
+            <h3 className="text-lg font-semibold text-white">Er skadedjurssituation</h3>
+            <p className="text-sm text-slate-400">Inga bedömningar än</p>
           </div>
         </div>
         <div className="text-center py-8">
           <div className="w-16 h-16 bg-slate-700/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <Clock className="w-8 h-8 text-slate-600" />
           </div>
-          <p className="text-slate-400">Inga bedömningar än</p>
+          <p className="text-slate-400">Inga bedömningar att visa</p>
           <p className="text-sm text-slate-500 mt-1">
-            Bedömningar kommer att visas efter att våra tekniker har utfört servicearenden
+            Bedömningar visas efter att våra tekniker utfört servicearenden
           </p>
         </div>
       </Card>
@@ -153,26 +204,45 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
       case 'stable':
         return 'Stabilt'
       default:
-        return 'Okänd trend'
+        return null
     }
   }
+
+  const handleOpenCase = (caseId: string) => {
+    if (onOpenCaseDetails) {
+      onOpenCaseDetails(caseId)
+    }
+  }
+
+  // Kontrollera om senaste ärendet är bekräftat
+  const isLatestCaseAcknowledged = summary.latestAssessment
+    ? !summary.unacknowledgedCriticalCases.some(c => c.id === summary.latestAssessment?.id)
+    : true
+
+  const latestCaseStatus = summary.latestAssessment
+    ? getCaseStatusLevel(summary.latestAssessment)
+    : 'ok'
+
+  const latestCaseNeedsAcknowledgment = latestCaseStatus === 'critical'
 
   return (
     <Card className={`bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700 ${className}`}>
       <div className="p-6">
-        {/* Header */}
+        {/* Header med nya rubriker */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
               <span className="text-lg">🚦</span>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Servicebedömningar</h3>
-              <p className="text-sm text-slate-400">Professionella utvärderingar av er situation</p>
+              <h3 className="text-lg font-semibold text-white">Er skadedjurssituation</h3>
+              <p className="text-sm text-slate-400">
+                Sammanfattning av {summary.casesWithAssessments} bedömda ärenden
+              </p>
             </div>
           </div>
-          
-          {summary.recentTrend && (
+
+          {summary.recentTrend && getTrendText() && (
             <div className="flex items-center gap-2 text-sm text-slate-300">
               {getTrendIcon()}
               <span>{getTrendText()}</span>
@@ -180,13 +250,43 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
           )}
         </div>
 
+        {/* Bekräftelse-banner för obekräftade kritiska ärenden */}
+        {summary.unacknowledgedCriticalCases.length > 0 && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400" />
+                <span className="text-sm text-red-400 font-medium">
+                  {summary.unacknowledgedCriticalCases.length} ärende{summary.unacknowledgedCriticalCases.length > 1 ? 'n' : ''} kräver er bekräftelse
+                </span>
+              </div>
+              {onOpenCaseDetails && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleOpenCase(summary.unacknowledgedCriticalCases[0].id)}
+                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1"
+                >
+                  Visa ärende
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Summary Statistics */}
         <div className="grid grid-cols-3 gap-4 mb-4">
           {/* Critical Cases */}
-          <div className="text-center p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+          <div className={`text-center p-3 bg-red-500/10 border border-red-500/20 rounded-lg ${
+            summary.unacknowledgedCriticalCases.length > 0 ? 'ring-1 ring-red-500/50' : ''
+          }`}>
             <div className="flex items-center justify-center gap-1 mb-1">
               <AlertTriangle className="w-4 h-4 text-red-400" />
               <span className="text-xl font-bold text-red-400">{summary.criticalCases}</span>
+              {summary.unacknowledgedCriticalCases.length > 0 && (
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              )}
             </div>
             <p className="text-xs text-red-300">Kritiska</p>
           </div>
@@ -212,7 +312,7 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
 
         {/* Lugnande meddelande för kritiska/varning-situationer */}
         {(summary.criticalCases > 0 || summary.warningCases > 0) && (
-          <div className="mb-6">
+          <div className="mb-4">
             <ReassuranceMessage
               level={summary.criticalCases > 0 ? 'critical' : 'warning'}
               compact={true}
@@ -220,56 +320,91 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
           </div>
         )}
 
-        {/* Latest Assessment Preview */}
+        {/* Senaste bedömda ärende - kompakt kort */}
         {summary.latestAssessment && (
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold text-slate-300">Senaste bedömning</h4>
-              <span className="text-xs text-slate-500">
-                Ärende #{summary.latestAssessment.case_number}
-              </span>
+          <div
+            className={`p-4 rounded-lg border transition-all ${
+              onOpenCaseDetails
+                ? 'cursor-pointer hover:bg-slate-700/30 border-slate-700/50 hover:border-slate-600'
+                : 'border-slate-700/50'
+            }`}
+            onClick={() => onOpenCaseDetails && handleOpenCase(summary.latestAssessment!.id)}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                Senaste bedömda ärende
+              </h4>
+              {onOpenCaseDetails && (
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              )}
             </div>
-            
-            {showDetails ? (
-              <ProfessionalAssessment 
-                assessment={{
-                  pest_level: summary.latestAssessment.pest_level,
-                  problem_rating: summary.latestAssessment.problem_rating,
-                  recommendations: summary.latestAssessment.recommendations,
-                  assessment_date: summary.latestAssessment.assessment_date,
-                  assessed_by: summary.latestAssessment.assessed_by
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white font-medium">
+                  #{summary.latestAssessment.case_number}
+                  {summary.latestAssessment.service_type && (
+                    <span className="text-slate-400 font-normal ml-2">
+                      - {summary.latestAssessment.service_type === 'inspection' ? 'Inspektion' : 'Rutinbesök'}
+                    </span>
+                  )}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm">
+                    {getStatusEmoji(latestCaseStatus)} {getStatusText(latestCaseStatus)}
+                  </span>
+                  {latestCaseNeedsAcknowledgment && (
+                    <>
+                      <span className="text-slate-600">•</span>
+                      {isLatestCaseAcknowledged ? (
+                        <span className="text-emerald-400 text-sm flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Bekräftad
+                        </span>
+                      ) : (
+                        <span className="text-red-400 text-sm flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Ej bekräftad
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {summary.latestAssessment.assessment_date && (
+                <span className="text-xs text-slate-500">
+                  {new Date(summary.latestAssessment.assessment_date).toLocaleDateString('sv-SE', {
+                    day: 'numeric',
+                    month: 'short'
+                  })}
+                </span>
+              )}
+            </div>
+
+            {/* Visa ärendedetaljer-knapp */}
+            {onOpenCaseDetails && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full mt-3 justify-center"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenCase(summary.latestAssessment!.id)
                 }}
-              />
-            ) : (
-              <ProfessionalAssessment 
-                assessment={{
-                  pest_level: summary.latestAssessment.pest_level,
-                  problem_rating: summary.latestAssessment.problem_rating,
-                  recommendations: summary.latestAssessment.recommendations,
-                  assessment_date: summary.latestAssessment.assessment_date,
-                  assessed_by: summary.latestAssessment.assessed_by
-                }}
-                compact
-              />
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Visa ärendedetaljer
+              </Button>
             )}
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-700/50">
           <div className="text-xs text-slate-500">
             {summary.casesWithAssessments} av {summary.totalCases} ärenden bedömda
           </div>
-          
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-2"
-          >
-            <span>{showDetails ? 'Dölj detaljer' : 'Visa detaljer'}</span>
-            <ChevronRight className={`w-3 h-3 transition-transform ${showDetails ? 'rotate-90' : ''}`} />
-          </Button>
         </div>
       </div>
     </Card>

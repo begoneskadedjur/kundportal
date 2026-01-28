@@ -1,5 +1,5 @@
 // src/pages/customer/Portal.tsx - Premium Customer Portal
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { LogOut, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
@@ -25,6 +25,8 @@ import PendingQuoteNotification from '../../components/customer/PendingQuoteNoti
 import QuoteListView from '../../components/customer/QuoteListView'
 import CustomerEquipmentView from '../../components/customer/CustomerEquipmentView'
 import InspectionSessionsView from '../../components/customer/InspectionSessionsView'
+import CaseDetailsModal from '../../components/customer/CaseDetailsModal'
+import { Case } from '../../types/cases'
 
 // Customer type matching new database structure
 type Customer = {
@@ -71,6 +73,10 @@ const CustomerPortal: React.FC = () => {
   const [highlightedStationId, setHighlightedStationId] = useState<string | null>(null)
   const [highlightedStationType, setHighlightedStationType] = useState<'outdoor' | 'indoor' | null>(null)
   const [highlightedFloorPlanId, setHighlightedFloorPlanId] = useState<string | null>(null)
+
+  // Case details modal state (för ServiceAssessmentSummary)
+  const [selectedCaseForModal, setSelectedCaseForModal] = useState<Case | null>(null)
+  const [isCaseModalOpen, setIsCaseModalOpen] = useState(false)
 
   // Check multisite access and redirect if needed - KRITISK: Måste köras först
   useEffect(() => {
@@ -254,6 +260,30 @@ const CustomerPortal: React.FC = () => {
     )
   }
 
+  // Öppna case details modal från ServiceAssessmentSummary
+  const handleOpenCaseDetails = useCallback(async (caseId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('cases')
+        .select('*')
+        .eq('id', caseId)
+        .single()
+
+      if (error) throw error
+
+      setSelectedCaseForModal(data)
+      setIsCaseModalOpen(true)
+    } catch (error) {
+      console.error('Error fetching case details:', error)
+    }
+  }, [])
+
+  // Stäng case details modal
+  const handleCloseCaseModal = useCallback(() => {
+    setIsCaseModalOpen(false)
+    setSelectedCaseForModal(null)
+  }, [])
+
   // Navigera till station på karta/planritning från Genomförda kontroller
   const handleNavigateToStation = (stationId: string, type: 'outdoor' | 'indoor', floorPlanId?: string) => {
     // Sätt highlighted state innan vi byter vy
@@ -362,8 +392,9 @@ const CustomerPortal: React.FC = () => {
 
             {/* Service Assessment Summary */}
             {customer && (
-              <ServiceAssessmentSummary 
+              <ServiceAssessmentSummary
                 customerId={customer.id}
+                onOpenCaseDetails={handleOpenCaseDetails}
               />
             )}
 
@@ -399,6 +430,32 @@ const CustomerPortal: React.FC = () => {
           onSuccess={() => {
             // Trigger refresh of timeline when new case is created
             window.location.reload()
+          }}
+        />
+      )}
+
+      {/* Case Details Modal - från ServiceAssessmentSummary */}
+      {selectedCaseForModal && (
+        <CaseDetailsModal
+          caseId={selectedCaseForModal.id}
+          clickupTaskId={selectedCaseForModal.clickup_task_id || ''}
+          isOpen={isCaseModalOpen}
+          onClose={handleCloseCaseModal}
+          fallbackData={{
+            case_number: selectedCaseForModal.case_number,
+            title: selectedCaseForModal.title || '',
+            description: selectedCaseForModal.description,
+            status: selectedCaseForModal.status,
+            service_type: selectedCaseForModal.service_type,
+            pest_type: selectedCaseForModal.pest_type,
+            price: selectedCaseForModal.price,
+            technician_name: selectedCaseForModal.technician_name,
+            scheduled_date: selectedCaseForModal.scheduled_date,
+            completed_date: selectedCaseForModal.completed_date,
+            pest_level: selectedCaseForModal.pest_level,
+            problem_rating: selectedCaseForModal.problem_rating,
+            recommendations: selectedCaseForModal.recommendations,
+            time_spent_minutes: selectedCaseForModal.time_spent_minutes
           }}
         />
       )}
