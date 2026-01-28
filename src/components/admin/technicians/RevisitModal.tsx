@@ -151,7 +151,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
         .update({
           start_date: newStartDate,
           due_date: newDueDate,
-          status: 'Bokad',
+          status: 'Återbesök',
         })
         .eq('id', caseData.id)
         .select()

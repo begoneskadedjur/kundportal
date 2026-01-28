@@ -1009,6 +1009,43 @@ export default function EditContractCaseModal({
 
       if (error) throw error
 
+      // 🚦 Logga trafikljusändring om pest_level eller problem_rating har ändrats
+      const originalPestLevel = localCaseData.pest_level
+      const originalProblemRating = localCaseData.problem_rating
+      const newPestLevel = cleanedFormData.pest_level
+      const newProblemRating = cleanedFormData.problem_rating
+
+      const trafficLightChanged =
+        originalPestLevel !== newPestLevel ||
+        originalProblemRating !== newProblemRating
+
+      if (trafficLightChanged && profile) {
+        try {
+          await supabase.from('case_updates_log').insert({
+            case_id: localCaseData.id,
+            case_table: 'cases',
+            update_type: 'traffic_light_updated',
+            previous_value: JSON.stringify({
+              pest_level: originalPestLevel,
+              problem_rating: originalProblemRating
+            }),
+            new_value: JSON.stringify({
+              pest_level: newPestLevel,
+              problem_rating: newProblemRating,
+              work_report: cleanedFormData.work_report || null,
+              recommendations: cleanedFormData.recommendations || null
+            }),
+            updated_by_id: profile.id,
+            updated_by_name: profile.full_name || profile.display_name || profile.email || 'Okänd',
+            case_type: 'contract',
+            user_role: profile.role || 'technician'
+          })
+        } catch (logError) {
+          console.warn('Kunde inte logga trafikljusändring:', logError)
+          // Fortsätt ändå - loggning ska inte blockera sparandet
+        }
+      }
+
       // Spara bildändringar om det finns några
       if (imageGalleryRef.current?.hasPendingChanges()) {
         const imageResult = await imageGalleryRef.current.commitChanges()

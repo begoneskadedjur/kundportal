@@ -31,6 +31,7 @@ import CustomerAssessmentPanel from './CustomerAssessmentPanel'
 import CriticalAcknowledgmentBanner from './CriticalAcknowledgmentBanner'
 import CloseWarningDialog from './CloseWarningDialog'
 import RevisitHistorySection, { RevisitHistoryEntry } from '../shared/RevisitHistorySection'
+import CaseJourneyTimeline from './CaseJourneyTimeline'
 import { generatePDFReport } from '../../utils/pdfReportGenerator'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -548,14 +549,15 @@ export default function CaseDetailsModal({
                   />
                 )}
 
-                {/* Återbesökshistorik */}
-                {revisitHistory.length > 0 && (
-                  <RevisitHistorySection
-                    history={revisitHistory}
-                    title="Besökshistorik"
-                    defaultExpanded={false}
-                  />
-                )}
+                {/* Ärendets utveckling - Tidslinje med trafikljushistorik */}
+                <CaseJourneyTimeline
+                  caseId={fallbackData.id}
+                  currentPestLevel={fallbackData.pest_level}
+                  currentProblemRating={fallbackData.problem_rating}
+                  assessmentDate={fallbackData.assessment_date}
+                  assessedBy={fallbackData.assessed_by}
+                  defaultExpanded={true}
+                />
 
                 {/* Beskrivning */}
                 {fallbackData.description && (

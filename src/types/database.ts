@@ -690,11 +690,12 @@ export type Database = {
 }
 
 // 🎯 CLICKUP STATUS SYSTEM - EXACT internal statuses (used in database, dropdowns, coordinator/technician views)
-export type ClickUpStatus = 
+export type ClickUpStatus =
   | 'Öppen'
   | 'Bokad'  // Note: "Bokat" variant also exists in some places
   | 'Offert skickad'
   | 'Offert signerad - boka in'
+  | 'Återbesök'  // General revisit status (unlimited revisits, local only - not synced to ClickUp)
   | 'Återbesök 1'
   | 'Återbesök 2'
   | 'Återbesök 3'
@@ -735,6 +736,7 @@ export const STATUS_NAME_TO_ID: { [key in ClickUpStatus]: string } = {
   'Öppen': 'c127553498_fwlMbGKH',
   'Bokat': 'c127553498_E9tR4uKl',
   'Bokad': 'c127553498_E9tR4uKl',
+  'Återbesök': 'local_revisit',  // Local status - not synced to ClickUp
   'Återbesök 1': 'c127553498_vUiYm1mz',
   'Återbesök 2': 'c127553498_oWvoXUqP',
   'Återbesök 3': 'c127553498_Pk6EAmNr',
@@ -756,6 +758,7 @@ export const STATUS_CONFIG: { [key in ClickUpStatus]: { id: string; color: strin
   'Öppen': { id: 'c127553498_fwlMbGKH', color: '#87909e', type: 'open', orderindex: 0 },
   'Bokat': { id: 'c127553498_E9tR4uKl', color: '#f8ae00', type: 'custom', orderindex: 1 },
   'Bokad': { id: 'c127553498_E9tR4uKl', color: '#f8ae00', type: 'custom', orderindex: 1 },
+  'Återbesök': { id: 'local_revisit', color: '#1090e0', type: 'custom', orderindex: 2 },  // Same color as numbered revisits
   'Återbesök 1': { id: 'c127553498_vUiYm1mz', color: '#1090e0', type: 'custom', orderindex: 2 },
   'Återbesök 2': { id: 'c127553498_oWvoXUqP', color: '#1090e0', type: 'custom', orderindex: 3 },
   'Återbesök 3': { id: 'c127553498_Pk6EAmNr', color: '#1090e0', type: 'custom', orderindex: 4 },
@@ -807,6 +810,7 @@ export const getCustomerStatusDisplay = (status: ClickUpStatus): string => {
       return 'Offert skickad'
     case 'Offert signerad - boka in':
       return 'Offert Signerad'
+    case 'Återbesök':
     case 'Återbesök 1':
     case 'Återbesök 2':
     case 'Återbesök 3':
@@ -836,6 +840,7 @@ export const DROPDOWN_STATUSES: ClickUpStatus[] = [
   'Bokad',
   'Offert skickad',
   'Offert signerad - boka in',
+  'Återbesök',  // General revisit status
   'Återbesök 1',
   'Återbesök 2',
   'Återbesök 3',
@@ -853,6 +858,7 @@ export const ALL_VALID_STATUSES: ClickUpStatus[] = [
   'Bokat', // Alternative spelling
   'Offert skickad',
   'Offert signerad - boka in',
+  'Återbesök',  // General revisit status
   'Återbesök 1',
   'Återbesök 2',
   'Återbesök 3',
