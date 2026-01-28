@@ -2,7 +2,6 @@
 // Enhanced modal för avtalsärenden med offert, rapport och tidloggning
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -1242,7 +1241,6 @@ export default function EditContractCaseModal({
   const showCommunication = caseData && !isCustomerView
 
   return (
-    <>
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
@@ -2208,6 +2206,88 @@ export default function EditContractCaseModal({
         </div>
       )}
 
+      {/* Val-dialog: Återbesök eller Nytt ärende */}
+      {showActionDialog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md border border-slate-700 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-teal-400" />
+              Vad vill du göra?
+            </h3>
+
+            {/* Alternativ 1: Återbesök */}
+            <button
+              onClick={() => {
+                setShowRevisitModal(true)
+                setShowActionDialog(false)
+              }}
+              className="w-full p-4 mb-3 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 rounded-lg text-left transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <RotateCcw className="w-5 h-5 text-teal-400" />
+                <div>
+                  <p className="text-white font-medium">Boka återbesök</p>
+                  <p className="text-sm text-slate-400">Flytta ärendet till ett framtida datum för uppföljning</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Alternativ 2: Kopiera ärende */}
+            <button
+              onClick={() => {
+                setShowFollowUpDialog(true)
+                setShowActionDialog(false)
+              }}
+              className="w-full p-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-left transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Plus className="w-5 h-5 text-amber-400" />
+                <div>
+                  <p className="text-white font-medium">Kopiera ärende</p>
+                  <p className="text-sm text-slate-400">Nytt problem hos samma kund (annat skadedjur)</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Avbryt */}
+            <button
+              onClick={() => setShowActionDialog(false)}
+              className="w-full mt-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Avbryt
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Återbesök-modal för kontraktsärenden */}
+      {showRevisitModal && caseData && (
+        <RevisitContractModal
+          caseData={{
+            ...caseData,
+            case_number: formData.case_number,
+            title: formData.title,
+            description: formData.description,
+            status: formData.status,
+            contact_person: formData.contact_person,
+            contact_phone: formData.contact_phone,
+            contact_email: formData.contact_email,
+            pest_type: formData.pest_type,
+            address: formData.address,
+            scheduled_start: formData.scheduled_start,
+            scheduled_end: formData.scheduled_end,
+            work_report: formData.work_report,
+            id: caseData.id
+          }}
+          onSuccess={(updatedCase) => {
+            setShowRevisitModal(false)
+            if (onSuccess) onSuccess()
+            handleClose()
+          }}
+          onClose={() => setShowRevisitModal(false)}
+        />
+      )}
+
       {/* Kommunikations-panel (slide-in från höger) */}
       {/* KRITISKT: Endast för interna användare - ALDRIG för kundvyer */}
       {showCommunication && (
@@ -2236,89 +2316,5 @@ export default function EditContractCaseModal({
         />
       )}
     </Modal>
-
-    {/* Val-dialog: Återbesök eller Kopiera ärende - UTANFÖR Modal via Portal */}
-    {showActionDialog && createPortal(
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
-        <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md border border-slate-700 shadow-2xl">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-teal-400" />
-            Vad vill du göra?
-          </h3>
-
-          {/* Alternativ 1: Återbesök */}
-          <button
-            onClick={() => {
-              setShowRevisitModal(true)
-              setShowActionDialog(false)
-            }}
-            className="w-full p-4 mb-3 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 rounded-lg text-left transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <RotateCcw className="w-5 h-5 text-teal-400" />
-              <div>
-                <p className="text-white font-medium">Boka återbesök</p>
-                <p className="text-sm text-slate-400">Flytta ärendet till ett framtida datum för uppföljning</p>
-              </div>
-            </div>
-          </button>
-
-          {/* Alternativ 2: Kopiera ärende */}
-          <button
-            onClick={() => {
-              setShowFollowUpDialog(true)
-              setShowActionDialog(false)
-            }}
-            className="w-full p-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-left transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Plus className="w-5 h-5 text-amber-400" />
-              <div>
-                <p className="text-white font-medium">Kopiera ärende</p>
-                <p className="text-sm text-slate-400">Nytt problem hos samma kund (annat skadedjur)</p>
-              </div>
-            </div>
-          </button>
-
-          {/* Avbryt */}
-          <button
-            onClick={() => setShowActionDialog(false)}
-            className="w-full mt-4 py-2 text-slate-400 hover:text-white transition-colors"
-          >
-            Avbryt
-          </button>
-        </div>
-      </div>,
-      document.body
-    )}
-
-    {/* Återbesök-modal för kontraktsärenden - UTANFÖR Modal */}
-    {showRevisitModal && caseData && (
-      <RevisitContractModal
-        caseData={{
-          ...caseData,
-          case_number: formData.case_number,
-          title: formData.title,
-          description: formData.description,
-          status: formData.status,
-          contact_person: formData.contact_person,
-          contact_phone: formData.contact_phone,
-          contact_email: formData.contact_email,
-          pest_type: formData.pest_type,
-          address: formData.address,
-          scheduled_start: formData.scheduled_start,
-          scheduled_end: formData.scheduled_end,
-          work_report: formData.work_report,
-          id: caseData.id
-        }}
-        onSuccess={(updatedCase) => {
-          setShowRevisitModal(false)
-          if (onSuccess) onSuccess()
-          handleClose()
-        }}
-        onClose={() => setShowRevisitModal(false)}
-      />
-    )}
-  </>
   )
 }
