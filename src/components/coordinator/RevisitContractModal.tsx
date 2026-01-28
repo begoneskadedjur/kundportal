@@ -159,6 +159,14 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
         .from('case_updates_log')
         .insert({
           case_id: caseData.id,
+          case_table: 'cases',
+          updated_by: profile.id,
+          field_changes: {
+            scheduled_start: { old: caseData.scheduled_start, new: newScheduledStart },
+            scheduled_end: { old: caseData.scheduled_end, new: newScheduledEnd },
+            status: { old: caseData.status, new: 'Bokad' }
+          },
+          user_role: 'technician',
           case_type: 'contract',
           update_type: 'revisit_scheduled',
           previous_value: JSON.stringify({
