@@ -45,6 +45,9 @@ import { PEST_TYPE_OPTIONS } from '../../../utils/clickupFieldMapper'
 import DeleteCaseConfirmDialog from '../../shared/DeleteCaseConfirmDialog'
 import type { DeleteableCaseType } from '../../../services/caseDeleteService'
 
+// Återbesök modal
+import RevisitModal from './RevisitModal'
+
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
 interface TechnicianCase {
@@ -353,6 +356,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
   const [followUpPestType, setFollowUpPestType] = useState('')
   const [followUpLoading, setFollowUpLoading] = useState(false)
+
+  // Återbesök / Nytt ärende val-dialog
+  const [showActionDialog, setShowActionDialog] = useState(false)
+  const [showRevisitModal, setShowRevisitModal] = useState(false)
 
   // Kommunikations-panel state
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
@@ -923,16 +930,16 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
                 </button>
 
-                {/* Följeärende Button - endast för private/business och inte redan ett följeärende */}
+                {/* Återbesök / Nytt ärende Button - endast för private/business och inte redan ett följeärende */}
                 {canCreateFollowUp ? (
                   <button
                     type="button"
-                    onClick={() => setShowFollowUpDialog(true)}
-                    className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 rounded-lg text-amber-300 hover:text-amber-200 text-sm font-medium transition-all duration-200 active:scale-95"
-                    title="Skapa följeärende för annat skadedjur"
+                    onClick={() => setShowActionDialog(true)}
+                    className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 rounded-lg text-teal-300 hover:text-teal-200 text-sm font-medium transition-all duration-200 active:scale-95"
+                    title="Boka återbesök eller skapa nytt ärende"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span className="sm:inline text-xs sm:text-sm">Följe</span>
+                    <CalendarIcon className="w-4 h-4" />
+                    <span className="sm:inline text-xs sm:text-sm">Återbesök</span>
                   </button>
                 ) : (
                   // Placeholder för att behålla grid-layouten
@@ -991,14 +998,98 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           </div>
         )}
 
-        {/* Följeärende-dialog */}
+        {/* Val-dialog: Återbesök eller Nytt ärende */}
+        {showActionDialog && (
+          <div className="mb-6 p-4 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h4 className="text-lg font-medium text-teal-300 flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5" />
+                  Återbesök / Nytt ärende
+                </h4>
+                <p className="text-sm text-slate-400 mt-1">
+                  Vad vill du göra?
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowActionDialog(false)}
+                className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {/* Alternativ 1: Boka återbesök */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowActionDialog(false)
+                  setShowRevisitModal(true)
+                }}
+                className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-teal-500/50 rounded-lg text-left transition-all group"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-teal-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-teal-500/30 transition-colors">
+                    <CalendarIcon className="w-5 h-5 text-teal-400" />
+                  </div>
+                  <div>
+                    <h5 className="text-white font-medium group-hover:text-teal-300 transition-colors">
+                      Boka återbesök
+                    </h5>
+                    <p className="text-sm text-slate-400 mt-0.5">
+                      Flytta ärendet till ett framtida datum för uppföljning av skadedjursstatus
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              {/* Alternativ 2: Skapa nytt ärende */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowActionDialog(false)
+                  setShowFollowUpDialog(true)
+                }}
+                className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/50 rounded-lg text-left transition-all group"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-amber-500/30 transition-colors">
+                    <Plus className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <h5 className="text-white font-medium group-hover:text-amber-300 transition-colors">
+                      Skapa nytt ärende
+                    </h5>
+                    <p className="text-sm text-slate-400 mt-0.5">
+                      Nytt problem hos samma kund (annat skadedjur)
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              {/* Avbryt */}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowActionDialog(false)}
+                className="w-full mt-2"
+              >
+                Avbryt
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Följeärende-dialog (Nytt ärende) */}
         {showFollowUpDialog && (
           <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h4 className="text-lg font-medium text-amber-300 flex items-center gap-2">
                   <Plus className="w-5 h-5" />
-                  Skapa följeärende
+                  Skapa nytt ärende
                 </h4>
                 <p className="text-sm text-slate-400 mt-1">
                   Välj skadedjurstyp för det nya ärendet. Kundinformation, adress och schemaläggning kopieras automatiskt.
@@ -1056,7 +1147,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   disabled={!followUpPestType || followUpLoading}
                   className="flex-1"
                 >
-                  {followUpLoading ? 'Skapar...' : 'Skapa följeärende'}
+                  {followUpLoading ? 'Skapar...' : 'Skapa nytt ärende'}
                 </Button>
               </div>
             </div>
@@ -1475,6 +1566,28 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         caseType={currentCase.case_type as DeleteableCaseType}
         caseTitle={currentCase.title}
       />
+
+      {/* Återbesöks-modal */}
+      {showRevisitModal && currentCase && (
+        <RevisitModal
+          caseData={currentCase}
+          onSuccess={(updatedCase) => {
+            setShowRevisitModal(false)
+            // Uppdatera currentCase med nya datum
+            setCurrentCase(updatedCase)
+            // Uppdatera formData med nya datum
+            setFormData(prev => ({
+              ...prev,
+              start_date: updatedCase.start_date,
+              due_date: updatedCase.due_date,
+              status: updatedCase.status
+            }))
+            // Informera parent-komponenten
+            onSuccess(updatedCase)
+          }}
+          onClose={() => setShowRevisitModal(false)}
+        />
+      )}
     </Modal>
   )
 }
