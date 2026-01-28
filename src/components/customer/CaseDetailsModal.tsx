@@ -30,6 +30,7 @@ import CasePreparationsSection from '../shared/CasePreparationsSection'
 import CustomerAssessmentPanel from './CustomerAssessmentPanel'
 import CriticalAcknowledgmentBanner from './CriticalAcknowledgmentBanner'
 import CloseWarningDialog from './CloseWarningDialog'
+import RevisitHistorySection, { RevisitHistoryEntry } from '../shared/RevisitHistorySection'
 import { generatePDFReport } from '../../utils/pdfReportGenerator'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -133,6 +134,7 @@ export default function CaseDetailsModal({
   const [caseImages, setCaseImages] = useState<CaseImageWithUrl[]>([])
   const [loadingImages, setLoadingImages] = useState(false)
   const [showCloseWarning, setShowCloseWarning] = useState(false)
+  const [revisitHistory, setRevisitHistory] = useState<RevisitHistoryEntry[]>([])
   const { profile } = useAuth()
 
   // Hook för läskvitton
@@ -193,6 +195,8 @@ export default function CaseDetailsModal({
     if (isOpen) {
       // Hämta bilder för alla ärenden
       fetchCaseImages()
+      // Hämta återbesökshistorik
+      fetchRevisitHistory()
 
       // Om vi har clickupTaskId, försök hämta från ClickUp
       if (clickupTaskId) {
@@ -276,6 +280,27 @@ export default function CaseDetailsModal({
       console.error('Error fetching case images:', error)
     } finally {
       setLoadingImages(false)
+    }
+  }
+
+  // Hämta återbesökshistorik
+  const fetchRevisitHistory = async () => {
+    if (!caseId) return
+    try {
+      const { data, error } = await supabase
+        .from('case_updates_log')
+        .select('*')
+        .eq('case_id', caseId)
+        .eq('update_type', 'revisit_scheduled')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching revisit history:', error)
+      } else {
+        setRevisitHistory(data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching revisit history:', error)
     }
   }
 
@@ -520,6 +545,15 @@ export default function CaseDetailsModal({
                     acknowledgment={acknowledgment}
                     loading={acknowledgmentLoading}
                     onAcknowledge={handleAcknowledge}
+                  />
+                )}
+
+                {/* Återbesökshistorik */}
+                {revisitHistory.length > 0 && (
+                  <RevisitHistorySection
+                    history={revisitHistory}
+                    title="Besökshistorik"
+                    defaultExpanded={false}
                   />
                 )}
 

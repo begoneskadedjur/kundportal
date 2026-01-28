@@ -100,30 +100,31 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
   const [revisitHistory, setRevisitHistory] = useState<RevisitHistoryEntry[]>([])
   const [showFullHistory, setShowFullHistory] = useState(false)
 
-  // Ladda återbesökshistorik
-  useEffect(() => {
-    const fetchHistory = async () => {
-      setLoadingHistory(true)
-      try {
-        const { data, error } = await supabase
-          .from('case_updates_log')
-          .select('*')
-          .eq('case_id', caseData.id)
-          .eq('update_type', 'revisit_scheduled')
-          .order('created_at', { ascending: false })
+  // Funktion för att hämta återbesökshistorik
+  const fetchHistory = async () => {
+    setLoadingHistory(true)
+    try {
+      const { data, error } = await supabase
+        .from('case_updates_log')
+        .select('*')
+        .eq('case_id', caseData.id)
+        .eq('update_type', 'revisit_scheduled')
+        .order('created_at', { ascending: false })
 
-        if (error) {
-          console.error('Error fetching revisit history:', error)
-        } else {
-          setRevisitHistory(data || [])
-        }
-      } catch (error) {
-        console.error('Error fetching history:', error)
-      } finally {
-        setLoadingHistory(false)
+      if (error) {
+        console.error('Error fetching revisit history:', error)
+      } else {
+        setRevisitHistory(data || [])
       }
+    } catch (error) {
+      console.error('Error fetching history:', error)
+    } finally {
+      setLoadingHistory(false)
     }
+  }
 
+  // Ladda återbesökshistorik vid mount
+  useEffect(() => {
     fetchHistory()
   }, [caseData.id])
 
@@ -182,7 +183,22 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           updated_by_name: profile.full_name || profile.display_name || 'Okänd'
         })
 
-      toast.success('Återbesök bokat!')
+      toast.success('Återbesök bokat! Du kan boka fler återbesök.')
+
+      // Refresha historiken så den nya bokningen visas
+      await fetchHistory()
+
+      // Rensa anteckningsfältet för nästa bokning
+      setRevisitNote('')
+
+      // Uppdatera startdatum till det nya bokade datumet
+      setStartDate(new Date(newScheduledStart))
+      setEndDate(null)
+
+      // Expandera historiken så användaren ser den nya bokningen
+      setShowFullHistory(true)
+
+      // Meddela parent-komponenten om uppdateringen
       onSuccess({
         ...caseData,
         ...updatedCase

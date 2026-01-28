@@ -95,6 +95,7 @@ export default function EditContractCaseModal({
   const navigate = useNavigate()
   const { profile } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [localCaseData, setLocalCaseData] = useState<any>(caseData)
   const [customerData, setCustomerData] = useState<any>(null)
   const [formData, setFormData] = useState({
     // Grundläggande information
@@ -397,6 +398,52 @@ export default function EditContractCaseModal({
       setTimerInterval(null)
     }
   }, [isTimerRunning, formData.work_started_at])
+
+  // Synkronisera localCaseData med inkommande caseData prop när modal öppnas
+  useEffect(() => {
+    if (caseData && isOpen) {
+      setLocalCaseData(caseData)
+    }
+  }, [caseData, isOpen])
+
+  // Funktion för att hämta uppdaterad data från databasen
+  const refreshCaseData = async () => {
+    if (!localCaseData?.id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('cases')
+        .select('*')
+        .eq('id', localCaseData.id)
+        .single()
+
+      if (error) throw error
+
+      if (data) {
+        setLocalCaseData(data)
+        // Uppdatera även formData med den nya datan
+        setFormData(prev => ({
+          ...prev,
+          case_number: data.case_number || prev.case_number,
+          title: data.title || prev.title,
+          description: data.description || prev.description,
+          status: data.status || prev.status,
+          scheduled_start: data.scheduled_start ? new Date(data.scheduled_start) : prev.scheduled_start,
+          scheduled_end: data.scheduled_end ? new Date(data.scheduled_end) : prev.scheduled_end,
+          work_report: data.work_report || prev.work_report,
+          recommendations: data.recommendations || prev.recommendations,
+          time_spent_minutes: data.time_spent_minutes ?? prev.time_spent_minutes,
+          materials_used: data.materials_used || prev.materials_used,
+          material_cost: data.material_cost ?? prev.material_cost,
+          price: data.price ?? prev.price,
+          pest_level: data.pest_level !== null ? data.pest_level : prev.pest_level,
+          problem_rating: data.problem_rating !== null ? data.problem_rating : prev.problem_rating,
+        }))
+      }
+    } catch (error) {
+      console.error('Error refreshing case data:', error)
+    }
+  }
 
   const fetchTechnicians = async () => {
     try {
@@ -905,7 +952,7 @@ export default function EditContractCaseModal({
   }
 
   const handleSubmit = async () => {
-    if (!caseData?.id) return
+    if (!localCaseData?.id) return
 
     setLoading(true)
     try {
@@ -923,14 +970,14 @@ export default function EditContractCaseModal({
         // 🚦 Traffic Light System
         pest_level: formData.pest_level !== undefined ? formData.pest_level : null,
         problem_rating: formData.problem_rating !== undefined ? formData.problem_rating : null,
-        assessment_date: (formData.pest_level !== undefined || formData.problem_rating !== undefined) 
+        assessment_date: (formData.pest_level !== undefined || formData.problem_rating !== undefined)
           ? new Date().toISOString() : null,
         assessed_by: (formData.pest_level !== undefined || formData.problem_rating !== undefined)
           ? profile?.email || null : null,
         // Automatically set completed_date when status changes to "Avslutat"
-        completed_date: (formData.status === 'Avslutat' && caseData.status !== 'Avslutat')
+        completed_date: (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat')
           ? toSwedishISOString(new Date())
-          : (formData.status !== 'Avslutat' ? null : caseData.completed_date || null)
+          : (formData.status !== 'Avslutat' ? null : localCaseData.completed_date || null)
       }
 
       // Remove fields that don't exist in database
@@ -944,7 +991,7 @@ export default function EditContractCaseModal({
           .select('id')
           .eq('contact_email', formData.contact_email)
           .single()
-        
+
         if (customer) {
           customerId = customer.id
         }
@@ -956,7 +1003,7 @@ export default function EditContractCaseModal({
           ...cleanedFormData,
           customer_id: customerId || null
         })
-        .eq('id', caseData.id)
+        .eq('id', localCaseData.id)
         .select()
 
       if (error) throw error
@@ -971,7 +1018,8 @@ export default function EditContractCaseModal({
 
       toast.success('Ärende uppdaterat!')
       onSuccess?.()
-      handleClose()
+      // Refresha data istället för att stänga - tekniker kan nu boka återbesök direkt
+      await refreshCaseData()
     } catch (error) {
       console.error('Error updating case:', error)
       toast.error('Kunde inte uppdatera ärendet')
@@ -983,16 +1031,16 @@ export default function EditContractCaseModal({
   // Handle closing with timer running
   const handleClose = async () => {
     // If timer is running, save current progress
-    if (isTimerRunning && caseData?.id) {
+    if (isTimerRunning && localCaseData?.id) {
       const totalMinutes = formData.time_spent_minutes + sessionMinutes
       try {
         await supabase
           .from('cases')
-          .update({ 
+          .update({
             time_spent_minutes: totalMinutes,
             // Keep work_started_at so timer can resume
           })
-          .eq('id', caseData.id)
+          .eq('id', localCaseData.id)
       } catch (error) {
         console.error('Error saving time on close:', error)
       }
@@ -1221,7 +1269,7 @@ export default function EditContractCaseModal({
         variant="secondary"
         className="bg-slate-700 hover:bg-slate-600"
       >
-        Avbryt
+        Stäng
       </Button>
       {!isCustomerView && (
         <Button
@@ -1230,7 +1278,7 @@ export default function EditContractCaseModal({
           className="bg-purple-500 hover:bg-purple-600"
         >
           <Save className="w-4 h-4 mr-2" />
-          Spara ändringar
+          Spara
         </Button>
       )}
     </div>
@@ -2261,10 +2309,10 @@ export default function EditContractCaseModal({
       )}
 
       {/* Återbesök-modal för kontraktsärenden - MÅSTE renderas INUTI Modal för att visas ovanpå */}
-      {showRevisitModal && caseData && (
+      {showRevisitModal && localCaseData && (
         <RevisitContractModal
           caseData={{
-            ...caseData,
+            ...localCaseData,
             case_number: formData.case_number,
             title: formData.title,
             description: formData.description,
@@ -2277,12 +2325,20 @@ export default function EditContractCaseModal({
             scheduled_start: formData.scheduled_start,
             scheduled_end: formData.scheduled_end,
             work_report: formData.work_report,
-            id: caseData.id
+            id: localCaseData.id
           }}
-          onSuccess={(updatedCase) => {
-            setShowRevisitModal(false)
+          onSuccess={async (updatedCase) => {
+            // Uppdatera lokal data med nya datum från återbesöksbokningen
+            setLocalCaseData(updatedCase)
+            setFormData(prev => ({
+              ...prev,
+              scheduled_start: updatedCase.scheduled_start ? new Date(updatedCase.scheduled_start) : prev.scheduled_start,
+              scheduled_end: updatedCase.scheduled_end ? new Date(updatedCase.scheduled_end) : prev.scheduled_end,
+              status: updatedCase.status || prev.status
+            }))
+            // Meddela parent att data uppdaterats
             if (onSuccess) onSuccess()
-            handleClose()
+            // Modalen förblir öppen - tekniker kan boka fler återbesök
           }}
           onClose={() => setShowRevisitModal(false)}
         />

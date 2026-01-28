@@ -15,7 +15,9 @@ import {
   Filter,
   Eye,
   Bug,
-  User
+  User,
+  Clock,
+  CalendarCheck
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDebounce } from '../../hooks/useDebounce'
@@ -196,6 +198,7 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                     <th className="text-center px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Övergripande status</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Skadedjur</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Tekniker</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Nästa besök</th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Kostnad</th>
                     <th className="text-center px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide"></th>
                   </tr>
@@ -281,6 +284,31 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                             <User className="w-4 h-4 text-slate-500" />
                             <span className="text-slate-300">{caseItem.primary_technician_name || caseItem.technician_name || '-'}</span>
                           </div>
+                        </td>
+
+                        {/* Nästa besök */}
+                        <td className="px-4 py-3">
+                          {(() => {
+                            // Visa nästa schemalagt besök om det finns och är i framtiden
+                            const scheduledStart = caseItem.scheduled_start
+                            if (scheduledStart) {
+                              const scheduledDate = new Date(scheduledStart)
+                              const now = new Date()
+                              const isFuture = scheduledDate > now
+
+                              if (isFuture) {
+                                return (
+                                  <div className="flex items-center gap-2">
+                                    <CalendarCheck className="w-4 h-4 text-teal-400" />
+                                    <span className="text-teal-400 font-medium">
+                                      {format(scheduledDate, 'd MMM', { locale: sv })}
+                                    </span>
+                                  </div>
+                                )
+                              }
+                            }
+                            return <span className="text-slate-500">-</span>
+                          })()}
                         </td>
 
                         {/* Kostnad */}

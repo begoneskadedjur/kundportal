@@ -1,6 +1,8 @@
 // src/components/customer/ServiceAssessmentSummary.tsx - Service Assessment Summary Card
 import React, { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle, Clock, ChevronRight, Eye, AlertCircle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle, Clock, ChevronRight, Eye, AlertCircle, CalendarCheck } from 'lucide-react'
+import { format } from 'date-fns'
+import { sv } from 'date-fns/locale'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
@@ -16,6 +18,14 @@ interface ServiceAssessmentSummaryProps {
   onOpenCaseDetails?: (caseId: string) => void
 }
 
+interface UpcomingVisit {
+  id: string
+  case_number: string
+  title: string
+  scheduled_start: string
+  pest_type?: string
+}
+
 interface AssessmentSummary {
   latestAssessment: Case | null
   totalCases: number
@@ -25,6 +35,7 @@ interface AssessmentSummary {
   okCases: number
   recentTrend: 'improving' | 'stable' | 'worsening' | null
   unacknowledgedCriticalCases: Case[]
+  upcomingVisits: UpcomingVisit[]
 }
 
 const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
@@ -99,6 +110,20 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
       const latestAssessment = casesWithAssessments.length > 0 ? casesWithAssessments[0] : null
       const recentTrend = latestAssessment?.pest_level_trend || null
 
+      // Hämta kommande besök (schemalagda i framtiden)
+      const now = new Date().toISOString()
+      const upcomingVisits: UpcomingVisit[] = (cases || [])
+        .filter(c => c.scheduled_start && new Date(c.scheduled_start) > new Date())
+        .sort((a, b) => new Date(a.scheduled_start!).getTime() - new Date(b.scheduled_start!).getTime())
+        .slice(0, 3)
+        .map(c => ({
+          id: c.id,
+          case_number: c.case_number || '',
+          title: c.title || 'Servicebesök',
+          scheduled_start: c.scheduled_start!,
+          pest_type: c.pest_type
+        }))
+
       setSummary({
         latestAssessment,
         totalCases: cases?.length || 0,
@@ -107,7 +132,8 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
         warningCases,
         okCases,
         recentTrend,
-        unacknowledgedCriticalCases
+        unacknowledgedCriticalCases,
+        upcomingVisits
       })
     } catch (error: any) {
       console.error('Error fetching assessment summary:', error)
@@ -309,6 +335,52 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
             <p className="text-xs text-green-300">OK</p>
           </div>
         </div>
+
+        {/* Kommande besök */}
+        {summary.upcomingVisits.length > 0 && (
+          <div className="mb-4 p-4 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarCheck className="w-4 h-4 text-teal-400" />
+              <h4 className="text-sm font-semibold text-teal-400 uppercase tracking-wider">
+                Kommande besök
+              </h4>
+            </div>
+            <div className="space-y-2">
+              {summary.upcomingVisits.map((visit) => (
+                <div
+                  key={visit.id}
+                  className={`flex items-center justify-between p-2 rounded-lg bg-slate-800/30 ${
+                    onOpenCaseDetails ? 'cursor-pointer hover:bg-slate-700/50' : ''
+                  }`}
+                  onClick={() => onOpenCaseDetails && handleOpenCase(visit.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-teal-500/20 rounded-lg flex flex-col items-center justify-center">
+                      <span className="text-xs font-bold text-teal-400">
+                        {format(new Date(visit.scheduled_start), 'd', { locale: sv })}
+                      </span>
+                      <span className="text-[10px] text-teal-400/70 uppercase">
+                        {format(new Date(visit.scheduled_start), 'MMM', { locale: sv })}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-white text-sm font-medium">
+                        {visit.title}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {format(new Date(visit.scheduled_start), 'HH:mm', { locale: sv })}
+                        {visit.pest_type && ` • ${visit.pest_type}`}
+                      </p>
+                    </div>
+                  </div>
+                  {onOpenCaseDetails && (
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Lugnande meddelande för kritiska/varning-situationer */}
         {(summary.criticalCases > 0 || summary.warningCases > 0) && (
