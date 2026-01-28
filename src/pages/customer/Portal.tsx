@@ -78,6 +78,33 @@ const CustomerPortal: React.FC = () => {
   const [selectedCaseForModal, setSelectedCaseForModal] = useState<Case | null>(null)
   const [isCaseModalOpen, setIsCaseModalOpen] = useState(false)
 
+  // VIKTIGT: Alla useCallback hooks MÅSTE definieras FÖRE alla early returns
+  // för att följa React hooks-reglerna (samma antal hooks vid varje render)
+
+  // Öppna case details modal från ServiceAssessmentSummary
+  const handleOpenCaseDetails = useCallback(async (caseId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('cases')
+        .select('*')
+        .eq('id', caseId)
+        .single()
+
+      if (error) throw error
+
+      setSelectedCaseForModal(data)
+      setIsCaseModalOpen(true)
+    } catch (error) {
+      console.error('Error fetching case details:', error)
+    }
+  }, [])
+
+  // Stäng case details modal
+  const handleCloseCaseModal = useCallback(() => {
+    setIsCaseModalOpen(false)
+    setSelectedCaseForModal(null)
+  }, [])
+
   // Check multisite access and redirect if needed - KRITISK: Måste köras först
   useEffect(() => {
     // Vänta tills multisite-context har laddats
@@ -259,30 +286,6 @@ const CustomerPortal: React.FC = () => {
       </div>
     )
   }
-
-  // Öppna case details modal från ServiceAssessmentSummary
-  const handleOpenCaseDetails = useCallback(async (caseId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('cases')
-        .select('*')
-        .eq('id', caseId)
-        .single()
-
-      if (error) throw error
-
-      setSelectedCaseForModal(data)
-      setIsCaseModalOpen(true)
-    } catch (error) {
-      console.error('Error fetching case details:', error)
-    }
-  }, [])
-
-  // Stäng case details modal
-  const handleCloseCaseModal = useCallback(() => {
-    setIsCaseModalOpen(false)
-    setSelectedCaseForModal(null)
-  }, [])
 
   // Navigera till station på karta/planritning från Genomförda kontroller
   const handleNavigateToStation = (stationId: string, type: 'outdoor' | 'indoor', floorPlanId?: string) => {
