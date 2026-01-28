@@ -3,7 +3,6 @@
 
 import React, { useState } from 'react'
 import {
-  Briefcase,
   Home,
   LogOut,
   FileText,
@@ -57,9 +56,9 @@ const navItems: NavItem[] = [
   },
   {
     id: 'cases',
-    label: 'Genomförda ärenden',
+    label: 'Dina ärenden',
     shortLabel: 'Ärenden',
-    icon: Briefcase,
+    icon: FileText,
     activeColor: 'text-cyan-400',
     activeBg: 'bg-cyan-500/20'
   },

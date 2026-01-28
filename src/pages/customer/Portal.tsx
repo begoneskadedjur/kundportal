@@ -15,7 +15,6 @@ import ServiceExcellenceDashboard from '../../components/customer/ServiceExcelle
 import RelationshipShowcase from '../../components/customer/RelationshipShowcase'
 import ContractValueCard from '../../components/customer/ContractValueCard'
 import PremiumServiceRequest from '../../components/customer/PremiumServiceRequest'
-import ServiceActivityTimeline from '../../components/customer/ServiceActivityTimeline'
 import ServiceAssessmentSummary from '../../components/customer/ServiceAssessmentSummary'
 import PartnershipValueSection from '../../components/customer/PartnershipValueSection'
 import CustomerPortalLayout, { CustomerPortalView } from '../../components/customer/CustomerPortalLayout'
@@ -398,13 +397,6 @@ const CustomerPortal: React.FC = () => {
               <ServiceAssessmentSummary
                 customerId={customer.id}
                 onOpenCaseDetails={handleOpenCaseDetails}
-              />
-            )}
-
-            {/* Service Activity Timeline */}
-            {customer && (
-              <ServiceActivityTimeline 
-                customerId={customer.id}
               />
             )}
           </div>
