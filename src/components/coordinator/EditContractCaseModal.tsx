@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import {
-  X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save,
+  X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save, Check,
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
   FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign, Lightbulb,
   Building, Building2, Image as ImageIcon, Trash2, Plus, AlertTriangle, MessageSquare,
@@ -95,6 +95,7 @@ export default function EditContractCaseModal({
   const navigate = useNavigate()
   const { profile } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false)
   const [localCaseData, setLocalCaseData] = useState<any>(caseData)
   const [customerData, setCustomerData] = useState<any>(null)
   const [formData, setFormData] = useState({
@@ -1017,6 +1018,9 @@ export default function EditContractCaseModal({
       }
 
       toast.success('Ärende uppdaterat!')
+      // Visa visuell bekräftelse på knappen
+      setShowSaveSuccess(true)
+      setTimeout(() => setShowSaveSuccess(false), 2000)
       // Refresha data istället för att stänga - tekniker kan nu boka återbesök direkt
       await refreshCaseData()
       // Skicka med uppdaterad data så parent-komponenten vet att det INTE är en radering
@@ -1276,10 +1280,23 @@ export default function EditContractCaseModal({
         <Button
           onClick={handleSubmit}
           loading={loading}
-          className="bg-purple-500 hover:bg-purple-600"
+          disabled={showSaveSuccess}
+          className={`${showSaveSuccess
+            ? 'bg-green-500 hover:bg-green-500'
+            : 'bg-purple-500 hover:bg-purple-600'
+          } transition-colors duration-300`}
         >
-          <Save className="w-4 h-4 mr-2" />
-          Spara
+          {showSaveSuccess ? (
+            <>
+              <Check className="w-4 h-4 mr-2" />
+              Sparat!
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Spara
+            </>
+          )}
         </Button>
       )}
     </div>
