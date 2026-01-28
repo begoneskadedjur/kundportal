@@ -9,7 +9,8 @@ import {
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save,
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
   FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign, Lightbulb,
-  Building, Building2, Image as ImageIcon, Trash2, Plus, AlertTriangle, MessageSquare
+  Building, Building2, Image as ImageIcon, Trash2, Plus, AlertTriangle, MessageSquare,
+  Footprints
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -1208,15 +1209,6 @@ export default function EditContractCaseModal({
           getTimeSinceReport={getTimeSinceReport}
         />
 
-        {/* Återbesök-knapp - MOBILANPASSAD */}
-        <button
-          onClick={() => setShowActionDialog(true)}
-          className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-teal-500/20 hover:bg-teal-500/30 rounded-lg text-teal-300 transition-colors active:scale-95"
-          title="Boka återbesök eller skapa nytt ärende"
-        >
-          <Calendar className="w-4 h-4" />
-          <span className="text-xs sm:text-sm font-medium">Återbesök</span>
-        </button>
       </div>
     </div>
   )
@@ -1257,15 +1249,29 @@ export default function EditContractCaseModal({
       footer={modalFooter}
       usePortal={true}
       className="scroll-smooth"
-      headerActions={showCommunication ? (
-        <button
-          type="button"
-          onClick={() => setShowCommunicationPanel(true)}
-          className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all duration-200"
-          title="Öppna intern kommunikation"
-        >
-          <MessageSquare className="w-5 h-5" />
-        </button>
+      headerActions={!isCustomerView ? (
+        <div className="flex items-center gap-1">
+          {/* Återbesök/Kopiera-ikon */}
+          <button
+            type="button"
+            onClick={() => setShowActionDialog(true)}
+            className="p-2 text-slate-400 hover:text-teal-400 hover:bg-teal-500/20 rounded-lg transition-all duration-200"
+            title="Boka återbesök eller kopiera ärende"
+          >
+            <Footprints className="w-5 h-5" />
+          </button>
+          {/* Kommunikation */}
+          {showCommunication && (
+            <button
+              type="button"
+              onClick={() => setShowCommunicationPanel(true)}
+              className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all duration-200"
+              title="Öppna intern kommunikation"
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button>
+          )}
+        </div>
       ) : undefined}
     >
       <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
@@ -2226,7 +2232,7 @@ export default function EditContractCaseModal({
               </div>
             </button>
 
-            {/* Alternativ 2: Nytt ärende */}
+            {/* Alternativ 2: Kopiera ärende */}
             <button
               onClick={() => {
                 setShowFollowUpDialog(true)
@@ -2237,7 +2243,7 @@ export default function EditContractCaseModal({
               <div className="flex items-center gap-3">
                 <Plus className="w-5 h-5 text-amber-400" />
                 <div>
-                  <p className="text-white font-medium">Skapa nytt ärende</p>
+                  <p className="text-white font-medium">Kopiera ärende</p>
                   <p className="text-sm text-slate-400">Nytt problem hos samma kund (annat skadedjur)</p>
                 </div>
               </div>
