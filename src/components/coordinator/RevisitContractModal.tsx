@@ -2,7 +2,6 @@
 // Modal för att boka återbesök för kontraktsärenden (avtalskunder)
 
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import {
   X,
   Calendar,
@@ -426,5 +425,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
     </div>
   )
 
-  return createPortal(modalContent, document.body)
+  // Returnera direkt utan createPortal - komponenten renderas redan utanför Modal
+  // och z-[10001] säkerställer att den visas ovanpå
+  return modalContent
 }
