@@ -1241,6 +1241,7 @@ export default function EditContractCaseModal({
   const showCommunication = caseData && !isCustomerView
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
@@ -2260,34 +2261,6 @@ export default function EditContractCaseModal({
         </div>
       )}
 
-      {/* Återbesök-modal för kontraktsärenden */}
-      {showRevisitModal && caseData && (
-        <RevisitContractModal
-          caseData={{
-            ...caseData,
-            case_number: formData.case_number,
-            title: formData.title,
-            description: formData.description,
-            status: formData.status,
-            contact_person: formData.contact_person,
-            contact_phone: formData.contact_phone,
-            contact_email: formData.contact_email,
-            pest_type: formData.pest_type,
-            address: formData.address,
-            scheduled_start: formData.scheduled_start,
-            scheduled_end: formData.scheduled_end,
-            work_report: formData.work_report,
-            id: caseData.id
-          }}
-          onSuccess={(updatedCase) => {
-            setShowRevisitModal(false)
-            if (onSuccess) onSuccess()
-            handleClose()
-          }}
-          onClose={() => setShowRevisitModal(false)}
-        />
-      )}
-
       {/* Kommunikations-panel (slide-in från höger) */}
       {/* KRITISKT: Endast för interna användare - ALDRIG för kundvyer */}
       {showCommunication && (
@@ -2316,5 +2289,34 @@ export default function EditContractCaseModal({
         />
       )}
     </Modal>
+
+    {/* Återbesök-modal för kontraktsärenden - renderas UTANFÖR Modal för korrekt Portal-hantering */}
+    {showRevisitModal && caseData && (
+      <RevisitContractModal
+        caseData={{
+          ...caseData,
+          case_number: formData.case_number,
+          title: formData.title,
+          description: formData.description,
+          status: formData.status,
+          contact_person: formData.contact_person,
+          contact_phone: formData.contact_phone,
+          contact_email: formData.contact_email,
+          pest_type: formData.pest_type,
+          address: formData.address,
+          scheduled_start: formData.scheduled_start,
+          scheduled_end: formData.scheduled_end,
+          work_report: formData.work_report,
+          id: caseData.id
+        }}
+        onSuccess={(updatedCase) => {
+          setShowRevisitModal(false)
+          if (onSuccess) onSuccess()
+          handleClose()
+        }}
+        onClose={() => setShowRevisitModal(false)}
+      />
+    )}
+    </>
   )
 }
