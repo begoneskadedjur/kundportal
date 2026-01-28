@@ -75,6 +75,9 @@ interface CaseDetailsModalProps {
       size: number
       uploaded_at: string
     }> | null
+    // Trafikljus-metadata
+    assessment_date?: string | null
+    assessed_by?: string | null
   }
 }
 
@@ -551,7 +554,7 @@ export default function CaseDetailsModal({
 
                 {/* Ärendets utveckling - Tidslinje med trafikljushistorik */}
                 <CaseJourneyTimeline
-                  caseId={fallbackData.id}
+                  caseId={caseId}
                   currentPestLevel={fallbackData.pest_level}
                   currentProblemRating={fallbackData.problem_rating}
                   assessmentDate={fallbackData.assessment_date}
