@@ -1024,6 +1024,12 @@ export default function EditContractCaseModal({
           await supabase.from('case_updates_log').insert({
             case_id: localCaseData.id,
             case_table: 'cases',
+            updated_by: profile.id,  // Obligatoriskt fält
+            field_changes: {         // Obligatoriskt fält
+              pest_level: { old: originalPestLevel, new: newPestLevel },
+              problem_rating: { old: originalProblemRating, new: newProblemRating }
+            },
+            user_role: profile.role || 'technician',
             update_type: 'traffic_light_updated',
             previous_value: JSON.stringify({
               pest_level: originalPestLevel,
@@ -1037,8 +1043,7 @@ export default function EditContractCaseModal({
             }),
             updated_by_id: profile.id,
             updated_by_name: profile.full_name || profile.display_name || profile.email || 'Okänd',
-            case_type: 'contract',
-            user_role: profile.role || 'technician'
+            case_type: 'contract'
           })
         } catch (logError) {
           console.warn('Kunde inte logga trafikljusändring:', logError)
