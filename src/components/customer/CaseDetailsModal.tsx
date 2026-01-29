@@ -32,6 +32,7 @@ import CriticalAcknowledgmentBanner from './CriticalAcknowledgmentBanner'
 import CloseWarningDialog from './CloseWarningDialog'
 import RevisitHistorySection, { RevisitHistoryEntry } from '../shared/RevisitHistorySection'
 import CaseJourneyTimeline from './CaseJourneyTimeline'
+import TrafficLightBadge from '../organisation/TrafficLightBadge'
 import { generatePDFReport } from '../../utils/pdfReportGenerator'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -447,25 +448,36 @@ export default function CaseDetailsModal({
   // Detta säkerställer att modalen alltid visas ovanför alla andra element
   return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <Card className="relative">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/10">
-            <div>
-              <h2 className="text-2xl font-bold text-white">
-                {displayTitle}
-              </h2>
-              {displayCaseNumber && (
-                <p className="text-slate-400 text-sm mt-1">
-                  Ärende #{displayCaseNumber}
-                </p>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+            <div className="flex items-start gap-3">
+              {/* Trafikljusikon */}
+              {(fallbackData?.pest_level !== undefined || fallbackData?.problem_rating !== undefined) && (
+                <TrafficLightBadge
+                  pestLevel={fallbackData?.pest_level}
+                  problemRating={fallbackData?.problem_rating}
+                  size="large"
+                  showTooltip={true}
+                />
               )}
-              {/* Visa kundinfo i header om tillgänglig */}
-              {customerInfo && (
-                <p className="text-slate-300 text-sm mt-1">
-                  {customerInfo.company_name} • {customerInfo.org_number}
-                </p>
-              )}
+              <div>
+                <h2 className="text-xl font-bold text-white">
+                  {displayTitle}
+                </h2>
+                {displayCaseNumber && (
+                  <p className="text-slate-400 text-sm">
+                    Ärende #{displayCaseNumber}
+                  </p>
+                )}
+                {/* Visa kundinfo i header om tillgänglig */}
+                {customerInfo && (
+                  <p className="text-slate-300 text-sm">
+                    {customerInfo.company_name} • {customerInfo.org_number}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -489,16 +501,16 @@ export default function CaseDetailsModal({
             </div>
           </div>
 
-          {/* Content - resten av koden förblir densamma */}
-          <div className="p-6">
+          {/* Content */}
+          <div className="p-5">
             {loading && (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex items-center justify-center py-8">
                 <LoadingSpinner />
               </div>
             )}
 
             {error && !useFallback && (
-              <div className="flex items-center justify-center py-12 text-red-400">
+              <div className="flex items-center justify-center py-8 text-red-400">
                 <AlertCircle className="w-5 h-5 mr-2" />
                 {error}
               </div>
@@ -506,7 +518,7 @@ export default function CaseDetailsModal({
 
             {/* Fallback-vy när ClickUp-data saknas */}
             {useFallback && fallbackData && !error && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Status och datum */}
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-4">
@@ -546,7 +558,6 @@ export default function CaseDetailsModal({
                   <CustomerAssessmentPanel
                     pestLevel={fallbackData.pest_level ?? null}
                     problemRating={fallbackData.problem_rating ?? null}
-                    recommendations={fallbackData.recommendations ?? null}
                   />
                 )}
 
@@ -784,7 +795,7 @@ export default function CaseDetailsModal({
             )}
 
             {taskDetails && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Status, prioritet och datum */}
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-4">
@@ -949,40 +960,17 @@ export default function CaseDetailsModal({
                       </div>
                     )}
 
-                    {/* Rekommendationer från tekniker - endast för avtalsärenden */}
+                    {/* Rekommendationer från tekniker */}
                     {fallbackData?.recommendations && (
-                      <div className="space-y-3">
-                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                          <Lightbulb className="w-4 h-4 text-amber-400" />
-                          Rekommenderade åtgärder
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-semibold text-amber-400 flex items-center gap-2">
+                          <Lightbulb className="w-4 h-4" />
+                          Teknikerns rekommendationer
                         </h4>
-                        <div className="p-4 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-lg">
-                          <div className="flex items-start gap-3">
-                            <div className="p-2 bg-amber-500/20 rounded-lg shrink-0">
-                              <AlertCircle className="w-5 h-5 text-amber-400" />
-                            </div>
-                            <div className="flex-1">
-                              <h5 className="text-white font-medium mb-2">Våra rekommendationer för dig</h5>
-                              <p className="text-slate-200 whitespace-pre-wrap leading-relaxed">
-                                {fallbackData.recommendations}
-                              </p>
-
-                              {/* Call-to-action */}
-                              <div className="mt-4 pt-3 border-t border-amber-500/20">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-sm text-amber-300">
-                                    Har du frågor om dessa rekommendationer?
-                                  </p>
-                                  <button
-                                    onClick={() => window.open('tel:010-280-44-10', '_self')}
-                                    className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-amber-300 hover:text-amber-200 transition-colors text-sm font-medium"
-                                  >
-                                    Ring oss
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                        <div className="p-3 bg-amber-500/10 border-l-4 border-amber-500 rounded-r-lg">
+                          <p className="text-white text-sm whitespace-pre-wrap leading-relaxed">
+                            {fallbackData.recommendations}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -1058,7 +1046,7 @@ export default function CaseDetailsModal({
           </div>
 
           {/* Footer */}
-          <div className="p-6 border-t border-white/10">
+          <div className="px-5 py-4 border-t border-white/10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-slate-400">
                 <Phone className="w-4 h-4" />
@@ -1068,7 +1056,7 @@ export default function CaseDetailsModal({
               <Button
                 variant="secondary"
                 onClick={handleClose}
-                className="px-6"
+                size="sm"
               >
                 Stäng
               </Button>

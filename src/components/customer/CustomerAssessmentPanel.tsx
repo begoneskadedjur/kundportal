@@ -1,24 +1,18 @@
 // src/components/customer/CustomerAssessmentPanel.tsx - Trafikljussystem för kundbedömning
 
 import React from 'react'
-import { Activity, AlertTriangle, CheckCircle, Info, Shield, AlertCircle } from 'lucide-react'
-import {
-  getOverallAssessmentLevel,
-  requiresAcknowledgment
-} from '../../types/acknowledgment'
+import { Activity, AlertTriangle, CheckCircle, Info, AlertCircle } from 'lucide-react'
+import { getOverallAssessmentLevel } from '../../types/acknowledgment'
 import AssessmentScaleBar from '../shared/AssessmentScaleBar'
-import ReassuranceMessage from '../shared/ReassuranceMessage'
 
 interface CustomerAssessmentPanelProps {
   pestLevel: number | null
   problemRating: number | null
-  recommendations?: string | null
 }
 
 const CustomerAssessmentPanel: React.FC<CustomerAssessmentPanelProps> = ({
   pestLevel,
-  problemRating,
-  recommendations
+  problemRating
 }) => {
   // Om inga värden finns, visa inte panelen
   if (pestLevel === null && problemRating === null) {
@@ -26,7 +20,6 @@ const CustomerAssessmentPanel: React.FC<CustomerAssessmentPanelProps> = ({
   }
 
   const overallLevel = getOverallAssessmentLevel(pestLevel, problemRating)
-  const needsAcknowledgment = requiresAcknowledgment(pestLevel, problemRating)
 
   // Övergripande konfiguration baserat på nivå
   const overallConfig = {
@@ -120,54 +113,15 @@ const CustomerAssessmentPanel: React.FC<CustomerAssessmentPanelProps> = ({
           )}
         </div>
 
-        {/* Förklaringssektion */}
-        <div className={`p-4 rounded-lg bg-slate-800/50 border border-slate-700/50`}>
-          <div className="flex items-start gap-3">
-            <Info className={`w-5 h-5 flex-shrink-0 mt-0.5 ${overallConfig.textColor}`} />
-            <div>
-              <p className={`text-sm font-medium ${overallConfig.textColor}`}>
-                {overallConfig.label}
-              </p>
-              <p className="text-sm text-slate-400 mt-1">
-                {overallConfig.description}
-              </p>
-            </div>
+        {/* Kortfattad statustext */}
+        <div className={`p-3 rounded-lg bg-slate-800/50 border border-slate-700/50`}>
+          <div className="flex items-center gap-2">
+            <Info className={`w-4 h-4 flex-shrink-0 ${overallConfig.textColor}`} />
+            <p className={`text-sm ${overallConfig.textColor}`}>
+              {overallConfig.label}
+            </p>
           </div>
         </div>
-
-        {/* Rekommendationer om de finns */}
-        {recommendations && (
-          <div className="mt-4 p-4 rounded-lg bg-slate-800/30 border border-slate-700/30">
-            <div className="flex items-start gap-3">
-              <Shield className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-blue-400 mb-1">Teknikerns rekommendationer</p>
-                <p className="text-sm text-slate-300 whitespace-pre-wrap">{recommendations}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Lugnande meddelande för varning/kritisk */}
-        {(overallLevel === 'warning' || overallLevel === 'critical') && (
-          <div className="mt-4">
-            <ReassuranceMessage
-              level={overallLevel === 'critical' ? 'critical' : 'warning'}
-            />
-          </div>
-        )}
-
-        {/* Kritisk varning - bekräftelse krävs */}
-        {needsAcknowledgment && (
-          <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-400" />
-              <p className="text-sm text-red-400">
-                Denna bedömning kräver er bekräftelse nedan.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

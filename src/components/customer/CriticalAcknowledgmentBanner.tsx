@@ -87,8 +87,8 @@ const CriticalAcknowledgmentBanner: React.FC<CriticalAcknowledgmentBannerProps> 
             <AlertCircle className="w-5 h-5 text-red-400" />
           </div>
           <div>
-            <h4 className="text-red-400 font-semibold">Denna bedömning kräver er bekräftelse</h4>
-            <p className="text-sm text-slate-400">Vänligen bekräfta att ni har tagit del av informationen</p>
+            <h4 className="text-red-400 font-semibold">Kritisk situation - bekräftelse krävs</h4>
+            <p className="text-sm text-blue-300">Vi har en plan och arbetar aktivt med ärendet</p>
           </div>
         </div>
       </div>
