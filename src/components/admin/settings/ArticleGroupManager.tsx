@@ -10,10 +10,6 @@ import {
   Trash2,
   Loader2,
   Package,
-  Target,
-  Bug,
-  Zap,
-  Bird,
   AlertTriangle,
   Check
 } from 'lucide-react'
@@ -21,15 +17,6 @@ import { ArticleGroupService } from '../../../services/articleGroupService'
 import { ArticleGroup, CreateArticleGroupInput } from '../../../types/articles'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
-
-// Tillgängliga ikoner
-const AVAILABLE_ICONS = [
-  { name: 'Target', icon: Target, label: 'Måltavla' },
-  { name: 'Bug', icon: Bug, label: 'Insekt' },
-  { name: 'Zap', icon: Zap, label: 'Blixt' },
-  { name: 'Bird', icon: Bird, label: 'Fågel' },
-  { name: 'Package', icon: Package, label: 'Paket' }
-]
 
 // Tillgängliga färger
 const AVAILABLE_COLORS = [
@@ -62,8 +49,7 @@ export function ArticleGroupManager({ isOpen, onClose, onGroupsChanged }: Articl
   const [formData, setFormData] = useState<CreateArticleGroupInput>({
     name: '',
     description: '',
-    color: '#6b7280',
-    icon: 'Package'
+    color: '#6b7280'
   })
 
   useEffect(() => {
@@ -93,8 +79,7 @@ export function ArticleGroupManager({ isOpen, onClose, onGroupsChanged }: Articl
     setFormData({
       name: '',
       description: '',
-      color: '#6b7280',
-      icon: 'Package'
+      color: '#6b7280'
     })
     setEditingGroup(null)
     setIsCreating(false)
@@ -109,8 +94,7 @@ export function ArticleGroupManager({ isOpen, onClose, onGroupsChanged }: Articl
     setFormData({
       name: group.name,
       description: group.description || '',
-      color: group.color,
-      icon: group.icon
+      color: group.color
     })
     setEditingGroup(group)
     setIsCreating(false)
@@ -128,16 +112,14 @@ export function ArticleGroupManager({ isOpen, onClose, onGroupsChanged }: Articl
         await ArticleGroupService.updateGroup(editingGroup.id, {
           name: formData.name.trim(),
           description: formData.description?.trim() || null,
-          color: formData.color,
-          icon: formData.icon
+          color: formData.color
         })
         toast.success('Grupp uppdaterad')
       } else {
         await ArticleGroupService.createGroup({
           name: formData.name.trim(),
           description: formData.description?.trim() || undefined,
-          color: formData.color,
-          icon: formData.icon
+          color: formData.color
         })
         toast.success('Grupp skapad')
       }
@@ -171,11 +153,6 @@ export function ArticleGroupManager({ isOpen, onClose, onGroupsChanged }: Articl
     } finally {
       setDeletingId(null)
     }
-  }
-
-  const getIconComponent = (iconName: string) => {
-    const found = AVAILABLE_ICONS.find(i => i.name === iconName)
-    return found ? found.icon : Package
   }
 
   if (!isOpen) return null
@@ -280,40 +257,13 @@ export function ArticleGroupManager({ isOpen, onClose, onGroupsChanged }: Articl
                       </div>
                     </div>
 
-                    {/* Ikon */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Ikon
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {AVAILABLE_ICONS.map(({ name, icon: Icon, label }) => (
-                          <button
-                            key={name}
-                            onClick={() => setFormData({ ...formData, icon: name })}
-                            className={`p-2 rounded-lg border-2 transition-all ${
-                              formData.icon === name
-                                ? 'border-cyan-500 bg-cyan-500/20'
-                                : 'border-slate-600 hover:border-slate-500 bg-slate-800'
-                            }`}
-                            title={label}
-                          >
-                            <Icon className="w-5 h-5 text-slate-300" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
                     {/* Förhandsgranskning */}
                     <div className="pt-2 border-t border-slate-700">
                       <label className="block text-sm font-medium text-slate-300 mb-2">
                         Förhandsgranskning
                       </label>
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium"
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium"
                         style={{ backgroundColor: `${formData.color}20`, color: formData.color }}>
-                        {(() => {
-                          const IconComp = getIconComponent(formData.icon || 'Package')
-                          return <IconComp className="w-4 h-4" />
-                        })()}
                         {formData.name || 'Gruppnamn'}
                       </div>
                     </div>
@@ -368,7 +318,6 @@ export function ArticleGroupManager({ isOpen, onClose, onGroupsChanged }: Articl
                   ) : (
                     <div className="space-y-2">
                       {groups.map(group => {
-                        const IconComp = getIconComponent(group.icon)
                         const count = articleCounts[group.id] || 0
 
                         return (
@@ -382,11 +331,9 @@ export function ArticleGroupManager({ isOpen, onClose, onGroupsChanged }: Articl
                           >
                             <div className="flex items-center gap-3">
                               <div
-                                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                style={{ backgroundColor: `${group.color}20` }}
-                              >
-                                <IconComp className="w-4 h-4" style={{ color: group.color }} />
-                              </div>
+                                className="w-3 h-8 rounded-full"
+                                style={{ backgroundColor: group.color }}
+                              />
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium text-white">{group.name}</span>
