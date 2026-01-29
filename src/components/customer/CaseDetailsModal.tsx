@@ -606,29 +606,29 @@ export default function CaseDetailsModal({
                   </div>
                 )}
 
-                {/* Snabbinfo - kompakt rad med chips */}
+                {/* Snabbinfo - professionella chips med textlabels */}
                 <div className="flex flex-wrap gap-2">
                   {fallbackData.pest_type && (
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <Bug className="w-4 h-4 text-orange-400" />
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <span className="text-xs text-slate-400">Skadedjur:</span>
                       <span className="text-sm text-white">{fallbackData.pest_type}</span>
                     </div>
                   )}
                   {fallbackData.price && fallbackData.price > 0 && (
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <DollarSign className="w-4 h-4 text-green-400" />
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <span className="text-xs text-slate-400">Pris:</span>
                       <span className="text-sm text-white font-medium">{fallbackData.price} kr</span>
                     </div>
                   )}
                   {fallbackData.primary_technician_name && (
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <User className="w-4 h-4 text-blue-400" />
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <span className="text-xs text-slate-400">Tekniker:</span>
                       <span className="text-sm text-white">{fallbackData.primary_technician_name}</span>
                     </div>
                   )}
                   {fallbackData.time_spent_minutes !== undefined && fallbackData.time_spent_minutes > 0 && (
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <Clock className="w-4 h-4 text-cyan-400" />
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <span className="text-xs text-slate-400">Tid:</span>
                       <span className="text-sm text-white">
                         {Math.floor(fallbackData.time_spent_minutes / 60) > 0
                           ? `${Math.floor(fallbackData.time_spent_minutes / 60)}h ${fallbackData.time_spent_minutes % 60}min`
@@ -638,8 +638,8 @@ export default function CaseDetailsModal({
                     </div>
                   )}
                   {fallbackData.address?.formatted_address && (
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <MapPin className="w-4 h-4 text-red-400" />
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <span className="text-xs text-slate-400">Adress:</span>
                       <span className="text-sm text-white">{fallbackData.address.formatted_address}</span>
                     </div>
                   )}
