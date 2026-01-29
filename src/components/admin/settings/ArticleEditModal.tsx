@@ -13,8 +13,10 @@ import {
 } from 'lucide-react'
 import { ArticleService } from '../../../services/articleService'
 import { PriceListService } from '../../../services/priceListService'
+import { ArticleGroupService } from '../../../services/articleGroupService'
 import {
   Article,
+  ArticleGroup,
   CreateArticleInput,
   ArticleUnit,
   ArticleCategory,
@@ -52,7 +54,12 @@ export function ArticleEditModal({
   const [defaultPrice, setDefaultPrice] = useState('')
   const [vatRate, setVatRate] = useState('25')
   const [category, setCategory] = useState<ArticleCategory>('Övrigt')
+  const [groupId, setGroupId] = useState<string | null>(null)
   const [isActive, setIsActive] = useState(true)
+
+  // Gruppstate
+  const [groups, setGroups] = useState<ArticleGroup[]>([])
+  const [loadingGroups, setLoadingGroups] = useState(false)
 
   // Prislista-state
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
@@ -62,28 +69,34 @@ export function ArticleEditModal({
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Ladda prislistor
+  // Ladda grupper och prislistor
   useEffect(() => {
-    const loadPriceLists = async () => {
+    const loadData = async () => {
+      setLoadingGroups(true)
       setLoadingPriceLists(true)
       try {
-        const lists = await PriceListService.getActivePriceLists()
-        setPriceLists(lists)
+        const [groupsData, listsData] = await Promise.all([
+          ArticleGroupService.getActiveGroups(),
+          PriceListService.getActivePriceLists()
+        ])
+        setGroups(groupsData)
+        setPriceLists(listsData)
         // Förväl standardprislistan för nya artiklar
         if (!article) {
-          const defaultList = lists.find(l => l.is_default)
+          const defaultList = listsData.find(l => l.is_default)
           if (defaultList) {
             setSelectedPriceListIds([defaultList.id])
           }
         }
       } catch (error) {
-        console.error('Kunde inte ladda prislistor:', error)
+        console.error('Kunde inte ladda data:', error)
       } finally {
+        setLoadingGroups(false)
         setLoadingPriceLists(false)
       }
     }
     if (isOpen) {
-      loadPriceLists()
+      loadData()
     }
   }, [isOpen, article])
 
@@ -97,6 +110,7 @@ export function ArticleEditModal({
       setDefaultPrice(article.default_price.toString())
       setVatRate(article.vat_rate.toString())
       setCategory(article.category)
+      setGroupId(article.group_id)
       setIsActive(article.is_active)
       setSelectedPriceListIds([]) // Vid redigering behåller vi inte prislista-val
     } else {
@@ -108,6 +122,7 @@ export function ArticleEditModal({
       setDefaultPrice('')
       setVatRate('25')
       setCategory('Övrigt')
+      setGroupId(null)
       setIsActive(true)
       // selectedPriceListIds hanteras i loadPriceLists
     }
@@ -166,6 +181,7 @@ export function ArticleEditModal({
         default_price: parseFloat(defaultPrice),
         vat_rate: parseFloat(vatRate),
         category,
+        group_id: groupId,
         is_active: isActive
       }
 
@@ -269,6 +285,52 @@ export function ArticleEditModal({
                 )
               })}
             </div>
+          </div>
+
+          {/* Grupp */}
+          <div>
+            <label className="block text-sm font-medium text-white mb-2">
+              Artikelgrupp
+            </label>
+            {loadingGroups ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Laddar grupper...
+              </div>
+            ) : groups.length === 0 ? (
+              <p className="text-slate-500 text-sm">Inga grupper skapade än. Hantera grupper via kugghjulsikonen på artikelsidan.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setGroupId(null)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    groupId === null
+                      ? 'bg-slate-600 text-white border-2 border-slate-500'
+                      : 'bg-slate-700 text-slate-400 border-2 border-transparent hover:bg-slate-600'
+                  }`}
+                >
+                  Ingen
+                </button>
+                {groups.map((group) => (
+                  <button
+                    key={group.id}
+                    onClick={() => setGroupId(group.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all border-2 ${
+                      groupId === group.id
+                        ? ''
+                        : 'bg-slate-700 text-slate-300 border-transparent hover:bg-slate-600'
+                    }`}
+                    style={groupId === group.id ? {
+                      backgroundColor: `${group.color}20`,
+                      borderColor: `${group.color}50`,
+                      color: group.color
+                    } : undefined}
+                  >
+                    {group.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Namn */}

@@ -2,27 +2,21 @@
 // Huvudkomponent för hantering av prislistor i admin
 
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import {
   Plus,
   ArrowLeft,
   Loader2,
   FileText,
   AlertTriangle,
-  RefreshCw,
-  Star,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Trash2,
-  Edit2
+  RefreshCw
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PriceListService } from '../../../services/priceListService'
 import { ArticleService } from '../../../services/articleService'
 import { PriceList, Article } from '../../../types/articles'
 import { PriceListEditModal } from './PriceListEditModal'
-import { PriceListItemsEditor } from './PriceListItemsEditor'
+import { PriceListsTable } from './PriceListsTable'
 import { ArticlePriceListNav } from './ArticlePriceListNav'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
@@ -36,6 +30,10 @@ export function PriceListsSettings() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [expandedListId, setExpandedListId] = useState<string | null>(null)
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({})
+
+  // Loading states för actions
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Ladda data vid mount
   useEffect(() => {
@@ -80,6 +78,7 @@ export function PriceListsSettings() {
 
   // Hantera sätt som standard
   const handleSetDefault = async (id: string) => {
+    setSettingDefaultId(id)
     try {
       await PriceListService.updatePriceList(id, { is_default: true })
       toast.success('Standardprislista uppdaterad')
@@ -87,11 +86,14 @@ export function PriceListsSettings() {
     } catch (error) {
       console.error('Fel vid uppdatering:', error)
       toast.error('Kunde inte sätta som standard')
+    } finally {
+      setSettingDefaultId(null)
     }
   }
 
   // Hantera borttagning
   const handleDelete = async (id: string) => {
+    setDeletingId(id)
     try {
       await PriceListService.deletePriceList(id)
       toast.success('Prislista borttagen')
@@ -100,6 +102,8 @@ export function PriceListsSettings() {
     } catch (error) {
       console.error('Fel vid borttagning:', error)
       toast.error(error instanceof Error ? error.message : 'Kunde inte ta bort prislistan')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -108,6 +112,11 @@ export function PriceListsSettings() {
     setEditingPriceList(null)
     setIsCreateModalOpen(false)
     loadData()
+  }
+
+  // Toggle expand
+  const handleToggleExpand = (id: string) => {
+    setExpandedListId(expandedListId === id ? null : id)
   }
 
   // Beräkna statistik
@@ -150,7 +159,7 @@ export function PriceListsSettings() {
         </div>
 
         {/* KPI-kort */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
             <p className="text-2xl font-bold text-white">{priceLists.length}</p>
             <p className="text-sm text-slate-400">Prislistor</p>
@@ -166,8 +175,10 @@ export function PriceListsSettings() {
         </div>
 
         {/* Åtgärder */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-white">Alla prislistor</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-slate-400">
+            Visar {priceLists.length} prislistor
+          </div>
           <div className="flex items-center gap-2">
             <Button
               variant="secondary"
@@ -188,7 +199,7 @@ export function PriceListsSettings() {
           </div>
         </div>
 
-        {/* Lista */}
+        {/* Tabell */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
@@ -206,119 +217,20 @@ export function PriceListsSettings() {
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            <AnimatePresence>
-              {priceLists.map((priceList) => (
-                <motion.div
-                  key={priceList.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`bg-slate-800/50 rounded-xl border overflow-hidden transition-all ${
-                    priceList.is_active
-                      ? priceList.is_default
-                        ? 'border-purple-500/50'
-                        : 'border-slate-700/50'
-                      : 'border-slate-700/30 opacity-60'
-                  }`}
-                >
-                  {/* Prislista-header */}
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-white font-medium text-lg">{priceList.name}</h3>
-                          {priceList.is_default && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">
-                              <Star className="w-3 h-3" />
-                              Standard
-                            </span>
-                          )}
-                          {!priceList.is_active && (
-                            <span className="px-2 py-0.5 bg-slate-600 rounded text-xs text-slate-400">
-                              Inaktiv
-                            </span>
-                          )}
-                        </div>
-
-                        {priceList.description && (
-                          <p className="text-slate-400 text-sm mb-2">{priceList.description}</p>
-                        )}
-
-                        <p className="text-slate-500 text-sm">
-                          {itemCounts[priceList.id] || 0} artikelpriser definierade
-                        </p>
-                      </div>
-
-                      {/* Åtgärder */}
-                      <div className="flex items-center gap-1">
-                        {!priceList.is_default && (
-                          <button
-                            onClick={() => handleSetDefault(priceList.id)}
-                            className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-colors"
-                            title="Sätt som standard"
-                          >
-                            <Star className="w-5 h-5" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleCopy(priceList)}
-                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                          title="Kopiera"
-                        >
-                          <Copy className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => setEditingPriceList(priceList)}
-                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                          title="Redigera"
-                        >
-                          <Edit2 className="w-5 h-5" />
-                        </button>
-                        {!priceList.is_default && (
-                          <button
-                            onClick={() => handleDelete(priceList.id)}
-                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                            title="Ta bort"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setExpandedListId(expandedListId === priceList.id ? null : priceList.id)}
-                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                          {expandedListId === priceList.id ? (
-                            <ChevronUp className="w-5 h-5" />
-                          ) : (
-                            <ChevronDown className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanderad: Artikelpriser */}
-                  <AnimatePresence>
-                    {expandedListId === priceList.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="border-t border-slate-700/50 overflow-hidden"
-                      >
-                        <PriceListItemsEditor
-                          priceListId={priceList.id}
-                          articles={articles}
-                          onUpdate={() => loadData()}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+          <PriceListsTable
+            priceLists={priceLists}
+            itemCounts={itemCounts}
+            articles={articles}
+            expandedListId={expandedListId}
+            onToggleExpand={handleToggleExpand}
+            onEdit={setEditingPriceList}
+            onCopy={handleCopy}
+            onSetDefault={handleSetDefault}
+            onDelete={handleDelete}
+            onUpdateItems={loadData}
+            settingDefaultId={settingDefaultId}
+            deletingId={deletingId}
+          />
         )}
 
         {/* Info om standard */}

@@ -12,6 +12,46 @@ export type ArticleUnit = 'st' | 'timme' | 'm2' | 'kg' | 'l' | 'dag' | 'månad'
 export type ArticleCategory = 'Inspektion' | 'Bekämpning' | 'Tillbehör' | 'Övrigt'
 
 /**
+ * Artikelgrupp från databasen
+ */
+export interface ArticleGroup {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  color: string
+  icon: string
+  sort_order: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Input för att skapa ny artikelgrupp
+ */
+export interface CreateArticleGroupInput {
+  name: string
+  slug?: string
+  description?: string
+  color?: string
+  icon?: string
+  sort_order?: number
+}
+
+/**
+ * Input för att uppdatera artikelgrupp
+ */
+export interface UpdateArticleGroupInput {
+  name?: string
+  description?: string | null
+  color?: string
+  icon?: string
+  sort_order?: number
+  is_active?: boolean
+}
+
+/**
  * Artikel från databasen
  */
 export interface Article {
@@ -23,11 +63,19 @@ export interface Article {
   default_price: number
   vat_rate: number
   category: ArticleCategory
+  group_id: string | null
   is_active: boolean
   sort_order: number
   fortnox_article_id: string | null
   created_at: string
   updated_at: string
+}
+
+/**
+ * Artikel med grupp (för joins)
+ */
+export interface ArticleWithGroup extends Article {
+  group?: ArticleGroup | null
 }
 
 /**
@@ -41,6 +89,7 @@ export interface CreateArticleInput {
   default_price: number
   vat_rate?: number
   category: ArticleCategory
+  group_id?: string | null
   is_active?: boolean
   sort_order?: number
   fortnox_article_id?: string
@@ -56,6 +105,7 @@ export interface UpdateArticleInput {
   default_price?: number
   vat_rate?: number
   category?: ArticleCategory
+  group_id?: string | null
   is_active?: boolean
   sort_order?: number
   fortnox_article_id?: string | null

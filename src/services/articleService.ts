@@ -4,6 +4,7 @@
 import { supabase } from '../lib/supabase'
 import {
   Article,
+  ArticleWithGroup,
   CreateArticleInput,
   UpdateArticleInput
 } from '../types/articles'
@@ -31,6 +32,23 @@ export class ArticleService {
     const { data, error } = await supabase
       .from('articles')
       .select('*')
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true })
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return data || []
+  }
+
+  /**
+   * Hämta alla artiklar med gruppdata (för tabellvy)
+   */
+  static async getAllArticlesWithGroups(): Promise<ArticleWithGroup[]> {
+    const { data, error } = await supabase
+      .from('articles')
+      .select(`
+        *,
+        group:article_groups(*)
+      `)
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true })
 
@@ -95,6 +113,7 @@ export class ArticleService {
         default_price: input.default_price,
         vat_rate: input.vat_rate ?? 25,
         category: input.category,
+        group_id: input.group_id || null,
         is_active: input.is_active ?? true,
         sort_order: input.sort_order ?? 0,
         fortnox_article_id: input.fortnox_article_id || null
@@ -118,6 +137,7 @@ export class ArticleService {
     if (input.default_price !== undefined) updateData.default_price = input.default_price
     if (input.vat_rate !== undefined) updateData.vat_rate = input.vat_rate
     if (input.category !== undefined) updateData.category = input.category
+    if (input.group_id !== undefined) updateData.group_id = input.group_id
     if (input.is_active !== undefined) updateData.is_active = input.is_active
     if (input.sort_order !== undefined) updateData.sort_order = input.sort_order
     if (input.fortnox_article_id !== undefined) updateData.fortnox_article_id = input.fortnox_article_id

@@ -2,7 +2,7 @@
 // Huvudkomponent för hantering av artiklar i admin
 
 import { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import {
   Plus,
   ArrowLeft,
@@ -14,28 +14,44 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ArticleService } from '../../../services/articleService'
+import { ArticleGroupService } from '../../../services/articleGroupService'
 import {
-  Article,
+  ArticleWithGroup,
+  ArticleGroup,
   ArticleCategory,
   ARTICLE_CATEGORIES,
   ARTICLE_CATEGORY_CONFIG
 } from '../../../types/articles'
-import { ArticleCard } from './ArticleCard'
+import { ArticlesTable } from './ArticlesTable'
+import { ArticleGroupFilter } from './ArticleGroupFilter'
 import { ArticleEditModal } from './ArticleEditModal'
 import { ArticlePriceListNav } from './ArticlePriceListNav'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
 
+type SortField = 'code' | 'name' | 'category' | 'group' | 'default_price' | 'unit' | 'is_active'
+
 export function ArticlesSettings() {
   const navigate = useNavigate()
-  const [articles, setArticles] = useState<Article[]>([])
+  const [articles, setArticles] = useState<ArticleWithGroup[]>([])
+  const [groups, setGroups] = useState<ArticleGroup[]>([])
   const [loading, setLoading] = useState(true)
-  const [editingArticle, setEditingArticle] = useState<Article | null>(null)
+  const [editingArticle, setEditingArticle] = useState<ArticleWithGroup | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+  // Filter state
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<ArticleCategory | 'all'>('all')
+  const [groupFilter, setGroupFilter] = useState<string | 'all'>('all')
 
-  // Ladda artiklar vid mount
+  // Sortering
+  const [sortField, setSortField] = useState<SortField | null>('name')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  // Loading states för actions
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
   useEffect(() => {
     loadData()
   }, [])
@@ -43,8 +59,12 @@ export function ArticlesSettings() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const data = await ArticleService.getAllArticles()
-      setArticles(data)
+      const [articlesData, groupsData] = await Promise.all([
+        ArticleService.getAllArticlesWithGroups(),
+        ArticleGroupService.getActiveGroups()
+      ])
+      setArticles(articlesData)
+      setGroups(groupsData)
     } catch (error) {
       console.error('Fel vid laddning av artiklar:', error)
       toast.error('Kunde inte ladda artiklar')
@@ -53,9 +73,20 @@ export function ArticlesSettings() {
     }
   }
 
-  // Filtrera artiklar
+  // Beräkna antal artiklar per grupp
+  const articleCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    articles.forEach(article => {
+      if (article.group_id) {
+        counts[article.group_id] = (counts[article.group_id] || 0) + 1
+      }
+    })
+    return counts
+  }, [articles])
+
+  // Filtrera och sortera artiklar
   const filteredArticles = useMemo(() => {
-    return articles.filter(article => {
+    let result = articles.filter(article => {
       // Sökfilter
       if (searchTerm) {
         const search = searchTerm.toLowerCase()
@@ -73,12 +104,77 @@ export function ArticlesSettings() {
         return false
       }
 
+      // Gruppfilter
+      if (groupFilter !== 'all') {
+        if (groupFilter === 'ungrouped') {
+          if (article.group_id) return false
+        } else {
+          if (article.group_id !== groupFilter) return false
+        }
+      }
+
       return true
     })
-  }, [articles, searchTerm, categoryFilter])
 
-  // Hantera toggle av aktiv-status
+    // Sortering
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        let aVal: string | number | boolean
+        let bVal: string | number | boolean
+
+        switch (sortField) {
+          case 'code':
+            aVal = a.code
+            bVal = b.code
+            break
+          case 'name':
+            aVal = a.name.toLowerCase()
+            bVal = b.name.toLowerCase()
+            break
+          case 'category':
+            aVal = a.category
+            bVal = b.category
+            break
+          case 'group':
+            aVal = a.group?.name?.toLowerCase() || 'zzz'
+            bVal = b.group?.name?.toLowerCase() || 'zzz'
+            break
+          case 'default_price':
+            aVal = a.default_price
+            bVal = b.default_price
+            break
+          case 'unit':
+            aVal = a.unit
+            bVal = b.unit
+            break
+          case 'is_active':
+            aVal = a.is_active ? 1 : 0
+            bVal = b.is_active ? 1 : 0
+            break
+          default:
+            return 0
+        }
+
+        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      })
+    }
+
+    return result
+  }, [articles, searchTerm, categoryFilter, groupFilter, sortField, sortDirection])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
   const handleToggleActive = async (id: string, isActive: boolean) => {
+    setTogglingId(id)
     try {
       await ArticleService.toggleArticleActive(id, isActive)
       toast.success(isActive ? 'Artikel aktiverad' : 'Artikel inaktiverad')
@@ -86,11 +182,13 @@ export function ArticlesSettings() {
     } catch (error) {
       console.error('Fel vid toggle av status:', error)
       toast.error('Kunde inte ändra status')
+    } finally {
+      setTogglingId(null)
     }
   }
 
-  // Hantera borttagning
   const handleDelete = async (id: string) => {
+    setDeletingId(id)
     try {
       await ArticleService.deleteArticle(id)
       toast.success('Artikel borttagen')
@@ -98,10 +196,11 @@ export function ArticlesSettings() {
     } catch (error) {
       console.error('Fel vid borttagning:', error)
       toast.error(error instanceof Error ? error.message : 'Kunde inte ta bort artikeln')
+    } finally {
+      setDeletingId(null)
     }
   }
 
-  // Hantera sparande
   const handleSave = async () => {
     setEditingArticle(null)
     setIsCreateModalOpen(false)
@@ -158,7 +257,7 @@ export function ArticlesSettings() {
         </div>
 
         {/* KPI-kort */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
             <p className="text-2xl font-bold text-white">{stats.total}</p>
             <p className="text-sm text-slate-400">Totalt</p>
@@ -175,8 +274,20 @@ export function ArticlesSettings() {
           ))}
         </div>
 
+        {/* Gruppfilter */}
+        <div className="mb-4">
+          <ArticleGroupFilter
+            groups={groups}
+            selectedGroupId={groupFilter}
+            articleCounts={articleCounts}
+            totalCount={articles.length}
+            onSelectGroup={setGroupFilter}
+            onGroupsChanged={loadData}
+          />
+        </div>
+
         {/* Filter och åtgärder */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
           {/* Sökfält */}
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -221,49 +332,28 @@ export function ArticlesSettings() {
           </div>
         </div>
 
-        {/* Lista */}
+        {/* Resultaträknare */}
+        <div className="mb-4 text-sm text-slate-400">
+          Visar {filteredArticles.length} av {articles.length} artiklar
+        </div>
+
+        {/* Tabell */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
           </div>
-        ) : filteredArticles.length === 0 ? (
-          <div className="text-center py-16 bg-slate-800/30 rounded-xl border border-slate-700/50">
-            <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400 mb-4">
-              {searchTerm || categoryFilter !== 'all'
-                ? 'Inga artiklar matchar din sökning'
-                : 'Inga artiklar skapade'}
-            </p>
-            {!searchTerm && categoryFilter === 'all' && (
-              <Button
-                variant="primary"
-                onClick={() => setIsCreateModalOpen(true)}
-              >
-                <Plus className="w-4 h-4" />
-                Skapa första artikeln
-              </Button>
-            )}
-          </div>
         ) : (
-          <div className="space-y-3">
-            <AnimatePresence>
-              {filteredArticles.map((article) => (
-                <motion.div
-                  key={article.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <ArticleCard
-                    article={article}
-                    onEdit={() => setEditingArticle(article)}
-                    onToggleActive={(isActive) => handleToggleActive(article.id, isActive)}
-                    onDelete={() => handleDelete(article.id)}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+          <ArticlesTable
+            articles={filteredArticles}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onEdit={setEditingArticle}
+            onToggleActive={handleToggleActive}
+            onDelete={handleDelete}
+            togglingId={togglingId}
+            deletingId={deletingId}
+          />
         )}
 
         {/* Info om inaktiva */}
