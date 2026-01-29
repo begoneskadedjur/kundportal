@@ -480,6 +480,26 @@ const AdminDashboard: React.FC = () => {
                 />
 
                 <AdminDashboardCard
+                  href="/admin/settings/articles"
+                  icon={Package}
+                  title="Artiklar"
+                  description="Hantera artiklar och tjänster för fakturering"
+                  stats="Artikelregister"
+                  tag="Inställningar"
+                  iconColor="text-cyan-400"
+                />
+
+                <AdminDashboardCard
+                  href="/admin/settings/price-lists"
+                  icon={FileText}
+                  title="Prislistor"
+                  description="Hantera prislistor med kundspecifika priser"
+                  stats="Prissättning"
+                  tag="Inställningar"
+                  iconColor="text-purple-400"
+                />
+
+                <AdminDashboardCard
                   href="/admin/organisation/register"
                   icon={Building2}
                   title="Registrering"

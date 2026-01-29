@@ -28,6 +28,8 @@ import SalesOpportunities from './pages/admin/SalesOpportunities';
 import ProductManagementPage from './pages/admin/ProductManagement';
 import StationTypesPage from './pages/admin/settings/StationTypesPage';
 import PreparationsPage from './pages/admin/settings/PreparationsPage';
+import ArticlesPage from './pages/admin/settings/ArticlesPage';
+import PriceListsPage from './pages/admin/settings/PriceListsPage';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import ImageBank from './pages/admin/ImageBank';
@@ -239,6 +241,22 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <PreparationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/settings/articles"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <ArticlesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/settings/price-lists"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <PriceListsPage />
                 </ProtectedRoute>
               }
             />
