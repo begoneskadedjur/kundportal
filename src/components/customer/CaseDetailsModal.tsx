@@ -155,24 +155,31 @@ export default function CaseDetailsModal({
   })
 
   // Avgör om ärende kräver bekräftelse
-  const needsAcknowledgment = requiresAcknowledgment(
-    fallbackData?.pest_level ?? null,
-    fallbackData?.problem_rating ?? null
+  const currentPestLevel = fallbackData?.pest_level ?? null
+  const currentProblemRating = fallbackData?.problem_rating ?? null
+
+  // Kontrollera om situationen har försämrats sedan senaste bekräftelsen
+  const hasWorsenedSinceAcknowledgment = acknowledgment && (
+    (currentPestLevel ?? 0) > (acknowledgment.pest_level_at_acknowledgment ?? 0) ||
+    (currentProblemRating ?? 0) > (acknowledgment.problem_rating_at_acknowledgment ?? 0)
   )
+
+  // Kräv ny bekräftelse om:
+  // 1. Kritisk status OCH inte bekräftat
+  // 2. Kritisk status OCH situationen har försämrats sedan senaste bekräftelsen
+  const needsAcknowledgment = requiresAcknowledgment(currentPestLevel, currentProblemRating) &&
+    (!hasAcknowledged || hasWorsenedSinceAcknowledgment)
 
   // Handle acknowledgment
   const handleAcknowledge = useCallback(async () => {
     try {
-      await acknowledge(
-        fallbackData?.pest_level ?? null,
-        fallbackData?.problem_rating ?? null
-      )
+      await acknowledge(currentPestLevel, currentProblemRating)
       toast.success('Tack för din bekräftelse!')
     } catch (error) {
       console.error('Error acknowledging case:', error)
       toast.error('Kunde inte spara bekräftelse')
     }
-  }, [acknowledge, fallbackData?.pest_level, fallbackData?.problem_rating])
+  }, [acknowledge, currentPestLevel, currentProblemRating])
 
   // Handle close with soft block
   const handleClose = useCallback(() => {
@@ -572,6 +579,19 @@ export default function CaseDetailsModal({
                   </div>
                 )}
 
+                {/* Arbetsrapport - visas direkt under beskrivning */}
+                {fallbackData.work_report && fallbackData.work_report.trim() !== '' && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Wrench className="w-4 h-4 text-blue-400" />
+                      Arbetsrapport
+                    </h3>
+                    <div className="p-4 bg-slate-800/50 rounded-lg">
+                      <p className="text-white whitespace-pre-wrap">{fallbackData.work_report}</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Grid med information */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Vänster kolumn */}
@@ -624,19 +644,6 @@ export default function CaseDetailsModal({
 
                   {/* Höger kolumn */}
                   <div className="space-y-4">
-                    {/* Arbetsrapport */}
-                    {fallbackData.work_report && fallbackData.work_report.trim() !== '' && (
-                      <div className="space-y-3">
-                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                          <Wrench className="w-4 h-4 text-blue-400" />
-                          Arbetsrapport
-                        </h4>
-                        <div className="p-4 bg-slate-800/50 rounded-lg">
-                          <p className="text-white whitespace-pre-wrap">{fallbackData.work_report}</p>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Material använt */}
                     {fallbackData.materials_used && fallbackData.materials_used.trim() !== '' && (
                       <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
