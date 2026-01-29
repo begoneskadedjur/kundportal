@@ -77,6 +77,10 @@ export type Database = {
           created_at: string | null
           updated_at: string | null
           
+          // 💰 Billing Settings
+          price_list_id: string | null  // FK till price_lists
+          billing_frequency: 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'on_demand' | null
+
           // 🏢 Multisite Support
           organization_id: string | null  // FK till multisite_organizations
           is_multisite: boolean

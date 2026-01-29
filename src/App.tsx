@@ -30,6 +30,7 @@ import StationTypesPage from './pages/admin/settings/StationTypesPage';
 import PreparationsPage from './pages/admin/settings/PreparationsPage';
 import ArticlesPage from './pages/admin/settings/ArticlesPage';
 import PriceListsPage from './pages/admin/settings/PriceListsPage';
+import ContractBilling from './pages/admin/ContractBilling';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import ImageBank from './pages/admin/ImageBank';
@@ -257,6 +258,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <PriceListsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/contract-billing"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <ContractBilling />
                 </ProtectedRoute>
               }
             />

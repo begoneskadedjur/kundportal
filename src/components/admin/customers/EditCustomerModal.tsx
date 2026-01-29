@@ -1,7 +1,7 @@
 // src/components/admin/customers/EditCustomerModal.tsx - Customer edit modal
 
 import React, { useState, useEffect } from 'react'
-import { User, Building2, Mail, Phone, MapPin, Calendar, DollarSign, Save, AlertCircle } from 'lucide-react'
+import { User, Building2, Mail, Phone, MapPin, Calendar, DollarSign, Save, AlertCircle, Receipt } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -9,6 +9,9 @@ import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
+import { PriceListService } from '../../../services/priceListService'
+import { PriceList } from '../../../types/articles'
+import { BillingFrequency, BILLING_FREQUENCY_CONFIG } from '../../../types/contractBilling'
 
 interface Customer {
   id: string
@@ -36,6 +39,8 @@ interface Customer {
   product_summary?: string | null
   service_details?: string | null
   agreement_text?: string | null
+  price_list_id?: string | null
+  billing_frequency?: BillingFrequency | null
 }
 
 interface EditCustomerModalProps {
@@ -54,6 +59,7 @@ export default function EditCustomerModal({
   const [formData, setFormData] = useState<Partial<Customer>>({})
   const [loading, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [priceLists, setPriceLists] = useState<PriceList[]>([])
 
   // Initialize form data when customer changes
   useEffect(() => {
@@ -82,11 +88,20 @@ export default function EditCustomerModal({
         service_frequency: customer.service_frequency || '',
         product_summary: customer.product_summary || '',
         service_details: customer.service_details || '',
-        agreement_text: customer.agreement_text || ''
+        agreement_text: customer.agreement_text || '',
+        price_list_id: customer.price_list_id || null,
+        billing_frequency: customer.billing_frequency || 'monthly'
       })
       setErrors({})
     }
   }, [customer])
+
+  // Ladda prislistor
+  useEffect(() => {
+    PriceListService.getActivePriceLists()
+      .then(setPriceLists)
+      .catch(err => console.error('Kunde inte ladda prislistor:', err))
+  }, [])
 
   // Handle form input changes
   const handleInputChange = (field: keyof Customer, value: any) => {
@@ -574,6 +589,63 @@ export default function EditCustomerModal({
               />
             </div>
           </div>
+        </Card>
+
+        {/* Billing Settings */}
+        <Card className="p-4 bg-slate-800/50 border-slate-700">
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+            <Receipt className="w-5 h-5 text-emerald-400" />
+            Fakturering
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                Prislista
+              </label>
+              <select
+                value={formData.price_list_id || ''}
+                onChange={(e) => handleInputChange('price_list_id', e.target.value || null)}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="">Välj prislista...</option>
+                {priceLists.map(pl => (
+                  <option key={pl.id} value={pl.id}>
+                    {pl.name} {pl.is_default && '(Standard)'}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500 mt-1">
+                Prislistan avgör vilka artiklar och priser som faktureras
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                Faktureringsfrekvens
+              </label>
+              <select
+                value={formData.billing_frequency || 'monthly'}
+                onChange={(e) => handleInputChange('billing_frequency', e.target.value as BillingFrequency)}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500"
+              >
+                {Object.entries(BILLING_FREQUENCY_CONFIG).map(([key, config]) => (
+                  <option key={key} value={key}>{config.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500 mt-1">
+                Hur ofta kunden ska faktureras för avtalstjänster
+              </p>
+            </div>
+          </div>
+
+          {formData.price_list_id && (
+            <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+              <p className="text-sm text-emerald-400">
+                Kunden är kopplad till en prislista och kan inkluderas i periodisk avtalsfakturering.
+              </p>
+            </div>
+          )}
         </Card>
       </div>
     </Modal>

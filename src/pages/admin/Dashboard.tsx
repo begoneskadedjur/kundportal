@@ -518,14 +518,24 @@ const AdminDashboard: React.FC = () => {
                   tag="Fakturering"
                   iconColor="text-yellow-400"
                 />
-                
+
+                <AdminDashboardCard
+                  href="/admin/contract-billing"
+                  icon={Receipt}
+                  title="Avtalsfakturering"
+                  description="Periodisk fakturering för avtalskunder"
+                  stats="Faktureringskö"
+                  tag="Fakturering"
+                  iconColor="text-emerald-400"
+                />
+
                 <AdminDashboardCard
                   href="/admin/commissions"
                   icon={Wallet}
                   title="Provisioner"
                   description="Redovisning av samtliga provisionsuppgifter"
                   tag="Provisioner"
-                  iconColor="text-emerald-400"
+                  iconColor="text-teal-400"
                 />
               </StaggeredGrid>
             </div>
