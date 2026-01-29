@@ -26,6 +26,7 @@ import { ContractBillingKpiCards } from '../../components/admin/contractBilling/
 import { ContractBillingItemsTable } from '../../components/admin/contractBilling/ContractBillingItemsTable'
 import { ContractBillingBatchList } from '../../components/admin/contractBilling/ContractBillingBatchList'
 import { ContractBillingGenerateModal } from '../../components/admin/contractBilling/ContractBillingGenerateModal'
+import { ArticlePriceListNav } from '../../components/admin/settings/ArticlePriceListNav'
 import toast from 'react-hot-toast'
 
 export default function ContractBilling() {
@@ -245,6 +246,11 @@ export default function ContractBilling() {
               Generera fakturering
             </Button>
           </div>
+        </div>
+
+        {/* Navigation */}
+        <div className="mb-8">
+          <ArticlePriceListNav />
         </div>
 
         {/* KPI-kort */}

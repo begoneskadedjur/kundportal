@@ -7,14 +7,18 @@ import {
   X,
   Save,
   Package,
-  Loader2
+  Loader2,
+  FileText,
+  Check
 } from 'lucide-react'
 import { ArticleService } from '../../../services/articleService'
+import { PriceListService } from '../../../services/priceListService'
 import {
   Article,
   CreateArticleInput,
   ArticleUnit,
   ArticleCategory,
+  PriceList,
   ARTICLE_UNITS,
   ARTICLE_CATEGORIES,
   ARTICLE_UNIT_CONFIG,
@@ -50,8 +54,38 @@ export function ArticleEditModal({
   const [category, setCategory] = useState<ArticleCategory>('Övrigt')
   const [isActive, setIsActive] = useState(true)
 
+  // Prislista-state
+  const [priceLists, setPriceLists] = useState<PriceList[]>([])
+  const [selectedPriceListIds, setSelectedPriceListIds] = useState<string[]>([])
+  const [loadingPriceLists, setLoadingPriceLists] = useState(false)
+
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Ladda prislistor
+  useEffect(() => {
+    const loadPriceLists = async () => {
+      setLoadingPriceLists(true)
+      try {
+        const lists = await PriceListService.getActivePriceLists()
+        setPriceLists(lists)
+        // Förväl standardprislistan för nya artiklar
+        if (!article) {
+          const defaultList = lists.find(l => l.is_default)
+          if (defaultList) {
+            setSelectedPriceListIds([defaultList.id])
+          }
+        }
+      } catch (error) {
+        console.error('Kunde inte ladda prislistor:', error)
+      } finally {
+        setLoadingPriceLists(false)
+      }
+    }
+    if (isOpen) {
+      loadPriceLists()
+    }
+  }, [isOpen, article])
 
   // Fyll i formulär vid redigering
   useEffect(() => {
@@ -64,6 +98,7 @@ export function ArticleEditModal({
       setVatRate(article.vat_rate.toString())
       setCategory(article.category)
       setIsActive(article.is_active)
+      setSelectedPriceListIds([]) // Vid redigering behåller vi inte prislista-val
     } else {
       // Återställ för ny
       setCode('')
@@ -74,6 +109,7 @@ export function ArticleEditModal({
       setVatRate('25')
       setCategory('Övrigt')
       setIsActive(true)
+      // selectedPriceListIds hanteras i loadPriceLists
     }
     setErrors({})
   }, [article, isOpen])
@@ -107,6 +143,15 @@ export function ArticleEditModal({
     return Object.keys(newErrors).length === 0
   }
 
+  // Toggle prislista-val
+  const handleTogglePriceList = (priceListId: string) => {
+    setSelectedPriceListIds(prev =>
+      prev.includes(priceListId)
+        ? prev.filter(id => id !== priceListId)
+        : [...prev, priceListId]
+    )
+  }
+
   // Spara
   const handleSave = async () => {
     if (!validate()) return
@@ -124,12 +169,28 @@ export function ArticleEditModal({
         is_active: isActive
       }
 
+      let savedArticle: Article
+
       if (isEditing && article) {
-        await ArticleService.updateArticle(article.id, input)
+        savedArticle = await ArticleService.updateArticle(article.id, input)
         toast.success('Artikel uppdaterad')
       } else {
-        await ArticleService.createArticle(input)
-        toast.success('Artikel skapad')
+        savedArticle = await ArticleService.createArticle(input)
+
+        // Lägg till artikeln i valda prislistor
+        if (selectedPriceListIds.length > 0) {
+          for (const priceListId of selectedPriceListIds) {
+            await PriceListService.upsertPriceListItem({
+              price_list_id: priceListId,
+              article_id: savedArticle.id,
+              custom_price: parseFloat(defaultPrice),
+              discount_percent: 0
+            })
+          }
+          toast.success(`Artikel skapad och tillagd i ${selectedPriceListIds.length} prislista(or)`)
+        } else {
+          toast.success('Artikel skapad')
+        }
       }
 
       onSave()
@@ -359,6 +420,63 @@ export function ArticleEditModal({
             <span className="text-white">Aktiv</span>
             <span className="text-slate-500 text-sm">(kan väljas vid fakturering)</span>
           </label>
+
+          {/* Prislistor - endast för nya artiklar */}
+          {!isEditing && (
+            <div className="border-t border-slate-700 pt-5">
+              <label className="block text-sm font-medium text-white mb-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-purple-400" />
+                  Lägg till i prislistor
+                </div>
+              </label>
+              {loadingPriceLists ? (
+                <div className="flex items-center gap-2 text-slate-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Laddar prislistor...
+                </div>
+              ) : priceLists.length === 0 ? (
+                <p className="text-slate-500 text-sm">Inga prislistor finns. Skapa en prislista först.</p>
+              ) : (
+                <div className="space-y-2">
+                  {priceLists.map(pl => {
+                    const isSelected = selectedPriceListIds.includes(pl.id)
+                    return (
+                      <button
+                        key={pl.id}
+                        type="button"
+                        onClick={() => handleTogglePriceList(pl.id)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
+                          isSelected
+                            ? 'bg-purple-500/20 border-purple-500/50 text-white'
+                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                            isSelected
+                              ? 'bg-purple-500 border-purple-500'
+                              : 'border-slate-600'
+                          }`}>
+                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <span className="font-medium">{pl.name}</span>
+                          {pl.is_default && (
+                            <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">
+                              Standard
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                  <p className="text-slate-500 text-xs mt-2">
+                    Artikeln läggs till med standardpriset i valda prislistor
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}

@@ -22,6 +22,7 @@ import {
 } from '../../../types/articles'
 import { ArticleCard } from './ArticleCard'
 import { ArticleEditModal } from './ArticleEditModal'
+import { ArticlePriceListNav } from './ArticlePriceListNav'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
 
@@ -163,6 +164,9 @@ export function ArticlesSettings() {
           ))}
         </div>
       </div>
+
+      {/* Navigation */}
+      <ArticlePriceListNav />
 
       {/* Filter och åtgärder */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">

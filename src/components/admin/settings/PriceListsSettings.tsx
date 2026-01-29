@@ -23,6 +23,7 @@ import { ArticleService } from '../../../services/articleService'
 import { PriceList, Article } from '../../../types/articles'
 import { PriceListEditModal } from './PriceListEditModal'
 import { PriceListItemsEditor } from './PriceListItemsEditor'
+import { ArticlePriceListNav } from './ArticlePriceListNav'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
 
@@ -153,6 +154,9 @@ export function PriceListsSettings() {
           </div>
         </div>
       </div>
+
+      {/* Navigation */}
+      <ArticlePriceListNav />
 
       {/* Åtgärder */}
       <div className="flex items-center justify-between mb-6">
