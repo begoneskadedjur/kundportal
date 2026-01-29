@@ -115,31 +115,42 @@ export function PriceListsSettings() {
   const activeCount = priceLists.filter(pl => pl.is_active).length
 
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-4">
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
-              <FileText className="w-6 h-6 text-purple-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Prislistor</h1>
-              <p className="text-slate-400 text-sm">
-                Hantera prislistor med kundspecifika priser
-              </p>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Bakgrund */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-purple-500/5" />
+
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/admin/dashboard')}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
+                <FileText className="w-6 h-6 text-purple-400" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Prislistor</h1>
+                <p className="text-slate-400 text-sm">
+                  Hantera prislistor med kundspecifika priser
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Statistik */}
-        <div className="grid grid-cols-3 gap-4 mt-6">
+        {/* Navigation */}
+        <div className="mb-6">
+          <ArticlePriceListNav />
+        </div>
+
+        {/* KPI-kort */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
             <p className="text-2xl font-bold text-white">{priceLists.length}</p>
             <p className="text-sm text-slate-400">Prislistor</p>
@@ -153,205 +164,202 @@ export function PriceListsSettings() {
             <p className="text-sm text-slate-400">Artiklar</p>
           </div>
         </div>
-      </div>
 
-      {/* Navigation */}
-      <ArticlePriceListNav />
-
-      {/* Åtgärder */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-white">Alla prislistor</h2>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={loadData}
-            disabled={loading}
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            <Plus className="w-4 h-4" />
-            Ny prislista
-          </Button>
-        </div>
-      </div>
-
-      {/* Lista */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
-        </div>
-      ) : priceLists.length === 0 ? (
-        <div className="text-center py-16 bg-slate-800/30 rounded-xl border border-slate-700/50">
-          <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400 mb-4">Inga prislistor skapade</p>
-          <Button
-            variant="primary"
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            <Plus className="w-4 h-4" />
-            Skapa första prislistan
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <AnimatePresence>
-            {priceLists.map((priceList) => (
-              <motion.div
-                key={priceList.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className={`bg-slate-800/50 rounded-xl border overflow-hidden transition-all ${
-                  priceList.is_active
-                    ? priceList.is_default
-                      ? 'border-purple-500/50'
-                      : 'border-slate-700/50'
-                    : 'border-slate-700/30 opacity-60'
-                }`}
-              >
-                {/* Prislista-header */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-white font-medium text-lg">{priceList.name}</h3>
-                        {priceList.is_default && (
-                          <span className="flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">
-                            <Star className="w-3 h-3" />
-                            Standard
-                          </span>
-                        )}
-                        {!priceList.is_active && (
-                          <span className="px-2 py-0.5 bg-slate-600 rounded text-xs text-slate-400">
-                            Inaktiv
-                          </span>
-                        )}
-                      </div>
-
-                      {priceList.description && (
-                        <p className="text-slate-400 text-sm mb-2">{priceList.description}</p>
-                      )}
-
-                      <p className="text-slate-500 text-sm">
-                        {itemCounts[priceList.id] || 0} artikelpriser definierade
-                      </p>
-                    </div>
-
-                    {/* Åtgärder */}
-                    <div className="flex items-center gap-1">
-                      {!priceList.is_default && (
-                        <button
-                          onClick={() => handleSetDefault(priceList.id)}
-                          className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-colors"
-                          title="Sätt som standard"
-                        >
-                          <Star className="w-5 h-5" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleCopy(priceList)}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                        title="Kopiera"
-                      >
-                        <Copy className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => setEditingPriceList(priceList)}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                        title="Redigera"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                      {!priceList.is_default && (
-                        <button
-                          onClick={() => handleDelete(priceList.id)}
-                          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                          title="Ta bort"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setExpandedListId(expandedListId === priceList.id ? null : priceList.id)}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                      >
-                        {expandedListId === priceList.id ? (
-                          <ChevronUp className="w-5 h-5" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Expanderad: Artikelpriser */}
-                <AnimatePresence>
-                  {expandedListId === priceList.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="border-t border-slate-700/50 overflow-hidden"
-                    >
-                      <PriceListItemsEditor
-                        priceListId={priceList.id}
-                        articles={articles}
-                        onUpdate={() => loadData()}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {/* Info om standard */}
-      {!defaultList && priceLists.length > 0 && (
-        <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-amber-400 font-medium">Ingen standardprislista vald</p>
-              <p className="text-sm text-slate-400 mt-1">
-                Välj en prislista som standard genom att klicka på stjärnikonen.
-              </p>
-            </div>
+        {/* Åtgärder */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-white">Alla prislistor</h2>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={loadData}
+              disabled={loading}
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsCreateModalOpen(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Ny prislista
+            </Button>
           </div>
         </div>
-      )}
 
-      {/* Edit Modal */}
-      <AnimatePresence>
-        {editingPriceList && (
-          <PriceListEditModal
-            priceList={editingPriceList}
-            isOpen={true}
-            onClose={() => setEditingPriceList(null)}
-            onSave={handleSave}
-          />
-        )}
-      </AnimatePresence>
+        {/* Lista */}
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+          </div>
+        ) : priceLists.length === 0 ? (
+          <div className="text-center py-16 bg-slate-800/30 rounded-xl border border-slate-700/50">
+            <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-400 mb-4">Inga prislistor skapade</p>
+            <Button
+              variant="primary"
+              onClick={() => setIsCreateModalOpen(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Skapa första prislistan
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <AnimatePresence>
+              {priceLists.map((priceList) => (
+                <motion.div
+                  key={priceList.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`bg-slate-800/50 rounded-xl border overflow-hidden transition-all ${
+                    priceList.is_active
+                      ? priceList.is_default
+                        ? 'border-purple-500/50'
+                        : 'border-slate-700/50'
+                      : 'border-slate-700/30 opacity-60'
+                  }`}
+                >
+                  {/* Prislista-header */}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-white font-medium text-lg">{priceList.name}</h3>
+                          {priceList.is_default && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">
+                              <Star className="w-3 h-3" />
+                              Standard
+                            </span>
+                          )}
+                          {!priceList.is_active && (
+                            <span className="px-2 py-0.5 bg-slate-600 rounded text-xs text-slate-400">
+                              Inaktiv
+                            </span>
+                          )}
+                        </div>
 
-      {/* Create Modal */}
-      <AnimatePresence>
-        {isCreateModalOpen && (
-          <PriceListEditModal
-            priceList={null}
-            isOpen={true}
-            onClose={() => setIsCreateModalOpen(false)}
-            onSave={handleSave}
-          />
+                        {priceList.description && (
+                          <p className="text-slate-400 text-sm mb-2">{priceList.description}</p>
+                        )}
+
+                        <p className="text-slate-500 text-sm">
+                          {itemCounts[priceList.id] || 0} artikelpriser definierade
+                        </p>
+                      </div>
+
+                      {/* Åtgärder */}
+                      <div className="flex items-center gap-1">
+                        {!priceList.is_default && (
+                          <button
+                            onClick={() => handleSetDefault(priceList.id)}
+                            className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-colors"
+                            title="Sätt som standard"
+                          >
+                            <Star className="w-5 h-5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleCopy(priceList)}
+                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                          title="Kopiera"
+                        >
+                          <Copy className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => setEditingPriceList(priceList)}
+                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                          title="Redigera"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        {!priceList.is_default && (
+                          <button
+                            onClick={() => handleDelete(priceList.id)}
+                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                            title="Ta bort"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setExpandedListId(expandedListId === priceList.id ? null : priceList.id)}
+                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          {expandedListId === priceList.id ? (
+                            <ChevronUp className="w-5 h-5" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanderad: Artikelpriser */}
+                  <AnimatePresence>
+                    {expandedListId === priceList.id && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-slate-700/50 overflow-hidden"
+                      >
+                        <PriceListItemsEditor
+                          priceListId={priceList.id}
+                          articles={articles}
+                          onUpdate={() => loadData()}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         )}
-      </AnimatePresence>
+
+        {/* Info om standard */}
+        {!defaultList && priceLists.length > 0 && (
+          <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-amber-400 font-medium">Ingen standardprislista vald</p>
+                <p className="text-sm text-slate-400 mt-1">
+                  Välj en prislista som standard genom att klicka på stjärnikonen.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        <AnimatePresence>
+          {editingPriceList && (
+            <PriceListEditModal
+              priceList={editingPriceList}
+              isOpen={true}
+              onClose={() => setEditingPriceList(null)}
+              onSave={handleSave}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Create Modal */}
+        <AnimatePresence>
+          {isCreateModalOpen && (
+            <PriceListEditModal
+              priceList={null}
+              isOpen={true}
+              onClose={() => setIsCreateModalOpen(false)}
+              onSave={handleSave}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

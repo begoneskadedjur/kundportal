@@ -123,31 +123,42 @@ export function ArticlesSettings() {
   }, [articles])
 
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-4">
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center">
-              <Package className="w-6 h-6 text-blue-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Artiklar</h1>
-              <p className="text-slate-400 text-sm">
-                Hantera artiklar och tjänster som kan faktureras
-              </p>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Bakgrund */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-cyan-500/5" />
+
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/admin/dashboard')}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center">
+                <Package className="w-6 h-6 text-cyan-400" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Artiklar</h1>
+                <p className="text-slate-400 text-sm">
+                  Hantera artiklar och tjänster som kan faktureras
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Statistik */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+        {/* Navigation */}
+        <div className="mb-6">
+          <ArticlePriceListNav />
+        </div>
+
+        {/* KPI-kort */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
             <p className="text-2xl font-bold text-white">{stats.total}</p>
             <p className="text-sm text-slate-400">Totalt</p>
@@ -163,142 +174,139 @@ export function ArticlesSettings() {
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Navigation */}
-      <ArticlePriceListNav />
+        {/* Filter och åtgärder */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          {/* Sökfält */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Sök artikel..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
 
-      {/* Filter och åtgärder */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        {/* Sökfält */}
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Sök artikel..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Kategorifilter */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as ArticleCategory | 'all')}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="all">Alla kategorier</option>
+              {ARTICLE_CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Kategorifilter */}
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as ArticleCategory | 'all')}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">Alla kategorier</option>
-            {ARTICLE_CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={loadData}
-            disabled={loading}
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            <Plus className="w-4 h-4" />
-            Ny artikel
-          </Button>
-        </div>
-      </div>
-
-      {/* Lista */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-        </div>
-      ) : filteredArticles.length === 0 ? (
-        <div className="text-center py-16 bg-slate-800/30 rounded-xl border border-slate-700/50">
-          <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400 mb-4">
-            {searchTerm || categoryFilter !== 'all'
-              ? 'Inga artiklar matchar din sökning'
-              : 'Inga artiklar skapade'}
-          </p>
-          {!searchTerm && categoryFilter === 'all' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={loadData}
+              disabled={loading}
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
             <Button
               variant="primary"
+              size="sm"
               onClick={() => setIsCreateModalOpen(true)}
             >
               <Plus className="w-4 h-4" />
-              Skapa första artikeln
+              Ny artikel
             </Button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <AnimatePresence>
-            {filteredArticles.map((article) => (
-              <motion.div
-                key={article.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <ArticleCard
-                  article={article}
-                  onEdit={() => setEditingArticle(article)}
-                  onToggleActive={(isActive) => handleToggleActive(article.id, isActive)}
-                  onDelete={() => handleDelete(article.id)}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {/* Info om inaktiva */}
-      {stats.inactive > 0 && (
-        <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-amber-400 font-medium">
-                {stats.inactive} {stats.inactive === 1 ? 'artikel är inaktiverad' : 'artiklar är inaktiverade'}
-              </p>
-              <p className="text-sm text-slate-400 mt-1">
-                Inaktiverade artiklar kan inte väljas vid fakturering.
-              </p>
-            </div>
           </div>
         </div>
-      )}
 
-      {/* Edit Modal */}
-      <AnimatePresence>
-        {editingArticle && (
-          <ArticleEditModal
-            article={editingArticle}
-            isOpen={true}
-            onClose={() => setEditingArticle(null)}
-            onSave={handleSave}
-          />
+        {/* Lista */}
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+          </div>
+        ) : filteredArticles.length === 0 ? (
+          <div className="text-center py-16 bg-slate-800/30 rounded-xl border border-slate-700/50">
+            <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-400 mb-4">
+              {searchTerm || categoryFilter !== 'all'
+                ? 'Inga artiklar matchar din sökning'
+                : 'Inga artiklar skapade'}
+            </p>
+            {!searchTerm && categoryFilter === 'all' && (
+              <Button
+                variant="primary"
+                onClick={() => setIsCreateModalOpen(true)}
+              >
+                <Plus className="w-4 h-4" />
+                Skapa första artikeln
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <AnimatePresence>
+              {filteredArticles.map((article) => (
+                <motion.div
+                  key={article.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <ArticleCard
+                    article={article}
+                    onEdit={() => setEditingArticle(article)}
+                    onToggleActive={(isActive) => handleToggleActive(article.id, isActive)}
+                    onDelete={() => handleDelete(article.id)}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         )}
-      </AnimatePresence>
 
-      {/* Create Modal */}
-      <AnimatePresence>
-        {isCreateModalOpen && (
-          <ArticleEditModal
-            article={null}
-            isOpen={true}
-            onClose={() => setIsCreateModalOpen(false)}
-            onSave={handleSave}
-          />
+        {/* Info om inaktiva */}
+        {stats.inactive > 0 && (
+          <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-amber-400 font-medium">
+                  {stats.inactive} {stats.inactive === 1 ? 'artikel är inaktiverad' : 'artiklar är inaktiverade'}
+                </p>
+                <p className="text-sm text-slate-400 mt-1">
+                  Inaktiverade artiklar kan inte väljas vid fakturering.
+                </p>
+              </div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+
+        {/* Edit Modal */}
+        <AnimatePresence>
+          {editingArticle && (
+            <ArticleEditModal
+              article={editingArticle}
+              isOpen={true}
+              onClose={() => setEditingArticle(null)}
+              onSave={handleSave}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Create Modal */}
+        <AnimatePresence>
+          {isCreateModalOpen && (
+            <ArticleEditModal
+              article={null}
+              isOpen={true}
+              onClose={() => setIsCreateModalOpen(false)}
+              onSave={handleSave}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

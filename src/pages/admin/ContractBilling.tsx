@@ -199,7 +199,7 @@ export default function ContractBilling() {
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-emerald-500/5" />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
@@ -249,7 +249,7 @@ export default function ContractBilling() {
         </div>
 
         {/* Navigation */}
-        <div className="mb-8">
+        <div className="mb-6">
           <ArticlePriceListNav />
         </div>
 

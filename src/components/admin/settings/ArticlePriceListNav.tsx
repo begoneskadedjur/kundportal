@@ -36,7 +36,7 @@ export function ArticlePriceListNav() {
   const location = useLocation()
 
   return (
-    <div className="flex items-center gap-2 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50 mb-6">
+    <div className="flex items-center gap-2 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50">
       {navItems.map((item) => {
         const isActive = location.pathname === item.href
         const Icon = item.icon
