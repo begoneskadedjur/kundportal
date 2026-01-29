@@ -582,107 +582,85 @@ export default function CaseDetailsModal({
 
                 {/* Beskrivning */}
                 {fallbackData.description && (
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-semibold text-white">Beskrivning</h3>
-                    <div className="p-4 bg-slate-800/50 rounded-lg">
-                      <p className="text-white whitespace-pre-wrap">{fallbackData.description}</p>
+                  <div className="space-y-1.5">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-400" />
+                      Beskrivning
+                    </h3>
+                    <div className="p-3 bg-slate-800/50 rounded-lg">
+                      <p className="text-sm text-slate-200 whitespace-pre-wrap">{fallbackData.description}</p>
                     </div>
                   </div>
                 )}
 
-                {/* Arbetsrapport - visas direkt under beskrivning */}
+                {/* Arbetsrapport */}
                 {fallbackData.work_report && fallbackData.work_report.trim() !== '' && (
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <div className="space-y-1.5">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                       <Wrench className="w-4 h-4 text-blue-400" />
                       Arbetsrapport
                     </h3>
-                    <div className="p-4 bg-slate-800/50 rounded-lg">
-                      <p className="text-white whitespace-pre-wrap">{fallbackData.work_report}</p>
+                    <div className="p-3 bg-slate-800/50 rounded-lg">
+                      <p className="text-sm text-slate-200 whitespace-pre-wrap">{fallbackData.work_report}</p>
                     </div>
                   </div>
                 )}
 
-                {/* Grid med information */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Snabbinfo - kompakt rad med chips */}
+                <div className="flex flex-wrap gap-2">
+                  {fallbackData.pest_type && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <Bug className="w-4 h-4 text-orange-400" />
+                      <span className="text-sm text-white">{fallbackData.pest_type}</span>
+                    </div>
+                  )}
+                  {fallbackData.price && fallbackData.price > 0 && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <DollarSign className="w-4 h-4 text-green-400" />
+                      <span className="text-sm text-white font-medium">{fallbackData.price} kr</span>
+                    </div>
+                  )}
+                  {fallbackData.primary_technician_name && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <User className="w-4 h-4 text-blue-400" />
+                      <span className="text-sm text-white">{fallbackData.primary_technician_name}</span>
+                    </div>
+                  )}
+                  {fallbackData.time_spent_minutes !== undefined && fallbackData.time_spent_minutes > 0 && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <Clock className="w-4 h-4 text-cyan-400" />
+                      <span className="text-sm text-white">
+                        {Math.floor(fallbackData.time_spent_minutes / 60) > 0
+                          ? `${Math.floor(fallbackData.time_spent_minutes / 60)}h ${fallbackData.time_spent_minutes % 60}min`
+                          : `${fallbackData.time_spent_minutes} min`
+                        }
+                      </span>
+                    </div>
+                  )}
+                  {fallbackData.address?.formatted_address && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <MapPin className="w-4 h-4 text-red-400" />
+                      <span className="text-sm text-white">{fallbackData.address.formatted_address}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Grid med resterande information */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Vänster kolumn */}
-                  <div className="space-y-4">
-                    {/* Adress */}
-                    {fallbackData.address?.formatted_address && (
-                      <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <MapPin className="w-5 h-5 text-red-400 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-sm text-slate-400 mb-1">Adress</p>
-                          <p className="text-white font-medium">{fallbackData.address.formatted_address}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Skadedjur */}
-                    {fallbackData.pest_type && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <Bug className="w-5 h-5 text-orange-400" />
-                        <div>
-                          <p className="text-sm text-slate-400">Skadedjur</p>
-                          <p className="text-white font-medium">{fallbackData.pest_type}</p>
-                        </div>
-                      </div>
-                    )}
-
-
-                    {/* Pris */}
-                    {fallbackData.price && fallbackData.price > 0 && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <DollarSign className="w-5 h-5 text-green-400" />
-                        <div>
-                          <p className="text-sm text-slate-400">Kostnad</p>
-                          <p className="text-white font-medium text-xl">{fallbackData.price} kr</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tekniker */}
-                    {fallbackData.primary_technician_name && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <User className="w-5 h-5 text-blue-400" />
-                        <div>
-                          <p className="text-sm text-slate-400">Ansvarig tekniker</p>
-                          <p className="text-white font-medium">{fallbackData.primary_technician_name}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Höger kolumn */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {/* Material använt */}
                     {fallbackData.materials_used && fallbackData.materials_used.trim() !== '' && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <Package className="w-5 h-5 text-purple-400" />
+                      <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg">
+                        <Package className="w-4 h-4 text-purple-400" />
                         <div>
-                          <p className="text-sm text-slate-400">Material använt</p>
-                          <p className="text-white font-medium">{fallbackData.materials_used}</p>
+                          <p className="text-xs text-slate-400">Material</p>
+                          <p className="text-sm text-white">{fallbackData.materials_used}</p>
                         </div>
                       </div>
                     )}
 
-                    {/* Tid spenderad */}
-                    {fallbackData.time_spent_minutes !== undefined && fallbackData.time_spent_minutes > 0 && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <Clock className="w-5 h-5 text-cyan-400" />
-                        <div>
-                          <p className="text-sm text-slate-400">Tid spenderad</p>
-                          <p className="text-white font-medium">
-                            {Math.floor(fallbackData.time_spent_minutes / 60) > 0
-                              ? `${Math.floor(fallbackData.time_spent_minutes / 60)}h ${fallbackData.time_spent_minutes % 60}min`
-                              : `${fallbackData.time_spent_minutes} min`
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Använda preparat - endast läsläge för kunder */}
+                    {/* Använda preparat */}
                     {caseId && fallbackData?.service_type !== 'inspection' && (
                       <CasePreparationsSection
                         caseId={caseId}
@@ -691,48 +669,51 @@ export default function CaseDetailsModal({
                         isReadOnly={true}
                       />
                     )}
+                  </div>
+
+                  {/* Höger kolumn */}
+                  <div className="space-y-3">
 
                     {/* Bilder från case_images (teknikerns bilder) */}
                     {caseImages.length > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-semibold text-white flex items-center gap-2">
                           <Images className="w-4 h-4 text-indigo-400" />
                           Bilder ({caseImages.length})
                         </h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                           {caseImages.map((image) => (
                             <div
                               key={image.id}
-                              className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700"
+                              className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square"
                             >
                               <img
                                 src={image.url}
                                 alt={image.original_name}
-                                className="w-full h-24 object-cover"
+                                className="w-full h-full object-cover"
                               />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                                 <a
                                   href={image.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+                                  className="p-1.5 bg-white/20 rounded-full hover:bg-white/30"
                                 >
-                                  <Eye className="w-4 h-4 text-white" />
+                                  <Eye className="w-3 h-3 text-white" />
                                 </a>
                                 <a
                                   href={image.url}
                                   download={image.original_name}
-                                  className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+                                  className="p-1.5 bg-white/20 rounded-full hover:bg-white/30"
                                 >
-                                  <Download className="w-4 h-4 text-white" />
+                                  <Download className="w-3 h-3 text-white" />
                                 </a>
                               </div>
                               {image.tags && image.tags.length > 0 && (
-                                <span className="absolute top-2 left-2 px-2 py-0.5 text-xs bg-black/60 text-white rounded">
+                                <span className="absolute top-1 left-1 px-1.5 py-0.5 text-[10px] bg-black/60 text-white rounded">
                                   {image.tags[0] === 'before' ? 'Före' : image.tags[0] === 'after' ? 'Efter' : 'Övrigt'}
                                 </span>
                               )}
-                              <p className="text-xs text-slate-400 p-2 truncate">{image.original_name}</p>
                             </div>
                           ))}
                         </div>
@@ -741,48 +722,47 @@ export default function CaseDetailsModal({
 
                     {/* Filer och bilder från fallback (om inga case_images) */}
                     {caseImages.length === 0 && fallbackData.files && fallbackData.files.length > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-semibold text-white flex items-center gap-2">
                           <Images className="w-4 h-4 text-indigo-400" />
                           Bilder & Filer ({fallbackData.files.length})
                         </h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                           {fallbackData.files.map((file, index) => {
                             const isImage = file.type.startsWith('image/')
                             return (
                               <div
                                 key={index}
-                                className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700"
+                                className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square"
                               >
                                 {isImage ? (
                                   <img
                                     src={file.url}
                                     alt={file.name}
-                                    className="w-full h-24 object-cover"
+                                    className="w-full h-full object-cover"
                                   />
                                 ) : (
-                                  <div className="w-full h-24 flex items-center justify-center">
-                                    <FileText className="w-8 h-8 text-slate-400" />
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <FileText className="w-6 h-6 text-slate-400" />
                                   </div>
                                 )}
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                                   <a
                                     href={file.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+                                    className="p-1.5 bg-white/20 rounded-full hover:bg-white/30"
                                   >
-                                    <Eye className="w-4 h-4 text-white" />
+                                    <Eye className="w-3 h-3 text-white" />
                                   </a>
                                   <a
                                     href={file.url}
                                     download={file.name}
-                                    className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+                                    className="p-1.5 bg-white/20 rounded-full hover:bg-white/30"
                                   >
-                                    <Download className="w-4 h-4 text-white" />
+                                    <Download className="w-3 h-3 text-white" />
                                   </a>
                                 </div>
-                                <p className="text-xs text-slate-400 p-2 truncate">{file.name}</p>
                               </div>
                             )
                           })}
