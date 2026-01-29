@@ -301,6 +301,10 @@ const CaseJourneyTimeline: React.FC<CaseJourneyTimelineProps> = ({
 
                 const config = statusConfig[status]
 
+                // Beräkna tidigare status för att visa "från → till"
+                const previousStatus = getTrafficLightStatus(entry.previousPestLevel, entry.previousProblemRating)
+                const previousConfig = previousStatus ? statusConfig[previousStatus] : null
+
                 return (
                   <div key={entry.id} className="relative pl-10 pb-4">
                     <div className={`absolute left-2 w-5 h-5 rounded-full ${config.bg} ${config.border} border-2 flex items-center justify-center z-10`}>
@@ -313,7 +317,7 @@ const CaseJourneyTimeline: React.FC<CaseJourneyTimelineProps> = ({
                       )}
                     </div>
                     <div className={`p-3 rounded-lg ${config.bg} ${config.border} border`}>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-lg">{config.icon}</span>
                         <span className={`font-semibold ${config.text}`}>
                           {config.label}
@@ -329,22 +333,26 @@ const CaseJourneyTimeline: React.FC<CaseJourneyTimelineProps> = ({
                           </span>
                         )}
                       </div>
+                      {/* Visa explicit statusförändring (från → till) */}
+                      {previousConfig && previousStatus !== status && (
+                        <div className="text-xs text-slate-400 mb-2 flex items-center gap-1">
+                          <span>{previousConfig.icon} {previousConfig.label}</span>
+                          <span>→</span>
+                          <span>{config.icon} {config.label}</span>
+                        </div>
+                      )}
 
                       {/* Arbetsrapport eller rekommendationer */}
                       {(entry.workReport || entry.recommendations) && (
-                        <div className="mt-2 space-y-1">
+                        <div className="mt-2 space-y-2">
                           {entry.workReport && (
                             <p className="text-sm text-slate-300">
-                              {entry.workReport.length > 150
-                                ? `${entry.workReport.substring(0, 150)}...`
-                                : entry.workReport}
+                              {entry.workReport}
                             </p>
                           )}
                           {entry.recommendations && (
-                            <p className="text-sm text-slate-400 italic">
-                              Rekommendation: {entry.recommendations.length > 100
-                                ? `${entry.recommendations.substring(0, 100)}...`
-                                : entry.recommendations}
+                            <p className="text-sm text-slate-400 italic whitespace-pre-line">
+                              <span className="font-medium text-slate-300">Rekommendation:</span> {entry.recommendations}
                             </p>
                           )}
                         </div>
