@@ -10,8 +10,6 @@ import {
   TrendingDown,
   Minus,
   Clock,
-  CheckCircle,
-  AlertCircle,
   ChevronDown,
   ChevronUp,
   User
@@ -82,8 +80,7 @@ const CaseJourneyTimeline: React.FC<CaseJourneyTimelineProps> = ({
   caseId,
   currentPestLevel,
   currentProblemRating,
-  assessmentDate,
-  assessedBy,
+  // assessmentDate och assessedBy behålls i interfacet för bakåtkompatibilitet men används inte längre
   defaultExpanded = true
 }) => {
   const [updates, setUpdates] = useState<TrafficLightUpdate[]>([])
@@ -236,35 +233,7 @@ const CaseJourneyTimeline: React.FC<CaseJourneyTimelineProps> = ({
               {/* Tidslinje-linje */}
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-700" />
 
-              {/* Nuvarande status (alltid överst) */}
-              {currentStatus && (
-                <div className="relative pl-10 pb-4">
-                  <div className={`absolute left-2 w-5 h-5 rounded-full ${statusConfig[currentStatus].bg} ${statusConfig[currentStatus].border} border-2 flex items-center justify-center z-10`}>
-                    <CheckCircle className={`w-3 h-3 ${statusConfig[currentStatus].text}`} />
-                  </div>
-                  <div className={`p-3 rounded-lg ${statusConfig[currentStatus].bg} ${statusConfig[currentStatus].border} border`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{statusConfig[currentStatus].icon}</span>
-                      <span className={`font-semibold ${statusConfig[currentStatus].text}`}>
-                        {statusConfig[currentStatus].label}
-                      </span>
-                      <span className="text-xs text-slate-500">- Nuläge</span>
-                    </div>
-                    <p className="text-sm text-slate-400">
-                      {statusConfig[currentStatus].description}
-                    </p>
-                    {assessmentDate && (
-                      <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {format(new Date(assessmentDate), 'd MMMM yyyy', { locale: sv })}
-                        {assessedBy && <span>• {assessedBy}</span>}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Historiska uppdateringar (nyaste först) */}
+              {/* Historiska uppdateringar (nyaste först) - "Nuläge"-rutan borttagen då senaste uppdateringen visar nuläget */}
               {[...timeline].reverse().map((entry, index) => {
                 if (entry.type === 'revisit') {
                   return (
@@ -342,19 +311,12 @@ const CaseJourneyTimeline: React.FC<CaseJourneyTimelineProps> = ({
                         </div>
                       )}
 
-                      {/* Arbetsrapport eller rekommendationer */}
-                      {(entry.workReport || entry.recommendations) && (
-                        <div className="mt-2 space-y-2">
-                          {entry.workReport && (
-                            <p className="text-sm text-slate-300">
-                              {entry.workReport}
-                            </p>
-                          )}
-                          {entry.recommendations && (
-                            <p className="text-sm text-slate-400 italic whitespace-pre-line">
-                              <span className="font-medium text-slate-300">Rekommendation:</span> {entry.recommendations}
-                            </p>
-                          )}
+                      {/* Rekommendationer (arbetsrapporten visas i modalen under Beskrivning istället) */}
+                      {entry.recommendations && (
+                        <div className="mt-2">
+                          <p className="text-sm text-slate-400 italic whitespace-pre-line">
+                            <span className="font-medium text-slate-300">Rekommendation:</span> {entry.recommendations}
+                          </p>
                         </div>
                       )}
 
