@@ -11,11 +11,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Loader2,
-  Package,
-  Target,
-  Bug,
-  Zap,
-  Bird
+  Package
 } from 'lucide-react'
 import {
   ArticleWithGroup,
@@ -23,15 +19,6 @@ import {
   ARTICLE_UNIT_CONFIG,
   formatArticlePrice
 } from '../../../types/articles'
-
-// Mapping av ikonnamn till komponenter
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
-  Target,
-  Bug,
-  Zap,
-  Bird,
-  Package
-}
 
 type SortField = 'code' | 'name' | 'category' | 'group' | 'default_price' | 'unit' | 'is_active'
 
@@ -67,10 +54,6 @@ export function ArticlesTable({
     return sortDirection === 'asc'
       ? <ArrowUp className="w-3.5 h-3.5 text-cyan-400" />
       : <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
-  }
-
-  const getIconComponent = (iconName: string) => {
-    return ICON_MAP[iconName] || Package
   }
 
   const handleDeleteClick = (id: string) => {
@@ -113,7 +96,7 @@ export function ArticlesTable({
                 onClick={() => onSort('group')}
               >
                 <div className="flex items-center gap-1.5">
-                  Grupp
+                  Artikelgrupp
                   {getSortIcon('group')}
                 </div>
               </th>
@@ -190,22 +173,18 @@ export function ArticlesTable({
                     </div>
                   </td>
 
-                  {/* Grupp */}
+                  {/* Artikelgrupp */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     {article.group ? (
-                      <div
-                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium"
+                      <span
+                        className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium"
                         style={{
                           backgroundColor: `${article.group.color}20`,
                           color: article.group.color
                         }}
                       >
-                        {(() => {
-                          const IconComp = getIconComponent(article.group.icon)
-                          return <IconComp className="w-3 h-3" />
-                        })()}
                         {article.group.name}
-                      </div>
+                      </span>
                     ) : (
                       <span className="text-xs text-slate-500">-</span>
                     )}
