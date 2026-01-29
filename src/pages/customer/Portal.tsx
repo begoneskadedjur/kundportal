@@ -445,12 +445,16 @@ const CustomerPortal: React.FC = () => {
             pest_type: selectedCaseForModal.pest_type,
             price: selectedCaseForModal.price,
             technician_name: selectedCaseForModal.technician_name,
+            primary_technician_name: selectedCaseForModal.primary_technician_name,
             scheduled_date: selectedCaseForModal.scheduled_date,
             completed_date: selectedCaseForModal.completed_date,
             pest_level: selectedCaseForModal.pest_level,
             problem_rating: selectedCaseForModal.problem_rating,
             recommendations: selectedCaseForModal.recommendations,
-            time_spent_minutes: selectedCaseForModal.time_spent_minutes
+            time_spent_minutes: selectedCaseForModal.time_spent_minutes,
+            work_report: selectedCaseForModal.work_report,
+            materials_used: selectedCaseForModal.materials_used,
+            address: selectedCaseForModal.address
           }}
         />
       )}
