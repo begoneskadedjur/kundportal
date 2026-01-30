@@ -1,14 +1,12 @@
 // src/components/admin/settings/PriceListItemsEditor.tsx
-// Inline-editor för artikelpriser i en prislista
+// Kompakt tabell-editor för artikelpriser i en prislista
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Loader2,
   Search,
-  Save,
-  X,
   Check,
-  AlertTriangle
+  AlertCircle
 } from 'lucide-react'
 import { PriceListService } from '../../../services/priceListService'
 import {
@@ -25,9 +23,31 @@ interface PriceListItemsEditorProps {
   onUpdate: () => void
 }
 
-interface EditingPrice {
-  articleId: string
-  price: string
+type PriceType = 'standard' | 'custom' | 'discount'
+
+interface ArticlePriceState {
+  priceType: PriceType
+  customPrice: string
+  discountPercent: string
+  isSaving: boolean
+  savedAt: number | null
+}
+
+// Debounce hook
+function useDebounce<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): T {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  return useCallback((...args: Parameters<T>) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    timeoutRef.current = setTimeout(() => {
+      callback(...args)
+    }, delay)
+  }, [callback, delay]) as T
 }
 
 export function PriceListItemsEditor({
@@ -38,8 +58,7 @@ export function PriceListItemsEditor({
   const [items, setItems] = useState<PriceListItemWithArticle[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [editingPrice, setEditingPrice] = useState<EditingPrice | null>(null)
-  const [saving, setSaving] = useState(false)
+  const [priceStates, setPriceStates] = useState<Record<string, ArticlePriceState>>({})
 
   // Ladda artikelpriser
   useEffect(() => {
@@ -51,6 +70,29 @@ export function PriceListItemsEditor({
     try {
       const data = await PriceListService.getPriceListItems(priceListId)
       setItems(data)
+
+      // Initialisera priceStates från databas
+      const initialStates: Record<string, ArticlePriceState> = {}
+      data.forEach(item => {
+        if (item.discount_percent && item.discount_percent > 0) {
+          initialStates[item.article_id] = {
+            priceType: 'discount',
+            customPrice: item.custom_price?.toString() || '',
+            discountPercent: item.discount_percent.toString(),
+            isSaving: false,
+            savedAt: null
+          }
+        } else if (item.custom_price !== null) {
+          initialStates[item.article_id] = {
+            priceType: 'custom',
+            customPrice: item.custom_price.toString(),
+            discountPercent: '',
+            isSaving: false,
+            savedAt: null
+          }
+        }
+      })
+      setPriceStates(initialStates)
     } catch (error) {
       console.error('Fel vid laddning:', error)
       toast.error('Kunde inte ladda artikelpriser')
@@ -80,66 +122,144 @@ export function PriceListItemsEditor({
     )
   }, [articles, searchTerm])
 
-  // Spara pris
-  const handleSavePrice = async () => {
-    if (!editingPrice) return
+  // Spara pris till databas
+  const savePrice = async (articleId: string, article: Article, state: ArticlePriceState) => {
+    setPriceStates(prev => ({
+      ...prev,
+      [articleId]: { ...prev[articleId], isSaving: true }
+    }))
 
-    const price = parseFloat(editingPrice.price)
-    if (isNaN(price) || price < 0) {
-      toast.error('Ogiltigt pris')
-      return
-    }
-
-    setSaving(true)
     try {
-      await PriceListService.upsertPriceListItem({
-        price_list_id: priceListId,
-        article_id: editingPrice.articleId,
-        custom_price: price
-      })
-      toast.success('Pris sparat')
-      setEditingPrice(null)
+      if (state.priceType === 'standard') {
+        // Ta bort anpassning
+        await PriceListService.removePriceListItem(priceListId, articleId)
+      } else if (state.priceType === 'custom') {
+        const price = parseFloat(state.customPrice)
+        if (!isNaN(price) && price >= 0) {
+          await PriceListService.upsertPriceListItem({
+            price_list_id: priceListId,
+            article_id: articleId,
+            custom_price: price,
+            discount_percent: 0
+          })
+        }
+      } else if (state.priceType === 'discount') {
+        const discount = parseFloat(state.discountPercent)
+        if (!isNaN(discount) && discount >= 0 && discount <= 100) {
+          const discountedPrice = article.default_price * (1 - discount / 100)
+          await PriceListService.upsertPriceListItem({
+            price_list_id: priceListId,
+            article_id: articleId,
+            custom_price: Math.round(discountedPrice * 100) / 100,
+            discount_percent: discount
+          })
+        }
+      }
+
+      setPriceStates(prev => ({
+        ...prev,
+        [articleId]: { ...prev[articleId], isSaving: false, savedAt: Date.now() }
+      }))
+
+      // Rensa savedAt efter 2 sekunder
+      setTimeout(() => {
+        setPriceStates(prev => ({
+          ...prev,
+          [articleId]: prev[articleId] ? { ...prev[articleId], savedAt: null } : prev[articleId]
+        }))
+      }, 2000)
+
       loadItems()
       onUpdate()
     } catch (error) {
       console.error('Fel vid sparande:', error)
       toast.error('Kunde inte spara priset')
-    } finally {
-      setSaving(false)
+      setPriceStates(prev => ({
+        ...prev,
+        [articleId]: { ...prev[articleId], isSaving: false }
+      }))
     }
   }
 
-  // Ta bort pris (återgå till standard)
-  const handleRemovePrice = async (articleId: string) => {
-    setSaving(true)
-    try {
-      await PriceListService.removePriceListItem(priceListId, articleId)
-      toast.success('Prisavvikelse borttagen')
-      loadItems()
-      onUpdate()
-    } catch (error) {
-      console.error('Fel vid borttagning:', error)
-      toast.error('Kunde inte ta bort priset')
-    } finally {
-      setSaving(false)
+  // Debounced save
+  const debouncedSave = useDebounce(savePrice, 500)
+
+  // Hantera pristyp-ändring
+  const handlePriceTypeChange = (articleId: string, article: Article, newType: PriceType) => {
+    const currentState = priceStates[articleId] || {
+      priceType: 'standard',
+      customPrice: article.default_price.toString(),
+      discountPercent: '0',
+      isSaving: false,
+      savedAt: null
+    }
+
+    const newState: ArticlePriceState = {
+      ...currentState,
+      priceType: newType,
+      customPrice: newType === 'custom' ? article.default_price.toString() : currentState.customPrice,
+      discountPercent: newType === 'discount' ? '0' : currentState.discountPercent
+    }
+
+    setPriceStates(prev => ({
+      ...prev,
+      [articleId]: newState
+    }))
+
+    // Om standard, spara direkt (ta bort)
+    if (newType === 'standard') {
+      savePrice(articleId, article, newState)
     }
   }
 
-  // Börja redigera
-  const startEditing = (article: Article) => {
-    const existingPrice = priceMap[article.id]
-    setEditingPrice({
-      articleId: article.id,
-      price: existingPrice
-        ? existingPrice.custom_price.toString()
-        : article.default_price.toString()
+  // Hantera prisändring
+  const handlePriceChange = (articleId: string, article: Article, value: string) => {
+    const currentState = priceStates[articleId]
+    if (!currentState) return
+
+    const newState: ArticlePriceState = {
+      ...currentState,
+      customPrice: value
+    }
+
+    setPriceStates(prev => ({
+      ...prev,
+      [articleId]: newState
+    }))
+
+    debouncedSave(articleId, article, newState)
+  }
+
+  // Hantera rabattändring
+  const handleDiscountChange = (articleId: string, article: Article, value: string) => {
+    const currentState = priceStates[articleId]
+    if (!currentState) return
+
+    const newState: ArticlePriceState = {
+      ...currentState,
+      discountPercent: value
+    }
+
+    setPriceStates(prev => ({
+      ...prev,
+      [articleId]: newState
+    }))
+
+    debouncedSave(articleId, article, newState)
+  }
+
+  // Räkna statistik
+  const stats = useMemo(() => {
+    let customCount = 0
+    let discountCount = 0
+
+    Object.values(priceStates).forEach(state => {
+      if (state.priceType === 'custom') customCount++
+      if (state.priceType === 'discount') discountCount++
     })
-  }
 
-  // Avbryt redigering
-  const cancelEditing = () => {
-    setEditingPrice(null)
-  }
+    return { customCount, discountCount }
+  }, [priceStates])
 
   if (loading) {
     return (
@@ -163,144 +283,169 @@ export function PriceListItemsEditor({
         />
       </div>
 
-      {/* Info */}
-      <div className="mb-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
-        <div className="flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-slate-400">
-            Klicka på en artikel för att sätta ett kundspecifikt pris. Artiklar utan anpassat pris använder standardpriset.
-          </p>
-        </div>
-      </div>
+      {/* Tabell */}
+      <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="max-h-96 overflow-y-auto">
+          <table className="w-full">
+            <thead className="bg-slate-900/80 sticky top-0 z-10">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Kod
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Namn
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Kategori
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Pristyp
+                </th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Pris
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/30">
+              {filteredArticles.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
+                    {searchTerm ? 'Inga artiklar matchar sökningen' : 'Inga artiklar tillgängliga'}
+                  </td>
+                </tr>
+              ) : (
+                filteredArticles.map(article => {
+                  const state = priceStates[article.id]
+                  const priceType = state?.priceType || 'standard'
+                  const categoryConfig = ARTICLE_CATEGORY_CONFIG[article.category]
+                  const isSaving = state?.isSaving
+                  const justSaved = state?.savedAt && Date.now() - state.savedAt < 2000
 
-      {/* Artikellista */}
-      <div className="space-y-2 max-h-96 overflow-y-auto">
-        {filteredArticles.length === 0 ? (
-          <p className="text-center text-slate-500 py-4">
-            {searchTerm ? 'Inga artiklar matchar sökningen' : 'Inga artiklar tillgängliga'}
-          </p>
-        ) : (
-          filteredArticles.map(article => {
-            const customItem = priceMap[article.id]
-            const hasCustomPrice = !!customItem
-            const isEditing = editingPrice?.articleId === article.id
-            const categoryConfig = ARTICLE_CATEGORY_CONFIG[article.category]
+                  // Beräkna visuell markering
+                  const rowClass = priceType === 'custom'
+                    ? 'border-l-2 border-purple-500 bg-purple-500/5'
+                    : priceType === 'discount'
+                      ? 'border-l-2 border-emerald-500 bg-emerald-500/5'
+                      : ''
 
-            return (
-              <div
-                key={article.id}
-                className={`p-3 rounded-lg border transition-all ${
-                  isEditing
-                    ? 'bg-purple-500/10 border-purple-500/50'
-                    : hasCustomPrice
-                      ? 'bg-slate-800/70 border-slate-600'
-                      : 'bg-slate-900/50 border-slate-700/50 hover:border-slate-600 cursor-pointer'
-                }`}
-                onClick={() => !isEditing && startEditing(article)}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  {/* Artikel-info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="px-1.5 py-0.5 bg-slate-700 rounded text-xs font-mono text-slate-300">
-                        {article.code}
-                      </span>
-                      <span className={`px-1.5 py-0.5 rounded text-xs ${categoryConfig.bgColor} ${categoryConfig.color}`}>
-                        {article.category}
-                      </span>
-                    </div>
-                    <p className="text-white text-sm font-medium truncate">{article.name}</p>
-                  </div>
+                  // Beräkna rabatterat pris
+                  const discountPercent = parseFloat(state?.discountPercent || '0')
+                  const discountedPrice = article.default_price * (1 - discountPercent / 100)
 
-                  {/* Pris */}
-                  <div className="flex items-center gap-2">
-                    {isEditing ? (
-                      <>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            value={editingPrice.price}
-                            onChange={(e) => setEditingPrice({ ...editingPrice, price: e.target.value })}
-                            min="0"
-                            step="0.01"
-                            className="w-28 px-3 py-1.5 pr-8 bg-slate-900 border border-purple-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSavePrice()
-                              if (e.key === 'Escape') cancelEditing()
-                            }}
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">kr</span>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleSavePrice()
-                          }}
-                          disabled={saving}
-                          className="p-1.5 text-emerald-400 hover:bg-emerald-500/20 rounded transition-colors"
+                  return (
+                    <tr
+                      key={article.id}
+                      className={`hover:bg-slate-800/30 transition-colors ${rowClass}`}
+                    >
+                      {/* Kod */}
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <code className="text-xs font-mono text-slate-400">
+                          {article.code}
+                        </code>
+                      </td>
+
+                      {/* Namn */}
+                      <td className="px-3 py-2">
+                        <span className="text-sm text-white truncate block max-w-[200px]" title={article.name}>
+                          {article.name}
+                        </span>
+                      </td>
+
+                      {/* Kategori */}
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color}`}>
+                          {categoryConfig.label}
+                        </span>
+                      </td>
+
+                      {/* Pristyp */}
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <select
+                          value={priceType}
+                          onChange={(e) => handlePriceTypeChange(article.id, article, e.target.value as PriceType)}
+                          className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
                         >
-                          {saving ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Check className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            cancelEditing()
-                          }}
-                          className="p-1.5 text-slate-400 hover:bg-slate-700 rounded transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-right">
-                          {hasCustomPrice ? (
-                            <div>
-                              <p className="text-white font-medium text-sm">
-                                {formatArticlePrice(customItem.custom_price)}
-                              </p>
-                              <p className="text-slate-500 text-xs line-through">
-                                {formatArticlePrice(article.default_price)}
-                              </p>
-                            </div>
-                          ) : (
-                            <p className="text-slate-400 text-sm">
+                          <option value="standard">Standard</option>
+                          <option value="custom">Anpassat (kr)</option>
+                          <option value="discount">Rabatt (%)</option>
+                        </select>
+                      </td>
+
+                      {/* Pris */}
+                      <td className="px-3 py-2 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {priceType === 'standard' && (
+                            <span className="text-sm text-slate-400">
                               {formatArticlePrice(article.default_price)}
-                            </p>
+                            </span>
                           )}
+
+                          {priceType === 'custom' && (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                value={state?.customPrice || ''}
+                                onChange={(e) => handlePriceChange(article.id, article, e.target.value)}
+                                min="0"
+                                step="1"
+                                className="w-20 px-2 py-1 bg-slate-900 border border-purple-500/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              />
+                              <span className="text-xs text-slate-500">kr</span>
+                            </div>
+                          )}
+
+                          {priceType === 'discount' && (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                value={state?.discountPercent || ''}
+                                onChange={(e) => handleDiscountChange(article.id, article, e.target.value)}
+                                min="0"
+                                max="100"
+                                step="1"
+                                className="w-14 px-2 py-1 bg-slate-900 border border-emerald-500/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                              <span className="text-xs text-slate-500">%</span>
+                              <span className="text-xs text-emerald-400 ml-1">
+                                = {formatArticlePrice(discountedPrice)}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Sparindikator */}
+                          <div className="w-5">
+                            {isSaving && (
+                              <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                            )}
+                            {justSaved && !isSaving && (
+                              <Check className="w-4 h-4 text-emerald-400" />
+                            )}
+                          </div>
                         </div>
-                        {hasCustomPrice && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleRemovePrice(article.id)
-                            }}
-                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors"
-                            title="Återställ till standard"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )
-          })
-        )}
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Sammanfattning */}
       <div className="mt-4 pt-4 border-t border-slate-700/50 flex items-center justify-between text-sm">
         <span className="text-slate-400">
-          {items.length} av {articles.length} artiklar har anpassat pris
+          {articles.length} artiklar
+          {stats.customCount > 0 && (
+            <span className="ml-2">
+              • <span className="text-purple-400">{stats.customCount} anpassade</span>
+            </span>
+          )}
+          {stats.discountCount > 0 && (
+            <span className="ml-2">
+              • <span className="text-emerald-400">{stats.discountCount} med rabatt</span>
+            </span>
+          )}
         </span>
       </div>
     </div>
