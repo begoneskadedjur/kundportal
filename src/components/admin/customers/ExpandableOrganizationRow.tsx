@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, Users, ExternalLink } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, Users, ExternalLink, Edit3 } from 'lucide-react'
 import { ConsolidatedCustomer, PortalAccessStatus } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 
@@ -421,6 +421,17 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               title="Visa detaljerad kundvy"
             >
               <ExternalLink className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Edit Customer Button */}
+          {onEdit && (
+            <button
+              onClick={() => onEdit(organization)}
+              className="text-slate-400 hover:text-white text-sm font-medium transition-colors duration-200"
+              title="Redigera kund"
+            >
+              <Edit3 className="h-4 w-4" />
             </button>
           )}
         </div>
