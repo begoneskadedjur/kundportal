@@ -251,4 +251,49 @@ export class PriceListService {
     if (error) throw new Error(`Databasfel: ${error.message}`)
     return count || 0
   }
+
+  /**
+   * Hämta alla prislistor som en artikel finns i
+   * Returnerar en map: { articleId: [{ priceList, customPrice }] }
+   */
+  static async getPriceListsByArticles(): Promise<Record<string, Array<{ priceList: PriceList; customPrice: number | null }>>> {
+    // Hämta alla prislistor
+    const priceLists = await this.getAllPriceLists()
+    const priceListMap = new Map(priceLists.map(pl => [pl.id, pl]))
+
+    // Hämta alla price_list_items
+    const { data: items, error } = await supabase
+      .from('price_list_items')
+      .select('article_id, price_list_id, custom_price')
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+
+    // Bygg upp mappningen
+    const result: Record<string, Array<{ priceList: PriceList; customPrice: number | null }>> = {}
+
+    for (const item of items || []) {
+      const priceList = priceListMap.get(item.price_list_id)
+      if (!priceList) continue
+
+      if (!result[item.article_id]) {
+        result[item.article_id] = []
+      }
+
+      result[item.article_id].push({
+        priceList,
+        customPrice: item.custom_price
+      })
+    }
+
+    // Sortera så att standardprislistan kommer först
+    for (const articleId in result) {
+      result[articleId].sort((a, b) => {
+        if (a.priceList.is_default && !b.priceList.is_default) return -1
+        if (!a.priceList.is_default && b.priceList.is_default) return 1
+        return a.priceList.name.localeCompare(b.priceList.name)
+      })
+    }
+
+    return result
+  }
 }

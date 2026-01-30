@@ -2,6 +2,7 @@
 // Kompakt tabell för artikelhantering
 
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowUpDown,
   ArrowUp,
@@ -11,19 +12,25 @@ import {
   ToggleLeft,
   ToggleRight,
   Loader2,
-  Package
+  Package,
+  Star
 } from 'lucide-react'
 import {
   ArticleWithGroup,
+  PriceList,
   ARTICLE_CATEGORY_CONFIG,
   ARTICLE_UNIT_CONFIG,
   formatArticlePrice
 } from '../../../types/articles'
 
+// Typ för prislista-kopplingar per artikel
+type ArticlePriceListMap = Record<string, Array<{ priceList: PriceList; customPrice: number | null }>>
+
 type SortField = 'code' | 'name' | 'category' | 'group' | 'default_price' | 'unit' | 'is_active'
 
 interface ArticlesTableProps {
   articles: ArticleWithGroup[]
+  articlePriceLists: ArticlePriceListMap
   sortField: SortField | null
   sortDirection: 'asc' | 'desc'
   onSort: (field: SortField) => void
@@ -36,6 +43,7 @@ interface ArticlesTableProps {
 
 export function ArticlesTable({
   articles,
+  articlePriceLists,
   sortField,
   sortDirection,
   onSort,
@@ -45,6 +53,7 @@ export function ArticlesTable({
   togglingId,
   deletingId
 }: ArticlesTableProps) {
+  const navigate = useNavigate()
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const getSortIcon = (field: SortField) => {
@@ -108,6 +117,9 @@ export function ArticlesTable({
                   Kategori
                   {getSortIcon('category')}
                 </div>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                Prislistor
               </th>
               <th
                 className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
@@ -195,6 +207,49 @@ export function ArticlesTable({
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color}`}>
                       {categoryConfig.label}
                     </span>
+                  </td>
+
+                  {/* Prislistor */}
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const priceLists = articlePriceLists[article.id] || []
+                      if (priceLists.length === 0) {
+                        return <span className="text-xs text-slate-500">-</span>
+                      }
+
+                      // Visa max 2 prislistor + overflow
+                      const maxVisible = 2
+                      const visibleLists = priceLists.slice(0, maxVisible)
+                      const hiddenCount = priceLists.length - maxVisible
+
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {visibleLists.map(({ priceList }) => (
+                            <button
+                              key={priceList.id}
+                              onClick={() => navigate('/admin/settings/price-lists')}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer ${
+                                priceList.is_default
+                                  ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+                                  : 'bg-slate-600/30 text-slate-300 hover:bg-slate-600/50'
+                              }`}
+                              title={`Gå till ${priceList.name}`}
+                            >
+                              {priceList.is_default && <Star className="w-3 h-3" />}
+                              {priceList.name.length > 12 ? `${priceList.name.slice(0, 12)}...` : priceList.name}
+                            </button>
+                          ))}
+                          {hiddenCount > 0 && (
+                            <span
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-400"
+                              title={priceLists.slice(maxVisible).map(p => p.priceList.name).join(', ')}
+                            >
+                              +{hiddenCount} till
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </td>
 
                   {/* Pris */}

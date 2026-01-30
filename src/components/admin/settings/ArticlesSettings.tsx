@@ -15,10 +15,12 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { ArticleService } from '../../../services/articleService'
 import { ArticleGroupService } from '../../../services/articleGroupService'
+import { PriceListService } from '../../../services/priceListService'
 import {
   ArticleWithGroup,
   ArticleGroup,
   ArticleCategory,
+  PriceList,
   ARTICLE_CATEGORIES,
   ARTICLE_CATEGORY_CONFIG
 } from '../../../types/articles'
@@ -31,10 +33,14 @@ import toast from 'react-hot-toast'
 
 type SortField = 'code' | 'name' | 'category' | 'group' | 'default_price' | 'unit' | 'is_active'
 
+// Typ för prislista-kopplingar per artikel
+type ArticlePriceListMap = Record<string, Array<{ priceList: PriceList; customPrice: number | null }>>
+
 export function ArticlesSettings() {
   const navigate = useNavigate()
   const [articles, setArticles] = useState<ArticleWithGroup[]>([])
   const [groups, setGroups] = useState<ArticleGroup[]>([])
+  const [articlePriceLists, setArticlePriceLists] = useState<ArticlePriceListMap>({})
   const [loading, setLoading] = useState(true)
   const [editingArticle, setEditingArticle] = useState<ArticleWithGroup | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -59,12 +65,14 @@ export function ArticlesSettings() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [articlesData, groupsData] = await Promise.all([
+      const [articlesData, groupsData, priceListsData] = await Promise.all([
         ArticleService.getAllArticlesWithGroups(),
-        ArticleGroupService.getActiveGroups()
+        ArticleGroupService.getActiveGroups(),
+        PriceListService.getPriceListsByArticles()
       ])
       setArticles(articlesData)
       setGroups(groupsData)
+      setArticlePriceLists(priceListsData)
     } catch (error) {
       console.error('Fel vid laddning av artiklar:', error)
       toast.error('Kunde inte ladda artiklar')
@@ -345,6 +353,7 @@ export function ArticlesSettings() {
         ) : (
           <ArticlesTable
             articles={filteredArticles}
+            articlePriceLists={articlePriceLists}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
