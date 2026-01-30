@@ -350,10 +350,10 @@ export function ArticleEditModal({
             {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
           </div>
 
-          {/* Kod */}
+          {/* Art nr */}
           <div>
             <label className="block text-sm font-medium text-white mb-1">
-              Artikelkod <span className="text-red-400">*</span>
+              Art nr <span className="text-red-400">*</span>
             </label>
             <input
               type="text"

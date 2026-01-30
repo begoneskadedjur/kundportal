@@ -290,7 +290,7 @@ export function PriceListItemsEditor({
             <thead className="bg-slate-900/80 sticky top-0 z-10">
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Kod
+                  Art nr
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Namn
@@ -337,7 +337,7 @@ export function PriceListItemsEditor({
                       key={article.id}
                       className={`hover:bg-slate-800/30 transition-colors ${rowClass}`}
                     >
-                      {/* Kod */}
+                      {/* Art nr */}
                       <td className="px-3 py-2 whitespace-nowrap">
                         <code className="text-xs font-mono text-slate-400">
                           {article.code}

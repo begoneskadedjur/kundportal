@@ -87,7 +87,7 @@ export function ArticlesTable({
                 onClick={() => onSort('code')}
               >
                 <div className="flex items-center gap-1.5">
-                  Kod
+                  Art nr
                   {getSortIcon('code')}
                 </div>
               </th>
@@ -168,7 +168,7 @@ export function ArticlesTable({
                     !article.is_active ? 'opacity-50' : ''
                   }`}
                 >
-                  {/* Kod */}
+                  {/* Art nr */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <code className="text-sm font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded">
                       {article.code}
