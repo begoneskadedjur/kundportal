@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@tailwindcss/typography";
 
 @layer theme {
   :root {
