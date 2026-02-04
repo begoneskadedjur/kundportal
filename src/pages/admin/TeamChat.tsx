@@ -409,15 +409,19 @@ export default function TeamChat() {
                     <div className="mb-1 text-xs opacity-75">📎 Bild bifogad</div>
                   )}
                   {msg.role === 'assistant' ? (
-                    <div className="prose prose-invert prose-sm max-w-none
+                    <div className="prose prose-invert prose-sm max-w-none leading-relaxed
                       prose-hr:hidden
-                      prose-headings:text-white prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-2
-                      prose-p:text-slate-100 prose-p:my-1
+                      prose-headings:text-white prose-headings:font-semibold
+                      prose-h1:text-lg prose-h1:mt-4 prose-h1:mb-3
+                      prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2
+                      prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-2
+                      prose-p:text-slate-100 prose-p:my-3
                       prose-strong:text-emerald-400 prose-strong:font-semibold
-                      prose-ul:my-1 prose-ol:my-1
-                      prose-li:text-slate-100 prose-li:my-0.5
+                      prose-ul:my-3 prose-ol:my-3
+                      prose-li:text-slate-100 prose-li:my-1.5
                       prose-code:bg-slate-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-emerald-300
-                      prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700">
+                      prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700
+                      prose-table:my-3 prose-th:px-3 prose-th:py-2 prose-td:px-3 prose-td:py-2">
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
                   ) : (

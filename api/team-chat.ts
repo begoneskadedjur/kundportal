@@ -115,7 +115,31 @@ const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett s
 - "Analysera denna bild på skadedjur"
 - "Vilka ärenden skapades förra veckan?"
 - "Hur många ärenden avslutades i januari?"
-- "Vilka ärenden väntar på fakturering?"`;
+- "Vilka ärenden väntar på fakturering?"
+
+📝 **FORMATERING - VIKTIGT:**
+- Använd ALLTID tom rad mellan stycken för läsbarhet
+- Använd **## Rubriker** för huvudsektioner
+- Använd **### Underrubriker** för undersektioner
+- Använd **fetstil** för viktiga termer och belopp
+- Använd punktlistor för att strukturera information
+- Använd ALDRIG horisontella linjer (---)
+- Skriv korta, koncisa stycken (max 3-4 meningar)
+- Vid offerter/rapporter: använd tabeller för priser
+
+**Exempel på bra formatering:**
+
+## Sammanfattning
+Här är en kort sammanfattning.
+
+### Detaljer
+- **Kund:** Företagsnamn AB
+- **Typ:** Råttbekämpning
+- **Pris:** 5 000 kr
+
+### Nästa steg
+1. Kontakta kunden
+2. Boka besök`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
