@@ -58,6 +58,7 @@ export default function TeamChat() {
   const [editingTitle, setEditingTitle] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   // Hjälpfunktion för filtyp-label med ikon
   const getFileTypeLabel = (mimeType: string) => {
@@ -226,6 +227,99 @@ export default function TeamChat() {
       toast.error('Ett fel uppstod');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Generera bild med Imagen/Nano Banana
+  const handleGenerateImage = async () => {
+    if (!inputMessage.trim() || isGeneratingImage) return;
+
+    // Skapa konversation om det inte finns en
+    let convId = currentConversation?.id;
+    if (!convId && user?.id) {
+      const title = `Bildgenerering: ${inputMessage.slice(0, 40)}`;
+      convId = await createConversation(title, user.id);
+      if (convId) {
+        await loadConversations();
+        setCurrentConversation({
+          id: convId,
+          title,
+          created_by: user.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
+    }
+
+    if (!convId) {
+      toast.error('Kunde inte skapa konversation');
+      return;
+    }
+
+    const prompt = inputMessage;
+
+    // Lägg till användarens meddelande
+    const userMessage: TeamChatMessage = {
+      role: 'user',
+      content: `🎨 Generera bild: ${prompt}`
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+    setIsGeneratingImage(true);
+
+    try {
+      // Spara användarens meddelande
+      await saveMessage(convId, 'user', userMessage.content, user?.id);
+
+      // Anropa bildgenerering
+      const response = await generateImage(prompt);
+
+      if (response.success) {
+        if (response.image) {
+          // Bild genererades - visa den
+          const imageDataUrl = `data:${response.image.mimeType};base64,${response.image.data}`;
+          const aiMessage: TeamChatMessage = {
+            role: 'assistant',
+            content: `![Genererad bild](${imageDataUrl})\n\n*Bild genererad baserat på: "${prompt}"*`
+          };
+          setMessages(prev => [...prev, aiMessage]);
+          await saveMessage(convId, 'assistant', `[Genererad bild] ${prompt}`);
+          toast.success('Bild genererad!');
+        } else if (response.response) {
+          // Bara text (t.ex. om bildgenerering misslyckades)
+          const aiMessage: TeamChatMessage = {
+            role: 'assistant',
+            content: response.response
+          };
+          setMessages(prev => [...prev, aiMessage]);
+          await saveMessage(convId, 'assistant', response.response);
+        }
+
+        // Logga användning
+        if (user?.id && response.usage) {
+          await logUsage(
+            user.id,
+            convId,
+            response.usage.model,
+            response.usage.input_tokens || 0,
+            response.usage.output_tokens || 0,
+            response.usage.images_analyzed || 0,
+            response.usage.images_generated || 0,
+            response.usage.estimated_cost_usd
+          );
+        }
+      } else {
+        toast.error(response.error || 'Kunde inte generera bild');
+      }
+    } catch (error) {
+      console.error('Error generating image:', error);
+      toast.error('Ett fel uppstod vid bildgenerering');
+    } finally {
+      setIsGeneratingImage(false);
     }
   };
 
@@ -497,12 +591,14 @@ export default function TeamChat() {
             ))
           )}
 
-          {isLoading && (
+          {(isLoading || isGeneratingImage) && (
             <div className="flex justify-start">
               <div className="bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl">
                 <div className="flex items-center gap-2 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
-                  <span className="text-slate-400">Analyserar...</span>
+                  <Loader2 className={`w-4 h-4 animate-spin ${isGeneratingImage ? 'text-purple-500' : 'text-emerald-500'}`} />
+                  <span className="text-slate-400">
+                    {isGeneratingImage ? 'Genererar bild...' : 'Analyserar...'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -578,9 +674,22 @@ export default function TeamChat() {
               className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
             />
             <button
+              onClick={handleGenerateImage}
+              disabled={isGeneratingImage || isLoading || !inputMessage.trim()}
+              className="p-2 text-purple-400 hover:text-purple-300 hover:bg-slate-700 disabled:text-slate-600 disabled:cursor-not-allowed rounded transition-colors"
+              title="Generera bild från beskrivning"
+            >
+              {isGeneratingImage ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Sparkles className="w-5 h-5" />
+              )}
+            </button>
+            <button
               onClick={handleSendMessage}
               disabled={isLoading || (!inputMessage.trim() && !selectedImage)}
               className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded transition-colors"
+              title="Skicka meddelande"
             >
               <Send className="w-5 h-5" />
             </button>
