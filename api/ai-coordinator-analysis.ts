@@ -1,5 +1,6 @@
 // api/ai-coordinator-analysis.ts
 // UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
+// UPPDATERAD: 2026-02-04 - Uppgraderad till Gemini 2.5 Flash (2.0 deprecated)
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -151,7 +152,7 @@ Kom ihåg att svara i det exakta JSON-format som specificerats.`;
 
     // --- Anropa Google Gemini ---
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.7,
         responseMimeType: 'application/json',
@@ -181,7 +182,7 @@ Kom ihåg att svara i det exakta JSON-format som specificerats.`;
     return res.status(200).json({
       success: true,
       analysis,
-      ai_model: "gemini-2.0-flash",
+      ai_model: "gemini-2.5-flash",
       timestamp: new Date().toISOString()
     });
 

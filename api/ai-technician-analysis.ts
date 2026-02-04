@@ -1,5 +1,6 @@
 // /api/ai-technician-analysis.ts
 // UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
+// UPPDATERAD: 2026-02-04 - Uppgraderad till Gemini 2.5 Flash (2.0 deprecated)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -77,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // --- Anropa Google Gemini ---
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.5,
         maxOutputTokens: 3000,
@@ -120,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           data_points_analyzed: Object.keys(analysisContext).length,
         }
       },
-      ai_model: 'gemini-2.0-flash',
+      ai_model: 'gemini-2.5-flash',
       timestamp: new Date().toISOString(),
     });
 
