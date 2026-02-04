@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "@tailwindcss/typography";
 
 @layer theme {
   :root {
@@ -50,6 +49,183 @@
 
   input[type="number"] {
     -moz-appearance: textfield;
+  }
+}
+
+/* Custom prose styles för Team Chat (ersätter @tailwindcss/typography) */
+@layer components {
+  .prose {
+    max-width: 65ch;
+    color: var(--tw-prose-body);
+    --tw-prose-body: #e2e8f0;
+    --tw-prose-headings: #10b981;
+    --tw-prose-bold: #ffffff;
+    --tw-prose-links: #10b981;
+    --tw-prose-code: #6ee7b7;
+    --tw-prose-quotes: #94a3b8;
+    --tw-prose-hr: #475569;
+    --tw-prose-th-borders: #475569;
+    --tw-prose-td-borders: #334155;
+  }
+
+  .prose-invert {
+    --tw-prose-body: #e2e8f0;
+    --tw-prose-headings: #10b981;
+    --tw-prose-bold: #ffffff;
+    --tw-prose-links: #10b981;
+  }
+
+  .prose-base {
+    font-size: 1rem;
+    line-height: 1.75;
+  }
+
+  /* Headings */
+  .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+    color: var(--tw-prose-headings);
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .prose h1 {
+    font-size: 1.5rem;
+    margin-top: 2rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #475569;
+  }
+
+  .prose h2 {
+    font-size: 1.25rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #334155;
+  }
+
+  .prose h3 {
+    font-size: 1.125rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Paragraphs */
+  .prose p {
+    color: var(--tw-prose-body);
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    line-height: 1.75;
+  }
+
+  /* Strong/Bold */
+  .prose strong {
+    color: var(--tw-prose-bold);
+    font-weight: 600;
+  }
+
+  /* Lists */
+  .prose ul, .prose ol {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .prose li {
+    color: var(--tw-prose-body);
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.75;
+  }
+
+  .prose ul > li {
+    list-style-type: disc;
+  }
+
+  .prose ol > li {
+    list-style-type: decimal;
+  }
+
+  /* Tables */
+  .prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .prose th {
+    background-color: #334155;
+    border: 1px solid var(--tw-prose-th-borders);
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 700;
+    color: var(--tw-prose-headings);
+  }
+
+  .prose td {
+    border: 1px solid var(--tw-prose-td-borders);
+    padding: 0.75rem 1rem;
+    color: var(--tw-prose-body);
+  }
+
+  /* Blockquotes */
+  .prose blockquote {
+    border-left: 4px solid #10b981;
+    background-color: rgba(16, 185, 129, 0.1);
+    padding: 0.75rem 1rem;
+    margin: 1.5rem 0;
+    border-radius: 0 0.5rem 0.5rem 0;
+    font-style: italic;
+    color: var(--tw-prose-quotes);
+  }
+
+  .prose blockquote p {
+    margin: 0;
+  }
+
+  /* Horizontal Rule */
+  .prose hr {
+    border: none;
+    border-top: 2px solid var(--tw-prose-hr);
+    margin: 2rem 0;
+  }
+
+  /* Links */
+  .prose a {
+    color: var(--tw-prose-links);
+    text-decoration: underline;
+  }
+
+  .prose a:hover {
+    color: #6ee7b7;
+  }
+
+  /* Code */
+  .prose code {
+    background-color: #1e293b;
+    color: var(--tw-prose-code);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  .prose pre {
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1.5rem 0;
+    overflow-x: auto;
+  }
+
+  .prose pre code {
+    background-color: transparent;
+    padding: 0;
+  }
+
+  /* Max width none utility */
+  .prose.max-w-none {
+    max-width: none;
   }
 }
 
