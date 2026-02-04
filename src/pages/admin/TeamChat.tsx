@@ -61,6 +61,50 @@ export default function TeamChat() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
+  // Konvertera markdown till ren text för kopiering
+  const markdownToPlainText = (markdown: string): string => {
+    let text = markdown;
+
+    // Ta bort rubriker (## -> tom)
+    text = text.replace(/^#{1,6}\s+/gm, '');
+
+    // Konvertera fetstil **text** -> text
+    text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+
+    // Konvertera kursiv *text* -> text
+    text = text.replace(/\*([^*]+)\*/g, '$1');
+
+    // Behåll listpunkter men med bullet
+    text = text.replace(/^[\-\*]\s+/gm, '• ');
+
+    // Konvertera numrerade listor
+    text = text.replace(/^\d+\.\s+/gm, '• ');
+
+    // Hantera tabeller - ta bort separatorrader först
+    text = text.replace(/^\|[\s\-:]+\|$/gm, '');
+    // Konvertera tabellrader till text
+    text = text.replace(/^\|(.+)\|$/gm, (_, content) => {
+      return content.split('|').map((cell: string) => cell.trim()).filter(Boolean).join(' | ');
+    });
+
+    // Ta bort blockquote-markör
+    text = text.replace(/^>\s*/gm, '');
+
+    // Ta bort horisontella linjer
+    text = text.replace(/^---+$/gm, '');
+
+    // Ta bort code blocks markers
+    text = text.replace(/```[\w]*\n?/g, '');
+
+    // Ta bort inline code backticks
+    text = text.replace(/`([^`]+)`/g, '$1');
+
+    // Ta bort överflödiga tomrader
+    text = text.replace(/\n{3,}/g, '\n\n');
+
+    return text.trim();
+  };
+
   // Hjälpfunktion för filtyp-label med ikon
   const getFileTypeLabel = (mimeType: string) => {
     if (mimeType === 'application/pdf') return { icon: FileText, label: 'Dokument bifogat', color: 'text-red-400' };
@@ -70,10 +114,11 @@ export default function TeamChat() {
     return { icon: Paperclip, label: 'Fil bifogad', color: 'text-slate-400' };
   };
 
-  // Kopiera AI-svar till urklipp
+  // Kopiera AI-svar till urklipp (konverterar markdown till ren text)
   const handleCopy = async (text: string, index: number) => {
     try {
-      await navigator.clipboard.writeText(text);
+      const plainText = markdownToPlainText(text);
+      await navigator.clipboard.writeText(plainText);
       setCopiedIndex(index);
       toast.success('Kopierat till urklipp!');
       setTimeout(() => setCopiedIndex(null), 2000);
