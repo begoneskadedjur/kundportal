@@ -32,7 +32,8 @@ import {
   BookOpen,
   Bell,
   MessageSquareText,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -596,8 +597,8 @@ const AdminDashboard: React.FC = () => {
               </StaggeredGrid>
             </div>
 
-            {/* Systemunderhåll - Moved to bottom with reduced visual weight */}
-            <div className="opacity-75">
+            {/* Systemunderhåll */}
+            <div>
               <h2 className="text-lg font-medium text-slate-400 mb-6 flex items-center gap-3">
                 <div className="w-8 h-px bg-slate-700/50 flex-1" />
                 <span className="text-slate-500">Systemunderhåll</span>
@@ -680,6 +681,36 @@ const AdminDashboard: React.FC = () => {
                   stats="Användarmanual"
                   tag="Docs"
                   iconColor="text-cyan-500"
+                  className="scale-95 hover:scale-100 transition-transform duration-200 cursor-pointer"
+                />
+
+                <AdminDashboardCard
+                  onClick={async () => {
+                    const toastId = toast.loading('Synkroniserar AI-embeddings... Detta kan ta några minuter.')
+                    try {
+                      const response = await fetch('/api/embeddings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'sync' })
+                      })
+                      const data = await response.json()
+                      toast.dismiss(toastId)
+                      if (data.success) {
+                        toast.success(`RAG synkroniserat! ${data.stats.customers} kunder, ${data.stats.technicians} tekniker, ${data.stats.privateCases + data.stats.businessCases} ärenden`)
+                      } else {
+                        toast.error(data.error || 'Synkronisering misslyckades')
+                      }
+                    } catch (error) {
+                      toast.dismiss(toastId)
+                      toast.error('Kunde inte synkronisera embeddings')
+                    }
+                  }}
+                  icon={RefreshCw}
+                  title="Synka AI-data"
+                  description="Uppdatera RAG-embeddings för Team AI Chat"
+                  stats="Semantisk sökning"
+                  tag="AI"
+                  iconColor="text-emerald-500"
                   className="scale-95 hover:scale-100 transition-transform duration-200 cursor-pointer"
                 />
               </StaggeredGrid>
