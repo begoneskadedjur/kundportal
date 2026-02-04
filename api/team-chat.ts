@@ -66,6 +66,48 @@ async function searchRelevantContext(query: string, limit: number = 10): Promise
   }
 }
 
+// Post-processing: Fixa Geminis markdown-formatering
+function fixMarkdownFormatting(text: string): string {
+  let result = text;
+
+  // 1. Normalisera radbrytningar
+  result = result.replace(/\r\n/g, '\n');
+
+  // 2. Konvertera fristående **Text** (utan :) till ## rubriker
+  // Matchar rader som BARA har **text** (inte **term:** värde eller **text** i mening)
+  result = result.replace(/^(\*\*[^*:]+\*\*)$/gm, (_, p1) => {
+    const content = p1.replace(/\*\*/g, '').trim();
+    return `\n## ${content}\n`;
+  });
+
+  // 3. Konvertera **Term:** mönster till punktlistor
+  // Matchar rader som börjar med **något**: följt av text
+  result = result.replace(/^(\*\*[^*]+\*\*:)(.*)$/gm, '- $1$2');
+
+  // 4. Konvertera kursiva noteringar till blockquotes
+  result = result.replace(/^(\*[^*]+\*)$/gm, (_, p1) => {
+    const content = p1.replace(/^\*|\*$/g, '');
+    if (/observera|notera|obs|viktigt|priser|exempel|variera/i.test(content)) {
+      return `\n> ${content}\n`;
+    }
+    return p1;
+  });
+
+  // 5. Fixa dubbla listpunkter
+  result = result.replace(/^- - /gm, '- ');
+
+  // 6. Säkerställ tomrad före rubriker
+  result = result.replace(/([^\n])\n(## )/g, '$1\n\n$2');
+
+  // 7. Ta bort överflödiga tomrader (max 2 i rad)
+  result = result.replace(/\n{3,}/g, '\n\n');
+
+  // 8. Trimma start/slut
+  result = result.trim();
+
+  return result;
+}
+
 // Prisberäkning (ungefärlig)
 const PRICING = {
   'gemini-2.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
@@ -381,7 +423,8 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
     });
 
     const result = await chat.sendMessage(messageParts);
-    const response = result.response.text();
+    const rawResponse = result.response.text();
+    const response = fixMarkdownFormatting(rawResponse);
 
     // Uppskatta tokens (grov uppskattning: ~4 tecken per token)
     const inputTokens = Math.ceil(
