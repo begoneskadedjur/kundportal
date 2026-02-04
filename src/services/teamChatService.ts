@@ -10,6 +10,7 @@ export interface TeamChatMessage {
   content: string;
   user_id?: string;
   image_urls?: string[];
+  file_type?: string;
   created_at?: string;
 }
 

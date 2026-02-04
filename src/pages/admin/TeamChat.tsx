@@ -35,7 +35,11 @@ import {
   PanelLeftClose,
   PanelLeft,
   Database,
-  FileText
+  FileText,
+  Copy,
+  Check,
+  Image,
+  Table2
 } from 'lucide-react';
 
 export default function TeamChat() {
@@ -52,6 +56,28 @@ export default function TeamChat() {
   const [selectedImage, setSelectedImage] = useState<{ base64: string; mimeType: string } | null>(null);
   const [editingTitle, setEditingTitle] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Hjälpfunktion för filtyp-label med ikon
+  const getFileTypeLabel = (mimeType: string) => {
+    if (mimeType === 'application/pdf') return { icon: FileText, label: 'Dokument bifogat', color: 'text-red-400' };
+    if (mimeType.startsWith('image/')) return { icon: Image, label: 'Bild bifogad', color: 'text-blue-400' };
+    if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType.includes('csv')) return { icon: Table2, label: 'Kalkylblad bifogat', color: 'text-green-400' };
+    if (mimeType.includes('word') || mimeType.includes('document')) return { icon: FileText, label: 'Dokument bifogat', color: 'text-blue-400' };
+    return { icon: Paperclip, label: 'Fil bifogad', color: 'text-slate-400' };
+  };
+
+  // Kopiera AI-svar till urklipp
+  const handleCopy = async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(index);
+      toast.success('Kopierat till urklipp!');
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (err) {
+      toast.error('Kunde inte kopiera');
+    }
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -133,13 +159,19 @@ export default function TeamChat() {
       return;
     }
 
-    // Lägg till användarens meddelande
+    // Spara fil-referens innan vi rensar preview
+    const sentFile = selectedImage;
+
+    // Lägg till användarens meddelande med filtyp
     const userMessage: TeamChatMessage = {
       role: 'user',
-      content: inputMessage || 'Analysera bilden',
-      image_urls: selectedImage ? ['uploaded_image'] : undefined
+      content: inputMessage || 'Analysera filen',
+      image_urls: sentFile ? ['uploaded_file'] : undefined,
+      file_type: sentFile?.mimeType
     };
 
+    // Rensa fil-preview direkt när meddelandet skickas
+    setSelectedImage(null);
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
@@ -148,15 +180,13 @@ export default function TeamChat() {
       // Spara användarens meddelande
       await saveMessage(convId, 'user', userMessage.content, user?.id);
 
-      // Skicka till AI
+      // Skicka till AI med sparad fil-referens
       const response = await sendTeamChatMessage(
         inputMessage,
         messages,
-        selectedImage?.base64,
-        selectedImage?.mimeType
+        sentFile?.base64,
+        sentFile?.mimeType
       );
-
-      setSelectedImage(null);
 
       if (response.success && response.response) {
         // Lägg till AI:s svar
@@ -407,23 +437,47 @@ export default function TeamChat() {
                   }`}
                 >
                   {msg.image_urls && msg.image_urls.length > 0 && (
-                    <div className="mb-1 text-xs opacity-75">📎 Bild bifogad</div>
+                    <div className="mb-2 flex items-center gap-2 text-xs opacity-90">
+                      {(() => {
+                        const fileInfo = getFileTypeLabel(msg.file_type || 'image/png');
+                        const Icon = fileInfo.icon;
+                        return (
+                          <>
+                            <Icon className={`w-4 h-4 ${fileInfo.color}`} />
+                            <span>{fileInfo.label}</span>
+                          </>
+                        );
+                      })()}
+                    </div>
                   )}
                   {msg.role === 'assistant' ? (
-                    <div className="prose prose-invert prose-sm max-w-none leading-relaxed
-                      prose-hr:hidden
-                      prose-headings:text-white prose-headings:font-semibold
-                      prose-h1:text-lg prose-h1:mt-4 prose-h1:mb-3
-                      prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2
-                      prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-2
-                      prose-p:text-slate-100 prose-p:my-3
-                      prose-strong:text-emerald-400 prose-strong:font-semibold
-                      prose-ul:my-3 prose-ol:my-3
-                      prose-li:text-slate-100 prose-li:my-1.5
-                      prose-code:bg-slate-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-emerald-300
-                      prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700
-                      prose-table:my-3 prose-th:px-3 prose-th:py-2 prose-td:px-3 prose-td:py-2">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <div className="relative group">
+                      <button
+                        onClick={() => handleCopy(msg.content, index)}
+                        className="absolute top-1 right-1 p-1.5 bg-slate-700/80 hover:bg-slate-600 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                        title="Kopiera"
+                      >
+                        {copiedIndex === index ? (
+                          <Check className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-slate-400" />
+                        )}
+                      </button>
+                      <div className="prose prose-invert prose-sm max-w-none leading-relaxed
+                        prose-hr:hidden
+                        prose-headings:text-white prose-headings:font-semibold
+                        prose-h1:text-lg prose-h1:mt-4 prose-h1:mb-3
+                        prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2
+                        prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-2
+                        prose-p:text-slate-100 prose-p:my-3
+                        prose-strong:text-emerald-400 prose-strong:font-semibold
+                        prose-ul:my-3 prose-ol:my-3
+                        prose-li:text-slate-100 prose-li:my-1.5
+                        prose-code:bg-slate-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-emerald-300
+                        prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700
+                        prose-table:my-3 prose-th:px-3 prose-th:py-2 prose-td:px-3 prose-td:py-2">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
                     </div>
                   ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
