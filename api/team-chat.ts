@@ -46,13 +46,13 @@ async function fetchSystemData() {
         id, title, status, kontaktperson, pris, skadedjur, adress,
         primary_assignee_name, primary_assignee_email,
         start_date, due_date, created_at, updated_at, completed_date,
-        telefon, email, billing_status
+        telefon_kontaktperson, e_post_kontaktperson, billing_status
       `).order('created_at', { ascending: false }),
       supabase.from('business_cases').select(`
         id, title, status, kontaktperson, pris, skadedjur, adress,
         primary_assignee_name, primary_assignee_email,
         start_date, due_date, created_at, updated_at, completed_date,
-        telefon, email, billing_status, customer_id
+        telefon_kontaktperson, e_post_kontaktperson, billing_status
       `).order('created_at', { ascending: false })
     ]);
 
