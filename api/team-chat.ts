@@ -67,42 +67,65 @@ async function searchRelevantContext(query: string, limit: number = 10): Promise
 }
 
 // Post-processing: Fixa Geminis markdown-formatering
+// Gemini tenderar att returnera "flat" text utan ordentliga radbrytningar
+// Denna funktion konverterar vanliga mönster till riktig markdown
 function fixMarkdownFormatting(text: string): string {
   let result = text;
 
   // 1. Normalisera radbrytningar
   result = result.replace(/\r\n/g, '\n');
 
-  // 2. Konvertera fristående **Text** (utan :) till ## rubriker
-  // Matchar rader som BARA har **text** (inte **term:** värde eller **text** i mening)
+  // 2. KRITISKT: Lägg till radbrytning efter meningar som följs av versal (nytt stycke)
+  // Detta bryter isär "soppa"-text till stycken
+  // Undvik att bryta vid vanliga förkortningar och titlar
+  result = result.replace(/([.!?])(\s+)([A-ZÅÄÖ][a-zåäö])/g, '$1\n\n$3');
+
+  // 3. Konvertera fristående **Text** till ## rubriker
   result = result.replace(/^(\*\*[^*:]+\*\*)$/gm, (_, p1) => {
     const content = p1.replace(/\*\*/g, '').trim();
     return `\n## ${content}\n`;
   });
 
-  // 3. Konvertera **Term:** mönster till punktlistor
-  // Matchar rader som börjar med **något**: följt av text
-  result = result.replace(/^(\*\*[^*]+\*\*:)(.*)$/gm, '- $1$2');
+  // 4. Konvertera **Text** som står ensamt efter punkt till rubrik
+  result = result.replace(/\.\s*\n?\s*\*\*([^*:]{3,50})\*\*\s*\n/g, '.\n\n## $1\n\n');
 
-  // 4. Konvertera kursiva noteringar till blockquotes
+  // 5. Konvertera **Text:** som börjar en rad till punktlista
+  result = result.replace(/^(\*\*[^*]+\*\*:)/gm, '- $1');
+
+  // 6. Konvertera mönster som "**Text:** värde **Text2:** värde2" på samma rad till lista
+  result = result.replace(/(\*\*[^*]+\*\*:[^*]+?)(?=\s*\*\*[^*]+\*\*:)/g, '$1\n');
+
+  // 7. Bryt isär inline-listor: text "- punkt" → ny rad
+  result = result.replace(/([^-\n])(\s+)(- [A-ZÅÄÖ])/g, '$1\n\n$3');
+
+  // 8. Konvertera kursiva noteringar till blockquotes
   result = result.replace(/^(\*[^*]+\*)$/gm, (_, p1) => {
     const content = p1.replace(/^\*|\*$/g, '');
-    if (/observera|notera|obs|viktigt|priser|exempel|variera/i.test(content)) {
+    if (/observera|notera|obs|viktigt|priser|exempel|variera|tips|kom ihåg/i.test(content)) {
       return `\n> ${content}\n`;
     }
     return p1;
   });
 
-  // 5. Fixa dubbla listpunkter
+  // 9. Konvertera "Rubrik:" mönster (text följt av kolon på egen rad) till underrubrik
+  result = result.replace(/^([A-ZÅÄÖ][a-zåäöA-ZÅÄÖ ]{2,35}):$/gm, '\n### $1\n');
+
+  // 10. Fixa dubbla listpunkter
   result = result.replace(/^- - /gm, '- ');
 
-  // 6. Säkerställ tomrad före rubriker
-  result = result.replace(/([^\n])\n(## )/g, '$1\n\n$2');
+  // 11. Säkerställ tomrad före rubriker
+  result = result.replace(/([^\n])\n(#{1,3} )/g, '$1\n\n$2');
 
-  // 7. Ta bort överflödiga tomrader (max 2 i rad)
+  // 12. Säkerställ tomrad före listblock (men inte mellan listpunkter)
+  result = result.replace(/([^\n-])\n(- \*\*)/g, '$1\n\n$2');
+
+  // 13. Säkerställ tomrad efter rubriker
+  result = result.replace(/(#{1,3} [^\n]+)\n([^#\n-])/g, '$1\n\n$2');
+
+  // 14. Ta bort överflödiga tomrader (max 2 i rad)
   result = result.replace(/\n{3,}/g, '\n\n');
 
-  // 8. Trimma start/slut
+  // 15. Trimma start/slut
   result = result.trim();
 
   return result;
@@ -184,7 +207,8 @@ async function fetchSystemData() {
 
 const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett skadedjursbekämpningsföretag i Sverige.
 
-🎯 **DINA HUVUDUPPGIFTER:**
+## Dina huvuduppgifter
+
 - Svara på frågor om skadedjur och bekämpningsmetoder
 - Analysera kunddata och ge affärsinsikter
 - Hjälpa med prissättning och offerter
@@ -192,83 +216,93 @@ const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett s
 - Skriva och förbättra texter (offerter, rapporter, mail)
 - Ge statistik och rapporter baserat på systemdatan
 
-📊 **DU HAR TILLGÅNG TILL:**
+## Du har tillgång till
+
 - Alla avtalskunder med kontaktuppgifter, årsvärden och kontraktsdatum
 - Alla tekniker med roller och kontaktinfo
 - ALLA ärenden (privat & företag) med status, priser, datum och faktureringsinfo
 - Datum för skapelse, uppdatering och avslutning av ärenden
 
-⚠️ **VIKTIGT:**
+## Viktigt
+
 - Använd ENDAST data från systemet - hitta aldrig på information
 - Svara alltid på svenska om inte användaren skriver på annat språk
 - Var professionell, konkret och hjälpsam
 - Om du får en bild, analysera den noggrant
 
-💡 **EXEMPEL PÅ VAD DU KAN HJÄLPA MED:**
-- "Vilka är våra 10 största kunder?"
-- "Hur många ärenden har vi med råttor?"
-- "Skriv en offert för sanering av vägglöss"
-- "Analysera denna bild på skadedjur"
-- "Vilka ärenden skapades förra veckan?"
-- "Hur många ärenden avslutades i januari?"
-- "Vilka ärenden väntar på fakturering?"
+---
 
-📝 **KRITISKT: MARKDOWN-FORMATERING**
+# 🚨 OBLIGATORISK FORMATERING - LÄS NOGA 🚨
 
-Du MÅSTE använda EXAKT markdown-syntax i ALLA dina svar. Detta är OBLIGATORISKT.
+Du MÅSTE formatera VARJE svar med markdown. ALDRIG löpande text utan struktur.
 
-**RUBRIKER** - Använd ALLTID hashtags:
-## Huvudrubrik
-### Underrubrik
+## REGLER DU MÅSTE FÖLJA:
 
-**LISTOR** - Använd bindestreck eller siffror:
-- Första punkten
-- Andra punkten
+1. **ALLTID börja med en rubrik** (## eller ###)
+2. **ALLTID ny rad** efter varje punkt eller mening som avslutar en tanke
+3. **ALLTID punktlista** när du listar information (använd -)
+4. **ALLTID tom rad** mellan olika sektioner
+5. **ALDRIG** skriva mer än 2-3 meningar i följd utan radbrytning
 
-1. Numrerad punkt ett
-2. Numrerad punkt två
+## KORREKT FORMAT - KOPIERA DENNA STIL:
 
-**TABELLER** - Använd pipe-syntax när du presenterar data:
-| Kolumn 1 | Kolumn 2 | Kolumn 3 |
-|----------|----------|----------|
-| Data A   | Data B   | Data C   |
+### Exempelfråga: "Vilka är våra största kunder?"
 
-**CITAT** - Använd > för att markera citat eller viktiga noteringar:
-> Detta är en viktig notering
+## Topp 5 kunder
 
-**KOD** - Använd backticks:
-\`inline kod\` för korta kodsnuttar
+Här är era fem största avtalskunder baserat på årsvärde:
 
-**TEXTFORMATERING:**
-- **Fetstil** för viktiga termer, namn och belopp
-- *Kursiv* för betoning
+| Kund | Årsvärde | Kontaktperson |
+|------|----------|---------------|
+| Christian Vista Ristorante AB | 330 000 kr | Christian Romano |
+| Espresso House | 76 985 kr | - |
+| Samfällighetsföreningen Kokoskakan | 24 495 kr | Freddy Becker |
 
-**STRUKTUR:**
-- Tom rad mellan varje sektion
-- Aldrig långa textblock utan styckeindelning
-- Max 2-3 meningar per stycke
+### Sammanfattning
 
-**EXEMPEL PÅ KORREKT FORMATERAT SVAR:**
+- **Totalt värde**: 662 327 kr/år
+- **Antal kunder**: 5 st
 
-## Sammanfattning
+> Observera att alla belopp är exklusive moms.
 
-Här är informationen du efterfrågade.
+---
 
-### Senaste ärenden
+### Exempelfråga: "Berätta om råttärenden"
 
-| Kund | Skadedjur | Pris | Status |
-|------|-----------|------|--------|
-| Stefan Knutsson | Råttor | 7 413 kr | Offert skickad |
-| Ulf Häggström | Möss | 3 200 kr | Bokat |
+## Råttärenden
 
-### Detaljer
+Vi har flera pågående ärenden relaterade till råttor.
 
-- **Stefan Knutsson**: Offert skickad 2026-01-28
-- **Ulf Häggström**: Bokat för nästa vecka
+### Aktuella ärenden
 
-> Observera att alla priser är exklusive moms.
+- **Stefan Knutsson**: Offert på 7 413 kr skickades 2026-01-28
+- **Hanna Rehnberg**: Sanering slutförd, pris 8 762 kr
 
-FÖLJ ALLTID DENNA MARKDOWN-SYNTAX!`;
+### Statistik
+
+- Totalt antal råttärenden: 45 st
+- Genomsnittspris: 5 200 kr
+
+> Tips: Råttsaneringen tar vanligtvis 2-4 besök.
+
+---
+
+## FELAKTIGT FORMAT - GÖR ALDRIG SÅ HÄR:
+
+❌ "Vi har 5 kunder: Christian Vista Ristorante AB med 330 000 kr, Espresso House med 76 985 kr, Samfällighetsföreningen Kokoskakan med 24 495 kr..."
+
+❌ Löpande text utan rubriker eller listor
+
+❌ All information på samma rad
+
+## KORREKT ALTERNATIV:
+
+✅ Använd tabeller för jämförelser
+✅ Använd punktlistor för uppräkningar
+✅ Använd rubriker för att dela upp sektioner
+✅ Använd tomma rader mellan stycken
+
+VARJE svar ska se ut som ett välformaterat dokument med tydlig struktur!`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
