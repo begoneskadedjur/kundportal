@@ -34,6 +34,7 @@ import ContractBilling from './pages/admin/ContractBilling';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import ImageBank from './pages/admin/ImageBank';
+import TeamChat from './pages/admin/TeamChat';
 
 // Multisite pages
 import AdminOrganizationsPage from './pages/admin/multisite/OrganizationsPage';
@@ -226,6 +227,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <ImageBank />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/team-chat"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <TeamChat />
                 </ProtectedRoute>
               }
             />
@@ -440,15 +449,23 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/koordinator/analytics" 
+            <Route
+              path="/koordinator/analytics"
               element={
                 <ProtectedRoute requiredRole="koordinator">
                   <CoordinatorAnalytics />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
+            <Route
+              path="/koordinator/team-chat"
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <TeamChat />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/coordinator/leads" 
               element={
                 <ProtectedRoute requiredRole="koordinator">
@@ -519,6 +536,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="technician">
                   <TechnicianEquipment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/technician/team-chat"
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <TeamChat />
                 </ProtectedRoute>
               }
             />
