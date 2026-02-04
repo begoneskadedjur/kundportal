@@ -14,23 +14,24 @@
     @apply text-white bg-slate-950;
   }
   
-  /* Säkerställ att alla rubriker är ljusa */
-  h1, h2, h3, h4, h5, h6 {
+  /* Säkerställ att alla rubriker är ljusa (utom i .prose) */
+  h1:not(.prose *), h2:not(.prose *), h3:not(.prose *),
+  h4:not(.prose *), h5:not(.prose *), h6:not(.prose *) {
     @apply text-white;
   }
-  
+
   /* Säkerställ att labels och beskrivningar är synliga */
   label {
     @apply text-slate-300;
   }
-  
-  /* Standard text-färger för olika element */
-  p {
+
+  /* Standard text-färger för olika element (utom i .prose) */
+  p:not(.prose *) {
     @apply text-slate-300;
   }
-  
-  /* Links */
-  a {
+
+  /* Links (utom i .prose) */
+  a:not(.prose *) {
     @apply text-slate-300 hover:text-white;
   }
   

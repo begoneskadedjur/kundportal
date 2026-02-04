@@ -26,6 +26,7 @@
     "@sparticuz/chromium": "^138.0.2",
     "@supabase/supabase-js": "^2.50.0",
     "@tailwindcss/cli": "^4.1.10",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/crypto-js": "^4.2.2",
     "@types/leaflet": "^1.9.21",
     "@types/react-datepicker": "^6.2.0",
