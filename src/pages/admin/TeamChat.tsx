@@ -410,6 +410,7 @@ export default function TeamChat() {
                   )}
                   {msg.role === 'assistant' ? (
                     <div className="prose prose-invert prose-sm max-w-none
+                      prose-hr:hidden
                       prose-headings:text-white prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-2
                       prose-p:text-slate-100 prose-p:my-1
                       prose-strong:text-emerald-400 prose-strong:font-semibold

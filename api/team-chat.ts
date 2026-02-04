@@ -24,6 +24,10 @@ const PRICING = {
 // Hämta systemdata från Supabase
 async function fetchSystemData() {
   try {
+    console.log('[Team Chat] Fetching system data...');
+    console.log('[Team Chat] Supabase URL:', supabaseUrl ? 'SET' : 'MISSING');
+    console.log('[Team Chat] Supabase Key:', supabaseKey ? 'SET' : 'MISSING');
+
     const [
       customersResult,
       techniciansResult,
@@ -51,6 +55,17 @@ async function fetchSystemData() {
         telefon, email, billing_status, customer_id
       `).order('created_at', { ascending: false })
     ]);
+
+    // Logga resultat för debugging
+    console.log('[Team Chat] Customers fetched:', customersResult.data?.length || 0);
+    console.log('[Team Chat] Technicians fetched:', techniciansResult.data?.length || 0);
+    console.log('[Team Chat] Private cases fetched:', privateCasesResult.data?.length || 0);
+    console.log('[Team Chat] Business cases fetched:', businessCasesResult.data?.length || 0);
+
+    if (customersResult.error) console.error('[Team Chat] Customers error:', customersResult.error);
+    if (techniciansResult.error) console.error('[Team Chat] Technicians error:', techniciansResult.error);
+    if (privateCasesResult.error) console.error('[Team Chat] Private cases error:', privateCasesResult.error);
+    if (businessCasesResult.error) console.error('[Team Chat] Business cases error:', businessCasesResult.error);
 
     return {
       customers: customersResult.data || [],
