@@ -81,6 +81,7 @@ export default function TeamChat() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Ladda konversationer vid mount
   useEffect(() => {
@@ -174,6 +175,10 @@ export default function TeamChat() {
     setSelectedImage(null);
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
+    // Återställ textarea-höjd
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     setIsLoading(true);
 
     try {
@@ -531,9 +536,9 @@ export default function TeamChat() {
           </div>
         )}
 
-        {/* Inputfält - kompaktare */}
+        {/* Inputfält - expanderande */}
         <div className="p-3 bg-slate-800 border-t border-slate-700">
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2">
             <input
               type="file"
               ref={fileInputRef}
@@ -548,10 +553,15 @@ export default function TeamChat() {
             >
               <Paperclip className="w-5 h-5" />
             </button>
-            <input
-              type="text"
+            <textarea
+              ref={textareaRef}
               value={inputMessage}
-              onChange={e => setInputMessage(e.target.value)}
+              onChange={e => {
+                setInputMessage(e.target.value);
+                // Auto-resize
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+              }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -559,7 +569,8 @@ export default function TeamChat() {
                 }
               }}
               placeholder="Fråga om kunder, ärenden, tekniker..."
-              className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              rows={1}
+              className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none overflow-hidden min-h-[40px] max-h-[200px]"
             />
             <button
               onClick={handleSendMessage}
