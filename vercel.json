@@ -4,9 +4,11 @@
   "framework": "vite",
   "functions": {
     "api/**/*.ts": {
-      "runtime": "@vercel/node@5.2.2"
+      "runtime": "@vercel/node@5.2.2",
+      "maxDuration": 60
     },
-    "api/cron/sync-embeddings.ts": {
+    "api/cron/*.ts": {
+      "runtime": "@vercel/node@5.2.2",
       "maxDuration": 300
     }
   },
