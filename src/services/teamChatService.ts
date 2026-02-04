@@ -141,8 +141,8 @@ export async function createConversation(title: string, userId: string): Promise
   }
 }
 
-// Hämta alla konversationer
-export async function getConversations(): Promise<TeamChatConversation[]> {
+// Hämta konversationer för en specifik användare
+export async function getConversations(userId: string): Promise<TeamChatConversation[]> {
   try {
     const { data, error } = await supabase
       .from('ai_team_conversations')
@@ -152,6 +152,7 @@ export async function getConversations(): Promise<TeamChatConversation[]> {
           display_name
         )
       `)
+      .eq('created_by', userId)
       .order('updated_at', { ascending: false })
       .limit(50);
 
@@ -356,16 +357,26 @@ export async function updateConversationTitle(conversationId: string, title: str
   }
 }
 
-// Ta bort konversation
+// Ta bort konversation (med verifiering att den faktiskt raderades)
 export async function deleteConversation(conversationId: string): Promise<boolean> {
   try {
-    const { error } = await supabase
+    // Radera först meddelandena i konversationen
+    await supabase
+      .from('ai_team_messages')
+      .delete()
+      .eq('conversation_id', conversationId);
+
+    // Radera konversationen och verifiera via .select()
+    const { data, error } = await supabase
       .from('ai_team_conversations')
       .delete()
-      .eq('id', conversationId);
+      .eq('id', conversationId)
+      .select();
 
     if (error) throw error;
-    return true;
+
+    // Returnera true endast om något faktiskt raderades
+    return data !== null && data.length > 0;
   } catch (error) {
     console.error('deleteConversation error:', error);
     return false;

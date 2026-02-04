@@ -159,10 +159,12 @@ export default function TeamChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Ladda konversationer vid mount
+  // Ladda konversationer när användaren är inloggad
   useEffect(() => {
-    loadConversations();
-  }, []);
+    if (user?.id) {
+      loadConversations();
+    }
+  }, [user?.id]);
 
   // Scrolla till botten när meddelanden ändras
   useEffect(() => {
@@ -170,7 +172,8 @@ export default function TeamChat() {
   }, [messages]);
 
   const loadConversations = async () => {
-    const convs = await getConversations();
+    if (!user?.id) return;
+    const convs = await getConversations(user.id);
     setConversations(convs);
   };
 
@@ -433,6 +436,8 @@ export default function TeamChat() {
         setMessages([]);
       }
       toast.success('Konversation borttagen');
+    } else {
+      toast.error('Kunde inte ta bort konversationen');
     }
   };
 
