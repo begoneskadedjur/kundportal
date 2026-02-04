@@ -20,6 +20,7 @@ import {
   UsageStats
 } from '../../services/teamChatService';
 import toast from 'react-hot-toast';
+import ReactMarkdown from 'react-markdown';
 import {
   Send,
   Paperclip,
@@ -407,7 +408,20 @@ export default function TeamChat() {
                   {msg.image_urls && msg.image_urls.length > 0 && (
                     <div className="mb-1 text-xs opacity-75">📎 Bild bifogad</div>
                   )}
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                  {msg.role === 'assistant' ? (
+                    <div className="prose prose-invert prose-sm max-w-none
+                      prose-headings:text-white prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-2
+                      prose-p:text-slate-100 prose-p:my-1
+                      prose-strong:text-emerald-400 prose-strong:font-semibold
+                      prose-ul:my-1 prose-ol:my-1
+                      prose-li:text-slate-100 prose-li:my-0.5
+                      prose-code:bg-slate-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-emerald-300
+                      prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                  )}
                 </div>
               </div>
             ))

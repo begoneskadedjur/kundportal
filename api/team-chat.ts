@@ -30,10 +30,26 @@ async function fetchSystemData() {
       privateCasesResult,
       businessCasesResult
     ] = await Promise.all([
-      supabase.from('customers').select('id, company_name, annual_value, contact_person, contact_email, contact_phone, contact_address').eq('is_active', true).limit(100),
-      supabase.from('technicians').select('id, name, role, email, direct_phone, office_phone, address, is_active').eq('is_active', true),
-      supabase.from('private_cases').select('id, title, status, kontaktperson, pris, skadedjur, adress, primary_assignee_name, primary_assignee_email, start_date, due_date').order('created_at', { ascending: false }).limit(50),
-      supabase.from('business_cases').select('id, title, status, kontaktperson, pris, skadedjur, adress, primary_assignee_name, primary_assignee_email, start_date, due_date').order('created_at', { ascending: false }).limit(50)
+      supabase.from('customers').select(`
+        id, company_name, annual_value, contact_person, contact_email, contact_phone, contact_address,
+        created_at, updated_at, contract_start_date, contract_end_date, billing_frequency
+      `).eq('is_active', true).limit(500),
+      supabase.from('technicians').select(`
+        id, name, role, email, direct_phone, office_phone, address, is_active,
+        created_at, updated_at
+      `).eq('is_active', true),
+      supabase.from('private_cases').select(`
+        id, title, status, kontaktperson, pris, skadedjur, adress,
+        primary_assignee_name, primary_assignee_email,
+        start_date, due_date, created_at, updated_at, completed_date,
+        telefon, email, billing_status
+      `).order('created_at', { ascending: false }),
+      supabase.from('business_cases').select(`
+        id, title, status, kontaktperson, pris, skadedjur, adress,
+        primary_assignee_name, primary_assignee_email,
+        start_date, due_date, created_at, updated_at, completed_date,
+        telefon, email, billing_status, customer_id
+      `).order('created_at', { ascending: false })
     ]);
 
     return {
@@ -66,9 +82,10 @@ const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett s
 - Ge statistik och rapporter baserat på systemdatan
 
 📊 **DU HAR TILLGÅNG TILL:**
-- Alla avtalskunder med kontaktuppgifter och årsvärden
+- Alla avtalskunder med kontaktuppgifter, årsvärden och kontraktsdatum
 - Alla tekniker med roller och kontaktinfo
-- Senaste ärenden (privat & företag) med status och priser
+- ALLA ärenden (privat & företag) med status, priser, datum och faktureringsinfo
+- Datum för skapelse, uppdatering och avslutning av ärenden
 
 ⚠️ **VIKTIGT:**
 - Använd ENDAST data från systemet - hitta aldrig på information
@@ -80,7 +97,10 @@ const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett s
 - "Vilka är våra 10 största kunder?"
 - "Hur många ärenden har vi med råttor?"
 - "Skriv en offert för sanering av vägglöss"
-- "Analysera denna bild på skadedjur"`;
+- "Analysera denna bild på skadedjur"
+- "Vilka ärenden skapades förra veckan?"
+- "Hur många ärenden avslutades i januari?"
+- "Vilka ärenden väntar på fakturering?"`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
@@ -150,10 +170,24 @@ ${systemData.customers
 **Tekniker och kontaktinfo:**
 ${systemData.technicians.map((t: any) => `- ${t.name} (${t.role}) - ${t.email}${t.direct_phone ? ' - ' + t.direct_phone : ''}`).join('\n')}
 
-**Senaste 20 ärenden med tilldelade tekniker:**
-${systemData.recentCases.slice(0, 20).map((c: any) =>
-  `- [${c.type}] ${c.title || 'Utan titel'} - ${c.status} - ${c.skadedjur || 'Ej angivet'} - ${(c.pris || 0).toLocaleString('sv-SE')} kr - Tilldelad: ${c.primary_assignee_name || 'Ej tilldelad'}`
-).join('\n')}
+**Ärendestatistik:**
+- Totalt antal ärenden: ${systemData.recentCases.length}
+- Privatärenden: ${systemData.recentCases.filter((c: any) => c.type === 'privat').length}
+- Företagsärenden: ${systemData.recentCases.filter((c: any) => c.type === 'företag').length}
+
+**Senaste 30 ärenden (med fullständig info):**
+${systemData.recentCases.slice(0, 30).map((c: any) => {
+  const skapad = c.created_at ? new Date(c.created_at).toLocaleDateString('sv-SE') : 'Okänt';
+  const avslutad = c.completed_date ? new Date(c.completed_date).toLocaleDateString('sv-SE') : '';
+  return `- [${c.type}] ${c.title || 'Utan titel'} | Status: ${c.status} | Skadedjur: ${c.skadedjur || '-'} | Pris: ${(c.pris || 0).toLocaleString('sv-SE')} kr | Tilldelad: ${c.primary_assignee_name || '-'} | Skapad: ${skapad}${avslutad ? ' | Avslutad: ' + avslutad : ''} | Faktura: ${c.billing_status || '-'}`;
+}).join('\n')}
+
+**Alla ärenden (komplett lista för sökning/analys, ${systemData.recentCases.length} st):**
+${systemData.recentCases.map((c: any) => {
+  const skapad = c.created_at ? new Date(c.created_at).toLocaleDateString('sv-SE') : '';
+  const avslutad = c.completed_date ? new Date(c.completed_date).toLocaleDateString('sv-SE') : '';
+  return `[${c.type}] ${c.title || 'Utan titel'} (${c.status}, ${c.skadedjur || '-'}, ${(c.pris || 0)}kr, ${c.primary_assignee_name || '-'}, skapad:${skapad}${avslutad ? ', avslutad:' + avslutad : ''})`;
+}).join(' | ')}
 
 **Alla avtalskunder (för sökning):**
 ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person || 'Ingen kontakt'}, ${c.contact_email || 'ingen email'})`).join(', ')}

@@ -52,6 +52,7 @@
     "react-hotkeys-hook": "^5.1.0",
     "react-leaflet": "^5.0.0",
     "react-leaflet-cluster": "^4.0.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.6.2",
     "react-spring": "^10.0.1",
     "react-zoom-pan-pinch": "^3.7.0",
