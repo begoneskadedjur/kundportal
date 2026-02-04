@@ -30,10 +30,10 @@ async function fetchSystemData() {
       privateCasesResult,
       businessCasesResult
     ] = await Promise.all([
-      supabase.from('customers').select('id, company_name, annual_value, contact_person, email, phone').eq('is_active', true).limit(100),
-      supabase.from('technicians').select('id, name, role, phone, email').eq('is_active', true),
-      supabase.from('private_cases').select('id, title, status, kontaktperson, pris, skadedjur, adress').order('created_at', { ascending: false }).limit(50),
-      supabase.from('business_cases').select('id, title, status, kontaktperson, pris, skadedjur, adress').order('created_at', { ascending: false }).limit(50)
+      supabase.from('customers').select('id, company_name, annual_value, contact_person, contact_email, contact_phone, contact_address').eq('is_active', true).limit(100),
+      supabase.from('technicians').select('id, name, role, email, direct_phone, office_phone, address, is_active').eq('is_active', true),
+      supabase.from('private_cases').select('id, title, status, kontaktperson, pris, skadedjur, adress, primary_assignee_name, primary_assignee_email, start_date, due_date').order('created_at', { ascending: false }).limit(50),
+      supabase.from('business_cases').select('id, title, status, kontaktperson, pris, skadedjur, adress, primary_assignee_name, primary_assignee_email, start_date, due_date').order('created_at', { ascending: false }).limit(50)
     ]);
 
     return {
@@ -147,16 +147,16 @@ ${systemData.customers
   .map((c: any, i: number) => `${i + 1}. ${c.company_name} - ${(c.annual_value || 0).toLocaleString('sv-SE')} kr/år`)
   .join('\n')}
 
-**Tekniker:**
-${systemData.technicians.map((t: any) => `- ${t.name} (${t.role})`).join('\n')}
+**Tekniker och kontaktinfo:**
+${systemData.technicians.map((t: any) => `- ${t.name} (${t.role}) - ${t.email}${t.direct_phone ? ' - ' + t.direct_phone : ''}`).join('\n')}
 
-**Senaste 10 ärenden:**
-${systemData.recentCases.slice(0, 10).map((c: any) =>
-  `- [${c.type}] ${c.title || 'Utan titel'} - ${c.status} - ${c.skadedjur || 'Ej angivet'} - ${(c.pris || 0).toLocaleString('sv-SE')} kr`
+**Senaste 20 ärenden med tilldelade tekniker:**
+${systemData.recentCases.slice(0, 20).map((c: any) =>
+  `- [${c.type}] ${c.title || 'Utan titel'} - ${c.status} - ${c.skadedjur || 'Ej angivet'} - ${(c.pris || 0).toLocaleString('sv-SE')} kr - Tilldelad: ${c.primary_assignee_name || 'Ej tilldelad'}`
 ).join('\n')}
 
-**Alla kunder (för sökning):**
-${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person || 'Ingen kontakt'}, ${c.email || 'ingen email'})`).join(', ')}
+**Alla avtalskunder (för sökning):**
+${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person || 'Ingen kontakt'}, ${c.contact_email || 'ingen email'})`).join(', ')}
 `;
     }
 
