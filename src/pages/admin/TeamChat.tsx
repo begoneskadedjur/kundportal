@@ -575,7 +575,7 @@ export default function TeamChat() {
               }}
               placeholder="Fråga om kunder, ärenden, tekniker..."
               rows={1}
-              className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none overflow-hidden min-h-[40px] max-h-[200px]"
+              className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
             />
             <button
               onClick={handleSendMessage}
