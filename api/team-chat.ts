@@ -70,65 +70,50 @@ async function searchRelevantContext(query: string, limit: number = 10): Promise
 }
 
 // Post-processing: Fixa Geminis markdown-formatering
-// Gemini tenderar att returnera "flat" text utan ordentliga radbrytningar
-// Denna funktion konverterar vanliga mönster till riktig markdown
+// FÖRENKLAD VERSION - undviker att förstöra redan korrekt formaterad markdown
+// Fokuserar på att reparera vanliga problem utan att skapa nya
 function fixMarkdownFormatting(text: string): string {
   let result = text;
 
   // 1. Normalisera radbrytningar
   result = result.replace(/\r\n/g, '\n');
 
-  // 2. KRITISKT: Lägg till radbrytning efter meningar som följs av versal (nytt stycke)
-  // Detta bryter isär "soppa"-text till stycken
-  // Undvik att bryta vid vanliga förkortningar och titlar
-  result = result.replace(/([.!?])(\s+)([A-ZÅÄÖ][a-zåäö])/g, '$1\n\n$3');
+  // 2. REPARERA trasiga listpunkter: "-\n **Text**" eller "-\n**Text**" → "- **Text**"
+  // Detta fixar när radbrytningar hamnat mitt i listpunkter
+  result = result.replace(/^-\n\s*(\*\*)/gm, '- $1');
+  result = result.replace(/^-\n\s*([A-ZÅÄÖ])/gm, '- $1');
 
-  // 3. Konvertera fristående **Text** till ## rubriker
+  // 3. Konvertera fristående **Text** (hel rad, utan kolon) till ## rubriker
   result = result.replace(/^(\*\*[^*:]+\*\*)$/gm, (_, p1) => {
     const content = p1.replace(/\*\*/g, '').trim();
     return `\n## ${content}\n`;
   });
 
-  // 4. Konvertera **Text** som står ensamt efter punkt till rubrik
-  result = result.replace(/\.\s*\n?\s*\*\*([^*:]{3,50})\*\*\s*\n/g, '.\n\n## $1\n\n');
+  // 4. Konvertera blockquote-markör "> " som saknar mellanslag efter
+  result = result.replace(/^>\n\s*(\*\*)/gm, '> $1');
 
-  // 5. Konvertera **Text:** som börjar en rad till punktlista
-  result = result.replace(/^(\*\*[^*]+\*\*:)/gm, '- $1');
-
-  // 6. Konvertera mönster som "**Text:** värde **Text2:** värde2" på samma rad till lista
-  result = result.replace(/(\*\*[^*]+\*\*:[^*]+?)(?=\s*\*\*[^*]+\*\*:)/g, '$1\n');
-
-  // 7. Bryt isär inline-listor: text "- punkt" → ny rad
-  result = result.replace(/([^-\n])(\s+)(- [A-ZÅÄÖ])/g, '$1\n\n$3');
-
-  // 8. Konvertera kursiva noteringar till blockquotes
+  // 5. Konvertera kursiva noteringar med nyckelord till blockquotes
   result = result.replace(/^(\*[^*]+\*)$/gm, (_, p1) => {
     const content = p1.replace(/^\*|\*$/g, '');
-    if (/observera|notera|obs|viktigt|priser|exempel|variera|tips|kom ihåg/i.test(content)) {
+    if (/observera|notera|obs|viktigt|priser|tips|kom ihåg/i.test(content)) {
       return `\n> ${content}\n`;
     }
     return p1;
   });
 
-  // 9. Konvertera "Rubrik:" mönster (text följt av kolon på egen rad) till underrubrik
-  result = result.replace(/^([A-ZÅÄÖ][a-zåäöA-ZÅÄÖ ]{2,35}):$/gm, '\n### $1\n');
-
-  // 10. Fixa dubbla listpunkter
+  // 6. Fixa dubbla listpunkter
   result = result.replace(/^- - /gm, '- ');
 
-  // 11. Säkerställ tomrad före rubriker
+  // 7. Säkerställ tomrad före rubriker (men inte om redan finns)
   result = result.replace(/([^\n])\n(#{1,3} )/g, '$1\n\n$2');
 
-  // 12. Säkerställ tomrad före listblock (men inte mellan listpunkter)
-  result = result.replace(/([^\n-])\n(- \*\*)/g, '$1\n\n$2');
+  // 8. Säkerställ tomrad efter rubriker (men inte före listor/rubriker)
+  result = result.replace(/(#{1,3} [^\n]+)\n([^#\n-\s])/g, '$1\n\n$2');
 
-  // 13. Säkerställ tomrad efter rubriker
-  result = result.replace(/(#{1,3} [^\n]+)\n([^#\n-])/g, '$1\n\n$2');
-
-  // 14. Ta bort överflödiga tomrader (max 2 i rad)
+  // 9. Ta bort överflödiga tomrader (max 2 i rad)
   result = result.replace(/\n{3,}/g, '\n\n');
 
-  // 15. Trimma start/slut
+  // 10. Trimma start/slut
   result = result.trim();
 
   return result;

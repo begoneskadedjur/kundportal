@@ -597,20 +597,20 @@ export default function TeamChat() {
                       </button>
                       <div className="prose prose-invert prose-sm max-w-none leading-relaxed
                         prose-headings:text-white prose-headings:font-semibold
-                        prose-h1:text-lg prose-h1:mt-4 prose-h1:mb-3
-                        prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2
-                        prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-2
-                        prose-p:text-slate-100 prose-p:my-2
+                        prose-h1:text-lg prose-h1:mt-6 prose-h1:mb-4
+                        prose-h2:text-base prose-h2:mt-6 prose-h2:mb-3
+                        prose-h3:text-sm prose-h3:mt-5 prose-h3:mb-2
+                        prose-p:text-slate-100 prose-p:my-3
                         prose-strong:text-emerald-400 prose-strong:font-semibold
-                        prose-ul:my-2 prose-ol:my-2
-                        prose-li:text-slate-100 prose-li:my-1
+                        prose-ul:my-3 prose-ol:my-3
+                        prose-li:text-slate-100 prose-li:my-1.5
                         prose-code:bg-slate-700 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-emerald-300
-                        prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700 prose-pre:rounded-lg prose-pre:my-3
-                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-slate-700/30 prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-3 prose-blockquote:italic
-                        prose-table:border-collapse prose-table:w-full prose-table:my-3
+                        prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700 prose-pre:rounded-lg prose-pre:my-4
+                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-slate-700/30 prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-4 prose-blockquote:italic
+                        prose-table:border-collapse prose-table:w-full prose-table:my-4
                         prose-th:border prose-th:border-slate-600 prose-th:bg-slate-700/50 prose-th:px-3 prose-th:py-2 prose-th:text-left
                         prose-td:border prose-td:border-slate-600 prose-td:px-3 prose-td:py-2
-                        prose-hr:border-slate-600 prose-hr:my-4
+                        prose-hr:border-slate-600 prose-hr:my-6
                         prose-a:text-emerald-400 prose-a:underline">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
