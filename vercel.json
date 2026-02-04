@@ -6,10 +6,6 @@
     "api/**/*.ts": {
       "runtime": "@vercel/node@5.2.2",
       "maxDuration": 60
-    },
-    "api/cron/*.ts": {
-      "runtime": "@vercel/node@5.2.2",
-      "maxDuration": 300
     }
   },
   "crons": [

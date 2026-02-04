@@ -3,6 +3,11 @@
 // Körs automatiskt varje natt kl 02:00 via Vercel Cron
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+// Vercel function config - 5 minuters timeout för cron
+export const config = {
+  maxDuration: 300,
+};
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 
