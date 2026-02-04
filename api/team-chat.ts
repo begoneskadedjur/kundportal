@@ -171,45 +171,62 @@ const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett s
 - "Hur många ärenden avslutades i januari?"
 - "Vilka ärenden väntar på fakturering?"
 
-📝 **FORMATERING - KRITISKT VIKTIGT:**
-Du MÅSTE formatera ALLA svar med tydlig struktur:
+📝 **KRITISKT: MARKDOWN-FORMATERING**
 
-1. **ALLTID** en tom rad mellan varje stycke och sektion
-2. **ALLTID** använd ## för huvudrubriker (med tom rad före och efter)
-3. **ALLTID** använd ### för underrubriker (med tom rad före och efter)
-4. **ALDRIG** skriv långa textblock utan styckeindelning
-5. **ALDRIG** använd --- horisontella linjer
-6. Använd **fetstil** för viktiga termer, namn och belopp
-7. Använd punktlistor (-) för att lista information
-8. Varje stycke max 2-3 meningar
+Du MÅSTE använda EXAKT markdown-syntax i ALLA dina svar. Detta är OBLIGATORISKT.
 
-**EXEMPEL PÅ KORREKT FORMAT:**
+**RUBRIKER** - Använd ALLTID hashtags:
+## Huvudrubrik
+### Underrubrik
+
+**LISTOR** - Använd bindestreck eller siffror:
+- Första punkten
+- Andra punkten
+
+1. Numrerad punkt ett
+2. Numrerad punkt två
+
+**TABELLER** - Använd pipe-syntax när du presenterar data:
+| Kolumn 1 | Kolumn 2 | Kolumn 3 |
+|----------|----------|----------|
+| Data A   | Data B   | Data C   |
+
+**CITAT** - Använd > för att markera citat eller viktiga noteringar:
+> Detta är en viktig notering
+
+**KOD** - Använd backticks:
+\`inline kod\` för korta kodsnuttar
+
+**TEXTFORMATERING:**
+- **Fetstil** för viktiga termer, namn och belopp
+- *Kursiv* för betoning
+
+**STRUKTUR:**
+- Tom rad mellan varje sektion
+- Aldrig långa textblock utan styckeindelning
+- Max 2-3 meningar per stycke
+
+**EXEMPEL PÅ KORREKT FORMATERAT SVAR:**
 
 ## Sammanfattning
 
-Här är en kort sammanfattning av ärendet.
+Här är informationen du efterfrågade.
 
-### Privatärenden
+### Senaste ärenden
 
-**Stefan Knutsson**
-- **Status:** Offert skickad
-- **Skadedjur:** Råttor
-- **Pris:** 7 413 kr
-- **Skapad:** 2026-01-28
+| Kund | Skadedjur | Pris | Status |
+|------|-----------|------|--------|
+| Stefan Knutsson | Råttor | 7 413 kr | Offert skickad |
+| Ulf Häggström | Möss | 3 200 kr | Bokat |
 
-**Ulf Häggström**
-- **Status:** Bokat
-- **Skadedjur:** Råttor
-- **Pris:** 0 kr
+### Detaljer
 
-### Företagsärenden
+- **Stefan Knutsson**: Offert skickad 2026-01-28
+- **Ulf Häggström**: Bokat för nästa vecka
 
-**Ten hotel Upplandväsby AB**
-- **Status:** Avslutat
-- **Skadedjur:** Vägglöss
-- **Pris:** 4 800 kr
+> Observera att alla priser är exklusive moms.
 
-FÖLJ ALLTID DETTA FORMAT!`;
+FÖLJ ALLTID DENNA MARKDOWN-SYNTAX!`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
