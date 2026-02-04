@@ -71,6 +71,7 @@ const PRICING = {
   'gemini-2.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
   'gemini-3-flash-preview': { input: 0.50 / 1_000_000, output: 3.00 / 1_000_000 },
   'gemini-2.5-flash-image': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000, outputImage: 0.02 },
+  'gemini-3-pro-image-preview': { input: 1.25 / 1_000_000, output: 10.00 / 1_000_000, outputImage: 0.04 },
   'gemini-embedding-001': { input: 0.00 / 1_000_000, output: 0.00 / 1_000_000 }, // Gratis under 1500 req/min
 };
 
@@ -401,9 +402,9 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
 
 async function handleImageGeneration(prompt: string, res: VercelResponse) {
   try {
-    // Nano Banana - Geminis native bildgenerering via gemini-2.5-flash
+    // Nano Banana Pro - Geminis högkvalitativa bildgenerering
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash-preview-native-audio-dialog',
+      model: 'gemini-3-pro-image-preview',
       generationConfig: {
         responseModalities: ['Text', 'Image'],
       } as any,
@@ -428,9 +429,9 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
             mimeType: part.inlineData.mimeType
           },
           usage: {
-            model: 'gemini-2.5-flash-image',
+            model: 'gemini-3-pro-image-preview',
             images_generated: 1,
-            estimated_cost_usd: 0.02
+            estimated_cost_usd: 0.04
           },
           timestamp: new Date().toISOString()
         });
@@ -443,7 +444,7 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
       success: true,
       response: textResponse || 'Bildgenerering kunde inte genomföras. Försök med en annan beskrivning.',
       usage: {
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-pro-image-preview',
         images_generated: 0,
         estimated_cost_usd: 0
       },
@@ -458,7 +459,7 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
       success: true,
       response: `⚠️ Bildgenerering kunde inte utföras: ${errorMessage}`,
       usage: {
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-pro-image-preview',
         images_generated: 0,
         estimated_cost_usd: 0
       },
