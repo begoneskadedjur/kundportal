@@ -16,9 +16,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Prisberäkning (ungefärlig)
 const PRICING = {
-  'gemini-2.5-flash': { input: 0.50 / 1_000_000, output: 2.00 / 1_000_000 },
+  'gemini-2.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
   'gemini-3-flash-preview': { input: 0.50 / 1_000_000, output: 3.00 / 1_000_000 },
-  'imagen-3.0-generate-002': { outputImage: 0.04 }, // Imagen 3 pricing
+  'gemini-2.5-flash-image': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000, outputImage: 0.02 },
 };
 
 // Hämta systemdata från Supabase
@@ -249,8 +249,8 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
 `;
     }
 
-    // Välj modell
-    const modelName = 'gemini-2.5-flash';
+    // Välj modell - Gemini 3 Flash för bättre svar
+    const modelName = 'gemini-3-flash-preview';
 
     const model = genAI.getGenerativeModel({
       model: modelName,
@@ -337,25 +337,19 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
 
 async function handleImageGeneration(prompt: string, res: VercelResponse) {
   try {
-    // Använd Imagen 3 för bildgenerering via Vertex AI endpoint
-    // OBS: Imagen 3 kräver Vertex AI-konfiguration
-    // För nu använder vi Gemini 2.0 Flash med bildgenerering som fallback
-
+    // Nano Banana - Geminis native bildgenerering via gemini-2.5-flash
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp', // Experimentell modell med bildgenerering
+      model: 'gemini-2.5-flash-preview-native-audio-dialog',
       generationConfig: {
-        temperature: 1,
-      },
+        responseModalities: ['Text', 'Image'],
+      } as any,
     });
 
     const result = await model.generateContent({
       contents: [{
         role: 'user',
-        parts: [{ text: `Generate an image: ${prompt}. Create a professional, high-quality image suitable for a pest control company.` }]
+        parts: [{ text: `Generate a professional, high-quality image: ${prompt}. The image should be suitable for a pest control company's marketing or documentation.` }]
       }],
-      generationConfig: {
-        responseModalities: ['TEXT', 'IMAGE'] as any,
-      } as any,
     });
 
     const response = result.response;
@@ -370,9 +364,9 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
             mimeType: part.inlineData.mimeType
           },
           usage: {
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-2.5-flash-image',
             images_generated: 1,
-            estimated_cost_usd: 0.04
+            estimated_cost_usd: 0.02
           },
           timestamp: new Date().toISOString()
         });
@@ -383,9 +377,9 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
     const textResponse = response.text();
     return res.status(200).json({
       success: true,
-      response: textResponse || 'Bildgenerering är för närvarande inte tillgänglig. Gemini 2.0 Flash Experimental stödjer inte bildgenerering i denna konfiguration. Kontakta admin för att konfigurera Imagen 3 via Vertex AI.',
+      response: textResponse || 'Bildgenerering kunde inte genomföras. Försök med en annan beskrivning.',
       usage: {
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash-image',
         images_generated: 0,
         estimated_cost_usd: 0
       },
@@ -394,15 +388,13 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
 
   } catch (error) {
     console.error('Image Generation Error:', error);
-
-    // Ge ett mer informativt felmeddelande
     const errorMessage = error instanceof Error ? error.message : 'Okänt fel';
 
     return res.status(200).json({
       success: true,
-      response: `⚠️ Bildgenerering kunde inte utföras: ${errorMessage}\n\nFör att aktivera bildgenerering behöver du konfigurera Imagen 3 via Google Cloud Vertex AI. Kontakta systemadministratören.`,
+      response: `⚠️ Bildgenerering kunde inte utföras: ${errorMessage}`,
       usage: {
-        model: 'imagen-3',
+        model: 'gemini-2.5-flash-image',
         images_generated: 0,
         estimated_cost_usd: 0
       },
