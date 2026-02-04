@@ -350,7 +350,12 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
     if (message) {
       messageParts.push({ text: message });
     } else if (imageBase64) {
-      messageParts.push({ text: 'Analysera denna bild och beskriv vad du ser.' });
+      // Anpassa default-prompt baserat på filtyp
+      if (imageMimeType === 'application/pdf') {
+        messageParts.push({ text: 'Analysera detta PDF-dokument. Extrahera viktig information, sammanfatta innehållet och lista de viktigaste punkterna.' });
+      } else {
+        messageParts.push({ text: 'Analysera denna bild och beskriv vad du ser.' });
+      }
     }
 
     // Starta chat och skicka meddelande

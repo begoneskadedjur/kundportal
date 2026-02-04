@@ -3,6 +3,11 @@
 // Använder Google Gemini gemini-embedding-001 modell
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+// Vercel function config - 5 minuters timeout för sync
+export const config = {
+  maxDuration: 300,
+};
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 
@@ -138,7 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Synkronisera alla embeddings
     if (action === 'sync') {
-      console.log('[Embeddings] Starting sync...');
+      console.log('[Embeddings] Starting sync with batch processing...');
 
       let stats = {
         customers: 0,
@@ -148,115 +153,119 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         errors: 0
       };
 
+      // Batch-inställningar för parallell bearbetning
+      const batchSize = 25;
+      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
       // Hämta all data
       const [customersRes, techsRes, privateCasesRes, businessCasesRes] = await Promise.all([
         supabase.from('customers').select('*').eq('is_active', true),
         supabase.from('technicians').select('*').eq('is_active', true),
-        supabase.from('private_cases').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('business_cases').select('*').order('created_at', { ascending: false }).limit(500)
+        supabase.from('private_cases').select('*').order('created_at', { ascending: false }).limit(300),
+        supabase.from('business_cases').select('*').order('created_at', { ascending: false }).limit(300)
       ]);
 
       // Rensa gamla embeddings
       await supabase.from('document_embeddings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
-      // Processa kunder
-      for (const customer of customersRes.data || []) {
-        try {
-          const text = formatCustomerForEmbedding(customer);
-          const embedding = await generateEmbedding(text);
-
-          await supabase.from('document_embeddings').insert({
-            content: text,
-            content_type: 'customer',
-            source_id: customer.id,
-            source_table: 'customers',
-            embedding: `[${embedding.join(',')}]`,
-            metadata: {
-              company_name: customer.company_name,
-              annual_value: customer.annual_value
-            }
-          });
-          stats.customers++;
-        } catch (err) {
-          console.error('[Embeddings] Customer error:', err);
-          stats.errors++;
-        }
+      // Processa kunder i batchar
+      const customers = customersRes.data || [];
+      console.log(`[Embeddings] Processing ${customers.length} customers in batches of ${batchSize}`);
+      for (let i = 0; i < customers.length; i += batchSize) {
+        const batch = customers.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (customer) => {
+          try {
+            const text = formatCustomerForEmbedding(customer);
+            const embedding = await generateEmbedding(text);
+            await supabase.from('document_embeddings').insert({
+              content: text,
+              content_type: 'customer',
+              source_id: customer.id,
+              source_table: 'customers',
+              embedding: `[${embedding.join(',')}]`,
+              metadata: { company_name: customer.company_name, annual_value: customer.annual_value }
+            });
+            stats.customers++;
+          } catch (err) {
+            stats.errors++;
+          }
+        }));
+        if (i + batchSize < customers.length) await delay(500);
       }
 
-      // Processa tekniker
-      for (const tech of techsRes.data || []) {
-        try {
-          const text = formatTechnicianForEmbedding(tech);
-          const embedding = await generateEmbedding(text);
-
-          await supabase.from('document_embeddings').insert({
-            content: text,
-            content_type: 'technician',
-            source_id: tech.id,
-            source_table: 'technicians',
-            embedding: `[${embedding.join(',')}]`,
-            metadata: {
-              name: tech.name,
-              role: tech.role
-            }
-          });
-          stats.technicians++;
-        } catch (err) {
-          console.error('[Embeddings] Technician error:', err);
-          stats.errors++;
-        }
+      // Processa tekniker i batchar
+      const technicians = techsRes.data || [];
+      console.log(`[Embeddings] Processing ${technicians.length} technicians`);
+      for (let i = 0; i < technicians.length; i += batchSize) {
+        const batch = technicians.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (tech) => {
+          try {
+            const text = formatTechnicianForEmbedding(tech);
+            const embedding = await generateEmbedding(text);
+            await supabase.from('document_embeddings').insert({
+              content: text,
+              content_type: 'technician',
+              source_id: tech.id,
+              source_table: 'technicians',
+              embedding: `[${embedding.join(',')}]`,
+              metadata: { name: tech.name, role: tech.role }
+            });
+            stats.technicians++;
+          } catch (err) {
+            stats.errors++;
+          }
+        }));
+        if (i + batchSize < technicians.length) await delay(500);
       }
 
-      // Processa privatärenden (senaste 200)
-      for (const caseData of (privateCasesRes.data || []).slice(0, 200)) {
-        try {
-          const text = formatCaseForEmbedding(caseData, 'privat');
-          const embedding = await generateEmbedding(text);
-
-          await supabase.from('document_embeddings').insert({
-            content: text,
-            content_type: 'case',
-            source_id: caseData.id,
-            source_table: 'private_cases',
-            embedding: `[${embedding.join(',')}]`,
-            metadata: {
-              title: caseData.title,
-              status: caseData.status,
-              skadedjur: caseData.skadedjur,
-              case_type: 'privat'
-            }
-          });
-          stats.privateCases++;
-        } catch (err) {
-          console.error('[Embeddings] Private case error:', err);
-          stats.errors++;
-        }
+      // Processa privatärenden i batchar (senaste 200)
+      const privateCases = (privateCasesRes.data || []).slice(0, 200);
+      console.log(`[Embeddings] Processing ${privateCases.length} private cases`);
+      for (let i = 0; i < privateCases.length; i += batchSize) {
+        const batch = privateCases.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (caseData) => {
+          try {
+            const text = formatCaseForEmbedding(caseData, 'privat');
+            const embedding = await generateEmbedding(text);
+            await supabase.from('document_embeddings').insert({
+              content: text,
+              content_type: 'case',
+              source_id: caseData.id,
+              source_table: 'private_cases',
+              embedding: `[${embedding.join(',')}]`,
+              metadata: { title: caseData.title, status: caseData.status, skadedjur: caseData.skadedjur, case_type: 'privat' }
+            });
+            stats.privateCases++;
+          } catch (err) {
+            stats.errors++;
+          }
+        }));
+        if (i + batchSize < privateCases.length) await delay(500);
       }
 
-      // Processa företagsärenden (senaste 200)
-      for (const caseData of (businessCasesRes.data || []).slice(0, 200)) {
-        try {
-          const text = formatCaseForEmbedding(caseData, 'företag');
-          const embedding = await generateEmbedding(text);
-
-          await supabase.from('document_embeddings').insert({
-            content: text,
-            content_type: 'case',
-            source_id: caseData.id,
-            source_table: 'business_cases',
-            embedding: `[${embedding.join(',')}]`,
-            metadata: {
-              title: caseData.title,
-              status: caseData.status,
-              skadedjur: caseData.skadedjur,
-              case_type: 'företag'
-            }
-          });
-          stats.businessCases++;
-        } catch (err) {
-          console.error('[Embeddings] Business case error:', err);
-          stats.errors++;
-        }
+      // Processa företagsärenden i batchar (senaste 200)
+      const businessCases = (businessCasesRes.data || []).slice(0, 200);
+      console.log(`[Embeddings] Processing ${businessCases.length} business cases`);
+      for (let i = 0; i < businessCases.length; i += batchSize) {
+        const batch = businessCases.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (caseData) => {
+          try {
+            const text = formatCaseForEmbedding(caseData, 'företag');
+            const embedding = await generateEmbedding(text);
+            await supabase.from('document_embeddings').insert({
+              content: text,
+              content_type: 'case',
+              source_id: caseData.id,
+              source_table: 'business_cases',
+              embedding: `[${embedding.join(',')}]`,
+              metadata: { title: caseData.title, status: caseData.status, skadedjur: caseData.skadedjur, case_type: 'företag' }
+            });
+            stats.businessCases++;
+          } catch (err) {
+            stats.errors++;
+          }
+        }));
+        if (i + batchSize < businessCases.length) await delay(500);
       }
 
       console.log('[Embeddings] Sync complete:', stats);

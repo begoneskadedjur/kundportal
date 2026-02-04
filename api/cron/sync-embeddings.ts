@@ -69,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await supabase.from('document_embeddings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
     // Batch-processa för att undvika rate limits
-    const batchSize = 50;
+    const batchSize = 25;
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     // Processa kunder
@@ -93,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           stats.errors++;
         }
       }));
-      if (i + batchSize < customers.length) await delay(1000); // Rate limit pause
+      if (i + batchSize < customers.length) await delay(500); // Rate limit pause
     }
 
     // Processa tekniker
@@ -136,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           stats.errors++;
         }
       }));
-      if (i + batchSize < privateCases.length) await delay(1000);
+      if (i + batchSize < privateCases.length) await delay(500);
     }
 
     // Processa företagsärenden
@@ -160,7 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           stats.errors++;
         }
       }));
-      if (i + batchSize < businessCases.length) await delay(1000);
+      if (i + batchSize < businessCases.length) await delay(500);
     }
 
     console.log('[Cron] Embeddings sync complete:', stats);

@@ -34,7 +34,8 @@ import {
   Loader2,
   PanelLeftClose,
   PanelLeft,
-  Database
+  Database,
+  FileText
 } from 'lucide-react';
 
 export default function TeamChat() {
@@ -196,8 +197,8 @@ export default function TeamChat() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Bilden får max vara 10 MB');
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('Filen får max vara 20 MB');
       return;
     }
 
@@ -451,11 +452,17 @@ export default function TeamChat() {
           <div className="px-3 py-2 bg-slate-800 border-t border-slate-700">
             <div className="flex items-center gap-2">
               <div className="relative">
-                <img
-                  src={`data:${selectedImage.mimeType};base64,${selectedImage.base64}`}
-                  alt="Vald fil"
-                  className="h-12 w-12 object-cover rounded border border-slate-600"
-                />
+                {selectedImage.mimeType === 'application/pdf' ? (
+                  <div className="h-12 w-12 flex items-center justify-center bg-red-500/20 rounded border border-red-500/30">
+                    <FileText className="w-6 h-6 text-red-400" />
+                  </div>
+                ) : (
+                  <img
+                    src={`data:${selectedImage.mimeType};base64,${selectedImage.base64}`}
+                    alt="Vald fil"
+                    className="h-12 w-12 object-cover rounded border border-slate-600"
+                  />
+                )}
                 <button
                   onClick={() => setSelectedImage(null)}
                   className="absolute -top-1 -right-1 p-0.5 bg-red-500 rounded-full text-white"
@@ -463,7 +470,9 @@ export default function TeamChat() {
                   <X className="w-3 h-3" />
                 </button>
               </div>
-              <span className="text-xs text-slate-400">Fil kommer att analyseras av AI</span>
+              <span className="text-xs text-slate-400">
+                {selectedImage.mimeType === 'application/pdf' ? 'PDF-dokument kommer att analyseras av AI' : 'Fil kommer att analyseras av AI'}
+              </span>
             </div>
           </div>
         )}
