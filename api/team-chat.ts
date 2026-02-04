@@ -2,12 +2,14 @@
 // Team AI Chat - Centraliserad AI-lösning för hela teamet
 // Stödjer chat, bildanalys och bildgenerering via Google Gemini
 // Med tillgång till BeGones systemdata (kunder, ärenden, tekniker)
+// Nya funktioner: Google Search grounding och URL Context
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
+// Ny SDK-klient
+const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY || '' });
 
 // Supabase klient för att hämta systemdata
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -16,14 +18,15 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // RAG: Generera embedding för en sökfråga
 async function generateQueryEmbedding(query: string): Promise<number[]> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
-
-  const result = await model.embedContent({
-    content: { parts: [{ text: query }] },
-    taskType: 'RETRIEVAL_QUERY' as any,
+  const result = await ai.models.embedContent({
+    model: 'gemini-embedding-001',
+    contents: query,
+    config: {
+      taskType: 'RETRIEVAL_QUERY' as any,
+    }
   });
 
-  return result.embedding.values;
+  return result.embeddings?.[0]?.values || [];
 }
 
 // RAG: Sök efter relevant kontext baserat på användarens fråga
@@ -215,6 +218,8 @@ const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett s
 - Analysera bilder på skadedjur eller skador
 - Skriva och förbättra texter (offerter, rapporter, mail)
 - Ge statistik och rapporter baserat på systemdatan
+- **Söka på webben** för aktuell information (Google Search)
+- **Analysera webbsidor** som användaren delar (URL Context)
 
 ## Du har tillgång till
 
@@ -223,12 +228,28 @@ const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett s
 - ALLA ärenden (privat & företag) med status, priser, datum och faktureringsinfo
 - Datum för skapelse, uppdatering och avslutning av ärenden
 
+## 🌐 NYA VERKTYG: Google Search & URL Context
+
+Du har nu tillgång till **Google Search** och **URL Context**:
+
+### Google Search
+- Använd för att hitta aktuell information som inte finns i systemdatan
+- Bra för frågor om senaste nytt, regler, priser på marknaden, etc.
+- Exempel: "Vad säger Livsmedelsverket om råttbekämpning?"
+
+### URL Context
+- Om användaren inkluderar en URL i sitt meddelande, kan du läsa och analysera innehållet
+- Bra för att jämföra priser, läsa artiklar, analysera konkurrenters webbsidor
+- Exempel: "Analysera denna artikel: https://example.com/artikel"
+
 ## Viktigt
 
-- Använd ENDAST data från systemet - hitta aldrig på information
+- Använd systemdata för intern information om kunder, ärenden och tekniker
+- Använd Google Search för extern, aktuell information
 - Svara alltid på svenska om inte användaren skriver på annat språk
 - Var professionell, konkret och hjälpsam
 - Om du får en bild, analysera den noggrant
+- När du använder webbsökning, ange källorna i ditt svar
 
 ---
 
@@ -410,17 +431,8 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
     // Välj modell - Gemini 3 Flash för bättre svar
     const modelName = 'gemini-3-flash-preview';
 
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 8192, // Ökat för längre svar utan avbrott
-      },
-      systemInstruction: systemMessage,
-    });
-
-    // Bygg konversationshistorik för Gemini
-    const geminiHistory: Content[] = conversationHistory
+    // Bygg konversationshistorik för Gemini (ny SDK-format)
+    const geminiHistory = conversationHistory
       .filter((msg: any) => msg.role !== 'system')
       .slice(-10) // Behåll senaste 10 meddelanden
       .map((msg: any) => ({
@@ -428,11 +440,11 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
         parts: [{ text: msg.content }]
       }));
 
-    // Bygg aktuella meddelande-parts
-    const messageParts: Part[] = [];
+    // Bygg aktuellt meddelande (contents)
+    const currentParts: any[] = [];
 
     if (imageBase64 && imageMimeType) {
-      messageParts.push({
+      currentParts.push({
         inlineData: {
           mimeType: imageMimeType,
           data: imageBase64
@@ -440,37 +452,68 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
       });
     }
 
-    if (message) {
-      messageParts.push({ text: message });
-    } else if (imageBase64) {
+    let userMessage = message;
+    if (!userMessage && imageBase64) {
       // Anpassa default-prompt baserat på filtyp
       if (imageMimeType === 'application/pdf') {
-        messageParts.push({ text: 'Analysera detta PDF-dokument. Extrahera viktig information, sammanfatta innehållet och lista de viktigaste punkterna.' });
+        userMessage = 'Analysera detta PDF-dokument. Extrahera viktig information, sammanfatta innehållet och lista de viktigaste punkterna.';
       } else {
-        messageParts.push({ text: 'Analysera denna bild och beskriv vad du ser.' });
+        userMessage = 'Analysera denna bild och beskriv vad du ser.';
       }
     }
 
-    // Starta chat och skicka meddelande
-    const chat = model.startChat({
-      history: geminiHistory,
+    if (userMessage) {
+      currentParts.push({ text: userMessage });
+    }
+
+    // Bygg contents array med historik + aktuellt meddelande
+    const contents = [
+      ...geminiHistory,
+      { role: 'user', parts: currentParts }
+    ];
+
+    // Anropa med nya SDK:t - inkluderar Google Search och URL Context!
+    const result = await ai.models.generateContent({
+      model: modelName,
+      contents: contents,
+      config: {
+        systemInstruction: systemMessage,
+        temperature: 1.0, // Gemini 3 rekommenderar 1.0
+        maxOutputTokens: 8192,
+        // 🚀 NYA FUNKTIONER: Google Search och URL Context
+        tools: [
+          { googleSearch: {} },  // Ger tillgång till realtidsinformation från webben
+          { urlContext: {} }     // Kan analysera innehåll från URLs i meddelanden
+        ],
+      },
     });
 
-    const result = await chat.sendMessage(messageParts);
-    const rawResponse = result.response.text();
+    const rawResponse = result.text || '';
     const response = fixMarkdownFormatting(rawResponse);
 
-    // Uppskatta tokens (grov uppskattning: ~4 tecken per token)
-    const inputTokens = Math.ceil(
+    // Logga om grounding användes
+    const groundingMetadata = result.candidates?.[0]?.groundingMetadata;
+    const urlContextMetadata = result.candidates?.[0]?.urlContextMetadata;
+    if (groundingMetadata) {
+      console.log('[Team Chat] Google Search grounding used:', groundingMetadata.webSearchQueries);
+    }
+    if (urlContextMetadata) {
+      console.log('[Team Chat] URL Context used:', urlContextMetadata.urlMetadata?.map((u: any) => u.retrievedUrl));
+    }
+
+    // Hämta faktisk token-användning från svaret
+    const usageMetadata = result.usageMetadata;
+    const inputTokens = usageMetadata?.promptTokenCount || Math.ceil(
       (message?.length || 0) / 4 +
-      (imageBase64 ? 1000 : 0) + // Bilder kostar ca 1000 tokens
+      (imageBase64 ? 1000 : 0) +
       conversationHistory.reduce((sum: number, msg: any) => sum + (msg.content?.length || 0) / 4, 0)
     );
-    const outputTokens = Math.ceil(response.length / 4);
+    const outputTokens = usageMetadata?.candidatesTokenCount || Math.ceil(response.length / 4);
+    const toolTokens = usageMetadata?.toolUsePromptTokenCount || 0;
 
     const pricing = PRICING[modelName as keyof typeof PRICING];
     const estimatedCost = 'input' in pricing
-      ? (inputTokens * pricing.input) + (outputTokens * pricing.output)
+      ? ((inputTokens + toolTokens) * pricing.input) + (outputTokens * pricing.output)
       : 0;
 
     return res.status(200).json({
@@ -480,9 +523,17 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
         model: modelName,
         input_tokens: inputTokens,
         output_tokens: outputTokens,
+        tool_tokens: toolTokens,
         images_analyzed: imageBase64 ? 1 : 0,
-        estimated_cost_usd: estimatedCost
+        estimated_cost_usd: estimatedCost,
+        google_search_used: !!groundingMetadata,
+        url_context_used: !!urlContextMetadata
       },
+      // Inkludera källor om Google Search användes
+      sources: groundingMetadata?.groundingChunks?.map((chunk: any) => ({
+        title: chunk.web?.title,
+        uri: chunk.web?.uri
+      })) || [],
       timestamp: new Date().toISOString()
     });
 
@@ -501,26 +552,20 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
 
 async function handleImageGeneration(prompt: string, res: VercelResponse) {
   try {
-    // Nano Banana Pro - Geminis högkvalitativa bildgenerering
-    const model = genAI.getGenerativeModel({
+    // Nano Banana Pro - Geminis högkvalitativa bildgenerering med nya SDK:t
+    const result = await ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
-      generationConfig: {
+      contents: `Generate a professional, high-quality image: ${prompt}. The image should be suitable for a pest control company's marketing or documentation.`,
+      config: {
         responseModalities: ['Text', 'Image'],
+        // Kan använda Google Search för att få aktuell info för bilden
+        tools: [{ googleSearch: {} }],
       } as any,
     });
 
-    const result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [{ text: `Generate a professional, high-quality image: ${prompt}. The image should be suitable for a pest control company's marketing or documentation.` }]
-      }],
-    });
-
-    const response = result.response;
-
     // Kolla om det finns genererad bild
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if ('inlineData' in part && part.inlineData) {
+    for (const part of result.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
         return res.status(200).json({
           success: true,
           image: {
@@ -538,7 +583,7 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
     }
 
     // Om ingen bild genererades, returnera textsvaret
-    const textResponse = response.text();
+    const textResponse = result.text || '';
     return res.status(200).json({
       success: true,
       response: textResponse || 'Bildgenerering kunde inte genomföras. Försök med en annan beskrivning.',

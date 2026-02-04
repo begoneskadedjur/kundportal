@@ -20,6 +20,7 @@
     "@fullcalendar/resource": "^6.1.18",
     "@fullcalendar/resource-timeline": "^6.1.18",
     "@fullcalendar/timegrid": "^6.1.18",
+    "@google/genai": "^1.39.0",
     "@google/generative-ai": "^0.24.1",
     "@react-google-maps/api": "^2.20.7",
     "@sparticuz/chromium": "^138.0.2",
