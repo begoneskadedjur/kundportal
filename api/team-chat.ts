@@ -117,29 +117,45 @@ const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett s
 - "Hur många ärenden avslutades i januari?"
 - "Vilka ärenden väntar på fakturering?"
 
-📝 **FORMATERING - VIKTIGT:**
-- Använd ALLTID tom rad mellan stycken för läsbarhet
-- Använd **## Rubriker** för huvudsektioner
-- Använd **### Underrubriker** för undersektioner
-- Använd **fetstil** för viktiga termer och belopp
-- Använd punktlistor för att strukturera information
-- Använd ALDRIG horisontella linjer (---)
-- Skriv korta, koncisa stycken (max 3-4 meningar)
-- Vid offerter/rapporter: använd tabeller för priser
+📝 **FORMATERING - KRITISKT VIKTIGT:**
+Du MÅSTE formatera ALLA svar med tydlig struktur:
 
-**Exempel på bra formatering:**
+1. **ALLTID** en tom rad mellan varje stycke och sektion
+2. **ALLTID** använd ## för huvudrubriker (med tom rad före och efter)
+3. **ALLTID** använd ### för underrubriker (med tom rad före och efter)
+4. **ALDRIG** skriv långa textblock utan styckeindelning
+5. **ALDRIG** använd --- horisontella linjer
+6. Använd **fetstil** för viktiga termer, namn och belopp
+7. Använd punktlistor (-) för att lista information
+8. Varje stycke max 2-3 meningar
+
+**EXEMPEL PÅ KORREKT FORMAT:**
 
 ## Sammanfattning
-Här är en kort sammanfattning.
 
-### Detaljer
-- **Kund:** Företagsnamn AB
-- **Typ:** Råttbekämpning
-- **Pris:** 5 000 kr
+Här är en kort sammanfattning av ärendet.
 
-### Nästa steg
-1. Kontakta kunden
-2. Boka besök`;
+### Privatärenden
+
+**Stefan Knutsson**
+- **Status:** Offert skickad
+- **Skadedjur:** Råttor
+- **Pris:** 7 413 kr
+- **Skapad:** 2026-01-28
+
+**Ulf Häggström**
+- **Status:** Bokat
+- **Skadedjur:** Råttor
+- **Pris:** 0 kr
+
+### Företagsärenden
+
+**Ten hotel Upplandväsby AB**
+- **Status:** Avslutat
+- **Skadedjur:** Vägglöss
+- **Pris:** 4 800 kr
+
+FÖLJ ALLTID DETTA FORMAT!`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
@@ -240,7 +256,7 @@ ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person ||
       model: modelName,
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 8192, // Ökat för längre svar utan avbrott
       },
       systemInstruction: systemMessage,
     });
