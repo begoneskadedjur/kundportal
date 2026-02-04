@@ -588,8 +588,8 @@ const AdminDashboard: React.FC = () => {
                   href="/admin/team-chat"
                   icon={Sparkles}
                   title="Team AI Chat"
-                  description="Centraliserad AI-assistent för hela teamet med bildanalys"
-                  stats="Gemini 2.5 Flash"
+                  description="Centraliserad AI-assistent med RAG-sökning och bildanalys"
+                  stats="Gemini 3 Flash"
                   tag="AI"
                   iconColor="text-emerald-400"
                 />

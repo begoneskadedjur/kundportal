@@ -14,11 +14,64 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL ||
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// RAG: Generera embedding för en sökfråga
+async function generateQueryEmbedding(query: string): Promise<number[]> {
+  const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+
+  const result = await model.embedContent({
+    content: { parts: [{ text: query }] },
+    taskType: 'RETRIEVAL_QUERY' as any,
+  });
+
+  return result.embedding.values;
+}
+
+// RAG: Sök efter relevant kontext baserat på användarens fråga
+async function searchRelevantContext(query: string, limit: number = 10): Promise<string> {
+  try {
+    console.log('[Team Chat] RAG search for:', query);
+
+    // Generera embedding för frågan
+    const queryEmbedding = await generateQueryEmbedding(query);
+
+    // Sök i embeddings-tabellen
+    const { data, error } = await supabase.rpc('search_similar_documents', {
+      query_embedding: `[${queryEmbedding.join(',')}]`,
+      match_count: limit,
+      filter_type: null
+    });
+
+    if (error) {
+      console.error('[Team Chat] RAG search error:', error);
+      return '';
+    }
+
+    if (!data || data.length === 0) {
+      console.log('[Team Chat] No RAG results found');
+      return '';
+    }
+
+    console.log('[Team Chat] RAG found', data.length, 'relevant documents');
+
+    // Formatera resultaten till kontext
+    const contextParts = data.map((doc: any, i: number) => {
+      const similarity = Math.round(doc.similarity * 100);
+      return `[Relevans: ${similarity}%]\n${doc.content}`;
+    });
+
+    return `\n\n🔍 **RELEVANTA SÖKRESULTAT (baserat på din fråga):**\n\n${contextParts.join('\n\n---\n\n')}`;
+  } catch (error) {
+    console.error('[Team Chat] RAG error:', error);
+    return '';
+  }
+}
+
 // Prisberäkning (ungefärlig)
 const PRICING = {
   'gemini-2.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
   'gemini-3-flash-preview': { input: 0.50 / 1_000_000, output: 3.00 / 1_000_000 },
   'gemini-2.5-flash-image': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000, outputImage: 0.02 },
+  'gemini-embedding-001': { input: 0.00 / 1_000_000, output: 0.00 / 1_000_000 }, // Gratis under 1500 req/min
 };
 
 // Hämta systemdata från Supabase
@@ -200,6 +253,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Hämta systemdata för att ge AI:n kontext
     const systemData = await fetchSystemData();
 
+    // RAG: Sök efter relevant kontext baserat på användarens fråga
+    let ragContext = '';
+    if (message) {
+      ragContext = await searchRelevantContext(message, 8);
+    }
+
     // Bygg system message med aktuell data
     let systemMessage = BASE_SYSTEM_MESSAGE;
 
@@ -247,6 +306,11 @@ ${systemData.recentCases.map((c: any) => {
 **Alla avtalskunder (för sökning):**
 ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person || 'Ingen kontakt'}, ${c.contact_email || 'ingen email'})`).join(', ')}
 `;
+    }
+
+    // Lägg till RAG-kontext om den finns
+    if (ragContext) {
+      systemMessage += ragContext;
     }
 
     // Välj modell - Gemini 3 Flash för bättre svar

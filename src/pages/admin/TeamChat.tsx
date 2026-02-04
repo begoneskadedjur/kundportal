@@ -363,7 +363,7 @@ export default function TeamChat() {
               Systemdata
             </span>
             <span className="text-[10px] text-slate-400 bg-slate-700 px-1.5 py-0.5 rounded">
-              Gemini 2.5
+              Gemini 3 + RAG
             </span>
           </div>
         </div>
