@@ -595,23 +595,23 @@ export default function TeamChat() {
                           <Copy className="w-4 h-4 text-slate-400" />
                         )}
                       </button>
-                      <div className="prose prose-invert prose-sm max-w-none leading-relaxed
-                        prose-headings:text-white prose-headings:font-semibold
-                        prose-h1:text-lg prose-h1:mt-6 prose-h1:mb-4
-                        prose-h2:text-base prose-h2:mt-6 prose-h2:mb-3
-                        prose-h3:text-sm prose-h3:mt-5 prose-h3:mb-2
-                        prose-p:text-slate-100 prose-p:my-3
-                        prose-strong:text-emerald-400 prose-strong:font-semibold
-                        prose-ul:my-3 prose-ol:my-3
-                        prose-li:text-slate-100 prose-li:my-1.5
-                        prose-code:bg-slate-700 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-emerald-300
-                        prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700 prose-pre:rounded-lg prose-pre:my-4
-                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-slate-700/30 prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-4 prose-blockquote:italic
-                        prose-table:border-collapse prose-table:w-full prose-table:my-4
-                        prose-th:border prose-th:border-slate-600 prose-th:bg-slate-700/50 prose-th:px-3 prose-th:py-2 prose-th:text-left
-                        prose-td:border prose-td:border-slate-600 prose-td:px-3 prose-td:py-2
-                        prose-hr:border-slate-600 prose-hr:my-6
-                        prose-a:text-emerald-400 prose-a:underline">
+                      <div className="prose prose-invert prose-base max-w-none
+                        prose-headings:text-emerald-400 prose-headings:font-bold
+                        prose-h1:text-2xl prose-h1:mt-8 prose-h1:mb-6 prose-h1:pb-2 prose-h1:border-b prose-h1:border-slate-600
+                        prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-4 prose-h2:pb-2 prose-h2:border-b prose-h2:border-slate-700
+                        prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-3
+                        prose-p:text-slate-100 prose-p:my-4 prose-p:leading-7
+                        prose-strong:text-white prose-strong:font-semibold
+                        prose-ul:my-4 prose-ol:my-4 prose-ul:pl-6 prose-ol:pl-6
+                        prose-li:text-slate-100 prose-li:my-2 prose-li:leading-7
+                        prose-code:bg-slate-800 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-emerald-300 prose-code:text-sm
+                        prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700 prose-pre:rounded-lg prose-pre:my-6 prose-pre:p-4
+                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-950/30 prose-blockquote:pl-4 prose-blockquote:pr-4 prose-blockquote:py-3 prose-blockquote:my-6 prose-blockquote:rounded-r-lg
+                        prose-table:border-collapse prose-table:w-full prose-table:my-6
+                        prose-th:border prose-th:border-slate-500 prose-th:bg-slate-700 prose-th:px-4 prose-th:py-3 prose-th:text-left prose-th:font-bold prose-th:text-emerald-400
+                        prose-td:border prose-td:border-slate-600 prose-td:px-4 prose-td:py-3
+                        prose-hr:border-slate-500 prose-hr:border-t-2 prose-hr:my-8
+                        prose-a:text-emerald-400 prose-a:underline hover:prose-a:text-emerald-300">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
                       {/* Visa genererad bild om den finns */}

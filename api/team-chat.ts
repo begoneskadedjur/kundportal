@@ -69,54 +69,26 @@ async function searchRelevantContext(query: string, limit: number = 10): Promise
   }
 }
 
-// Post-processing: Fixa Geminis markdown-formatering
-// FÖRENKLAD VERSION - undviker att förstöra redan korrekt formaterad markdown
-// Fokuserar på att reparera vanliga problem utan att skapa nya
+// Post-processing: Minimal markdown-fix
+// Gör ENDAST nödvändiga reparationer - låt Gemini formatera själv
 function fixMarkdownFormatting(text: string): string {
   let result = text;
 
   // 1. Normalisera radbrytningar
   result = result.replace(/\r\n/g, '\n');
 
-  // 2. REPARERA trasiga listpunkter: "-\n **Text**" eller "-\n**Text**" → "- **Text**"
-  // Detta fixar när radbrytningar hamnat mitt i listpunkter
+  // 2. Reparera trasiga listpunkter (om Gemini brutit dem)
   result = result.replace(/^-\n\s*(\*\*)/gm, '- $1');
   result = result.replace(/^-\n\s*([A-ZÅÄÖ])/gm, '- $1');
 
-  // 3. Konvertera fristående **Text** (hel rad, utan kolon) till ## rubriker
-  result = result.replace(/^(\*\*[^*:]+\*\*)$/gm, (_, p1) => {
-    const content = p1.replace(/\*\*/g, '').trim();
-    return `\n## ${content}\n`;
-  });
-
-  // 4. Konvertera blockquote-markör "> " som saknar mellanslag efter
-  result = result.replace(/^>\n\s*(\*\*)/gm, '> $1');
-
-  // 5. Konvertera kursiva noteringar med nyckelord till blockquotes
-  result = result.replace(/^(\*[^*]+\*)$/gm, (_, p1) => {
-    const content = p1.replace(/^\*|\*$/g, '');
-    if (/observera|notera|obs|viktigt|priser|tips|kom ihåg/i.test(content)) {
-      return `\n> ${content}\n`;
-    }
-    return p1;
-  });
-
-  // 6. Fixa dubbla listpunkter
+  // 3. Fixa dubbla listpunkter
   result = result.replace(/^- - /gm, '- ');
 
-  // 7. Säkerställ tomrad före rubriker (men inte om redan finns)
-  result = result.replace(/([^\n])\n(#{1,3} )/g, '$1\n\n$2');
-
-  // 8. Säkerställ tomrad efter rubriker (men inte före listor/rubriker)
-  result = result.replace(/(#{1,3} [^\n]+)\n([^#\n-\s])/g, '$1\n\n$2');
-
-  // 9. Ta bort överflödiga tomrader (max 2 i rad)
+  // 4. Ta bort överflödiga tomrader (max 2 i rad)
   result = result.replace(/\n{3,}/g, '\n\n');
 
-  // 10. Trimma start/slut
-  result = result.trim();
-
-  return result;
+  // 5. Trimma
+  return result.trim();
 }
 
 // Prisberäkning (ungefärlig)
