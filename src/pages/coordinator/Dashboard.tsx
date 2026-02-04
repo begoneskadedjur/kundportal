@@ -9,7 +9,7 @@ import GeographicOverview from '../../components/admin/coordinator/GeographicOve
 import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
-import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp, Receipt, Target } from 'lucide-react';
+import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp, Receipt, Target, Sparkles } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 import EventLogCard from '../../components/shared/EventLogCard';
@@ -357,6 +357,14 @@ export default function CoordinatorDashboard() {
               title="Analytics & Insights"
               description="Djup analys av din koordinatorspåverkan på verksamheten och konkreta förbättringsförslag."
               tag="Ny"
+            />
+            <CoordinatorDashboardCard
+              href="/koordinator/team-chat"
+              icon={Sparkles}
+              iconColor="text-emerald-400"
+              title="Team AI Chat"
+              description="Centraliserad AI-assistent för hela teamet med bildanalys och konversationshistorik."
+              tag="AI"
             />
           </div>
         </section>

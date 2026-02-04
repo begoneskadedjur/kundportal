@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   DollarSign, FileText, ClipboardList, Calendar,
   TrendingUp, Award, Clock, AlertCircle,
-  Plus, Eye, ArrowRight, ChevronDown, ChevronUp, Info, Briefcase, Target, MapPin
+  Plus, Eye, ArrowRight, ChevronDown, ChevronUp, Info, Briefcase, Target, MapPin, Sparkles
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Card from '../../components/ui/Card'
@@ -722,6 +722,24 @@ export default function TechnicianDashboard() {
                 </motion.div>
                 <div className="text-left"><p className="font-medium text-white">Utrustning</p><p className="text-emerald-300 text-sm">Placera fällor & stationer</p></div>
                 <ArrowRight className="w-4 h-4 text-emerald-400 ml-auto group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/technician/team-chat')}
+              className="p-4 bg-gradient-to-br from-cyan-500/20 to-emerald-600/20 border border-cyan-500/30 rounded-lg hover:from-cyan-500/30 hover:to-emerald-600/30 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <motion.div
+                  whileHover={{ rotate: 10 }}
+                  className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors"
+                >
+                  <Sparkles className="w-5 h-5 text-cyan-400" />
+                </motion.div>
+                <div className="text-left"><p className="font-medium text-white">Team AI Chat</p><p className="text-cyan-300 text-sm">AI-assistent & bildanalys</p></div>
+                <ArrowRight className="w-4 h-4 text-cyan-400 ml-auto group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.button>
 

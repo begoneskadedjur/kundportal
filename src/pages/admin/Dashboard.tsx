@@ -31,7 +31,8 @@ import {
   Beaker,
   BookOpen,
   Bell,
-  MessageSquareText
+  MessageSquareText,
+  Sparkles
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -581,6 +582,16 @@ const AdminDashboard: React.FC = () => {
                   stats="Steg-för-steg"
                   tag="Guide"
                   iconColor="text-cyan-400"
+                />
+
+                <AdminDashboardCard
+                  href="/admin/team-chat"
+                  icon={Sparkles}
+                  title="Team AI Chat"
+                  description="Centraliserad AI-assistent för hela teamet med bildanalys"
+                  stats="Gemini 2.5 Flash"
+                  tag="AI"
+                  iconColor="text-emerald-400"
                 />
               </StaggeredGrid>
             </div>
