@@ -1,10 +1,9 @@
 // api/ai-coordinator-analysis.ts
+// UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
 // Systemmeddelande för AI:n
 const SYSTEM_MESSAGE = `Du är en datadriven expert på schemaläggning och koordinering inom skadedjursbekämpning.
@@ -150,19 +149,21 @@ ${JSON.stringify(analysisData, null, 2)}
 
 Kom ihåg att svara i det exakta JSON-format som specificerats.`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: SYSTEM_MESSAGE },
-        { role: "user", content: userMessage }
-      ],
-      temperature: 0.7,
-      response_format: { type: "json_object" }
+    // --- Anropa Google Gemini ---
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        temperature: 0.7,
+        responseMimeType: 'application/json',
+      },
     });
 
-    const analysisContent = completion.choices[0].message.content;
+    const combinedPrompt = `${SYSTEM_MESSAGE}\n\n---\n\n${userMessage}`;
+    const result = await model.generateContent(combinedPrompt);
+    const analysisContent = result.response.text();
+
     if (!analysisContent) {
-      throw new Error('Tom respons från AI');
+      throw new Error('Tom respons från Google Gemini');
     }
 
     const analysis = JSON.parse(analysisContent);
@@ -180,7 +181,7 @@ Kom ihåg att svara i det exakta JSON-format som specificerats.`;
     return res.status(200).json({
       success: true,
       analysis,
-      ai_model: "gpt-4o",
+      ai_model: "gemini-2.0-flash",
       timestamp: new Date().toISOString()
     });
 

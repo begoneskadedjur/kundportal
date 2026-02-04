@@ -1,10 +1,9 @@
 // api/global-coordinator-chat.ts
+// UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI, Content } from '@google/generative-ai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
 const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en universell AI-koordinator-assistent med KOMPLETT tillgång till ALLA systemdata OCH BOKNINGSFÖRMÅGA. HITTA ALDRIG PÅ information - använd ENDAST faktisk data!
 
@@ -232,12 +231,12 @@ export default async function handler(
     
     console.log(`- Sample of data being sent:`, JSON.stringify(universalData, null, 2).slice(0, 500) + '...');
 
-    // Förbered konversationshistorik
-    const messages: any[] = [
-      { role: 'system', content: SYSTEM_MESSAGE },
-      { 
-        role: 'system', 
-        content: `AKTUELL SESSION:
+    // Förbered systemkontexten
+    const systemContext = `${SYSTEM_MESSAGE}
+
+---
+
+AKTUELL SESSION:
 Sida: ${currentPage}
 Tidpunkt: ${new Date().toLocaleString('sv-SE')}
 
@@ -247,32 +246,33 @@ HITTA ALDRIG PÅ namn som "Anna Svensson", "Erik Lund", "Johan Andersson" etc.
 KOMPLETT SYSTEMDATA (DU HAR ALLTID TILLGÅNG TILL ALLT):
 ${truncatedData}
 
-Analysera HELA datasetet för optimal rådgivning. Du har tillgång till alla tekniker, scheman, priser, och geografisk data samtidigt.`
-      }
-    ];
+Analysera HELA datasetet för optimal rådgivning. Du har tillgång till alla tekniker, scheman, priser, och geografisk data samtidigt.`;
 
-    // Lägg till konversationshistorik (senaste 8 meddelanden)
+    // Förbered konversationshistorik för Gemini
     const recentHistory = conversationHistory.slice(-8);
-    recentHistory.forEach((msg: any) => {
-      if (msg.role !== 'system') {
-        messages.push({
-          role: msg.role,
-          content: msg.content
-        });
-      }
+    const geminiHistory: Content[] = recentHistory
+      .filter((msg: any) => msg.role !== 'system')
+      .map((msg: any) => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      }));
+
+    // --- Anropa Google Gemini med chat ---
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 800,
+      },
+      systemInstruction: systemContext,
     });
 
-    // Lägg till användarens nya meddelande
-    messages.push({ role: 'user', content: message });
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages,
-      temperature: 0.7,
-      max_tokens: 800
+    const chat = model.startChat({
+      history: geminiHistory,
     });
 
-    const response = completion.choices[0].message.content;
+    const result = await chat.sendMessage(message);
+    const response = result.response.text();
 
     // Check if AI wants to create a booking
     let bookingResult = null;

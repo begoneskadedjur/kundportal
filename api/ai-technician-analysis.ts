@@ -1,16 +1,14 @@
 // /api/ai-technician-analysis.ts
-// UPPDATERAD: 2025-07-15 - Fullständig omskrivning med ny systemprompt och robust fallback.
+// UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // =================================================================================
 // SECTION 1: CONFIGURATION & INITIALIZATION
 // =================================================================================
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
 // Definition av den förväntade JSON-strukturen.
 // Detta är hjärtat av vår nya, djupgående analys.
@@ -63,8 +61,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { technician, allTechnicians, monthlyData, pestSpecialization } = req.body;
 
     // --- Input Validering ---
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ success: false, error: 'OpenAI API-nyckel är inte konfigurerad på servern.' });
+    if (!process.env.GOOGLE_AI_API_KEY) {
+      return res.status(500).json({ success: false, error: 'Google AI API-nyckel är inte konfigurerad på servern.' });
     }
     if (!technician || !allTechnicians || allTechnicians.length === 0) {
       return res.status(400).json({ success: false, error: 'Nödvändig tekniker-data saknas i anropet.' });
@@ -77,21 +75,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const analysisContext = buildAnalysisContext(technician, allTechnicians, monthlyData, pestSpecialization);
     const userPrompt = `Analysera följande teknikerdata och generera en JSON enligt systeminstruktionen:\n\n${JSON.stringify(analysisContext, null, 2)}`;
 
-    // --- Anropa OpenAI ---
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o', // Använder den senaste och mest kapabla modellen
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: "json_object" }, // Tvingar modellen att svara med JSON
-      temperature: 0.5, // Något kreativ men fortfarande grundad i data
-      max_tokens: 3000,
+    // --- Anropa Google Gemini ---
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        temperature: 0.5,
+        maxOutputTokens: 3000,
+        responseMimeType: 'application/json',
+      },
     });
 
-    const aiResponse = completion.choices[0]?.message?.content;
+    const combinedPrompt = `${systemPrompt}\n\n---\n\n${userPrompt}`;
+    const result = await model.generateContent(combinedPrompt);
+    const aiResponse = result.response.text();
+
     if (!aiResponse) {
-      throw new Error('Tom respons från OpenAI.');
+      throw new Error('Tom respons från Google Gemini.');
     }
 
     // --- Parsa och Validera Svar ---
@@ -117,11 +116,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         metadata: {
           generated_at: new Date().toISOString(),
           technician_name: technician.name,
-          analysis_version: '3.0-new',
+          analysis_version: '3.1-gemini',
           data_points_analyzed: Object.keys(analysisContext).length,
         }
       },
-      ai_model: completion.model,
+      ai_model: 'gemini-2.0-flash',
       timestamp: new Date().toISOString(),
     });
 
