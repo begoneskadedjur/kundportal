@@ -1,31 +1,86 @@
 // api/team-chat.ts
 // Team AI Chat - Centraliserad AI-lösning för hela teamet
 // Stödjer chat, bildanalys och bildgenerering via Google Gemini
+// Med tillgång till BeGones systemdata (kunder, ärenden, tekniker)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
+import { createClient } from '@supabase/supabase-js';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
+
+// Supabase klient för att hämta systemdata
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Prisberäkning (ungefärlig)
 const PRICING = {
   'gemini-2.5-flash': { input: 0.50 / 1_000_000, output: 2.00 / 1_000_000 },
   'gemini-3-flash-preview': { input: 0.50 / 1_000_000, output: 3.00 / 1_000_000 },
-  'gemini-3-pro-image-preview': { inputText: 2.00 / 1_000_000, outputImage: 0.134 },
+  'imagen-3.0-generate-002': { outputImage: 0.04 }, // Imagen 3 pricing
 };
 
-const SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett skadedjursbekämpningsföretag.
+// Hämta systemdata från Supabase
+async function fetchSystemData() {
+  try {
+    const [
+      customersResult,
+      techniciansResult,
+      privateCasesResult,
+      businessCasesResult
+    ] = await Promise.all([
+      supabase.from('customers').select('id, company_name, annual_value, contact_person, email, phone').eq('is_active', true).limit(100),
+      supabase.from('technicians').select('id, name, role, phone, email').eq('is_active', true),
+      supabase.from('private_cases').select('id, title, status, kontaktperson, pris, skadedjur, adress').order('created_at', { ascending: false }).limit(50),
+      supabase.from('business_cases').select('id, title, status, kontaktperson, pris, skadedjur, adress').order('created_at', { ascending: false }).limit(50)
+    ]);
 
-Du kan hjälpa teamet med:
+    return {
+      customers: customersResult.data || [],
+      technicians: techniciansResult.data || [],
+      recentCases: [
+        ...(privateCasesResult.data || []).map(c => ({ ...c, type: 'privat' })),
+        ...(businessCasesResult.data || []).map(c => ({ ...c, type: 'företag' }))
+      ],
+      summary: {
+        totalCustomers: customersResult.data?.length || 0,
+        totalTechnicians: techniciansResult.data?.length || 0,
+        totalRevenue: customersResult.data?.reduce((sum, c) => sum + (c.annual_value || 0), 0) || 0
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching system data:', error);
+    return null;
+  }
+}
+
+const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett skadedjursbekämpningsföretag i Sverige.
+
+🎯 **DINA HUVUDUPPGIFTER:**
 - Svara på frågor om skadedjur och bekämpningsmetoder
-- Ge råd om prissättning och kundhantering
+- Analysera kunddata och ge affärsinsikter
+- Hjälpa med prissättning och offerter
 - Analysera bilder på skadedjur eller skador
 - Skriva och förbättra texter (offerter, rapporter, mail)
-- Allmänna frågor och brainstorming
+- Ge statistik och rapporter baserat på systemdatan
 
-Var professionell, konkret och hjälpsam. Svara alltid på svenska om inte användaren skriver på ett annat språk.
+📊 **DU HAR TILLGÅNG TILL:**
+- Alla avtalskunder med kontaktuppgifter och årsvärden
+- Alla tekniker med roller och kontaktinfo
+- Senaste ärenden (privat & företag) med status och priser
 
-Om användaren skickar en bild, analysera den noggrant och beskriv vad du ser. Om det rör skadedjur, ge specifik information om arten och rekommenderade åtgärder.`;
+⚠️ **VIKTIGT:**
+- Använd ENDAST data från systemet - hitta aldrig på information
+- Svara alltid på svenska om inte användaren skriver på annat språk
+- Var professionell, konkret och hjälpsam
+- Om du får en bild, analysera den noggrant
+
+💡 **EXEMPEL PÅ VAD DU KAN HJÄLPA MED:**
+- "Vilka är våra 10 största kunder?"
+- "Hur många ärenden har vi med råttor?"
+- "Skriv en offert för sanering av vägglöss"
+- "Analysera denna bild på skadedjur"`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
@@ -67,7 +122,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Välj modell baserat på om det finns bild
+    // Hämta systemdata för att ge AI:n kontext
+    const systemData = await fetchSystemData();
+
+    // Bygg system message med aktuell data
+    let systemMessage = BASE_SYSTEM_MESSAGE;
+
+    if (systemData) {
+      systemMessage += `
+
+---
+
+📈 **AKTUELL SYSTEMDATA (${new Date().toLocaleDateString('sv-SE')}):**
+
+**Sammanfattning:**
+- Totalt ${systemData.summary.totalCustomers} aktiva avtalskunder
+- ${systemData.summary.totalTechnicians} tekniker
+- Totalt årsvärde: ${systemData.summary.totalRevenue.toLocaleString('sv-SE')} kr
+
+**Topp 10 Avtalskunder (efter årsvärde):**
+${systemData.customers
+  .sort((a: any, b: any) => (b.annual_value || 0) - (a.annual_value || 0))
+  .slice(0, 10)
+  .map((c: any, i: number) => `${i + 1}. ${c.company_name} - ${(c.annual_value || 0).toLocaleString('sv-SE')} kr/år`)
+  .join('\n')}
+
+**Tekniker:**
+${systemData.technicians.map((t: any) => `- ${t.name} (${t.role})`).join('\n')}
+
+**Senaste 10 ärenden:**
+${systemData.recentCases.slice(0, 10).map((c: any) =>
+  `- [${c.type}] ${c.title || 'Utan titel'} - ${c.status} - ${c.skadedjur || 'Ej angivet'} - ${(c.pris || 0).toLocaleString('sv-SE')} kr`
+).join('\n')}
+
+**Alla kunder (för sökning):**
+${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person || 'Ingen kontakt'}, ${c.email || 'ingen email'})`).join(', ')}
+`;
+    }
+
+    // Välj modell
     const modelName = 'gemini-2.5-flash';
 
     const model = genAI.getGenerativeModel({
@@ -76,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         temperature: 0.7,
         maxOutputTokens: 2048,
       },
-      systemInstruction: SYSTEM_MESSAGE,
+      systemInstruction: systemMessage,
     });
 
     // Bygg konversationshistorik för Gemini
@@ -155,16 +248,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 async function handleImageGeneration(prompt: string, res: VercelResponse) {
   try {
+    // Använd Imagen 3 för bildgenerering via Vertex AI endpoint
+    // OBS: Imagen 3 kräver Vertex AI-konfiguration
+    // För nu använder vi Gemini 2.0 Flash med bildgenerering som fallback
+
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3-pro-image-preview',
+      model: 'gemini-2.0-flash-exp', // Experimentell modell med bildgenerering
       generationConfig: {
-        temperature: 0.7,
+        temperature: 1,
       },
     });
 
-    const result = await model.generateContent([
-      { text: `Generera en bild: ${prompt}` }
-    ]);
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{ text: `Generate an image: ${prompt}. Create a professional, high-quality image suitable for a pest control company.` }]
+      }],
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'] as any,
+      } as any,
+    });
 
     const response = result.response;
 
@@ -178,9 +281,9 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
             mimeType: part.inlineData.mimeType
           },
           usage: {
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-2.0-flash-exp',
             images_generated: 1,
-            estimated_cost_usd: PRICING['gemini-3-pro-image-preview'].outputImage
+            estimated_cost_usd: 0.04
           },
           timestamp: new Date().toISOString()
         });
@@ -188,11 +291,12 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
     }
 
     // Om ingen bild genererades, returnera textsvaret
+    const textResponse = response.text();
     return res.status(200).json({
       success: true,
-      response: response.text() || 'Kunde inte generera bild. Försök med en annan prompt.',
+      response: textResponse || 'Bildgenerering är för närvarande inte tillgänglig. Gemini 2.0 Flash Experimental stödjer inte bildgenerering i denna konfiguration. Kontakta admin för att konfigurera Imagen 3 via Vertex AI.',
       usage: {
-        model: 'gemini-3-pro-image-preview',
+        model: 'gemini-2.0-flash-exp',
         images_generated: 0,
         estimated_cost_usd: 0
       },
@@ -202,9 +306,17 @@ async function handleImageGeneration(prompt: string, res: VercelResponse) {
   } catch (error) {
     console.error('Image Generation Error:', error);
 
-    return res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Kunde inte generera bild',
+    // Ge ett mer informativt felmeddelande
+    const errorMessage = error instanceof Error ? error.message : 'Okänt fel';
+
+    return res.status(200).json({
+      success: true,
+      response: `⚠️ Bildgenerering kunde inte utföras: ${errorMessage}\n\nFör att aktivera bildgenerering behöver du konfigurera Imagen 3 via Google Cloud Vertex AI. Kontakta systemadministratören.`,
+      usage: {
+        model: 'imagen-3',
+        images_generated: 0,
+        estimated_cost_usd: 0
+      },
       timestamp: new Date().toISOString()
     });
   }

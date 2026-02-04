@@ -22,7 +22,7 @@ import {
 import toast from 'react-hot-toast';
 import {
   Send,
-  Image,
+  Paperclip,
   Sparkles,
   Plus,
   Trash2,
@@ -30,7 +30,10 @@ import {
   MessageSquare,
   BarChart3,
   X,
-  Loader2
+  Loader2,
+  PanelLeftClose,
+  PanelLeft,
+  Database
 } from 'lucide-react';
 
 export default function TeamChat() {
@@ -245,54 +248,56 @@ export default function TeamChat() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-slate-900">
-      {/* Sidebar */}
-      <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden`}>
-        <div className="p-4 border-b border-slate-700">
+      {/* Sidebar - kompaktare */}
+      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-200 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden`}>
+        <div className="p-3 border-b border-slate-700">
           <button
             onClick={handleNewConversation}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition-colors"
           >
-            <Plus className="w-5 h-5" />
-            Ny konversation
+            <Plus className="w-4 h-4" />
+            Ny chatt
           </button>
         </div>
 
-        {/* Konversationslista */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {conversations.map(conv => (
-            <div
-              key={conv.id}
-              className={`group p-3 rounded-lg cursor-pointer transition-colors ${
-                currentConversation?.id === conv.id
-                  ? 'bg-slate-700'
-                  : 'hover:bg-slate-700/50'
-              }`}
-              onClick={() => loadConversation(conv.id)}
-            >
-              {editingTitle === conv.id ? (
-                <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                  <input
-                    type="text"
-                    value={newTitle}
-                    onChange={e => setNewTitle(e.target.value)}
-                    className="flex-1 px-2 py-1 bg-slate-600 rounded text-sm"
-                    autoFocus
-                    onKeyDown={e => e.key === 'Enter' && handleUpdateTitle(conv.id)}
-                  />
-                  <button
-                    onClick={() => handleUpdateTitle(conv.id)}
-                    className="text-emerald-500 hover:text-emerald-400"
-                  >
-                    OK
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between">
-                    <span className="text-white text-sm font-medium truncate flex-1">
+        {/* Konversationslista - kompaktare */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {conversations.length === 0 ? (
+            <p className="text-slate-500 text-xs text-center py-4">Inga konversationer än</p>
+          ) : (
+            conversations.map(conv => (
+              <div
+                key={conv.id}
+                className={`group p-2 rounded cursor-pointer transition-colors ${
+                  currentConversation?.id === conv.id
+                    ? 'bg-slate-700'
+                    : 'hover:bg-slate-700/50'
+                }`}
+                onClick={() => loadConversation(conv.id)}
+              >
+                {editingTitle === conv.id ? (
+                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                    <input
+                      type="text"
+                      value={newTitle}
+                      onChange={e => setNewTitle(e.target.value)}
+                      className="flex-1 px-2 py-1 bg-slate-600 rounded text-xs"
+                      autoFocus
+                      onKeyDown={e => e.key === 'Enter' && handleUpdateTitle(conv.id)}
+                    />
+                    <button
+                      onClick={() => handleUpdateTitle(conv.id)}
+                      className="text-emerald-500 hover:text-emerald-400 text-xs px-1"
+                    >
+                      OK
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-white text-xs font-medium truncate flex-1">
                       {conv.title}
                     </span>
-                    <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                    <div className="opacity-0 group-hover:opacity-100 flex">
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -301,7 +306,7 @@ export default function TeamChat() {
                         }}
                         className="p-1 text-slate-400 hover:text-white"
                       >
-                        <Pencil className="w-4 h-4" />
+                        <Pencil className="w-3 h-3" />
                       </button>
                       <button
                         onClick={e => {
@@ -310,66 +315,81 @@ export default function TeamChat() {
                         }}
                         className="p-1 text-slate-400 hover:text-red-500"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    {conv.creator_name} • {new Date(conv.updated_at).toLocaleDateString('sv-SE')}
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            ))
+          )}
         </div>
 
-        {/* Statistik-knapp */}
-        <div className="p-4 border-t border-slate-700">
+        {/* Statistik-knapp - kompaktare */}
+        <div className="p-2 border-t border-slate-700">
           <button
             onClick={() => {
               setShowStats(true);
               loadStats();
             }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded transition-colors"
           >
-            <BarChart3 className="w-5 h-5" />
-            Användningsstatistik
+            <BarChart3 className="w-3.5 h-3.5" />
+            Statistik
           </button>
         </div>
       </div>
 
       {/* Huvudinnehåll */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="h-14 px-4 flex items-center justify-between bg-slate-800 border-b border-slate-700">
-          <div className="flex items-center gap-3">
+        {/* Header - kompaktare */}
+        <div className="h-12 px-3 flex items-center justify-between bg-slate-800 border-b border-slate-700">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700"
+              className="p-1.5 text-slate-400 hover:text-white rounded hover:bg-slate-700"
+              title={isSidebarOpen ? 'Dölj sidopanel' : 'Visa sidopanel'}
             >
-              <MessageSquare className="w-5 h-5" />
+              {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
             </button>
-            <h1 className="text-white font-medium">
+            <h1 className="text-white text-sm font-medium truncate">
               {currentConversation?.title || 'Team AI Chat'}
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded">
-              Gemini 2.5 Flash
+            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <Database className="w-3 h-3" />
+              Systemdata
+            </span>
+            <span className="text-[10px] text-slate-400 bg-slate-700 px-1.5 py-0.5 rounded">
+              Gemini 2.5
             </span>
           </div>
         </div>
 
         {/* Meddelandeområde */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
-              <Sparkles className="w-16 h-16 mb-4 text-emerald-500" />
-              <h2 className="text-xl font-medium text-white mb-2">Team AI Chat</h2>
-              <p className="text-center max-w-md">
-                Ställ frågor, analysera bilder, eller få hjälp med texter.
-                All konversationshistorik sparas för teamet.
+              <Sparkles className="w-12 h-12 mb-3 text-emerald-500" />
+              <h2 className="text-lg font-medium text-white mb-1">Team AI Chat</h2>
+              <p className="text-center text-sm max-w-md mb-4">
+                AI-assistent med tillgång till kunddata, ärenden och tekniker.
               </p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-slate-800 border border-slate-700 rounded-lg p-2">
+                  <span className="text-emerald-400">💡</span> "Vilka är våra största kunder?"
+                </div>
+                <div className="bg-slate-800 border border-slate-700 rounded-lg p-2">
+                  <span className="text-emerald-400">📊</span> "Sammanfatta senaste ärenden"
+                </div>
+                <div className="bg-slate-800 border border-slate-700 rounded-lg p-2">
+                  <span className="text-emerald-400">📷</span> "Analysera denna bild"
+                </div>
+                <div className="bg-slate-800 border border-slate-700 rounded-lg p-2">
+                  <span className="text-emerald-400">✍️</span> "Skriv en offert för..."
+                </div>
+              </div>
             </div>
           ) : (
             messages.map((msg, index) => (
@@ -378,16 +398,14 @@ export default function TeamChat() {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] p-4 rounded-2xl ${
+                  className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${
                     msg.role === 'user'
                       ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-700 text-slate-100'
+                      : 'bg-slate-800 border border-slate-700 text-slate-100'
                   }`}
                 >
                   {msg.image_urls && msg.image_urls.length > 0 && (
-                    <div className="mb-2 text-sm opacity-75">
-                      [Bild bifogad]
-                    </div>
+                    <div className="mb-1 text-xs opacity-75">📎 Bild bifogad</div>
                   )}
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                 </div>
@@ -397,10 +415,10 @@ export default function TeamChat() {
 
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-slate-700 p-4 rounded-2xl">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
-                  <span className="text-slate-300">Tänker...</span>
+              <div className="bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl">
+                <div className="flex items-center gap-2 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+                  <span className="text-slate-400">Analyserar...</span>
                 </div>
               </div>
             </div>
@@ -409,46 +427,47 @@ export default function TeamChat() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Vald bild-preview */}
+        {/* Vald fil-preview */}
         {selectedImage && (
-          <div className="px-4 py-2 bg-slate-800 border-t border-slate-700">
+          <div className="px-3 py-2 bg-slate-800 border-t border-slate-700">
             <div className="flex items-center gap-2">
               <div className="relative">
                 <img
                   src={`data:${selectedImage.mimeType};base64,${selectedImage.base64}`}
-                  alt="Vald bild"
-                  className="h-16 w-16 object-cover rounded-lg"
+                  alt="Vald fil"
+                  className="h-12 w-12 object-cover rounded border border-slate-600"
                 />
                 <button
                   onClick={() => setSelectedImage(null)}
-                  className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full text-white"
+                  className="absolute -top-1 -right-1 p-0.5 bg-red-500 rounded-full text-white"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3 h-3" />
                 </button>
               </div>
-              <span className="text-sm text-slate-400">Bild kommer att analyseras</span>
+              <span className="text-xs text-slate-400">Fil kommer att analyseras av AI</span>
             </div>
           </div>
         )}
 
-        {/* Inputfält */}
-        <div className="p-4 bg-slate-800 border-t border-slate-700">
-          <div className="flex items-end gap-2">
+        {/* Inputfält - kompaktare */}
+        <div className="p-3 bg-slate-800 border-t border-slate-700">
+          <div className="flex items-center gap-2">
             <input
               type="file"
               ref={fileInputRef}
-              accept="image/*"
+              accept="image/*,.pdf,.xlsx,.xls,.csv,.doc,.docx"
               onChange={handleImageSelect}
               className="hidden"
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-3 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-              title="Ladda upp bild"
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+              title="Bifoga fil (bild, PDF, Excel)"
             >
-              <Image className="w-6 h-6" />
+              <Paperclip className="w-5 h-5" />
             </button>
-            <textarea
+            <input
+              type="text"
               value={inputMessage}
               onChange={e => setInputMessage(e.target.value)}
               onKeyDown={e => {
@@ -457,16 +476,15 @@ export default function TeamChat() {
                   handleSendMessage();
                 }
               }}
-              placeholder="Skriv ett meddelande... (Enter för att skicka)"
-              className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-              rows={1}
+              placeholder="Fråga om kunder, ärenden, tekniker..."
+              className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
             <button
               onClick={handleSendMessage}
               disabled={isLoading || (!inputMessage.trim() && !selectedImage)}
-              className="p-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded transition-colors"
             >
-              <Send className="w-6 h-6" />
+              <Send className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -524,9 +542,9 @@ export default function TeamChat() {
 
 function StatCard({ label, value, highlight = false }: { label: string; value: string | number; highlight?: boolean }) {
   return (
-    <div className={`p-4 rounded-lg ${highlight ? 'bg-emerald-600/20 border border-emerald-500/30' : 'bg-slate-700'}`}>
-      <div className="text-sm text-slate-400">{label}</div>
-      <div className={`text-xl font-semibold ${highlight ? 'text-emerald-400' : 'text-white'}`}>
+    <div className={`p-3 rounded-lg ${highlight ? 'bg-emerald-600/20 border border-emerald-500/30' : 'bg-slate-700'}`}>
+      <div className="text-xs text-slate-400">{label}</div>
+      <div className={`text-lg font-semibold ${highlight ? 'text-emerald-400' : 'text-white'}`}>
         {value}
       </div>
     </div>
