@@ -12,6 +12,10 @@ export interface TeamChatMessage {
   image_urls?: string[];
   file_type?: string;
   created_at?: string;
+  generated_image?: {
+    data: string;
+    mimeType: string;
+  };
 }
 
 export interface TeamChatConversation {

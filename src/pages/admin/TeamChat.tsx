@@ -40,7 +40,8 @@ import {
   Copy,
   Check,
   Image,
-  Table2
+  Table2,
+  Download
 } from 'lucide-react';
 
 export default function TeamChat() {
@@ -79,6 +80,34 @@ export default function TeamChat() {
     } catch (err) {
       toast.error('Kunde inte kopiera');
     }
+  };
+
+  // Kopiera genererad bild till urklipp
+  const copyImageToClipboard = async (image: { data: string; mimeType: string }) => {
+    try {
+      const blob = await fetch(`data:${image.mimeType};base64,${image.data}`).then(r => r.blob());
+      await navigator.clipboard.write([new ClipboardItem({ [image.mimeType]: blob })]);
+      toast.success('Bild kopierad till urklipp!');
+    } catch (err) {
+      // Fallback: kopiera base64 som text
+      try {
+        await navigator.clipboard.writeText(`data:${image.mimeType};base64,${image.data}`);
+        toast.success('Bild-URL kopierad!');
+      } catch {
+        toast.error('Kunde inte kopiera bild');
+      }
+    }
+  };
+
+  // Ladda ner genererad bild
+  const downloadImage = (image: { data: string; mimeType: string }, filename = 'begone-genererad-bild.png') => {
+    const link = document.createElement('a');
+    link.href = `data:${image.mimeType};base64,${image.data}`;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Bild laddas ner...');
   };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -280,11 +309,14 @@ export default function TeamChat() {
 
       if (response.success) {
         if (response.image) {
-          // Bild genererades - visa den
-          const imageDataUrl = `data:${response.image.mimeType};base64,${response.image.data}`;
+          // Bild genererades - spara den separat för korrekt rendering
           const aiMessage: TeamChatMessage = {
             role: 'assistant',
-            content: `![Genererad bild](${imageDataUrl})\n\n*Bild genererad baserat på: "${prompt}"*`
+            content: `Bild genererad baserat på: "${prompt}"`,
+            generated_image: {
+              data: response.image.data,
+              mimeType: response.image.mimeType
+            }
           };
           setMessages(prev => [...prev, aiMessage]);
           await saveMessage(convId, 'assistant', `[Genererad bild] ${prompt}`);
@@ -582,6 +614,32 @@ export default function TeamChat() {
                         prose-a:text-emerald-400 prose-a:underline">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
+                      {/* Visa genererad bild om den finns */}
+                      {msg.generated_image && (
+                        <div className="mt-3">
+                          <img
+                            src={`data:${msg.generated_image.mimeType};base64,${msg.generated_image.data}`}
+                            alt="Genererad bild"
+                            className="max-w-full max-h-96 rounded-lg border border-slate-600 shadow-lg"
+                          />
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => copyImageToClipboard(msg.generated_image!)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
+                            >
+                              <Copy className="w-4 h-4" />
+                              Kopiera
+                            </button>
+                            <button
+                              onClick={() => downloadImage(msg.generated_image!)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
+                            >
+                              <Download className="w-4 h-4" />
+                              Ladda ner
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
