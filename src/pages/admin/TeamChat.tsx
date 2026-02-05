@@ -43,8 +43,9 @@ import {
   Table2,
   Download
 } from 'lucide-react';
-import { CaseLink, parseCaseLinks } from '../../components/shared/CaseLink';
+// CaseLink-komponenten används inte längre - vi använder hyperlänkar istället
 import CaseDetailsModal from '../../components/customer/CaseDetailsModal';
+import { supabase } from '../../lib/supabase';
 
 export default function TeamChat() {
   const { user, profile } = useAuth();
@@ -68,6 +69,7 @@ export default function TeamChat() {
     caseId: string;
     caseType: 'private' | 'business' | 'contract';
     clickupTaskId?: string;
+    fallbackData?: any;
   } | null>(null);
 
   // Konvertera markdown till ren text för kopiering
@@ -164,61 +166,81 @@ export default function TeamChat() {
     toast.success('Bild laddas ner...');
   };
 
-  // Hantera klick på ärende-länk
-  const handleOpenCase = (caseId: string, caseType: 'private' | 'business' | 'contract') => {
-    setSelectedCase({ caseId, caseType });
-  };
+  // Hantera klick på ärende-länk - hämta data från databasen
+  const handleOpenCase = async (caseId: string, caseType: 'private' | 'business' | 'contract') => {
+    try {
+      const tableName = caseType === 'private' ? 'private_cases' :
+                        caseType === 'business' ? 'business_cases' : 'cases';
 
-  // Rendera markdown med klickbara CASE-länkar
-  const renderMarkdownWithCaseLinks = (content: string) => {
-    const caseLinks = parseCaseLinks(content);
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .eq('id', caseId)
+        .single();
 
-    if (caseLinks.length === 0) {
-      // Ingen CASE-länk, rendera vanlig markdown
-      return <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>;
-    }
-
-    // Dela upp innehållet i delar baserat på CASE-länkar
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-
-    caseLinks.forEach((link, i) => {
-      // Lägg till text före länken
-      if (link.startIndex > lastIndex) {
-        const textBefore = content.substring(lastIndex, link.startIndex);
-        parts.push(
-          <ReactMarkdown key={`text-${i}`} remarkPlugins={[remarkGfm]}>
-            {textBefore}
-          </ReactMarkdown>
-        );
+      if (error) {
+        console.error('Error fetching case:', error);
+        toast.error('Kunde inte hämta ärendedetaljer');
+        return;
       }
 
-      // Lägg till CASE-länken som en klickbar knapp
-      parts.push(
-        <span key={`case-${i}`} className="inline-block my-1">
-          <CaseLink
-            caseType={link.caseType}
-            caseId={link.caseId}
-            title={link.title}
-            onClick={() => handleOpenCase(link.caseId, link.caseType)}
-          />
-        </span>
-      );
-
-      lastIndex = link.endIndex;
-    });
-
-    // Lägg till eventuell text efter sista länken
-    if (lastIndex < content.length) {
-      const textAfter = content.substring(lastIndex);
-      parts.push(
-        <ReactMarkdown key="text-final" remarkPlugins={[remarkGfm]}>
-          {textAfter}
-        </ReactMarkdown>
-      );
+      setSelectedCase({
+        caseId,
+        caseType,
+        clickupTaskId: data?.clickup_task_id,
+        fallbackData: data
+      });
+    } catch (err) {
+      console.error('Error in handleOpenCase:', err);
+      toast.error('Något gick fel');
     }
+  };
 
-    return <>{parts}</>;
+  // Konvertera CASE-syntax till markdown-länkar: [CASE|type|id|title] -> [📋 title](#case-type-id)
+  const processCaseLinks = (content: string): string => {
+    return content.replace(
+      /\[CASE\|([^|]+)\|([^|]+)\|([^\]]+)\]/g,
+      (_, type, id, title) => `[📋 ${title}](#case-${type}-${id})`
+    );
+  };
+
+  // Rendera markdown med klickbara CASE-länkar som hyperlänkar
+  const renderMarkdownWithCaseLinks = (content: string) => {
+    // Konvertera CASE-syntax till markdown-länkar
+    const processedContent = processCaseLinks(content);
+
+    return (
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ href, children, ...props }) => {
+            // Kolla om det är en case-länk
+            if (href?.startsWith('#case-')) {
+              const match = href.match(/#case-(\w+)-(.+)/);
+              if (match) {
+                const [, type, id] = match;
+                return (
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleOpenCase(id, type as 'private' | 'business' | 'contract');
+                    }}
+                    className="text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
+                  >
+                    {children}
+                  </a>
+                );
+              }
+            }
+            // Vanlig länk
+            return <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline" {...props}>{children}</a>;
+          }
+        }}
+      >
+        {processedContent}
+      </ReactMarkdown>
+    );
   };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -909,6 +931,7 @@ export default function TeamChat() {
           clickupTaskId={selectedCase.clickupTaskId || ''}
           isOpen={!!selectedCase}
           onClose={() => setSelectedCase(null)}
+          fallbackData={selectedCase.fallbackData}
         />
       )}
     </div>
