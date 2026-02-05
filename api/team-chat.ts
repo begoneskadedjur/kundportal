@@ -100,6 +100,39 @@ const PRICING = {
   'gemini-embedding-001': { input: 0.00 / 1_000_000, output: 0.00 / 1_000_000 }, // Gratis under 1500 req/min
 };
 
+// Hämta dagens bokningar med tidsslottar
+async function fetchTodayBookings() {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+
+  const [privateResult, businessResult] = await Promise.all([
+    supabase
+      .from('private_cases')
+      .select('title, primary_assignee_name, start_date, due_date, adress, skadedjur, status, kontaktperson')
+      .gte('start_date', todayStart)
+      .lt('start_date', tomorrowStart)
+      .order('start_date', { ascending: true }),
+    supabase
+      .from('business_cases')
+      .select('title, primary_assignee_name, start_date, due_date, adress, skadedjur, status, kontaktperson')
+      .gte('start_date', todayStart)
+      .lt('start_date', tomorrowStart)
+      .order('start_date', { ascending: true })
+  ]);
+
+  if (privateResult.error) console.error('[Team Chat] Today private bookings error:', privateResult.error);
+  if (businessResult.error) console.error('[Team Chat] Today business bookings error:', businessResult.error);
+
+  const allBookings = [
+    ...(privateResult.data || []).map(c => ({ ...c, type: 'privat' })),
+    ...(businessResult.data || []).map(c => ({ ...c, type: 'företag' }))
+  ].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+
+  console.log('[Team Chat] Today bookings fetched:', allBookings.length);
+  return allBookings;
+}
+
 // Hämta systemdata från Supabase
 async function fetchSystemData() {
   try {
@@ -146,6 +179,9 @@ async function fetchSystemData() {
     if (privateCasesResult.error) console.error('[Team Chat] Private cases error:', privateCasesResult.error);
     if (businessCasesResult.error) console.error('[Team Chat] Business cases error:', businessCasesResult.error);
 
+    // Hämta dagens bokningar separat
+    const todayBookings = await fetchTodayBookings();
+
     return {
       customers: customersResult.data || [],
       technicians: techniciansResult.data || [],
@@ -153,6 +189,7 @@ async function fetchSystemData() {
         ...(privateCasesResult.data || []).map(c => ({ ...c, type: 'privat' })),
         ...(businessCasesResult.data || []).map(c => ({ ...c, type: 'företag' }))
       ],
+      todayBookings,
       summary: {
         totalCustomers: customersResult.data?.length || 0,
         totalTechnicians: techniciansResult.data?.length || 0,
@@ -377,6 +414,31 @@ ${systemData.recentCases.map((c: any) => {
 
 **Alla avtalskunder (för sökning):**
 ${systemData.customers.map((c: any) => `${c.company_name} (${c.contact_person || 'Ingen kontakt'}, ${c.contact_email || 'ingen email'})`).join(', ')}
+
+---
+
+📅 **DAGENS DATUM: ${new Date().toLocaleDateString('sv-SE')} (${new Date().toLocaleDateString('sv-SE', { weekday: 'long' })})**
+
+📋 **BOKADE ÄRENDEN IDAG (${systemData.todayBookings?.length || 0} st):**
+${(systemData.todayBookings?.length || 0) > 0 ? `
+| Tid | Tekniker | Kund | Adress | Skadedjur |
+|-----|----------|------|--------|-----------|
+${systemData.todayBookings.map((b: any) => {
+  const start = b.start_date ? new Date(b.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' }) : '-';
+  const end = b.due_date ? new Date(b.due_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' }) : '-';
+  const adressKort = typeof b.adress === 'string' ? b.adress.substring(0, 35) : '-';
+  return `| ${start}-${end} | ${b.primary_assignee_name || '-'} | ${b.kontaktperson || b.title || '-'} | ${adressKort} | ${b.skadedjur || '-'} |`;
+}).join('\n')}
+` : '(Inga bokade ärenden idag)'}
+
+💡 **DATUMRELATIVA BERÄKNINGAR:**
+- "för 3 dagar sedan" = ${new Date(Date.now() - 3*24*60*60*1000).toLocaleDateString('sv-SE')}
+- "om 2 veckor" = ${new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString('sv-SE')}
+- Du kan beräkna datum för specifika veckodagar (t.ex. "fredag om 2 veckor")
+
+🔍 **SÖK I ÄRENDEHISTORIK:**
+Om användaren frågar om ärenden för ett specifikt datum eller tekniker, sök i "Alla ärenden"-listan ovan.
+Filtrera på tekniker med primary_assignee_name och datum med start_date.
 `;
     }
 
