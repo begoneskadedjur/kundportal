@@ -576,14 +576,23 @@ export default function CaseDetailsModal({
                         {new Date(fallbackData.start_date).toLocaleDateString('sv-SE', {
                           weekday: 'short',
                           day: 'numeric',
-                          month: 'short'
+                          month: 'short',
+                          timeZone: 'Europe/Stockholm'
                         })}
                         <span className="text-slate-400 mx-1">
-                          {new Date(fallbackData.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(fallbackData.start_date).toLocaleTimeString('sv-SE', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Europe/Stockholm'
+                          })}
                           {fallbackData.due_date && (
                             <>
                               {' - '}
-                              {new Date(fallbackData.due_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(fallbackData.due_date).toLocaleTimeString('sv-SE', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone: 'Europe/Stockholm'
+                              })}
                             </>
                           )}
                         </span>
@@ -595,7 +604,8 @@ export default function CaseDetailsModal({
                           weekday: 'short',
                           day: 'numeric',
                           month: 'short',
-                          year: 'numeric'
+                          year: 'numeric',
+                          timeZone: 'Europe/Stockholm'
                         })}
                       </span>
                     )}

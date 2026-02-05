@@ -348,6 +348,9 @@ async function fetchBookingsForDateRange(startDate: string, endDate: string, tec
       tekniker: formatTechnicians(c.primary_assignee_name, c.secondary_assignee_name, c.tertiary_assignee_name),
       start_date: c.start_date,
       due_date: c.due_date,
+      // Formaterade tider i svensk tid för AI:n att visa
+      start_time_swedish: formatSwedishTime(c.start_date),
+      end_time_swedish: formatSwedishTime(c.due_date),
       adress: c.adress,
       skadedjur: c.skadedjur,
       status: c.status,
@@ -360,6 +363,9 @@ async function fetchBookingsForDateRange(startDate: string, endDate: string, tec
       tekniker: formatTechnicians(c.primary_assignee_name, c.secondary_assignee_name, c.tertiary_assignee_name),
       start_date: c.start_date,
       due_date: c.due_date,
+      // Formaterade tider i svensk tid för AI:n att visa
+      start_time_swedish: formatSwedishTime(c.start_date),
+      end_time_swedish: formatSwedishTime(c.due_date),
       adress: c.adress,
       skadedjur: c.skadedjur,
       status: c.status,
@@ -373,6 +379,9 @@ async function fetchBookingsForDateRange(startDate: string, endDate: string, tec
       tekniker: formatTechnicians(c.primary_tech?.name, c.secondary_tech?.name, c.tertiary_tech?.name),
       start_date: c.scheduled_start,
       due_date: c.scheduled_end,
+      // Formaterade tider i svensk tid för AI:n att visa
+      start_time_swedish: formatSwedishTime(c.scheduled_start),
+      end_time_swedish: formatSwedishTime(c.scheduled_end),
       adress: c.address,
       skadedjur: null,
       status: c.status,
@@ -598,8 +607,15 @@ async function searchCasesInDb(args: Record<string, unknown>) {
   filtered.sort((a, b) => new Date(b.start_date || 0).getTime() - new Date(a.start_date || 0).getTime());
   filtered = filtered.slice(0, limit);
 
-  console.log(`[Team Chat] searchCasesInDb: ${filtered.length} cases found`);
-  return { cases: filtered, count: filtered.length };
+  // Lägg till formaterade tider i svensk tid
+  const casesWithSwedishTimes = filtered.map(c => ({
+    ...c,
+    start_time_swedish: formatSwedishTime(c.start_date),
+    end_time_swedish: formatSwedishTime(c.due_date || c.scheduled_end),
+  }));
+
+  console.log(`[Team Chat] searchCasesInDb: ${casesWithSwedishTimes.length} cases found`);
+  return { cases: casesWithSwedishTimes, count: casesWithSwedishTimes.length };
 }
 
 // Hämta dagens bokningar med tidsslottar - hämtar från ALLA 3 tabeller med ALLA tekniker
@@ -885,6 +901,12 @@ Vid bokningshjälp: Filtrera tekniker baserat på kompetens för det aktuella sk
 
 ### search_cases
 Använd för att söka i ärendehistorik - både gamla och framtida ärenden.
+
+### ⏰ VIKTIGT OM TIDER
+Alla bokningar innehåller fälten \`start_time_swedish\` och \`end_time_swedish\` som är korrekt formaterade i svensk tid (CET/CEST).
+**Använd ALLTID dessa fält när du visar tider till användaren!** Fälten \`start_date\` och \`due_date\` är i UTC och ska INTE visas direkt.
+
+Exempel: Om ett ärende har \`start_time_swedish: "08:00"\` och \`end_time_swedish: "10:00"\`, visa det som "08:00 - 10:00".
 
 ## 🌐 EXTERNA RESURSER
 
