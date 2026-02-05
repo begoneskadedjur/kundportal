@@ -2,7 +2,7 @@
 // Team AI Chat - Centraliserad AI-lösning för hela teamet
 // Stödjer chat, bildanalys och bildgenerering via Google Gemini
 // Med tillgång till BeGones systemdata (kunder, ärenden, tekniker)
-// Nya funktioner: Google Search grounding och URL Context
+// Nya funktioner: Function Calling för dynamisk datahämtning
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
@@ -848,28 +848,12 @@ När du nämner ett specifikt ärende, använd ALLTID detta format för att skap
 
 Detta gör att användaren kan klicka på ärendet för att se detaljer!
 
-## 🌐 NYA VERKTYG: Google Search & URL Context
-
-Du har nu tillgång till **Google Search** och **URL Context**:
-
-### Google Search
-- Använd för att hitta aktuell information som inte finns i systemdatan
-- Bra för frågor om senaste nytt, regler, priser på marknaden, etc.
-- Exempel: "Vad säger Livsmedelsverket om råttbekämpning?"
-
-### URL Context
-- Om användaren inkluderar en URL i sitt meddelande, kan du läsa och analysera innehållet
-- Bra för att jämföra priser, läsa artiklar, analysera konkurrenters webbsidor
-- Exempel: "Analysera denna artikel: https://example.com/artikel"
-
 ## Viktigt
 
-- Använd systemdata för intern information om kunder, ärenden och tekniker
-- Använd Google Search för extern, aktuell information
+- Använd systemdata och dynamiska funktioner för information om kunder, ärenden och tekniker
 - Svara alltid på svenska om inte användaren skriver på annat språk
 - Var professionell, konkret och hjälpsam
 - Om du får en bild, analysera den noggrant
-- När du använder webbsökning, ange källorna i ditt svar
 
 ---
 
@@ -1129,14 +1113,14 @@ OBS: Varje ärende kan ha upp till 3 tekniker som arbetar tillsammans - alla des
       { role: 'user', parts: currentParts }
     ];
 
-    // Anropa med nya SDK:t - inkluderar Google Search, URL Context och Function Calling!
+    // Anropa med nya SDK:t - Function Calling för dynamisk datahämtning
+    // OBS: googleSearch och urlContext kan INTE kombineras med functionDeclarations
+    // utanför Live API, så vi prioriterar function calling för databasfrågor
     const generateConfig = {
       systemInstruction: systemMessage,
       temperature: 1.0, // Gemini 3 rekommenderar 1.0
       maxOutputTokens: 8192,
       tools: [
-        { googleSearch: {} },  // Ger tillgång till realtidsinformation från webben
-        { urlContext: {} },    // Kan analysera innehåll från URLs i meddelanden
         { functionDeclarations }  // Dynamisk datahämtning från databasen
       ],
     };
