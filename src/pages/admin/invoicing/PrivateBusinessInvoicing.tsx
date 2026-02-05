@@ -20,6 +20,7 @@ import toast from 'react-hot-toast'
 import { InvoiceService } from '../../../services/invoiceService'
 import type { Invoice, InvoiceStatus, InvoiceStats } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
+import InvoiceDetailModal from '../../../components/admin/invoicing/InvoiceDetailModal'
 
 export default function PrivateBusinessInvoicing() {
   // State
@@ -27,6 +28,7 @@ export default function PrivateBusinessInvoicing() {
   const [stats, setStats] = useState<InvoiceStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'all'>('all')
@@ -402,6 +404,13 @@ export default function PrivateBusinessInvoicing() {
                               <XCircle className="w-4 h-4" />
                             </button>
                           )}
+                          <button
+                            onClick={() => setSelectedInvoiceId(invoice.id)}
+                            className="p-1.5 text-slate-400 hover:bg-slate-600/50 rounded transition-colors"
+                            title="Visa detaljer"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -412,6 +421,14 @@ export default function PrivateBusinessInvoicing() {
           </div>
         )}
       </div>
+
+      {/* Fakturadetalj-modal */}
+      <InvoiceDetailModal
+        isOpen={selectedInvoiceId !== null}
+        onClose={() => setSelectedInvoiceId(null)}
+        invoiceId={selectedInvoiceId}
+        onStatusChange={loadData}
+      />
     </div>
   )
 }

@@ -34,6 +34,10 @@ import CasePreparationsSection from '../../shared/CasePreparationsSection'
 // Artikelväljare för fakturering
 import CaseArticleSelector from '../../shared/CaseArticleSelector'
 
+// Fakturering - auto-generera vid ärendeavslut
+import { InvoiceService } from '../../../services/invoiceService'
+import { CaseBillingService } from '../../../services/caseBillingService'
+
 // Kommunikation
 import { CommunicationSlidePanel } from '../../communication'
 import { CaseType } from '../../../types/communication'
@@ -711,9 +715,57 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
       onSuccess(updatedCaseFromDb);
 
+      // ═══════════════════════════════════════════════════════════════════════════
+      // AUTO-FAKTURERING: Generera faktura om ärendet avslutas med billing items
+      // ═══════════════════════════════════════════════════════════════════════════
+      let invoiceGenerated = false;
+      if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
+        // Endast för private och business cases (inte contract)
+        if (tableName === 'private_cases' || tableName === 'business_cases') {
+          const billingCaseType = tableName === 'private_cases' ? 'private' : 'business';
+
+          try {
+            // Kontrollera om det finns billing items
+            const hasBillingItems = await CaseBillingService.caseHasBillingItems(
+              currentCase.id,
+              billingCaseType
+            );
+
+            if (hasBillingItems) {
+              // Generera faktura automatiskt
+              await InvoiceService.createInvoiceFromCase(
+                currentCase.id,
+                billingCaseType,
+                {
+                  name: formData.kontaktperson || currentCase.kontaktperson || 'Okänd kund',
+                  email: formData.e_post_kontaktperson || currentCase.e_post_kontaktperson,
+                  phone: formData.telefon_kontaktperson || currentCase.telefon_kontaktperson,
+                  address: formatAddress(formData.adress || currentCase.adress),
+                  organization_number: billingCaseType === 'business'
+                    ? (formData.org_nr || currentCase.org_nr)
+                    : undefined
+                }
+              );
+              invoiceGenerated = true;
+              console.log('[EditCaseModal] Faktura genererad för ärendet');
+            }
+          } catch (invoiceError: any) {
+            // Ärendet är redan sparat, så detta är bara en varning
+            console.warn('[EditCaseModal] Kunde inte generera faktura:', invoiceError);
+            toast.error(`Faktura kunde inte genereras: ${invoiceError.message}`);
+          }
+        }
+      }
+
       setSubmitted(true);
-      toast.success('Ärendet har uppdaterats!');
-      
+
+      // Visa lämpligt meddelande baserat på om faktura genererades
+      if (invoiceGenerated) {
+        toast.success('Ärendet avslutat och faktura genererad!');
+      } else {
+        toast.success('Ärendet har uppdaterats!');
+      }
+
       // Synka till ClickUp i bakgrunden om det är private eller business case
       if ((tableName === 'private_cases' || tableName === 'business_cases') && currentCase.id) {
         const caseType = tableName === 'private_cases' ? 'private' : 'business';

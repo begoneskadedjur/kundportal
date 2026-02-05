@@ -13,6 +13,7 @@ import {
   ContractBillingItemType,
   ContractBillingItemFilters
 } from '../types/contractBilling'
+import { CaseBillingService } from './caseBillingService'
 
 export class ContractBillingService {
   /**
@@ -240,6 +241,70 @@ export class ContractBillingService {
 
     if (error) throw new Error(`Kunde inte skapa ad-hoc post: ${error.message}`)
     return data
+  }
+
+  /**
+   * Skapa ad-hoc billing items från ett avslutat ärende
+   * Kopierar alla case_billing_items till contract_billing_items
+   * och markerar case_billing_items som 'billed'
+   */
+  static async createAdHocItemsFromCase(
+    caseId: string,
+    customerId: string
+  ): Promise<{ created: number; totalAmount: number }> {
+    // 1. Hämta case_billing_items för ärendet
+    const caseBillingItems = await CaseBillingService.getCaseBillingItems(caseId, 'contract')
+
+    if (caseBillingItems.length === 0) {
+      return { created: 0, totalAmount: 0 }
+    }
+
+    // 2. Dagens datum för faktureringsperiod
+    const today = new Date().toISOString().split('T')[0]
+
+    let totalAmount = 0
+
+    // 3. Skapa contract_billing_items för varje case_billing_item
+    for (const item of caseBillingItems) {
+      const requiresApproval = (item.discount_percent || 0) > 0
+
+      const { error } = await supabase.from('contract_billing_items').insert({
+        customer_id: customerId,
+        article_id: item.article_id,
+        article_code: item.article_code,
+        article_name: item.article_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        vat_rate: item.vat_rate,
+        item_type: 'ad_hoc',
+        case_id: caseId,
+        case_type: 'contract',
+        source: 'case_completion',
+        requires_approval: requiresApproval,
+        discount_percent: item.discount_percent || 0,
+        original_price: item.unit_price, // Originalpris utan rabatt
+        billing_period_start: today,
+        billing_period_end: today,
+        status: requiresApproval ? 'pending' : 'approved',
+        notes: item.notes || `Från ärende ${caseId}`
+      })
+
+      if (error) {
+        console.error('Kunde inte skapa ad-hoc item:', error)
+        throw new Error(`Kunde inte skapa ad-hoc faktureringspost: ${error.message}`)
+      }
+
+      totalAmount += item.total_price
+    }
+
+    // 4. Markera case_billing_items som 'billed'
+    await CaseBillingService.updateCaseItemsStatus(caseId, 'contract', 'billed')
+
+    return {
+      created: caseBillingItems.length,
+      totalAmount
+    }
   }
 
   /**

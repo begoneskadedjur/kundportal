@@ -30,6 +30,10 @@ import CasePreparationsSection from '../shared/CasePreparationsSection'
 import CaseArticleSelector from '../shared/CaseArticleSelector'
 import CustomerAcknowledgmentIndicator from '../shared/CustomerAcknowledgmentIndicator'
 
+// Fakturering - ad-hoc billing för avtalskunder vid ärendeavslut
+import { CaseBillingService } from '../../services/caseBillingService'
+import { ContractBillingService } from '../../services/contractBillingService'
+
 // Radering av ärenden
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
 
@@ -1060,7 +1064,45 @@ export default function EditContractCaseModal({
         }
       }
 
-      toast.success('Ärende uppdaterat!')
+      // ═══════════════════════════════════════════════════════════════════════════
+      // AD-HOC BILLING: Kopiera artiklar till avtalsfakturering vid ärendeavslut
+      // ═══════════════════════════════════════════════════════════════════════════
+      let billingItemsCreated = 0
+      if (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat') {
+        const effectiveCustomerId = customerId || formData.customer_id
+
+        if (effectiveCustomerId) {
+          try {
+            // Kontrollera om det finns billing items
+            const hasBillingItems = await CaseBillingService.caseHasBillingItems(
+              localCaseData.id,
+              'contract'
+            )
+
+            if (hasBillingItems) {
+              // Kopiera till contract_billing_items
+              const result = await ContractBillingService.createAdHocItemsFromCase(
+                localCaseData.id,
+                effectiveCustomerId
+              )
+              billingItemsCreated = result.created
+              console.log('[EditContractCaseModal] Skapade', result.created, 'ad-hoc faktureringsrader, totalt:', result.totalAmount, 'kr')
+            }
+          } catch (billingError: any) {
+            console.warn('[EditContractCaseModal] Kunde inte skapa ad-hoc billing:', billingError)
+            toast.error(`Ad-hoc fakturering misslyckades: ${billingError.message}`)
+          }
+        } else {
+          console.warn('[EditContractCaseModal] Ingen customer_id - kan inte skapa ad-hoc billing')
+        }
+      }
+
+      // Visa lämpligt meddelande baserat på resultat
+      if (billingItemsCreated > 0) {
+        toast.success(`Ärende avslutat! ${billingItemsCreated} artikel(er) skickade till fakturering.`)
+      } else {
+        toast.success('Ärende uppdaterat!')
+      }
       // Visa visuell bekräftelse på knappen
       setShowSaveSuccess(true)
       setTimeout(() => setShowSaveSuccess(false), 2000)

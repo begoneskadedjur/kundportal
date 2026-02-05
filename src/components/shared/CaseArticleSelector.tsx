@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { CaseBillingService } from '../../services/caseBillingService'
+import { DiscountNotificationService } from '../../services/discountNotificationService'
 import type {
   CaseBillingItem,
   CaseBillingItemWithRelations,
@@ -173,12 +174,32 @@ export default function CaseArticleSelector({
   const handleUpdateDiscount = async (item: CaseBillingItem, discountPercent: number) => {
     if (readOnly || saving) return
 
+    // Kolla om detta är en ny rabatt (tidigare ingen rabatt)
+    const hadNoDiscount = item.discount_percent === 0
+    const willHaveDiscount = discountPercent > 0
+
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(item.id, { discount_percent: discountPercent })
-      if (discountPercent > 0) {
+
+      if (willHaveDiscount) {
         toast.success('Rabatt tillagd - kräver admin-godkännande')
+
+        // Skicka notifikation till admins om detta är en ny rabatt
+        if (hadNoDiscount) {
+          DiscountNotificationService.notifyAdminsOfDiscountRequest({
+            caseId,
+            caseType,
+            articleName: item.article_name,
+            discountPercent,
+            technicianId,
+            technicianName
+          }).catch(err => {
+            console.warn('Kunde inte skicka rabatt-notifikation:', err)
+          })
+        }
       }
+
       await loadData()
     } catch (error) {
       console.error('Kunde inte uppdatera rabatt:', error)
