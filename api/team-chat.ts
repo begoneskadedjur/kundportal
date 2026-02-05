@@ -91,6 +91,37 @@ function fixMarkdownFormatting(text: string): string {
   return result.trim();
 }
 
+// Analysera vilken typ av fråga det är för att välja rätt verktyg
+// OBS: googleSearch/urlContext KAN INTE kombineras med functionDeclarations i Gemini
+function analyzeQueryType(message: string): 'internal' | 'external' {
+  // Snabb heuristik för att undvika extra API-anrop
+
+  // URL → external
+  const urlPattern = /https?:\/\/[^\s]+/i;
+  if (urlPattern.test(message)) {
+    console.log('[Team Chat] Query contains URL → external');
+    return 'external';
+  }
+
+  // Interna nyckelord (hög prioritet) - BeGones affärsdata
+  const internalKeywords = /\b(bokat|bokad|bokningar|bokning|tekniker|ärenden|ärende|kunder|kund|arbetstider|arbetstid|kompetens|schema|frånvarande|frånvaro|faktura|beläggning|imorgon|idag|nästa\s+vecka|förra\s+veckan|januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december|avtal|pris|status)\b/i;
+  if (internalKeywords.test(message)) {
+    console.log('[Team Chat] Query matches internal keywords → internal');
+    return 'internal';
+  }
+
+  // Externa nyckelord - webbsökningar, externa resurser
+  const externalKeywords = /\b(sök\s+på|googla|på\s+nätet|online|nyheter|aktuellt|priser\s+på\s+marknaden|vad\s+kostar.*allmänt|vädret|väder|wikipedia|artikel|länk|hemsida|webbsida)\b/i;
+  if (externalKeywords.test(message)) {
+    console.log('[Team Chat] Query matches external keywords → external');
+    return 'external';
+  }
+
+  // Default: internal (de flesta frågor handlar om företagets data)
+  console.log('[Team Chat] Query type defaulting to internal');
+  return 'internal';
+}
+
 // Prisberäkning (ungefärlig)
 const PRICING = {
   'gemini-2.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
@@ -821,6 +852,17 @@ Vid bokningshjälp: Filtrera tekniker baserat på kompetens för det aktuella sk
 ### search_cases
 Använd för att söka i ärendehistorik - både gamla och framtida ärenden.
 
+## 🌐 EXTERNA RESURSER
+
+För frågor som handlar om saker utanför BeGones system (marknadspriser, nyheter, webbsidor):
+
+- **Google Search**: Söker automatiskt på webben för aktuell information
+- **URL Context**: Analyserar innehåll från URLs som användaren delar
+
+Dessa aktiveras automatiskt när du:
+- Frågar om externa ämnen (marknadspriser, nyheter, väder)
+- Delar en webbadress (https://...)
+
 ## VIKTIGT: Beläggningsberäkning
 
 När du beräknar beläggning/kapacitet:
@@ -1113,17 +1155,29 @@ OBS: Varje ärende kan ha upp till 3 tekniker som arbetar tillsammans - alla des
       { role: 'user', parts: currentParts }
     ];
 
-    // Anropa med nya SDK:t - Function Calling för dynamisk datahämtning
-    // OBS: googleSearch och urlContext kan INTE kombineras med functionDeclarations
-    // utanför Live API, så vi prioriterar function calling för databasfrågor
-    const generateConfig = {
-      systemInstruction: systemMessage,
-      temperature: 1.0, // Gemini 3 rekommenderar 1.0
-      maxOutputTokens: 8192,
-      tools: [
-        { functionDeclarations }  // Dynamisk datahämtning från databasen
-      ],
-    };
+    // Analysera frågan och välj verktyg dynamiskt
+    // OBS: googleSearch/urlContext KAN INTE kombineras med functionDeclarations
+    const queryType = analyzeQueryType(message || '');
+
+    // Välj verktyg baserat på frågetyp
+    const generateConfig = queryType === 'external'
+      ? {
+          systemInstruction: systemMessage,
+          temperature: 1.0,
+          maxOutputTokens: 8192,
+          tools: [
+            { googleSearch: {} },  // Webbsökning för externa frågor
+            { urlContext: {} }     // Analysera URLs
+          ],
+        }
+      : {
+          systemInstruction: systemMessage,
+          temperature: 1.0,
+          maxOutputTokens: 8192,
+          tools: [
+            { functionDeclarations }  // Databasfrågor
+          ],
+        };
 
     let result = await ai.models.generateContent({
       model: modelName,
