@@ -202,11 +202,18 @@ async function fetchSystemData() {
     console.log('[Team Chat] Supabase URL:', supabaseUrl ? 'SET' : 'MISSING');
     console.log('[Team Chat] Supabase Key:', supabaseKey ? 'SET' : 'MISSING');
 
+    // Hämta datum för frånvarofiltrering
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
     const [
       customersResult,
       techniciansResult,
       privateCasesResult,
-      businessCasesResult
+      businessCasesResult,
+      profilesResult,
+      absencesResult,
+      competenciesResult
     ] = await Promise.all([
       supabase.from('customers').select(`
         id, company_name, annual_value, contact_person, contact_email, contact_phone, contact_address,
@@ -227,7 +234,14 @@ async function fetchSystemData() {
         primary_assignee_name, primary_assignee_email,
         start_date, due_date, created_at, updated_at, completed_date,
         telefon_kontaktperson, e_post_kontaktperson, billing_status
-      `).order('created_at', { ascending: false })
+      `).order('created_at', { ascending: false }),
+      // Hämta profiles för att filtrera på roll (endast technician)
+      supabase.from('profiles').select('technician_id, role').not('technician_id', 'is', null),
+      // Hämta frånvaro som gäller idag eller framåt
+      supabase.from('technician_absences').select('technician_id, start_date, end_date, reason, notes')
+        .gte('end_date', todayStr),
+      // Hämta kompetenser
+      supabase.from('staff_competencies').select('staff_id, pest_type')
     ]);
 
     // Logga resultat för debugging
@@ -235,18 +249,79 @@ async function fetchSystemData() {
     console.log('[Team Chat] Technicians fetched:', techniciansResult.data?.length || 0);
     console.log('[Team Chat] Private cases fetched:', privateCasesResult.data?.length || 0);
     console.log('[Team Chat] Business cases fetched:', businessCasesResult.data?.length || 0);
+    console.log('[Team Chat] Profiles fetched:', profilesResult.data?.length || 0);
+    console.log('[Team Chat] Absences fetched:', absencesResult.data?.length || 0);
+    console.log('[Team Chat] Competencies fetched:', competenciesResult.data?.length || 0);
 
     if (customersResult.error) console.error('[Team Chat] Customers error:', customersResult.error);
     if (techniciansResult.error) console.error('[Team Chat] Technicians error:', techniciansResult.error);
     if (privateCasesResult.error) console.error('[Team Chat] Private cases error:', privateCasesResult.error);
     if (businessCasesResult.error) console.error('[Team Chat] Business cases error:', businessCasesResult.error);
+    if (profilesResult.error) console.error('[Team Chat] Profiles error:', profilesResult.error);
+    if (absencesResult.error) console.error('[Team Chat] Absences error:', absencesResult.error);
+    if (competenciesResult.error) console.error('[Team Chat] Competencies error:', competenciesResult.error);
+
+    // Skapa en Set med technician_ids som har role='technician' (exkludera admin/koordinator)
+    const technicianRoleIds = new Set(
+      (profilesResult.data || [])
+        .filter((p: any) => p.role === 'technician')
+        .map((p: any) => p.technician_id)
+    );
+
+    // Filtrera tekniker: endast de som har role='technician' i profiles
+    const filteredTechnicians = (techniciansResult.data || []).filter((t: any) =>
+      technicianRoleIds.has(t.id)
+    );
+
+    console.log('[Team Chat] Technicians after role filter:', filteredTechnicians.length);
+
+    // Skapa maps för frånvaro och kompetenser
+    const absencesByTechId = new Map<string, any[]>();
+    (absencesResult.data || []).forEach((a: any) => {
+      if (!absencesByTechId.has(a.technician_id)) {
+        absencesByTechId.set(a.technician_id, []);
+      }
+      absencesByTechId.get(a.technician_id)!.push({
+        start_date: a.start_date,
+        end_date: a.end_date,
+        reason: a.reason,
+        notes: a.notes
+      });
+    });
+
+    const competenciesByTechId = new Map<string, string[]>();
+    (competenciesResult.data || []).forEach((c: any) => {
+      if (!competenciesByTechId.has(c.staff_id)) {
+        competenciesByTechId.set(c.staff_id, []);
+      }
+      competenciesByTechId.get(c.staff_id)!.push(c.pest_type);
+    });
+
+    // Berika tekniker med frånvaro och kompetenser
+    const enrichedTechnicians = filteredTechnicians.map((t: any) => ({
+      ...t,
+      absences: absencesByTechId.get(t.id) || [],
+      competencies: competenciesByTechId.get(t.id) || []
+    }));
+
+    // Kolla vilka tekniker som är frånvarande idag
+    const techniciansAbsentToday = enrichedTechnicians.filter((t: any) => {
+      return t.absences.some((a: any) => {
+        const start = new Date(a.start_date).toISOString().split('T')[0];
+        const end = new Date(a.end_date).toISOString().split('T')[0];
+        return todayStr >= start && todayStr <= end;
+      });
+    });
+
+    console.log('[Team Chat] Technicians absent today:', techniciansAbsentToday.length);
 
     // Hämta dagens bokningar separat
     const todayBookings = await fetchTodayBookings();
 
     return {
       customers: customersResult.data || [],
-      technicians: techniciansResult.data || [],
+      technicians: enrichedTechnicians,
+      techniciansAbsentToday,
       recentCases: [
         ...(privateCasesResult.data || []).map(c => ({ ...c, type: 'privat' })),
         ...(businessCasesResult.data || []).map(c => ({ ...c, type: 'företag' }))
@@ -254,7 +329,7 @@ async function fetchSystemData() {
       todayBookings,
       summary: {
         totalCustomers: customersResult.data?.length || 0,
-        totalTechnicians: techniciansResult.data?.length || 0,
+        totalTechnicians: enrichedTechnicians.length,
         totalRevenue: customersResult.data?.reduce((sum, c) => sum + (c.annual_value || 0), 0) || 0
       }
     };
@@ -280,9 +355,25 @@ const BASE_SYSTEM_MESSAGE = `Du är en hjälpsam AI-assistent för BeGone, ett s
 ## Du har tillgång till
 
 - Alla avtalskunder med kontaktuppgifter, årsvärden och kontraktsdatum
-- Alla tekniker med roller och kontaktinfo
+- Alla **fälttekniker** med kontaktinfo, kompetenser och frånvaro
 - ALLA ärenden (privat & företag) med status, priser, datum och faktureringsinfo
 - Datum för skapelse, uppdatering och avslutning av ärenden
+
+## VIKTIGT: Beläggningsberäkning
+
+När du beräknar beläggning/kapacitet:
+- Räkna **ENDAST fälttekniker** (role='technician') - ALDRIG admins eller koordinatorer
+- Admins och koordinatorer utför normalt inte fältarbete och ska inte inkluderas
+- Kontrollera frånvaro - frånvarande tekniker ska inte räknas som tillgängliga
+- Varje tekniker antas arbeta 8 timmar per dag om inget annat anges
+
+### Kompetenser
+Varje tekniker har specifika kompetenser för olika skadedjurstyper.
+När du rekommenderar tekniker för ett ärende, prioritera de med rätt kompetens.
+
+### Frånvaro
+Du kan se vilka tekniker som är frånvarande och varför (semester, sjukdom, etc.).
+Frånvarande tekniker är INTE tillgängliga för bokningar.
 
 ## 🌐 NYA VERKTYG: Google Search & URL Context
 
@@ -442,7 +533,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 **Sammanfattning:**
 - Totalt ${systemData.summary.totalCustomers} aktiva avtalskunder
-- ${systemData.summary.totalTechnicians} tekniker
+- ${systemData.summary.totalTechnicians} fälttekniker (exkl. admins/koordinatorer)
 - Totalt årsvärde: ${systemData.summary.totalRevenue.toLocaleString('sv-SE')} kr
 
 **Topp 10 Avtalskunder (efter årsvärde):**
@@ -452,8 +543,24 @@ ${systemData.customers
   .map((c: any, i: number) => `${i + 1}. ${c.company_name} - ${(c.annual_value || 0).toLocaleString('sv-SE')} kr/år`)
   .join('\n')}
 
-**Tekniker och kontaktinfo:**
-${systemData.technicians.map((t: any) => `- ${t.name} (${t.role}) - ${t.email}${t.direct_phone ? ' - ' + t.direct_phone : ''}`).join('\n')}
+**Fälttekniker (för beläggningsberäkning):**
+${systemData.technicians.map((t: any) => {
+  const kompetenser = t.competencies?.length > 0 ? t.competencies.slice(0, 5).join(', ') + (t.competencies.length > 5 ? '...' : '') : 'Inga registrerade';
+  return `- ${t.name} (${t.role}) - ${t.email}${t.direct_phone ? ' - ' + t.direct_phone : ''}\n  Kompetenser: ${kompetenser}`;
+}).join('\n')}
+
+**Frånvarande tekniker idag:**
+${(systemData.techniciansAbsentToday?.length || 0) > 0
+  ? systemData.techniciansAbsentToday.map((t: any) => {
+      const absence = t.absences.find((a: any) => {
+        const start = new Date(a.start_date).toISOString().split('T')[0];
+        const end = new Date(a.end_date).toISOString().split('T')[0];
+        const today = new Date().toISOString().split('T')[0];
+        return today >= start && today <= end;
+      });
+      return `- ${t.name}: ${absence?.reason || 'Frånvarande'}${absence?.notes ? ' (' + absence.notes + ')' : ''}`;
+    }).join('\n')
+  : '(Alla tekniker är tillgängliga idag)'}
 
 **Ärendestatistik:**
 - Totalt antal ärenden: ${systemData.recentCases.length}
