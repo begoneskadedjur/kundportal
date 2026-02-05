@@ -205,11 +205,56 @@ export default function TeamChat() {
         return;
       }
 
+      // Mappa databasfält till vad modalen förväntar sig
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dbData = data as any;
+      const mappedData = {
+        // Grundinfo
+        case_number: dbData?.case_number,
+        title: dbData?.title || dbData?.kontaktperson || 'Ärende',
+        status: dbData?.status,
+        priority: dbData?.priority,
+        description: dbData?.description || dbData?.rapport,
+
+        // Skadedjur
+        pest_type: dbData?.skadedjur,
+
+        // Adress - hantera olika format (string eller JSONB)
+        address: typeof dbData?.adress === 'string'
+          ? { formatted_address: dbData.adress }
+          : dbData?.adress?.formatted_address
+            ? dbData.adress
+            : dbData?.adress
+              ? { formatted_address: typeof dbData.adress === 'object' ? Object.values(dbData.adress).filter(Boolean).join(', ') : String(dbData.adress) }
+              : dbData?.address
+                ? dbData.address
+                : undefined,
+
+        // Tekniker
+        primary_technician_name: dbData?.primary_assignee_name || dbData?.primary_tech?.name,
+
+        // Priser
+        price: dbData?.pris || dbData?.price,
+
+        // Datum
+        completed_date: dbData?.completed_date,
+
+        // Rapport/beskrivning
+        work_report: dbData?.rapport,
+        recommendations: dbData?.recommendations,
+
+        // Filer
+        files: dbData?.filer || dbData?.files,
+
+        // Ärendetyp
+        case_type: caseType,
+      };
+
       setSelectedCase({
         caseId,
         caseType,
-        clickupTaskId: undefined,  // Använd alltid databasen - all data finns där
-        fallbackData: data
+        clickupTaskId: undefined,  // Använd alltid databasen
+        fallbackData: mappedData
       });
     } catch (err) {
       console.error('Error in handleOpenCase:', err);
