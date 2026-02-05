@@ -11,7 +11,12 @@ import {
   BillingFrequency,
   CreateBillingItemInput,
   ContractBillingItemType,
-  ContractBillingItemFilters
+  ContractBillingItemFilters,
+  ContractInvoice,
+  BillingPeriodSummary,
+  ContractBillingPipelineFilters,
+  deriveInvoiceStatus,
+  formatBillingPeriod
 } from '../types/contractBilling'
 import { CaseBillingService } from './caseBillingService'
 
@@ -124,7 +129,7 @@ export class ContractBillingService {
       .from('contract_billing_items')
       .select(`
         *,
-        customer:customers(id, company_name, organization_number, billing_email),
+        customer:customers(id, company_name, organization_number, billing_email, billing_address, contact_address),
         article:articles(id, code, name)
       `)
       .order('created_at', { ascending: false })
@@ -471,7 +476,7 @@ export class ContractBillingService {
   }> {
     const [batchResult, itemsResult] = await Promise.all([
       supabase.from('contract_billing_batches').select('*').eq('id', batchId).single(),
-      this.getBillingItems({ batchId })
+      this.getBillingItems({ batch_id: batchId })
     ])
 
     if (batchResult.error) throw new Error(`Kunde inte hämta batch: ${batchResult.error.message}`)
@@ -583,5 +588,210 @@ export class ContractBillingService {
       .eq('id', batchId)
 
     if (error) throw new Error(`Kunde inte ta bort batch: ${error.message}`)
+  }
+
+  // ============ PIPELINE-VY METODER ============
+
+  /**
+   * Gruppera billing items till fakturor per kund och period
+   */
+  static groupItemsIntoInvoices(
+    items: ContractBillingItemWithRelations[]
+  ): ContractInvoice[] {
+    const groups = new Map<string, ContractBillingItemWithRelations[]>()
+
+    for (const item of items) {
+      const key = `${item.customer_id}::${item.billing_period_start}::${item.billing_period_end}`
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(item)
+    }
+
+    const invoices: ContractInvoice[] = []
+
+    for (const [, groupItems] of groups) {
+      const first = groupItems[0]
+      const subtotal = groupItems.reduce((sum, i) => sum + i.total_price, 0)
+      const vatAmount = groupItems.reduce(
+        (sum, i) => sum + i.total_price * (i.vat_rate / 100), 0
+      )
+
+      const batchIds = new Set(groupItems.map(i => i.batch_id).filter(Boolean))
+      const sharedBatchId = batchIds.size === 1 ? [...batchIds][0]! : null
+
+      invoices.push({
+        customer_id: first.customer_id,
+        period_start: first.billing_period_start,
+        period_end: first.billing_period_end,
+        customer: {
+          id: first.customer?.id || first.customer_id,
+          company_name: first.customer?.company_name || 'Okänd kund',
+          organization_number: first.customer?.organization_number || null,
+          billing_email: first.customer?.billing_email || null,
+          billing_address: first.customer?.billing_address || null,
+          contact_address: first.customer?.contact_address || null,
+        },
+        items: groupItems,
+        subtotal,
+        vat_amount: vatAmount,
+        total_amount: subtotal + vatAmount,
+        item_count: groupItems.length,
+        derived_status: deriveInvoiceStatus(groupItems),
+        has_items_requiring_approval: groupItems.some(
+          i => i.requires_approval && i.status === 'pending'
+        ),
+        has_discount: groupItems.some(i => i.discount_percent > 0),
+        batch_id: sharedBatchId,
+      })
+    }
+
+    invoices.sort((a, b) =>
+      a.customer.company_name.localeCompare(b.customer.company_name, 'sv')
+    )
+
+    return invoices
+  }
+
+  /**
+   * Hämta pipeline-vy: items grupperade per period och kund
+   */
+  static async getBillingPipeline(
+    filters?: ContractBillingPipelineFilters
+  ): Promise<BillingPeriodSummary[]> {
+    const items = await this.getBillingItems(filters)
+
+    let filtered = items
+    if (filters?.search) {
+      const search = filters.search.toLowerCase()
+      filtered = items.filter(item =>
+        item.customer?.company_name?.toLowerCase().includes(search) ||
+        item.article_name?.toLowerCase().includes(search) ||
+        item.article_code?.toLowerCase().includes(search)
+      )
+    }
+
+    const invoices = this.groupItemsIntoInvoices(filtered)
+
+    const periodMap = new Map<string, ContractInvoice[]>()
+    for (const invoice of invoices) {
+      const key = `${invoice.period_start}::${invoice.period_end}`
+      if (!periodMap.has(key)) periodMap.set(key, [])
+      periodMap.get(key)!.push(invoice)
+    }
+
+    const periods: BillingPeriodSummary[] = []
+    const allStatuses: ContractBillingItemStatus[] = ['pending', 'approved', 'invoiced', 'paid', 'cancelled']
+
+    for (const [, periodInvoices] of periodMap) {
+      const first = periodInvoices[0]
+      const statusBreakdown = {} as Record<ContractBillingItemStatus, number>
+      for (const status of allStatuses) {
+        statusBreakdown[status] = periodInvoices.filter(
+          inv => inv.derived_status === status
+        ).length
+      }
+
+      periods.push({
+        period_start: first.period_start,
+        period_end: first.period_end,
+        period_label: formatBillingPeriod(first.period_start, first.period_end),
+        customer_count: periodInvoices.length,
+        item_count: periodInvoices.reduce((sum, inv) => sum + inv.item_count, 0),
+        total_amount: periodInvoices.reduce((sum, inv) => sum + inv.subtotal, 0),
+        invoices: periodInvoices,
+        status_breakdown: statusBreakdown,
+      })
+    }
+
+    periods.sort((a, b) => b.period_start.localeCompare(a.period_start))
+    return periods
+  }
+
+  /**
+   * Hämta en kunds faktura för en specifik period
+   */
+  static async getCustomerInvoice(
+    customerId: string,
+    periodStart: string,
+    periodEnd: string
+  ): Promise<ContractInvoice | null> {
+    const items = await this.getBillingItems({
+      customer_id: customerId,
+      period_start: periodStart,
+      period_end: periodEnd,
+    })
+
+    if (items.length === 0) return null
+
+    const invoices = this.groupItemsIntoInvoices(items)
+    return invoices[0] || null
+  }
+
+  /**
+   * Uppdatera status för alla items i en kundfaktura
+   */
+  static async updateInvoiceStatus(
+    customerId: string,
+    periodStart: string,
+    periodEnd: string,
+    newStatus: ContractBillingItemStatus
+  ): Promise<void> {
+    const items = await this.getBillingItems({
+      customer_id: customerId,
+      period_start: periodStart,
+      period_end: periodEnd,
+    })
+
+    const eligibleIds = items
+      .filter(i => i.status !== 'cancelled' && i.status !== newStatus)
+      .map(i => i.id)
+
+    if (eligibleIds.length > 0) {
+      await this.bulkUpdateStatus(eligibleIds, newStatus)
+    }
+  }
+
+  /**
+   * Exportera grupperade fakturor till Fortnox CSV
+   */
+  static exportInvoicesForFortnox(invoices: ContractInvoice[]): string {
+    const rows: string[] = []
+
+    rows.push([
+      'Kundnamn',
+      'Organisationsnummer',
+      'Fakturerings-e-post',
+      'Faktureringsadress',
+      'Period',
+      'Artikelkod',
+      'Artikelnamn',
+      'Antal',
+      'Enhetspris',
+      'Rabatt %',
+      'Radbelopp',
+      'Moms %',
+      'Typ'
+    ].join(';'))
+
+    for (const invoice of invoices) {
+      for (const item of invoice.items) {
+        rows.push([
+          invoice.customer.company_name,
+          invoice.customer.organization_number || '',
+          invoice.customer.billing_email || '',
+          invoice.customer.billing_address || invoice.customer.contact_address || '',
+          formatBillingPeriod(invoice.period_start, invoice.period_end),
+          item.article_code || '',
+          item.article_name,
+          String(item.quantity),
+          String(item.unit_price),
+          String(item.discount_percent || 0),
+          String(item.total_price),
+          String(item.vat_rate),
+          item.item_type === 'contract' ? 'Löpande' : 'Tillägg'
+        ].join(';'))
+      }
+    }
+
+    return rows.join('\n')
   }
 }

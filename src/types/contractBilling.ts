@@ -53,6 +53,8 @@ export interface ContractBillingItemWithRelations extends ContractBillingItem {
     company_name: string
     organization_number: string | null
     billing_email: string | null
+    billing_address: string | null
+    contact_address: string | null
   }
   article?: {
     id: string
@@ -248,4 +250,76 @@ export function formatBillingAmount(amount: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(amount)
+}
+
+// ===== PIPELINE VIEW TYPES =====
+
+export interface ContractInvoiceCustomer {
+  id: string
+  company_name: string
+  organization_number: string | null
+  billing_email: string | null
+  billing_address: string | null
+  contact_address: string | null
+}
+
+/**
+ * Grupperad faktura per kund och period.
+ * Härledd från contract_billing_items - inte en databasentitet.
+ */
+export interface ContractInvoice {
+  customer_id: string
+  period_start: string
+  period_end: string
+  customer: ContractInvoiceCustomer
+  items: ContractBillingItemWithRelations[]
+  subtotal: number
+  vat_amount: number
+  total_amount: number
+  item_count: number
+  derived_status: ContractBillingItemStatus
+  has_items_requiring_approval: boolean
+  has_discount: boolean
+  batch_id: string | null
+}
+
+/**
+ * Sammanfattning för en faktureringsperiod.
+ */
+export interface BillingPeriodSummary {
+  period_start: string
+  period_end: string
+  period_label: string
+  customer_count: number
+  item_count: number
+  total_amount: number
+  invoices: ContractInvoice[]
+  status_breakdown: Record<ContractBillingItemStatus, number>
+}
+
+/**
+ * Filter för pipeline-vyn.
+ */
+export interface ContractBillingPipelineFilters extends ContractBillingItemFilters {
+  search?: string
+}
+
+/**
+ * Härleder den övergripande statusen för en grupperad faktura.
+ * Den lägsta statusen bland icke-cancelled items vinner.
+ */
+export function deriveInvoiceStatus(
+  items: ContractBillingItem[]
+): ContractBillingItemStatus {
+  const statusOrder: ContractBillingItemStatus[] = ['pending', 'approved', 'invoiced', 'paid']
+  const nonCancelled = items.filter(i => i.status !== 'cancelled')
+
+  if (nonCancelled.length === 0) return 'cancelled'
+
+  for (const status of statusOrder) {
+    if (nonCancelled.some(i => i.status === status)) {
+      return status
+    }
+  }
+  return 'pending'
 }
