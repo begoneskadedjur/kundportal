@@ -32,9 +32,10 @@ export default function InvoicingPage() {
       {/* Header */}
       <PageHeader
         title="Fakturering"
-        description="Hantera fakturering för alla kundtyper"
-        icon={<Receipt className="w-8 h-8" />}
-        gradient="from-emerald-500 to-teal-600"
+        subtitle="Hantera fakturering för alla kundtyper"
+        icon={Receipt}
+        iconColor="text-emerald-400"
+        showBackButton={false}
       />
 
       {/* Flikar */}
