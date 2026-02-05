@@ -47,6 +47,27 @@ import {
 import CaseDetailsModal from '../../components/customer/CaseDetailsModal';
 import { supabase } from '../../lib/supabase';
 
+// Typbaserad styling för case-länkar (privat=blå, företag=lila, avtal=grön)
+type CaseType = 'private' | 'business' | 'contract';
+
+const caseTypeStyles: Record<CaseType, { text: string; hover: string; bg: string }> = {
+  private: {
+    text: 'text-blue-400',
+    hover: 'hover:text-blue-300',
+    bg: 'hover:bg-blue-500/10',
+  },
+  business: {
+    text: 'text-purple-400',
+    hover: 'hover:text-purple-300',
+    bg: 'hover:bg-purple-500/10',
+  },
+  contract: {
+    text: 'text-emerald-400',
+    hover: 'hover:text-emerald-300',
+    bg: 'hover:bg-emerald-500/10',
+  },
+};
+
 export default function TeamChat() {
   const { user, profile } = useAuth();
   const [conversations, setConversations] = useState<TeamChatConversation[]>([]);
@@ -196,15 +217,17 @@ export default function TeamChat() {
     }
   };
 
-  // Konvertera CASE-syntax till markdown-länkar: [CASE|type|id|title] -> [📋 title](#case-type-id)
+  // Konvertera CASE-syntax till markdown-länkar: [CASE|type|id|title] -> [title](#case-type-id)
+  // Utan emoji - styling hanteras i renderMarkdownWithCaseLinks
   const processCaseLinks = (content: string): string => {
     return content.replace(
       /\[CASE\|([^|]+)\|([^|]+)\|([^\]]+)\]/g,
-      (_, type, id, title) => `[📋 ${title}](#case-${type}-${id})`
+      (_, type, id, title) => `[${title}](#case-${type}-${id})`
     );
   };
 
   // Rendera markdown med klickbara CASE-länkar som hyperlänkar
+  // Färgkodade efter typ: privat=blå, företag=lila, avtal=grön
   const renderMarkdownWithCaseLinks = (content: string) => {
     // Konvertera CASE-syntax till markdown-länkar
     const processedContent = processCaseLinks(content);
@@ -219,17 +242,27 @@ export default function TeamChat() {
               const match = href.match(/#case-(\w+)-(.+)/);
               if (match) {
                 const [, type, id] = match;
+                const styles = caseTypeStyles[type as CaseType] || caseTypeStyles.private;
+
                 return (
-                  <a
-                    href="#"
+                  <button
                     onClick={(e) => {
                       e.preventDefault();
-                      handleOpenCase(id, type as 'private' | 'business' | 'contract');
+                      handleOpenCase(id, type as CaseType);
                     }}
-                    className="text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
+                    className={`
+                      inline
+                      ${styles.text} ${styles.hover} ${styles.bg}
+                      underline decoration-current/40 decoration-1 underline-offset-2
+                      hover:decoration-current/80
+                      rounded px-0.5 -mx-0.5
+                      transition-all duration-200
+                      focus:outline-none focus:ring-1 focus:ring-current/30
+                      font-medium
+                    `}
                   >
                     {children}
-                  </a>
+                  </button>
                 );
               }
             }

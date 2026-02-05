@@ -122,6 +122,40 @@ function analyzeQueryType(message: string): 'internal' | 'external' {
   return 'internal';
 }
 
+// Formatera tid från UTC ISO-sträng till svensk tid (HH:MM)
+// Hanterar både vintertid (CET, UTC+1) och sommartid (CEST, UTC+2)
+function formatSwedishTime(isoString: string | null): string {
+  if (!isoString) return '-';
+  const date = new Date(isoString);
+
+  // Bestäm om det är sommartid (sista söndagen i mars till sista söndagen i oktober)
+  const year = date.getUTCFullYear();
+  const marchLast = new Date(Date.UTC(year, 2, 31)); // Mars
+  const octoberLast = new Date(Date.UTC(year, 9, 31)); // Oktober
+
+  // Hitta sista söndagen i mars och oktober
+  const lastSundayMarch = new Date(marchLast);
+  lastSundayMarch.setUTCDate(31 - ((marchLast.getUTCDay() + 7) % 7));
+  lastSundayMarch.setUTCHours(1, 0, 0, 0); // Sommartid börjar 01:00 UTC
+
+  const lastSundayOctober = new Date(octoberLast);
+  lastSundayOctober.setUTCDate(31 - ((octoberLast.getUTCDay() + 7) % 7));
+  lastSundayOctober.setUTCHours(1, 0, 0, 0); // Vintertid börjar 01:00 UTC
+
+  // Sommartid: UTC+2, Vintertid: UTC+1
+  const isSummerTime = date >= lastSundayMarch && date < lastSundayOctober;
+  const offsetHours = isSummerTime ? 2 : 1;
+
+  // Skapa ny Date med korrekt offset
+  const swedishDate = new Date(date.getTime() + offsetHours * 60 * 60 * 1000);
+
+  // Formatera HH:MM
+  const hours = swedishDate.getUTCHours().toString().padStart(2, '0');
+  const minutes = swedishDate.getUTCMinutes().toString().padStart(2, '0');
+
+  return `${hours}:${minutes}`;
+}
+
 // Prisberäkning (ungefärlig)
 const PRICING = {
   'gemini-2.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
@@ -1085,8 +1119,8 @@ ${(systemData.todayBookings?.length || 0) > 0 ? `
 | Tid | Tekniker | Kund | Adress | Skadedjur |
 |-----|----------|------|--------|-----------|
 ${systemData.todayBookings.map((b: any) => {
-  const start = b.start_date ? new Date(b.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' }) : '-';
-  const end = b.due_date ? new Date(b.due_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' }) : '-';
+  const start = formatSwedishTime(b.start_date);
+  const end = formatSwedishTime(b.due_date);
   const adressKort = typeof b.adress === 'string' ? b.adress.substring(0, 35) : '-';
   return `| ${start}-${end} | ${b.tekniker || '-'} | ${b.kontaktperson || b.title || '-'} | ${adressKort} | ${b.skadedjur || '-'} |`;
 }).join('\n')}
