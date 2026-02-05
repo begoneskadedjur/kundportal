@@ -220,17 +220,48 @@ export default function TeamChat() {
         pest_type: dbData?.skadedjur,
 
         // Adress - extrahera formatted_address korrekt från JSONB
+        // Hanterar både objekt och JSON-strängar
         address: (() => {
-          const addr = dbData?.adress || dbData?.address;
+          let addr = dbData?.adress || dbData?.address;
           if (!addr) return undefined;
-          if (typeof addr === 'string') return { formatted_address: addr };
-          if (addr.formatted_address) return { formatted_address: addr.formatted_address };
+
+          // Om addr är en JSON-sträng, parsea den först
+          if (typeof addr === 'string') {
+            if (addr.startsWith('{') || addr.startsWith('[')) {
+              try {
+                addr = JSON.parse(addr);
+              } catch {
+                // Inte valid JSON, använd som formatted_address direkt
+                return { formatted_address: addr };
+              }
+            } else {
+              // Vanlig sträng (t.ex. "Storgatan 1, Stockholm")
+              return { formatted_address: addr };
+            }
+          }
+
+          // Nu är addr ett objekt - extrahera formatted_address
+          if (addr.formatted_address) {
+            return { formatted_address: addr.formatted_address };
+          }
+
           return undefined;
         })(),
 
         // Location för "Visa på karta"
         location: (() => {
-          const addr = dbData?.adress || dbData?.address;
+          let addr = dbData?.adress || dbData?.address;
+          if (!addr) return undefined;
+
+          // Om addr är en JSON-sträng, parsea den först
+          if (typeof addr === 'string' && (addr.startsWith('{') || addr.startsWith('['))) {
+            try {
+              addr = JSON.parse(addr);
+            } catch {
+              return undefined;
+            }
+          }
+
           if (addr?.location) return addr.location;
           return undefined;
         })(),
