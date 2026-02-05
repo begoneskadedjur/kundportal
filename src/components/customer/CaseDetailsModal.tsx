@@ -88,6 +88,9 @@ interface CaseDetailsModalProps {
     // Datum
     created_at?: string
     updated_at?: string
+    start_date?: string      // Privat/företag: timestamptz med tid
+    due_date?: string        // Privat/företag: timestamptz med tid
+    scheduled_date?: string  // Avtalskunder: endast datum
   }
 }
 
@@ -561,6 +564,43 @@ export default function CaseDetailsModal({
                     </div>
                   )}
                 </div>
+
+                {/* Bokad tid */}
+                {(fallbackData.start_date || fallbackData.scheduled_date) && (
+                  <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded-lg">
+                    <Calendar className="w-4 h-4 text-blue-400" />
+                    <span className="text-slate-400">Bokad:</span>
+                    {fallbackData.start_date ? (
+                      // Privat/företag - har start och sluttid
+                      <span className="text-white font-medium">
+                        {new Date(fallbackData.start_date).toLocaleDateString('sv-SE', {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'short'
+                        })}
+                        <span className="text-slate-400 mx-1">
+                          {new Date(fallbackData.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                          {fallbackData.due_date && (
+                            <>
+                              {' - '}
+                              {new Date(fallbackData.due_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                            </>
+                          )}
+                        </span>
+                      </span>
+                    ) : (
+                      // Avtalskunder - endast datum
+                      <span className="text-white font-medium">
+                        {new Date(fallbackData.scheduled_date!).toLocaleDateString('sv-SE', {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Situationsöversikt - Trafikljussystem */}
                 {(fallbackData.pest_level !== null || fallbackData.problem_rating !== null) && (

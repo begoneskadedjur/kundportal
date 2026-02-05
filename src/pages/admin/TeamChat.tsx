@@ -283,6 +283,11 @@ export default function TeamChat() {
         created_at: dbData?.created_at,
         updated_at: dbData?.updated_at,
 
+        // Bokad tid - privat/företag har start_date/due_date, avtal har scheduled_date
+        start_date: dbData?.start_date,
+        due_date: dbData?.due_date,
+        scheduled_date: dbData?.scheduled_date,  // För avtalskunder
+
         // Rapport/beskrivning
         work_report: dbData?.rapport,
         recommendations: dbData?.recommendations,
