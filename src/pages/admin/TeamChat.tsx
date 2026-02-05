@@ -461,9 +461,9 @@ export default function TeamChat() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] bg-slate-900 overflow-hidden">
+    <div className="flex h-[calc(100dvh-3.5rem)] bg-slate-900 overflow-hidden">
       {/* Sidebar - kompaktare */}
-      <div className={`${isSidebarOpen ? 'w-56' : 'w-0'} transition-all duration-200 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden`}>
+      <div className={`${isSidebarOpen ? 'w-56' : 'w-0'} h-full min-h-0 transition-all duration-200 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden`}>
         <div className="p-2 border-b border-slate-700">
           <button
             onClick={handleNewConversation}
@@ -555,7 +555,7 @@ export default function TeamChat() {
       </div>
 
       {/* Huvudinnehåll */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Header - kompaktare */}
         <div className="h-10 px-2 flex items-center justify-between bg-slate-800 border-b border-slate-700">
           <div className="flex items-center gap-2">
@@ -582,7 +582,7 @@ export default function TeamChat() {
         </div>
 
         {/* Meddelandeområde */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
               <Sparkles className="w-12 h-12 mb-3 text-emerald-500" />
