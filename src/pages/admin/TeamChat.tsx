@@ -463,8 +463,8 @@ export default function TeamChat() {
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-slate-900">
       {/* Sidebar - kompaktare */}
-      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-200 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden`}>
-        <div className="p-3 border-b border-slate-700">
+      <div className={`${isSidebarOpen ? 'w-56' : 'w-0'} transition-all duration-200 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden`}>
+        <div className="p-2 border-b border-slate-700">
           <button
             onClick={handleNewConversation}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition-colors"
@@ -557,7 +557,7 @@ export default function TeamChat() {
       {/* Huvudinnehåll */}
       <div className="flex-1 flex flex-col">
         {/* Header - kompaktare */}
-        <div className="h-12 px-3 flex items-center justify-between bg-slate-800 border-b border-slate-700">
+        <div className="h-10 px-2 flex items-center justify-between bg-slate-800 border-b border-slate-700">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -582,7 +582,7 @@ export default function TeamChat() {
         </div>
 
         {/* Meddelandeområde */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
               <Sparkles className="w-12 h-12 mb-3 text-emerald-500" />
@@ -612,7 +612,7 @@ export default function TeamChat() {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${
+                  className={`max-w-[85%] px-2.5 py-1.5 rounded-lg text-sm ${
                     msg.role === 'user'
                       ? 'bg-emerald-600 text-white'
                       : 'bg-slate-800 border border-slate-700 text-slate-100'
@@ -685,7 +685,7 @@ export default function TeamChat() {
 
           {(isLoading || isGeneratingImage) && (
             <div className="flex justify-start">
-              <div className="bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl">
+              <div className="bg-slate-800 border border-slate-700 px-2.5 py-1.5 rounded-lg">
                 <div className="flex items-center gap-2 text-sm">
                   <Loader2 className={`w-4 h-4 animate-spin ${isGeneratingImage ? 'text-purple-500' : 'text-emerald-500'}`} />
                   <span className="text-slate-400">
@@ -701,7 +701,7 @@ export default function TeamChat() {
 
         {/* Vald fil-preview */}
         {selectedImage && (
-          <div className="px-3 py-2 bg-slate-800 border-t border-slate-700">
+          <div className="px-2 py-1.5 bg-slate-800 border-t border-slate-700">
             <div className="flex items-center gap-2">
               <div className="relative">
                 {selectedImage.mimeType === 'application/pdf' ? (
@@ -730,7 +730,7 @@ export default function TeamChat() {
         )}
 
         {/* Inputfält - expanderande */}
-        <div className="p-3 bg-slate-800 border-t border-slate-700">
+        <div className="p-2 bg-slate-800 border-t border-slate-700">
           <div className="flex items-end gap-2">
             <input
               type="file"
