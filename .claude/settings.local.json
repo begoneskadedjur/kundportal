@@ -92,7 +92,8 @@
       "Bash(dir:*)",
       "Bash(ls -la \"c:\\\\Users\\\\chris\\\\begone-kundportal\\\\src\"\" 2>/dev/null || dir \"c:Userschrisbegone-kundportalsrc\"\")",
       "WebFetch(domain:developer.oneflow.com)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(git status:*)"
     ],
     "deny": [],
     "ask": [],

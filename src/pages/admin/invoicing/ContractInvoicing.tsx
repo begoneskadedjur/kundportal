@@ -242,9 +242,9 @@ export default function ContractInvoicing() {
               onChange={(e) => setItemTypeFilter(e.target.value as any)}
               className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             >
-              <option value="all">Alla typer</option>
-              <option value="contract">Avtalsartiklar</option>
-              <option value="ad_hoc">Ad-hoc</option>
+              <option value="all">Alla tjänster</option>
+              <option value="contract">Löpande avtalstjänster</option>
+              <option value="ad_hoc">Tilläggstjänster</option>
             </select>
 
             {/* Godkännande filter */}
