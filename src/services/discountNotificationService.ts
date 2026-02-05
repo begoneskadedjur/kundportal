@@ -30,7 +30,7 @@ export class DiscountNotificationService {
       // Hämta alla admin-användare
       const { data: admins, error: adminError } = await supabase
         .from('profiles')
-        .select('id, full_name, email')
+        .select('id, display_name, email')
         .eq('role', 'admin')
 
       if (adminError) {
