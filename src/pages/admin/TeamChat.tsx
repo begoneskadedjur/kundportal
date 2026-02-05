@@ -208,7 +208,7 @@ export default function TeamChat() {
       setSelectedCase({
         caseId,
         caseType,
-        clickupTaskId: data?.clickup_task_id,
+        clickupTaskId: undefined,  // Använd alltid databasen - all data finns där
         fallbackData: data
       });
     } catch (err) {
