@@ -100,36 +100,98 @@ const PRICING = {
   'gemini-embedding-001': { input: 0.00 / 1_000_000, output: 0.00 / 1_000_000 }, // Gratis under 1500 req/min
 };
 
-// Hämta dagens bokningar med tidsslottar
+// Hämta dagens bokningar med tidsslottar - hämtar från ALLA 3 tabeller med ALLA tekniker
 async function fetchTodayBookings() {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
 
-  const [privateResult, businessResult] = await Promise.all([
+  const [privateResult, businessResult, contractResult] = await Promise.all([
+    // Private cases - hämta alla 3 tekniker
     supabase
       .from('private_cases')
-      .select('title, primary_assignee_name, start_date, due_date, adress, skadedjur, status, kontaktperson')
+      .select(`
+        title, start_date, due_date, adress, skadedjur, status, kontaktperson,
+        primary_assignee_name, secondary_assignee_name, tertiary_assignee_name
+      `)
       .gte('start_date', todayStart)
       .lt('start_date', tomorrowStart)
       .order('start_date', { ascending: true }),
+
+    // Business cases - hämta alla 3 tekniker
     supabase
       .from('business_cases')
-      .select('title, primary_assignee_name, start_date, due_date, adress, skadedjur, status, kontaktperson')
+      .select(`
+        title, start_date, due_date, adress, skadedjur, status, kontaktperson,
+        primary_assignee_name, secondary_assignee_name, tertiary_assignee_name
+      `)
       .gte('start_date', todayStart)
       .lt('start_date', tomorrowStart)
-      .order('start_date', { ascending: true })
+      .order('start_date', { ascending: true }),
+
+    // Cases (avtalsärenden) - hämta alla 3 tekniker via join
+    supabase
+      .from('cases')
+      .select(`
+        title, scheduled_start, scheduled_end, address, status,
+        customer:customers(company_name),
+        primary_tech:technicians!primary_technician_id(name),
+        secondary_tech:technicians!secondary_technician_id(name),
+        tertiary_tech:technicians!tertiary_technician_id(name)
+      `)
+      .gte('scheduled_start', todayStart)
+      .lt('scheduled_start', tomorrowStart)
+      .order('scheduled_start', { ascending: true })
   ]);
 
   if (privateResult.error) console.error('[Team Chat] Today private bookings error:', privateResult.error);
   if (businessResult.error) console.error('[Team Chat] Today business bookings error:', businessResult.error);
+  if (contractResult.error) console.error('[Team Chat] Today contract cases error:', contractResult.error);
 
+  // Kombinera alla tekniker till en kommaseparerad sträng
+  const formatTechnicians = (primary: string | null, secondary: string | null, tertiary: string | null): string => {
+    const techs = [primary, secondary, tertiary].filter(Boolean);
+    return techs.length > 0 ? techs.join(', ') : '-';
+  };
+
+  // Normalisera alla ärendetyper till samma format
   const allBookings = [
-    ...(privateResult.data || []).map(c => ({ ...c, type: 'privat' })),
-    ...(businessResult.data || []).map(c => ({ ...c, type: 'företag' }))
+    ...(privateResult.data || []).map(c => ({
+      title: c.title,
+      tekniker: formatTechnicians(c.primary_assignee_name, c.secondary_assignee_name, c.tertiary_assignee_name),
+      start_date: c.start_date,
+      due_date: c.due_date,
+      adress: c.adress,
+      skadedjur: c.skadedjur,
+      status: c.status,
+      kontaktperson: c.kontaktperson,
+      type: 'privat'
+    })),
+    ...(businessResult.data || []).map(c => ({
+      title: c.title,
+      tekniker: formatTechnicians(c.primary_assignee_name, c.secondary_assignee_name, c.tertiary_assignee_name),
+      start_date: c.start_date,
+      due_date: c.due_date,
+      adress: c.adress,
+      skadedjur: c.skadedjur,
+      status: c.status,
+      kontaktperson: c.kontaktperson,
+      type: 'företag'
+    })),
+    ...(contractResult.data || []).map((c: any) => ({
+      title: c.title,
+      tekniker: formatTechnicians(c.primary_tech?.name, c.secondary_tech?.name, c.tertiary_tech?.name),
+      start_date: c.scheduled_start,
+      due_date: c.scheduled_end,
+      adress: c.address,
+      skadedjur: null,
+      status: c.status,
+      kontaktperson: c.customer?.company_name || null,
+      type: 'avtal'
+    }))
   ].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
 
-  console.log('[Team Chat] Today bookings fetched:', allBookings.length);
+  console.log('[Team Chat] Today bookings fetched:', allBookings.length, '(private:', privateResult.data?.length || 0, ', business:', businessResult.data?.length || 0, ', contract:', contractResult.data?.length || 0, ')');
   return allBookings;
 }
 
@@ -427,7 +489,7 @@ ${systemData.todayBookings.map((b: any) => {
   const start = b.start_date ? new Date(b.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' }) : '-';
   const end = b.due_date ? new Date(b.due_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' }) : '-';
   const adressKort = typeof b.adress === 'string' ? b.adress.substring(0, 35) : '-';
-  return `| ${start}-${end} | ${b.primary_assignee_name || '-'} | ${b.kontaktperson || b.title || '-'} | ${adressKort} | ${b.skadedjur || '-'} |`;
+  return `| ${start}-${end} | ${b.tekniker || '-'} | ${b.kontaktperson || b.title || '-'} | ${adressKort} | ${b.skadedjur || '-'} |`;
 }).join('\n')}
 ` : '(Inga bokade ärenden idag)'}
 
@@ -438,7 +500,8 @@ ${systemData.todayBookings.map((b: any) => {
 
 🔍 **SÖK I ÄRENDEHISTORIK:**
 Om användaren frågar om ärenden för ett specifikt datum eller tekniker, sök i "Alla ärenden"-listan ovan.
-Filtrera på tekniker med primary_assignee_name och datum med start_date.
+Filtrera på tekniker med 'tekniker'-fältet (kan innehålla flera kommaseparerade namn) och datum med start_date.
+OBS: Varje ärende kan ha upp till 3 tekniker som arbetar tillsammans - alla dessa är upptagna under tidslotten.
 `;
     }
 
