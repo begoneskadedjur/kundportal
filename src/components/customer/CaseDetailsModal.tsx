@@ -57,7 +57,9 @@ interface CaseDetailsModalProps {
     price?: number | null
     completed_date?: string
     primary_technician_name?: string
+    primary_technician_email?: string
     address?: { formatted_address?: string }
+    location?: { lat: number; lng: number }
     description?: string
     recommendations?: string | null
     case_type?: 'private' | 'business' | 'contract'
@@ -79,6 +81,13 @@ interface CaseDetailsModalProps {
     // Trafikljus-metadata
     assessment_date?: string | null
     assessed_by?: string | null
+    // Kontaktperson
+    contact_person?: string
+    contact_email?: string
+    contact_phone?: string
+    // Datum
+    created_at?: string
+    updated_at?: string
   }
 }
 
@@ -620,12 +629,6 @@ export default function CaseDetailsModal({
                       <span className="text-sm text-white font-medium">{fallbackData.price} kr</span>
                     </div>
                   )}
-                  {fallbackData.primary_technician_name && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <span className="text-xs text-slate-400">Tekniker:</span>
-                      <span className="text-sm text-white">{fallbackData.primary_technician_name}</span>
-                    </div>
-                  )}
                   {fallbackData.time_spent_minutes !== undefined && fallbackData.time_spent_minutes > 0 && (
                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
                       <span className="text-xs text-slate-400">Tid:</span>
@@ -637,10 +640,105 @@ export default function CaseDetailsModal({
                       </span>
                     </div>
                   )}
-                  {fallbackData.address?.formatted_address && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <span className="text-xs text-slate-400">Adress:</span>
-                      <span className="text-sm text-white">{fallbackData.address.formatted_address}</span>
+                </div>
+
+                {/* Adress med kartknapp */}
+                {fallbackData.address?.formatted_address && (
+                  <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
+                    <MapPin className="w-5 h-5 text-red-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-slate-400 mb-1">Adress</p>
+                      <p className="text-white font-medium">
+                        {fallbackData.address.formatted_address}
+                      </p>
+                      {fallbackData.location && (
+                        <button
+                          className="mt-2 text-blue-400 hover:text-blue-300 text-sm"
+                          onClick={() => {
+                            const { lat, lng } = fallbackData.location!;
+                            window.open(`https://maps.google.com?q=${lat},${lng}`, '_blank');
+                          }}
+                        >
+                          Visa på karta
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Kontaktperson och Tekniker i grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Kontaktperson */}
+                  {fallbackData.contact_person && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                        <User className="w-4 h-4 text-blue-400" />
+                        Kontaktperson
+                      </h4>
+                      <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                          {fallbackData.contact_person.split(' ').map(n => n[0]).join('').slice(0,2)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium truncate">{fallbackData.contact_person}</p>
+                          {fallbackData.contact_email && (
+                            <p className="text-sm text-slate-400 truncate">{fallbackData.contact_email}</p>
+                          )}
+                          {fallbackData.contact_phone && (
+                            <p className="text-sm text-slate-400">{fallbackData.contact_phone}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          {fallbackData.contact_email && (
+                            <button
+                              onClick={() => window.open(`mailto:${fallbackData.contact_email}`, '_blank')}
+                              className="p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-lg transition-colors"
+                              title="Skicka e-post"
+                            >
+                              <Mail className="w-4 h-4" />
+                            </button>
+                          )}
+                          {fallbackData.contact_phone && (
+                            <button
+                              onClick={() => window.open(`tel:${fallbackData.contact_phone}`, '_blank')}
+                              className="p-2 text-slate-400 hover:text-green-400 hover:bg-slate-700/50 rounded-lg transition-colors"
+                              title="Ring"
+                            >
+                              <Phone className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ansvarig tekniker */}
+                  {fallbackData.primary_technician_name && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                        <User className="w-4 h-4 text-green-400" />
+                        Ansvarig tekniker
+                      </h4>
+                      <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
+                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                          {fallbackData.primary_technician_name.split(' ').map(n => n[0]).join('').slice(0,2)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium truncate">{fallbackData.primary_technician_name}</p>
+                          {fallbackData.primary_technician_email && (
+                            <p className="text-sm text-slate-400 truncate">{fallbackData.primary_technician_email}</p>
+                          )}
+                        </div>
+                        {fallbackData.primary_technician_email && (
+                          <button
+                            onClick={() => window.open(`mailto:${fallbackData.primary_technician_email}?subject=Fråga om ärende ${fallbackData.title || fallbackData.case_number}`, '_blank')}
+                            className="p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-lg transition-colors"
+                            title={`Skicka e-post till ${fallbackData.primary_technician_name}`}
+                          >
+                            <Mail className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

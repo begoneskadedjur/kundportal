@@ -219,25 +219,38 @@ export default function TeamChat() {
         // Skadedjur
         pest_type: dbData?.skadedjur,
 
-        // Adress - hantera olika format (string eller JSONB)
-        address: typeof dbData?.adress === 'string'
-          ? { formatted_address: dbData.adress }
-          : dbData?.adress?.formatted_address
-            ? dbData.adress
-            : dbData?.adress
-              ? { formatted_address: typeof dbData.adress === 'object' ? Object.values(dbData.adress).filter(Boolean).join(', ') : String(dbData.adress) }
-              : dbData?.address
-                ? dbData.address
-                : undefined,
+        // Adress - extrahera formatted_address korrekt från JSONB
+        address: (() => {
+          const addr = dbData?.adress || dbData?.address;
+          if (!addr) return undefined;
+          if (typeof addr === 'string') return { formatted_address: addr };
+          if (addr.formatted_address) return { formatted_address: addr.formatted_address };
+          return undefined;
+        })(),
 
-        // Tekniker
+        // Location för "Visa på karta"
+        location: (() => {
+          const addr = dbData?.adress || dbData?.address;
+          if (addr?.location) return addr.location;
+          return undefined;
+        })(),
+
+        // Tekniker - med e-post
         primary_technician_name: dbData?.primary_assignee_name || dbData?.primary_tech?.name,
+        primary_technician_email: dbData?.primary_assignee_email,
+
+        // Kontaktperson
+        contact_person: dbData?.kontaktperson,
+        contact_email: dbData?.e_post_kontaktperson,
+        contact_phone: dbData?.telefon_kontaktperson,
 
         // Priser
         price: dbData?.pris || dbData?.price,
 
         // Datum
         completed_date: dbData?.completed_date,
+        created_at: dbData?.created_at,
+        updated_at: dbData?.updated_at,
 
         // Rapport/beskrivning
         work_report: dbData?.rapport,
