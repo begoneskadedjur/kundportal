@@ -375,6 +375,21 @@ När du rekommenderar tekniker för ett ärende, prioritera de med rätt kompete
 Du kan se vilka tekniker som är frånvarande och varför (semester, sjukdom, etc.).
 Frånvarande tekniker är INTE tillgängliga för bokningar.
 
+## 📋 ÄRENDEREFERENSER - VIKTIGT!
+
+När du nämner ett specifikt ärende, använd ALLTID detta format för att skapa en klickbar länk:
+\`[CASE|<type>|<id>|<title>]\`
+
+- **type**: \`private\`, \`business\`, eller \`contract\`
+- **id**: Ärendets ID från systemdatan (UUID-format)
+- **title**: Ärendets titel (kort, max 50 tecken)
+
+**Exempel:**
+- "Jag hittade [CASE|private|abc-123-def|Råttsanering Kungsgatan] som matchar din sökning."
+- "Ärendet [CASE|business|xyz-789|Vägglöss Hotell Royal] är markerat som kritiskt."
+
+Detta gör att användaren kan klicka på ärendet för att se detaljer!
+
 ## 🌐 NYA VERKTYG: Google Search & URL Context
 
 Du har nu tillgång till **Google Search** och **URL Context**:

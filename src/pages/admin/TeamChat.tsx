@@ -43,6 +43,8 @@ import {
   Table2,
   Download
 } from 'lucide-react';
+import { CaseLink, parseCaseLinks } from '../../components/shared/CaseLink';
+import CaseDetailsModal from '../../components/customer/CaseDetailsModal';
 
 export default function TeamChat() {
   const { user, profile } = useAuth();
@@ -60,6 +62,13 @@ export default function TeamChat() {
   const [newTitle, setNewTitle] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+
+  // State för ärende-modal
+  const [selectedCase, setSelectedCase] = useState<{
+    caseId: string;
+    caseType: 'private' | 'business' | 'contract';
+    clickupTaskId?: string;
+  } | null>(null);
 
   // Konvertera markdown till ren text för kopiering
   const markdownToPlainText = (markdown: string): string => {
@@ -153,6 +162,63 @@ export default function TeamChat() {
     link.click();
     document.body.removeChild(link);
     toast.success('Bild laddas ner...');
+  };
+
+  // Hantera klick på ärende-länk
+  const handleOpenCase = (caseId: string, caseType: 'private' | 'business' | 'contract') => {
+    setSelectedCase({ caseId, caseType });
+  };
+
+  // Rendera markdown med klickbara CASE-länkar
+  const renderMarkdownWithCaseLinks = (content: string) => {
+    const caseLinks = parseCaseLinks(content);
+
+    if (caseLinks.length === 0) {
+      // Ingen CASE-länk, rendera vanlig markdown
+      return <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>;
+    }
+
+    // Dela upp innehållet i delar baserat på CASE-länkar
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    caseLinks.forEach((link, i) => {
+      // Lägg till text före länken
+      if (link.startIndex > lastIndex) {
+        const textBefore = content.substring(lastIndex, link.startIndex);
+        parts.push(
+          <ReactMarkdown key={`text-${i}`} remarkPlugins={[remarkGfm]}>
+            {textBefore}
+          </ReactMarkdown>
+        );
+      }
+
+      // Lägg till CASE-länken som en klickbar knapp
+      parts.push(
+        <span key={`case-${i}`} className="inline-block my-1">
+          <CaseLink
+            caseType={link.caseType}
+            caseId={link.caseId}
+            title={link.title}
+            onClick={() => handleOpenCase(link.caseId, link.caseType)}
+          />
+        </span>
+      );
+
+      lastIndex = link.endIndex;
+    });
+
+    // Lägg till eventuell text efter sista länken
+    if (lastIndex < content.length) {
+      const textAfter = content.substring(lastIndex);
+      parts.push(
+        <ReactMarkdown key="text-final" remarkPlugins={[remarkGfm]}>
+          {textAfter}
+        </ReactMarkdown>
+      );
+    }
+
+    return <>{parts}</>;
   };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -646,7 +712,7 @@ export default function TeamChat() {
                         )}
                       </button>
                       <div className="prose prose-invert prose-base max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                        {renderMarkdownWithCaseLinks(msg.content)}
                       </div>
                       {/* Visa genererad bild om den finns */}
                       {msg.generated_image && (
@@ -834,6 +900,16 @@ export default function TeamChat() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Ärende-modal */}
+      {selectedCase && (
+        <CaseDetailsModal
+          caseId={selectedCase.caseId}
+          clickupTaskId={selectedCase.clickupTaskId || ''}
+          isOpen={!!selectedCase}
+          onClose={() => setSelectedCase(null)}
+        />
       )}
     </div>
   );
