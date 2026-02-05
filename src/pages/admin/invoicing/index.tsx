@@ -8,8 +8,7 @@ import {
   Users,
   Building2,
   ArrowLeft,
-  TrendingUp,
-  FileSpreadsheet
+  TrendingUp
 } from 'lucide-react'
 import PrivateBusinessInvoicing from './PrivateBusinessInvoicing'
 import ContractInvoicing from './ContractInvoicing'
@@ -63,13 +62,6 @@ export default function InvoicingPage() {
               >
                 <TrendingUp className="w-4 h-4" />
                 <span className="hidden sm:inline">Ekonomi</span>
-              </button>
-              <button
-                onClick={() => {/* Export handled in tabs */}}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-400 hover:text-emerald-400 hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span className="hidden sm:inline">Exportera</span>
               </button>
             </div>
           </div>

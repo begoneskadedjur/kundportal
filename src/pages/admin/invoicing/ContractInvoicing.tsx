@@ -501,16 +501,15 @@ export default function ContractInvoicing() {
       </div>
 
       {/* Modal */}
-      {showGenerateModal && (
-        <ContractBillingGenerateModal
-          onClose={() => setShowGenerateModal(false)}
-          onSuccess={() => {
-            setShowGenerateModal(false)
-            loadData()
-            loadItems()
-          }}
-        />
-      )}
+      <ContractBillingGenerateModal
+        isOpen={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        onSuccess={() => {
+          setShowGenerateModal(false)
+          loadData()
+          loadItems()
+        }}
+      />
     </div>
   )
 }
