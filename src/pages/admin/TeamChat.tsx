@@ -461,7 +461,7 @@ export default function TeamChat() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] bg-slate-900 overflow-hidden">
+    <div className="fixed top-14 left-0 right-0 bottom-0 flex bg-slate-900 overflow-hidden">
       {/* Sidebar - kompaktare */}
       <div className={`${isSidebarOpen ? 'w-56' : 'w-0'} h-full min-h-0 transition-all duration-200 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden`}>
         <div className="p-2 border-b border-slate-700">
