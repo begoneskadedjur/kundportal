@@ -253,6 +253,61 @@ export class PriceListService {
   }
 
   /**
+   * Hämta effektivt pris för en artikel baserat på kund
+   * Kollar kundens prislista först, sedan standardprislistan, sist artikelns default_price
+   */
+  static async getEffectivePrice(
+    articleId: string,
+    customerId?: string | null
+  ): Promise<{ price: number; source: 'customer_list' | 'standard' }> {
+    // Kolla kundens prislista först
+    if (customerId) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('price_list_id')
+        .eq('id', customerId)
+        .single()
+
+      if (customer?.price_list_id) {
+        const { data: priceItem } = await supabase
+          .from('price_list_items')
+          .select('custom_price')
+          .eq('price_list_id', customer.price_list_id)
+          .eq('article_id', articleId)
+          .single()
+
+        if (priceItem) {
+          return { price: priceItem.custom_price, source: 'customer_list' }
+        }
+      }
+    }
+
+    // Fallback till standardprislista
+    const defaultPriceList = await this.getDefaultPriceList()
+    if (defaultPriceList) {
+      const { data: priceItem } = await supabase
+        .from('price_list_items')
+        .select('custom_price')
+        .eq('price_list_id', defaultPriceList.id)
+        .eq('article_id', articleId)
+        .single()
+
+      if (priceItem) {
+        return { price: priceItem.custom_price, source: 'standard' }
+      }
+    }
+
+    // Fallback till artikelns default_price
+    const { data: article } = await supabase
+      .from('articles')
+      .select('default_price')
+      .eq('id', articleId)
+      .single()
+
+    return { price: article?.default_price || 0, source: 'standard' }
+  }
+
+  /**
    * Hämta alla prislistor som en artikel finns i
    * Returnerar en map: { articleId: [{ priceList, customPrice }] }
    */

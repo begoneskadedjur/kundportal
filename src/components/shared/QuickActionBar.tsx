@@ -79,12 +79,21 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       category: 'navigation'
     },
     {
-      id: 'billing',
+      id: 'invoicing',
       title: 'Fakturering',
+      description: 'Komplett faktureringssystem',
+      icon: FileText,
+      href: '/admin/invoicing',
+      keywords: ['faktura', 'billing', 'ärenden', 'invoicing'],
+      category: 'navigation'
+    },
+    {
+      id: 'billing-legacy',
+      title: 'Fakturering (Legacy)',
       description: 'BeGone-ärenden fakturering',
       icon: FileText,
       href: '/admin/billing',
-      keywords: ['faktura', 'billing', 'ärenden'],
+      keywords: ['faktura', 'billing', 'ärenden', 'legacy'],
       category: 'navigation'
     },
     {

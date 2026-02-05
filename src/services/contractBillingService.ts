@@ -9,7 +9,9 @@ import {
   ContractBillingItemStatus,
   ContractBillingBatchStatus,
   BillingFrequency,
-  CreateBillingItemInput
+  CreateBillingItemInput,
+  ContractBillingItemType,
+  ContractBillingItemFilters
 } from '../types/contractBilling'
 
 export class ContractBillingService {
@@ -116,13 +118,7 @@ export class ContractBillingService {
   /**
    * Hämta faktureringsrader med filter
    */
-  static async getBillingItems(filters?: {
-    status?: ContractBillingItemStatus
-    customerId?: string
-    batchId?: string
-    periodStart?: string
-    periodEnd?: string
-  }): Promise<ContractBillingItemWithRelations[]> {
+  static async getBillingItems(filters?: ContractBillingItemFilters): Promise<ContractBillingItemWithRelations[]> {
     let query = supabase
       .from('contract_billing_items')
       .select(`
@@ -133,25 +129,117 @@ export class ContractBillingService {
       .order('created_at', { ascending: false })
 
     if (filters?.status) {
-      query = query.eq('status', filters.status)
+      if (Array.isArray(filters.status)) {
+        query = query.in('status', filters.status)
+      } else {
+        query = query.eq('status', filters.status)
+      }
     }
-    if (filters?.customerId) {
-      query = query.eq('customer_id', filters.customerId)
+    if (filters?.item_type && filters.item_type !== 'all') {
+      query = query.eq('item_type', filters.item_type)
     }
-    if (filters?.batchId) {
-      query = query.eq('batch_id', filters.batchId)
+    if (filters?.customer_id) {
+      query = query.eq('customer_id', filters.customer_id)
     }
-    if (filters?.periodStart) {
-      query = query.gte('billing_period_start', filters.periodStart)
+    if (filters?.batch_id) {
+      query = query.eq('batch_id', filters.batch_id)
     }
-    if (filters?.periodEnd) {
-      query = query.lte('billing_period_end', filters.periodEnd)
+    if (filters?.requires_approval !== undefined) {
+      query = query.eq('requires_approval', filters.requires_approval)
+    }
+    if (filters?.period_start) {
+      query = query.gte('billing_period_start', filters.period_start)
+    }
+    if (filters?.period_end) {
+      query = query.lte('billing_period_end', filters.period_end)
     }
 
     const { data, error } = await query
 
     if (error) throw new Error(`Kunde inte hämta faktureringsrader: ${error.message}`)
     return (data || []) as ContractBillingItemWithRelations[]
+  }
+
+  /**
+   * Hämta items som kräver godkännande (rabatterade)
+   */
+  static async getItemsRequiringApproval(): Promise<ContractBillingItemWithRelations[]> {
+    return this.getBillingItems({
+      requires_approval: true,
+      status: 'pending'
+    })
+  }
+
+  /**
+   * Godkänn rabatt för en item
+   */
+  static async approveDiscount(id: string): Promise<ContractBillingItem> {
+    const { data, error } = await supabase
+      .from('contract_billing_items')
+      .update({
+        requires_approval: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw new Error(`Kunde inte godkänna rabatt: ${error.message}`)
+    return data
+  }
+
+  /**
+   * Skapa ad-hoc billing item från ärende
+   */
+  static async createAdHocItem(input: {
+    customer_id: string
+    case_id: string
+    case_type: 'private' | 'business' | 'contract'
+    article_id?: string
+    article_code?: string
+    article_name: string
+    quantity: number
+    unit_price: number
+    total_price: number
+    vat_rate?: number
+    discount_percent?: number
+    original_price?: number
+    billing_period_start: string
+    billing_period_end: string
+    batch_id?: string
+    notes?: string
+  }): Promise<ContractBillingItem> {
+    const requiresApproval = (input.discount_percent ?? 0) > 0
+
+    const { data, error } = await supabase
+      .from('contract_billing_items')
+      .insert({
+        customer_id: input.customer_id,
+        case_id: input.case_id,
+        case_type: input.case_type,
+        article_id: input.article_id || null,
+        article_code: input.article_code || null,
+        article_name: input.article_name,
+        quantity: input.quantity,
+        unit_price: input.unit_price,
+        total_price: input.total_price,
+        vat_rate: input.vat_rate || 25,
+        item_type: 'ad_hoc',
+        source: 'case_completion',
+        requires_approval: requiresApproval,
+        discount_percent: input.discount_percent || 0,
+        original_price: input.original_price || null,
+        billing_period_start: input.billing_period_start,
+        billing_period_end: input.billing_period_end,
+        batch_id: input.batch_id || null,
+        notes: input.notes || null,
+        status: 'pending'
+      })
+      .select()
+      .single()
+
+    if (error) throw new Error(`Kunde inte skapa ad-hoc post: ${error.message}`)
+    return data
   }
 
   /**

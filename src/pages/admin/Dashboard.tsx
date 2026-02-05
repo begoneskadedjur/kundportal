@@ -512,23 +512,33 @@ const AdminDashboard: React.FC = () => {
                 />
                 
                 <AdminDashboardCard
+                  href="/admin/invoicing"
+                  icon={Receipt}
+                  title="Fakturering (Nytt)"
+                  description="Komplett faktureringssystem för alla kundtyper"
+                  stats="Privat, Företag & Avtal"
+                  tag="Fakturering"
+                  iconColor="text-emerald-400"
+                />
+
+                <AdminDashboardCard
                   href="/admin/billing"
                   icon={DollarSign}
-                  title="Fakturering"
+                  title="Fakturering (Legacy)"
                   description="Sluthantering av avslutade ärenden"
                   stats={`${(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden`}
-                  tag="Fakturering"
+                  tag="Legacy"
                   iconColor="text-yellow-400"
                 />
 
                 <AdminDashboardCard
                   href="/admin/contract-billing"
                   icon={Receipt}
-                  title="Avtalsfakturering"
+                  title="Avtalsfakturering (Legacy)"
                   description="Periodisk fakturering för avtalskunder"
                   stats="Faktureringskö"
-                  tag="Fakturering"
-                  iconColor="text-emerald-400"
+                  tag="Legacy"
+                  iconColor="text-slate-400"
                 />
 
                 <AdminDashboardCard

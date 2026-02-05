@@ -5,6 +5,16 @@ export type BillingFrequency = 'monthly' | 'quarterly' | 'semi_annual' | 'annual
 export type ContractBillingItemStatus = 'pending' | 'approved' | 'invoiced' | 'paid' | 'cancelled'
 export type ContractBillingBatchStatus = 'draft' | 'generated' | 'approved' | 'completed' | 'cancelled'
 
+/**
+ * Typ av faktureringspost
+ */
+export type ContractBillingItemType = 'contract' | 'ad_hoc'
+
+/**
+ * Källa för faktureringspost
+ */
+export type ContractBillingItemSource = 'price_list' | 'case_completion' | 'manual'
+
 export interface ContractBillingItem {
   id: string
   customer_id: string
@@ -27,6 +37,14 @@ export interface ContractBillingItem {
   notes: string | null
   created_at: string
   updated_at: string
+  // Nya fält för ad-hoc och rabatter
+  item_type: ContractBillingItemType
+  case_id: string | null
+  case_type: 'private' | 'business' | 'contract' | null
+  source: ContractBillingItemSource
+  requires_approval: boolean
+  discount_percent: number
+  original_price: number | null
 }
 
 export interface ContractBillingItemWithRelations extends ContractBillingItem {
@@ -40,6 +58,12 @@ export interface ContractBillingItemWithRelations extends ContractBillingItem {
     id: string
     code: string
     name: string
+  }
+  // Länkad ärendeinformation för ad-hoc poster
+  case_info?: {
+    id: string
+    title?: string
+    case_number?: string
   }
 }
 
@@ -72,6 +96,27 @@ export interface CreateBillingItemInput {
   vat_rate?: number
   batch_id?: string | null
   notes?: string | null
+  // Nya fält
+  item_type?: ContractBillingItemType
+  case_id?: string | null
+  case_type?: 'private' | 'business' | 'contract' | null
+  source?: ContractBillingItemSource
+  requires_approval?: boolean
+  discount_percent?: number
+  original_price?: number | null
+}
+
+/**
+ * Filter för att hämta billing items
+ */
+export interface ContractBillingItemFilters {
+  status?: ContractBillingItemStatus | ContractBillingItemStatus[]
+  item_type?: ContractBillingItemType | 'all'
+  customer_id?: string
+  batch_id?: string
+  requires_approval?: boolean
+  period_start?: string
+  period_end?: string
 }
 
 // UI-konfiguration för faktureringsfrekvens

@@ -25,10 +25,10 @@ const navItems: NavItem[] = [
     description: 'Kundpriser'
   },
   {
-    href: '/admin/contract-billing',
-    label: 'Avtalsfakturering',
+    href: '/admin/invoicing',
+    label: 'Fakturering',
     icon: Receipt,
-    description: 'Faktureringskö'
+    description: 'Nytt faktureringssystem'
   }
 ]
 

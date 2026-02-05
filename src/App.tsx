@@ -31,6 +31,7 @@ import PreparationsPage from './pages/admin/settings/PreparationsPage';
 import ArticlesPage from './pages/admin/settings/ArticlesPage';
 import PriceListsPage from './pages/admin/settings/PriceListsPage';
 import ContractBilling from './pages/admin/ContractBilling';
+import InvoicingPage from './pages/admin/invoicing';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import ImageBank from './pages/admin/ImageBank';
@@ -275,6 +276,24 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <ContractBilling />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Nytt faktureringssystem */}
+            <Route
+              path="/admin/invoicing"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <InvoicingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/invoicing/*"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <InvoicingPage />
                 </ProtectedRoute>
               }
             />

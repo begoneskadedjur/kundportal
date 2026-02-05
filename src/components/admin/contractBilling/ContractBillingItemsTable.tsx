@@ -9,7 +9,10 @@ import {
   MoreHorizontal,
   Building2,
   CheckCircle,
-  Loader2
+  Loader2,
+  AlertCircle,
+  Tag,
+  Percent
 } from 'lucide-react'
 import {
   ContractBillingItemWithRelations,
@@ -26,6 +29,8 @@ interface ContractBillingItemsTableProps {
   onSelectItem: (id: string, selected: boolean) => void
   onSelectAll: (selected: boolean) => void
   onStatusChange: (id: string, status: ContractBillingItemStatus) => void
+  onApproveDiscount?: (id: string) => void
+  showItemType?: boolean
 }
 
 export function ContractBillingItemsTable({
@@ -34,7 +39,9 @@ export function ContractBillingItemsTable({
   selectedIds,
   onSelectItem,
   onSelectAll,
-  onStatusChange
+  onStatusChange,
+  onApproveDiscount,
+  showItemType = false
 }: ContractBillingItemsTableProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
@@ -83,6 +90,9 @@ export function ContractBillingItemsTable({
               </th>
               <th className="p-4 text-left text-sm font-medium text-slate-400">Kund</th>
               <th className="p-4 text-left text-sm font-medium text-slate-400">Artikel</th>
+              {showItemType && (
+                <th className="p-4 text-center text-sm font-medium text-slate-400">Typ</th>
+              )}
               <th className="p-4 text-left text-sm font-medium text-slate-400">Period</th>
               <th className="p-4 text-right text-sm font-medium text-slate-400">Belopp</th>
               <th className="p-4 text-center text-sm font-medium text-slate-400">Status</th>
@@ -129,12 +139,30 @@ export function ContractBillingItemsTable({
                   </td>
                   <td className="p-4">
                     <div>
-                      <p className="text-white text-sm">{item.article_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-white text-sm">{item.article_name}</p>
+                        {item.requires_approval && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-orange-500/20 text-orange-400">
+                            <AlertCircle className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
                       {item.article_code && (
                         <p className="text-xs text-slate-500 font-mono">{item.article_code}</p>
                       )}
                     </div>
                   </td>
+                  {showItemType && (
+                    <td className="p-4 text-center">
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        item.item_type === 'contract'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-purple-500/20 text-purple-400'
+                      }`}>
+                        {item.item_type === 'contract' ? 'Avtal' : 'Ad-hoc'}
+                      </span>
+                    </td>
+                  )}
                   <td className="p-4">
                     <p className="text-slate-300 text-sm">
                       {formatBillingPeriod(item.billing_period_start, item.billing_period_end)}
@@ -144,9 +172,12 @@ export function ContractBillingItemsTable({
                     <p className="text-white font-medium">
                       {formatBillingAmount(item.total_price)}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {item.vat_rate}% moms
-                    </p>
+                    <div className="flex items-center justify-end gap-1 text-xs text-slate-500">
+                      {item.discount_percent > 0 && (
+                        <span className="text-orange-400">-{item.discount_percent}%</span>
+                      )}
+                      <span>{item.vat_rate}% moms</span>
+                    </div>
                   </td>
                   <td className="p-4">
                     <div className="flex justify-center">
@@ -163,7 +194,16 @@ export function ContractBillingItemsTable({
                         <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
                       ) : (
                         <>
-                          {item.status === 'pending' && (
+                          {item.requires_approval && item.status === 'pending' && onApproveDiscount && (
+                            <button
+                              onClick={() => onApproveDiscount(item.id)}
+                              className="p-1.5 text-orange-400 hover:bg-orange-500/20 rounded transition-colors"
+                              title="Godkänn rabatt"
+                            >
+                              <Percent className="w-4 h-4" />
+                            </button>
+                          )}
+                          {item.status === 'pending' && !item.requires_approval && (
                             <button
                               onClick={() => handleStatusChange(item.id, 'approved')}
                               className="p-1.5 text-blue-400 hover:bg-blue-500/20 rounded transition-colors"

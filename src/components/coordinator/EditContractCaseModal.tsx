@@ -27,6 +27,7 @@ import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGe
 import { toSwedishISOString } from '../../utils/dateHelpers'
 import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
 import CasePreparationsSection from '../shared/CasePreparationsSection'
+import CaseArticleSelector from '../shared/CaseArticleSelector'
 import CustomerAcknowledgmentIndicator from '../shared/CustomerAcknowledgmentIndicator'
 
 // Radering av ärenden
@@ -1673,6 +1674,19 @@ export default function EditContractCaseModal({
                   technicianName={formData.primary_technician_name || null}
                   isReadOnly={isCustomerView}
                 />
+              )}
+
+              {/* Utförda tjänster/artiklar för fakturering */}
+              {caseData?.id && !isCustomerView && (
+                <div className="bg-slate-800/30 rounded-xl border border-white/10 overflow-hidden">
+                  <CaseArticleSelector
+                    caseId={caseData.id}
+                    caseType="contract"
+                    customerId={caseData.customer_id || undefined}
+                    technicianId={formData.primary_technician_id || undefined}
+                    technicianName={formData.primary_technician_name || undefined}
+                  />
+                </div>
               )}
 
               {/* Bilder sektion */}
