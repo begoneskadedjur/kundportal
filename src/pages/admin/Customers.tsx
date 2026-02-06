@@ -1,6 +1,6 @@
 // src/pages/admin/Customers.tsx - Success Management Dashboard för kundhantering
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   Search, Filter, RefreshCw, ChevronDown, ChevronUp,
@@ -16,7 +16,7 @@ import { PageHeader } from '../../components/shared'
 import CustomerKpiCards from '../../components/admin/customers/CustomerKpiCards'
 import HealthScoreBadge from '../../components/admin/customers/HealthScoreBadge'
 import ChurnRiskBadge from '../../components/admin/customers/ChurnRiskBadge'
-import PortalAccessBadge from '../../components/admin/customers/PortalAccessBadge'
+import CustomerRevenueModal from '../../components/admin/customers/CustomerRevenueModal'
 import EmailCampaignModal from '../../components/admin/customers/EmailCampaignModal'
 import EditCustomerModal from '../../components/admin/customers/EditCustomerModal'
 import ARRForecastChart from '../../components/admin/customers/ARRForecastChart'
@@ -35,52 +35,39 @@ import {
 } from '../../utils/customerMetrics'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import { PriceListService } from '../../services/priceListService'
+import type { PriceList, PriceListItemWithArticle } from '../../types/articles'
 
 // Expanded row component för att visa mer detaljer
 const ExpandedCustomerRow = ({ customer }: { customer: any }) => {
-  const products = useMemo(() => {
-    if (!customer.products) return []
-    try {
-      const parsed = typeof customer.products === 'string'
-        ? JSON.parse(customer.products)
-        : customer.products
+  const [priceListData, setPriceListData] = useState<{
+    priceList: PriceList | null
+    items: PriceListItemWithArticle[]
+  }>({ priceList: null, items: [] })
+  const [loadingPriceList, setLoadingPriceList] = useState(false)
 
-      if (Array.isArray(parsed)) {
-        const allProducts: any[] = []
-        parsed.forEach((group: any) => {
-          if (group.products && Array.isArray(group.products)) {
-            group.products.forEach((product: any) => {
-              // Quantity kan vara ett objekt {type, amount} eller ett nummer
-              let qty = 1
-              if (product.quantity) {
-                if (typeof product.quantity === 'object' && product.quantity !== null) {
-                  qty = product.quantity.amount || 1
-                } else if (typeof product.quantity === 'number') {
-                  qty = product.quantity
-                } else if (typeof product.quantity === 'string') {
-                  qty = parseInt(product.quantity, 10) || 1
-                }
-              }
-
-              allProducts.push({
-                name: product.name || 'Okänd produkt',
-                quantity: qty,
-                description: product.description || ''
-              })
-            })
-          }
-        })
-        return allProducts
+  useEffect(() => {
+    const fetchPriceList = async () => {
+      if (!customer.price_list_id) return
+      setLoadingPriceList(true)
+      try {
+        const [pl, items] = await Promise.all([
+          PriceListService.getPriceListById(customer.price_list_id),
+          PriceListService.getPriceListItems(customer.price_list_id)
+        ])
+        setPriceListData({ priceList: pl, items })
+      } catch (err) {
+        console.error('Error fetching price list:', err)
+      } finally {
+        setLoadingPriceList(false)
       }
-    } catch (error) {
-      console.error('Error parsing products:', error)
     }
-    return []
-  }, [customer.products])
+    fetchPriceList()
+  }, [customer.price_list_id])
 
   return (
     <tr>
-      <td colSpan={11} className="px-4 py-4 bg-slate-800/30">
+      <td colSpan={10} className="px-4 py-4 bg-slate-800/30">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Kontaktinformation */}
           <div>
@@ -122,21 +109,34 @@ const ExpandedCustomerRow = ({ customer }: { customer: any }) => {
             </div>
           </div>
 
-          {/* Produkter */}
+          {/* Prislista & Artiklar */}
           <div>
-            <h4 className="text-sm font-medium text-slate-300 mb-3">Produkter & Tjänster</h4>
-            <div className="space-y-1 max-h-32 overflow-y-auto">
-              {products.length > 0 ? (
-                products.map((product, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs py-1">
-                    <span className="text-slate-300">{product.name}</span>
-                    <span className="text-slate-500 font-mono">{product.quantity}x</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-500">Inga produkter registrerade</p>
-              )}
-            </div>
+            <h4 className="text-sm font-medium text-slate-300 mb-3">Prislista & Artiklar</h4>
+            {loadingPriceList ? (
+              <p className="text-xs text-slate-500">Laddar...</p>
+            ) : priceListData.priceList ? (
+              <div>
+                <div className="text-xs text-purple-400 mb-2 font-medium">
+                  {priceListData.priceList.name}
+                </div>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {priceListData.items.length > 0 ? (
+                    priceListData.items.map(item => (
+                      <div key={item.id} className="flex items-center justify-between text-xs py-1">
+                        <span className="text-slate-300">{item.article?.name || 'Okänd'}</span>
+                        <span className="text-slate-500 font-mono">
+                          {new Intl.NumberFormat('sv-SE').format(item.custom_price)} kr/{item.article?.unit || 'st'}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-500">Inga artiklar i prislistan</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">Ingen prislista tilldelad</p>
+            )}
           </div>
 
           {/* Health Score Breakdown */}
@@ -213,6 +213,8 @@ export default function Customers() {
   const [selectedMultiSiteOrg, setSelectedMultiSiteOrg] = useState<any>(null)
   const [singleCustomerDetailOpen, setSingleCustomerDetailOpen] = useState(false)
   const [selectedSingleCustomer, setSelectedSingleCustomer] = useState<any>(null)
+  const [revenueModalOpen, setRevenueModalOpen] = useState(false)
+  const [revenueCustomer, setRevenueCustomer] = useState<any>(null)
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -318,6 +320,12 @@ export default function Customers() {
     console.log('🚀 SINGLE MODAL DEBUG - Customer data:', organization)
     setSelectedSingleCustomer(organization)
     setSingleCustomerDetailOpen(true)
+  }
+
+  // Handle revenue modal
+  const handleViewRevenue = (organization: any) => {
+    setRevenueCustomer(organization)
+    setRevenueModalOpen(true)
   }
 
   // Get unique managers for filter
@@ -488,12 +496,6 @@ export default function Customers() {
                         Organisation & Kontakt
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-green-400" />
-                        Portal
-                      </div>
-                    </th>
                     <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
                       <div className="flex items-center justify-end gap-2">
                         <DollarSign className="w-4 h-4 text-green-400" />
@@ -556,9 +558,10 @@ export default function Customers() {
                           isExpanded={isExpanded}
                           onToggle={() => toggleExpandedRow(organization.id)}
                           onInviteToPortal={inviteToPortal}
-                          onEdit={(org) => handleEditCustomer(org.sites[0])} // Edit first site for now
+                          onEdit={(org) => handleEditCustomer(org.sites[0])}
                           onViewMultiSiteDetails={handleViewMultiSiteDetails}
                           onViewSingleCustomerDetails={handleViewSingleCustomerDetails}
+                          onViewRevenue={handleViewRevenue}
                         />
                         
                         {/* Contact and units expanded view for multisite organizations */}
@@ -843,6 +846,16 @@ export default function Customers() {
         onClose={() => {
           setSingleCustomerDetailOpen(false)
           setSelectedSingleCustomer(null)
+        }}
+      />
+
+      {/* Revenue Modal */}
+      <CustomerRevenueModal
+        customer={revenueCustomer}
+        isOpen={revenueModalOpen}
+        onClose={() => {
+          setRevenueModalOpen(false)
+          setRevenueCustomer(null)
         }}
       />
     </div>

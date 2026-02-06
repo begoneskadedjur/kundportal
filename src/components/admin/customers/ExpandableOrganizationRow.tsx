@@ -1,8 +1,8 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, Users, ExternalLink, Edit3 } from 'lucide-react'
-import { ConsolidatedCustomer, PortalAccessStatus } from '../../../hooks/useConsolidatedCustomers'
+import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins } from 'lucide-react'
+import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 
 interface ExpandableOrganizationRowProps {
@@ -15,59 +15,7 @@ interface ExpandableOrganizationRowProps {
   onViewDetails?: (org: ConsolidatedCustomer) => void
   onViewMultiSiteDetails?: (org: ConsolidatedCustomer) => void
   onViewSingleCustomerDetails?: (org: ConsolidatedCustomer) => void
-}
-
-const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: number; organization?: any }> = ({ status, userCount, organization }) => {
-  // Använd multisiteUsers.length om det finns, annars userCount
-  const totalUsers = organization?.multisiteUsers?.length || userCount
-  const hasAccess = totalUsers > 0
-  
-  const getBadgeStyles = () => {
-    return hasAccess 
-      ? 'text-green-400' // Enkel text för användare med tillgång
-      : 'bg-slate-500/20 text-slate-400 border-slate-500/30' // Cirkel för ingen tillgång
-  }
-
-  const getBadgeShape = () => {
-    return hasAccess 
-      ? 'rounded' // Mindre rundning för bättre textpassning
-      : 'rounded-full' // Behåll cirkel för "ingen tillgång"
-  }
-
-  const getBadgeIcon = () => {
-    return hasAccess ? '✓' : '✗'
-  }
-
-  const getBadgeLabel = () => {
-    return hasAccess 
-      ? `${totalUsers} användare har tillgång`
-      : 'Ingen tillgång'
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      {hasAccess ? (
-        // Design för användare MED tillgång - enkel text utan cirkel
-        <div className={`inline-flex items-center gap-1 text-xs font-medium ${getBadgeStyles()}`}>
-          <span>{getBadgeIcon()}</span>
-          <span>{getBadgeLabel()}</span>
-        </div>
-      ) : (
-        // Design för användare UTAN tillgång - behåll cirkel
-        <span className={`inline-flex items-center px-2.5 py-1 ${getBadgeShape()} text-xs font-medium border ${getBadgeStyles()}`}>
-          {getBadgeIcon()} {getBadgeLabel()}
-        </span>
-      )}
-      {(status === 'full' || status === 'partial') && userCount > 0 && (
-        <div className="flex items-center gap-1">
-          <Users className="w-3 h-3 text-slate-400" />
-          <span className="text-xs text-slate-400 font-mono">
-            {userCount} {userCount === 1 ? 'användare' : 'användare'}
-          </span>
-        </div>
-      )}
-    </div>
-  )
+  onViewRevenue?: (org: ConsolidatedCustomer) => void
 }
 
 const HealthScoreBadge: React.FC<{ level: string; score: number }> = ({ level, score }) => {
@@ -180,7 +128,8 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   onEmailContact,
   onViewDetails,
   onViewMultiSiteDetails,
-  onViewSingleCustomerDetails
+  onViewSingleCustomerDetails,
+  onViewRevenue
 }) => {
   const isMultisite = organization.organizationType === 'multisite'
   
@@ -231,25 +180,6 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               </div>
             </div>
           </div>
-        </div>
-      </td>
-
-      {/* Portal Access Column */}
-      <td className="px-6 py-4">
-        <div className="flex flex-col gap-1">
-          <PortalAccessBadge 
-            status={organization.portalAccessStatus} 
-            userCount={organization.activeUsersCount}
-            organization={organization}
-          />
-          {organization.pendingInvitationsCount > 0 && (
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></div>
-              <span className="text-xs text-amber-400">
-                {organization.pendingInvitationsCount} väntande inbjudan{organization.pendingInvitationsCount > 1 ? 'ar' : ''}
-              </span>
-            </div>
-          )}
         </div>
       </td>
 
@@ -402,6 +332,17 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
       {/* Actions Column */}
       <td className="px-6 py-4">
         <div className="flex items-center gap-2">
+          {/* Revenue Overview Button */}
+          {onViewRevenue && (
+            <button
+              onClick={() => onViewRevenue(organization)}
+              className="text-green-400 hover:text-green-300 text-sm font-medium transition-colors duration-200"
+              title="Visa intäktsöversikt"
+            >
+              <Coins className="h-4 w-4" />
+            </button>
+          )}
+
           {/* Multisite Detail Button */}
           {isMultisite && onViewMultiSiteDetails && (
             <button
@@ -412,7 +353,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               <ExternalLink className="h-4 w-4" />
             </button>
           )}
-          
+
           {/* Single Customer Detail Button */}
           {!isMultisite && onViewSingleCustomerDetails && (
             <button
