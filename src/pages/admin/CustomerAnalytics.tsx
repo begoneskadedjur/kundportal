@@ -20,7 +20,7 @@ import { formatCurrency } from '../../utils/customerMetrics'
 
 export default function CustomerAnalytics() {
   const navigate = useNavigate()
-  const { consolidatedCustomers, consolidatedAnalytics, loading } = useConsolidatedCustomers()
+  const { consolidatedCustomers, analytics: consolidatedAnalytics, loading } = useConsolidatedCustomers()
   const { customers: legacyCustomers } = useCustomerAnalytics()
 
   // KPI-data (de som flyttades från huvudsidan)
