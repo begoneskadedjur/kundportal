@@ -1,5 +1,5 @@
 // src/components/admin/customers/SingleCustomerDetailModal.tsx
-import React from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   X,
   Building2,
@@ -7,7 +7,7 @@ import {
   TrendingUp,
   AlertCircle,
   Users,
-  DollarSign,
+  Coins,
   User,
   Mail,
   Phone,
@@ -25,6 +25,7 @@ import PortalAccessBadge from './PortalAccessBadge'
 import AdminCasesList from './AdminCasesList'
 import CustomerEquipmentDualView from './CustomerEquipmentDualView'
 import { formatCurrency } from '../../../utils/customerMetrics'
+import { supabase } from '../../../lib/supabase'
 
 interface SingleCustomerDetailModalProps {
   customer: ConsolidatedCustomer | null
@@ -32,7 +33,7 @@ interface SingleCustomerDetailModalProps {
   onClose: () => void
 }
 
-const formatContractTimeRemaining = (customer: ConsolidatedCustomer): { 
+const formatContractTimeRemaining = (customer: ConsolidatedCustomer): {
   text: string
   months: number
   urgency: 'critical' | 'warning' | 'normal' | 'expired'
@@ -64,12 +65,26 @@ const formatContractTimeRemaining = (customer: ConsolidatedCustomer): {
     progress = Math.min(100, (diffMonths / 12) * 100)
   }
 
-  return { 
-    text: diffMonths < 0 ? 'Utgången' : `${diffMonths} månader kvar`, 
-    months: Math.max(0, diffMonths), 
+  return {
+    text: diffMonths < 0 ? 'Utgången' : `${diffMonths} månader kvar`,
+    months: Math.max(0, diffMonths),
     urgency,
     progress
   }
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  paid: 'text-green-400 bg-green-500/10 border-green-500/20',
+  invoiced: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  approved: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+  pending: 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  paid: 'Betald',
+  invoiced: 'Fakturerad',
+  approved: 'Godkänd',
+  pending: 'Väntande'
 }
 
 export default function SingleCustomerDetailModal({
@@ -80,43 +95,94 @@ export default function SingleCustomerDetailModal({
   if (!isOpen || !customer || customer.organizationType !== 'single') return null
 
   const contractTime = formatContractTimeRemaining(customer)
-  
+
   // Single customer data (direct access since there's only one site)
-  const site = customer.sites[0] // Single customer always has exactly one site
+  const site = customer.sites[0]
   const totalCustomerValue = customer.totalOrganizationValue
   const contractValue = customer.totalContractValue
   const casesValue = customer.totalCasesValue
   const casesCount = customer.totalCasesCount
-  
+
   // Billing status values from customer data
   const pendingCasesValue = customer.casesBillingStatus.pending.value
   const sentCasesValue = customer.casesBillingStatus.sent.value
   const paidCasesValue = customer.casesBillingStatus.paid.value
   const skipCasesValue = customer.casesBillingStatus.skip.value
 
+  // Hämta faktureringsdata från contract_billing_items
+  const [billingItems, setBillingItems] = useState<Array<{
+    total_price: number
+    status: string
+    item_type: string
+  }>>([])
+  const [billingLoading, setBillingLoading] = useState(false)
+
+  useEffect(() => {
+    const fetchBilling = async () => {
+      setBillingLoading(true)
+      try {
+        const { data, error } = await supabase
+          .from('contract_billing_items')
+          .select('total_price, status, item_type')
+          .eq('customer_id', site.id)
+          .neq('status', 'cancelled')
+        if (error) throw error
+        setBillingItems(data || [])
+      } catch {
+        setBillingItems([])
+      } finally {
+        setBillingLoading(false)
+      }
+    }
+    fetchBilling()
+  }, [site.id])
+
+  const billingStats = useMemo(() => {
+    const byStatus: Record<string, { amount: number; count: number }> = {
+      paid: { amount: 0, count: 0 },
+      invoiced: { amount: 0, count: 0 },
+      approved: { amount: 0, count: 0 },
+      pending: { amount: 0, count: 0 }
+    }
+    billingItems.forEach(i => {
+      if (byStatus[i.status]) {
+        byStatus[i.status].amount += i.total_price
+        byStatus[i.status].count++
+      }
+    })
+    const contractBilling = billingItems
+      .filter(i => i.item_type === 'contract')
+      .reduce((s, i) => s + i.total_price, 0)
+    const adHocBilling = billingItems
+      .filter(i => i.item_type === 'ad_hoc')
+      .reduce((s, i) => s + i.total_price, 0)
+    const total = contractBilling + adHocBilling
+    return { byStatus, contractBilling, adHocBilling, total }
+  }, [billingItems])
+
   return (
     <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-50 overflow-y-auto">
-      <div className="min-h-screen p-4">
+      <div className="min-h-screen p-3">
         <div className="max-w-7xl mx-auto bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-700/50 shadow-2xl">
-          
+
           {/* Sticky Header */}
           <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 rounded-t-2xl">
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-4">
+            <div className="p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start gap-3">
                   <div className="p-3 bg-blue-500/20 rounded-xl border border-blue-500/30">
                     <Building2 className="w-6 h-6 text-blue-400" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-3 mb-2">
-                      <h2 className="text-2xl font-bold text-white">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h2 className="text-xl font-bold text-white">
                         {customer.company_name}
                       </h2>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
                         Enskild kund
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-slate-400">
+                    <div className="flex items-center gap-3 text-sm text-slate-400">
                       <span className="flex items-center gap-1">
                         <User className="w-4 h-4" />
                         {customer.contact_person || 'Kontaktperson ej angiven'}
@@ -131,7 +197,7 @@ export default function SingleCustomerDetailModal({
                     </div>
                   </div>
                 </div>
-                
+
                 <button
                   onClick={onClose}
                   className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
@@ -141,10 +207,10 @@ export default function SingleCustomerDetailModal({
               </div>
 
               {/* Quick Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                   <div className="flex items-center gap-2 mb-1">
-                    <DollarSign className="w-4 h-4 text-green-400" />
+                    <Coins className="w-4 h-4 text-green-400" />
                     <span className="text-xs text-slate-400">Total Värde</span>
                   </div>
                   <div className="text-lg font-semibold text-green-400">
@@ -184,8 +250,8 @@ export default function SingleCustomerDetailModal({
                         contractTime.urgency === 'warning' ? 'bg-amber-400' :
                         'bg-green-400'
                       }`}
-                      style={{ 
-                        width: contractTime.urgency === 'expired' ? '0%' : `${contractTime.progress}%` 
+                      style={{
+                        width: contractTime.urgency === 'expired' ? '0%' : `${contractTime.progress}%`
                       }}
                     />
                   </div>
@@ -228,27 +294,27 @@ export default function SingleCustomerDetailModal({
           </div>
 
           {/* Main Content */}
-          <div className="p-6 space-y-8">
-            
+          <div className="p-4 space-y-5">
+
             {/* Customer Overview Section */}
-            <section className="space-y-6">
-              <div className="flex items-center gap-3 mb-6">
+            <section className="space-y-4">
+              <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 bg-blue-500/20 rounded-lg border border-blue-500/30">
                   <User className="w-5 h-5 text-blue-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white">Kundöversikt</h3>
+                <h3 className="text-lg font-semibold text-white">Kundöversikt</h3>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
                 {/* Contact Information */}
-                <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
-                  <h4 className="text-lg font-medium text-slate-200 mb-4 flex items-center gap-2">
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h4 className="text-lg font-medium text-slate-200 mb-3 flex items-center gap-2">
                     <User className="w-5 h-5 text-slate-400" />
                     Kontaktinformation
                   </h4>
-                  
-                  <div className="space-y-4">
+
+                  <div className="space-y-3">
                     <div className="flex items-start gap-3">
                       <User className="w-4 h-4 text-slate-500 mt-1" />
                       <div>
@@ -263,7 +329,7 @@ export default function SingleCustomerDetailModal({
                       <Mail className="w-4 h-4 text-slate-500 mt-1" />
                       <div>
                         <div className="text-sm text-slate-400">E-postadress</div>
-                        <a 
+                        <a
                           href={`mailto:${customer.contact_email}`}
                           className="text-blue-400 hover:text-blue-300 transition-colors"
                         >
@@ -277,7 +343,7 @@ export default function SingleCustomerDetailModal({
                         <Phone className="w-4 h-4 text-slate-500 mt-1" />
                         <div>
                           <div className="text-sm text-slate-400">Telefonnummer</div>
-                          <a 
+                          <a
                             href={`tel:${customer.contact_phone}`}
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
@@ -314,7 +380,7 @@ export default function SingleCustomerDetailModal({
                           <div className="text-sm text-slate-400">Säljare</div>
                           <div className="text-white">{customer.assigned_account_manager}</div>
                           {customer.account_manager_email && (
-                            <a 
+                            <a
                               href={`mailto:${customer.account_manager_email}`}
                               className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
                             >
@@ -326,12 +392,12 @@ export default function SingleCustomerDetailModal({
                     )}
 
                     {/* Portal Access Status */}
-                    <div className="flex items-start gap-3 pt-4 border-t border-slate-700/50">
+                    <div className="flex items-start gap-3 pt-3 border-t border-slate-700/50">
                       <Shield className="w-4 h-4 text-slate-500 mt-1" />
                       <div>
                         <div className="text-sm text-slate-400">Portalåtkomst</div>
                         <div className="mt-1">
-                          <PortalAccessBadge 
+                          <PortalAccessBadge
                             status={customer.portalAccessStatus}
                             tooltip={
                               customer.portalAccessStatus === 'full' ? 'Kund har fullständig portalåtkomst' :
@@ -347,16 +413,16 @@ export default function SingleCustomerDetailModal({
                 </div>
 
                 {/* Contract Overview */}
-                <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
-                  <h4 className="text-lg font-medium text-slate-200 mb-4 flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-green-400" />
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h4 className="text-lg font-medium text-slate-200 mb-3 flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-green-400" />
                     Kontraktsöversikt
                   </h4>
-                  
-                  <div className="space-y-6">
+
+                  <div className="space-y-4">
                     <div>
                       <div className="text-sm text-slate-400 mb-1">Total Kundvärde</div>
-                      <div className="text-2xl font-bold text-green-400">
+                      <div className="text-xl font-bold text-green-400">
                         {formatCurrency(totalCustomerValue)}
                       </div>
                       <div className="space-y-1 mt-2">
@@ -396,7 +462,7 @@ export default function SingleCustomerDetailModal({
                           </span>
                         )}
                       </div>
-                      
+
                       {/* Progress bar */}
                       <div className="mt-3">
                         <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
@@ -415,7 +481,7 @@ export default function SingleCustomerDetailModal({
                           />
                         </div>
                       </div>
-                      
+
                       {customer.nextRenewalDate && (
                         <div className="text-sm text-slate-500 mt-2">
                           Förnyelse: {new Date(customer.nextRenewalDate).toLocaleDateString('sv-SE', {
@@ -428,8 +494,8 @@ export default function SingleCustomerDetailModal({
                     </div>
 
                     {/* Cases Summary */}
-                    <div className="pt-4 border-t border-slate-700/50">
-                      <div className="text-sm text-slate-400 mb-3 flex items-center gap-2">
+                    <div className="pt-3 border-t border-slate-700/50">
+                      <div className="text-sm text-slate-400 mb-2 flex items-center gap-2">
                         <FileText className="w-4 h-4" />
                         Ärenden & Extra Arbeten
                       </div>
@@ -447,10 +513,10 @@ export default function SingleCustomerDetailModal({
                           <div className="text-xs text-slate-400">Ärenden värde</div>
                         </div>
                       </div>
-                      
+
                       {/* Billing Status Breakdown - only show if there are cases */}
                       {casesValue > 0 && (
-                        <div className="mt-4 space-y-2">
+                        <div className="mt-3 space-y-2">
                           <div className="text-xs text-slate-500 mb-2">Faktureringsstatus:</div>
                           <div className="grid grid-cols-4 gap-1 text-xs">
                             <div className="bg-amber-500/10 text-amber-400 px-2 py-1 rounded text-center">
@@ -472,10 +538,10 @@ export default function SingleCustomerDetailModal({
                           </div>
                         </div>
                       )}
-                      
+
                       {casesValue === 0 && (
-                        <div className="mt-4 p-3 bg-slate-800/30 rounded-lg text-center">
-                          <div className="text-slate-400 text-sm">📋 Inga ärenden ännu</div>
+                        <div className="mt-3 p-3 bg-slate-800/30 rounded-lg text-center">
+                          <div className="text-slate-400 text-sm">Inga ärenden ännu</div>
                           <div className="text-slate-500 text-xs mt-1">Ärenden visas när de läggs till i systemet</div>
                         </div>
                       )}
@@ -483,22 +549,22 @@ export default function SingleCustomerDetailModal({
 
                     {/* Additional customer info */}
                     {(customer.industry_category || customer.business_type || customer.customer_size) && (
-                      <div className="pt-4 border-t border-slate-700/50">
-                        <div className="grid grid-cols-1 gap-4">
+                      <div className="pt-3 border-t border-slate-700/50">
+                        <div className="grid grid-cols-1 gap-3">
                           {customer.industry_category && (
                             <div>
                               <div className="text-sm text-slate-400">Bransch</div>
                               <div className="text-white capitalize">{customer.industry_category}</div>
                             </div>
                           )}
-                          
+
                           {customer.business_type && (
                             <div>
                               <div className="text-sm text-slate-400">Verksamhetstyp</div>
                               <div className="text-white">{customer.business_type}</div>
                             </div>
                           )}
-                          
+
                           {customer.customer_size && (
                             <div>
                               <div className="text-sm text-slate-400">Företagsstorlek</div>
@@ -514,15 +580,15 @@ export default function SingleCustomerDetailModal({
             </section>
 
             {/* Cases Management Section */}
-            <section className="space-y-6">
+            <section className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-500/20 rounded-lg border border-purple-500/30">
                   <FileText className="w-5 h-5 text-purple-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white">Ärendehantering</h3>
+                <h3 className="text-lg font-semibold text-white">Ärendehantering</h3>
               </div>
 
-              <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
                 <AdminCasesList
                   customerId={site.id}
                   organizationId={customer.organizationId || undefined}
@@ -534,12 +600,12 @@ export default function SingleCustomerDetailModal({
             <div className="border-t border-slate-700" />
 
             {/* Equipment Placement Section */}
-            <section className="space-y-6">
+            <section className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-500/20 rounded-lg border border-emerald-500/30">
                   <MapPin className="w-5 h-5 text-emerald-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white">Utrustningsplacering</h3>
+                <h3 className="text-lg font-semibold text-white">Utrustningsplacering</h3>
               </div>
 
               <CustomerEquipmentDualView
@@ -548,96 +614,97 @@ export default function SingleCustomerDetailModal({
               />
             </section>
 
-            {/* Economic Analysis Section */}
-            <section className="space-y-6">
+            {/* Economic Analysis Section — ny faktureringsdata */}
+            <section className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
-                  <DollarSign className="w-5 h-5 text-yellow-400" />
+                  <Coins className="w-5 h-5 text-yellow-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white">Ekonomisk Analys</h3>
+                <h3 className="text-lg font-semibold text-white">Ekonomisk Analys</h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Revenue Breakdown */}
-                <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
-                  <h4 className="text-lg font-medium text-slate-200 mb-4">Intäktsfördelning</h4>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                        <span className="text-slate-300">Kontrakt (årligt)</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-white font-semibold">{formatCurrency(customer.totalAnnualValue)}</div>
-                        <div className="text-xs text-slate-500">{((customer.totalAnnualValue / totalCustomerValue) * 100).toFixed(1)}%</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-                        <span className="text-slate-300">Ärenden & Extra arbeten</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-white font-semibold">{formatCurrency(casesValue)}</div>
-                        <div className="text-xs text-slate-500">{((casesValue / totalCustomerValue) * 100).toFixed(1)}%</div>
-                      </div>
-                    </div>
-                    
-                    <div className="pt-4 border-t border-slate-700/50">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 font-medium">Totalt kundvärde:</span>
-                        <span className="text-xl font-bold text-green-400">{formatCurrency(totalCustomerValue)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Revenue Breakdown — från contract_billing_items */}
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h4 className="text-lg font-medium text-slate-200 mb-3">Fakturerad intäkt</h4>
 
-                {/* Payment Status */}
-                <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
-                  <h4 className="text-lg font-medium text-slate-200 mb-4">Betalningsstatus (Ärenden)</h4>
-                  
-                  {casesValue > 0 ? (
+                  {billingLoading ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full mx-auto mb-2" />
+                      <p className="text-slate-400 text-sm">Laddar...</p>
+                    </div>
+                  ) : billingStats.total > 0 ? (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                        <span className="text-green-400">Betalda</span>
+                      <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                          <span className="text-slate-300">Avtalsfakturering</span>
+                        </div>
                         <div className="text-right">
-                          <div className="text-green-400 font-semibold">{formatCurrency(paidCasesValue)}</div>
-                          <div className="text-xs text-slate-500">{customer.casesBillingStatus.paid.count} st</div>
+                          <div className="text-white font-semibold">{formatCurrency(billingStats.contractBilling)}</div>
+                          {billingStats.total > 0 && (
+                            <div className="text-xs text-slate-500">{((billingStats.contractBilling / billingStats.total) * 100).toFixed(0)}%</div>
+                          )}
                         </div>
                       </div>
-                      
-                      <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                        <span className="text-blue-400">Skickade</span>
+
+                      <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full bg-blue-400"></div>
+                          <span className="text-slate-300">Tilläggstjänster</span>
+                        </div>
                         <div className="text-right">
-                          <div className="text-blue-400 font-semibold">{formatCurrency(sentCasesValue)}</div>
-                          <div className="text-xs text-slate-500">{customer.casesBillingStatus.sent.count} st</div>
+                          <div className="text-white font-semibold">{formatCurrency(billingStats.adHocBilling)}</div>
+                          {billingStats.total > 0 && (
+                            <div className="text-xs text-slate-500">{((billingStats.adHocBilling / billingStats.total) * 100).toFixed(0)}%</div>
+                          )}
                         </div>
                       </div>
-                      
-                      <div className="flex items-center justify-between p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                        <span className="text-amber-400">Väntande</span>
-                        <div className="text-right">
-                          <div className="text-amber-400 font-semibold">{formatCurrency(pendingCasesValue)}</div>
-                          <div className="text-xs text-slate-500">{customer.casesBillingStatus.pending.count} st</div>
+
+                      <div className="pt-3 border-t border-slate-700/50">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 font-medium">Totalt fakturerat:</span>
+                          <span className="text-xl font-bold text-green-400">{formatCurrency(billingStats.total)}</span>
                         </div>
                       </div>
-                      
-                      {skipCasesValue > 0 && (
-                        <div className="flex items-center justify-between p-3 bg-slate-500/10 rounded-lg border border-slate-500/20">
-                          <span className="text-slate-400">Hoppas över</span>
-                          <div className="text-right">
-                            <div className="text-slate-400 font-semibold">{formatCurrency(skipCasesValue)}</div>
-                            <div className="text-xs text-slate-500">{customer.casesBillingStatus.skip.count} st</div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ) : (
-                    <div className="text-center py-6">
-                      <div className="text-slate-400 text-sm">💰 Inga ärenden att fakturera</div>
-                      <div className="text-slate-500 text-xs mt-1">Betalningsstatus visas här när ärenden skapas</div>
+                    <div className="text-center py-4">
+                      <div className="text-slate-400 text-sm">Inga faktureringsdata registrerade</div>
+                      <div className="text-slate-500 text-xs mt-1">Data visas när avtalsfakturering genereras</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Payment Status — från contract_billing_items */}
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h4 className="text-lg font-medium text-slate-200 mb-3">Faktureringsstatus</h4>
+
+                  {billingLoading ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full mx-auto mb-2" />
+                      <p className="text-slate-400 text-sm">Laddar...</p>
+                    </div>
+                  ) : billingItems.length > 0 ? (
+                    <div className="space-y-3">
+                      {(['paid', 'invoiced', 'approved', 'pending'] as const).map(status => {
+                        const data = billingStats.byStatus[status]
+                        if (data.amount === 0 && data.count === 0) return null
+                        return (
+                          <div key={status} className={`flex items-center justify-between p-3 rounded-lg border ${STATUS_COLORS[status]}`}>
+                            <span>{STATUS_LABELS[status]}</span>
+                            <div className="text-right">
+                              <div className="font-semibold">{formatCurrency(data.amount)}</div>
+                              <div className="text-xs opacity-80">{data.count} poster</div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <div className="text-slate-400 text-sm">Inga faktureringsdata registrerade</div>
+                      <div className="text-slate-500 text-xs mt-1">Status visas när fakturering genereras</div>
                     </div>
                   )}
                 </div>
@@ -645,24 +712,24 @@ export default function SingleCustomerDetailModal({
             </section>
 
             {/* Health & Risk Metrics Section */}
-            <section className="space-y-6">
+            <section className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-red-500/20 rounded-lg border border-red-500/30">
                   <Activity className="w-5 h-5 text-red-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white">Hälsa & Riskanalys</h3>
+                <h3 className="text-lg font-semibold text-white">Hälsa & Riskanalys</h3>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Health Score Breakdown */}
-                <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
-                  <h4 className="text-lg font-medium text-slate-200 mb-4 flex items-center gap-2">
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h4 className="text-lg font-medium text-slate-200 mb-3 flex items-center gap-2">
                     <Activity className="w-5 h-5 text-blue-400" />
                     Health Score Uppdelning
                   </h4>
-                  
+
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-3">
                       <span className="text-slate-300">Övergripande Health Score</span>
                       <HealthScoreBadge
                         score={customer.overallHealthScore.score}
@@ -671,7 +738,7 @@ export default function SingleCustomerDetailModal({
                         size="md"
                       />
                     </div>
-                    
+
                     {/* Health Score Components */}
                     <div className="space-y-3">
                       {Object.entries(customer.overallHealthScore.breakdown).map(([key, data]) => {
@@ -681,10 +748,10 @@ export default function SingleCustomerDetailModal({
                           supportTickets: 'Supportärenden',
                           paymentHistory: 'Betalningshistorik'
                         }[key] || key
-                        
+
                         const percentage = Math.round((data.weight * 100))
                         const scoreValue = Math.round(data.score)
-                        
+
                         return (
                           <div key={key} className="space-y-2">
                             <div className="flex items-center justify-between text-sm">
@@ -710,14 +777,14 @@ export default function SingleCustomerDetailModal({
                 </div>
 
                 {/* Risk Analysis */}
-                <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
-                  <h4 className="text-lg font-medium text-slate-200 mb-4 flex items-center gap-2">
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h4 className="text-lg font-medium text-slate-200 mb-3 flex items-center gap-2">
                     <TrendingDown className="w-5 h-5 text-red-400" />
                     Riskanalys
                   </h4>
-                  
+
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-3">
                       <span className="text-slate-300">Churn Risk</span>
                       <ChurnRiskBadge
                         risk={customer.highestChurnRisk.risk}
@@ -726,7 +793,7 @@ export default function SingleCustomerDetailModal({
                         size="md"
                       />
                     </div>
-                    
+
                     {/* Risk Factors */}
                     {customer.highestChurnRisk.factors && customer.highestChurnRisk.factors.length > 0 && (
                       <div className="space-y-2">
@@ -739,9 +806,9 @@ export default function SingleCustomerDetailModal({
                         ))}
                       </div>
                     )}
-                    
+
                     {/* Renewal Probability */}
-                    <div className="pt-4 border-t border-slate-700/50">
+                    <div className="pt-3 border-t border-slate-700/50">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-slate-400">Förnyelsesannolikhet</span>
@@ -760,7 +827,7 @@ export default function SingleCustomerDetailModal({
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Contract Status Alerts */}
                     <div className="space-y-2">
                       {customer.hasExpiringSites && (
@@ -769,14 +836,14 @@ export default function SingleCustomerDetailModal({
                           <span className="text-amber-400 text-sm">Avtal går ut inom 90 dagar</span>
                         </div>
                       )}
-                      
+
                       {customer.highestChurnRisk.risk === 'high' && (
                         <div className="flex items-center gap-2 p-2 bg-red-500/10 rounded-lg border border-red-500/20">
                           <AlertCircle className="w-4 h-4 text-red-400" />
                           <span className="text-red-400 text-sm">Hög risk för kundförlust</span>
                         </div>
                       )}
-                      
+
                       {!customer.is_active && (
                         <div className="flex items-center gap-2 p-2 bg-slate-500/10 rounded-lg border border-slate-500/20">
                           <AlertCircle className="w-4 h-4 text-slate-400" />
@@ -795,8 +862,8 @@ export default function SingleCustomerDetailModal({
           <div className="sticky bottom-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 rounded-b-2xl p-4">
             <div className="flex items-center justify-between">
               <div className="text-xs text-slate-500">
-                Senast uppdaterad: {customer.updated_at ? 
-                  new Date(customer.updated_at).toLocaleString('sv-SE') : 
+                Senast uppdaterad: {customer.updated_at ?
+                  new Date(customer.updated_at).toLocaleString('sv-SE') :
                   'Okänt'
                 }
               </div>
