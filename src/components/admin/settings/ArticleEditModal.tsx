@@ -56,6 +56,8 @@ export function ArticleEditModal({
   const [category, setCategory] = useState<ArticleCategory>('Övrigt')
   const [groupId, setGroupId] = useState<string | null>(null)
   const [isActive, setIsActive] = useState(true)
+  const [rotEligible, setRotEligible] = useState(false)
+  const [rutEligible, setRutEligible] = useState(false)
 
   // Gruppstate
   const [groups, setGroups] = useState<ArticleGroup[]>([])
@@ -112,6 +114,8 @@ export function ArticleEditModal({
       setCategory(article.category)
       setGroupId(article.group_id)
       setIsActive(article.is_active)
+      setRotEligible(article.rot_eligible ?? false)
+      setRutEligible(article.rut_eligible ?? false)
       setSelectedPriceListIds([]) // Vid redigering behåller vi inte prislista-val
     } else {
       // Återställ för ny
@@ -124,6 +128,8 @@ export function ArticleEditModal({
       setCategory('Övrigt')
       setGroupId(null)
       setIsActive(true)
+      setRotEligible(false)
+      setRutEligible(false)
       // selectedPriceListIds hanteras i loadPriceLists
     }
     setErrors({})
@@ -182,7 +188,9 @@ export function ArticleEditModal({
         vat_rate: parseFloat(vatRate),
         category,
         group_id: groupId,
-        is_active: isActive
+        is_active: isActive,
+        rot_eligible: rotEligible,
+        rut_eligible: rutEligible
       }
 
       let savedArticle: Article
@@ -471,17 +479,42 @@ export function ArticleEditModal({
             </div>
           </div>
 
-          {/* Aktiv */}
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="w-5 h-5 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500"
-            />
-            <span className="text-white">Aktiv</span>
-            <span className="text-slate-500 text-sm">(kan väljas vid fakturering)</span>
-          </label>
+          {/* Aktiv + ROT/RUT */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="w-5 h-5 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500"
+              />
+              <span className="text-white">Aktiv</span>
+              <span className="text-slate-500 text-sm">(kan väljas vid fakturering)</span>
+            </label>
+
+            <div className="flex gap-6">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rotEligible}
+                  onChange={(e) => setRotEligible(e.target.checked)}
+                  className="w-5 h-5 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500"
+                />
+                <span className="text-white">ROT-berättigad</span>
+                <span className="text-slate-500 text-xs">(30%)</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rutEligible}
+                  onChange={(e) => setRutEligible(e.target.checked)}
+                  className="w-5 h-5 rounded bg-slate-900 border-slate-600 text-green-500 focus:ring-green-500"
+                />
+                <span className="text-white">RUT-berättigad</span>
+                <span className="text-slate-500 text-xs">(50%)</span>
+              </label>
+            </div>
+          </div>
 
           {/* Prislistor - endast för nya artiklar */}
           {!isEditing && (

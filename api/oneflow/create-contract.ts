@@ -20,7 +20,9 @@ interface ContractRequestBody {
   senderName?: string
   // NYTT: Case ID för koppling
   caseId?: string
-  // NYTT: Produkter
+  // Prislista-ID för fakturering
+  priceListId?: string | null
+  // Produkter
   selectedProducts?: Array<{
     product: {
       id: string
@@ -242,7 +244,8 @@ export default async function handler(
     senderEmail,
     senderName,
     selectedProducts,
-    caseId
+    caseId,
+    priceListId
   } = req.body as ContractRequestBody
 
   // Validera användaren
@@ -390,11 +393,12 @@ export default async function handler(
       process.env.SUPABASE_SERVICE_KEY!
     )
     
-    // Uppdatera kontraktet med creator info och case-koppling
+    // Uppdatera kontraktet med creator info, case-koppling och prislista
     const updateData: any = {
       created_by_email: creatorEmail,
       created_by_name: creatorName,
-      created_by_role: creatorRole
+      created_by_role: creatorRole,
+      price_list_id: priceListId || null
     }
     
     // Lägg till source_id och source_type om caseId finns

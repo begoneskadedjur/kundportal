@@ -91,6 +91,15 @@ export interface SelectedProduct {
   notes?: string
 }
 
+// Artikelbaserat val i wizard (ersätter SelectedProduct för prislisteflöde)
+export interface SelectedArticleItem {
+  article: import('./articles').Article
+  priceListItem: import('./articles').PriceListItem | null
+  effectivePrice: number
+  quantity: number
+  notes?: string
+}
+
 // Prissammanfattning
 export interface PriceSummary {
   subtotal: number

@@ -67,6 +67,8 @@ export interface Article {
   is_active: boolean
   sort_order: number
   fortnox_article_id: string | null
+  rot_eligible: boolean
+  rut_eligible: boolean
   created_at: string
   updated_at: string
 }
@@ -93,6 +95,8 @@ export interface CreateArticleInput {
   is_active?: boolean
   sort_order?: number
   fortnox_article_id?: string
+  rot_eligible?: boolean
+  rut_eligible?: boolean
 }
 
 /**
@@ -109,6 +113,8 @@ export interface UpdateArticleInput {
   is_active?: boolean
   sort_order?: number
   fortnox_article_id?: string | null
+  rot_eligible?: boolean
+  rut_eligible?: boolean
 }
 
 /**

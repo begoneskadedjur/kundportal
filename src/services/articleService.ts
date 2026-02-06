@@ -116,7 +116,9 @@ export class ArticleService {
         group_id: input.group_id || null,
         is_active: input.is_active ?? true,
         sort_order: input.sort_order ?? 0,
-        fortnox_article_id: input.fortnox_article_id || null
+        fortnox_article_id: input.fortnox_article_id || null,
+        rot_eligible: input.rot_eligible ?? false,
+        rut_eligible: input.rut_eligible ?? false
       })
       .select()
       .single()
@@ -141,6 +143,8 @@ export class ArticleService {
     if (input.is_active !== undefined) updateData.is_active = input.is_active
     if (input.sort_order !== undefined) updateData.sort_order = input.sort_order
     if (input.fortnox_article_id !== undefined) updateData.fortnox_article_id = input.fortnox_article_id
+    if (input.rot_eligible !== undefined) updateData.rot_eligible = input.rot_eligible
+    if (input.rut_eligible !== undefined) updateData.rut_eligible = input.rut_eligible
 
     const { data, error } = await supabase
       .from('articles')

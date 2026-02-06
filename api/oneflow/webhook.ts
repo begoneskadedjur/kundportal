@@ -548,11 +548,12 @@ const saveOrUpdateContract = async (contractData: ContractInsertData): Promise<v
     }
 
     if (existingContract) {
-      // Uppdatera befintligt kontrakt
+      // Uppdatera befintligt kontrakt - bevara fält som sätts via create-contract API
+      const { price_list_id, created_by_email, created_by_name, created_by_role, ...webhookData } = contractData as any
       const { error: updateError } = await supabase
         .from('contracts')
         .update({
-          ...contractData,
+          ...webhookData,
           updated_at: new Date().toISOString()
         })
         .eq('oneflow_contract_id', contractData.oneflow_contract_id)
@@ -975,6 +976,9 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       customer_size: calculateCustomerSize(totalContractValue),
       service_frequency: serviceFrequency,
       
+      // Prislista från wizard
+      price_list_id: contract.price_list_id || null,
+
       // Metadata
       source_type: 'oneflow' as const,
       is_active: true
