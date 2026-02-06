@@ -300,6 +300,10 @@ const functionDeclarations = [
             enum: ['month', 'pest_type', 'technician', 'status', 'case_type']
           },
           description: 'Grupperingar att inkludera i rapporten. Default: ["month", "pest_type"]'
+        },
+        exclude_zero_revenue: {
+          type: 'boolean',
+          description: 'Om true, exkludera ärenden utan intäkter (pris = 0 eller null). Default: false'
         }
       },
       required: ['date_from']
@@ -587,7 +591,7 @@ async function searchCasesInDb(args: Record<string, unknown>) {
   const buildQuery = (table: string, dateField: string, isContract: boolean) => {
     let query = supabase.from(table).select(
       isContract
-        ? 'id, title, scheduled_start, scheduled_end, address, status, customer:customers(company_name), primary_tech:technicians!primary_technician_id(name)'
+        ? 'id, title, scheduled_start, scheduled_end, address, pest_type, status, customer:customers(company_name), primary_tech:technicians!primary_technician_id(name)'
         : 'id, title, start_date, due_date, adress, skadedjur, status, kontaktperson, pris, primary_assignee_name'
     );
 
@@ -634,6 +638,7 @@ async function searchCasesInDb(args: Record<string, unknown>) {
             ...c,
             start_date: c.scheduled_start,
             adress: c.address,
+            skadedjur: c.pest_type,
             kontaktperson: c.customer?.company_name,
             primary_assignee_name: c.primary_tech?.name,
             type: 'avtal'
@@ -652,6 +657,7 @@ async function searchCasesInDb(args: Record<string, unknown>) {
     filtered = filtered.filter(c =>
       c.title?.toLowerCase().includes(term) ||
       c.kontaktperson?.toLowerCase().includes(term) ||
+      c.skadedjur?.toLowerCase().includes(term) ||
       extractAddress(c.adress).toLowerCase().includes(term)
     );
   }
@@ -686,6 +692,7 @@ async function generateCaseReport(args: Record<string, unknown>) {
   const technicianName = (args.technician_name as string | undefined)?.toLowerCase().trim();
   const caseTypeFilter = (args.case_type as string) || 'all';
   const groupBy = (args.group_by as string[]) || ['month', 'pest_type'];
+  const excludeZeroRevenue = args.exclude_zero_revenue as boolean || false;
 
   console.log(`[Team Chat] generateCaseReport:`, { pestTypeSearch, dateFrom, dateTo, technicianName, caseTypeFilter, groupBy });
 
@@ -780,6 +787,12 @@ async function generateCaseReport(args: Record<string, unknown>) {
   if (pestTypeSearch) {
     allCases = allCases.filter(c => c.pest_type_field.toLowerCase().includes(pestTypeSearch));
     console.log(`[Team Chat] After pest_type filter "${pestTypeSearch}": ${allCases.length} cases`);
+  }
+
+  // Filtrera bort 0-intäktsärenden om begärt
+  if (excludeZeroRevenue) {
+    allCases = allCases.filter(c => c.price_field > 0);
+    console.log(`[Team Chat] After exclude_zero_revenue: ${allCases.length} cases`);
   }
 
   // Bygg summary
@@ -1196,6 +1209,8 @@ Använd för aggregerade rapporter över längre perioder. Returnerar statistik 
 **Resultat:**
 - summary: Totalt antal, intäkter, genomsnittspris, datumintervall
 - breakdowns: Uppdelningar per månad/skadedjur/tekniker/status/ärendetyp
+
+Om användaren vill exkludera ärenden utan intäkter, sätt \`exclude_zero_revenue: true\`.
 
 Presentera alltid data i tydliga tabeller. Nämn alltid datumintervall och eventuella filter i svaret.
 
