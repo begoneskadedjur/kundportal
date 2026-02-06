@@ -37,12 +37,9 @@ export default function CustomerKpiCards({ analytics }: KpiCardsProps) {
         label: 'denna månad'
       } : null,
       tooltip: `Total summa av alla aktiva kontraktsvärden
-      
+
 Beräkning:
-Summan av alla kunders total_contract_value
-      
-Månadsvis tillväxt: ${analytics.monthlyGrowth > 0 ? '+' : ''}${analytics.monthlyGrowth.toFixed(1)}%
-Inkluderar både nya kontrakt och uppsägningar`
+Summan av alla kunders total_contract_value`
     },
     {
       title: 'Aktiva Kunder',

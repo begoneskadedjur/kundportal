@@ -205,25 +205,30 @@ export function useConsolidatedCustomers() {
       setLoading(true)
       setError(null)
 
-      // Hämta alla kunder
-      const { data: customersData, error: customersError } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false })
+      // Parallellisera oberoende queries för snabbare laddning
+      const [
+        customersResult,
+        profilesResult,
+        multisiteRolesResult,
+        casesResult,
+        invitationsResult
+      ] = await Promise.all([
+        supabase.from('customers').select('*').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('customer_id, role').eq('role', 'customer'),
+        supabase.from('multisite_user_roles').select('organization_id, user_id, is_active, role_type, site_ids').eq('is_active', true),
+        supabase.from('cases').select('id, customer_id, title, description, price, billing_status, created_at'),
+        supabase.from('user_invitations').select('customer_id, accepted_at, expires_at')
+      ])
 
+      const { data: customersData, error: customersError } = customersResult
       if (customersError) throw customersError
-      
-      // DEBUG: Log raw data
-      console.log('🔍 DEBUG - Raw customers data:', customersData?.length)
-      console.log('🔍 DEBUG - Multisite candidates:', customersData?.filter(c => c.is_multisite && c.organization_id)?.length)
-      console.log('🔍 DEBUG - Sample multisite customer:', customersData?.find(c => c.is_multisite && c.organization_id))
 
-      // Hämta portal access information
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('customer_id, role')
-        .eq('role', 'customer')
+      const { data: profilesData } = profilesResult
+      const { data: multisiteRoles, error: multisiteError } = multisiteRolesResult
+      const { data: casesData, error: casesError } = casesResult
+      const { data: invitationsData, error: invitationsError } = invitationsResult
 
+      // Portal access map
       const portalAccessMap = new Map<string, boolean>()
       profilesData?.forEach(profile => {
         if (profile.customer_id) {
@@ -231,44 +236,31 @@ export function useConsolidatedCustomers() {
         }
       })
 
-      // Hämta multisite portal access - först testa enkel query
-      console.log('🔍 DEBUG - Testing simple multisite_user_roles query...')
-      const { data: multisiteRoles, error: multisiteError } = await supabase
-        .from('multisite_user_roles')
-        .select('organization_id, user_id, is_active, role_type, site_ids')
-        .eq('is_active', true)
-      
-      console.log('🔍 DEBUG - Multisite roles result:', multisiteRoles?.length, 'error:', multisiteError)
-      
-      // Hämta profiles och auth users separat om multisite_user_roles fungerar
+      // Hämta multisite profiles och auth users (beror på multisiteRoles)
       let multisiteProfilesData = null
       let authUsersData = null
       if (multisiteRoles && !multisiteError) {
         const userIds = multisiteRoles.map(r => r.user_id)
-        
-        // Hämta profiles data
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
+
+        // Parallellisera multisite-relaterade queries
+        const multisiteProfilesPromise = supabase.from('profiles')
           .select('user_id, display_name, email, last_login, email_verified, is_active')
           .in('user_id', userIds)
           .eq('is_active', true)
-        
-        console.log('🔍 DEBUG - Profiles result:', profiles?.length, 'error:', profilesError)
-        multisiteProfilesData = profiles
 
-        // Hämta auth users data via RPC för korrekt login-status
-        try {
-          const { data: authUsers, error: authError } = await supabase
-            .rpc('get_user_login_status', { user_ids: userIds })
-          
-          console.log('🔍 DEBUG - Auth users RPC result:', authUsers?.length, 'error:', authError)
-          if (!authError && authUsers) {
-            authUsersData = authUsers
-          }
-        } catch (rpcError) {
-          console.warn('⚠️ RPC get_user_login_status inte tillgänglig, använder profiles.last_login fallback:', rpcError)
-          // Fallback till profiles.last_login om RPC inte finns
-          authUsersData = null
+        const authUsersPromise = supabase
+          .rpc('get_user_login_status', { user_ids: userIds })
+          .then(result => result)
+          .catch(() => ({ data: null, error: { message: 'RPC not available' } }))
+
+        const [multisiteProfilesResult, authUsersResult] = await Promise.all([
+          multisiteProfilesPromise,
+          authUsersPromise
+        ])
+
+        multisiteProfilesData = multisiteProfilesResult.data
+        if (authUsersResult && !(authUsersResult as any).error && (authUsersResult as any).data) {
+          authUsersData = (authUsersResult as any).data
         }
       }
 
@@ -289,12 +281,12 @@ export function useConsolidatedCustomers() {
       // Kombinera multisite_user_roles med profiles och auth users data
       if (multisiteRoles && multisiteProfilesData) {
         const profilesMap = new Map(multisiteProfilesData.map(p => [p.user_id, p]))
-        const authUsersMap = new Map((authUsersData || []).map(u => [u.id, u]))
-        
+        const authUsersMap = new Map((authUsersData || []).map((u: any) => [u.id, u]))
+
         multisiteRoles.forEach(role => {
           const profile = profilesMap.get(role.user_id)
           const authUser = authUsersMap.get(role.user_id)
-          
+
           if (role.organization_id && profile) {
             const current = multisiteUsersMap.get(role.organization_id) || []
             current.push({
@@ -306,8 +298,8 @@ export function useConsolidatedCustomers() {
               last_sign_in_at: authUser?.last_sign_in_at || null,
               email_verified: profile.email_verified,
               is_active: profile.is_active,
-              hasLoggedIn: authUser?.last_sign_in_at ? !!authUser.last_sign_in_at : !!profile.last_login, // Fallback till profiles om auth data saknas
-              site_ids: role.site_ids // Lägg till site_ids från multisite_user_roles
+              hasLoggedIn: authUser?.last_sign_in_at ? !!authUser.last_sign_in_at : !!profile.last_login,
+              site_ids: role.site_ids
             })
             multisiteUsersMap.set(role.organization_id, current)
           }
@@ -320,16 +312,11 @@ export function useConsolidatedCustomers() {
         multisiteAccessMap.set(orgId, users.length)
       })
 
-      // Hämta cases-data för alla kunder
-      const { data: casesData, error: casesError } = await supabase
-        .from('cases')
-        .select('id, customer_id, title, description, price, billing_status, created_at')
-
+      // Cases map
       if (casesError && !casesError.message.includes('permission denied')) {
         console.error('Error fetching cases:', casesError)
       }
 
-      // Skapa cases map per customer_id
       const casesMap = new Map<string, any[]>()
       casesData?.forEach(caseItem => {
         if (caseItem.customer_id) {
@@ -341,18 +328,13 @@ export function useConsolidatedCustomers() {
             price: caseItem.price || 0,
             billing_status: caseItem.billing_status || 'pending',
             created_at: caseItem.created_at,
-            case_type: 'private_case' // Assuming private cases for now
+            case_type: 'private_case'
           })
           casesMap.set(caseItem.customer_id, existing)
         }
       })
 
-      // Hämta inbjudningar med felhantering
-      const { data: invitationsData, error: invitationsError } = await supabase
-        .from('user_invitations')
-        .select('customer_id, accepted_at, expires_at')
-      
-      // Om vi får 403-fel, fortsätt utan inbjudningsdata
+      // Inbjudningar
       if (invitationsError && !invitationsError.message.includes('permission denied')) {
         console.error('Error fetching invitations:', invitationsError)
       }
@@ -432,10 +414,6 @@ export function useConsolidatedCustomers() {
     }>>
   ): ConsolidatedCustomer[] => {
     const consolidatedMap = new Map<string, ConsolidatedCustomer>()
-    
-    // DEBUG: Log consolidation input
-    console.log('🔧 DEBUG - Consolidating customers:', customers.length)
-    console.log('🔧 DEBUG - Multisite customers to consolidate:', customers.filter(c => c.is_multisite && c.organization_id).length)
     
     customers.forEach(customer => {
       if (customer.is_multisite && customer.organization_id) {
@@ -686,11 +664,6 @@ export function useConsolidatedCustomers() {
     const result = Array.from(consolidatedMap.values())
     
     // DEBUG: Log consolidation result
-    console.log('✅ DEBUG - Consolidated result:', result.length)
-    console.log('✅ DEBUG - Multisite organizations:', result.filter(c => c.organizationType === 'multisite').length)
-    console.log('✅ DEBUG - Single customers:', result.filter(c => c.organizationType === 'single').length)
-    console.log('✅ DEBUG - Sample multisite org:', result.find(c => c.organizationType === 'multisite'))
-    
     return result
   }
 
@@ -768,17 +741,21 @@ export function useConsolidatedCustomers() {
       multisiteOrganizations: multisiteOrgs.length,
       singleCustomers: singleCustomers.length,
       portfolioValue,
-      renewalValue30Days: 0, // TODO: Beräkna från sites
-      renewalValue90Days: 0, // TODO: Beräkna från sites
+      renewalValue30Days: consolidatedCustomers
+        .filter(c => c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 30)
+        .reduce((sum, c) => sum + c.totalContractValue, 0),
+      renewalValue90Days: consolidatedCustomers
+        .filter(c => c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90)
+        .reduce((sum, c) => sum + c.totalContractValue, 0),
       averageContractValue,
       averageHealthScore,
       organizationsAtRisk: organizationsAtRiskCount,
-      monthlyGrowth: 5.2, // Placeholder värde
-      
+      monthlyGrowth: 0,
+
       // KPI Cards properties
       totalCustomers: consolidatedCustomers.length,
       activeCustomers: activeCustomersCount,
-      netRevenueRetention: 98.5, // Placeholder värde
+      netRevenueRetention: 0,
       highRiskCount: organizationsAtRiskCount,
       
       topOrganizationsByValue,

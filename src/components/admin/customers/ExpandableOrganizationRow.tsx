@@ -132,9 +132,16 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   onViewRevenue
 }) => {
   const isMultisite = organization.organizationType === 'multisite'
-  
+
+  // Röd border på kritiska rader: avtal < 30 dagar kvar eller hög churn risk
+  const urgencyBorder =
+    (organization.daysToNextRenewal != null && organization.daysToNextRenewal <= 30)
+      || organization.highestChurnRisk.risk === 'high'
+      ? 'border-l-[3px] border-l-red-500'
+      : 'border-l-[3px] border-l-transparent'
+
   return (
-    <tr className={`border-b border-slate-700 hover:bg-slate-800/50 transition-colors duration-200 ${isExpanded ? 'bg-slate-800/30' : ''}`}>
+    <tr className={`border-b border-slate-700 hover:bg-slate-800/50 transition-colors duration-200 ${isExpanded ? 'bg-slate-800/30' : ''} ${urgencyBorder}`}>
       {/* Company & Contact Column */}
       <td className="px-6 py-4">
         <div className="flex items-center">

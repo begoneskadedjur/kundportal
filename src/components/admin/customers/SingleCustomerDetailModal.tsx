@@ -56,10 +56,7 @@ export default function SingleCustomerDetailModal({
 
   // Single customer data (direct access since there's only one site)
   const site = customer.sites[0]
-  const totalCustomerValue = customer.totalOrganizationValue
   const contractValue = customer.totalContractValue
-  const casesValue = customer.totalCasesValue
-  const casesCount = customer.totalCasesCount
 
   // Kontraktsperiod — korrekt beräkning baserat på start/slut-datum
   const contractProgress = getContractProgress(site.contract_start_date, site.contract_end_date)
@@ -166,22 +163,25 @@ export default function SingleCustomerDetailModal({
                 <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                   <div className="flex items-center gap-2 mb-1">
                     <Coins className="w-4 h-4 text-green-400" />
-                    <span className="text-xs text-slate-400">Total Värde</span>
+                    <span className="text-xs text-slate-400">Fakturerat</span>
                   </div>
-                  <div className="text-lg font-semibold text-green-400">
-                    {formatCurrency(totalCustomerValue)}
-                  </div>
-                  <div className="space-y-0.5">
-                    <div className="text-xs text-slate-500">
-                      Kontrakt: {formatCurrency(contractValue)}
-                    </div>
-                    <div className="text-xs text-blue-400">
-                      Ärenden: {formatCurrency(casesValue)}
-                      {casesCount > 0 && (
-                        <span className="ml-1 text-slate-500">({casesCount} st)</span>
-                      )}
-                    </div>
-                  </div>
+                  {billingLoading ? (
+                    <div className="animate-pulse h-6 w-24 bg-slate-700 rounded mt-1" />
+                  ) : (
+                    <>
+                      <div className="text-lg font-semibold text-green-400">
+                        {formatCurrency(billingStats.total)}
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="text-xs text-slate-500">
+                          Avtal: {formatCurrency(billingStats.contractBilling)}
+                        </div>
+                        <div className="text-xs text-blue-400">
+                          Tillägg: {formatCurrency(billingStats.adHocBilling)}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
@@ -372,23 +372,29 @@ export default function SingleCustomerDetailModal({
 
                   <div className="space-y-4">
                     <div>
-                      <div className="text-sm text-slate-400 mb-1">Total Kundvärde</div>
-                      <div className="text-xl font-bold text-green-400">
-                        {formatCurrency(totalCustomerValue)}
-                      </div>
-                      <div className="space-y-1 mt-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-500">Kontrakt:</span>
-                          <span className="text-slate-300">{formatCurrency(contractValue)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-500">Ärenden:</span>
-                          <span className="text-blue-400">{formatCurrency(casesValue)}</span>
-                        </div>
-                        <div className="text-xs text-slate-500 mt-2">
-                          {formatCurrency(customer.totalMonthlyValue)}/månad (kontrakt)
-                        </div>
-                      </div>
+                      <div className="text-sm text-slate-400 mb-1">Totalt fakturerat</div>
+                      {billingLoading ? (
+                        <div className="animate-pulse h-7 w-32 bg-slate-700 rounded" />
+                      ) : (
+                        <>
+                          <div className="text-xl font-bold text-green-400">
+                            {formatCurrency(billingStats.total)}
+                          </div>
+                          <div className="space-y-1 mt-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-slate-500">Avtalsfakturering:</span>
+                              <span className="text-slate-300">{formatCurrency(billingStats.contractBilling)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-slate-500">Tilläggstjänster:</span>
+                              <span className="text-blue-400">{formatCurrency(billingStats.adHocBilling)}</span>
+                            </div>
+                            <div className="text-xs text-slate-500 mt-2">
+                              Kontraktsvärde: {formatCurrency(contractValue)}/år
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     <div>

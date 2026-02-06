@@ -192,12 +192,7 @@ export default function Customers() {
     filterCustomers: filterConsolidatedCustomers, 
     refresh 
   } = useConsolidatedCustomers()
-  
-  // DEBUG: Log consolidated customers data in frontend
-  console.log('🎨 FRONTEND DEBUG - consolidatedCustomers:', consolidatedCustomers.length)
-  console.log('🎨 FRONTEND DEBUG - Multisite orgs:', consolidatedCustomers.filter(c => c.organizationType === 'multisite').length)
-  console.log('🎨 FRONTEND DEBUG - Sample data:', consolidatedCustomers.slice(0, 2))
-  
+
   // Keep old hook for backwards compatibility with components that need individual customers
   const { customers: legacyCustomers } = useCustomerAnalytics()
   
@@ -216,13 +211,32 @@ export default function Customers() {
   const [revenueModalOpen, setRevenueModalOpen] = useState(false)
   const [revenueCustomer, setRevenueCustomer] = useState<any>(null)
   
-  // Filter states
+  // Filter states — searchInput är UI-state, searchTerm debouncas för prestanda vid 3000+ kunder
+  const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchTerm(searchInput), 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'expiring'>('all')
   const [healthFilter, setHealthFilter] = useState<'all' | 'excellent' | 'good' | 'fair' | 'poor'>('all')
   const [portalFilter, setPortalFilter] = useState<'all' | 'full' | 'partial' | 'none'>('all')
   const [managerFilter, setManagerFilter] = useState<string>('all')
   const [organizationTypeFilter, setOrganizationTypeFilter] = useState<'all' | 'multisite' | 'single'>('all')
+
+  // Sortering
+  const [sortField, setSortField] = useState<string>('company_name')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  // Paginering
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 50
+
+  // Kollapserbara filter
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const activeFilterCount = [statusFilter, healthFilter, portalFilter, organizationTypeFilter, managerFilter]
+    .filter(f => f !== 'all').length
 
   // Filtered customers
   const filteredCustomers = useMemo(() => {
@@ -234,14 +248,95 @@ export default function Customers() {
       manager: managerFilter === 'all' ? undefined : managerFilter,
       organizationType: organizationTypeFilter === 'all' ? undefined : organizationTypeFilter
     })
-    
-    // DEBUG: Log filtering results
-    console.log('🔽 FILTER DEBUG - Applied filters:', { searchTerm, statusFilter, healthFilter, organizationTypeFilter })
-    console.log('🔽 FILTER DEBUG - Filtered result:', result.length)
-    console.log('🔽 FILTER DEBUG - Multisite in filtered result:', result.filter(c => c.organizationType === 'multisite').length)
-    
+
     return result
   }, [consolidatedCustomers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, filterConsolidatedCustomers])
+
+  // Sorterade kunder
+  const sortedCustomers = useMemo(() => {
+    return [...filteredCustomers].sort((a, b) => {
+      let aVal: any, bVal: any
+      switch (sortField) {
+        case 'company_name':
+          aVal = a.company_name; bVal = b.company_name; break
+        case 'totalAnnualValue':
+          aVal = a.totalAnnualValue || 0; bVal = b.totalAnnualValue || 0; break
+        case 'totalCasesValue':
+          aVal = a.totalCasesValue || 0; bVal = b.totalCasesValue || 0; break
+        case 'totalContractValue':
+          aVal = a.totalContractValue; bVal = b.totalContractValue; break
+        case 'daysToNextRenewal':
+          aVal = a.daysToNextRenewal ?? 9999; bVal = b.daysToNextRenewal ?? 9999; break
+        case 'healthScore':
+          aVal = a.overallHealthScore.score; bVal = b.overallHealthScore.score; break
+        case 'churnRisk':
+          aVal = a.highestChurnRisk.score; bVal = b.highestChurnRisk.score; break
+        default: return 0
+      }
+      if (typeof aVal === 'string') return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      return sortDirection === 'asc' ? (aVal - bVal) : (bVal - aVal)
+    })
+  }, [filteredCustomers, sortField, sortDirection])
+
+  // Paginerade kunder
+  const paginatedCustomers = sortedCustomers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
+  const totalPages = Math.ceil(sortedCustomers.length / pageSize)
+
+  // Sorteringshantering
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setCurrentPage(1)
+  }
+
+  // Snabbvy-counts (beräknas på hela datasetet, inte filtrerat)
+  const expiringCount = consolidatedCustomers.filter(c => c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90).length
+  const highRiskCount = consolidatedAnalytics.organizationsAtRisk
+  const multisiteCount = consolidatedAnalytics.multisiteOrganizations
+
+  // Aktiv preset-detektering
+  const activePreset = statusFilter === 'expiring' ? 'expiring'
+    : healthFilter === 'poor' ? 'highrisk'
+    : organizationTypeFilter === 'multisite' ? 'multisite'
+    : 'all'
+
+  // Reset alla filter
+  const resetFilters = () => {
+    setSearchInput(''); setStatusFilter('all'); setHealthFilter('all')
+    setPortalFilter('all'); setOrganizationTypeFilter('all'); setManagerFilter('all')
+    setSortField('company_name'); setSortDirection('asc')
+    setCurrentPage(1)
+  }
+
+  // Applicera preset
+  const applyPreset = (preset: string) => {
+    setSearchInput(''); setHealthFilter('all'); setPortalFilter('all'); setManagerFilter('all')
+    setCurrentPage(1)
+
+    switch (preset) {
+      case 'expiring':
+        setStatusFilter('expiring'); setOrganizationTypeFilter('all')
+        setSortField('daysToNextRenewal'); setSortDirection('asc')
+        break
+      case 'highrisk':
+        setStatusFilter('all'); setOrganizationTypeFilter('all'); setHealthFilter('poor')
+        setSortField('churnRisk'); setSortDirection('desc')
+        break
+      case 'multisite':
+        setStatusFilter('all'); setOrganizationTypeFilter('multisite')
+        break
+    }
+  }
+
+  // Reset paginering vid filterändring
+  useEffect(() => { setCurrentPage(1) }, [searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter])
 
   // Toggle expanded row
   const toggleExpandedRow = (customerId: string) => {
@@ -308,16 +403,12 @@ export default function Customers() {
 
   // Handle multisite detail view - Opens detailed modal for multisite organizations
   const handleViewMultiSiteDetails = (organization: any) => {
-    console.log('🚀 MODAL DEBUG - Opening multisite detail for:', organization.company_name)
-    console.log('🚀 MODAL DEBUG - Organization data:', organization)
     setSelectedMultiSiteOrg(organization)
     setMultiSiteDetailOpen(true)
   }
 
   // Handle single customer detail view - Opens detailed modal for single customers
   const handleViewSingleCustomerDetails = (organization: any) => {
-    console.log('🚀 SINGLE MODAL DEBUG - Opening single customer detail for:', organization.company_name)
-    console.log('🚀 SINGLE MODAL DEBUG - Customer data:', organization)
     setSelectedSingleCustomer(organization)
     setSingleCustomerDetailOpen(true)
   }
@@ -408,128 +499,263 @@ export default function Customers() {
       {/* KPI Cards */}
       <CustomerKpiCards analytics={consolidatedAnalytics} />
 
+      {/* Varningsbanner för utgående avtal */}
+      {consolidatedAnalytics.upcomingRenewals.length > 0 && (
+        <div className={`flex items-center justify-between p-4 rounded-lg border mb-4 ${
+          consolidatedAnalytics.upcomingRenewals.some(r => (r.daysToNextRenewal || 0) <= 30)
+            ? 'bg-red-500/10 border-red-500/20'
+            : 'bg-amber-500/10 border-amber-500/20'
+        }`}>
+          <div className="flex items-center gap-3">
+            <AlertTriangle className={`w-5 h-5 flex-shrink-0 ${
+              consolidatedAnalytics.upcomingRenewals.some(r => (r.daysToNextRenewal || 0) <= 30)
+                ? 'text-red-400'
+                : 'text-amber-400'
+            }`} />
+            <div>
+              <p className={`text-sm font-medium ${
+                consolidatedAnalytics.upcomingRenewals.some(r => (r.daysToNextRenewal || 0) <= 30)
+                  ? 'text-red-400'
+                  : 'text-amber-400'
+              }`}>
+                {consolidatedAnalytics.upcomingRenewals.length} avtal löper ut inom 90 dagar
+              </p>
+              <p className="text-xs text-slate-400">
+                Totalt värde: {formatCurrency(consolidatedAnalytics.renewalValue90Days)}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setStatusFilter('expiring')
+              setSearchInput('')
+              setHealthFilter('all')
+              setPortalFilter('all')
+              setOrganizationTypeFilter('all')
+              setManagerFilter('all')
+            }}
+            className={`${
+              consolidatedAnalytics.upcomingRenewals.some(r => (r.daysToNextRenewal || 0) <= 30)
+                ? 'text-red-400 hover:text-red-300'
+                : 'text-amber-400 hover:text-amber-300'
+            }`}
+          >
+            Visa utgående avtal
+          </Button>
+        </div>
+      )}
+
       {/* Main content with sidebar */}
       <div className="relative">
         <div className={`transition-all duration-300 ${sidebarOpen ? 'lg:mr-96' : ''}`}>
           {/* Filters */}
           <Card className="p-4 mb-6">
-            <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex gap-3">
+              {/* Sökfält — alltid synligt */}
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Sök företag, kontaktperson, e-post eller org.nr..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
+              {/* Filter toggle-knapp */}
+              <button
+                onClick={() => setFiltersExpanded(!filtersExpanded)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors text-sm font-medium ${
+                  filtersExpanded || activeFilterCount > 0
+                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'
+                }`}
               >
-                <option value="all">Alla status</option>
-                <option value="active">Aktiva</option>
-                <option value="inactive">Inaktiva</option>
-                <option value="expiring">Löper ut snart</option>
-              </select>
-
-              <select
-                value={healthFilter}
-                onChange={(e) => setHealthFilter(e.target.value as any)}
-                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
-              >
-                <option value="all">All Health</option>
-                <option value="excellent">Excellent (80+)</option>
-                <option value="good">Good (60-79)</option>
-                <option value="fair">Fair (40-59)</option>
-                <option value="poor">Poor (0-39)</option>
-              </select>
-
-              <select
-                value={portalFilter}
-                onChange={(e) => setPortalFilter(e.target.value as any)}
-                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
-              >
-                <option value="all">Portal Access</option>
-                <option value="full">Full tillgång</option>
-                <option value="partial">Delvis tillgång</option>
-                <option value="none">Ingen tillgång</option>
-              </select>
-
-              <select
-                value={organizationTypeFilter}
-                onChange={(e) => setOrganizationTypeFilter(e.target.value as any)}
-                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
-              >
-                <option value="all">Alla typer</option>
-                <option value="multisite">Multisite</option>
-                <option value="single">Enkelsites</option>
-              </select>
-
-              {uniqueManagers.length > 0 && (
-                <select
-                  value={managerFilter}
-                  onChange={(e) => setManagerFilter(e.target.value)}
-                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="all">Alla säljare</option>
-                  {uniqueManagers.map(manager => (
-                    <option key={manager} value={manager}>{manager}</option>
-                  ))}
-                </select>
-              )}
+                <Filter className="w-4 h-4" />
+                Filter
+                {activeFilterCount > 0 && (
+                  <span className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
             </div>
+
+            {/* Collapsible filter dropdowns */}
+            {filtersExpanded && (
+              <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-slate-700">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="all">Alla status</option>
+                  <option value="active">Aktiva</option>
+                  <option value="inactive">Inaktiva</option>
+                  <option value="expiring">Löper ut snart</option>
+                </select>
+
+                <select
+                  value={healthFilter}
+                  onChange={(e) => setHealthFilter(e.target.value as any)}
+                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="all">Alla hälsonivåer</option>
+                  <option value="excellent">Utmärkt (80+)</option>
+                  <option value="good">Bra (60-79)</option>
+                  <option value="fair">Acceptabel (40-59)</option>
+                  <option value="poor">Risk (0-39)</option>
+                </select>
+
+                <select
+                  value={portalFilter}
+                  onChange={(e) => setPortalFilter(e.target.value as any)}
+                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="all">Portaltillgång</option>
+                  <option value="full">Full tillgång</option>
+                  <option value="partial">Delvis tillgång</option>
+                  <option value="none">Ingen tillgång</option>
+                </select>
+
+                <select
+                  value={organizationTypeFilter}
+                  onChange={(e) => setOrganizationTypeFilter(e.target.value as any)}
+                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="all">Alla typer</option>
+                  <option value="multisite">Multisite</option>
+                  <option value="single">Enkelsites</option>
+                </select>
+
+                {uniqueManagers.length > 0 && (
+                  <select
+                    value={managerFilter}
+                    onChange={(e) => setManagerFilter(e.target.value)}
+                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="all">Alla säljare</option>
+                    {uniqueManagers.map(manager => (
+                      <option key={manager} value={manager}>{manager}</option>
+                    ))}
+                  </select>
+                )}
+
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={() => {
+                      setStatusFilter('all'); setHealthFilter('all'); setPortalFilter('all')
+                      setOrganizationTypeFilter('all'); setManagerFilter('all')
+                    }}
+                    className="px-3 py-2 text-xs text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Rensa filter
+                  </button>
+                )}
+              </div>
+            )}
           </Card>
+
+          {/* Snabbvy-knappar */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs text-slate-400 font-medium mr-1">Snabbvy:</span>
+            <button
+              onClick={() => resetFilters()}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                activePreset === 'all'
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
+              }`}
+            >
+              Alla ({sortedCustomers.length})
+            </button>
+            <button
+              onClick={() => applyPreset('expiring')}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                activePreset === 'expiring'
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-amber-400 hover:border-amber-500/30'
+              }`}
+            >
+              Utgående avtal ({expiringCount})
+            </button>
+            <button
+              onClick={() => applyPreset('highrisk')}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                activePreset === 'highrisk'
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-red-400 hover:border-red-500/30'
+              }`}
+            >
+              Hög risk ({highRiskCount})
+            </button>
+            <button
+              onClick={() => applyPreset('multisite')}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                activePreset === 'multisite'
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-blue-400 hover:border-blue-500/30'
+              }`}
+            >
+              Multisite ({multisiteCount})
+            </button>
+          </div>
 
           {/* Consolidated Customer table */}
           <Card className="overflow-hidden border-slate-700/50 bg-gradient-to-br from-slate-800/40 to-slate-900/40">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-800/70 border-b border-slate-600">
+                <thead className="bg-slate-800/95 backdrop-blur border-b border-slate-600 sticky top-0 z-10">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('company_name')}>
                       <div className="flex items-center gap-2">
                         <Building2 className="w-4 h-4 text-blue-400" />
                         Organisation & Kontakt
+                        {sortField === 'company_name' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalAnnualValue')}>
                       <div className="flex items-center justify-end gap-2">
                         <DollarSign className="w-4 h-4 text-green-400" />
                         Årspremie
+                        {sortField === 'totalAnnualValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </div>
                     </th>
-                    <th className="hidden lg:table-cell px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    <th className="hidden lg:table-cell px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalCasesValue')}>
                       <div className="flex items-center justify-end gap-2">
                         <DollarSign className="w-4 h-4 text-blue-400" />
                         Debiterat utöver avtal
+                        {sortField === 'totalCasesValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalContractValue')}>
                       <div className="flex items-center justify-end gap-2">
                         <DollarSign className="w-4 h-4 text-yellow-400" />
                         Avtalsvärde
+                        {sortField === 'totalContractValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('daysToNextRenewal')}>
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-purple-400" />
                         Kontraktsperiod
+                        {sortField === 'daysToNextRenewal' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('healthScore')}>
                       <div className="flex items-center gap-2">
                         <Activity className="w-4 h-4 text-green-400" />
                         Health Score
+                        {sortField === 'healthScore' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('churnRisk')}>
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4 text-red-400" />
                         Churn Risk
+                        {sortField === 'churnRisk' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </div>
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
@@ -547,7 +773,7 @@ export default function Customers() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCustomers.map((organization) => {
+                  {paginatedCustomers.map((organization) => {
                     const isExpanded = expandedRows.has(organization.id)
 
                     return (
@@ -563,12 +789,12 @@ export default function Customers() {
                           onViewSingleCustomerDetails={handleViewSingleCustomerDetails}
                           onViewRevenue={handleViewRevenue}
                         />
-                        
+
                         {/* Contact and units expanded view for multisite organizations */}
                         {isExpanded && organization.organizationType === 'multisite' && (
                           <ContactAndUnitsExpandedView organization={organization} />
                         )}
-                        
+
                         {/* Expanded details for single-site customers */}
                         {isExpanded && organization.organizationType === 'single' && (
                           <ExpandedCustomerRow customer={organization.sites[0]} />
@@ -579,7 +805,7 @@ export default function Customers() {
                 </tbody>
               </table>
 
-              {filteredCustomers.length === 0 && (
+              {sortedCustomers.length === 0 && (
                 <div className="text-center py-20 bg-slate-800/20">
                   <div className="mx-auto w-fit p-4 rounded-full bg-slate-700/30 border border-slate-600/50 mb-6">
                     <Building2 className="w-16 h-16 text-slate-500" />
@@ -594,6 +820,51 @@ export default function Customers() {
                       ? 'Prova att justera dina filterkriterier för att hitta organisationer.'
                       : 'Organisationer kommer att visas här när de läggs till i systemet.'}
                   </p>
+                </div>
+              )}
+
+              {/* Pagineringsfooter */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-3 bg-slate-800/50 border-t border-slate-700">
+                  <span className="text-sm text-slate-400">
+                    Visar {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, sortedCustomers.length)} av {sortedCustomers.length}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 rounded text-xs font-medium transition-colors bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Föregående
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                      .map((page, idx, arr) => (
+                        <React.Fragment key={page}>
+                          {idx > 0 && arr[idx - 1] !== page - 1 && (
+                            <span className="text-slate-500 text-xs">...</span>
+                          )}
+                          <button
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-8 h-8 rounded text-xs font-medium transition-colors ${
+                              page === currentPage
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        </React.Fragment>
+                      ))
+                    }
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 rounded text-xs font-medium transition-colors bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Nästa
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
