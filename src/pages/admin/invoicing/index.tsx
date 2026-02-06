@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import PrivateBusinessInvoicing from './PrivateBusinessInvoicing'
 import ContractInvoicing from './ContractInvoicing'
+import BillingSummaryLedge from '../../../components/admin/invoicing/BillingSummaryLedge'
 
 type InvoicingTab = 'private-business' | 'contracts'
 
@@ -97,6 +98,9 @@ export default function InvoicingPage() {
           </div>
         </div>
       </div>
+
+      {/* Billing summary ledge */}
+      <BillingSummaryLedge />
 
       {/* Tab Content - ingen extra padding */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
