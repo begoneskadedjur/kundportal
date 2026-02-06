@@ -11,11 +11,11 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import ProductSelector from '../../components/admin/ProductSelector'
-import ProductSummary from '../../components/admin/ProductSummary'
+import PriceListArticleSelector from '../../components/admin/PriceListArticleSelector'
+import ArticleSummary from '../../components/admin/ArticleSummary'
 import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
-import { SelectedProduct, CustomerType } from '../../types/products'
-import { calculatePriceSummary, generateContractDescription, validateOneflowCompatibility } from '../../utils/pricingCalculator'
+import { SelectedProduct, CustomerType, SelectedArticleItem } from '../../types/products'
+import { convertArticlesToOneflowProducts, generateArticleContractDescription } from '../../utils/articlePricingCalculator'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
 import toast from 'react-hot-toast'
 
@@ -43,7 +43,9 @@ interface WizardData {
   foretag: string
   'org-nr': string
   
-  // Steg 6 - Produkter (🆕 NYTT STEG)
+  // Steg 6 - Prislista & Artiklar
+  selectedPriceListId: string | null
+  selectedArticles: SelectedArticleItem[]
   selectedProducts: SelectedProduct[]
   
   // Steg 7 - Avtalsobjekt
@@ -88,7 +90,10 @@ export default function OneflowContractCreator() {
   const [creationStep, setCreationStep] = useState('')
   const [createdContract, setCreatedContract] = useState<any>(null)
   const [showConfetti, setShowConfetti] = useState(false)
-  
+  const [showZeroArticlesWarning, setShowZeroArticlesWarning] = useState(false)
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   // 🆕 DYNAMISK BEGONE INFO BASERAT PÅ INLOGGAD ANVÄNDARE
   const [wizardData, setWizardData] = useState<WizardData>({
     documentType: 'contract',
@@ -106,7 +111,9 @@ export default function OneflowContractCreator() {
     'utforande-adress': '',
     foretag: '',
     'org-nr': '',
-    selectedProducts: [], // 🆕 PRODUKTER
+    selectedPriceListId: null,
+    selectedArticles: [],
+    selectedProducts: [],
     agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
     sendForSigning: true
   })
@@ -207,6 +214,30 @@ export default function OneflowContractCreator() {
     }
   }, [])  // Kör bara en gång vid mount
 
+  // Navigation guard — varna om osparade ändringar
+  const hasUnsavedProgress = useCallback((): boolean => {
+    if (createdContract) return false
+    if (currentStep > 1) return true
+    return (
+      wizardData.Kontaktperson !== '' ||
+      wizardData['e-post-kontaktperson'] !== '' ||
+      wizardData.foretag !== '' ||
+      wizardData.selectedPriceListId !== null ||
+      wizardData.selectedArticles.length > 0
+    )
+  }, [currentStep, wizardData, createdContract])
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedProgress()) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasUnsavedProgress])
+
   const updateWizardData = (field: keyof WizardData, value: any) => {
     setWizardData(prev => {
       const updated = { ...prev, [field]: value }
@@ -236,6 +267,13 @@ export default function OneflowContractCreator() {
 
   const nextStep = () => {
     if (currentStep < STEPS.length) {
+      // Varning vid 0 artiklar i steg 6
+      if (currentStep === 6 && wizardData.selectedArticles.length === 0 && !showZeroArticlesWarning) {
+        setShowZeroArticlesWarning(true)
+        return
+      }
+      setShowZeroArticlesWarning(false)
+
       let nextStepNumber = currentStep + 1
       
       // Om vi är på steg 2 (mallval) och har valt en offertmall,
@@ -267,17 +305,51 @@ export default function OneflowContractCreator() {
     }
   }
 
+  const isValidEmail = (email: string): boolean =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+
   const canProceed = () => {
     switch (currentStep) {
       case 1: return wizardData.documentType !== ''
       case 2: return wizardData.selectedTemplate !== ''
       case 3: return true // Partytype har default
       case 4: return wizardData.anstalld && wizardData['e-post-anstlld'] && (wizardData.documentType === 'offer' || wizardData.avtalslngd)
-      case 5: return wizardData.Kontaktperson && wizardData['e-post-kontaktperson']
-      case 6: return wizardData.selectedProducts.length >= 0 // Produkter (kan vara tom för enkla avtal)
+      case 5: {
+        if (!wizardData.Kontaktperson.trim()) return false
+        if (!wizardData['e-post-kontaktperson'].trim()) return false
+        if (!isValidEmail(wizardData['e-post-kontaktperson'])) return false
+        if (wizardData.partyType === 'company') {
+          if (!wizardData.foretag.trim()) return false
+          if (!wizardData['org-nr'].trim()) return false
+        }
+        return true
+      }
+      case 6: return wizardData.selectedPriceListId !== null
       case 7: return wizardData.agreementText.length > 0
       case 8: return true
       default: return false
+    }
+  }
+
+  const getValidationHint = (): string => {
+    switch (currentStep) {
+      case 5: {
+        if (wizardData.partyType === 'company' && !wizardData.foretag.trim())
+          return 'Fyll i företagsnamn'
+        if (wizardData.partyType === 'company' && !wizardData['org-nr'].trim())
+          return 'Fyll i organisationsnummer'
+        if (!wizardData.Kontaktperson.trim())
+          return 'Fyll i kontaktperson'
+        if (!wizardData['e-post-kontaktperson'].trim())
+          return 'Fyll i e-postadress'
+        if (!isValidEmail(wizardData['e-post-kontaktperson']))
+          return 'Ange en giltig e-postadress'
+        return ''
+      }
+      case 6:
+        if (!wizardData.selectedPriceListId) return 'Välj en prislista'
+        return ''
+      default: return ''
     }
   }
 
@@ -286,6 +358,11 @@ export default function OneflowContractCreator() {
   const selectedTemplate = availableTemplates.find(t => t.id === wizardData.selectedTemplate)
 
   const handleSubmit = async () => {
+    // Konvertera artiklar → SelectedProduct-format för API:et
+    const convertedProducts = wizardData.selectedArticles.length > 0
+      ? convertArticlesToOneflowProducts(wizardData.selectedArticles, wizardData.partyType as CustomerType)
+      : wizardData.selectedProducts
+
     const LIMIT = 1024
     const part1 = wizardData.agreementText.substring(0, LIMIT)
     const part2 = wizardData.agreementText.substring(LIMIT, LIMIT * 2)
@@ -330,11 +407,10 @@ export default function OneflowContractCreator() {
           partyType: wizardData.partyType,
           documentType: wizardData.documentType,
           caseId: wizardData.case_id, // Skicka case_id för webhook-koppling
-          // 🆕 SKICKA ANVÄNDARENS UPPGIFTER
           senderEmail: user?.email,
           senderName: wizardData.anstalld,
-          // 🆕 SKICKA PRODUKTER
-          selectedProducts: wizardData.selectedProducts
+          selectedProducts: convertedProducts,
+          priceListId: wizardData.selectedPriceListId
         })
       })
       
@@ -380,7 +456,8 @@ export default function OneflowContractCreator() {
       setTimeout(() => setShowConfetti(false), 5000)
       
     } catch (err: any) {
-      toast.error(`❌ Fel: ${err.message}`)
+      setSubmitError(err.message || 'Ett okänt fel inträffade')
+      toast.error(`Fel: ${err.message}`)
     } finally {
       setIsCreating(false)
       setCreationStep('')
@@ -769,6 +846,11 @@ export default function OneflowContractCreator() {
                   onChange={e => updateWizardData('e-post-kontaktperson', e.target.value)}
                   icon={<Mail className="w-4 h-4" />}
                   placeholder="kontakt@exempel.se"
+                  error={
+                    wizardData['e-post-kontaktperson'] && !isValidEmail(wizardData['e-post-kontaktperson'])
+                      ? 'Ogiltig e-postadress'
+                      : undefined
+                  }
                 />
                 
                 <Input
@@ -810,28 +892,29 @@ export default function OneflowContractCreator() {
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
                 <ShoppingCart className="w-6 h-6 text-green-400" />
-                Produkter & Tjänster
+                Prislista & Artiklar
               </h3>
               <p className="text-slate-400">
-                Välj vilka produkter och tjänster som ska ingå i {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}
+                Välj prislista och artiklar som ska ingå i {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}
               </p>
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">
-                <ProductSelector
-                  selectedProducts={wizardData.selectedProducts}
-                  onSelectionChange={(products) => updateWizardData('selectedProducts', products)}
+                <PriceListArticleSelector
+                  selectedPriceListId={wizardData.selectedPriceListId}
+                  onPriceListChange={(id) => updateWizardData('selectedPriceListId', id)}
+                  selectedArticles={wizardData.selectedArticles}
+                  onSelectionChange={(articles) => updateWizardData('selectedArticles', articles)}
                   customerType={wizardData.partyType as CustomerType}
                 />
               </div>
-              
+
               <div className="lg:col-span-1">
                 <div className="sticky top-4">
-                  <ProductSummary
-                    selectedProducts={wizardData.selectedProducts}
+                  <ArticleSummary
+                    selectedArticles={wizardData.selectedArticles}
                     customerType={wizardData.partyType as CustomerType}
-                    showDetailedBreakdown={true}
                   />
                 </div>
               </div>
@@ -880,19 +963,19 @@ export default function OneflowContractCreator() {
                   )}
                 </div>
                 
-                {wizardData.selectedProducts.length > 0 && (
+                {wizardData.selectedArticles.length > 0 && (
                   <div className="pt-4 border-t border-slate-700">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        const generatedText = generateContractDescription(wizardData.selectedProducts)
+                        const generatedText = generateArticleContractDescription(wizardData.selectedArticles)
                         updateWizardData('agreementText', generatedText)
-                        toast.success('Beskrivning genererad från valda produkter!')
+                        toast.success('Beskrivning genererad från valda artiklar!')
                       }}
                       className="w-full"
                     >
-                      ⚡ Generera beskrivning från valda produkter
+                      ⚡ Generera beskrivning från valda artiklar
                     </Button>
                   </div>
                 )}
@@ -985,12 +1068,11 @@ export default function OneflowContractCreator() {
               </Card>
             </div>
 
-            {/* Produktsammanfattning */}
-            {wizardData.selectedProducts.length > 0 && (
-              <ProductSummary
-                selectedProducts={wizardData.selectedProducts}
+            {/* Artikelsammanfattning */}
+            {wizardData.selectedArticles.length > 0 && (
+              <ArticleSummary
+                selectedArticles={wizardData.selectedArticles}
                 customerType={wizardData.partyType as CustomerType}
-                showDetailedBreakdown={false}
               />
             )}
 
@@ -1024,8 +1106,11 @@ export default function OneflowContractCreator() {
 
             {/* Skapa kontrakt */}
             <div className="text-center">
-              <Button 
-                onClick={handleSubmit}
+              <Button
+                onClick={() => {
+                  setSubmitError(null)
+                  setShowSubmitConfirm(true)
+                }}
                 disabled={isCreating}
                 className="px-8 py-3 text-lg"
                 size="lg"
@@ -1051,6 +1136,44 @@ export default function OneflowContractCreator() {
                 )}
               </Button>
             </div>
+
+            {/* Bekräftelsedialog */}
+            {showSubmitConfirm && !isCreating && !createdContract && (
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                onClick={() => setShowSubmitConfirm(false)}>
+                <div className="bg-slate-800 rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4"
+                  onClick={e => e.stopPropagation()}>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Send className="w-5 h-5 text-green-400" />
+                    Bekräfta
+                  </h3>
+                  <p className="text-slate-300">
+                    Du är på väg att {wizardData.sendForSigning ? 'skicka' : 'spara'}{' '}
+                    {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'} till{' '}
+                    <span className="text-white font-medium">{wizardData.Kontaktperson}</span>.
+                  </p>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setShowSubmitConfirm(false)}>
+                      Avbryt
+                    </Button>
+                    <Button size="sm" onClick={() => { setShowSubmitConfirm(false); handleSubmit() }}>
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      {wizardData.sendForSigning ? 'Skapa & Skicka' : 'Skapa Utkast'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Retry vid fel */}
+            {submitError && !isCreating && !createdContract && (
+              <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-center">
+                <p className="text-red-400 text-sm mb-3">{submitError}</p>
+                <Button size="sm" onClick={() => { setSubmitError(null); handleSubmit() }}>
+                  Försök igen
+                </Button>
+              </div>
+            )}
 
             {/* Resultat */}
             {createdContract && (
@@ -1102,7 +1225,6 @@ export default function OneflowContractCreator() {
                         documentType: 'contract',
                         selectedTemplate: '',
                         partyType: 'company',
-                        // 🆕 ÅTERSTÄLL MED ANVÄNDARENS INFO
                         anstalld: profile?.technicians?.name || profile?.display_name || user?.user_metadata?.full_name || 'BeGone Medarbetare',
                         'e-post-anstlld': user?.email || '',
                         avtalslngd: '1',
@@ -1113,6 +1235,9 @@ export default function OneflowContractCreator() {
                         'utforande-adress': '',
                         foretag: '',
                         'org-nr': '',
+                        selectedPriceListId: null,
+                        selectedArticles: [],
+                        selectedProducts: [],
                         agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
                         sendForSigning: true
                       })
@@ -1148,10 +1273,15 @@ export default function OneflowContractCreator() {
       <header className="bg-slate-900/50 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              onClick={() => navigate(getDashboardRoute())} 
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                if (hasUnsavedProgress()) {
+                  if (!window.confirm('Du har osparade ändringar. Vill du lämna sidan?')) return
+                }
+                navigate(getDashboardRoute())
+              }}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" /> Tillbaka
@@ -1197,6 +1327,23 @@ export default function OneflowContractCreator() {
           </AnimatePresence>
         </div>
 
+        {/* Varning vid 0 artiklar */}
+        {showZeroArticlesWarning && currentStep === 6 && (
+          <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center justify-between">
+            <p className="text-amber-400 text-sm">
+              Du har inte valt några artiklar. Vill du fortsätta utan?
+            </p>
+            <div className="flex gap-2 ml-4">
+              <Button variant="outline" size="sm" onClick={() => setShowZeroArticlesWarning(false)}>
+                Tillbaka
+              </Button>
+              <Button size="sm" onClick={() => { setShowZeroArticlesWarning(false); setCurrentStep(7) }}>
+                Fortsätt ändå
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Navigation Buttons */}
         {!createdContract && (
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-800">
@@ -1214,6 +1361,9 @@ export default function OneflowContractCreator() {
               <p className="text-sm text-slate-400">
                 Steg {currentStep} av {STEPS.length}
               </p>
+              {!canProceed() && getValidationHint() && (
+                <p className="text-xs text-amber-400 mt-1">{getValidationHint()}</p>
+              )}
             </div>
 
             {currentStep < STEPS.length && (
