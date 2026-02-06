@@ -8,6 +8,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 
+// Vercel serverless config — explicit timeout
+export const config = {
+  maxDuration: 60,
+};
+
 // Ny SDK-klient
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY || '' });
 
@@ -225,7 +230,7 @@ const functionDeclarations = [
   },
   {
     name: 'search_cases',
-    description: 'Söker i alla ärenden (privat, företag, avtal) baserat på olika kriterier. Använd för historiska sökningar, specifika ärenden, eller när du behöver hitta ärenden med vissa egenskaper.',
+    description: 'Söker i alla ärenden (privat, företag, avtal). Returnerar max 200 resultat per anrop. VIKTIGT: Använd alltid search_term OCH datumintervall för effektiva sökningar. Gör EN bred sökning istället för flera parallella. Max 2 anrop per svar.',
     parameters: {
       type: 'object',
       properties: {
@@ -915,6 +920,15 @@ Vid bokningshjälp: Filtrera tekniker baserat på kompetens för det aktuella sk
 ### search_cases
 Använd för att söka i ärendehistorik - både gamla och framtida ärenden.
 
+**VIKTIGA SÖKREGLER:**
+- Använd ALLTID search_term för att filtrera — hämta aldrig alla ärenden utan sökterm
+- Begränsa datumintervall till max 3 månader per sökning
+- Om du behöver data för flera perioder: sammanfatta redan hämtad data istället för att söka fler gånger
+- Föredra EN bred sökning framför flera parallella — t.ex. sök "rått" med 6 månaders intervall
+- Om första sökningen ger 0 resultat, prova utan search_term men med snävare datumintervall
+- **MAX 2 search_cases-anrop per svar** — sammanfatta det du har efter det
+- Om resultaten inte räcker, be användaren specificera snävare kriterier
+
 ### ⏰ VIKTIGT OM TIDER
 Alla bokningar innehåller fälten \`start_time_swedish\` och \`end_time_swedish\` som är korrekt formaterade i svensk tid (CET/CEST).
 **Använd ALLTID dessa fält när du visar tider till användaren!** Fälten \`start_date\` och \`due_date\` är i UTC och ska INTE visas direkt.
@@ -1256,10 +1270,17 @@ OBS: Varje ärende kan ha upp till 3 tekniker som arbetar tillsammans - alla des
 
     // Hantera function calls - loop tills modellen är klar
     let iterations = 0;
-    const maxIterations = 5; // Säkerhetsgräns
+    const maxIterations = 3; // Säkerhetsgräns — sänkt från 5 för att minska timeout-risk
+    const functionCallStart = Date.now();
+    const FUNCTION_CALL_TIMEOUT_MS = 45_000; // 45s — lämnar 15s marginal innan Vercels 60s-gräns
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     while ((result as any).functionCalls && (result as any).functionCalls.length > 0 && iterations < maxIterations) {
+      // Tidsgränskontroll — avbryt innan Vercel dödar processen
+      if (Date.now() - functionCallStart > FUNCTION_CALL_TIMEOUT_MS) {
+        console.warn('[Team Chat] Function call timeout after ' + Math.round((Date.now() - functionCallStart) / 1000) + 's - generating response with available data');
+        break;
+      }
       iterations++;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const functionCalls = (result as any).functionCalls;
