@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 
@@ -16,6 +16,8 @@ interface ExpandableOrganizationRowProps {
   onViewMultiSiteDetails?: (org: ConsolidatedCustomer) => void
   onViewSingleCustomerDetails?: (org: ConsolidatedCustomer) => void
   onViewRevenue?: (org: ConsolidatedCustomer) => void
+  onRenewal?: (org: ConsolidatedCustomer) => void
+  visibleColumns?: Set<string>
 }
 
 const HealthScoreBadge: React.FC<{ level: string; score: number }> = ({ level, score }) => {
@@ -129,9 +131,16 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   onViewDetails,
   onViewMultiSiteDetails,
   onViewSingleCustomerDetails,
-  onViewRevenue
+  onViewRevenue,
+  onRenewal,
+  visibleColumns
 }) => {
+  const isVisible = (col: string) => !visibleColumns || visibleColumns.has(col)
   const isMultisite = organization.organizationType === 'multisite'
+  const showRenewalButton = organization.daysToNextRenewal != null
+    && organization.daysToNextRenewal > 0
+    && organization.daysToNextRenewal <= 90
+    && onRenewal
 
   // Röd border på kritiska rader: avtal < 30 dagar kvar eller hög churn risk
   const urgencyBorder =
@@ -191,150 +200,164 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
       </td>
 
       {/* Annual Premium Column */}
-      <td className="px-4 lg:px-6 py-4">
-        <div className="text-right">
-          <div className="font-semibold text-green-400 text-sm lg:text-base">
-            {formatCurrency(organization.totalAnnualValue || 0)}
+      {isVisible('annualValue') && (
+        <td className="px-4 lg:px-6 py-4">
+          <div className="text-right">
+            <div className="font-semibold text-green-400 text-sm lg:text-base">
+              {formatCurrency(organization.totalAnnualValue || 0)}
+            </div>
+            <div className="text-xs text-slate-500 hidden sm:block">
+              {formatCurrency((organization.totalAnnualValue || 0) / 12)}/mån
+            </div>
           </div>
-          <div className="text-xs text-slate-500 hidden sm:block">
-            {formatCurrency((organization.totalAnnualValue || 0) / 12)}/mån
-          </div>
-        </div>
-      </td>
+        </td>
+      )}
 
       {/* Extra Billing Column */}
-      <td className="hidden lg:table-cell px-4 lg:px-6 py-4">
-        <div className="text-right">
-          <div className="font-semibold text-blue-400 text-sm lg:text-base">
-            {formatCurrency(organization.totalCasesValue || 0)}
+      {isVisible('casesValue') && (
+        <td className="hidden lg:table-cell px-4 lg:px-6 py-4">
+          <div className="text-right">
+            <div className="font-semibold text-blue-400 text-sm lg:text-base">
+              {formatCurrency(organization.totalCasesValue || 0)}
+            </div>
+            <div className="text-xs text-slate-500 hidden sm:block">
+              utöver avtal
+            </div>
           </div>
-          <div className="text-xs text-slate-500 hidden sm:block">
-            utöver avtal
-          </div>
-        </div>
-      </td>
+        </td>
+      )}
 
       {/* Total Contract Value Column */}
-      <td className="px-4 lg:px-6 py-4">
-        <div className="text-right">
-          <div className="font-semibold text-slate-200 text-sm lg:text-base">
-            {formatCurrency(organization.totalContractValue)}
+      {isVisible('contractValue') && (
+        <td className="px-4 lg:px-6 py-4">
+          <div className="text-right">
+            <div className="font-semibold text-slate-200 text-sm lg:text-base">
+              {formatCurrency(organization.totalContractValue)}
+            </div>
+            <div className="text-xs text-slate-500 hidden sm:block">
+              totalt värde
+            </div>
           </div>
-          <div className="text-xs text-slate-500 hidden sm:block">
-            totalt värde
-          </div>
-        </div>
-      </td>
+        </td>
+      )}
 
       {/* Contract Period Column */}
-      <td className="px-6 py-4">
-        {(() => {
-          const { period, remaining, color } = formatContractPeriod(organization)
-          return (
-            <div className="space-y-1">
-              <div className="text-sm text-slate-200 font-medium">
-                {period}
-              </div>
-              {remaining && (
-                <div className={`text-xs font-medium ${color}`}>
-                  {remaining}
+      {isVisible('contractPeriod') && (
+        <td className="px-6 py-4">
+          {(() => {
+            const { period, remaining, color } = formatContractPeriod(organization)
+            return (
+              <div className="space-y-1">
+                <div className="text-sm text-slate-200 font-medium">
+                  {period}
                 </div>
-              )}
-            </div>
-          )
-        })()}
-      </td>
+                {remaining && (
+                  <div className={`text-xs font-medium ${color}`}>
+                    {remaining}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+        </td>
+      )}
 
       {/* Health Score Column */}
-      <td className="px-6 py-4">
-        <CustomTooltip
-          content={
-            <div className="space-y-2">
-              <div className="font-semibold">Health Score</div>
-              <div className="text-xs">
-                Beräknas utifrån:
-                <ul className="list-disc list-inside mt-1 space-y-0.5">
-                  <li>Antal aktiva ärenden</li>
-                  <li>Genomsnittlig responstid</li>
-                  <li>Kundnöjdhet från enkäter</li>
-                  <li>Betalningshistorik</li>
-                  <li>Avtalsföljsamhet</li>
-                </ul>
+      {isVisible('healthScore') && (
+        <td className="px-6 py-4">
+          <CustomTooltip
+            content={
+              <div className="space-y-2">
+                <div className="font-semibold">Health Score</div>
+                <div className="text-xs">
+                  Beräknas utifrån:
+                  <ul className="list-disc list-inside mt-1 space-y-0.5">
+                    <li>Antal aktiva ärenden</li>
+                    <li>Genomsnittlig responstid</li>
+                    <li>Kundnöjdhet från enkäter</li>
+                    <li>Betalningshistorik</li>
+                    <li>Avtalsföljsamhet</li>
+                  </ul>
+                </div>
+                <div className="text-xs pt-1 border-t border-slate-600">
+                  <strong>Excellent:</strong> 90-100 poäng<br/>
+                  <strong>Good:</strong> 70-89 poäng<br/>
+                  <strong>Fair:</strong> 50-69 poäng<br/>
+                  <strong>Poor:</strong> Under 50 poäng
+                </div>
               </div>
-              <div className="text-xs pt-1 border-t border-slate-600">
-                <strong>Excellent:</strong> 90-100 poäng<br/>
-                <strong>Good:</strong> 70-89 poäng<br/>
-                <strong>Fair:</strong> 50-69 poäng<br/>
-                <strong>Poor:</strong> Under 50 poäng
-              </div>
+            }
+            position="left"
+          >
+            <HealthScoreBadge
+              level={organization.overallHealthScore.level}
+              score={organization.overallHealthScore.score}
+            />
+          </CustomTooltip>
+          {organization.hasHighRiskSites && (
+            <div className="text-xs text-red-600 mt-1">
+              ⚠ Riskenhet
             </div>
-          }
-          position="left"
-        >
-          <HealthScoreBadge 
-            level={organization.overallHealthScore.level} 
-            score={organization.overallHealthScore.score} 
-          />
-        </CustomTooltip>
-        {organization.hasHighRiskSites && (
-          <div className="text-xs text-red-600 mt-1">
-            ⚠ Riskenhet
-          </div>
-        )}
-      </td>
+          )}
+        </td>
+      )}
 
       {/* Churn Risk Column */}
-      <td className="px-6 py-4">
-        <CustomTooltip
-          content={
-            <div className="space-y-2">
-              <div className="font-semibold">Churn Risk</div>
-              <div className="text-xs">
-                Sannolikhet att kunden säger upp avtalet:
-                <ul className="list-disc list-inside mt-1 space-y-0.5">
-                  <li>Betalningsförseningar</li>
-                  <li>Minskat engagemang</li>
-                  <li>Support-ärenden trend</li>
-                  <li>Användning av tjänster</li>
-                  <li>Avtalsförnyelsehistorik</li>
-                </ul>
+      {isVisible('churnRisk') && (
+        <td className="px-6 py-4">
+          <CustomTooltip
+            content={
+              <div className="space-y-2">
+                <div className="font-semibold">Churn Risk</div>
+                <div className="text-xs">
+                  Sannolikhet att kunden säger upp avtalet:
+                  <ul className="list-disc list-inside mt-1 space-y-0.5">
+                    <li>Betalningsförseningar</li>
+                    <li>Minskat engagemang</li>
+                    <li>Support-ärenden trend</li>
+                    <li>Användning av tjänster</li>
+                    <li>Avtalsförnyelsehistorik</li>
+                  </ul>
+                </div>
+                <div className="text-xs pt-1 border-t border-slate-600">
+                  <strong>Hög risk:</strong> &gt;70% sannolikhet<br/>
+                  <strong>Medel risk:</strong> 40-70% sannolikhet<br/>
+                  <strong>Låg risk:</strong> &lt;40% sannolikhet
+                </div>
               </div>
-              <div className="text-xs pt-1 border-t border-slate-600">
-                <strong>Hög risk:</strong> &gt;70% sannolikhet<br/>
-                <strong>Medel risk:</strong> 40-70% sannolikhet<br/>
-                <strong>Låg risk:</strong> &lt;40% sannolikhet
-              </div>
+            }
+            position="left"
+          >
+            <div className={`text-sm font-medium ${
+              organization.highestChurnRisk.risk === 'high' ? 'text-red-600' :
+              organization.highestChurnRisk.risk === 'medium' ? 'text-yellow-600' :
+              'text-green-600'
+            }`}>
+              {organization.highestChurnRisk.risk === 'high' ? 'Hög' :
+               organization.highestChurnRisk.risk === 'medium' ? 'Medel' : 'Låg'}
             </div>
-          }
-          position="left"
-        >
-          <div className={`text-sm font-medium ${
-            organization.highestChurnRisk.risk === 'high' ? 'text-red-600' :
-            organization.highestChurnRisk.risk === 'medium' ? 'text-yellow-600' :
-            'text-green-600'
-          }`}>
-            {organization.highestChurnRisk.risk === 'high' ? 'Hög' :
-             organization.highestChurnRisk.risk === 'medium' ? 'Medel' : 'Låg'}
+          </CustomTooltip>
+          <div className="text-xs text-slate-500">
+            {Math.round(organization.highestChurnRisk.score)}%
           </div>
-        </CustomTooltip>
-        <div className="text-xs text-slate-500">
-          {Math.round(organization.highestChurnRisk.score)}%
-        </div>
-      </td>
+        </td>
+      )}
 
       {/* Manager Column */}
-      <td className="px-6 py-4">
-        <div className="text-sm font-medium text-slate-200">
-          {organization.assigned_account_manager || (
-            <span className="text-slate-500 italic">Ej tilldelad</span>
-          )}
-        </div>
-        {organization.account_manager_email && (
-          <div className="text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer">
-            {organization.account_manager_email}
+      {isVisible('manager') && (
+        <td className="px-6 py-4">
+          <div className="text-sm font-medium text-slate-200">
+            {organization.assigned_account_manager || (
+              <span className="text-slate-500 italic">Ej tilldelad</span>
+            )}
           </div>
-        )}
-      </td>
+          {organization.account_manager_email && (
+            <div className="text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer">
+              {organization.account_manager_email}
+            </div>
+          )}
+        </td>
+      )}
 
       {/* Actions Column */}
       <td className="px-6 py-4">
@@ -347,6 +370,17 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               title="Visa intäktsöversikt"
             >
               <Coins className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Renewal Button — visas bara om avtal < 90 dagar */}
+          {showRenewalButton && (
+            <button
+              onClick={() => onRenewal!(organization)}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors duration-200 animate-pulse"
+              title="Starta avtalsförnyelse"
+            >
+              <RefreshCw className="h-4 w-4" />
             </button>
           )}
 

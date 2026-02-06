@@ -20,6 +20,7 @@ import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 
 interface ContactAndUnitsExpandedViewProps {
   organization: ConsolidatedCustomer
+  colSpan?: number
 }
 
 const formatCurrency = (amount: number): string => {
@@ -32,7 +33,8 @@ const formatCurrency = (amount: number): string => {
 }
 
 export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewProps> = ({
-  organization
+  organization,
+  colSpan = 10
 }) => {
   // Hitta verksamhetschef - använd först organisation-nivå data, sedan huvudkontor site
   const verksamhetschef = organization.sites.find(site => site.site_type === 'huvudkontor') 
@@ -89,7 +91,7 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
 
   return (
     <tr>
-      <td colSpan={10} className="px-6 py-6 bg-slate-800/30">
+      <td colSpan={colSpan} className="px-6 py-6 bg-slate-800/30">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Kontaktöversikt */}

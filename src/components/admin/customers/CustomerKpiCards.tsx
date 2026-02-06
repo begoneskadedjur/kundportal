@@ -1,9 +1,9 @@
 // src/components/admin/customers/CustomerKpiCards.tsx - KPI-kort med tooltips för Success Management
 
 import React from 'react'
-import { 
-  DollarSign, TrendingUp, Users, AlertTriangle, 
-  Target, Activity, Info
+import {
+  DollarSign, Users, AlertTriangle,
+  Activity, Info
 } from 'lucide-react'
 import Card from '../../ui/Card'
 import TooltipWrapper from '../../ui/TooltipWrapper'
@@ -55,38 +55,6 @@ Inkluderar:
 • Status = 'signed'
 
 Exkluderar utgångna och uppsagda kontrakt`
-    },
-    {
-      title: 'Förnyelsevärde',
-      value: formatCurrency(analytics.renewalValue90Days),
-      subtitle: 'Nästa 90 dagar',
-      icon: TrendingUp,
-      color: 'from-purple-500/10 to-purple-600/5 border-purple-500/20',
-      iconColor: 'text-purple-500',
-      tooltip: `Totalt kontraktsvärde som löper ut inom 90 dagar
-      
-Detta är värdet av kontrakt som behöver förnyas
-för att behålla intäkterna.
-
-Fokusera säljinsatser på dessa kunder
-för att säkra förnyelser i tid.`
-    },
-    {
-      title: 'Genomsnittligt Värde',
-      value: formatCurrency(analytics.averageContractValue),
-      subtitle: 'Per kontrakt',
-      icon: Target,
-      color: 'from-orange-500/10 to-orange-600/5 border-orange-500/20',
-      iconColor: 'text-orange-500',
-      tooltip: `Genomsnittligt totalt kontraktsvärde
-      
-Beräkning:
-Total portföljvärde / Antal kunder
-
-Använd detta för att:
-• Sätta prismål för nya affärer
-• Identifiera upsell-möjligheter
-• Benchmarka mot branschstandard`
     },
     {
       title: 'Health Score',
@@ -148,7 +116,7 @@ eventuella problem.`
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
       {kpiCards.map((kpi, index) => (
         <Card 
           key={index} 

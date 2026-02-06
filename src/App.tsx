@@ -34,6 +34,7 @@ import ContractBilling from './pages/admin/ContractBilling';
 import InvoicingPage from './pages/admin/invoicing';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
+import CustomerAnalytics from './pages/admin/CustomerAnalytics';
 import ImageBank from './pages/admin/ImageBank';
 import TeamChat from './pages/admin/TeamChat';
 
@@ -151,13 +152,21 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/admin/customers/:id" 
+            <Route
+              path="/admin/customers/analytics"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <CustomerAnalytics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/customers/:id"
               element={
                 <ProtectedRoute requiredRole="admin">
                   <CustomerDetails />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route 
               path="/admin/customers/new" 

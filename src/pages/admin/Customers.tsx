@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom'
 import { 
   Search, Filter, RefreshCw, ChevronDown, ChevronUp,
   Mail, Phone, Building2, User, Calendar, DollarSign,
-  ChevronLeft, ChevronRight, X, UserPlus, ExternalLink,
   TrendingUp, AlertTriangle, Activity, Send, Edit3, Users
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -14,18 +13,17 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { PageHeader } from '../../components/shared'
 import CustomerKpiCards from '../../components/admin/customers/CustomerKpiCards'
-import HealthScoreBadge from '../../components/admin/customers/HealthScoreBadge'
-import ChurnRiskBadge from '../../components/admin/customers/ChurnRiskBadge'
 import CustomerRevenueModal from '../../components/admin/customers/CustomerRevenueModal'
 import EmailCampaignModal from '../../components/admin/customers/EmailCampaignModal'
 import EditCustomerModal from '../../components/admin/customers/EditCustomerModal'
-import ARRForecastChart from '../../components/admin/customers/ARRForecastChart'
+import RenewalWorkflowModal from '../../components/admin/customers/RenewalWorkflowModal'
 import TooltipWrapper from '../../components/ui/TooltipWrapper'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers } from '../../hooks/useConsolidatedCustomers'
 import ExpandableOrganizationRow from '../../components/admin/customers/ExpandableOrganizationRow'
+import ColumnSelector, { useColumnVisibility } from '../../components/admin/customers/ColumnSelector'
 import SiteDetailRow from '../../components/admin/customers/SiteDetailRow'
-import ContactAndUnitsExpandedView from '../../components/admin/customers/ContactAndUnitsExpandedView'
+import MultisiteExpandedTabs from '../../components/admin/customers/MultisiteExpandedTabs'
 import MultiSiteCustomerDetailModal from '../../components/admin/customers/MultiSiteCustomerDetailModal'
 import SingleCustomerDetailModal from '../../components/admin/customers/SingleCustomerDetailModal'
 import { 
@@ -39,7 +37,7 @@ import { PriceListService } from '../../services/priceListService'
 import type { PriceList, PriceListItemWithArticle } from '../../types/articles'
 
 // Expanded row component för att visa mer detaljer
-const ExpandedCustomerRow = ({ customer }: { customer: any }) => {
+const ExpandedCustomerRow = ({ customer, colSpan = 10 }: { customer: any; colSpan?: number }) => {
   const [priceListData, setPriceListData] = useState<{
     priceList: PriceList | null
     items: PriceListItemWithArticle[]
@@ -67,7 +65,7 @@ const ExpandedCustomerRow = ({ customer }: { customer: any }) => {
 
   return (
     <tr>
-      <td colSpan={10} className="px-4 py-4 bg-slate-800/30">
+      <td colSpan={colSpan} className="px-4 py-4 bg-slate-800/30">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Kontaktinformation */}
           <div>
@@ -200,7 +198,6 @@ export default function Customers() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set())
   const [sendingInvitation, setSendingInvitation] = useState<string | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [emailCampaignOpen, setEmailCampaignOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<any>(null)
@@ -210,6 +207,8 @@ export default function Customers() {
   const [selectedSingleCustomer, setSelectedSingleCustomer] = useState<any>(null)
   const [revenueModalOpen, setRevenueModalOpen] = useState(false)
   const [revenueCustomer, setRevenueCustomer] = useState<any>(null)
+  const [renewalModalOpen, setRenewalModalOpen] = useState(false)
+  const [renewalOrganization, setRenewalOrganization] = useState<any>(null)
   
   // Filter states — searchInput är UI-state, searchTerm debouncas för prestanda vid 3000+ kunder
   const [searchInput, setSearchInput] = useState('')
@@ -232,6 +231,9 @@ export default function Customers() {
   // Paginering
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 50
+
+  // Kolumnväljare
+  const { visibleColumns, toggleColumn, resetToDefaults } = useColumnVisibility()
 
   // Kollapserbara filter
   const [filtersExpanded, setFiltersExpanded] = useState(false)
@@ -419,6 +421,11 @@ export default function Customers() {
     setRevenueModalOpen(true)
   }
 
+  const handleStartRenewal = (organization: any) => {
+    setRenewalOrganization(organization)
+    setRenewalModalOpen(true)
+  }
+
   // Get unique managers for filter
   const uniqueManagers = useMemo(() => {
     const managers = new Set<string>()
@@ -486,11 +493,11 @@ export default function Customers() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              onClick={() => navigate('/admin/customers/analytics')}
               className="flex items-center gap-2"
             >
-              {sidebarOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-              Analytics
+              <Activity className="w-4 h-4" />
+              Detaljerad Analytics
             </Button>
           </div>
         }
@@ -549,7 +556,7 @@ export default function Customers() {
 
       {/* Main content with sidebar */}
       <div className="relative">
-        <div className={`transition-all duration-300 ${sidebarOpen ? 'lg:mr-96' : ''}`}>
+        <div>
           {/* Filters */}
           <Card className="p-4 mb-6">
             <div className="flex gap-3">
@@ -581,6 +588,8 @@ export default function Customers() {
                   </span>
                 )}
               </button>
+              {/* Kolumnväljare */}
+              <ColumnSelector visibleColumns={visibleColumns} onToggle={toggleColumn} onReset={resetToDefaults} />
             </div>
 
             {/* Collapsible filter dropdowns */}
@@ -716,54 +725,68 @@ export default function Customers() {
                         {sortField === 'company_name' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalAnnualValue')}>
-                      <div className="flex items-center justify-end gap-2">
-                        <DollarSign className="w-4 h-4 text-green-400" />
-                        Årspremie
-                        {sortField === 'totalAnnualValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                      </div>
-                    </th>
-                    <th className="hidden lg:table-cell px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalCasesValue')}>
-                      <div className="flex items-center justify-end gap-2">
-                        <DollarSign className="w-4 h-4 text-blue-400" />
-                        Debiterat utöver avtal
-                        {sortField === 'totalCasesValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalContractValue')}>
-                      <div className="flex items-center justify-end gap-2">
-                        <DollarSign className="w-4 h-4 text-yellow-400" />
-                        Avtalsvärde
-                        {sortField === 'totalContractValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('daysToNextRenewal')}>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-purple-400" />
-                        Kontraktsperiod
-                        {sortField === 'daysToNextRenewal' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('healthScore')}>
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-green-400" />
-                        Health Score
-                        {sortField === 'healthScore' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('churnRisk')}>
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-red-400" />
-                        Churn Risk
-                        {sortField === 'churnRisk' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-blue-400" />
-                        Säljare
-                      </div>
-                    </th>
+                    {visibleColumns.has('annualValue') && (
+                      <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalAnnualValue')}>
+                        <div className="flex items-center justify-end gap-2">
+                          <DollarSign className="w-4 h-4 text-green-400" />
+                          Årspremie
+                          {sortField === 'totalAnnualValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.has('casesValue') && (
+                      <th className="hidden lg:table-cell px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalCasesValue')}>
+                        <div className="flex items-center justify-end gap-2">
+                          <DollarSign className="w-4 h-4 text-blue-400" />
+                          Debiterat utöver avtal
+                          {sortField === 'totalCasesValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.has('contractValue') && (
+                      <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalContractValue')}>
+                        <div className="flex items-center justify-end gap-2">
+                          <DollarSign className="w-4 h-4 text-yellow-400" />
+                          Avtalsvärde
+                          {sortField === 'totalContractValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.has('contractPeriod') && (
+                      <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('daysToNextRenewal')}>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-purple-400" />
+                          Kontraktsperiod
+                          {sortField === 'daysToNextRenewal' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.has('healthScore') && (
+                      <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('healthScore')}>
+                        <div className="flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-green-400" />
+                          Health Score
+                          {sortField === 'healthScore' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.has('churnRisk') && (
+                      <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('churnRisk')}>
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-red-400" />
+                          Churn Risk
+                          {sortField === 'churnRisk' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.has('manager') && (
+                      <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-blue-400" />
+                          Säljare
+                        </div>
+                      </th>
+                    )}
                     <th className="px-6 py-4 text-center text-xs font-medium text-slate-300 uppercase tracking-wider">
                       <div className="flex items-center justify-center gap-2">
                         <Edit3 className="w-4 h-4 text-slate-400" />
@@ -788,16 +811,18 @@ export default function Customers() {
                           onViewMultiSiteDetails={handleViewMultiSiteDetails}
                           onViewSingleCustomerDetails={handleViewSingleCustomerDetails}
                           onViewRevenue={handleViewRevenue}
+                          onRenewal={handleStartRenewal}
+                          visibleColumns={visibleColumns}
                         />
 
                         {/* Contact and units expanded view for multisite organizations */}
                         {isExpanded && organization.organizationType === 'multisite' && (
-                          <ContactAndUnitsExpandedView organization={organization} />
+                          <MultisiteExpandedTabs organization={organization} colSpan={visibleColumns.size} />
                         )}
 
                         {/* Expanded details for single-site customers */}
                         {isExpanded && organization.organizationType === 'single' && (
-                          <ExpandedCustomerRow customer={organization.sites[0]} />
+                          <ExpandedCustomerRow customer={organization.sites[0]} colSpan={visibleColumns.size} />
                         )}
                       </React.Fragment>
                     )
@@ -871,215 +896,6 @@ export default function Customers() {
           </Card>
         </div>
 
-        {/* Analytics Sidebar */}
-        <div className={`
-          fixed top-0 right-0 h-full w-96 
-          bg-slate-900/95 backdrop-blur-xl border-l border-slate-700/50 
-          transform transition-all duration-300 z-40 overflow-y-auto shadow-2xl
-          ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}
-        `}>
-          <div className="p-6 space-y-6">
-            {/* Sidebar header */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Portfolio Analytics</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-
-            {/* ARR Forecast - Prominent feature */}
-            <ARRForecastChart customers={legacyCustomers || []} />
-
-            {/* Separator */}
-            <div className="border-t border-slate-700"></div>
-
-            {/* Organization statistics */}
-            <Card className="p-4">
-              <h4 className="text-sm font-medium text-slate-300 mb-3">Organisationsöversikt</h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded">
-                  <span className="text-xs text-slate-400">Totalt organisationer</span>
-                  <span className="text-sm font-medium text-white">{consolidatedAnalytics.totalOrganizations}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-blue-500/10 rounded">
-                  <span className="text-xs text-slate-400">Multisite-organisationer</span>
-                  <span className="text-sm font-medium text-blue-400">{consolidatedAnalytics.multisiteOrganizations}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded">
-                  <span className="text-xs text-slate-400">Enkelkunder</span>
-                  <span className="text-sm font-medium text-white">{consolidatedAnalytics.singleCustomers}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-green-500/10 rounded">
-                  <span className="text-xs text-slate-400">Totalt enheter</span>
-                  <span className="text-sm font-medium text-green-400">{consolidatedAnalytics.totalSites}</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Top organizations */}
-            <Card className="p-4">
-              <h4 className="text-sm font-medium text-slate-300 mb-3">Top 5 Organisationer</h4>
-              <div className="space-y-2">
-                {consolidatedAnalytics.topOrganizationsByValue.slice(0, 5).map((organization, idx) => (
-                  <div 
-                    key={organization.id}
-                    className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-all cursor-pointer"
-                    onClick={() => {
-                      setSearchTerm(organization.company_name)
-                      setSidebarOpen(false)
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">#{idx + 1}</span>
-                      <div>
-                        <p className="text-sm text-white truncate">
-                          {organization.company_name}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <HealthScoreBadge
-                            score={organization.overallHealthScore.score}
-                            level={organization.overallHealthScore.level}
-                            tooltip=""
-                            size="sm"
-                            showIcon={false}
-                          />
-                          {organization.organizationType === 'multisite' && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded">
-                              {organization.totalSites} enheter
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm font-bold text-green-400">
-                      {formatCurrency(organization.totalContractValue)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* At risk organizations */}
-            {consolidatedAnalytics.organizationsAtRiskList.length > 0 && (
-              <Card className="p-4 bg-red-500/10 border-red-500/20">
-                <h4 className="text-sm font-medium text-red-400 mb-3">
-                  Organisationer i Riskzonen ({consolidatedAnalytics.organizationsAtRiskList.length})
-                </h4>
-                <div className="space-y-2">
-                  {consolidatedAnalytics.organizationsAtRiskList.slice(0, 5).map((organization) => (
-                    <div 
-                      key={organization.id}
-                      className="p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-all cursor-pointer"
-                      onClick={() => {
-                        setSearchTerm(organization.company_name)
-                        setSidebarOpen(false)
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-white truncate">{organization.company_name}</p>
-                        {organization.organizationType === 'multisite' && (
-                          <span className="text-xs bg-red-200 text-red-800 px-1 py-0.5 rounded">
-                            {organization.totalSites} enheter
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <ChurnRiskBadge
-                          risk={organization.highestChurnRisk.risk}
-                          score={organization.highestChurnRisk.score}
-                          tooltip=""
-                          size="sm"
-                          showIcon={false}
-                        />
-                        <span className="text-xs text-slate-500">
-                          {organization.daysToNextRenewal ? `${organization.daysToNextRenewal} dagar kvar` : 'Okänt'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {/* Upcoming renewals */}
-            <Card className="p-4">
-              <h4 className="text-sm font-medium text-slate-300 mb-3">
-                Kommande Förnyelser ({consolidatedAnalytics.upcomingRenewals.length})
-              </h4>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {consolidatedAnalytics.upcomingRenewals.map((organization) => (
-                  <div 
-                    key={organization.id}
-                    className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-all cursor-pointer"
-                    onClick={() => {
-                      setSearchTerm(organization.company_name)
-                      setSidebarOpen(false)
-                    }}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm text-white truncate">{organization.company_name}</p>
-                        {organization.organizationType === 'multisite' && (
-                          <span className="text-xs bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded">
-                            {organization.totalSites} enheter
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        {formatCurrency(organization.totalContractValue)}
-                      </p>
-                    </div>
-                    <span className={`text-xs font-medium ${
-                      (organization.daysToNextRenewal || 0) <= 30 ? 'text-red-400' :
-                      (organization.daysToNextRenewal || 0) <= 60 ? 'text-orange-400' :
-                      'text-yellow-400'
-                    }`}>
-                      {organization.daysToNextRenewal || 0} dagar
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Growth metrics */}
-            <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-              <h4 className="text-sm font-medium text-slate-300 mb-3">Tillväxt Metrics</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs text-slate-500">Portal-tillgång</p>
-                  <div className="grid grid-cols-3 gap-1 text-xs">
-                    <span className="text-green-400">✓ {consolidatedAnalytics.portalAccessStats.fullAccess}</span>
-                    <span className="text-yellow-400">⚠ {consolidatedAnalytics.portalAccessStats.partialAccess}</span>
-                    <span className="text-gray-400">✗ {consolidatedAnalytics.portalAccessStats.noAccess}</span>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Genomsnittsvärde</p>
-                  <p className="text-lg font-bold text-white">
-                    {formatCurrency(consolidatedAnalytics.averageContractValue)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Health Score</p>
-                  <p className="text-lg font-bold text-green-400">
-                    {consolidatedAnalytics.averageHealthScore.toFixed(0)}/100
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">I riskzonen</p>
-                  <p className="text-lg font-bold text-red-400">
-                    {consolidatedAnalytics.organizationsAtRisk}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
       </div>
 
       {/* Email Campaign Modal */}
@@ -1127,6 +943,16 @@ export default function Customers() {
         onClose={() => {
           setRevenueModalOpen(false)
           setRevenueCustomer(null)
+        }}
+      />
+
+      {/* Renewal Workflow Modal */}
+      <RenewalWorkflowModal
+        organization={renewalOrganization}
+        isOpen={renewalModalOpen}
+        onClose={() => {
+          setRenewalModalOpen(false)
+          setRenewalOrganization(null)
         }}
       />
     </div>
