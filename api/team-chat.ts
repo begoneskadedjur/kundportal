@@ -510,6 +510,19 @@ async function fetchTechnicianCompetencies(technicianName?: string, pestType?: s
   return { technicians: result };
 }
 
+// Extrahera adress som sträng från JSONB-fält (adress kan vara objekt eller sträng)
+function extractAddress(adress: unknown): string {
+  if (!adress) return '';
+  if (typeof adress === 'string') {
+    try { const parsed = JSON.parse(adress); return parsed?.formatted_address || adress; }
+    catch { return adress; }
+  }
+  if (typeof adress === 'object' && adress !== null) {
+    return (adress as any).formatted_address || '';
+  }
+  return '';
+}
+
 // Sök i ärenden
 async function searchCasesInDb(args: Record<string, unknown>) {
   const searchTerm = args.search_term as string | undefined;
@@ -592,7 +605,7 @@ async function searchCasesInDb(args: Record<string, unknown>) {
     filtered = filtered.filter(c =>
       c.title?.toLowerCase().includes(term) ||
       c.kontaktperson?.toLowerCase().includes(term) ||
-      c.adress?.toLowerCase().includes(term)
+      extractAddress(c.adress).toLowerCase().includes(term)
     );
   }
 
