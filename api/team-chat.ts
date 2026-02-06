@@ -265,6 +265,45 @@ const functionDeclarations = [
         }
       }
     }
+  },
+  {
+    name: 'generate_case_report',
+    description: 'Genererar aggregerade rapporter/statistik för breda datafrågor. Returnerar summeringar (antal, intäkter, uppdelningar per månad/skadedjur/tekniker) — INTE individuella ärenden. Använd för frågor som "alla råttärenden senaste året" eller "vilka skadedjur har vi jobbat mest med?". ETT anrop räcker för hela rapporten.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pest_type_search: {
+          type: 'string',
+          description: 'Sökterm för skadedjurstyp, t.ex. "rått", "vägglöss", "myror". Partiell matchning. Lämna tom för alla typer.'
+        },
+        date_from: {
+          type: 'string',
+          description: 'Startdatum (YYYY-MM-DD). Ingen maxgräns — kan vara år bakåt.'
+        },
+        date_to: {
+          type: 'string',
+          description: 'Slutdatum (YYYY-MM-DD). Default: idag.'
+        },
+        technician_name: {
+          type: 'string',
+          description: 'Filtrera på tekniker (partiell matchning)'
+        },
+        case_type: {
+          type: 'string',
+          enum: ['private', 'business', 'contract', 'all'],
+          description: 'Ärendetyp. Default: all'
+        },
+        group_by: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['month', 'pest_type', 'technician', 'status', 'case_type']
+          },
+          description: 'Grupperingar att inkludera i rapporten. Default: ["month", "pest_type"]'
+        }
+      },
+      required: ['date_from']
+    }
   }
 ];
 
@@ -294,6 +333,9 @@ async function executeFunction(name: string, args: Record<string, unknown>): Pro
 
     case 'search_cases':
       return await searchCasesInDb(args);
+
+    case 'generate_case_report':
+      return await generateCaseReport(args);
 
     default:
       return { error: `Unknown function: ${name}` };
@@ -636,6 +678,216 @@ async function searchCasesInDb(args: Record<string, unknown>) {
   return { cases: casesWithSwedishTimes, count: casesWithSwedishTimes.length };
 }
 
+// Generera aggregerad ärenderapport — för breda datafrågor utan timeout-risk
+async function generateCaseReport(args: Record<string, unknown>) {
+  const pestTypeSearch = (args.pest_type_search as string | undefined)?.toLowerCase().trim();
+  const dateFrom = args.date_from as string;
+  const dateTo = (args.date_to as string) || new Date().toISOString().split('T')[0];
+  const technicianName = (args.technician_name as string | undefined)?.toLowerCase().trim();
+  const caseTypeFilter = (args.case_type as string) || 'all';
+  const groupBy = (args.group_by as string[]) || ['month', 'pest_type'];
+
+  console.log(`[Team Chat] generateCaseReport:`, { pestTypeSearch, dateFrom, dateTo, technicianName, caseTypeFilter, groupBy });
+
+  const dateFromISO = new Date(dateFrom + 'T00:00:00').toISOString();
+  const dateToISO = new Date(dateTo + 'T23:59:59').toISOString();
+
+  const shouldQueryPrivate = caseTypeFilter === 'all' || caseTypeFilter === 'private';
+  const shouldQueryBusiness = caseTypeFilter === 'all' || caseTypeFilter === 'business';
+  const shouldQueryContract = caseTypeFilter === 'all' || caseTypeFilter === 'contract';
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const queries: Promise<any[]>[] = [];
+
+  if (shouldQueryPrivate) {
+    let query = supabase
+      .from('private_cases')
+      .select('start_date, skadedjur, pris, status, primary_assignee_name')
+      .gte('start_date', dateFromISO)
+      .lte('start_date', dateToISO);
+
+    if (technicianName) {
+      query = query.ilike('primary_assignee_name', `%${technicianName}%`);
+    }
+
+    queries.push(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      query.then(({ data }) => (data || []).map((c: any) => ({
+        case_type: 'privat',
+        pest_type_field: c.skadedjur || 'Ej angivet',
+        price_field: c.pris || 0,
+        date_field: c.start_date,
+        status: c.status || 'Okänd',
+        technician_field: c.primary_assignee_name || 'Ej tilldelad',
+      })))
+    );
+  }
+
+  if (shouldQueryBusiness) {
+    let query = supabase
+      .from('business_cases')
+      .select('start_date, skadedjur, pris, status, primary_assignee_name')
+      .gte('start_date', dateFromISO)
+      .lte('start_date', dateToISO);
+
+    if (technicianName) {
+      query = query.ilike('primary_assignee_name', `%${technicianName}%`);
+    }
+
+    queries.push(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      query.then(({ data }) => (data || []).map((c: any) => ({
+        case_type: 'företag',
+        pest_type_field: c.skadedjur || 'Ej angivet',
+        price_field: c.pris || 0,
+        date_field: c.start_date,
+        status: c.status || 'Okänd',
+        technician_field: c.primary_assignee_name || 'Ej tilldelad',
+      })))
+    );
+  }
+
+  if (shouldQueryContract) {
+    let query = supabase
+      .from('cases')
+      .select('scheduled_start, pest_type, price, status, assigned_technician_name')
+      .gte('scheduled_start', dateFromISO)
+      .lte('scheduled_start', dateToISO);
+
+    if (technicianName) {
+      query = query.ilike('assigned_technician_name', `%${technicianName}%`);
+    }
+
+    queries.push(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      query.then(({ data }) => (data || []).map((c: any) => ({
+        case_type: 'avtal',
+        pest_type_field: c.pest_type || 'Ej angivet',
+        price_field: c.price || 0,
+        date_field: c.scheduled_start,
+        status: c.status || 'Okänd',
+        technician_field: c.assigned_technician_name || 'Ej tilldelad',
+      })))
+    );
+  }
+
+  const results = await Promise.all(queries);
+  let allCases = results.flat();
+
+  console.log(`[Team Chat] generateCaseReport: ${allCases.length} cases fetched before pest filter`);
+
+  // Filtrera på skadedjurstyp (case-insensitiv partiell matchning)
+  if (pestTypeSearch) {
+    allCases = allCases.filter(c => c.pest_type_field.toLowerCase().includes(pestTypeSearch));
+    console.log(`[Team Chat] After pest_type filter "${pestTypeSearch}": ${allCases.length} cases`);
+  }
+
+  // Bygg summary
+  const totalCases = allCases.length;
+  const totalRevenue = allCases.reduce((sum: number, c: { price_field: number }) => sum + c.price_field, 0);
+  const dateRangeDays = Math.ceil(
+    (new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const summary: any = {
+    total_cases: totalCases,
+    total_revenue: totalRevenue,
+    avg_revenue_per_case: totalCases > 0 ? Math.round(totalRevenue / totalCases) : 0,
+    date_range: { from: dateFrom, to: dateTo, days: dateRangeDays },
+    filters_applied: {
+      ...(pestTypeSearch && { pest_type: pestTypeSearch }),
+      ...(technicianName && { technician: technicianName }),
+      ...(caseTypeFilter !== 'all' && { case_type: caseTypeFilter }),
+    },
+  };
+
+  // Bygg breakdowns baserat på group_by
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const breakdowns: any = {};
+
+  if (groupBy.includes('month')) {
+    const monthMap = new Map<string, { count: number; revenue: number }>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allCases.forEach((c: any) => {
+      if (!c.date_field) return;
+      const d = new Date(c.date_field);
+      const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthMap.has(mk)) monthMap.set(mk, { count: 0, revenue: 0 });
+      const entry = monthMap.get(mk)!;
+      entry.count++;
+      entry.revenue += c.price_field;
+    });
+
+    const monthNames = ['Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni', 'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'];
+    breakdowns.by_month = Array.from(monthMap.entries())
+      .map(([month, data]) => {
+        const [year, monthNum] = month.split('-');
+        return { month, month_display: `${monthNames[parseInt(monthNum) - 1]} ${year}`, ...data };
+      })
+      .sort((a: { month: string }, b: { month: string }) => a.month.localeCompare(b.month));
+  }
+
+  if (groupBy.includes('pest_type')) {
+    const pestMap = new Map<string, { count: number; revenue: number }>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allCases.forEach((c: any) => {
+      if (!pestMap.has(c.pest_type_field)) pestMap.set(c.pest_type_field, { count: 0, revenue: 0 });
+      const entry = pestMap.get(c.pest_type_field)!;
+      entry.count++;
+      entry.revenue += c.price_field;
+    });
+    breakdowns.by_pest_type = Array.from(pestMap.entries())
+      .map(([pest_type, data]) => ({ pest_type, ...data }))
+      .sort((a: { count: number }, b: { count: number }) => b.count - a.count);
+  }
+
+  if (groupBy.includes('technician')) {
+    const techMap = new Map<string, { count: number; revenue: number }>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allCases.forEach((c: any) => {
+      if (!techMap.has(c.technician_field)) techMap.set(c.technician_field, { count: 0, revenue: 0 });
+      const entry = techMap.get(c.technician_field)!;
+      entry.count++;
+      entry.revenue += c.price_field;
+    });
+    breakdowns.by_technician = Array.from(techMap.entries())
+      .map(([technician_name, data]) => ({ technician_name, ...data }))
+      .sort((a: { count: number }, b: { count: number }) => b.count - a.count);
+  }
+
+  if (groupBy.includes('status')) {
+    const statusMap = new Map<string, { count: number; revenue: number }>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allCases.forEach((c: any) => {
+      if (!statusMap.has(c.status)) statusMap.set(c.status, { count: 0, revenue: 0 });
+      const entry = statusMap.get(c.status)!;
+      entry.count++;
+      entry.revenue += c.price_field;
+    });
+    breakdowns.by_status = Array.from(statusMap.entries())
+      .map(([status, data]) => ({ status, ...data }))
+      .sort((a: { count: number }, b: { count: number }) => b.count - a.count);
+  }
+
+  if (groupBy.includes('case_type')) {
+    const typeMap = new Map<string, { count: number; revenue: number }>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allCases.forEach((c: any) => {
+      if (!typeMap.has(c.case_type)) typeMap.set(c.case_type, { count: 0, revenue: 0 });
+      const entry = typeMap.get(c.case_type)!;
+      entry.count++;
+      entry.revenue += c.price_field;
+    });
+    breakdowns.by_case_type = Array.from(typeMap.entries())
+      .map(([case_type, data]) => ({ case_type, ...data }))
+      .sort((a: { count: number }, b: { count: number }) => b.count - a.count);
+  }
+
+  console.log(`[Team Chat] generateCaseReport complete: ${totalCases} cases, ${totalRevenue} kr revenue`);
+  return { summary, breakdowns };
+}
+
 // Hämta dagens bokningar med tidsslottar - hämtar från ALLA 3 tabeller med ALLA tekniker
 async function fetchTodayBookings() {
   const now = new Date();
@@ -918,16 +1170,34 @@ Vid bokningshjälp: Filtrera tekniker baserat på kompetens för det aktuella sk
 **NÄMN ALDRIG kompetenser i allmänna listningar eller sammanfattningar!**
 
 ### search_cases
-Använd för att söka i ärendehistorik - både gamla och framtida ärenden.
+Använd för att söka specifika ärenden eller visa individuella ärendedetaljer.
 
 **VIKTIGA SÖKREGLER:**
 - Använd ALLTID search_term för att filtrera — hämta aldrig alla ärenden utan sökterm
 - Begränsa datumintervall till max 3 månader per sökning
-- Om du behöver data för flera perioder: sammanfatta redan hämtad data istället för att söka fler gånger
-- Föredra EN bred sökning framför flera parallella — t.ex. sök "rått" med 6 månaders intervall
-- Om första sökningen ger 0 resultat, prova utan search_term men med snävare datumintervall
+- Föredra EN bred sökning framför flera parallella
 - **MAX 2 search_cases-anrop per svar** — sammanfatta det du har efter det
-- Om resultaten inte räcker, be användaren specificera snävare kriterier
+- **För statistik/översikter över längre perioder** → använd generate_case_report istället
+
+### generate_case_report
+Använd för aggregerade rapporter över längre perioder. Returnerar statistik — INTE individuella ärenden.
+
+**Använd generate_case_report när:**
+- Frågor om många ärenden över flera månader/år ("alla råttärenden senaste året")
+- Statistikfrågor ("hur många vägglössärenden har vi haft?")
+- Trendanalys ("vilka skadedjur har ökat?")
+- Sammanfattningar med antal/summor/genomsnitt
+
+**Använd search_cases istället när:**
+- Behöver se specifika ärenden eller individuella detaljer
+- Datumintervall kortare än 2 veckor
+- "Dagens/imorgons ärenden" → get_bookings_for_date_range
+
+**Resultat:**
+- summary: Totalt antal, intäkter, genomsnittspris, datumintervall
+- breakdowns: Uppdelningar per månad/skadedjur/tekniker/status/ärendetyp
+
+Presentera alltid data i tydliga tabeller. Nämn alltid datumintervall och eventuella filter i svaret.
 
 ### ⏰ VIKTIGT OM TIDER
 Alla bokningar innehåller fälten \`start_time_swedish\` och \`end_time_swedish\` som är korrekt formaterade i svensk tid (CET/CEST).
