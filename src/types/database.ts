@@ -42,7 +42,12 @@ export type Database = {
           contract_length: string | null
           contract_start_date: string | null
           contract_end_date: string | null
-          
+
+          // Termination
+          terminated_at: string | null
+          termination_reason: string | null
+          effective_end_date: string | null
+
           // Financial Information
           total_contract_value: number | null
           annual_value: number | null

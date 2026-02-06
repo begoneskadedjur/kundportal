@@ -17,6 +17,7 @@ import CustomerRevenueModal from '../../components/admin/customers/CustomerReven
 import EmailCampaignModal from '../../components/admin/customers/EmailCampaignModal'
 import EditCustomerModal from '../../components/admin/customers/EditCustomerModal'
 import RenewalWorkflowModal from '../../components/admin/customers/RenewalWorkflowModal'
+import TerminateContractModal from '../../components/admin/customers/TerminateContractModal'
 import TooltipWrapper from '../../components/ui/TooltipWrapper'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers } from '../../hooks/useConsolidatedCustomers'
@@ -209,6 +210,8 @@ export default function Customers() {
   const [revenueCustomer, setRevenueCustomer] = useState<any>(null)
   const [renewalModalOpen, setRenewalModalOpen] = useState(false)
   const [renewalOrganization, setRenewalOrganization] = useState<any>(null)
+  const [terminateModalOpen, setTerminateModalOpen] = useState(false)
+  const [terminateOrganization, setTerminateOrganization] = useState<any>(null)
   
   // Filter states — searchInput är UI-state, searchTerm debouncas för prestanda vid 3000+ kunder
   const [searchInput, setSearchInput] = useState('')
@@ -218,7 +221,7 @@ export default function Customers() {
     const timer = setTimeout(() => setSearchTerm(searchInput), 300)
     return () => clearTimeout(timer)
   }, [searchInput])
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'expiring'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'expiring' | 'terminated'>('all')
   const [healthFilter, setHealthFilter] = useState<'all' | 'excellent' | 'good' | 'fair' | 'poor'>('all')
   const [portalFilter, setPortalFilter] = useState<'all' | 'full' | 'partial' | 'none'>('all')
   const [managerFilter, setManagerFilter] = useState<string>('all')
@@ -302,9 +305,11 @@ export default function Customers() {
   const expiringCount = consolidatedCustomers.filter(c => c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90).length
   const highRiskCount = consolidatedAnalytics.organizationsAtRisk
   const multisiteCount = consolidatedAnalytics.multisiteOrganizations
+  const terminatedCount = consolidatedCustomers.filter(c => c.isTerminated).length
 
   // Aktiv preset-detektering
   const activePreset = statusFilter === 'expiring' ? 'expiring'
+    : statusFilter === 'terminated' ? 'terminated'
     : healthFilter === 'poor' ? 'highrisk'
     : organizationTypeFilter === 'multisite' ? 'multisite'
     : 'all'
@@ -333,6 +338,10 @@ export default function Customers() {
         break
       case 'multisite':
         setStatusFilter('all'); setOrganizationTypeFilter('multisite')
+        break
+      case 'terminated':
+        setStatusFilter('terminated'); setOrganizationTypeFilter('all')
+        setSortField('company_name'); setSortDirection('asc')
         break
     }
   }
@@ -424,6 +433,11 @@ export default function Customers() {
   const handleStartRenewal = (organization: any) => {
     setRenewalOrganization(organization)
     setRenewalModalOpen(true)
+  }
+
+  const handleTerminate = (organization: any) => {
+    setTerminateOrganization(organization)
+    setTerminateModalOpen(true)
   }
 
   // Get unique managers for filter
@@ -558,7 +572,7 @@ export default function Customers() {
       <div className="relative">
         <div>
           {/* Filters */}
-          <Card className="p-4 mb-6">
+          <Card className="p-4 mb-6 overflow-visible relative z-20">
             <div className="flex gap-3">
               {/* Sökfält — alltid synligt */}
               <div className="relative flex-1">
@@ -604,6 +618,7 @@ export default function Customers() {
                   <option value="active">Aktiva</option>
                   <option value="inactive">Inaktiva</option>
                   <option value="expiring">Löper ut snart</option>
+                  <option value="terminated">Uppsagda</option>
                 </select>
 
                 <select
@@ -710,6 +725,18 @@ export default function Customers() {
             >
               Multisite ({multisiteCount})
             </button>
+            {terminatedCount > 0 && (
+              <button
+                onClick={() => applyPreset('terminated')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  activePreset === 'terminated'
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-red-400 hover:border-red-500/30'
+                }`}
+              >
+                Uppsagda ({terminatedCount})
+              </button>
+            )}
           </div>
 
           {/* Consolidated Customer table */}
@@ -812,6 +839,7 @@ export default function Customers() {
                           onViewSingleCustomerDetails={handleViewSingleCustomerDetails}
                           onViewRevenue={handleViewRevenue}
                           onRenewal={handleStartRenewal}
+                          onTerminate={handleTerminate}
                           visibleColumns={visibleColumns}
                         />
 
@@ -954,6 +982,17 @@ export default function Customers() {
           setRenewalModalOpen(false)
           setRenewalOrganization(null)
         }}
+      />
+
+      {/* Terminate Contract Modal */}
+      <TerminateContractModal
+        organization={terminateOrganization}
+        isOpen={terminateModalOpen}
+        onClose={() => {
+          setTerminateModalOpen(false)
+          setTerminateOrganization(null)
+        }}
+        onTerminated={refresh}
       />
     </div>
   )

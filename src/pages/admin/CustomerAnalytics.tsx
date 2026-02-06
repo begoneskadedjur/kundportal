@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  TrendingUp, DollarSign, Target, ArrowLeft, BarChart3, Users
+  TrendingUp, DollarSign, Target, ArrowLeft, BarChart3, Users, XCircle
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import { PageHeader } from '../../components/shared'
@@ -13,6 +13,7 @@ import HealthScoreDistributionChart from '../../components/admin/customers/analy
 import PortalAdoptionChart from '../../components/admin/customers/analytics/PortalAdoptionChart'
 import CustomerSegmentationScatter from '../../components/admin/customers/analytics/CustomerSegmentationScatter'
 import ContractTimelineGantt from '../../components/admin/customers/analytics/ContractTimelineGantt'
+import ChurnAnalysisSection from '../../components/admin/customers/analytics/ChurnAnalysisSection'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { useConsolidatedCustomers } from '../../hooks/useConsolidatedCustomers'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
@@ -20,7 +21,7 @@ import { formatCurrency } from '../../utils/customerMetrics'
 
 export default function CustomerAnalytics() {
   const navigate = useNavigate()
-  const { consolidatedCustomers, analytics: consolidatedAnalytics, loading } = useConsolidatedCustomers()
+  const { consolidatedCustomers, activeConsolidatedCustomers, analytics: consolidatedAnalytics, loading } = useConsolidatedCustomers()
   const { customers: legacyCustomers } = useCustomerAnalytics()
 
   // KPI-data (de som flyttades från huvudsidan)
@@ -32,6 +33,11 @@ export default function CustomerAnalytics() {
     singleCustomers: consolidatedAnalytics.singleCustomers,
     totalSites: consolidatedAnalytics.totalSites,
   }), [consolidatedAnalytics])
+
+  const terminatedCustomers = useMemo(
+    () => consolidatedCustomers.filter(c => c.isTerminated),
+    [consolidatedCustomers]
+  )
 
   const navigateWithFilter = (filter: Record<string, string>) => {
     navigate('/admin/customers', { state: { filter } })
@@ -76,7 +82,7 @@ export default function CustomerAnalytics() {
       />
 
       {/* Flyttade KPI-kort: Förnyelsevärde + Genomsnittsvärde + Organisationsöversikt */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${consolidatedAnalytics.terminatedCount > 0 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'} gap-4`}>
         <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
           <div className="flex items-start justify-between mb-2">
             <p className="text-xs text-slate-400">Förnyelsevärde (90 dagar)</p>
@@ -128,21 +134,36 @@ export default function CustomerAnalytics() {
             Enheter under förvaltning
           </p>
         </Card>
+
+        {consolidatedAnalytics.terminatedCount > 0 && (
+          <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
+            <div className="flex items-start justify-between mb-2">
+              <p className="text-xs text-slate-400">Uppsagda Kunder</p>
+              <XCircle className="w-6 h-6 text-red-500 opacity-50" />
+            </div>
+            <p className="text-2xl font-bold text-white mb-1">
+              {consolidatedAnalytics.terminatedCount}
+            </p>
+            <p className="text-xs text-slate-400">
+              Exkluderas från analysen
+            </p>
+          </Card>
+        )}
       </div>
 
       {/* ARR Forecast - Flyttad från sidebar */}
       <Card className="p-6">
-        <ARRForecastChart customers={legacyCustomers || []} />
+        <ARRForecastChart customers={(legacyCustomers || []).filter(c => c.contract_status !== 'terminated')} />
       </Card>
 
       {/* 2x2 Grid med diagram */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RevenueBreakdownChart
-          customers={consolidatedCustomers}
+          customers={activeConsolidatedCustomers}
           onSegmentClick={(type) => navigateWithFilter({ revenueType: type })}
         />
         <HealthScoreDistributionChart
-          customers={consolidatedCustomers}
+          customers={activeConsolidatedCustomers}
           onBarClick={(level) => navigateWithFilter({ healthFilter: level })}
         />
         <PortalAdoptionChart
@@ -153,15 +174,23 @@ export default function CustomerAnalytics() {
 
       {/* Kontrakts-tidslinje — full bredd */}
       <ContractTimelineGantt
-        customers={consolidatedCustomers}
+        customers={activeConsolidatedCustomers}
         onCustomerClick={(name) => navigateWithFilter({ search: name })}
       />
 
       {/* Kundsegmentering scatter chart — full bredd */}
       <CustomerSegmentationScatter
-        customers={consolidatedCustomers}
+        customers={activeConsolidatedCustomers}
         onCustomerClick={(name) => navigateWithFilter({ search: name })}
       />
+
+      {/* Churn-analys — visas bara om det finns uppsagda kunder */}
+      {terminatedCustomers.length > 0 && (
+        <ChurnAnalysisSection
+          terminatedCustomers={terminatedCustomers}
+          onCustomerClick={(name) => navigateWithFilter({ search: name })}
+        />
+      )}
     </div>
   )
 }

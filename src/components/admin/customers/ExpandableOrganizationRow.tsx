@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw, XCircle } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 
@@ -17,6 +17,7 @@ interface ExpandableOrganizationRowProps {
   onViewSingleCustomerDetails?: (org: ConsolidatedCustomer) => void
   onViewRevenue?: (org: ConsolidatedCustomer) => void
   onRenewal?: (org: ConsolidatedCustomer) => void
+  onTerminate?: (org: ConsolidatedCustomer) => void
   visibleColumns?: Set<string>
 }
 
@@ -133,14 +134,18 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   onViewSingleCustomerDetails,
   onViewRevenue,
   onRenewal,
+  onTerminate,
   visibleColumns
 }) => {
   const isVisible = (col: string) => !visibleColumns || visibleColumns.has(col)
   const isMultisite = organization.organizationType === 'multisite'
-  const showRenewalButton = organization.daysToNextRenewal != null
+  const isTerminated = organization.isTerminated
+  const showRenewalButton = !isTerminated
+    && organization.daysToNextRenewal != null
     && organization.daysToNextRenewal > 0
     && organization.daysToNextRenewal <= 90
     && onRenewal
+  const showTerminateButton = !isTerminated && onTerminate
 
   // Röd border på kritiska rader: avtal < 30 dagar kvar eller hög churn risk
   const urgencyBorder =
@@ -251,11 +256,22 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                 <div className="text-sm text-slate-200 font-medium">
                   {period}
                 </div>
-                {remaining && (
+                {isTerminated ? (
+                  <div className="space-y-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
+                      Uppsagt
+                    </span>
+                    {organization.effectiveEndDate && (
+                      <div className="text-xs text-red-400">
+                        Slutar {new Date(organization.effectiveEndDate).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
+                ) : remaining ? (
                   <div className={`text-xs font-medium ${color}`}>
                     {remaining}
                   </div>
-                )}
+                ) : null}
               </div>
             )
           })()}
@@ -403,6 +419,17 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               title="Visa detaljerad kundvy"
             >
               <ExternalLink className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Terminate Contract Button */}
+          {showTerminateButton && (
+            <button
+              onClick={() => onTerminate!(organization)}
+              className="text-red-400/70 hover:text-red-400 text-sm font-medium transition-colors duration-200"
+              title="Säg upp avtal"
+            >
+              <XCircle className="h-4 w-4" />
             </button>
           )}
 

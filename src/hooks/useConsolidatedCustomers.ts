@@ -34,6 +34,9 @@ interface Customer {
   contract_start_date?: string | null
   contract_end_date?: string | null
   contract_length?: string | null
+  terminated_at?: string | null
+  termination_reason?: string | null
+  effective_end_date?: string | null
   annual_value?: number | null
   monthly_value?: number | null
   total_contract_value?: number | null
@@ -152,6 +155,8 @@ export interface ConsolidatedCustomer {
   
   // Status flags
   is_active: boolean
+  isTerminated: boolean
+  effectiveEndDate?: string | null
   hasExpiringSites: boolean
   hasHighRiskSites: boolean
   
@@ -176,6 +181,7 @@ export interface ConsolidatedAnalytics {
   // KPI Cards properties
   totalCustomers: number
   activeCustomers: number
+  terminatedCount: number
   netRevenueRetention: number
   highRiskCount: number
   
@@ -487,6 +493,8 @@ export function useConsolidatedCustomers() {
             averageRenewalProbability: 0,
             
             is_active: huvudkontor.is_active || false,
+            isTerminated: false,
+            effectiveEndDate: null,
             hasExpiringSites: false,
             hasHighRiskSites: false,
             
@@ -552,11 +560,15 @@ export function useConsolidatedCustomers() {
           overallHealthScore: customer.healthScore,
           highestChurnRisk: customer.churnRisk,
           averageRenewalProbability: customer.renewalProbability.probability,
-          nextRenewalDate: customer.contract_end_date,
-          daysToNextRenewal: customer.contractProgress.daysRemaining,
+          nextRenewalDate: customer.effective_end_date || customer.contract_end_date,
+          daysToNextRenewal: customer.effective_end_date
+            ? Math.ceil((new Date(customer.effective_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            : customer.contractProgress.daysRemaining,
           earliestContractStartDate: customer.contract_start_date,
-          
+
           is_active: customer.is_active || false,
+          isTerminated: !!customer.terminated_at,
+          effectiveEndDate: customer.effective_end_date || null,
           hasExpiringSites: customer.contractProgress.daysRemaining <= 90,
           hasHighRiskSites: customer.churnRisk.risk === 'high',
           
@@ -636,14 +648,21 @@ export function useConsolidatedCustomers() {
         // Renewal probability
         org.averageRenewalProbability = sites.reduce((sum, site) => sum + site.renewalProbability.probability, 0) / sites.length
         
-        // Next renewal
+        // Next renewal — prefer effective_end_date if terminated
         const nextRenewal = sites
-          .filter(site => site.contract_end_date)
-          .sort((a, b) => new Date(a.contract_end_date!).getTime() - new Date(b.contract_end_date!).getTime())[0]
-        
+          .filter(site => site.effective_end_date || site.contract_end_date)
+          .sort((a, b) => {
+            const dateA = new Date(a.effective_end_date || a.contract_end_date!).getTime()
+            const dateB = new Date(b.effective_end_date || b.contract_end_date!).getTime()
+            return dateA - dateB
+          })[0]
+
         if (nextRenewal) {
-          org.nextRenewalDate = nextRenewal.contract_end_date
-          org.daysToNextRenewal = nextRenewal.contractProgress.daysRemaining
+          const renewalDate = nextRenewal.effective_end_date || nextRenewal.contract_end_date
+          org.nextRenewalDate = renewalDate
+          org.daysToNextRenewal = renewalDate
+            ? Math.ceil((new Date(renewalDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            : nextRenewal.contractProgress.daysRemaining
         }
         
         // Earliest contract start
@@ -658,6 +677,17 @@ export function useConsolidatedCustomers() {
         // Status flags
         org.hasExpiringSites = sites.some(site => site.contractProgress.daysRemaining <= 90)
         org.hasHighRiskSites = sites.some(site => site.churnRisk.risk === 'high')
+
+        // Termination — org is terminated if ALL sites are terminated
+        org.isTerminated = sites.every(site => !!site.terminated_at)
+        const terminatedSites = sites.filter(s => s.effective_end_date)
+        if (terminatedSites.length > 0) {
+          // Use the earliest effective_end_date across sites
+          const earliest = terminatedSites.sort((a, b) =>
+            new Date(a.effective_end_date!).getTime() - new Date(b.effective_end_date!).getTime()
+          )[0]
+          org.effectiveEndDate = earliest.effective_end_date
+        }
       }
     })
     
@@ -684,6 +714,7 @@ export function useConsolidatedCustomers() {
         monthlyGrowth: 0,
         totalCustomers: 0,
         activeCustomers: 0,
+        terminatedCount: 0,
         netRevenueRetention: 100,
         highRiskCount: 0,
         topOrganizationsByValue: [],
@@ -693,58 +724,62 @@ export function useConsolidatedCustomers() {
       }
     }
 
-    const multisiteOrgs = consolidatedCustomers.filter(c => c.organizationType === 'multisite')
-    const singleCustomers = consolidatedCustomers.filter(c => c.organizationType === 'single')
-    
-    const portfolioValue = consolidatedCustomers.reduce((sum, c) => sum + c.totalContractValue, 0)
-    const averageContractValue = portfolioValue / consolidatedCustomers.length
-    const averageHealthScore = consolidatedCustomers.reduce((sum, c) => sum + c.overallHealthScore.score, 0) / consolidatedCustomers.length
-    
-    const organizationsAtRiskCount = consolidatedCustomers.filter(c => 
+    // Exkludera uppsagda kunder från alla finansiella/operativa KPI:er
+    const active = consolidatedCustomers.filter(c => !c.isTerminated)
+    const terminatedCount = consolidatedCustomers.length - active.length
+
+    const multisiteOrgs = active.filter(c => c.organizationType === 'multisite')
+    const singleCustomers = active.filter(c => c.organizationType === 'single')
+
+    const portfolioValue = active.reduce((sum, c) => sum + c.totalContractValue, 0)
+    const averageContractValue = portfolioValue / (active.length || 1)
+    const averageHealthScore = active.reduce((sum, c) => sum + c.overallHealthScore.score, 0) / (active.length || 1)
+
+    const organizationsAtRiskCount = active.filter(c =>
       c.highestChurnRisk.risk === 'high' || c.hasHighRiskSites
     ).length
-    
-    const totalSites = consolidatedCustomers.reduce((sum, c) => sum + c.totalSites, 0)
-    
+
+    const totalSites = active.reduce((sum, c) => sum + c.totalSites, 0)
+
     // Portal access stats
-    const portalAccessStats = consolidatedCustomers.reduce(
+    const portalAccessStats = active.reduce(
       (stats, c) => {
-        stats[c.portalAccessStatus === 'full' ? 'fullAccess' : 
+        stats[c.portalAccessStatus === 'full' ? 'fullAccess' :
                c.portalAccessStatus === 'partial' ? 'partialAccess' : 'noAccess']++
         return stats
       },
       { fullAccess: 0, partialAccess: 0, noAccess: 0 }
     )
-    
+
     // Top organizations by value
-    const topOrganizationsByValue = [...consolidatedCustomers]
+    const topOrganizationsByValue = [...active]
       .sort((a, b) => b.totalContractValue - a.totalContractValue)
       .slice(0, 10)
-    
+
     // Organizations at risk
-    const organizationsAtRiskList = consolidatedCustomers
+    const organizationsAtRiskList = active
       .filter(c => c.highestChurnRisk.risk === 'high' || c.hasHighRiskSites)
       .sort((a, b) => b.highestChurnRisk.score - a.highestChurnRisk.score)
       .slice(0, 10)
-    
+
     // Upcoming renewals
-    const upcomingRenewals = consolidatedCustomers
+    const upcomingRenewals = active
       .filter(c => c.daysToNextRenewal && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90)
       .sort((a, b) => (a.daysToNextRenewal || 0) - (b.daysToNextRenewal || 0))
-    
+
     // Additional metrics for KPI cards
-    const activeCustomersCount = consolidatedCustomers.filter(c => c.is_active).length
-    
+    const activeCustomersCount = active.filter(c => c.is_active).length
+
     return {
-      totalOrganizations: consolidatedCustomers.length,
+      totalOrganizations: active.length,
       totalSites,
       multisiteOrganizations: multisiteOrgs.length,
       singleCustomers: singleCustomers.length,
       portfolioValue,
-      renewalValue30Days: consolidatedCustomers
+      renewalValue30Days: active
         .filter(c => c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 30)
         .reduce((sum, c) => sum + c.totalContractValue, 0),
-      renewalValue90Days: consolidatedCustomers
+      renewalValue90Days: active
         .filter(c => c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90)
         .reduce((sum, c) => sum + c.totalContractValue, 0),
       averageContractValue,
@@ -753,11 +788,12 @@ export function useConsolidatedCustomers() {
       monthlyGrowth: 0,
 
       // KPI Cards properties
-      totalCustomers: consolidatedCustomers.length,
+      totalCustomers: active.length,
       activeCustomers: activeCustomersCount,
+      terminatedCount,
       netRevenueRetention: 0,
       highRiskCount: organizationsAtRiskCount,
-      
+
       topOrganizationsByValue,
       organizationsAtRiskList,
       upcomingRenewals,
@@ -768,7 +804,7 @@ export function useConsolidatedCustomers() {
   // Filter function för consolidated customers
   const filterCustomers = (filters: {
     search?: string
-    status?: 'all' | 'active' | 'inactive' | 'expiring'
+    status?: 'all' | 'active' | 'inactive' | 'expiring' | 'terminated'
     manager?: string
     industry?: string
     healthScore?: 'all' | 'excellent' | 'good' | 'fair' | 'poor'
@@ -808,6 +844,7 @@ export function useConsolidatedCustomers() {
         if (filters.status === 'active' && !customer.is_active) return false
         if (filters.status === 'inactive' && customer.is_active) return false
         if (filters.status === 'expiring' && !customer.hasExpiringSites) return false
+        if (filters.status === 'terminated' && !customer.isTerminated) return false
       }
       
       // Manager filter
@@ -838,12 +875,19 @@ export function useConsolidatedCustomers() {
     })
   }
 
+  // Förfiltrerad lista utan uppsagda kunder — för analytics/diagram
+  const activeConsolidatedCustomers = useMemo(
+    () => consolidatedCustomers.filter(c => !c.isTerminated),
+    [consolidatedCustomers]
+  )
+
   const refresh = () => {
     setRefreshKey(prev => prev + 1)
   }
 
   return {
     consolidatedCustomers,
+    activeConsolidatedCustomers,
     analytics,
     loading,
     error,
