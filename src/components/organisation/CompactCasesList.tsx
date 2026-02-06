@@ -2,7 +2,7 @@
 // Skalbar kompakt ärendelista för organisationsroller
 
 import React from 'react'
-import { ChevronRight, Calendar, User, DollarSign, FileText } from 'lucide-react'
+import { ChevronRight, Calendar, User, Coins, FileText } from 'lucide-react'
 import PDFExportButton from '../shared/PDFExportButton'
 
 interface CaseRowData {
@@ -226,10 +226,10 @@ export default function CompactCasesList({
   if (loading) {
     return (
       <div className={`bg-slate-800/50 border border-slate-700 rounded-lg ${className}`}>
-        <div className="p-6">
+        <div className="p-4">
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 animate-pulse">
+              <div key={i} className="flex items-center gap-3 animate-pulse">
                 <div className="w-4 h-4 bg-slate-700 rounded-full"></div>
                 <div className="w-20 h-4 bg-slate-700 rounded"></div>
                 <div className="flex-1 h-4 bg-slate-700 rounded"></div>
@@ -249,7 +249,7 @@ export default function CompactCasesList({
   if (!cases || cases.length === 0) {
     return (
       <div className={`bg-slate-800/50 border border-slate-700 rounded-lg ${className}`}>
-        <div className="p-12 text-center">
+        <div className="p-8 text-center">
           <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
           <p className="text-slate-400 text-lg">Inga ärenden hittades</p>
           <p className="text-slate-500 text-sm mt-1">Prova att ändra filtreringen eller kontrollera tillgängligheten</p>
@@ -261,7 +261,7 @@ export default function CompactCasesList({
   return (
     <div className={`bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden ${className}`}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-900/20 to-purple-800/20 px-6 py-4 border-b border-slate-700">
+      <div className="bg-gradient-to-r from-purple-900/20 to-purple-800/20 px-4 py-3 border-b border-slate-700">
         <div className="flex items-center justify-between">
           <h3 className="text-white font-semibold flex items-center gap-2">
             <Calendar className="w-5 h-5 text-purple-400" />
@@ -290,7 +290,7 @@ export default function CompactCasesList({
               key={caseData.id || index}
               onClick={() => onCaseClick(caseData)}
               className={`
-                group flex items-center gap-4 px-6 py-3 cursor-pointer transition-all duration-200
+                group flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-all duration-200
                 hover:bg-slate-700/30 hover:border-l-4 hover:border-l-emerald-500
                 ${index % 2 === 0 ? 'bg-slate-800/20' : 'bg-slate-800/40'}
               `}
@@ -347,7 +347,7 @@ export default function CompactCasesList({
               {/* Kostnad (dold på mobil) */}
               <div className="hidden md:block w-20 flex-shrink-0">
                 <div className="flex items-center gap-1" title="Kostnad">
-                  <DollarSign className="w-3 h-3 text-slate-400" />
+                  <Coins className="w-3 h-3 text-slate-400" />
                   <span className="text-slate-300 text-xs">
                     {formatPrice(caseData.price)}
                   </span>
@@ -381,7 +381,7 @@ export default function CompactCasesList({
 
       {/* Footer med totaler */}
       {cases.length > 0 && (
-        <div className="bg-slate-900/50 px-6 py-3 border-t border-slate-700">
+        <div className="bg-slate-900/50 px-4 py-2 border-t border-slate-700">
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>Visar {cases.length} ärenden</span>
             <span>Sorterat efter datum (nyast först)</span>

@@ -24,53 +24,13 @@ import ChurnRiskBadge from './ChurnRiskBadge'
 import PortalAccessBadge from './PortalAccessBadge'
 import AdminCasesList from './AdminCasesList'
 import CustomerEquipmentDualView from './CustomerEquipmentDualView'
-import { formatCurrency } from '../../../utils/customerMetrics'
+import { formatCurrency, getContractProgress } from '../../../utils/customerMetrics'
 import { supabase } from '../../../lib/supabase'
 
 interface SingleCustomerDetailModalProps {
   customer: ConsolidatedCustomer | null
   isOpen: boolean
   onClose: () => void
-}
-
-const formatContractTimeRemaining = (customer: ConsolidatedCustomer): {
-  text: string
-  months: number
-  urgency: 'critical' | 'warning' | 'normal' | 'expired'
-  progress: number
-} => {
-  if (!customer.nextRenewalDate) {
-    return { text: 'Okänt', months: 0, urgency: 'normal', progress: 0 }
-  }
-
-  const endDate = new Date(customer.nextRenewalDate)
-  const now = new Date()
-  const diffTime = endDate.getTime() - now.getTime()
-  const diffMonths = Math.round(diffTime / (1000 * 60 * 60 * 24 * 30))
-
-  let urgency: 'critical' | 'warning' | 'normal' | 'expired'
-  let progress = 0
-
-  if (diffMonths < 0) {
-    urgency = 'expired'
-    progress = 0
-  } else if (diffMonths <= 3) {
-    urgency = 'critical'
-    progress = Math.max(10, (diffMonths / 12) * 100)
-  } else if (diffMonths <= 6) {
-    urgency = 'warning'
-    progress = (diffMonths / 12) * 100
-  } else {
-    urgency = 'normal'
-    progress = Math.min(100, (diffMonths / 12) * 100)
-  }
-
-  return {
-    text: diffMonths < 0 ? 'Utgången' : `${diffMonths} månader kvar`,
-    months: Math.max(0, diffMonths),
-    urgency,
-    progress
-  }
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -94,8 +54,6 @@ export default function SingleCustomerDetailModal({
 }: SingleCustomerDetailModalProps) {
   if (!isOpen || !customer || customer.organizationType !== 'single') return null
 
-  const contractTime = formatContractTimeRemaining(customer)
-
   // Single customer data (direct access since there's only one site)
   const site = customer.sites[0]
   const totalCustomerValue = customer.totalOrganizationValue
@@ -103,11 +61,8 @@ export default function SingleCustomerDetailModal({
   const casesValue = customer.totalCasesValue
   const casesCount = customer.totalCasesCount
 
-  // Billing status values from customer data
-  const pendingCasesValue = customer.casesBillingStatus.pending.value
-  const sentCasesValue = customer.casesBillingStatus.sent.value
-  const paidCasesValue = customer.casesBillingStatus.paid.value
-  const skipCasesValue = customer.casesBillingStatus.skip.value
+  // Kontraktsperiod — korrekt beräkning baserat på start/slut-datum
+  const contractProgress = getContractProgress(site.contract_start_date, site.contract_end_date)
 
   // Hämta faktureringsdata från contract_billing_items
   const [billingItems, setBillingItems] = useState<Array<{
@@ -235,24 +190,20 @@ export default function SingleCustomerDetailModal({
                     <span className="text-xs text-slate-400">Avtalstid</span>
                   </div>
                   <div className={`text-lg font-semibold ${
-                    contractTime.urgency === 'expired' ? 'text-red-400' :
-                    contractTime.urgency === 'critical' ? 'text-red-400' :
-                    contractTime.urgency === 'warning' ? 'text-amber-400' :
+                    contractProgress.status === 'expired' ? 'text-red-400' :
+                    contractProgress.status === 'expiring-soon' ? 'text-amber-400' :
                     'text-green-400'
                   }`}>
-                    {contractTime.text}
+                    {contractProgress.daysRemaining <= 0 ? 'Utgången' : `${contractProgress.monthsRemaining} mån kvar`}
                   </div>
                   <div className="w-full bg-slate-700 rounded-full h-1.5 mt-2">
                     <div
                       className={`h-1.5 rounded-full transition-all ${
-                        contractTime.urgency === 'expired' ? 'bg-red-400' :
-                        contractTime.urgency === 'critical' ? 'bg-red-400' :
-                        contractTime.urgency === 'warning' ? 'bg-amber-400' :
+                        contractProgress.status === 'expired' ? 'bg-red-400' :
+                        contractProgress.status === 'expiring-soon' ? 'bg-amber-400' :
                         'bg-green-400'
                       }`}
-                      style={{
-                        width: contractTime.urgency === 'expired' ? '0%' : `${contractTime.progress}%`
-                      }}
+                      style={{ width: `${contractProgress.percentage}%` }}
                     />
                   </div>
                 </div>
@@ -444,21 +395,20 @@ export default function SingleCustomerDetailModal({
                       <div className="text-sm text-slate-400 mb-2">Kontraktsperiod</div>
                       <div className="flex items-center gap-3">
                         <div className={`text-lg font-semibold ${
-                          contractTime.urgency === 'expired' ? 'text-red-400' :
-                          contractTime.urgency === 'critical' ? 'text-red-400' :
-                          contractTime.urgency === 'warning' ? 'text-amber-400' :
+                          contractProgress.status === 'expired' ? 'text-red-400' :
+                          contractProgress.status === 'expiring-soon' ? 'text-amber-400' :
                           'text-green-400'
                         }`}>
-                          {contractTime.text}
+                          {contractProgress.daysRemaining <= 0 ? 'Utgången' : `${contractProgress.monthsRemaining} månader kvar`}
                         </div>
-                        {contractTime.urgency === 'critical' && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
-                            Kritisk
+                        {contractProgress.status === 'expiring-soon' && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            Löper ut snart
                           </span>
                         )}
-                        {contractTime.urgency === 'warning' && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                            Varning
+                        {contractProgress.status === 'expired' && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
+                            Utgången
                           </span>
                         )}
                       </div>
@@ -466,83 +416,71 @@ export default function SingleCustomerDetailModal({
                       {/* Progress bar */}
                       <div className="mt-3">
                         <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                          <span>Avtalstid kvar</span>
-                          <span>{Math.round(contractTime.progress)}%</span>
+                          <span>Avtalstid förbrukad</span>
+                          <span>{contractProgress.percentage}%</span>
                         </div>
                         <div className="w-full bg-slate-700 rounded-full h-2">
                           <div
                             className={`h-2 rounded-full transition-all duration-500 ${
-                              contractTime.urgency === 'expired' ? 'bg-red-400' :
-                              contractTime.urgency === 'critical' ? 'bg-red-400' :
-                              contractTime.urgency === 'warning' ? 'bg-amber-400' :
+                              contractProgress.status === 'expired' ? 'bg-red-400' :
+                              contractProgress.status === 'expiring-soon' ? 'bg-amber-400' :
                               'bg-green-400'
                             }`}
-                            style={{ width: `${contractTime.progress}%` }}
+                            style={{ width: `${contractProgress.percentage}%` }}
                           />
                         </div>
                       </div>
 
-                      {customer.nextRenewalDate && (
+                      {/* Exakta kontraktsdatum */}
+                      {(site.contract_start_date || site.contract_end_date) && (
                         <div className="text-sm text-slate-500 mt-2">
-                          Förnyelse: {new Date(customer.nextRenewalDate).toLocaleDateString('sv-SE', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
+                          {site.contract_start_date && new Date(site.contract_start_date).toLocaleDateString('sv-SE', {
+                            day: 'numeric', month: 'short', year: 'numeric'
+                          })}
+                          {site.contract_start_date && site.contract_end_date && ' — '}
+                          {site.contract_end_date && new Date(site.contract_end_date).toLocaleDateString('sv-SE', {
+                            day: 'numeric', month: 'short', year: 'numeric'
                           })}
                         </div>
                       )}
                     </div>
 
-                    {/* Cases Summary */}
+                    {/* Faktureringsstatus från contract_billing_items */}
                     <div className="pt-3 border-t border-slate-700/50">
                       <div className="text-sm text-slate-400 mb-2 flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        Ärenden & Extra Arbeten
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-slate-700/30 rounded-lg p-3">
-                          <div className="text-lg font-bold text-blue-400 mb-1">
-                            {casesCount}
-                          </div>
-                          <div className="text-xs text-slate-400">Totala ärenden</div>
-                        </div>
-                        <div className="bg-slate-700/30 rounded-lg p-3">
-                          <div className="text-lg font-bold text-green-400 mb-1">
-                            {formatCurrency(casesValue)}
-                          </div>
-                          <div className="text-xs text-slate-400">Ärenden värde</div>
-                        </div>
+                        <Coins className="w-4 h-4" />
+                        Faktureringsstatus
                       </div>
 
-                      {/* Billing Status Breakdown - only show if there are cases */}
-                      {casesValue > 0 && (
-                        <div className="mt-3 space-y-2">
-                          <div className="text-xs text-slate-500 mb-2">Faktureringsstatus:</div>
-                          <div className="grid grid-cols-4 gap-1 text-xs">
-                            <div className="bg-amber-500/10 text-amber-400 px-2 py-1 rounded text-center">
-                              <div className="font-medium">{formatCurrency(pendingCasesValue)}</div>
-                              <div className="text-xs opacity-80">Väntande</div>
-                            </div>
-                            <div className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded text-center">
-                              <div className="font-medium">{formatCurrency(sentCasesValue)}</div>
-                              <div className="text-xs opacity-80">Skickad</div>
-                            </div>
-                            <div className="bg-green-500/10 text-green-400 px-2 py-1 rounded text-center">
-                              <div className="font-medium">{formatCurrency(paidCasesValue)}</div>
-                              <div className="text-xs opacity-80">Betald</div>
-                            </div>
-                            <div className="bg-slate-500/10 text-slate-400 px-2 py-1 rounded text-center">
-                              <div className="font-medium">{formatCurrency(skipCasesValue)}</div>
-                              <div className="text-xs opacity-80">Hoppa över</div>
-                            </div>
+                      {billingLoading ? (
+                        <div className="text-center py-3">
+                          <div className="animate-spin w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full mx-auto mb-1" />
+                          <p className="text-slate-400 text-xs">Laddar...</p>
+                        </div>
+                      ) : billingItems.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {(['paid', 'invoiced', 'approved', 'pending'] as const).map(status => {
+                            const data = billingStats.byStatus[status]
+                            if (data.amount === 0 && data.count === 0) return null
+                            return (
+                              <div key={status} className={`flex items-center justify-between px-2.5 py-1.5 rounded border text-xs ${STATUS_COLORS[status]}`}>
+                                <span className="font-medium">{STATUS_LABELS[status]}</span>
+                                <div className="flex items-center gap-3">
+                                  <span className="font-semibold">{formatCurrency(data.amount)}</span>
+                                  <span className="opacity-70">{data.count} st</span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-700/50 text-sm">
+                            <span className="text-slate-400">Totalt</span>
+                            <span className="text-green-400 font-semibold">{formatCurrency(billingStats.total)}</span>
                           </div>
                         </div>
-                      )}
-
-                      {casesValue === 0 && (
-                        <div className="mt-3 p-3 bg-slate-800/30 rounded-lg text-center">
-                          <div className="text-slate-400 text-sm">Inga ärenden ännu</div>
-                          <div className="text-slate-500 text-xs mt-1">Ärenden visas när de läggs till i systemet</div>
+                      ) : (
+                        <div className="p-3 bg-slate-800/30 rounded-lg text-center">
+                          <div className="text-slate-400 text-sm">Inga faktureringsdata</div>
+                          <div className="text-slate-500 text-xs mt-1">Data visas när avtalsfakturering genereras</div>
                         </div>
                       )}
                     </div>
