@@ -323,3 +323,67 @@ export function deriveInvoiceStatus(
   }
   return 'pending'
 }
+
+// ===== MONTHLY PIPELINE TYPES =====
+
+export type MonthlyCustomerStatus =
+  | 'not_billable'
+  | 'awaiting_generation'
+  | 'pending'
+  | 'approved'
+  | 'invoiced'
+  | 'paid'
+  | 'mixed'
+
+export interface PipelineCustomer {
+  id: string
+  company_name: string
+  organization_number: string | null
+  billing_email: string | null
+  billing_frequency: BillingFrequency | null
+  price_list_id: string | null
+  price_list_name: string | null
+  contract_status: string
+  effective_end_date: string | null
+  monthly_value: number | null
+}
+
+export interface MonthlyCustomerEntry {
+  customer: PipelineCustomer
+  status: MonthlyCustomerStatus
+  items: ContractBillingItemWithRelations[]
+  recurring_amount: number
+  adhoc_amount: number
+  total_amount: number
+  item_count: number
+  has_items_requiring_approval: boolean
+}
+
+export interface MonthlyPipelineSummary {
+  month_key: string
+  month_label: string
+  period_start: string
+  period_end: string
+  customers: MonthlyCustomerEntry[]
+  total_customers: number
+  billable_customers: number
+  generated_customers: number
+  missing_setup_customers: number
+  total_amount: number
+  projected_amount: number
+  status_breakdown: Record<MonthlyCustomerStatus, number>
+}
+
+export const PIPELINE_STATUS_CONFIG: Record<MonthlyCustomerStatus, {
+  label: string
+  color: string
+  bgColor: string
+}> = {
+  not_billable:        { label: 'Saknar prislista', color: 'text-slate-400',   bgColor: 'bg-slate-500/10' },
+  awaiting_generation: { label: 'Ej genererad',     color: 'text-amber-400',   bgColor: 'bg-amber-500/10' },
+  pending:             { label: 'Väntar',            color: 'text-yellow-400',  bgColor: 'bg-yellow-500/10' },
+  approved:            { label: 'Godkänd',           color: 'text-blue-400',    bgColor: 'bg-blue-500/10' },
+  invoiced:            { label: 'Fakturerad',        color: 'text-purple-400',  bgColor: 'bg-purple-500/10' },
+  paid:                { label: 'Betald',            color: 'text-emerald-400', bgColor: 'bg-emerald-500/10' },
+  mixed:               { label: 'Blandad',           color: 'text-orange-400',  bgColor: 'bg-orange-500/10' },
+}

@@ -16,7 +16,11 @@ import {
   BillingPeriodSummary,
   ContractBillingPipelineFilters,
   deriveInvoiceStatus,
-  formatBillingPeriod
+  formatBillingPeriod,
+  PipelineCustomer,
+  MonthlyCustomerEntry,
+  MonthlyCustomerStatus,
+  MonthlyPipelineSummary,
 } from '../types/contractBilling'
 import { CaseBillingService } from './caseBillingService'
 
@@ -748,6 +752,229 @@ export class ContractBillingService {
     if (eligibleIds.length > 0) {
       await this.bulkUpdateStatus(eligibleIds, newStatus)
     }
+  }
+
+  // ============ MONTHLY PIPELINE METHODS ============
+
+  /**
+   * Hämta alla avtalskunder oavsett prislista-status.
+   * Till skillnad från getCustomersForBilling() inkluderas kunder utan prislista.
+   */
+  static async getAllContractCustomers(): Promise<PipelineCustomer[]> {
+    const { data, error } = await supabase
+      .from('customers')
+      .select(`
+        id,
+        company_name,
+        organization_number,
+        billing_email,
+        billing_frequency,
+        price_list_id,
+        contract_status,
+        effective_end_date,
+        monthly_value,
+        price_list:price_lists(id, name)
+      `)
+      .eq('is_active', true)
+      .in('contract_status', ['signed', 'active'])
+      .not('billing_frequency', 'is', null)
+      .order('company_name', { ascending: true })
+
+    if (error) throw new Error(`Kunde inte hämta avtalskunder: ${error.message}`)
+
+    return (data || []).map((c: any) => ({
+      id: c.id,
+      company_name: c.company_name,
+      organization_number: c.organization_number,
+      billing_email: c.billing_email,
+      billing_frequency: c.billing_frequency,
+      price_list_id: c.price_list_id,
+      price_list_name: c.price_list?.name || null,
+      contract_status: c.contract_status,
+      effective_end_date: c.effective_end_date,
+      monthly_value: c.monthly_value,
+    }))
+  }
+
+  /**
+   * Bygg pipeline-data för ett månadsintervall.
+   * Returnerar alla avtalskunder × alla månader med status och belopp.
+   * Använder bara 2 Supabase-queries oavsett antal kunder/månader.
+   */
+  static async getMonthlyPipelineData(
+    startMonth: string,
+    endMonth: string
+  ): Promise<MonthlyPipelineSummary[]> {
+    // 1. Hämta alla avtalskunder
+    const customers = await this.getAllContractCustomers()
+
+    // 2. Beräkna datumintervall för items-query
+    const periodStart = `${startMonth}-01`
+    const [endY, endM] = endMonth.split('-').map(Number)
+    const lastDay = new Date(endY, endM, 0).getDate()
+    const periodEnd = `${endMonth}-${String(lastDay).padStart(2, '0')}`
+
+    // 3. Hämta alla billing items inom intervallet
+    const items = await this.getBillingItems({
+      period_start: periodStart,
+      period_end: periodEnd,
+    })
+
+    // 4. Bygg items-map: customer_id::month_key → items[]
+    const itemsMap = new Map<string, ContractBillingItemWithRelations[]>()
+    for (const item of items) {
+      const monthKey = item.billing_period_start.slice(0, 7)
+      const key = `${item.customer_id}::${monthKey}`
+      if (!itemsMap.has(key)) itemsMap.set(key, [])
+      itemsMap.get(key)!.push(item)
+    }
+
+    // 5. Generera månader
+    const months: MonthlyPipelineSummary[] = []
+    const [startY, startM] = startMonth.split('-').map(Number)
+    let year = startY
+    let month = startM
+
+    while (`${year}-${String(month).padStart(2, '0')}` <= endMonth) {
+      const monthKey = `${year}-${String(month).padStart(2, '0')}`
+      const monthStart = `${monthKey}-01`
+      const monthLastDay = new Date(year, month, 0).getDate()
+      const monthEnd = `${monthKey}-${String(monthLastDay).padStart(2, '0')}`
+      const monthLabel = new Date(year, month - 1, 1)
+        .toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+
+      const statusBreakdown: Record<MonthlyCustomerStatus, number> = {
+        not_billable: 0,
+        awaiting_generation: 0,
+        pending: 0,
+        approved: 0,
+        invoiced: 0,
+        paid: 0,
+        mixed: 0,
+      }
+
+      const customerEntries: MonthlyCustomerEntry[] = []
+      let totalAmount = 0
+      let projectedAmount = 0
+      let billableCount = 0
+      let generatedCount = 0
+      let missingSetupCount = 0
+
+      for (const customer of customers) {
+        // Filtrera bort terminated kunder vars effective_end_date < månadens start
+        if (
+          customer.contract_status === 'terminated' &&
+          customer.effective_end_date &&
+          customer.effective_end_date < monthStart
+        ) {
+          continue
+        }
+
+        const key = `${customer.id}::${monthKey}`
+        const customerItems = itemsMap.get(key) || []
+
+        let status: MonthlyCustomerStatus
+        let recurringAmount = 0
+        let adhocAmount = 0
+        let entryAmount = 0
+
+        if (customerItems.length > 0) {
+          // Har items - bestäm status från items
+          const nonCancelled = customerItems.filter(i => i.status !== 'cancelled')
+          if (nonCancelled.length === 0) {
+            status = 'not_billable'
+          } else {
+            const statuses = new Set(nonCancelled.map(i => i.status))
+            if (statuses.size === 1) {
+              status = [...statuses][0] as MonthlyCustomerStatus
+            } else {
+              status = 'mixed'
+            }
+          }
+
+          recurringAmount = customerItems
+            .filter(i => i.item_type === 'contract' && i.status !== 'cancelled')
+            .reduce((sum, i) => sum + i.total_price, 0)
+          adhocAmount = customerItems
+            .filter(i => i.item_type === 'ad_hoc' && i.status !== 'cancelled')
+            .reduce((sum, i) => sum + i.total_price, 0)
+          entryAmount = recurringAmount + adhocAmount
+          generatedCount++
+        } else if (customer.price_list_id) {
+          // Har prislista men inga items
+          status = 'awaiting_generation'
+          entryAmount = customer.monthly_value || 0
+          projectedAmount += entryAmount
+        } else {
+          // Saknar prislista
+          status = 'not_billable'
+          entryAmount = customer.monthly_value || 0
+          projectedAmount += entryAmount
+          missingSetupCount++
+        }
+
+        if (customer.price_list_id) {
+          billableCount++
+        }
+
+        statusBreakdown[status]++
+        totalAmount += entryAmount
+
+        customerEntries.push({
+          customer,
+          status,
+          items: customerItems,
+          recurring_amount: recurringAmount,
+          adhoc_amount: adhocAmount,
+          total_amount: entryAmount,
+          item_count: customerItems.length,
+          has_items_requiring_approval: customerItems.some(
+            i => i.requires_approval && i.status === 'pending'
+          ),
+        })
+      }
+
+      // Sortera: kunder som behöver åtgärd först
+      const statusPriority: Record<MonthlyCustomerStatus, number> = {
+        mixed: 0,
+        pending: 1,
+        awaiting_generation: 2,
+        approved: 3,
+        invoiced: 4,
+        paid: 5,
+        not_billable: 6,
+      }
+      customerEntries.sort((a, b) => {
+        const pa = statusPriority[a.status] ?? 9
+        const pb = statusPriority[b.status] ?? 9
+        if (pa !== pb) return pa - pb
+        return a.customer.company_name.localeCompare(b.customer.company_name, 'sv')
+      })
+
+      months.push({
+        month_key: monthKey,
+        month_label: monthLabel,
+        period_start: monthStart,
+        period_end: monthEnd,
+        customers: customerEntries,
+        total_customers: customerEntries.length,
+        billable_customers: billableCount,
+        generated_customers: generatedCount,
+        missing_setup_customers: missingSetupCount,
+        total_amount: totalAmount,
+        projected_amount: projectedAmount,
+        status_breakdown: statusBreakdown,
+      })
+
+      // Nästa månad
+      month++
+      if (month > 12) {
+        month = 1
+        year++
+      }
+    }
+
+    return months
   }
 
   /**
