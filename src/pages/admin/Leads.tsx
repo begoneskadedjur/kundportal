@@ -4,15 +4,14 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { 
-  Target, 
-  Plus, 
+import {
+  Target,
   TrendingUp,
-  Users,
   User,
   Calendar,
   XCircle,
-  BarChart3
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
@@ -22,26 +21,18 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { PageHeader } from '../../components/shared'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
 import StaggeredGrid from '../../components/shared/StaggeredGrid'
-import TooltipWrapper from '../../components/ui/TooltipWrapper'
 
-import { 
-  Lead, 
-  LeadStatus,
-  LeadPriority,
-  LEAD_STATUS_DISPLAY, 
-  CONTACT_METHOD_DISPLAY,
-  COMPANY_SIZE_DISPLAY,
-  calculateLeadScore,
-  getLeadQuality,
-  getPriorityLabel,
-  getPriorityColor
+import {
+  Lead,
+  calculateLeadScore
 } from '../../types/database'
 import CreateLeadModal from '../../components/admin/leads/CreateLeadModal'
 import LeadDetailModal from '../../components/admin/leads/LeadDetailModal'
 import EditLeadModal from '../../components/admin/leads/EditLeadModal'
-import LeadFilterPanel, { LeadFilters } from '../../components/admin/leads/LeadFilterPanel'
+import { LeadFilters } from '../../components/admin/leads/LeadFilterPanel'
 import LeadsFilters from '../../components/admin/leads/LeadsFilters'
 import LeadsTable from '../../components/admin/leads/LeadsTable'
+import { useLeadColumnVisibility } from '../../components/admin/leads/LeadColumnSelector'
 
 interface LeadStats {
   totalLeads: number
@@ -108,6 +99,9 @@ const Leads: React.FC = () => {
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [deletingLead, setDeletingLead] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const PAGE_SIZE = 50
+  const { visibleColumns, toggleColumn, resetToDefaults, isVisible } = useLeadColumnVisibility()
 
   useEffect(() => {
     fetchLeads()
@@ -612,6 +606,7 @@ const Leads: React.FC = () => {
   // Filter helper functions
   const handleFiltersChange = useCallback((newFilters: LeadFilters) => {
     setFilters(newFilters)
+    setCurrentPage(1)
     localStorage.setItem('leadFilters', JSON.stringify(newFilters))
   }, [])
 
@@ -820,14 +815,7 @@ const Leads: React.FC = () => {
           />
         </StaggeredGrid>
 
-        {/* Results Count */}
-        <div className="flex justify-end mb-6">
-          <div className="text-sm text-slate-400">
-            {filteredLeads.length} av {leads.length} leads
-          </div>
-        </div>
-
-        {/* Filters and Actions */}
+        {/* Filters toolbar */}
         <LeadsFilters
           filters={filters}
           onFiltersChange={handleFiltersChange}
@@ -838,32 +826,76 @@ const Leads: React.FC = () => {
           showOnlyActive={showOnlyActive}
           onShowOnlyActiveToggle={handleShowOnlyActiveToggle}
           onNavigateToAnalytics={() => navigate('/admin/leads/analytics')}
+          onCreateLead={() => setShowCreateModal(true)}
+          visibleColumns={visibleColumns}
+          onToggleColumn={toggleColumn}
+          onResetColumns={resetToDefaults}
         />
-
-        {/* Create Lead Button */}
-        <div className="flex justify-end mb-6">
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white flex-shrink-0"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Nytt Lead
-          </Button>
-        </div>
 
         {/* Leads Table */}
         <LeadsTable
-          leads={filteredLeads}
+          leads={filteredLeads.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}
           expandedRows={expandedRows}
           sortField={sortField}
           sortDirection={sortDirection}
           deletingLead={deletingLead}
+          visibleColumns={visibleColumns}
           onToggleExpandRow={toggleExpandRow}
           onSort={handleSort}
           onViewLead={handleViewLead}
           onEditLead={handleEditLead}
           onDeleteLead={handleDeleteLead}
         />
+
+        {/* Pagination footer */}
+        {filteredLeads.length > PAGE_SIZE && (() => {
+          const totalPages = Math.ceil(filteredLeads.length / PAGE_SIZE)
+          const startItem = (currentPage - 1) * PAGE_SIZE + 1
+          const endItem = Math.min(currentPage * PAGE_SIZE, filteredLeads.length)
+          return (
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-800/40 border border-slate-700/50 rounded-lg">
+              <span className="text-sm text-slate-400">
+                Visar {startItem}–{endItem} av {filteredLeads.length} leads
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                  .map((page, idx, arr) => (
+                    <React.Fragment key={page}>
+                      {idx > 0 && arr[idx - 1] !== page - 1 && (
+                        <span className="px-1 text-slate-500">...</span>
+                      )}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded text-sm font-medium ${
+                          page === currentPage
+                            ? 'bg-purple-600 text-white'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </React.Fragment>
+                  ))
+                }
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )
+        })()}
 
 
         {/* Modals */}
