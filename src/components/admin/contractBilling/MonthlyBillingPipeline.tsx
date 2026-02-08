@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
+  RotateCcw,
   Calendar,
   CheckCircle,
   FileText,
@@ -62,13 +63,16 @@ export function MonthlyBillingPipeline() {
   } | null>(null)
 
   // Berakna start/slut baserat pa offset
-  const { startMonth, endMonth } = useMemo(() => {
+  const { startMonth, endMonth, spanLabel } = useMemo(() => {
     const now = new Date()
     const startDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
     const endDate = new Date(now.getFullYear(), now.getMonth() + monthOffset + 12, 1)
+    const startLabel = startDate.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+    const endLabel = endDate.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
     return {
       startMonth: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`,
       endMonth: `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`,
+      spanLabel: `${startLabel} - ${endLabel}`,
     }
   }, [monthOffset])
 
@@ -287,29 +291,31 @@ export function MonthlyBillingPipeline() {
         {/* Manad-navigering */}
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setMonthOffset(o => o - 6)}
+            onClick={() => setMonthOffset(o => o - 1)}
             className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-            title="6 manader bakåt"
+            title="1 manad bakåt"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
+          <span className="px-2 text-xs text-slate-300 select-none">
+            {spanLabel}
+          </span>
           <button
-            onClick={() => setMonthOffset(0)}
-            className={`px-2.5 py-1.5 text-xs rounded-lg transition-colors ${
-              monthOffset === 0
-                ? 'bg-emerald-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
-          >
-            Idag
-          </button>
-          <button
-            onClick={() => setMonthOffset(o => o + 6)}
+            onClick={() => setMonthOffset(o => o + 1)}
             className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-            title="6 manader framat"
+            title="1 manad framat"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+          {monthOffset !== 0 && (
+            <button
+              onClick={() => setMonthOffset(0)}
+              className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-700 rounded-lg transition-colors"
+              title="Aterstall till nuvarande manad"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Uppdatera */}

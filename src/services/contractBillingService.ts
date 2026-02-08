@@ -221,6 +221,15 @@ export class ContractBillingService {
   }): Promise<ContractBillingItem> {
     const requiresApproval = (input.discount_percent ?? 0) > 0
 
+    // Normalisera single-date perioder till månadsgränser
+    let pStart = input.billing_period_start
+    let pEnd = input.billing_period_end
+    if (pStart === pEnd) {
+      const d = new Date(pStart + 'T00:00:00')
+      pStart = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]
+      pEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0]
+    }
+
     const { data, error } = await supabase
       .from('contract_billing_items')
       .insert({
@@ -239,8 +248,8 @@ export class ContractBillingService {
         requires_approval: requiresApproval,
         discount_percent: input.discount_percent || 0,
         original_price: input.original_price || null,
-        billing_period_start: input.billing_period_start,
-        billing_period_end: input.billing_period_end,
+        billing_period_start: pStart,
+        billing_period_end: pEnd,
         batch_id: input.batch_id || null,
         notes: input.notes || null,
         status: 'pending'
@@ -268,8 +277,12 @@ export class ContractBillingService {
       return { created: 0, totalAmount: 0 }
     }
 
-    // 2. Dagens datum för faktureringsperiod
-    const today = new Date().toISOString().split('T')[0]
+    // 2. Normalisera till månadsgränser (1:a till sista)
+    const now = new Date()
+    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      .toISOString().split('T')[0]
+    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      .toISOString().split('T')[0]
 
     let totalAmount = 0
 
@@ -293,8 +306,8 @@ export class ContractBillingService {
         requires_approval: requiresApproval,
         discount_percent: item.discount_percent || 0,
         original_price: item.unit_price, // Originalpris utan rabatt
-        billing_period_start: today,
-        billing_period_end: today,
+        billing_period_start: periodStart,
+        billing_period_end: periodEnd,
         status: requiresApproval ? 'pending' : 'approved',
         notes: item.notes || `Från ärende ${caseId}`
       })
@@ -605,7 +618,10 @@ export class ContractBillingService {
     const groups = new Map<string, ContractBillingItemWithRelations[]>()
 
     for (const item of items) {
-      const key = `${item.customer_id}::${item.billing_period_start}::${item.billing_period_end}`
+      // Gruppera per kund + månad (YYYY-MM) istället för exakta datum
+      // så att ad-hoc och löpande poster hamnar på samma faktura
+      const monthKey = item.billing_period_start.slice(0, 7)
+      const key = `${item.customer_id}::${monthKey}`
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key)!.push(item)
     }
@@ -622,10 +638,18 @@ export class ContractBillingService {
       const batchIds = new Set(groupItems.map(i => i.batch_id).filter(Boolean))
       const sharedBatchId = batchIds.size === 1 ? [...batchIds][0]! : null
 
+      // Beräkna månadsgränser från gruppens datum
+      const dates = groupItems.map(i => i.billing_period_start)
+      const firstDate = new Date(Math.min(...dates.map(d => new Date(d).getTime())))
+      const monthStart = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1)
+        .toISOString().split('T')[0]
+      const monthEnd = new Date(firstDate.getFullYear(), firstDate.getMonth() + 1, 0)
+        .toISOString().split('T')[0]
+
       invoices.push({
         customer_id: first.customer_id,
-        period_start: first.billing_period_start,
-        period_end: first.billing_period_end,
+        period_start: monthStart,
+        period_end: monthEnd,
         customer: {
           id: first.customer?.id || first.customer_id,
           company_name: first.customer?.company_name || 'Okänd kund',
