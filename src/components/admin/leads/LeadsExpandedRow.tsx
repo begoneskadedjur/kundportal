@@ -7,11 +7,7 @@ import {
   Activity,
   MessageSquare,
   Mail,
-  Phone,
-  Clock,
-  Flame,
-  Calendar,
-  Tag
+  Phone
 } from 'lucide-react'
 import {
   Lead,
@@ -38,8 +34,8 @@ const LeadsExpandedRow: React.FC<LeadsExpandedRowProps> = ({
 
   return (
     <tr className="bg-slate-800/30 border-b border-slate-700/30">
-      <td colSpan={colSpan} className="px-6 py-4 border-l-4 border-purple-400/50">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <td colSpan={colSpan} className="px-4 py-3 border-l-4 border-purple-400/50">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
 
           {/* Sektion 1: Kontakt & Affärsinformation */}
           <div className="space-y-3">
@@ -91,6 +87,17 @@ const LeadsExpandedRow: React.FC<LeadsExpandedRowProps> = ({
                 </div>
               )}
             </div>
+            {lead.tags && lead.tags.length > 0 && (
+              <div className="pt-2 border-t border-slate-700/50">
+                <div className="flex flex-wrap gap-1">
+                  {lead.tags.map((tag, idx) => (
+                    <span key={idx} className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sektion 2: BANT-kriterier */}
@@ -191,38 +198,15 @@ const LeadsExpandedRow: React.FC<LeadsExpandedRowProps> = ({
                 <span className="text-white">{lead.lead_events?.[0]?.count || 0}</span>
               </div>
             </div>
-          </div>
-
-          {/* Sektion 4: Anteckningar & Taggar */}
-          <div className="space-y-3">
-            {lead.tags && lead.tags.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-2">
-                  <Tag className="w-4 h-4 text-blue-400" />
-                  Taggar
-                </h4>
-                <div className="flex flex-wrap gap-1">
-                  {lead.tags.map((tag, idx) => (
-                    <span key={idx} className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
-                      {tag}
-                    </span>
-                  ))}
+            {lead.notes && (
+              <div className="pt-2 border-t border-slate-700/50">
+                <div className="flex items-start gap-2">
+                  <MessageSquare className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap line-clamp-3">
+                    {lead.notes}
+                  </p>
                 </div>
               </div>
-            )}
-            {lead.notes && (
-              <div>
-                <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-2">
-                  <MessageSquare className="w-4 h-4 text-blue-400" />
-                  Anteckningar
-                </h4>
-                <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap line-clamp-4">
-                  {lead.notes}
-                </p>
-              </div>
-            )}
-            {!lead.notes && (!lead.tags || lead.tags.length === 0) && (
-              <div className="text-sm text-slate-500 italic">Inga anteckningar eller taggar</div>
             )}
           </div>
 

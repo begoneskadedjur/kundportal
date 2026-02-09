@@ -108,11 +108,11 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
   return (
     <Card className="overflow-hidden border-slate-700/50 bg-gradient-to-br from-slate-800/40 to-slate-900/40">
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead className="bg-slate-800/95 backdrop-blur border-b border-slate-600 sticky top-0 z-10">
             <tr>
               {/* Lead & Kontakt — always visible, required */}
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('company_name')}>
+              <th className="w-[28%] px-3 py-2.5 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('company_name')}>
                 <div className="flex items-center gap-1.5">
                   <Building className="w-3.5 h-3.5 text-blue-400" />
                   Lead & Kontakt
@@ -122,7 +122,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
               {/* Status & Score */}
               {isVisible('statusScore') && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('status')}>
+                <th className="w-[13%] px-3 py-2.5 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('status')}>
                   <div className="flex items-center gap-1.5">
                     <Target className="w-3.5 h-3.5 text-purple-400" />
                     Status & Score
@@ -133,7 +133,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
               {/* Prioritet (valfri kolumn) */}
               {isVisible('priority') && (
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('priority')}>
+                <th className="w-[8%] px-2 py-2.5 text-center text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('priority')}>
                   <div className="flex items-center justify-center gap-1.5">
                     <Flame className="w-3.5 h-3.5 text-orange-400" />
                     Prioritet
@@ -144,7 +144,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
               {/* Tilldelad */}
               {isVisible('assigned') && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                <th className="w-[13%] px-3 py-2.5 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
                   <div className="flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-green-400" />
                     Tilldelad
@@ -154,7 +154,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
               {/* Värde */}
               {isVisible('value') && (
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('estimated_value')}>
+                <th className="w-[10%] px-3 py-2.5 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('estimated_value')}>
                   <div className="flex items-center justify-end gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-yellow-400" />
                     Värde
@@ -165,7 +165,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
               {/* Nästa steg */}
               {isVisible('nextStep') && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('follow_up_date')}>
+                <th className="w-[10%] px-3 py-2.5 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('follow_up_date')}>
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-purple-400" />
                     Nästa steg
@@ -176,7 +176,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
               {/* Aktivitet */}
               {isVisible('activity') && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('activity_pulse')}>
+                <th className="w-[8%] px-2 py-2.5 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('activity_pulse')}>
                   <div className="flex items-center gap-1.5">
                     <Activity className="w-3.5 h-3.5 text-green-400" />
                     Aktivitet
@@ -187,7 +187,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
               {/* Deal Velocity (valfri) */}
               {isVisible('dealVelocity') && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('deal_velocity')}>
+                <th className="w-[8%] px-2 py-2.5 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('deal_velocity')}>
                   <div className="flex items-center gap-1.5">
                     <Flame className="w-3.5 h-3.5 text-orange-400" />
                     Velocity
@@ -198,7 +198,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
               {/* Uppskattad deadline (valfri) */}
               {isVisible('closingDate') && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('closing_date_estimate')}>
+                <th className="w-[8%] px-2 py-2.5 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('closing_date_estimate')}>
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-purple-400" />
                     Deadline
@@ -209,7 +209,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
               {/* Senast uppdaterad (valfri) */}
               {isVisible('lastUpdated') && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('updated_at')}>
+                <th className="w-[8%] px-2 py-2.5 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('updated_at')}>
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
                     Uppdaterad
@@ -219,7 +219,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
               )}
 
               {/* Åtgärder — always visible, required */}
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-300 uppercase tracking-wider w-28">
+              <th className="w-24 px-2 py-2.5 text-center text-xs font-medium text-slate-300 uppercase tracking-wider">
                 Åtgärder
               </th>
             </tr>
@@ -244,7 +244,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                     lead.priority === 'low' ? 'border-l-4 border-l-green-400' : ''
                   }`}>
                     {/* Lead & Kontakt */}
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => onToggleExpandRow(lead.id)}
@@ -268,7 +268,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
                     {/* Status & Score */}
                     {isVisible('statusScore') && (
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5">
                             <div className={`w-2.5 h-2.5 rounded-full bg-${LEAD_STATUS_DISPLAY[lead.status].color}`} />
@@ -297,7 +297,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
                     {/* Prioritet (valfri) */}
                     {isVisible('priority') && (
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2 py-2.5 text-center">
                         {lead.priority ? (
                           <span className={`text-xs font-medium ${
                             lead.priority === 'urgent' ? 'text-red-400' :
@@ -315,7 +315,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
                     {/* Tilldelad */}
                     {isVisible('assigned') && (
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
                           <div className="space-y-0.5">
                             {lead.lead_technicians.slice(0, 2).map((assignment) => (
@@ -340,7 +340,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
                     {/* Värde */}
                     {isVisible('value') && (
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-2.5 text-right">
                         {lead.estimated_value ? (
                           <div>
                             <div className="text-sm font-semibold text-white font-mono">
@@ -358,7 +358,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
                     {/* Nästa steg */}
                     {isVisible('nextStep') && (
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         {lead.follow_up_date ? (
                           <span className={`text-xs font-medium ${
                             new Date(lead.follow_up_date) < new Date() ? 'text-red-400' :
@@ -375,7 +375,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
                     {/* Aktivitet */}
                     {isVisible('activity') && (
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-2.5">
                         <div className="flex items-center gap-1">
                           <span className={`text-xs font-medium ${getActivityColor(daysSinceUpdate)}`}>
                             {getActivityLabel(daysSinceUpdate)}
@@ -392,7 +392,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                       const leadAge = Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
                       const isStagnant = leadAge > 30 && (lead.status === 'blue_cold' || lead.status === 'red_lost')
                       return (
-                        <td className="px-4 py-3">
+                        <td className="px-2 py-2.5">
                           <span className={`text-xs font-medium ${
                             isStagnant ? 'text-red-400' :
                             leadAge > 14 ? 'text-yellow-400' :
@@ -406,7 +406,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
                     {/* Uppskattad deadline (valfri) */}
                     {isVisible('closingDate') && (
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-2.5">
                         {lead.closing_date_estimate ? (
                           <span className="text-xs text-white">
                             {new Date(lead.closing_date_estimate).toLocaleDateString('sv-SE')}
@@ -419,7 +419,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
                     {/* Senast uppdaterad (valfri) */}
                     {isVisible('lastUpdated') && (
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-2.5">
                         <div>
                           <div className="text-xs text-white">
                             {new Date(lead.updated_at).toLocaleDateString('sv-SE')}
@@ -434,7 +434,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                     )}
 
                     {/* Åtgärder */}
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-2.5">
                       <div className="flex items-center justify-center gap-1">
                         <Button
                           size="sm"
