@@ -759,7 +759,7 @@ const Leads: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-[1600px] space-y-6">
         <PageHeader 
           title="Lead Pipeline" 
           description="Hantera potentiella kunder och lead-processen"
