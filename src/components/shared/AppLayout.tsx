@@ -16,6 +16,7 @@ const EXCLUDED_PATHS = [
   '/set-password',
   '/forgot-password',
   '/reset-password',
+  '/admin/dashboard-demo',
 ];
 
 // Prefix för portaler som har egen layout
