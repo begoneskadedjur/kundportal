@@ -10,7 +10,6 @@ import {
   Wrench,
   ClipboardList,
   Plus,
-  MessageSquareText,
   Trash2
 } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -30,16 +29,6 @@ interface GuideItem {
 
 // Lista med tillgängliga guider
 const guides: GuideItem[] = [
-  {
-    id: 'communication-system',
-    title: 'Kommunikationssystemet',
-    description: 'Lär dig använda @mentions, svarstrådar och notifikationer',
-    icon: MessageSquareText,
-    iconColor: 'text-cyan-400',
-    iconBgColor: 'bg-cyan-500/20',
-    path: '/technician/guides/communication-system',
-    isNew: true
-  },
   {
     id: 'follow-up-case',
     title: 'Skapa Foljeärenden',

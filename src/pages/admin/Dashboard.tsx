@@ -24,10 +24,8 @@ import {
   AlertCircle,
   Receipt,
   Image as ImageIcon,
-  Megaphone,
   Beaker,
   Bell,
-  MessageSquareText,
   Sparkles,
   RefreshCw
 } from 'lucide-react'
@@ -447,16 +445,6 @@ const AdminDashboard: React.FC = () => {
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/product-management"
-                  icon={Package}
-                  title="Tjänsteutbud"
-                  description="Produktkatalog, Skapa & redigera produkter & tjänster, Används som val i offerter och avtalsförslag vi skapar"
-                  stats="Dynamisk prissättning"
-                  tag="Tjänsteutbud"
-                  iconColor="text-blue-400"
-                />
-
-                <AdminDashboardCard
                   href="/admin/settings/station-types"
                   icon={Target}
                   title="Stationstyper"
@@ -517,26 +505,6 @@ const AdminDashboard: React.FC = () => {
                 />
 
                 <AdminDashboardCard
-                  href="/admin/billing"
-                  icon={DollarSign}
-                  title="Fakturering (Legacy)"
-                  description="Sluthantering av avslutade ärenden"
-                  stats={`${(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden`}
-                  tag="Legacy"
-                  iconColor="text-yellow-400"
-                />
-
-                <AdminDashboardCard
-                  href="/admin/contract-billing"
-                  icon={Receipt}
-                  title="Avtalsfakturering (Legacy)"
-                  description="Periodisk fakturering för avtalskunder"
-                  stats="Faktureringskö"
-                  tag="Legacy"
-                  iconColor="text-slate-400"
-                />
-
-                <AdminDashboardCard
                   href="/admin/commissions"
                   icon={Wallet}
                   title="Provisioner"
@@ -555,7 +523,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="w-full h-px bg-gradient-to-r from-[#20c58f]/50 to-transparent" />
               </h2>
               <StaggeredGrid
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8"
                 staggerDelay={0.08}
                 initialDelay={0.9}
               >
@@ -566,27 +534,6 @@ const AdminDashboard: React.FC = () => {
                   description="Ärendebilder för marknadsföring, Före/efter-dokumentation"
                   stats="Saneringsrapporter"
                   tag="Material"
-                  iconColor="text-cyan-400"
-                />
-
-                <AdminDashboardCard
-                  href="#"
-                  icon={Megaphone}
-                  title="Mail-kampanjer"
-                  description="Skapa & skicka nyhetsbrev, Kommer snart"
-                  stats="Kommer snart"
-                  tag="Kommunikation"
-                  iconColor="text-purple-400"
-                  className="opacity-60"
-                />
-
-                <AdminDashboardCard
-                  href="/admin/guides/communication-system"
-                  icon={MessageSquareText}
-                  title="Kommunikationsguide"
-                  description="Interaktiv guide för @mentions, trådar och notifikationer"
-                  stats="Steg-för-steg"
-                  tag="Guide"
                   iconColor="text-cyan-400"
                 />
 

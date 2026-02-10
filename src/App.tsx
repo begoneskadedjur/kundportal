@@ -19,17 +19,14 @@ import AdminDashboard from './pages/admin/Dashboard';
 import Customers from './pages/admin/Customers';
 import CustomerDetails from './pages/admin/CustomerDetails';
 import Economics from './pages/admin/Economics';
-import BillingManagement from './pages/admin/BillingManagement';
 import Technicians from './pages/admin/Technicians';
 import TechnicianManagement from './pages/admin/TechnicianManagement';
 import TechnicianCommissions from './pages/admin/TechnicianCommissions';
 import SalesOpportunities from './pages/admin/SalesOpportunities';
-import ProductManagementPage from './pages/admin/ProductManagement';
 import StationTypesPage from './pages/admin/settings/StationTypesPage';
 import PreparationsPage from './pages/admin/settings/PreparationsPage';
 import ArticlesPage from './pages/admin/settings/ArticlesPage';
 import PriceListsPage from './pages/admin/settings/PriceListsPage';
-import ContractBilling from './pages/admin/ContractBilling';
 import InvoicingPage from './pages/admin/invoicing';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
@@ -175,15 +172,7 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/admin/billing" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <BillingManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
+            <Route
               path="/admin/technicians" 
               element={
                 <ProtectedRoute requiredRole="admin">
@@ -214,14 +203,6 @@ function App() {
                   <SalesOpportunities />
                 </ProtectedRoute>
               } 
-            />
-            <Route
-              path="/admin/product-management"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <ProductManagementPage />
-                </ProtectedRoute>
-              }
             />
             <Route
               path="/admin/image-bank"
@@ -271,16 +252,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/contract-billing"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <ContractBilling />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Nytt faktureringssystem */}
+            {/* Faktureringssystem */}
             <Route
               path="/admin/invoicing"
               element={

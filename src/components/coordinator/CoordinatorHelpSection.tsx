@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom'
 import {
   HelpCircle,
   ChevronRight,
-  MessageSquareText,
   Trash2,
   CalendarDays,
   Wand2
@@ -27,16 +26,6 @@ interface GuideItem {
 
 // Lista med tillgängliga guider för koordinatorer
 const guides: GuideItem[] = [
-  {
-    id: 'communication-system',
-    title: 'Kommunikationssystemet',
-    description: 'Lär dig använda @mentions, svarstrådar och notifikationer',
-    icon: MessageSquareText,
-    iconColor: 'text-cyan-400',
-    iconBgColor: 'bg-cyan-500/20',
-    path: '/koordinator/guides/communication-system',
-    isNew: true
-  },
   {
     id: 'case-deletion',
     title: 'Radera vs Slaska ärenden',

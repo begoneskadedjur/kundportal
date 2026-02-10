@@ -78,15 +78,6 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       category: 'navigation'
     },
     {
-      id: 'billing-legacy',
-      title: 'Fakturering (Legacy)',
-      description: 'BeGone-ärenden fakturering',
-      icon: FileText,
-      href: '/admin/billing',
-      keywords: ['faktura', 'billing', 'ärenden', 'legacy'],
-      category: 'navigation'
-    },
-    {
       id: 'contracts',
       title: 'Skapa Kontrakt',
       description: 'Oneflow-avtal för signering',
