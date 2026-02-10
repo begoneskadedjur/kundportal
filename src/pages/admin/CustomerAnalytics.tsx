@@ -3,10 +3,9 @@
 import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  TrendingUp, DollarSign, Target, ArrowLeft, BarChart3, Users, XCircle
+  TrendingUp, Building2, Target, BarChart3, Users, XCircle
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
-import { PageHeader } from '../../components/shared'
 import ARRForecastChart from '../../components/admin/customers/ARRForecastChart'
 import RevenueBreakdownChart from '../../components/admin/customers/analytics/RevenueBreakdownChart'
 import HealthScoreDistributionChart from '../../components/admin/customers/analytics/HealthScoreDistributionChart'
@@ -45,41 +44,19 @@ export default function CustomerAnalytics() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <PageHeader
-          title="Customer Analytics"
-          subtitle="Djupgående analyser av kundportföljen"
-          icon={BarChart3}
-          iconColor="text-purple-500"
-          showBackButton={true}
-          backPath="/admin/customers"
-        />
-        <div className="flex items-center justify-center h-96">
-          <LoadingSpinner />
-        </div>
+      <div className="flex items-center justify-center py-32">
+        <LoadingSpinner />
       </div>
     )
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader
-        title="Customer Analytics"
-        subtitle="Djupgående analyser av kundportföljen"
-        icon={BarChart3}
-        iconColor="text-purple-500"
-        showBackButton={true}
-        backPath="/admin/customers"
-        rightContent={
-          <button
-            onClick={() => navigate('/admin/customers')}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:text-white hover:border-slate-500 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Tillbaka till kundlista
-          </button>
-        }
-      />
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Sidtitel */}
+      <div>
+        <h1 className="text-2xl font-bold text-white">Kundanalys</h1>
+        <p className="text-sm text-slate-400 mt-1">Djupgående analyser av kundportföljen</p>
+      </div>
 
       {/* Flyttade KPI-kort: Förnyelsevärde + Genomsnittsvärde + Organisationsöversikt */}
       <div className={`grid grid-cols-1 md:grid-cols-2 ${consolidatedAnalytics.terminatedCount > 0 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'} gap-4`}>
@@ -125,7 +102,7 @@ export default function CustomerAnalytics() {
         <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <div className="flex items-start justify-between mb-2">
             <p className="text-xs text-slate-400">Totalt Enheter</p>
-            <DollarSign className="w-6 h-6 text-green-500 opacity-50" />
+            <Building2 className="w-6 h-6 text-green-500 opacity-50" />
           </div>
           <p className="text-2xl font-bold text-white mb-1">
             {kpis.totalSites}
