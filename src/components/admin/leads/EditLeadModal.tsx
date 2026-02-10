@@ -1,7 +1,7 @@
 // src/components/admin/leads/EditLeadModal.tsx - Edit existing lead modal
 
 import React, { useState, useEffect } from 'react'
-import { Edit3, Building2, User, Mail, Phone, MapPin, Calendar, AlertCircle, Save, Trash2, Target, Star, Users } from 'lucide-react'
+import { Edit3, Building2, Calendar, AlertCircle, Save, Trash2, Target, Star } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -651,45 +651,67 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
   if (!lead) return null
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="xl">
-      <div className="p-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center justify-center w-12 h-12 bg-blue-600/10 rounded-lg">
-              <Edit3 className="w-6 h-6 text-blue-400" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white">Redigera lead</h2>
-              <p className="text-slate-400">{lead.company_name}</p>
-            </div>
-          </div>
-
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      size="xl"
+      title={
+        <div className="flex items-center gap-2">
+          <Edit3 className="w-5 h-5 text-blue-400" />
+          <span>Redigera lead</span>
+        </div>
+      }
+      subtitle={lead.company_name}
+      headerActions={
+        <Button
+          onClick={handleDelete}
+          disabled={loading || deleting}
+          variant="ghost"
+          size="sm"
+          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+        >
+          {deleting ? <LoadingSpinner size="sm" /> : <Trash2 className="w-4 h-4" />}
+        </Button>
+      }
+      footer={
+        <div className="flex items-center justify-end gap-3 px-5 py-3">
+          <Button type="button" variant="ghost" onClick={handleClose} disabled={loading || deleting}>
+            Avbryt
+          </Button>
           <Button
-            onClick={handleDelete}
+            type="submit"
+            form="edit-lead-form"
             disabled={loading || deleting}
-            variant="ghost"
-            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
           >
-            {deleting ? (
-              <LoadingSpinner size="sm" />
+            {loading ? (
+              <>
+                <LoadingSpinner size="sm" />
+                Uppdaterar...
+              </>
             ) : (
-              <Trash2 className="w-5 h-5" />
+              <>
+                <Save className="w-4 h-4" />
+                Uppdatera lead
+              </>
             )}
           </Button>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-8">
+      }
+    >
+      <div className="p-5">
+        <form id="edit-lead-form" onSubmit={handleSubmit} className="space-y-5">
           
           {/* Obligatorisk huvudinformation */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+          <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-purple-400" />
               Obligatorisk huvudinformation
             </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Företagsnamn *
                 </label>
                 <Input
@@ -707,7 +729,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Organisationsnummer
                 </label>
                 <Input
@@ -718,7 +740,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Kontaktperson *
                 </label>
                 <Input
@@ -736,7 +758,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Telefonnummer *
                 </label>
                 <Input
@@ -754,7 +776,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   E-post *
                 </label>
                 <Input
@@ -773,7 +795,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Status
                 </label>
                 <select
@@ -792,15 +814,15 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           </Card>
 
           {/* Lead-hantering & uppföljning */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+          <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-green-400" />
               Lead-hantering & uppföljning
             </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Kontaktmetod
                 </label>
                 <select
@@ -818,7 +840,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Kontaktad datum
                 </label>
                 <Input
@@ -829,7 +851,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Ta kontakt igen datum
                 </label>
                 <Input
@@ -840,7 +862,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Offert lämnad datum
                 </label>
                 <Input
@@ -900,9 +922,9 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 </div>
                 
                 {formData.contract_status && (
-                  <div className="bg-slate-700/30 p-4 rounded-lg space-y-4 border border-slate-600/50">
+                  <div className="bg-slate-700/30 p-3 rounded-lg space-y-3 border border-slate-600/30">
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                      <label className="block text-sm font-medium text-slate-300 mb-1.5">
                         Nuvarande leverantör
                         <span className="text-slate-500 text-xs ml-2">(Namnet på företaget de har avtal med)</span>
                       </label>
@@ -914,7 +936,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                      <label className="block text-sm font-medium text-slate-300 mb-1.5">
                         Avtal löper ut
                         <span className="text-slate-500 text-xs ml-2">(När avtalet kan sägas upp eller löper ut)</span>
                       </label>
@@ -926,7 +948,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                      <label className="block text-sm font-medium text-slate-300 mb-1.5">
                         Avtalsdetaljer
                       </label>
                       <textarea
@@ -943,16 +965,16 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
             </div>
           </Card>
 
-          {/* Företagsinformation */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+          {/* Företagsinformation + Anteckningar (merged) */}
+          <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-blue-400" />
               Företagsinformation
             </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Verksamhetstyp
                 </label>
                 <Input
@@ -963,7 +985,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Typ av problem
                 </label>
                 <Input
@@ -974,7 +996,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Företagsstorlek
                 </label>
                 <select
@@ -992,7 +1014,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Hemsida
                 </label>
                 <Input
@@ -1010,7 +1032,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Adress
                 </label>
                 <Input
@@ -1030,7 +1052,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Verksamhetsbeskrivning
                 </label>
                 <textarea
@@ -1041,25 +1063,36 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                   className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
                 />
               </div>
+              {/* Anteckningar (merged into this card) */}
+              <div className="md:col-span-2 border-t border-slate-700/30 pt-3 mt-1">
+                <h4 className="text-sm font-medium text-slate-300 mb-1.5">Anteckningar</h4>
+                <textarea
+                  value={formData.notes || ''}
+                  onChange={(e) => handleInputChange('notes', e.target.value)}
+                  placeholder="Lägg till kommentarer, mötesinformation eller andra anteckningar här..."
+                  rows={3}
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/30 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                />
+              </div>
             </div>
           </Card>
 
-          {/* Lead-hantering & prioritering */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+          {/* Lead-hantering & prioritering + BANT (merged) */}
+          <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Target className="w-5 h-5 text-orange-400" />
               Lead-hantering & prioritering
             </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Prioritet
                 </label>
                 <select
                   value={formData.priority || ''}
                   onChange={(e) => handleInputChange('priority', e.target.value as LeadPriority || null)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                 >
                   <option value="">Välj prioritet</option>
                   {Object.entries(LEAD_PRIORITY_DISPLAY).map(([value, config]) => (
@@ -1071,7 +1104,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Källa
                 </label>
                 <Input
@@ -1081,9 +1114,8 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 />
               </div>
 
-
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Uppskattat värde (SEK)
                 </label>
                 <Input
@@ -1095,7 +1127,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Sannolikhet (0-100%)
                 </label>
                 <Input
@@ -1109,7 +1141,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Förhoppning om att slutföra affär till
                   <span className="text-slate-500 text-xs ml-2">(Ungefärligt datum när affären kan avslutas)</span>
                 </label>
@@ -1121,7 +1153,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Beslutsfattare
                 </label>
                 <Input
@@ -1131,76 +1163,54 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 />
               </div>
             </div>
-          </Card>
 
-          {/* BANT-kriterier */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <Star className="w-5 h-5 text-yellow-400" />
-              BANT-kvalificering
-            </h3>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <label className="flex items-center gap-2 text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={formData.budget_confirmed || false}
-                  onChange={(e) => handleInputChange('budget_confirmed', e.target.checked)}
-                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
-                />
-                Budget bekräftad
-              </label>
+            {/* BANT-kvalificering (merged into this card) */}
+            <div className="border-t border-slate-700/30 pt-3 mt-3">
+              <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 text-yellow-400" />
+                BANT-kvalificering
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <label className="flex items-center gap-2 text-slate-300 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.budget_confirmed || false}
+                    onChange={(e) => handleInputChange('budget_confirmed', e.target.checked)}
+                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                  />
+                  Budget bekräftad
+                </label>
 
-              <label className="flex items-center gap-2 text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={formData.authority_confirmed || false}
-                  onChange={(e) => handleInputChange('authority_confirmed', e.target.checked)}
-                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
-                />
-                Befogenhet bekräftad
-              </label>
+                <label className="flex items-center gap-2 text-slate-300 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.authority_confirmed || false}
+                    onChange={(e) => handleInputChange('authority_confirmed', e.target.checked)}
+                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                  />
+                  Befogenhet bekräftad
+                </label>
 
-              <label className="flex items-center gap-2 text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={formData.needs_confirmed || false}
-                  onChange={(e) => handleInputChange('needs_confirmed', e.target.checked)}
-                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
-                />
-                Behov bekräftat
-              </label>
+                <label className="flex items-center gap-2 text-slate-300 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.needs_confirmed || false}
+                    onChange={(e) => handleInputChange('needs_confirmed', e.target.checked)}
+                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                  />
+                  Behov bekräftat
+                </label>
 
-              <label className="flex items-center gap-2 text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={formData.timeline_confirmed || false}
-                  onChange={(e) => handleInputChange('timeline_confirmed', e.target.checked)}
-                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
-                />
-                Tidslinje bekräftad
-              </label>
-            </div>
-          </Card>
-
-          {/* Anteckningar */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <User className="w-5 h-5 text-yellow-400" />
-              Anteckningar
-            </h3>
-            
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Kommentarer och anteckningar
-              </label>
-              <textarea
-                value={formData.notes || ''}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
-                placeholder="Lägg till kommentarer, mötesinformation eller andra anteckningar här..."
-                rows={4}
-                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
-              />
+                <label className="flex items-center gap-2 text-slate-300 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.timeline_confirmed || false}
+                    onChange={(e) => handleInputChange('timeline_confirmed', e.target.checked)}
+                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                  />
+                  Tidslinje bekräftad
+                </label>
+              </div>
             </div>
           </Card>
 
@@ -1209,10 +1219,8 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
             leadId={lead.id}
             assignedTechnicians={leadTechnicians}
             onTechniciansChange={() => {
-              // Refresh lead technicians when changes occur
               const fetchLeadTechnicians = async () => {
                 if (!lead?.id) return
-
                 try {
                   const { data, error } = await supabase
                     .from('lead_technicians')
@@ -1233,46 +1241,15 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     .eq('lead_id', lead.id)
                     .order('is_primary', { ascending: false })
                     .order('assigned_at')
-
                   if (error) throw error
                   setLeadTechnicians(data || [])
                 } catch (error) {
-
+                  // silent
                 }
               }
-              
               fetchLeadTechnicians()
             }}
           />
-
-          {/* Form Actions */}
-          <div className="flex items-center justify-end gap-4 pt-6 border-t border-slate-700/50">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleClose}
-              disabled={loading || deleting}
-            >
-              Avbryt
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading || deleting}
-              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  Uppdaterar...
-                </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5" />
-                  Uppdatera lead
-                </>
-              )}
-            </Button>
-          </div>
 
         </form>
       </div>

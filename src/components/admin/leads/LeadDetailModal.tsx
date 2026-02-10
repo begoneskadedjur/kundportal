@@ -1,7 +1,7 @@
 // src/components/admin/leads/LeadDetailModal.tsx - Detailed lead view with all related components
 
 import React, { useState, useEffect } from 'react'
-import { Eye, Edit3, X, Star, TrendingUp, Users, MessageSquare, Clock, Tag, Phone, Mail, Building, Calendar, FileText, Globe, MapPin, Briefcase, Factory } from 'lucide-react'
+import { Eye, Edit3, Star, TrendingUp, Users, Phone, Mail, Building, Calendar, FileText, Globe, MapPin, Briefcase, Factory } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Card from '../../ui/Card'
@@ -306,47 +306,38 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={handleClose} size="full">
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center justify-center w-12 h-12 bg-blue-600/10 rounded-lg">
-                <Eye className="w-6 h-6 text-blue-400" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-white">{currentLead.company_name}</h2>
-                <p className="text-slate-400">{currentLead.contact_person}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => setShowEditModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Edit3 className="w-4 h-4 mr-2" />
-                Redigera
-              </Button>
-              <Button
-                onClick={handleClose}
-                variant="ghost"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
+      <Modal
+        isOpen={isOpen}
+        onClose={handleClose}
+        size="full"
+        title={
+          <div className="flex items-center gap-2">
+            <Eye className="w-5 h-5 text-blue-400" />
+            <span>{currentLead.company_name}</span>
           </div>
-
+        }
+        subtitle={currentLead.contact_person}
+        headerActions={
+          <Button
+            onClick={() => setShowEditModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            size="sm"
+          >
+            <Edit3 className="w-4 h-4 mr-1" />
+            Redigera
+          </Button>
+        }
+      >
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <LoadingSpinner size="lg" />
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="p-5">
               {/* Lead Overview */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 {/* Status & Priority */}
-                <Card className="p-4 bg-slate-800/50 border-slate-700/50">
+                <Card className="p-4 bg-slate-800/50 border-slate-700/30">
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Status & Prioritet</h3>
                   <div className="space-y-3">
                     <div>
@@ -366,7 +357,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </Card>
 
                 {/* Lead Score */}
-                <Card className="p-4 bg-slate-800/50 border-slate-700/50">
+                <Card className="p-4 bg-slate-800/50 border-slate-700/30">
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Lead Score</h3>
                   <div className="space-y-2">
                     <div className="text-2xl font-bold text-white">{leadScore}/100</div>
@@ -385,7 +376,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </Card>
 
                 {/* Value & Probability */}
-                <Card className="p-4 bg-slate-800/50 border-slate-700/50">
+                <Card className="p-4 bg-slate-800/50 border-slate-700/30">
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Affärsvärde</h3>
                   <div className="space-y-2">
                     <div className="text-lg font-semibold text-white">
@@ -406,12 +397,12 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               </div>
 
               {/* BANT Kvalificering */}
-              <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Card className="p-4 bg-slate-800/50 border-slate-700/30 mb-4">
+                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-green-400" />
                   BANT-kvalificering
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className={`p-3 rounded-lg border ${currentLead.budget_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
                     <div className="text-sm font-medium text-slate-300">Budget</div>
                     <div className={currentLead.budget_confirmed ? 'text-green-400' : 'text-slate-400'}>
@@ -439,16 +430,16 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </div>
               </Card>
 
-              {/* Customer Information Section - Consolidated */}
-              {(currentLead.phone_number || currentLead.email || currentLead.organization_number || currentLead.business_type || currentLead.problem_type || currentLead.company_size || currentLead.website || currentLead.address || currentLead.business_description || currentLead.sni07_label || currentLead.source || currentLead.decision_maker || currentLead.contract_with) && (
-                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              {/* Customer Information + Timeline (merged) */}
+              {(currentLead.phone_number || currentLead.email || currentLead.organization_number || currentLead.business_type || currentLead.problem_type || currentLead.company_size || currentLead.website || currentLead.address || currentLead.business_description || currentLead.sni07_label || currentLead.source || currentLead.decision_maker || currentLead.contract_with || currentLead.contact_date || currentLead.follow_up_date || currentLead.quote_provided_date || currentLead.contact_method) && (
+                <Card className="p-4 bg-slate-800/50 border-slate-700/30 mb-4">
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                     <Building className="w-5 h-5 text-blue-400" />
                     Kunduppgifter
                   </h3>
-                  
+
                   {/* Basic Contact Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm mb-4">
                     {currentLead.phone_number && (
                       <div>
                         <div className="text-slate-300 font-medium flex items-center gap-1">
@@ -501,9 +492,9 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                           Webbplats
                         </div>
                         <div className="text-white">
-                          <a href={currentLead.website.startsWith('http') ? currentLead.website : `https://${currentLead.website}`} 
-                             target="_blank" 
-                             rel="noopener noreferrer" 
+                          <a href={currentLead.website.startsWith('http') ? currentLead.website : `https://${currentLead.website}`}
+                             target="_blank"
+                             rel="noopener noreferrer"
                              className="text-blue-400 hover:text-blue-300 transition-colors">
                             {currentLead.website}
                           </a>
@@ -523,7 +514,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
                   {/* Business Description */}
                   {currentLead.business_description && (
-                    <div className="mb-6">
+                    <div className="mb-4">
                       <div className="text-slate-300 font-medium mb-2">Verksamhetsbeskrivning</div>
                       <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30 whitespace-pre-wrap">
                         {currentLead.business_description}
@@ -533,7 +524,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
                   {/* SNI Classification */}
                   {currentLead.sni07_label && (
-                    <div className="mb-6">
+                    <div className="mb-4">
                       <div className="text-slate-300 font-medium mb-2 flex items-center gap-1">
                         <Factory className="w-4 h-4" />
                         SNI-kod (Branschklassning)
@@ -549,10 +540,10 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   )}
 
                   {/* Additional Customer Info */}
-                  {(currentLead.source || currentLead.decision_maker || currentLead.contract_with) && (
-                    <div>
-                      <div className="text-slate-300 font-medium mb-3">Övrig information</div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                  {(currentLead.source || currentLead.decision_maker) && (
+                    <div className="mb-4">
+                      <div className="text-slate-300 font-medium mb-2">Övrig information</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                         {currentLead.source && (
                           <div>
                             <div className="text-slate-300 font-medium">Källa</div>
@@ -568,59 +559,59 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Timeline & Dates (merged into this card) */}
+                  {(currentLead.contact_date || currentLead.follow_up_date || currentLead.quote_provided_date || currentLead.contact_method) && (
+                    <div className="border-t border-slate-700/30 pt-3 mt-3">
+                      <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                        Tidslinje & Datum
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                        {currentLead.contact_date && (
+                          <div>
+                            <div className="text-slate-300 font-medium">Kontaktdatum</div>
+                            <div className="text-white">{formatDate(currentLead.contact_date)}</div>
+                          </div>
+                        )}
+                        {currentLead.follow_up_date && (
+                          <div>
+                            <div className="text-slate-300 font-medium">Uppföljning</div>
+                            <div className="text-white">{formatDate(currentLead.follow_up_date)}</div>
+                          </div>
+                        )}
+                        {currentLead.quote_provided_date && (
+                          <div>
+                            <div className="text-slate-300 font-medium">Offert skickad</div>
+                            <div className="text-white">{formatDate(currentLead.quote_provided_date)}</div>
+                          </div>
+                        )}
+                        {currentLead.contact_method && (
+                          <div>
+                            <div className="text-slate-300 font-medium">Kontaktmetod</div>
+                            <div className="text-white capitalize">
+                              {currentLead.contact_method === 'mail' ? 'E-post' :
+                               currentLead.contact_method === 'phone' ? 'Telefon' :
+                               currentLead.contact_method === 'visit' ? 'Besök' : currentLead.contact_method}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </Card>
               )}
 
-              {/* Timeline & Dates Section */}
-              {(currentLead.contact_date || currentLead.follow_up_date || currentLead.quote_provided_date || currentLead.contact_method) && (
-                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-purple-400" />
-                    Tidslinje & Datum
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                    {currentLead.contact_date && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Kontaktdatum</div>
-                        <div className="text-white">{formatDate(currentLead.contact_date)}</div>
-                      </div>
-                    )}
-                    {currentLead.follow_up_date && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Uppföljning</div>
-                        <div className="text-white">{formatDate(currentLead.follow_up_date)}</div>
-                      </div>
-                    )}
-                    {currentLead.quote_provided_date && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Offert skickad</div>
-                        <div className="text-white">{formatDate(currentLead.quote_provided_date)}</div>
-                      </div>
-                    )}
-                    {currentLead.contact_method && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Kontaktmetod</div>
-                        <div className="text-white capitalize">
-                          {currentLead.contact_method === 'mail' ? 'E-post' : 
-                           currentLead.contact_method === 'phone' ? 'Telefon' : 
-                           currentLead.contact_method === 'visit' ? 'Besök' : currentLead.contact_method}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              )}
-
-              {/* Contract Information Section */}
-              {(currentLead.contract_status !== null || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null || currentLead.contract_with || assignedTechnicians.length > 0 || technician) && (
-                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              {/* Contract Information + Notes (merged) */}
+              {(currentLead.contract_status !== null || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null || currentLead.contract_with || assignedTechnicians.length > 0 || technician || currentLead.notes) && (
+                <Card className="p-4 bg-slate-800/50 border-slate-700/30 mb-4">
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-yellow-400" />
                     Avtalsinfo
                   </h3>
-                  
+
                   {/* Contract Status Section */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm mb-4">
                     {currentLead.contract_status !== null && (
                       <div>
                         <div className="text-slate-300 font-medium">Befintligt avtal hos kunden</div>
@@ -629,14 +620,14 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         </div>
                       </div>
                     )}
-                    
+
                     {currentLead.contract_with && (
                       <div>
                         <div className="text-slate-300 font-medium">Nuvarande leverantör</div>
                         <div className="text-white">{currentLead.contract_with}</div>
                       </div>
                     )}
-                    
+
                     {currentLead.contract_end_date && (
                       <div>
                         <div className="text-slate-300 font-medium">Avtal löper ut</div>
@@ -644,9 +635,9 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Quote & Procurement Section */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm mb-4">
                     {currentLead.interested_in_quote !== null && (
                       <div>
                         <div className="text-slate-300 font-medium">Intresserad av offert</div>
@@ -655,7 +646,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         </div>
                       </div>
                     )}
-                    
+
                     {currentLead.procurement !== null && (
                       <div>
                         <div className="text-slate-300 font-medium">Upphandling</div>
@@ -665,20 +656,20 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Assigned Colleagues Section */}
                   {(assignedTechnicians.length > 0 || technician) && (
-                    <div>
-                      <div className="text-slate-300 font-medium mb-3">Tilldelade kollegor</div>
+                    <div className="mb-4">
+                      <div className="text-slate-300 font-medium mb-2">Tilldelade kollegor</div>
                       <div className="space-y-2">
                         {assignedTechnicians.map((assignment) => (
-                          <div key={assignment.id} className="flex items-center justify-between bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                          <div key={assignment.id} className="flex items-center justify-between bg-slate-700/30 rounded-lg p-2 border border-slate-600/30">
                             <div className="flex items-center gap-3">
-                              <div className="flex items-center justify-center w-8 h-8 bg-green-600/10 rounded-full">
-                                <Users className="w-4 h-4 text-green-400" />
+                              <div className="flex items-center justify-center w-7 h-7 bg-green-600/10 rounded-full">
+                                <Users className="w-3.5 h-3.5 text-green-400" />
                               </div>
                               <div>
-                                <div className="text-white font-medium">
+                                <div className="text-white font-medium text-sm">
                                   {assignment.technicians?.name || 'Okänd tekniker'}
                                 </div>
                                 {assignment.technicians?.email && (
@@ -687,49 +678,46 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                               </div>
                             </div>
                             {assignment.is_primary && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
                                 Primär
                               </span>
                             )}
                           </div>
                         ))}
-                        
-                        {/* Legacy technician display if no assignments but technician exists */}
+
                         {assignedTechnicians.length === 0 && technician && (
-                          <div className="flex items-center gap-3 bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
-                            <div className="flex items-center justify-center w-8 h-8 bg-green-600/10 rounded-full">
-                              <Users className="w-4 h-4 text-green-400" />
+                          <div className="flex items-center gap-3 bg-slate-700/30 rounded-lg p-2 border border-slate-600/30">
+                            <div className="flex items-center justify-center w-7 h-7 bg-green-600/10 rounded-full">
+                              <Users className="w-3.5 h-3.5 text-green-400" />
                             </div>
-                            <div className="text-white font-medium">{technician}</div>
+                            <div className="text-white font-medium text-sm">{technician}</div>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes (merged into this card) */}
+                  {currentLead.notes && (
+                    <div className="border-t border-slate-700/30 pt-3 mt-3">
+                      <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5 text-green-400" />
+                        Anteckningar
+                      </h4>
+                      <div className="text-sm">
+                        <div className="text-white whitespace-pre-wrap bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                          {currentLead.notes}
+                        </div>
                       </div>
                     </div>
                   )}
                 </Card>
               )}
 
-              {/* Notes Section */}
-              {currentLead.notes && (
-                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-green-400" />
-                    Anteckningar
-                  </h3>
-                  <div className="text-sm">
-                    <div className="text-white whitespace-pre-wrap bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
-                      {currentLead.notes}
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-
-
               {/* Management Components */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Left Column */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <LeadTechnicianManager
                     leadId={currentLead.id}
                     assignedTechnicians={assignedTechnicians}
@@ -753,7 +741,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </div>
 
                 {/* Right Column */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <LeadCommentsSystem
                     leadId={currentLead.id}
                     comments={comments}
@@ -769,7 +757,6 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               </div>
             </div>
           )}
-        </div>
       </Modal>
 
       {/* Edit Modal */}

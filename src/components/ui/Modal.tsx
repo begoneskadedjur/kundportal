@@ -10,7 +10,7 @@ interface ModalProps {
   onClose: () => void
   title: string | React.ReactNode
   subtitle?: string
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
   children: React.ReactNode
   footer?: React.ReactNode
   preventClose?: boolean
@@ -72,9 +72,10 @@ export default function Modal({
 
   const sizeClasses = {
     sm: 'max-w-md',
-    md: 'max-w-lg', 
+    md: 'max-w-lg',
     lg: 'max-w-2xl',
-    xl: 'max-w-4xl'
+    xl: 'max-w-4xl',
+    full: 'max-w-6xl'
   }
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -108,7 +109,7 @@ export default function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700 flex-shrink-0">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-semibold text-white truncate">{title}</h2>
             {subtitle && (
