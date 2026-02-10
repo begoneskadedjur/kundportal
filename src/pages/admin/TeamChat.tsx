@@ -676,7 +676,7 @@ export default function TeamChat() {
   };
 
   return (
-    <div className="fixed top-14 left-0 right-0 bottom-0 flex bg-slate-900 overflow-hidden">
+    <div className="h-[calc(100vh-3rem)] flex bg-slate-900 overflow-hidden -mb-20 lg:-mb-0">
       {/* Sidebar - kompaktare */}
       <div className={`${isSidebarOpen ? 'w-56' : 'w-0'} h-full min-h-0 transition-all duration-200 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden`}>
         <div className="p-2 border-b border-slate-700">
@@ -978,7 +978,7 @@ export default function TeamChat() {
               }}
               placeholder="Fråga om kunder, ärenden, tekniker..."
               rows={1}
-              className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
+              className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
             />
             <button
               onClick={handleGenerateImage}
@@ -1007,23 +1007,23 @@ export default function TeamChat() {
       {/* Statistik-modal */}
       {showStats && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-lg w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">Användningsstatistik</h2>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-lg w-full p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-white">Användningsstatistik</h2>
               <button
                 onClick={() => setShowStats(false)}
                 className="p-2 text-slate-400 hover:text-white"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Din användning */}
               <div>
                 <h3 className="text-sm font-medium text-slate-400 mb-3">Din användning denna månad</h3>
                 {userStats ? (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <StatCard label="Meddelanden" value={userStats.total_messages} />
                     <StatCard label="Kostnad" value={formatCost(userStats.total_cost_usd)} />
                     <StatCard label="Bilder analyserade" value={userStats.total_images_analyzed} />
@@ -1038,7 +1038,7 @@ export default function TeamChat() {
               {profile?.role === 'admin' && totalStats && (
                 <div>
                   <h3 className="text-sm font-medium text-slate-400 mb-3">Total användning (hela teamet)</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <StatCard label="Meddelanden" value={totalStats.total_messages} />
                     <StatCard label="Total kostnad" value={formatCost(totalStats.total_cost_usd)} highlight />
                     <StatCard label="Bilder analyserade" value={totalStats.total_images_analyzed} />
