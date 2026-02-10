@@ -1,7 +1,10 @@
 // src/components/admin/layout/AdminTopHeader.tsx
-import { useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useLocation, Link } from 'react-router-dom'
 import { ChevronRight, Search, RefreshCw, Bell } from 'lucide-react'
 import { breadcrumbMap } from './adminNavConfig'
+import { useAuth } from '../../../contexts/AuthContext'
+import { getTicketStats } from '../../../services/communicationService'
 
 interface AdminTopHeaderProps {
   sidebarCollapsed: boolean
@@ -10,7 +13,16 @@ interface AdminTopHeaderProps {
 
 export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderProps) {
   const location = useLocation()
+  const { profile } = useAuth()
   const currentLabel = breadcrumbMap[location.pathname] || 'Oversikt'
+  const [ticketCount, setTicketCount] = useState(0)
+
+  useEffect(() => {
+    if (!profile?.id) return
+    getTicketStats(profile.id).then(stats => {
+      setTicketCount(stats.open)
+    }).catch(() => {})
+  }, [profile?.id])
 
   return (
     <header
@@ -42,10 +54,14 @@ export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderPro
         <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors" aria-label="Synka data" title="Synka data">
           <RefreshCw className="w-4 h-4" />
         </button>
-        <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors relative" aria-label="Notifieringar">
+        <Link to="/admin/tickets" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors relative" aria-label="Notifieringar">
           <Bell className="w-5 h-5" />
-          <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full text-[10px] text-white font-bold flex items-center justify-center">3</span>
-        </button>
+          {ticketCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full text-[10px] text-white font-bold flex items-center justify-center">
+              {ticketCount > 9 ? '9+' : ticketCount}
+            </span>
+          )}
+        </Link>
         <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
           <span className="text-white text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
         </div>

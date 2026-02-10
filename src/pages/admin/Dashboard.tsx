@@ -15,7 +15,6 @@ import {
   ArrowRight,
   Calendar,
   Clock,
-  Building2,
   FileCheck,
   ClipboardCheck,
 } from 'lucide-react'
@@ -36,6 +35,9 @@ interface DashboardStats {
   totalRevenue: number
   activeTechnicians: number
   pendingCases: number
+  scheduledToday: number
+  completedToday: number
+  teamToday: Array<{ initials: string; name: string; gradient: string }>
   recentActivity: Array<{
     id: string
     type: string
@@ -205,17 +207,6 @@ function StatItem({ label, value, total, progress, color, valueColor }: {
   )
 }
 
-function UpcomingItem({ icon: Icon, title, time }: { icon: React.ElementType; title: string; time: string }) {
-  return (
-    <div className="flex items-start gap-2.5">
-      <Icon className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
-      <div>
-        <p className="text-sm text-slate-300">{title}</p>
-        <p className="text-xs text-slate-500">{time}</p>
-      </div>
-    </div>
-  )
-}
 
 // ============================================================
 // MAIN COMPONENT
@@ -251,6 +242,9 @@ const AdminDashboard: React.FC = () => {
       setError(null)
 
       const todayDate = new Date().toISOString().split('T')[0]
+      const now = new Date()
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString()
 
       const [
         customersResult,
@@ -258,7 +252,12 @@ const AdminDashboard: React.FC = () => {
         privateCasesResult,
         businessCasesResult,
         techniciansResult,
-        absencesResult
+        absencesResult,
+        privateScheduledResult,
+        businessScheduledResult,
+        privateCompletedResult,
+        businessCompletedResult,
+        profilesResult
       ] = await Promise.all([
         supabase.from('customers').select('id, company_name, annual_value').eq('is_active', true),
         supabase.from('cases').select('id, price').not('completed_date', 'is', null),
@@ -267,7 +266,20 @@ const AdminDashboard: React.FC = () => {
         supabase.from('technicians').select('id, name, role').eq('is_active', true).eq('role', 'Skadedjurstekniker'),
         supabase.from('technician_absences').select('technician_id')
           .lte('start_date', todayDate + ' 23:59:59')
-          .gte('end_date', todayDate + ' 00:00:00')
+          .gte('end_date', todayDate + ' 00:00:00'),
+        // Inbokade ärenden idag
+        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+          .gte('start_date', todayStart).lte('start_date', todayEnd),
+        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+          .gte('start_date', todayStart).lte('start_date', todayEnd),
+        // Slutförda ärenden idag
+        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+          .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
+        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+          .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
+        // Alla interna profiler
+        supabase.from('profiles').select('id, display_name, role, technician_id')
+          .in('role', ['admin', 'koordinator', 'technician']).eq('is_active', true)
       ])
 
       if (customersResult.error) throw customersResult.error
@@ -290,6 +302,31 @@ const AdminDashboard: React.FC = () => {
       const absentTechnicianIds = absencesResult.data?.map(absence => absence.technician_id) || []
       const availableTechnicians = techniciansResult.data?.filter(tech => !absentTechnicianIds.includes(tech.id)) || []
 
+      // Teamet idag: filtrera bort profiler med frånvaro (via technician_id)
+      const gradients = [
+        'from-blue-500 to-cyan-500',
+        'from-purple-500 to-pink-500',
+        'from-teal-500 to-emerald-500',
+        'from-amber-500 to-orange-500',
+        'from-rose-500 to-red-500',
+        'from-indigo-500 to-violet-500',
+        'from-emerald-500 to-lime-500',
+        'from-sky-500 to-blue-500',
+      ]
+      const teamToday = (profilesResult.data || [])
+        .filter(p => !p.technician_id || !absentTechnicianIds.includes(p.technician_id))
+        .map((p, i) => {
+          const name = p.display_name || 'Okänd'
+          const parts = name.split(' ')
+          const initials = parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : name.substring(0, 2).toUpperCase()
+          return { initials, name, gradient: gradients[i % gradients.length] }
+        })
+
+      const scheduledToday = (privateScheduledResult.count || 0) + (businessScheduledResult.count || 0)
+      const completedToday = (privateCompletedResult.count || 0) + (businessCompletedResult.count || 0)
+
       setStats({
         totalCustomers: customersResult.data?.length || 0,
         totalCases: casesResult.data?.length || 0,
@@ -298,6 +335,9 @@ const AdminDashboard: React.FC = () => {
         totalRevenue,
         activeTechnicians: availableTechnicians.length || 0,
         pendingCases: activeCasesResult.data?.length || 0,
+        scheduledToday,
+        completedToday,
+        teamToday,
         recentActivity: [],
         customers: customersResult.data || [],
         technicians: availableTechnicians || [],
@@ -523,8 +563,8 @@ const AdminDashboard: React.FC = () => {
               Idag
             </h3>
             <div className="space-y-4">
-              <StatItem label="Planerade besok" value="12" total={12} progress={0} color="slate" />
-              <StatItem label="Slutforda" value="7" total={12} progress={58} color="emerald" valueColor="text-emerald-400" />
+              <StatItem label="Planerade besok" value={String(stats?.scheduledToday || 0)} total={stats?.scheduledToday || 0} progress={0} color="slate" />
+              <StatItem label="Slutforda" value={String(stats?.completedToday || 0)} total={stats?.scheduledToday || 0} progress={stats?.scheduledToday ? Math.round(((stats?.completedToday || 0) / stats.scheduledToday) * 100) : 0} color="emerald" valueColor="text-emerald-400" />
               <StatItem label="Oppna arenden" value={String(stats?.pendingCases || 0)} color="blue" valueColor="text-blue-400" />
               <StatItem label="Aktiva tekniker" value={String(stats?.activeTechnicians || 0)} color="teal" valueColor="text-teal-400" />
             </div>
@@ -533,34 +573,21 @@ const AdminDashboard: React.FC = () => {
             <div className="mt-6 pt-4 border-t border-slate-700/50">
               <h4 className="text-sm font-semibold text-slate-400 mb-3">Teamet idag</h4>
               <div className="flex items-center">
-                {[
-                  { initials: 'EL', gradient: 'from-blue-500 to-cyan-500' },
-                  { initials: 'JK', gradient: 'from-purple-500 to-pink-500' },
-                  { initials: 'AS', gradient: 'from-teal-500 to-emerald-500' },
-                  { initials: 'ML', gradient: 'from-amber-500 to-orange-500' },
-                  { initials: 'NK', gradient: 'from-rose-500 to-red-500' },
-                ].map((member, i) => (
+                {(stats?.teamToday || []).slice(0, 5).map((member, i) => (
                   <div
-                    key={member.initials}
+                    key={member.name}
                     className={`w-8 h-8 rounded-full border-2 border-slate-800 bg-gradient-to-br ${member.gradient} flex items-center justify-center ${i > 0 ? '-ml-2' : ''}`}
-                    title={member.initials}
+                    title={member.name}
                   >
                     <span className="text-[10px] text-white font-bold">{member.initials}</span>
                   </div>
                 ))}
-                <span className="ml-2 text-xs text-slate-500">+3 mer</span>
+                {(stats?.teamToday?.length || 0) > 5 && (
+                  <span className="ml-2 text-xs text-slate-500">+{(stats?.teamToday?.length || 0) - 5} mer</span>
+                )}
               </div>
             </div>
 
-            {/* Upcoming events */}
-            <div className="mt-5 pt-4 border-t border-slate-700/50">
-              <h4 className="text-sm font-semibold text-slate-400 mb-3">Kommande</h4>
-              <div className="space-y-2.5">
-                <UpcomingItem icon={FileText} title="Kvartalsrapport" time="Imorgon 09:00" />
-                <UpcomingItem icon={Building2} title="Kundmote - Akademiska Hus" time="Onsdag 14:00" />
-                <UpcomingItem icon={Users} title="Teammotet" time="Fredag 10:00" />
-              </div>
-            </div>
           </motion.div>
         </div>
       </div>
