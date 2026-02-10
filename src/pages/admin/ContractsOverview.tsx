@@ -577,6 +577,14 @@ export default function ContractsOverview() {
     return stages
   }, [filteredContracts])
 
+  const stageLabels: Record<string, string> = {
+    pending: 'Väntande',
+    signed: 'Signerade',
+    active: 'Aktiva',
+    overdue: 'Försenade',
+    declined: 'Avvisade'
+  }
+
   const handleOpenFilesModal = (contract: ContractWithSourceData) => {
     setSelectedContractId(contract.id)
     setSelectedContractName(contract.company_name || contract.contact_person || 'Okänd motpart')
@@ -691,9 +699,9 @@ export default function ContractsOverview() {
         }
       />
       
-      <div className="relative">
+      <div className="flex gap-6">
         {/* Huvudinnehåll */}
-        <div className={`transition-all duration-300 ${sidePanelOpen ? 'lg:mr-96' : ''}`}>
+        <div className="flex-1 min-w-0">
           <div className="space-y-6">
 
           {/* Kompakt KPI-rad */}
@@ -1033,17 +1041,14 @@ export default function ContractsOverview() {
           </div>
         </div>
 
-        {/* Kollapsbar sidopanel */}
-      <div className={`
-        fixed top-0 right-0 h-full w-96 bg-slate-900 border-l border-slate-800 
-        transform transition-transform duration-300 z-40 overflow-y-auto
-        ${sidePanelOpen ? 'translate-x-0' : 'translate-x-full'}
-      `}>
-        <div className="p-4 space-y-4">
+        {/* Sidopanel */}
+        {sidePanelOpen && (
+        <aside className="hidden lg:block w-80 xl:w-96 flex-shrink-0">
+          <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto p-4 space-y-4">
           {/* Sidopanel header */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-              <BarChart3 className="w-4 h-4 text-green-500" />
+              <BarChart3 className="w-4 h-4 text-[#20c58f]" />
               Analys & Insikter
             </h3>
             <Button
@@ -1062,7 +1067,7 @@ export default function ContractsOverview() {
             <div className="space-y-2">
               {Object.entries(pipelineStats).map(([stage, data]) => (
                 <div key={stage} className="flex items-center justify-between">
-                  <span className={`text-xs capitalize ${stage === 'declined' ? 'text-red-400' : 'text-slate-400'}`}>{stage}</span>
+                  <span className={`text-xs ${stage === 'declined' ? 'text-red-400' : 'text-slate-400'}`}>{stageLabels[stage] || stage}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-white">{data.count}</span>
                     <span className="text-xs text-slate-500">|</span>
@@ -1076,7 +1081,7 @@ export default function ContractsOverview() {
           </div>
 
           {/* Top säljare */}
-          <div>
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
             <h4 className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
               <Users className="w-4 h-4 text-blue-400" />
               Top 3 Säljare
@@ -1102,7 +1107,7 @@ export default function ContractsOverview() {
           </div>
 
           {/* Top 5 Artiklar (från prislistor) med fallback till produkter */}
-          <div>
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
             <h4 className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
               <Package className="w-4 h-4 text-green-400" />
               {stats?.popular_articles && stats.popular_articles.length > 0 ? 'Top 5 Artiklar' : 'Top 5 Produkter'}
@@ -1157,7 +1162,7 @@ export default function ContractsOverview() {
           </div>
 
           {/* Quick stats */}
-          <div className="p-3 bg-slate-800/30 border border-green-500/20 rounded-xl">
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
             <h4 className="text-xs font-semibold text-slate-300 mb-2">Snabbstatistik</h4>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -1186,8 +1191,9 @@ export default function ContractsOverview() {
               </div>
             </div>
           </div>
-        </div>
-        </div>
+          </div>
+        </aside>
+        )}
 
         {/* Modals */}
         <ContractImportModal
