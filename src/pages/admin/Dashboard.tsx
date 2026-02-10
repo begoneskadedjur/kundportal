@@ -277,8 +277,8 @@ const AdminDashboard: React.FC = () => {
           .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
         supabase.from('business_cases').select('id', { count: 'exact', head: true })
           .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
-        // Alla interna profiler
-        supabase.from('profiles').select('id, display_name, role, technician_id')
+        // Alla interna profiler (med tekniker-namn som fallback)
+        supabase.from('profiles').select('id, display_name, role, technician_id, email, technicians(name)')
           .in('role', ['admin', 'koordinator', 'technician']).eq('is_active', true)
       ])
 
@@ -316,7 +316,10 @@ const AdminDashboard: React.FC = () => {
       const teamToday = (profilesResult.data || [])
         .filter(p => !p.technician_id || !absentTechnicianIds.includes(p.technician_id))
         .map((p, i) => {
-          const name = p.display_name || 'Okänd'
+          const name = p.display_name
+            || (p as any).technicians?.name
+            || p.email?.split('@')[0]
+            || 'Okänd'
           const parts = name.split(' ')
           const initials = parts.length >= 2
             ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
@@ -563,8 +566,8 @@ const AdminDashboard: React.FC = () => {
               Idag
             </h3>
             <div className="space-y-4">
-              <StatItem label="Planerade besok" value={String(stats?.scheduledToday || 0)} total={stats?.scheduledToday || 0} progress={0} color="slate" />
-              <StatItem label="Slutforda" value={String(stats?.completedToday || 0)} total={stats?.scheduledToday || 0} progress={stats?.scheduledToday ? Math.round(((stats?.completedToday || 0) / stats.scheduledToday) * 100) : 0} color="emerald" valueColor="text-emerald-400" />
+              <StatItem label="Planerade besok" value={String(stats?.scheduledToday || 0)} progress={stats?.scheduledToday ? Math.round(((stats?.completedToday || 0) / stats.scheduledToday) * 100) : 0} color="teal" />
+              <StatItem label="Slutforda" value={String(stats?.completedToday || 0)} color="emerald" valueColor="text-emerald-400" />
               <StatItem label="Oppna arenden" value={String(stats?.pendingCases || 0)} color="blue" valueColor="text-blue-400" />
               <StatItem label="Aktiva tekniker" value={String(stats?.activeTechnicians || 0)} color="teal" valueColor="text-teal-400" />
             </div>
@@ -572,8 +575,8 @@ const AdminDashboard: React.FC = () => {
             {/* Team avatars */}
             <div className="mt-6 pt-4 border-t border-slate-700/50">
               <h4 className="text-sm font-semibold text-slate-400 mb-3">Teamet idag</h4>
-              <div className="flex items-center">
-                {(stats?.teamToday || []).slice(0, 5).map((member, i) => (
+              <div className="flex items-center flex-wrap gap-y-1">
+                {(stats?.teamToday || []).map((member, i) => (
                   <div
                     key={member.name}
                     className={`w-8 h-8 rounded-full border-2 border-slate-800 bg-gradient-to-br ${member.gradient} flex items-center justify-center ${i > 0 ? '-ml-2' : ''}`}
@@ -582,9 +585,6 @@ const AdminDashboard: React.FC = () => {
                     <span className="text-[10px] text-white font-bold">{member.initials}</span>
                   </div>
                 ))}
-                {(stats?.teamToday?.length || 0) > 5 && (
-                  <span className="ml-2 text-xs text-slate-500">+{(stats?.teamToday?.length || 0) - 5} mer</span>
-                )}
               </div>
             </div>
 
