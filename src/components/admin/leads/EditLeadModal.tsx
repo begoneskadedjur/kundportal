@@ -5,7 +5,6 @@ import { Edit3, Building2, Calendar, AlertCircle, Save, Trash2, Target, Star } f
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
-import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -703,7 +702,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         <form id="edit-lead-form" onSubmit={handleSubmit} className="space-y-5">
           
           {/* Obligatorisk huvudinformation */}
-          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
+          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-purple-400" />
               Obligatorisk huvudinformation
@@ -811,10 +810,10 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 </select>
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Lead-hantering & uppföljning */}
-          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
+          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-green-400" />
               Lead-hantering & uppföljning
@@ -963,10 +962,10 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 )}
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Företagsinformation + Anteckningar (merged) */}
-          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
+          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-blue-400" />
               Företagsinformation
@@ -1075,10 +1074,10 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 />
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Lead-hantering & prioritering + BANT (merged) */}
-          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
+          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Target className="w-5 h-5 text-orange-400" />
               Lead-hantering & prioritering
@@ -1212,7 +1211,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 </label>
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Kollega-hantering */}
           <LeadTechnicianManager

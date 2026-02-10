@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import { Tag, Plus, X, Hash, AlertCircle } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
-import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -247,7 +246,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
   const availablePredefinedTags = PREDEFINED_TAGS.filter(tag => !tags.includes(tag))
 
   return (
-    <Card className="p-6 bg-slate-800/40 border-slate-700/50">
+    <div className="p-5 bg-slate-800/30 border border-slate-700 rounded-xl">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Tag className="w-5 h-5 text-orange-400" />
@@ -289,7 +288,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
 
       {/* Add Tag Form */}
       {showForm && (
-        <Card className="p-4 bg-slate-800/30 border-slate-700/40 mb-6">
+        <div className="p-4 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-medium text-white flex items-center gap-2">
@@ -356,7 +355,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
               </Button>
             </div>
           </form>
-        </Card>
+        </div>
       )}
 
       {/* Predefined Tags */}
@@ -389,7 +388,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
           <p className="text-slate-500 text-sm">Taggar hjälper till att kategorisera och filtrera leads</p>
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 

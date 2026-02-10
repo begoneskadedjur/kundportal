@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import { Users, Plus, Edit3, Trash2, Mail, Phone, User, AlertCircle, Star, Crown } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
-import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -285,7 +284,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
   const secondaryContacts = contacts.filter(contact => !contact.is_primary)
 
   return (
-    <Card className="p-6 bg-slate-800/40 border-slate-700/50">
+    <div className="p-5 bg-slate-800/30 border border-slate-700 rounded-xl">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Users className="w-5 h-5 text-green-400" />
@@ -436,7 +435,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
 
       {/* Add/Edit Form */}
       {showForm && (
-        <Card className="p-4 bg-slate-800/30 border-slate-700/40">
+        <div className="p-4 bg-slate-800/20 border border-slate-700/50 rounded-xl">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-medium text-white flex items-center gap-2">
@@ -558,7 +557,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
               </Button>
             </div>
           </form>
-        </Card>
+        </div>
       )}
 
       {contacts.length === 0 && !showForm && (
@@ -568,7 +567,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
           <p className="text-slate-500 text-sm">Klicka på "Lägg till" för att lägga till första kontaktpersonen</p>
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 

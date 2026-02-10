@@ -2,7 +2,6 @@
 import React, { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import Button from './Button'
-import Card from './Card'
 import Portal from './Portal'
 
 interface ModalProps {
@@ -95,18 +94,18 @@ export default function Modal({
       ref={modalRef}
       tabIndex={-1}
     >
-      <Card 
+      <div
         className={`
-          w-full ${sizeClasses[size]} 
+          w-full ${sizeClasses[size]}
           ${usePortal ? 'min-h-[600px] max-h-[90vh]' : 'max-h-[95vh]'}
-          overflow-hidden flex flex-col 
-          bg-slate-900/90 backdrop-blur-xl border-slate-700/50 shadow-2xl shadow-black/20
+          overflow-hidden flex flex-col
+          bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl shadow-black/20
           animate-in zoom-in-95 duration-200
         `}
         style={{
-          minHeight: usePortal ? '600px' : 'auto' // Ensure proper minimum height for modals
+          minHeight: usePortal ? '600px' : 'auto'
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700/50 flex-shrink-0">
@@ -137,7 +136,7 @@ export default function Modal({
             {footer}
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 

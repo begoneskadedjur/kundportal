@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import { Eye, Edit3, Star, TrendingUp, Users, Phone, Mail, Building, Calendar, FileText, Globe, MapPin, Briefcase, Factory } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
-import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -338,7 +337,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               {/* Lead Overview */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 {/* Status & Priority */}
-                <Card className="p-4 bg-slate-800/40 border-slate-700/50">
+                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Status & Prioritet</h3>
                   <div className="space-y-3">
                     <div>
@@ -355,10 +354,10 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       </div>
                     )}
                   </div>
-                </Card>
+                </div>
 
                 {/* Lead Score */}
-                <Card className="p-4 bg-slate-800/40 border-slate-700/50">
+                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Lead Score</h3>
                   <div className="space-y-2">
                     <div className="text-2xl font-bold text-white">{leadScore}/100</div>
@@ -372,10 +371,10 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       ></div>
                     </div>
                   </div>
-                </Card>
+                </div>
 
                 {/* Value & Probability */}
-                <Card className="p-4 bg-slate-800/40 border-slate-700/50">
+                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Affärsvärde</h3>
                   <div className="space-y-2">
                     <div className="text-lg font-semibold text-white">
@@ -392,11 +391,11 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       </div>
                     )}
                   </div>
-                </Card>
+                </div>
               </div>
 
               {/* BANT Kvalificering */}
-              <Card className="p-4 bg-slate-800/40 border-slate-700/50 mb-4">
+              <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl mb-4">
                 <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-green-400" />
                   BANT-kvalificering
@@ -427,11 +426,11 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                     </div>
                   </div>
                 </div>
-              </Card>
+              </div>
 
               {/* Customer Information + Timeline (merged) */}
               {(currentLead.phone_number || currentLead.email || currentLead.organization_number || currentLead.business_type || currentLead.problem_type || currentLead.company_size || currentLead.website || currentLead.address || currentLead.business_description || currentLead.sni07_label || currentLead.source || currentLead.decision_maker || currentLead.contract_with || currentLead.contact_date || currentLead.follow_up_date || currentLead.quote_provided_date || currentLead.contact_method) && (
-                <Card className="p-4 bg-slate-800/40 border-slate-700/50 mb-4">
+                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl mb-4">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                     <Building className="w-5 h-5 text-blue-400" />
                     Kunduppgifter
@@ -598,12 +597,12 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       </div>
                     </div>
                   )}
-                </Card>
+                </div>
               )}
 
               {/* Contract Information + Notes (merged) */}
               {(currentLead.contract_status !== null || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null || currentLead.contract_with || assignedTechnicians.length > 0 || technician || currentLead.notes) && (
-                <Card className="p-4 bg-slate-800/40 border-slate-700/50 mb-4">
+                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl mb-4">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-yellow-400" />
                     Avtalsinfo
@@ -710,7 +709,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       </div>
                     </div>
                   )}
-                </Card>
+                </div>
               )}
 
               {/* Management Components */}

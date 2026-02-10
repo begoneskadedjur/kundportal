@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import { formatSwedishDateTime, formatSwedishRelativeTime } from '../../../utils/swedishDateFormat'
 import Button from '../../ui/Button'
-import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -234,7 +233,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
   }, [allSortedEvents.length])
 
   return (
-    <Card className="p-6 bg-slate-800/40 border-slate-700/50">
+    <div className="p-5 bg-slate-800/30 border border-slate-700 rounded-xl">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Clock className="w-5 h-5 text-purple-400" />
@@ -252,7 +251,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
       {/* Add Event Form */}
       {showForm && (
-        <Card className="p-4 bg-slate-800/30 border-slate-700/40 mb-6">
+        <div className="p-4 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-medium text-white flex items-center gap-2">
@@ -348,7 +347,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
               </Button>
             </div>
           </form>
-        </Card>
+        </div>
       )}
 
       {/* Timeline */}
@@ -504,7 +503,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
           </div>
         )
       )}
-    </Card>
+    </div>
   )
 }
 

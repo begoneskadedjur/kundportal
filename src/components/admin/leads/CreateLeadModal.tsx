@@ -5,7 +5,6 @@ import { Plus, Building2, AlertCircle, Save, Target, Star } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
-import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import SNIBranchManager from './SNIBranchManager'
 import { supabase } from '../../../lib/supabase'
@@ -338,10 +337,10 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
           )}
           
           {/* Obligatorisk huvudinformation */}
-          <Card className={`p-4 bg-slate-800/40 ${
+          <div className={`p-4 bg-slate-800/30 rounded-xl border ${
             (errors.company_name || errors.contact_person || errors.phone_number || errors.email)
               ? 'border-red-500/50'
-              : 'border-slate-700/50'
+              : 'border-slate-700'
           }`}>
             <h3 className={`text-lg font-semibold mb-3 flex items-center gap-2 ${
               (errors.company_name || errors.contact_person || errors.phone_number || errors.email) 
@@ -465,10 +464,10 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 </select>
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Företagsinformation */}
-          <Card className={`p-4 bg-slate-800/40 ${errors.website ? 'border-red-500/50' : 'border-slate-700/50'}`}>
+          <div className={`p-4 bg-slate-800/30 rounded-xl border ${errors.website ? 'border-red-500/50' : 'border-slate-700'}`}>
             <h3 className={`text-lg font-semibold mb-3 flex items-center gap-2 ${errors.website ? 'text-red-300' : 'text-white'}`}>
               <Building2 className={`w-5 h-5 ${errors.website ? 'text-red-400' : 'text-blue-400'}`} />
               Företagsinformation
@@ -580,10 +579,10 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 />
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Lead-hantering & prioritering + BANT (merged) */}
-          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
+          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Target className="w-5 h-5 text-orange-400" />
               Lead-hantering & prioritering
@@ -796,7 +795,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 </label>
               </div>
             </div>
-          </Card>
+          </div>
 
         </form>
       </div>
