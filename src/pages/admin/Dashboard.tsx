@@ -13,23 +13,19 @@ import {
   Calendar,
   Building2,
   User,
-  Shield,
   LogOut,
   Wrench,
   Star,
   Target,
   UserCheck,
   Wallet,
-  Settings,
   Package,
   MapPin,
   AlertCircle,
-  UserPlus,
   Receipt,
   Image as ImageIcon,
   Megaphone,
   Beaker,
-  BookOpen,
   Bell,
   MessageSquareText,
   Sparkles,
@@ -53,7 +49,6 @@ import InteractiveRevenueChart from '../../components/shared/InteractiveRevenueC
 import VisualTimeline from '../../components/shared/VisualTimeline'
 import StaggeredGrid from '../../components/shared/StaggeredGrid'
 import LiveStatusIndicator from '../../components/shared/LiveStatusIndicator'
-import { generateTechnicianGuide } from '../../utils/generateTechnicianGuide'
 // NotificationCenter borttagen - nu finns global header med notifikationer
 
 interface DashboardStats {
@@ -615,31 +610,10 @@ const AdminDashboard: React.FC = () => {
                 <div className="w-8 h-px bg-slate-700/50 flex-1" />
               </h2>
               <StaggeredGrid 
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                 staggerDelay={0.05}
                 initialDelay={1.0}
               >
-                <AdminDashboardCard
-                  href="#"
-                  icon={Settings}
-                  title="Inställningar"
-                  description="Systemkonfiguration"
-                  tag="System"
-                  iconColor="text-slate-500"
-                  className="scale-95 hover:scale-100 transition-transform duration-200"
-                />
-                
-                <AdminDashboardCard
-                  href="#"
-                  icon={Shield}
-                  title="API Status"
-                  description="Systemövervakning"
-                  stats="Alla system online"
-                  tag="Live"
-                  iconColor="text-green-500"
-                  className="scale-95 hover:scale-100 transition-transform duration-200"
-                />
-                
                 <AdminDashboardCard
                   href="/admin/webhook-config"
                   icon={Wrench}
@@ -662,38 +636,6 @@ const AdminDashboard: React.FC = () => {
                   className="scale-95 hover:scale-100 transition-transform duration-200"
                 />
                 
-                <AdminDashboardCard
-                  href="/admin/customers/new"
-                  icon={UserPlus}
-                  title="Lägg till Kund"
-                  description="Skapa ny avtalskund, ClickUp-integration"
-                  stats="Legacy"
-                  tag="Legacy"
-                  iconColor="text-slate-500"
-                  className="scale-95 hover:scale-100 transition-transform duration-200"
-                />
-
-                <AdminDashboardCard
-                  onClick={async () => {
-                    try {
-                      toast.loading('Genererar teknikerguide...')
-                      await generateTechnicianGuide()
-                      toast.dismiss()
-                      toast.success('Teknikerguide genererad!')
-                    } catch (error) {
-                      toast.dismiss()
-                      toast.error('Kunde inte generera guide')
-                    }
-                  }}
-                  icon={BookOpen}
-                  title="Teknikerguide"
-                  description="Generera PDF-guide för utrustningsplacering"
-                  stats="Användarmanual"
-                  tag="Docs"
-                  iconColor="text-cyan-500"
-                  className="scale-95 hover:scale-100 transition-transform duration-200 cursor-pointer"
-                />
-
                 <AdminDashboardCard
                   onClick={async () => {
                     const toastId = toast.loading('Synkroniserar AI-embeddings... Detta kan ta några minuter.')

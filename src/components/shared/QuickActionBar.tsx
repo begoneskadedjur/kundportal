@@ -12,7 +12,6 @@ import {
   Settings,
   BarChart3,
   Calendar,
-  Building2,
   UserCheck,
   Wallet,
   Target
@@ -50,15 +49,6 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       href: '/admin/customers',
       keywords: ['kunder', 'customers', 'avtal'],
       category: 'navigation'
-    },
-    {
-      id: 'add-customer',
-      title: 'Lägg till Kund',
-      description: 'Skapa ny avtalskund',
-      icon: Building2,
-      href: '/admin/customers/new',
-      keywords: ['lägg till', 'ny', 'kund', 'skapa'],
-      category: 'create'
     },
     {
       id: 'technicians',
@@ -166,16 +156,6 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/admin/customers/new')}
-              className="flex items-center gap-2 px-4 py-2 bg-[#20c58f] text-white rounded-lg hover:bg-[#1ba876] transition-colors font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Lägg till Kund
-            </motion.button>
-            
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}

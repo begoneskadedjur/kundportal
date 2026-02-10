@@ -18,7 +18,6 @@ import UserProfile from './pages/shared/UserProfile';
 import AdminDashboard from './pages/admin/Dashboard';
 import Customers from './pages/admin/Customers';
 import CustomerDetails from './pages/admin/CustomerDetails';
-import NewCustomer from './pages/admin/NewCustomer';
 import Economics from './pages/admin/Economics';
 import BillingManagement from './pages/admin/BillingManagement';
 import Technicians from './pages/admin/Technicians';
@@ -168,15 +167,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/admin/customers/new" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <NewCustomer />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
+            <Route
               path="/admin/economics" 
               element={
                 <ProtectedRoute requiredRole="admin">
