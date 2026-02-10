@@ -16,6 +16,7 @@ import UserProfile from './pages/shared/UserProfile';
 
 // Admin pages
 import AdminDashboard from './pages/admin/Dashboard';
+import DashboardDemo from './pages/admin/DashboardDemo';
 import Customers from './pages/admin/Customers';
 import CustomerDetails from './pages/admin/CustomerDetails';
 import Economics from './pages/admin/Economics';
@@ -122,9 +123,17 @@ function App() {
                 <ProtectedRoute requiredRole="admin">
                   <AdminDashboard />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
+            <Route
+              path="/admin/dashboard-demo"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <DashboardDemo />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/customers" 
               element={
                 <ProtectedRoute requiredRole="admin">
