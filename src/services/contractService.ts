@@ -839,7 +839,6 @@ export class ContractService {
         contracts_expiring_soon
       }
 
-      console.log('✅ Utökad statistik hämtad:', stats)
       return stats
 
     } catch (error) {

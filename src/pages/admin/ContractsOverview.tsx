@@ -56,11 +56,6 @@ const parseContractProducts = (contract: ContractWithSourceData): Array<{name: s
           }
         })
         
-        // Debug-logging för att verifiera alla produkter
-        if (allProducts.length > 3) {
-          console.log(`Contract ${contract.id} har ${allProducts.length} produkter:`, allProducts)
-        }
-        
         return allProducts.length > 0 ? allProducts : []
       }
     }

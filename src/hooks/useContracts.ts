@@ -491,59 +491,53 @@ export function useContracts(): UseContractsReturn {
     }
   }, [])
 
-  // Initial loading vid mount
+  // Initial loading vid mount (körs bara en gång)
+  const initialLoadDone = useRef(false)
   useEffect(() => {
-    loadContracts()
-    loadContractStats()
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true
+      loadContracts()
+      loadContractStats()
+    }
   }, [loadContracts, loadContractStats])
 
   // Real-time subscription för nya/uppdaterade kontrakt
   useEffect(() => {
-    console.log('🔔 Sätter upp real-time subscription för kontrakt...')
-    
     const subscription = supabase
       .channel('contracts_changes')
       .on(
         'postgres_changes',
         {
-          event: '*', // Lyssna på INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
           table: 'contracts'
         },
         async (payload) => {
-          console.log('🔔 Kontrakt-förändring mottagen:', payload)
-          
           switch (payload.eventType) {
             case 'INSERT':
-              console.log('➕ Nytt kontrakt skapat:', payload.new)
-              // Ladda om hela listan för att få relationer
               await refreshContracts()
               toast.success('Nytt kontrakt skapat')
               break
-              
+
             case 'UPDATE':
-              console.log('🔄 Kontrakt uppdaterat:', payload.new)
-              // Uppdatera specifikt kontrakt i state
               const updatedContract = payload.new as Contract
               let contractExists = false
-              
+
               setContracts(prev => {
                 contractExists = prev.some(c => c.id === updatedContract.id)
-                return prev.map(contract => 
+                return prev.map(contract =>
                   contract.id === updatedContract.id
                     ? { ...contract, ...updatedContract }
                     : contract
                 )
               })
-              
-              // Uppdatera stats också (men bara om kontraktet verkligen finns)
+
               if (contractExists) {
                 loadContractStats()
               }
               break
-              
+
             case 'DELETE':
-              console.log('🗑️ Kontrakt borttaget:', payload.old)
               const deletedId = payload.old.id
               setContracts(prev => prev.filter(contract => contract.id !== deletedId))
               loadContractStats()
@@ -554,7 +548,6 @@ export function useContracts(): UseContractsReturn {
       .subscribe()
 
     return () => {
-      console.log('🔕 Stänger av real-time subscription för kontrakt')
       subscription.unsubscribe()
     }
   }, [refreshContracts])
