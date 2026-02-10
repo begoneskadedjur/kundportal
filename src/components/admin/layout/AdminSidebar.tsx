@@ -180,16 +180,16 @@ export function AdminSidebar({
       <div className="p-3 border-t border-slate-700/50 space-y-1">
         {/* Search trigger */}
         {!collapsed ? (
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors" aria-label="Sok">
+          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors" aria-label="Sök">
             <Search className="w-4 h-4" />
-            <span className="text-sm">Sok...</span>
+            <span className="text-sm">Sök...</span>
             <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded">⌘K</kbd>
           </button>
         ) : (
           <button
             className="w-full flex items-center justify-center px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors"
-            title="Sok (Cmd+K)"
-            aria-label="Sok"
+            title="Sök (Cmd+K)"
+            aria-label="Sök"
           >
             <Search className="w-4 h-4" />
           </button>
@@ -203,10 +203,10 @@ export function AdminSidebar({
             focus-visible:ring-2 focus-visible:ring-teal-400 outline-none
             ${collapsed ? 'justify-center' : ''}
           `}
-          title={collapsed ? 'Hjalpcenter' : undefined}
+          title={collapsed ? 'Hjälpcenter' : undefined}
         >
           <HelpCircle className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && <span className="text-sm">Hjalpcenter</span>}
+          {!collapsed && <span className="text-sm">Hjälpcenter</span>}
         </Link>
 
         {/* Collapse toggle */}

@@ -7,7 +7,7 @@ import { motion } from 'framer-motion'
 import {
   Users,
   FileText,
-  DollarSign,
+  Coins,
   UserCheck,
   Receipt,
   Target,
@@ -30,14 +30,18 @@ import AdminKpiModal from '../../components/admin/AdminKpiModal'
 interface DashboardStats {
   totalCustomers: number
   totalRevenue: number
-  activeCases: number
+  completedCasesPeriod: number
+  completedCasesTrend: string
   activeTechnicians: number
   pendingCases: number
   scheduledToday: number
   completedToday: number
   teamToday: Array<{ initials: string; name: string; gradient: string }>
+  absentToday: Array<{ name: string; reason: string }>
   revenueTrend: string
-  casesTrend: string
+  sparkRevenue: number[]
+  sparkCases: number[]
+  sparkCustomers: number[]
   recentActivity: Array<{
     id: string
     type: string
@@ -62,8 +66,42 @@ interface DashboardStats {
 // HELPER COMPONENTS
 // ============================================================
 
-function KpiCard({ title, value, icon: Icon, trend, color, onClick }: {
-  title: string; value: string; icon: React.ElementType; trend: string; color: string; onClick?: () => void
+function MiniSparkline({ data, color }: { data: number[]; color: string }) {
+  const max = Math.max(...data)
+  const min = Math.min(...data)
+  const range = max - min || 1
+  const w = 80
+  const h = 28
+  const padding = 2
+  const points = data.map((v, i) => {
+    const x = padding + (i / (data.length - 1)) * (w - padding * 2)
+    const y = h - padding - ((v - min) / range) * (h - padding * 2)
+    return `${x},${y}`
+  }).join(' ')
+
+  const colorMap: Record<string, string> = {
+    teal: '#2dd4bf',
+    emerald: '#34d399',
+    cyan: '#22d3ee',
+    blue: '#60a5fa',
+  }
+
+  return (
+    <svg width={w} height={h} className="mt-2 opacity-60">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={colorMap[color] || '#2dd4bf'}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function KpiCard({ title, value, icon: Icon, trend, color, sparkData, onClick }: {
+  title: string; value: string; icon: React.ElementType; trend: string; color: string; sparkData?: number[]; onClick?: () => void
 }) {
   const colorMap: Record<string, string> = {
     teal: 'from-teal-500/20 to-teal-600/5 border-teal-500/30',
@@ -77,7 +115,7 @@ function KpiCard({ title, value, icon: Icon, trend, color, onClick }: {
     cyan: 'text-cyan-400',
     blue: 'text-blue-400',
   }
-  const trendColor = trend.startsWith('+') ? 'text-emerald-400' : 'text-red-400'
+  const trendColor = trend.startsWith('+') ? 'text-emerald-400' : trend.startsWith('-') ? 'text-red-400' : 'text-slate-400'
 
   return (
     <div
@@ -89,6 +127,7 @@ function KpiCard({ title, value, icon: Icon, trend, color, onClick }: {
         {trend && <span className={`text-xs font-medium ${trendColor}`}>{trend}</span>}
       </div>
       <p className="text-2xl font-bold text-white">{value}</p>
+      {sparkData && sparkData.length > 1 && <MiniSparkline data={sparkData} color={color} />}
       <p className="text-sm text-slate-400 mt-2">{title}</p>
     </div>
   )
@@ -176,6 +215,55 @@ function StatItem({ label, value, total, progress, color, valueColor }: {
 
 
 // ============================================================
+// SPARKLINE HELPERS
+// ============================================================
+
+function buildDailyArray(
+  items: Array<{ date: string; value: number }>,
+  days: number,
+  now: Date,
+): number[] {
+  const result = new Array(days).fill(0)
+  for (const item of items) {
+    const d = new Date(item.date)
+    const diffMs = now.getTime() - d.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const idx = days - 1 - diffDays
+    if (idx >= 0 && idx < days) {
+      result[idx] += item.value
+    }
+  }
+  return result
+}
+
+function buildCumulativeCustomers(
+  totalCustomers: number,
+  newCustomers: Array<{ date: string }>,
+  days: number,
+  now: Date,
+): number[] {
+  // Räkna nya kunder per dag, sedan subtrahera bakåt från total
+  const newPerDay = new Array(days).fill(0)
+  for (const c of newCustomers) {
+    const d = new Date(c.date)
+    const diffMs = now.getTime() - d.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const idx = days - 1 - diffDays
+    if (idx >= 0 && idx < days) {
+      newPerDay[idx]++
+    }
+  }
+  // Bygg kumulativ: sista dagen = total, gå bakåt
+  const result = new Array(days).fill(0)
+  result[days - 1] = totalCustomers
+  for (let i = days - 2; i >= 0; i--) {
+    result[i] = result[i + 1] - newPerDay[i + 1]
+  }
+  return result
+}
+
+
+// ============================================================
 // MAIN COMPONENT
 // ============================================================
 
@@ -191,7 +279,7 @@ const AdminDashboard: React.FC = () => {
 
   const userName = profile?.display_name || profile?.email?.split('@')[0] || 'Admin'
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'God morgon' : hour < 18 ? 'God eftermiddag' : 'God kvall'
+  const greeting = hour < 12 ? 'God morgon' : hour < 18 ? 'God eftermiddag' : 'God kväll'
   const today = new Date().toLocaleDateString('sv-SE', {
     weekday: 'long',
     year: 'numeric',
@@ -216,6 +304,12 @@ const AdminDashboard: React.FC = () => {
       const todayDate = now.toISOString().split('T')[0]
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString()
+
+      // Sparkline: senaste 7 dagarna
+      const sevenDaysAgo = new Date(now)
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+      sevenDaysAgo.setHours(0, 0, 0, 0)
+      const sevenDaysAgoISO = sevenDaysAgo.toISOString()
 
       // Beräkna periodstart och föregående period
       const periodStart = new Date(now)
@@ -255,18 +349,22 @@ const AdminDashboard: React.FC = () => {
         techniciansResult,
         absencesResult,
         profilesResult,
-        // Aktiva ärenden (ej avslutade/stängda)
+        // Öppna ärenden (ögonblicksbild)
         privateActiveResult,
         businessActiveResult,
         // Inbokade/slutförda idag
         privateScheduledResult,
         businessScheduledResult,
-        privateCompletedResult,
-        businessCompletedResult,
-        // Intäkt denna period (gamla systemet)
+        privateCompletedTodayResult,
+        businessCompletedTodayResult,
+        // Genomförda ärenden denna period (gamla systemet)
         privatePeriodResult,
         businessPeriodResult,
         casesPeriodResult,
+        // Genomförda ärenden föregående period (count)
+        privatePrevCountResult,
+        businessPrevCountResult,
+        casesPrevCountResult,
         // Intäkt föregående period
         privatePrevResult,
         businessPrevResult,
@@ -277,15 +375,21 @@ const AdminDashboard: React.FC = () => {
         // Nya billing-systemet (föregående period)
         contractBillingPrevResult,
         caseBillingPrevResult,
+        // Sparkline: avslutade ärenden senaste 7 dagar
+        privateSparkResult,
+        businessSparkResult,
+        casesSparkResult,
+        // Sparkline: nya kunder senaste 7 dagar
+        customersSparkResult,
       ] = await Promise.all([
         supabase.from('customers').select('id, company_name, annual_value').eq('is_active', true),
         supabase.from('technicians').select('id, name, role').eq('is_active', true).eq('role', 'Skadedjurstekniker'),
-        supabase.from('technician_absences').select('technician_id')
-          .lte('start_date', todayDate + ' 23:59:59')
-          .gte('end_date', todayDate + ' 00:00:00'),
+        supabase.from('technician_absences').select('technician_id, reason, technicians(name)')
+          .lte('start_date', todayEnd)
+          .gte('end_date', todayStart),
         supabase.from('profiles').select('id, display_name, role, technician_id, email, technicians(name)')
           .in('role', ['admin', 'koordinator', 'technician']).eq('is_active', true),
-        // Aktiva ärenden
+        // Öppna ärenden
         supabase.from('private_cases').select('id', { count: 'exact', head: true })
           .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
         supabase.from('business_cases').select('id', { count: 'exact', head: true })
@@ -300,16 +404,24 @@ const AdminDashboard: React.FC = () => {
           .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
         supabase.from('business_cases').select('id', { count: 'exact', head: true })
           .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
-        // Intäkt denna period (gamla systemet)
-        supabase.from('private_cases').select('id, title, kontaktperson, pris')
-          .eq('status', 'Avslutat').not('pris', 'is', null)
+        // Genomförda denna period (med pris för intäkt)
+        supabase.from('private_cases').select('id, title, kontaktperson, pris, completed_date')
+          .eq('status', 'Avslutat').gte('completed_date', periodStartISO),
+        supabase.from('business_cases').select('id, title, kontaktperson, pris, completed_date')
+          .eq('status', 'Avslutat').gte('completed_date', periodStartISO),
+        supabase.from('cases').select('id, price, completed_date')
+          .not('completed_date', 'is', null)
           .gte('completed_date', periodStartISO),
-        supabase.from('business_cases').select('id, title, kontaktperson, pris')
-          .eq('status', 'Avslutat').not('pris', 'is', null)
-          .gte('completed_date', periodStartISO),
-        supabase.from('cases').select('id, price')
-          .not('completed_date', 'is', null).not('price', 'is', null)
-          .gte('completed_date', periodStartISO),
+        // Genomförda föregående period (count)
+        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+          .eq('status', 'Avslutat')
+          .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
+        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+          .eq('status', 'Avslutat')
+          .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
+        supabase.from('cases').select('id', { count: 'exact', head: true })
+          .not('completed_date', 'is', null)
+          .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
         // Intäkt föregående period
         supabase.from('private_cases').select('pris')
           .eq('status', 'Avslutat').not('pris', 'is', null)
@@ -334,6 +446,20 @@ const AdminDashboard: React.FC = () => {
         supabase.from('case_billing_items').select('total_price')
           .eq('status', 'billed')
           .gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+        // Sparkline: avslutade ärenden senaste 7 dagar (med pris och datum)
+        supabase.from('private_cases').select('completed_date, pris')
+          .eq('status', 'Avslutat').not('completed_date', 'is', null)
+          .gte('completed_date', sevenDaysAgoISO),
+        supabase.from('business_cases').select('completed_date, pris')
+          .eq('status', 'Avslutat').not('completed_date', 'is', null)
+          .gte('completed_date', sevenDaysAgoISO),
+        supabase.from('cases').select('completed_date, price')
+          .not('completed_date', 'is', null)
+          .gte('completed_date', sevenDaysAgoISO),
+        // Sparkline: nya kunder senaste 7 dagar
+        supabase.from('customers').select('created_at')
+          .eq('is_active', true)
+          .gte('created_at', sevenDaysAgoISO),
       ])
 
       if (customersResult.error) throw customersResult.error
@@ -363,14 +489,31 @@ const AdminDashboard: React.FC = () => {
       }
       const revenueTrend = calcTrend(totalRevenue, prevTotalRevenue)
 
-      // Aktiva ärenden
-      const activeCases = (privateActiveResult.count || 0) + (businessActiveResult.count || 0)
+      // Genomförda ärenden denna period
+      const completedCasesPeriod = (privatePeriodResult.data?.length || 0)
+        + (businessPeriodResult.data?.length || 0)
+        + (casesPeriodResult.data?.length || 0)
+
+      // Genomförda ärenden föregående period
+      const prevCompletedCases = (privatePrevCountResult.count || 0)
+        + (businessPrevCountResult.count || 0)
+        + (casesPrevCountResult.count || 0)
+      const completedCasesTrend = calcTrend(completedCasesPeriod, prevCompletedCases)
+
+      // Öppna ärenden (ögonblicksbild)
+      const pendingCases = (privateActiveResult.count || 0) + (businessActiveResult.count || 0)
 
       // Kontraktsintäkt (för breakdown)
       const contractRevenue = customersResult.data?.reduce((sum, c) => sum + (c.annual_value || 0), 0) || 0
 
       const absentTechnicianIds = absencesResult.data?.map(absence => absence.technician_id) || []
       const availableTechnicians = techniciansResult.data?.filter(tech => !absentTechnicianIds.includes(tech.id)) || []
+
+      // Frånvarande idag
+      const absentToday = (absencesResult.data || []).map(a => ({
+        name: (a as any).technicians?.name || 'Okänd',
+        reason: a.reason || 'Frånvarande',
+      }))
 
       // Teamet idag
       const gradients = [
@@ -398,19 +541,56 @@ const AdminDashboard: React.FC = () => {
         })
 
       const scheduledToday = (privateScheduledResult.count || 0) + (businessScheduledResult.count || 0)
-      const completedToday = (privateCompletedResult.count || 0) + (businessCompletedResult.count || 0)
+      const completedToday = (privateCompletedTodayResult.count || 0) + (businessCompletedTodayResult.count || 0)
+
+      // Sparkline-data: daglig intäkt och antal avslutade senaste 7 dagar
+      const sparkNow = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const allSparkItems = [
+        ...(privateSparkResult.data || []).map(c => ({
+          date: c.completed_date!,
+          revenue: c.pris || 0,
+        })),
+        ...(businessSparkResult.data || []).map(c => ({
+          date: c.completed_date!,
+          revenue: (c.pris || 0) * 1.25,
+        })),
+        ...(casesSparkResult.data || []).map(c => ({
+          date: c.completed_date!,
+          revenue: c.price || 0,
+        })),
+      ]
+
+      const sparkRevenue = buildDailyArray(
+        allSparkItems.map(i => ({ date: i.date, value: i.revenue })),
+        7, sparkNow
+      )
+      const sparkCases = buildDailyArray(
+        allSparkItems.map(i => ({ date: i.date, value: 1 })),
+        7, sparkNow
+      )
+
+      const totalCustomers = customersResult.data?.length || 0
+      const sparkCustomers = buildCumulativeCustomers(
+        totalCustomers,
+        (customersSparkResult.data || []).map(c => ({ date: c.created_at })),
+        7, sparkNow
+      )
 
       setStats({
-        totalCustomers: customersResult.data?.length || 0,
+        totalCustomers,
         totalRevenue,
-        activeCases,
+        completedCasesPeriod,
+        completedCasesTrend,
         activeTechnicians: availableTechnicians.length || 0,
-        pendingCases: activeCases,
+        pendingCases,
         scheduledToday,
         completedToday,
         teamToday,
+        absentToday,
         revenueTrend,
-        casesTrend: '', // Ärenden är ögonblicksbild, ingen trend
+        sparkRevenue,
+        sparkCases,
+        sparkCustomers,
         recentActivity: [],
         customers: customersResult.data || [],
         technicians: availableTechnicians || [],
@@ -454,7 +634,7 @@ const AdminDashboard: React.FC = () => {
         <div className="p-8 max-w-md backdrop-blur-sm bg-slate-800/70 border border-slate-700/50 rounded-2xl shadow-2xl text-center">
           <div className="text-red-400 mb-4">Fel vid laddning av dashboard</div>
           <p className="text-slate-400 mb-6">{error}</p>
-          <Button onClick={() => fetchDashboardStats(timePeriod)}>Forsok igen</Button>
+          <Button onClick={() => fetchDashboardStats(timePeriod)}>Försök igen</Button>
         </div>
       </div>
     )
@@ -476,7 +656,7 @@ const AdminDashboard: React.FC = () => {
           </h1>
           <p className="text-base text-slate-400 mt-1 capitalize">{today}</p>
           <p className="text-sm text-slate-500 mt-1">
-            {stats?.pendingCases || 0} oppna arenden och {stats?.activeTechnicians || 0} aktiva tekniker idag
+            {stats?.pendingCases || 0} öppna ärenden och {stats?.activeTechnicians || 0} aktiva tekniker idag
           </p>
         </motion.div>
 
@@ -495,7 +675,7 @@ const AdminDashboard: React.FC = () => {
                       : 'text-slate-400 hover:text-slate-300'
                   }`}
                 >
-                  {period === 'day' ? 'Idag' : period === 'week' ? 'Vecka' : 'Manad'}
+                  {period === 'day' ? 'Idag' : period === 'week' ? 'Vecka' : 'Månad'}
                 </button>
               ))}
             </div>
@@ -508,26 +688,29 @@ const AdminDashboard: React.FC = () => {
                 icon: Users,
                 trend: '',
                 color: 'teal' as const,
+                sparkData: stats?.sparkCustomers,
                 kpiType: 'customers' as const,
                 kpiTitle: 'Avtalskunder',
               },
               {
-                title: timePeriod === 'day' ? 'Intakt idag' : timePeriod === 'week' ? 'Intakt veckan' : 'Intakt manaden',
+                title: timePeriod === 'day' ? 'Intäkt idag' : timePeriod === 'week' ? 'Intäkt veckan' : 'Intäkt månaden',
                 value: formatCurrency(stats?.totalRevenue || 0),
-                icon: DollarSign,
+                icon: Coins,
                 trend: stats?.revenueTrend || '',
                 color: 'emerald' as const,
+                sparkData: stats?.sparkRevenue,
                 kpiType: 'revenue' as const,
-                kpiTitle: 'Intakt',
+                kpiTitle: 'Intäkt',
               },
               {
-                title: 'Aktiva arenden',
-                value: String(stats?.activeCases || 0),
-                icon: FileText,
-                trend: '',
+                title: timePeriod === 'day' ? 'Genomförda idag' : timePeriod === 'week' ? 'Genomförda veckan' : 'Genomförda månaden',
+                value: String(stats?.completedCasesPeriod || 0),
+                icon: FileCheck,
+                trend: stats?.completedCasesTrend || '',
                 color: 'cyan' as const,
+                sparkData: stats?.sparkCases,
                 kpiType: 'cases' as const,
-                kpiTitle: 'BeGone Arenden',
+                kpiTitle: 'Genomförda ärenden',
               },
               {
                 title: 'Aktiva tekniker',
@@ -535,6 +718,7 @@ const AdminDashboard: React.FC = () => {
                 icon: UserCheck,
                 trend: '',
                 color: 'blue' as const,
+                sparkData: undefined,
                 kpiType: 'technicians' as const,
                 kpiTitle: 'Aktiva Tekniker',
               },
@@ -551,6 +735,7 @@ const AdminDashboard: React.FC = () => {
                   icon={kpi.icon}
                   trend={kpi.trend}
                   color={kpi.color}
+                  sparkData={kpi.sparkData}
                   onClick={() => handleKpiClick(kpi.kpiType, kpi.kpiTitle)}
                 />
               </motion.div>
@@ -560,13 +745,13 @@ const AdminDashboard: React.FC = () => {
 
         {/* Quick Actions */}
         <div className="mb-12">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Snabbatgarder</h2>
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Snabbåtgärder</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { icon: Plus, label: 'Skapa avtal', desc: 'Generera via Oneflow', href: '/admin/oneflow-contract-creator', color: 'teal' },
               { icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', href: '/admin/invoicing', color: 'emerald' },
-              { icon: Users, label: 'Sok kund', desc: 'Sok i kundregistret', href: '/admin/customers', color: 'cyan' },
-              { icon: Target, label: 'Ny lead', desc: 'Lagg till prospekt', href: '/admin/leads', color: 'purple' },
+              { icon: Users, label: 'Sök kund', desc: 'Sök i kundregistret', href: '/admin/customers', color: 'cyan' },
+              { icon: Target, label: 'Ny lead', desc: 'Lägg till prospekt', href: '/admin/leads', color: 'purple' },
             ].map((action, index) => (
               <motion.div
                 key={action.label}
@@ -595,11 +780,11 @@ const AdminDashboard: React.FC = () => {
             </h3>
             <div className="space-y-1">
               {[
-                { title: 'Nytt avtal signerat', desc: 'Skanskas avtal for skadedjurskontroll signerat via Oneflow', time: '12 min sedan', color: 'emerald', icon: FileCheck },
+                { title: 'Nytt avtal signerat', desc: 'Skanskas avtal för skadedjurskontroll signerat via Oneflow', time: '12 min sedan', color: 'emerald', icon: FileCheck },
                 { title: 'Faktura skickad', desc: 'Faktura #2024-0147 skickad till Vasakronan AB', time: '45 min sedan', color: 'teal', icon: Receipt },
-                { title: 'Nytt arende', desc: 'Privat arende tilldelat tekniker Erik Lundberg', time: '1 timme sedan', color: 'cyan', icon: FileText },
-                { title: 'Lead tillagd', desc: 'Ny lead fran webbformuladet: Fastighets AB Centrum', time: '2 timmar sedan', color: 'purple', icon: Target },
-                { title: 'Inspektion slutford', desc: 'Kvartalsinspektion hos ICA Maxi Barkarby av Johan Karlsson', time: '3 timmar sedan', color: 'blue', icon: ClipboardCheck },
+                { title: 'Nytt ärende', desc: 'Privat ärende tilldelat tekniker Erik Lundberg', time: '1 timme sedan', color: 'cyan', icon: FileText },
+                { title: 'Lead tillagd', desc: 'Ny lead från webbformuläret: Fastighets AB Centrum', time: '2 timmar sedan', color: 'purple', icon: Target },
+                { title: 'Inspektion slutförd', desc: 'Kvartalsinspektion hos ICA Maxi Barkarby av Johan Karlsson', time: '3 timmar sedan', color: 'blue', icon: ClipboardCheck },
               ].map((item, index) => (
                 <motion.div
                   key={item.title}
@@ -629,9 +814,9 @@ const AdminDashboard: React.FC = () => {
               Idag
             </h3>
             <div className="space-y-4">
-              <StatItem label="Planerade besok" value={String(stats?.scheduledToday || 0)} progress={stats?.scheduledToday ? Math.round(((stats?.completedToday || 0) / stats.scheduledToday) * 100) : 0} color="teal" />
-              <StatItem label="Slutforda" value={String(stats?.completedToday || 0)} color="emerald" valueColor="text-emerald-400" />
-              <StatItem label="Oppna arenden" value={String(stats?.pendingCases || 0)} color="blue" valueColor="text-blue-400" />
+              <StatItem label="Planerade besök" value={String(stats?.scheduledToday || 0)} progress={stats?.scheduledToday ? Math.round(((stats?.completedToday || 0) / stats.scheduledToday) * 100) : 0} color="teal" />
+              <StatItem label="Slutförda" value={String(stats?.completedToday || 0)} color="emerald" valueColor="text-emerald-400" />
+              <StatItem label="Öppna ärenden" value={String(stats?.pendingCases || 0)} color="blue" valueColor="text-blue-400" />
               <StatItem label="Aktiva tekniker" value={String(stats?.activeTechnicians || 0)} color="teal" valueColor="text-teal-400" />
             </div>
 
@@ -650,6 +835,21 @@ const AdminDashboard: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Frånvarande */}
+            {stats?.absentToday && stats.absentToday.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-slate-700/50">
+                <h4 className="text-sm font-semibold text-slate-400 mb-2">Frånvarande</h4>
+                <div className="space-y-1.5">
+                  {stats.absentToday.map(person => (
+                    <div key={person.name} className="flex items-center justify-between">
+                      <span className="text-sm text-slate-300">{person.name}</span>
+                      <span className="text-xs text-slate-500 bg-slate-800/60 px-2 py-0.5 rounded-full">{person.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
           </motion.div>
         </div>

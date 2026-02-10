@@ -1,5 +1,5 @@
 // src/components/admin/layout/adminNavConfig.ts
-// Navigeringskonfiguration for admin CRM-layout
+// Navigeringskonfiguration för admin CRM-layout
 
 import {
   Home,
@@ -39,18 +39,18 @@ export interface NavGroup {
 }
 
 export const topLevelItems: NavItem[] = [
-  { label: 'Oversikt', icon: Home, path: '/admin/dashboard' },
+  { label: 'Översikt', icon: Home, path: '/admin/dashboard' },
   { label: 'Kunder', icon: Users, path: '/admin/customers' },
   { label: 'Leads', icon: Target, path: '/admin/leads' },
 ]
 
 export const navGroups: NavGroup[] = [
   {
-    label: 'Forsaljning',
+    label: 'Försäljning',
     icon: TrendingUp,
     items: [
-      { label: 'Avtalsoversikt', icon: Receipt, path: '/admin/contracts-overview' },
-      { label: 'Forsaljningsmojligheter', icon: TrendingUp, path: '/admin/sales-opportunities' },
+      { label: 'Avtalsöversikt', icon: Receipt, path: '/admin/contracts-overview' },
+      { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/admin/sales-opportunities' },
       { label: 'Kundanalys', icon: BarChart3, path: '/admin/customers/analytics' },
       { label: 'Leadanalys', icon: BarChart3, path: '/admin/leads/analytics' },
     ]
@@ -59,7 +59,7 @@ export const navGroups: NavGroup[] = [
     label: 'Ekonomi & Fakturering',
     icon: DollarSign,
     items: [
-      { label: 'Ekonomisk oversikt', icon: DollarSign, path: '/admin/economics' },
+      { label: 'Ekonomisk översikt', icon: DollarSign, path: '/admin/economics' },
       { label: 'Fakturering', icon: Receipt, path: '/admin/invoicing' },
       { label: 'Provisioner', icon: Wallet, path: '/admin/commissions' },
     ]
@@ -78,7 +78,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Kundkonton', icon: Building2, path: '/admin/organisation/organizations' },
       { label: 'Hantera organisationer', icon: Settings, path: '/admin/organisation/organizations-manage' },
-      { label: 'Trafikljusoversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
+      { label: 'Trafikljusöversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
       { label: 'Multisite-fakturering', icon: Receipt, path: '/admin/organisation/billing' },
       { label: 'Registrera multisite', icon: UserPlus, path: '/admin/organisation/register' },
     ]
@@ -91,11 +91,11 @@ export const navGroups: NavGroup[] = [
       { label: 'Bildbank', icon: ImageIcon, path: '/admin/image-bank' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
       { label: 'Skapa avtal', icon: FileText, path: '/admin/oneflow-contract-creator' },
-      { label: 'Larocenter', icon: GraduationCap, path: '/larosate' },
+      { label: 'Lärocenter', icon: GraduationCap, path: '/larosate' },
     ]
   },
   {
-    label: 'Installningar',
+    label: 'Inställningar',
     icon: Settings,
     items: [
       { label: 'Stationstyper', icon: Target, path: '/admin/settings/station-types' },
@@ -109,13 +109,13 @@ export const navGroups: NavGroup[] = [
 ]
 
 export const favoriteItems: NavItem[] = [
-  { label: 'Ekonomisk oversikt', icon: DollarSign, path: '/admin/economics' },
+  { label: 'Ekonomisk översikt', icon: DollarSign, path: '/admin/economics' },
   { label: 'Fakturering', icon: Receipt, path: '/admin/invoicing' },
   { label: 'Team AI Chat', icon: Sparkles, path: '/admin/team-chat' },
 ]
 
 export const mobileBottomItems: NavItem[] = [
-  { label: 'Oversikt', icon: Home, path: '/admin/dashboard' },
+  { label: 'Översikt', icon: Home, path: '/admin/dashboard' },
   { label: 'Kunder', icon: Users, path: '/admin/customers' },
   { label: 'Leads', icon: Target, path: '/admin/leads' },
   { label: 'Ekonomi', icon: DollarSign, path: '/admin/economics' },
@@ -123,21 +123,21 @@ export const mobileBottomItems: NavItem[] = [
 
 // Breadcrumb-mappning: path -> svenskt namn
 export const breadcrumbMap: Record<string, string> = {
-  '/admin/dashboard': 'Oversikt',
+  '/admin/dashboard': 'Översikt',
   '/admin/customers': 'Kunder',
   '/admin/leads': 'Leads',
-  '/admin/economics': 'Ekonomisk oversikt',
+  '/admin/economics': 'Ekonomisk översikt',
   '/admin/invoicing': 'Fakturering',
   '/admin/commissions': 'Provisioner',
   '/admin/technicians': 'Teknikerstatistik',
   '/admin/technician-management': 'Personalkonton',
-  '/admin/contracts-overview': 'Avtalsoversikt',
-  '/admin/sales-opportunities': 'Forsaljningsmojligheter',
+  '/admin/contracts-overview': 'Avtalsöversikt',
+  '/admin/sales-opportunities': 'Försäljningsmöjligheter',
   '/admin/customers/analytics': 'Kundanalys',
   '/admin/leads/analytics': 'Leadanalys',
   '/admin/organisation/organizations': 'Kundkonton',
   '/admin/organisation/organizations-manage': 'Hantera organisationer',
-  '/admin/organisation/traffic-light': 'Trafikljusoversikt',
+  '/admin/organisation/traffic-light': 'Trafikljusöversikt',
   '/admin/organisation/billing': 'Multisite-fakturering',
   '/admin/organisation/register': 'Registrera multisite',
   '/admin/team-chat': 'Team AI Chat',

@@ -14,7 +14,7 @@ interface AdminTopHeaderProps {
 export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderProps) {
   const location = useLocation()
   const { profile } = useAuth()
-  const currentLabel = breadcrumbMap[location.pathname] || 'Oversikt'
+  const currentLabel = breadcrumbMap[location.pathname] || 'Översikt'
   const [ticketCount, setTicketCount] = useState(0)
 
   useEffect(() => {
@@ -42,10 +42,10 @@ export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderPro
       {/* Centered search */}
       <button
         className="flex-1 max-w-md mx-auto flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/60 ring-1 ring-slate-700/50 hover:ring-slate-600 text-slate-400 transition-all duration-200"
-        aria-label="Sok"
+        aria-label="Sök"
       >
         <Search className="w-4 h-4" />
-        <span className="text-sm">Sok i systemet...</span>
+        <span className="text-sm">Sök i systemet...</span>
         <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded">⌘K</kbd>
       </button>
 
