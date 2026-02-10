@@ -361,10 +361,8 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
             {visibleEvents.map((event, index) => (
               <div key={event.id} className="relative flex items-start gap-4">
                 {/* Timeline dot */}
-                <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-${EVENT_TYPE_DISPLAY[event.event_type].color}/10 border-2 border-${EVENT_TYPE_DISPLAY[event.event_type].color}/30`}>
-                  <div className={`text-${EVENT_TYPE_DISPLAY[event.event_type].color}`}>
-                    {getEventTypeIcon(event.event_type)}
-                  </div>
+                <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full border-2 ${EVENT_TYPE_DISPLAY[event.event_type].iconClass}`}>
+                  {getEventTypeIcon(event.event_type)}
                 </div>
 
                 {/* Event content */}
@@ -372,7 +370,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
                   <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/40">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 text-xs rounded-full bg-${EVENT_TYPE_DISPLAY[event.event_type].color}/20 text-${EVENT_TYPE_DISPLAY[event.event_type].color}`}>
+                        <span className={`px-2 py-1 text-xs rounded-full ${EVENT_TYPE_DISPLAY[event.event_type].badgeClass}`}>
                           {EVENT_TYPE_DISPLAY[event.event_type].label}
                         </span>
                       </div>

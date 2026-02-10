@@ -18,6 +18,7 @@ import {
   calculateLeadScore,
   getLeadQuality,
   LEAD_STATUS_DISPLAY,
+  LEAD_PRIORITY_DISPLAY,
   getPriorityLabel,
   getPriorityColor
 } from '../../../types/database'
@@ -341,13 +342,13 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Status & Prioritet</h3>
                   <div className="space-y-3">
                     <div>
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-${statusConfig.color}/10 text-${statusConfig.color} border border-${statusConfig.color}/20`}>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${statusConfig.badgeClass}`}>
                         {statusConfig.label}
                       </span>
                     </div>
                     {currentLead.priority && (
                       <div>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-${getPriorityColor(currentLead.priority)}/10 text-${getPriorityColor(currentLead.priority)} border border-${getPriorityColor(currentLead.priority)}/20`}>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-medium border ${LEAD_PRIORITY_DISPLAY[currentLead.priority!]?.badgeClass || 'bg-gray-500/10 text-gray-500 border-gray-500/20'}`}>
                           <Star className="w-3 h-3 mr-1" />
                           {getPriorityLabel(currentLead.priority)}
                         </span>
@@ -361,14 +362,12 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Lead Score</h3>
                   <div className="space-y-2">
                     <div className="text-2xl font-bold text-white">{leadScore}/100</div>
-                    <div className={`text-sm px-2 py-1 rounded ${leadQuality.bgColor}`}>
-                      <span className={`text-${leadQuality.color} font-medium`}>
-                        {leadQuality.label}
-                      </span>
+                    <div className={`text-sm px-2 py-1 rounded font-medium ${leadQuality.bgColor}`}>
+                      {leadQuality.label}
                     </div>
                     <div className="w-full bg-slate-700 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full bg-${leadQuality.color}`}
+                      <div
+                        className={`h-2 rounded-full ${leadQuality.barColor}`}
                         style={{ width: `${leadScore}%` }}
                       ></div>
                     </div>

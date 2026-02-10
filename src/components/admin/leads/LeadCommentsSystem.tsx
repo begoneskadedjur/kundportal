@@ -357,12 +357,12 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg bg-${COMMENT_TYPE_DISPLAY[comment.comment_type].color}/10`}>
+                  <div className={`p-2 rounded-lg ${COMMENT_TYPE_DISPLAY[comment.comment_type].iconBgClass}`}>
                     {getCommentTypeIcon(comment.comment_type)}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 text-xs rounded-full bg-${COMMENT_TYPE_DISPLAY[comment.comment_type].color}/20 text-${COMMENT_TYPE_DISPLAY[comment.comment_type].color}`}>
+                      <span className={`px-2 py-1 text-xs rounded-full ${COMMENT_TYPE_DISPLAY[comment.comment_type].badgeClass}`}>
                         {COMMENT_TYPE_DISPLAY[comment.comment_type].label}
                       </span>
                     </div>

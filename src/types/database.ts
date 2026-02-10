@@ -1075,11 +1075,11 @@ export type EventType = 'created' | 'updated' | 'status_changed' | 'contacted' |
 
 // Status display mappings för UI
 export const LEAD_STATUS_DISPLAY = {
-  red_lost: { label: 'Förlorad', color: 'red-500' },
-  blue_cold: { label: 'Kall', color: 'blue-500' },
-  yellow_warm: { label: 'Ljummen', color: 'yellow-500' },
-  orange_hot: { label: 'Het', color: 'orange-500' },
-  green_deal: { label: 'Affär', color: 'green-500' }
+  red_lost: { label: 'Förlorad', color: 'red-500', badgeClass: 'bg-red-500/10 text-red-500 border-red-500/20', dotClass: 'bg-red-500', textClass: 'text-red-500' },
+  blue_cold: { label: 'Kall', color: 'blue-500', badgeClass: 'bg-blue-500/10 text-blue-500 border-blue-500/20', dotClass: 'bg-blue-500', textClass: 'text-blue-500' },
+  yellow_warm: { label: 'Ljummen', color: 'yellow-500', badgeClass: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20', dotClass: 'bg-yellow-500', textClass: 'text-yellow-500' },
+  orange_hot: { label: 'Het', color: 'orange-500', badgeClass: 'bg-orange-500/10 text-orange-500 border-orange-500/20', dotClass: 'bg-orange-500', textClass: 'text-orange-500' },
+  green_deal: { label: 'Affär', color: 'green-500', badgeClass: 'bg-green-500/10 text-green-500 border-green-500/20', dotClass: 'bg-green-500', textClass: 'text-green-500' }
 } as const
 
 export const CONTACT_METHOD_DISPLAY = {
@@ -1097,33 +1097,33 @@ export const COMPANY_SIZE_DISPLAY = {
 
 // 🆕 EVENT TYPE DISPLAY för händelsetyper - 🔧 UPPDATERAD
 export const EVENT_TYPE_DISPLAY = {
-  created: { label: 'Skapad', icon: 'Plus', color: 'green-500' },
-  updated: { label: 'Uppdaterad', icon: 'Edit', color: 'blue-500' },
-  status_changed: { label: 'Statusändring', icon: 'RotateCcw', color: 'blue-500' },
-  contacted: { label: 'Kontaktad', icon: 'Phone', color: 'green-500' },
-  meeting: { label: 'Möte', icon: 'Calendar', color: 'purple-500' },
-  quote_sent: { label: 'Offert skickad', icon: 'FileText', color: 'orange-500' },
-  quote_accepted: { label: 'Offert accepterad', icon: 'CheckCircle', color: 'green-600' },
-  quote_rejected: { label: 'Offert avvisad', icon: 'XCircle', color: 'red-500' },
-  assigned: { label: 'Tilldelad', icon: 'UserCheck', color: 'indigo-500' },
-  note_added: { label: 'Anteckning tillagd', icon: 'StickyNote', color: 'gray-500' }
+  created: { label: 'Skapad', icon: 'Plus', color: 'green-500', badgeClass: 'bg-green-500/20 text-green-500', iconClass: 'bg-green-500/10 border-green-500/30 text-green-500' },
+  updated: { label: 'Uppdaterad', icon: 'Edit', color: 'blue-500', badgeClass: 'bg-blue-500/20 text-blue-500', iconClass: 'bg-blue-500/10 border-blue-500/30 text-blue-500' },
+  status_changed: { label: 'Statusändring', icon: 'RotateCcw', color: 'blue-500', badgeClass: 'bg-blue-500/20 text-blue-500', iconClass: 'bg-blue-500/10 border-blue-500/30 text-blue-500' },
+  contacted: { label: 'Kontaktad', icon: 'Phone', color: 'green-500', badgeClass: 'bg-green-500/20 text-green-500', iconClass: 'bg-green-500/10 border-green-500/30 text-green-500' },
+  meeting: { label: 'Möte', icon: 'Calendar', color: 'purple-500', badgeClass: 'bg-purple-500/20 text-purple-500', iconClass: 'bg-purple-500/10 border-purple-500/30 text-purple-500' },
+  quote_sent: { label: 'Offert skickad', icon: 'FileText', color: 'orange-500', badgeClass: 'bg-orange-500/20 text-orange-500', iconClass: 'bg-orange-500/10 border-orange-500/30 text-orange-500' },
+  quote_accepted: { label: 'Offert accepterad', icon: 'CheckCircle', color: 'green-600', badgeClass: 'bg-green-600/20 text-green-500', iconClass: 'bg-green-600/10 border-green-600/30 text-green-500' },
+  quote_rejected: { label: 'Offert avvisad', icon: 'XCircle', color: 'red-500', badgeClass: 'bg-red-500/20 text-red-500', iconClass: 'bg-red-500/10 border-red-500/30 text-red-500' },
+  assigned: { label: 'Tilldelad', icon: 'UserCheck', color: 'indigo-500', badgeClass: 'bg-indigo-500/20 text-indigo-500', iconClass: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-500' },
+  note_added: { label: 'Anteckning tillagd', icon: 'StickyNote', color: 'gray-500', badgeClass: 'bg-gray-500/20 text-gray-500', iconClass: 'bg-gray-500/10 border-gray-500/30 text-gray-500' }
 } as const
 
 // 🆕 LEAD PRIORITY DISPLAY
 export const LEAD_PRIORITY_DISPLAY = {
-  low: { label: 'Låg', color: 'green-500', bgColor: 'bg-green-100' },
-  medium: { label: 'Medium', color: 'yellow-500', bgColor: 'bg-yellow-100' },
-  high: { label: 'Hög', color: 'orange-500', bgColor: 'bg-orange-100' },
-  urgent: { label: 'Brådskande', color: 'red-500', bgColor: 'bg-red-100' }
+  low: { label: 'Låg', color: 'green-500', bgColor: 'bg-green-500/15', badgeClass: 'bg-green-500/10 text-green-500 border-green-500/20' },
+  medium: { label: 'Medium', color: 'yellow-500', bgColor: 'bg-yellow-500/15', badgeClass: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' },
+  high: { label: 'Hög', color: 'orange-500', bgColor: 'bg-orange-500/15', badgeClass: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
+  urgent: { label: 'Brådskande', color: 'red-500', bgColor: 'bg-red-500/15', badgeClass: 'bg-red-500/10 text-red-500 border-red-500/20' }
 } as const
 
 // 🆕 COMMENT TYPE DISPLAY
 export const COMMENT_TYPE_DISPLAY = {
-  note: { label: 'Anteckning', icon: 'StickyNote', color: 'gray-500' },
-  follow_up: { label: 'Uppföljning', icon: 'Clock', color: 'yellow-500' },
-  meeting: { label: 'Möte', icon: 'Users', color: 'purple-500' },
-  call: { label: 'Samtal', icon: 'Phone', color: 'green-500' },
-  email: { label: 'E-post', icon: 'Mail', color: 'blue-500' }
+  note: { label: 'Anteckning', icon: 'StickyNote', color: 'gray-500', badgeClass: 'bg-gray-500/20 text-gray-500', iconBgClass: 'bg-gray-500/10' },
+  follow_up: { label: 'Uppföljning', icon: 'Clock', color: 'yellow-500', badgeClass: 'bg-yellow-500/20 text-yellow-500', iconBgClass: 'bg-yellow-500/10' },
+  meeting: { label: 'Möte', icon: 'Users', color: 'purple-500', badgeClass: 'bg-purple-500/20 text-purple-500', iconBgClass: 'bg-purple-500/10' },
+  call: { label: 'Samtal', icon: 'Phone', color: 'green-500', badgeClass: 'bg-green-500/20 text-green-500', iconBgClass: 'bg-green-500/10' },
+  email: { label: 'E-post', icon: 'Mail', color: 'blue-500', badgeClass: 'bg-blue-500/20 text-blue-500', iconBgClass: 'bg-blue-500/10' }
 } as const
 
 // 👨‍🔧 KÄNDA TEKNIKER (uppdaterade från din gamla fil)
@@ -1700,12 +1700,12 @@ export const calculateLeadScore = (lead: Lead): number => {
 }
 
 // Hjälpfunktion för att avgöra lead kvalitet baserat på score
-export const getLeadQuality = (score: number): { label: string; color: string; bgColor: string } => {
-  if (score >= 80) return { label: 'Utmärkt', color: 'green-600', bgColor: 'bg-green-100' }
-  if (score >= 60) return { label: 'Bra', color: 'blue-600', bgColor: 'bg-blue-100' }
-  if (score >= 40) return { label: 'Medel', color: 'yellow-600', bgColor: 'bg-yellow-100' }
-  if (score >= 20) return { label: 'Svag', color: 'orange-600', bgColor: 'bg-orange-100' }
-  return { label: 'Mycket svag', color: 'red-600', bgColor: 'bg-red-100' }
+export const getLeadQuality = (score: number): { label: string; color: string; bgColor: string; barColor: string } => {
+  if (score >= 80) return { label: 'Utmärkt', color: 'text-green-400', bgColor: 'bg-green-500/15 text-green-400', barColor: 'bg-green-500' }
+  if (score >= 60) return { label: 'Bra', color: 'text-blue-400', bgColor: 'bg-blue-500/15 text-blue-400', barColor: 'bg-blue-500' }
+  if (score >= 40) return { label: 'Medel', color: 'text-yellow-400', bgColor: 'bg-yellow-500/15 text-yellow-400', barColor: 'bg-yellow-500' }
+  if (score >= 20) return { label: 'Svag', color: 'text-orange-400', bgColor: 'bg-orange-500/15 text-orange-400', barColor: 'bg-orange-500' }
+  return { label: 'Mycket svag', color: 'text-red-400', bgColor: 'bg-red-500/15 text-red-400', barColor: 'bg-red-500' }
 }
 
 // ===== EQUIPMENT PLACEMENT TYPES =====

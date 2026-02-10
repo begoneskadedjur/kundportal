@@ -268,8 +268,8 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                       <td className="px-4 py-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5">
-                            <div className={`w-2.5 h-2.5 rounded-full bg-${LEAD_STATUS_DISPLAY[lead.status].color}`} />
-                            <span className={`text-xs font-medium text-${LEAD_STATUS_DISPLAY[lead.status].color}`}>
+                            <div className={`w-2.5 h-2.5 rounded-full ${LEAD_STATUS_DISPLAY[lead.status].dotClass}`} />
+                            <span className={`text-xs font-medium ${LEAD_STATUS_DISPLAY[lead.status].textClass}`}>
                               {LEAD_STATUS_DISPLAY[lead.status].label}
                             </span>
                           </div>
