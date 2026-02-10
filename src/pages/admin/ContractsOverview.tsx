@@ -666,8 +666,8 @@ export default function ContractsOverview() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader 
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <PageHeader
         title="Försäljningspipeline"
         subtitle="Hantera kontrakt och försäljningsprocesser"
         icon={FileText}
