@@ -285,7 +285,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
   const secondaryContacts = contacts.filter(contact => !contact.is_primary)
 
   return (
-    <Card className="p-6 bg-slate-800/50 border-slate-700/50">
+    <Card className="p-6 bg-slate-800/40 border-slate-700/50">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Users className="w-5 h-5 text-green-400" />
@@ -372,7 +372,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
             {secondaryContacts.map((contact) => (
               <div
                 key={contact.id}
-                className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600/30"
+                className="flex items-center justify-between p-4 bg-slate-800/30 rounded-lg border border-slate-700/40"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -436,7 +436,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
 
       {/* Add/Edit Form */}
       {showForm && (
-        <Card className="p-4 bg-slate-700/30 border-slate-600/50">
+        <Card className="p-4 bg-slate-800/30 border-slate-700/40">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-medium text-white flex items-center gap-2">
@@ -527,11 +527,11 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
                 onChange={(e) => handleInputChange('notes', e.target.value)}
                 placeholder="Ytterligare information om kontaktpersonen..."
                 rows={2}
-                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-none"
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-600/30">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
               <Button
                 type="button"
                 variant="ghost"

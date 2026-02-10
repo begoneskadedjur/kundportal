@@ -247,7 +247,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
   const availablePredefinedTags = PREDEFINED_TAGS.filter(tag => !tags.includes(tag))
 
   return (
-    <Card className="p-6 bg-slate-800/50 border-slate-700/50">
+    <Card className="p-6 bg-slate-800/40 border-slate-700/50">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Tag className="w-5 h-5 text-orange-400" />
@@ -289,7 +289,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
 
       {/* Add Tag Form */}
       {showForm && (
-        <Card className="p-4 bg-slate-700/30 border-slate-600/50 mb-6">
+        <Card className="p-4 bg-slate-800/30 border-slate-700/40 mb-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-medium text-white flex items-center gap-2">
@@ -324,7 +324,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-600/30">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
               <Button
                 type="button"
                 variant="ghost"

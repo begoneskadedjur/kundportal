@@ -703,7 +703,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         <form id="edit-lead-form" onSubmit={handleSubmit} className="space-y-5">
           
           {/* Obligatorisk huvudinformation */}
-          <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-purple-400" />
               Obligatorisk huvudinformation
@@ -801,7 +801,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 <select
                   value={formData.status || 'blue_cold'}
                   onChange={(e) => handleInputChange('status', e.target.value as LeadStatus)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   {Object.entries(LEAD_STATUS_DISPLAY).map(([value, config]) => (
                     <option key={value} value={value}>
@@ -814,7 +814,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           </Card>
 
           {/* Lead-hantering & uppföljning */}
-          <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-green-400" />
               Lead-hantering & uppföljning
@@ -828,7 +828,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 <select
                   value={formData.contact_method || ''}
                   onChange={(e) => handleInputChange('contact_method', e.target.value as ContactMethod || null)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj metod</option>
                   {Object.entries(CONTACT_METHOD_DISPLAY).map(([value, config]) => (
@@ -922,7 +922,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 </div>
                 
                 {formData.contract_status && (
-                  <div className="bg-slate-700/30 p-3 rounded-lg space-y-3 border border-slate-600/30">
+                  <div className="bg-slate-800/30 p-3 rounded-lg space-y-3 border border-slate-700/40">
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1.5">
                         Nuvarande leverantör
@@ -956,7 +956,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                         onChange={(e) => handleInputChange('competitor', e.target.value)}
                         placeholder="Ytterligare information om avtalet, uppsägningstid, etc."
                         rows={2}
-                        className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                        className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
                       />
                     </div>
                   </div>
@@ -966,7 +966,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           </Card>
 
           {/* Företagsinformation + Anteckningar (merged) */}
-          <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-blue-400" />
               Företagsinformation
@@ -1002,7 +1002,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 <select
                   value={formData.company_size || ''}
                   onChange={(e) => handleInputChange('company_size', e.target.value as CompanySize || null)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj storlek</option>
                   {Object.entries(COMPANY_SIZE_DISPLAY).map(([value, config]) => (
@@ -1060,25 +1060,25 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                   onChange={(e) => handleInputChange('business_description', e.target.value)}
                   placeholder="Beskriv verksamheten och eventuella särskilda omständigheter"
                   rows={3}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
                 />
               </div>
               {/* Anteckningar (merged into this card) */}
-              <div className="md:col-span-2 border-t border-slate-700/30 pt-3 mt-1">
+              <div className="md:col-span-2 border-t border-slate-700/50 pt-3 mt-1">
                 <h4 className="text-sm font-medium text-slate-300 mb-1.5">Anteckningar</h4>
                 <textarea
                   value={formData.notes || ''}
                   onChange={(e) => handleInputChange('notes', e.target.value)}
                   placeholder="Lägg till kommentarer, mötesinformation eller andra anteckningar här..."
                   rows={3}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/30 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
                 />
               </div>
             </div>
           </Card>
 
           {/* Lead-hantering & prioritering + BANT (merged) */}
-          <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Target className="w-5 h-5 text-orange-400" />
               Lead-hantering & prioritering
@@ -1092,7 +1092,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 <select
                   value={formData.priority || ''}
                   onChange={(e) => handleInputChange('priority', e.target.value as LeadPriority || null)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj prioritet</option>
                   {Object.entries(LEAD_PRIORITY_DISPLAY).map(([value, config]) => (
@@ -1165,7 +1165,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
             </div>
 
             {/* BANT-kvalificering (merged into this card) */}
-            <div className="border-t border-slate-700/30 pt-3 mt-3">
+            <div className="border-t border-slate-700/50 pt-3 mt-3">
               <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-1">
                 <Star className="w-3.5 h-3.5 text-yellow-400" />
                 BANT-kvalificering

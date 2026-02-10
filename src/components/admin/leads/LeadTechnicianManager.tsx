@@ -272,7 +272,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   }
 
   return (
-    <Card className="p-6 bg-slate-800/50 border-slate-700/50">
+    <Card className="p-6 bg-slate-800/40 border-slate-700/50">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Users className="w-5 h-5 text-green-400" />
@@ -298,7 +298,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
 
       {/* Add Technician Form */}
       {showAddForm && (
-        <Card className="p-4 bg-slate-700/30 border-slate-600/50 mb-6">
+        <Card className="p-4 bg-slate-800/30 border-slate-700/40 mb-6">
           <h4 className="font-medium text-white mb-4 flex items-center gap-2">
             <Users className="w-4 h-4" />
             Tilldela ny kollega
@@ -324,7 +324,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                 <select
                   value={selectedTechnicianId}
                   onChange={(e) => setSelectedTechnicianId(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500/50"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj kollega...</option>
                   {unassignedTechnicians.map(tech => (
@@ -344,11 +344,11 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                 onChange={(e) => setAssignmentNotes(e.target.value)}
                 placeholder="Anledning till tilldelning, specialområde, etc..."
                 rows={3}
-                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-none"
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
               />
             </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-600/30">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
                 <Button
                   type="button"
                   variant="ghost"
@@ -396,7 +396,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
             return (
               <div
                 key={assignment.id}
-                className="p-4 bg-slate-700/30 rounded-lg border border-slate-600/30"
+                className="p-4 bg-slate-800/30 rounded-lg border border-slate-700/40"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">

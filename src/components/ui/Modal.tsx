@@ -100,7 +100,7 @@ export default function Modal({
           w-full ${sizeClasses[size]} 
           ${usePortal ? 'min-h-[600px] max-h-[90vh]' : 'max-h-[95vh]'}
           overflow-hidden flex flex-col 
-          bg-slate-900/95 backdrop-blur border-slate-600 shadow-2xl
+          bg-slate-900/90 backdrop-blur-xl border-slate-700/50 shadow-2xl shadow-black/20
           animate-in zoom-in-95 duration-200
         `}
         style={{
@@ -109,7 +109,7 @@ export default function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700/50 flex-shrink-0">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-semibold text-white truncate">{title}</h2>
             {subtitle && (
@@ -133,7 +133,7 @@ export default function Modal({
 
         {/* Footer */}
         {footer && (
-          <div className="flex-shrink-0 border-t border-slate-700 bg-slate-900/95">
+          <div className="flex-shrink-0 border-t border-slate-700/50 bg-slate-900/80 backdrop-blur-xl">
             {footer}
           </div>
         )}

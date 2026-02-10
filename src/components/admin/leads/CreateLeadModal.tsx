@@ -1,7 +1,7 @@
 // src/components/admin/leads/CreateLeadModal.tsx - Create new lead modal
 
 import React, { useState, useEffect } from 'react'
-import { Plus, Building2, User, Mail, Phone, MapPin, Calendar, AlertCircle, Save, Target, Star, Tag } from 'lucide-react'
+import { Plus, Building2, AlertCircle, Save, Target, Star } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -282,19 +282,45 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
 
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="xl">
-      <div className="p-8">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="flex items-center justify-center w-12 h-12 bg-purple-600/10 rounded-lg">
-            <Plus className="w-6 h-6 text-purple-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white">Skapa ny lead</h2>
-            <p className="text-slate-400">Lägg till en potentiell kund i lead-pipelinen</p>
-          </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      size="xl"
+      title={
+        <div className="flex items-center gap-2">
+          <Plus className="w-5 h-5 text-purple-400" />
+          <span>Skapa ny lead</span>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-8">
+      }
+      subtitle="Lägg till en potentiell kund i lead-pipelinen"
+      footer={
+        <div className="flex items-center justify-end gap-3 px-5 py-3">
+          <Button type="button" variant="ghost" onClick={handleClose} disabled={loading}>
+            Avbryt
+          </Button>
+          <Button
+            type="submit"
+            form="create-lead-form"
+            disabled={loading}
+            className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+          >
+            {loading ? (
+              <>
+                <LoadingSpinner size="sm" />
+                Skapar lead...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Skapa lead
+              </>
+            )}
+          </Button>
+        </div>
+      }
+    >
+      <div className="p-5">
+        <form id="create-lead-form" onSubmit={handleSubmit} className="space-y-5">
           
           {/* Validation errors summary */}
           {Object.keys(errors).length > 0 && (
@@ -312,12 +338,12 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
           )}
           
           {/* Obligatorisk huvudinformation */}
-          <Card className={`p-6 bg-slate-800/50 ${
-            (errors.company_name || errors.contact_person || errors.phone_number || errors.email) 
-              ? 'border-red-500/50' 
+          <Card className={`p-4 bg-slate-800/40 ${
+            (errors.company_name || errors.contact_person || errors.phone_number || errors.email)
+              ? 'border-red-500/50'
               : 'border-slate-700/50'
           }`}>
-            <h3 className={`text-lg font-semibold mb-6 flex items-center gap-2 ${
+            <h3 className={`text-lg font-semibold mb-3 flex items-center gap-2 ${
               (errors.company_name || errors.contact_person || errors.phone_number || errors.email) 
                 ? 'text-red-300' 
                 : 'text-white'
@@ -333,9 +359,9 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               )}
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Företagsnamn *
                 </label>
                 <Input
@@ -353,7 +379,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Organisationsnummer
                 </label>
                 <Input
@@ -364,7 +390,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Kontaktperson *
                   <span className="text-slate-500 text-xs ml-2">(Blir huvudkontakt i kontaktlistan)</span>
                 </label>
@@ -386,7 +412,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Telefonnummer *
                 </label>
                 <Input
@@ -404,7 +430,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   E-post *
                 </label>
                 <Input
@@ -423,13 +449,13 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Status
                 </label>
                 <select
                   value={formData.status || 'blue_cold'}
                   onChange={(e) => handleInputChange('status', e.target.value as LeadStatus)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   {Object.entries(LEAD_STATUS_DISPLAY).map(([value, config]) => (
                     <option key={value} value={value}>
@@ -442,8 +468,8 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
           </Card>
 
           {/* Företagsinformation */}
-          <Card className={`p-6 bg-slate-800/50 ${errors.website ? 'border-red-500/50' : 'border-slate-700/50'}`}>
-            <h3 className={`text-lg font-semibold mb-6 flex items-center gap-2 ${errors.website ? 'text-red-300' : 'text-white'}`}>
+          <Card className={`p-4 bg-slate-800/40 ${errors.website ? 'border-red-500/50' : 'border-slate-700/50'}`}>
+            <h3 className={`text-lg font-semibold mb-3 flex items-center gap-2 ${errors.website ? 'text-red-300' : 'text-white'}`}>
               <Building2 className={`w-5 h-5 ${errors.website ? 'text-red-400' : 'text-blue-400'}`} />
               Företagsinformation
               {errors.website && (
@@ -451,9 +477,9 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               )}
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Verksamhetstyp
                 </label>
                 <Input
@@ -464,7 +490,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Typ av problem
                 </label>
                 <Input
@@ -475,13 +501,13 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Företagsstorlek
                 </label>
                 <select
                   value={formData.company_size || ''}
                   onChange={(e) => handleInputChange('company_size', e.target.value as CompanySize || null)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj storlek</option>
                   {Object.entries(COMPANY_SIZE_DISPLAY).map(([value, config]) => (
@@ -493,7 +519,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Hemsida
                 </label>
                 <Input
@@ -511,7 +537,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Adress
                 </label>
                 <Input
@@ -522,7 +548,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Verksamhetsbeskrivning
                 </label>
                 <textarea
@@ -530,7 +556,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   onChange={(e) => handleInputChange('business_description', e.target.value)}
                   placeholder="Beskriv verksamheten och eventuella särskilda omständigheter"
                   rows={3}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
                 />
               </div>
 
@@ -541,25 +567,37 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   disabled={loading}
                 />
               </div>
+
+              {/* Anteckningar (merged into this card) */}
+              <div className="md:col-span-2 border-t border-slate-700/50 pt-3 mt-1">
+                <h4 className="text-sm font-medium text-slate-300 mb-1.5">Anteckningar</h4>
+                <textarea
+                  value={formData.notes || ''}
+                  onChange={(e) => handleInputChange('notes', e.target.value)}
+                  placeholder="Lägg till kommentarer, mötesinformation eller andra anteckningar här..."
+                  rows={3}
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
+                />
+              </div>
             </div>
           </Card>
 
-          {/* Lead-hantering & prioritering */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+          {/* Lead-hantering & prioritering + BANT (merged) */}
+          <Card className="p-4 bg-slate-800/40 border-slate-700/50">
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Target className="w-5 h-5 text-orange-400" />
               Lead-hantering & prioritering
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Prioritet
                 </label>
                 <select
                   value={formData.priority || ''}
                   onChange={(e) => handleInputChange('priority', e.target.value as LeadPriority || null)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj prioritet</option>
                   {Object.entries(LEAD_PRIORITY_DISPLAY).map(([value, config]) => (
@@ -571,7 +609,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Källa
                 </label>
                 <Input
@@ -582,7 +620,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Notering
                 </label>
                 <p className="text-sm text-slate-400 mb-2">
@@ -591,7 +629,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Uppskattat värde (SEK)
                 </label>
                 <Input
@@ -603,7 +641,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Sannolikhet (0-100%)
                 </label>
                 <Input
@@ -617,7 +655,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Förhoppning om att slutföra affär till
                   <span className="text-slate-500 text-xs ml-2">(Ungefärligt datum när affären kan avslutas)</span>
                 </label>
@@ -656,9 +694,9 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 </div>
                 
                 {formData.contract_status && (
-                  <div className="bg-slate-700/30 p-4 rounded-lg space-y-4 border border-slate-600/50">
+                  <div className="bg-slate-800/30 p-3 rounded-lg space-y-3 border border-slate-700/40">
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                      <label className="block text-sm font-medium text-slate-300 mb-1.5">
                         Nuvarande leverantör
                         <span className="text-slate-500 text-xs ml-2">(Namnet på företaget de har avtal med)</span>
                       </label>
@@ -670,7 +708,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                      <label className="block text-sm font-medium text-slate-300 mb-1.5">
                         Avtal löper ut
                         <span className="text-slate-500 text-xs ml-2">(När avtalet kan sägas upp eller löper ut)</span>
                       </label>
@@ -682,7 +720,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                      <label className="block text-sm font-medium text-slate-300 mb-1.5">
                         Avtalsdetaljer
                         <span className="text-slate-500 text-xs ml-2">(Ytterligare information om avtalet)</span>
                       </label>
@@ -691,7 +729,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                         onChange={(e) => handleInputChange('competitor', e.target.value)}
                         placeholder="Ytterligare information om avtalet, uppsägningstid, etc."
                         rows={2}
-                        className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                        className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
                       />
                     </div>
                   </div>
@@ -699,7 +737,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Beslutsfattare
                 </label>
                 <Input
@@ -709,107 +747,56 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 />
               </div>
             </div>
-          </Card>
 
-          {/* BANT-kriterier */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <Star className="w-5 h-5 text-yellow-400" />
-              BANT-kvalificering
-            </h3>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <label className="flex items-center gap-2 text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={formData.budget_confirmed || false}
-                  onChange={(e) => handleInputChange('budget_confirmed', e.target.checked)}
-                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
-                />
-                Budget bekräftad
-              </label>
+            {/* BANT-kvalificering (merged into this card) */}
+            <div className="border-t border-slate-700/50 pt-3 mt-3">
+              <h4 className="text-sm font-medium text-slate-300 mb-1.5 flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 text-yellow-400" />
+                BANT-kvalificering
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <label className="flex items-center gap-2 text-slate-300 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.budget_confirmed || false}
+                    onChange={(e) => handleInputChange('budget_confirmed', e.target.checked)}
+                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                  />
+                  Budget bekräftad
+                </label>
 
-              <label className="flex items-center gap-2 text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={formData.authority_confirmed || false}
-                  onChange={(e) => handleInputChange('authority_confirmed', e.target.checked)}
-                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
-                />
-                Befogenhet bekräftad
-              </label>
+                <label className="flex items-center gap-2 text-slate-300 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.authority_confirmed || false}
+                    onChange={(e) => handleInputChange('authority_confirmed', e.target.checked)}
+                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                  />
+                  Befogenhet bekräftad
+                </label>
 
-              <label className="flex items-center gap-2 text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={formData.needs_confirmed || false}
-                  onChange={(e) => handleInputChange('needs_confirmed', e.target.checked)}
-                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
-                />
-                Behov bekräftat
-              </label>
+                <label className="flex items-center gap-2 text-slate-300 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.needs_confirmed || false}
+                    onChange={(e) => handleInputChange('needs_confirmed', e.target.checked)}
+                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                  />
+                  Behov bekräftat
+                </label>
 
-              <label className="flex items-center gap-2 text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={formData.timeline_confirmed || false}
-                  onChange={(e) => handleInputChange('timeline_confirmed', e.target.checked)}
-                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
-                />
-                Tidslinje bekräftad
-              </label>
+                <label className="flex items-center gap-2 text-slate-300 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.timeline_confirmed || false}
+                    onChange={(e) => handleInputChange('timeline_confirmed', e.target.checked)}
+                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                  />
+                  Tidslinje bekräftad
+                </label>
+              </div>
             </div>
           </Card>
-
-          {/* Anteckningar */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <User className="w-5 h-5 text-green-400" />
-              Anteckningar
-            </h3>
-            
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Kommentarer och anteckningar
-              </label>
-              <textarea
-                value={formData.notes || ''}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
-                placeholder="Lägg till kommentarer, mötesinformation eller andra anteckningar här..."
-                rows={4}
-                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
-              />
-            </div>
-          </Card>
-
-          {/* Form Actions */}
-          <div className="flex items-center justify-end gap-4 pt-6 border-t border-slate-700/50">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleClose}
-              disabled={loading}
-            >
-              Avbryt
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  Skapar lead...
-                </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5" />
-                  Skapa lead
-                </>
-              )}
-            </Button>
-          </div>
 
         </form>
       </div>

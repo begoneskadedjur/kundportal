@@ -234,7 +234,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
   }, [allSortedEvents.length])
 
   return (
-    <Card className="p-6 bg-slate-800/50 border-slate-700/50">
+    <Card className="p-6 bg-slate-800/40 border-slate-700/50">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Clock className="w-5 h-5 text-purple-400" />
@@ -252,7 +252,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
       {/* Add Event Form */}
       {showForm && (
-        <Card className="p-4 bg-slate-700/30 border-slate-600/50 mb-6">
+        <Card className="p-4 bg-slate-800/30 border-slate-700/40 mb-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-medium text-white flex items-center gap-2">
@@ -268,7 +268,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
               <select
                 value={formData.event_type}
                 onChange={(e) => handleInputChange('event_type', e.target.value as EventType)}
-                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
               >
                 {Object.entries(EVENT_TYPE_DISPLAY).map(([value, config]) => (
                   <option key={value} value={value}>
@@ -287,7 +287,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
                 value={formData.title}
                 onChange={(e) => handleInputChange('title', e.target.value)}
                 placeholder="Kort sammanfattning av händelsen..."
-                className={`w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 ${
+                className={`w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${
                   errors.title ? 'border-red-500' : ''
                 }`}
               />
@@ -308,7 +308,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Detaljerad beskrivning av vad som hände..."
                 rows={3}
-                className={`w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none ${
+                className={`w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none ${
                   errors.description ? 'border-red-500' : ''
                 }`}
               />
@@ -320,7 +320,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-600/30">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
               <Button
                 type="button"
                 variant="ghost"
@@ -369,7 +369,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
                 {/* Event content */}
                 <div className="flex-1 min-w-0 pb-6">
-                  <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
+                  <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/40">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-1 text-xs rounded-full bg-${EVENT_TYPE_DISPLAY[event.event_type].color}/20 text-${EVENT_TYPE_DISPLAY[event.event_type].color}`}>
@@ -487,7 +487,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
           {/* Timeline end marker */}
           <div className="relative flex items-start gap-4 mt-6">
-            <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-slate-700/30 border-2 border-slate-600/30">
+            <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/30 border-2 border-slate-700/40">
               <CheckCircle className="w-4 h-4 text-slate-500" />
             </div>
             <div className="flex-1 min-w-0">

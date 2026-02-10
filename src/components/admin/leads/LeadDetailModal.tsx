@@ -337,7 +337,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               {/* Lead Overview */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 {/* Status & Priority */}
-                <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+                <Card className="p-4 bg-slate-800/40 border-slate-700/50">
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Status & Prioritet</h3>
                   <div className="space-y-3">
                     <div>
@@ -357,7 +357,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </Card>
 
                 {/* Lead Score */}
-                <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+                <Card className="p-4 bg-slate-800/40 border-slate-700/50">
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Lead Score</h3>
                   <div className="space-y-2">
                     <div className="text-2xl font-bold text-white">{leadScore}/100</div>
@@ -376,7 +376,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </Card>
 
                 {/* Value & Probability */}
-                <Card className="p-4 bg-slate-800/50 border-slate-700/30">
+                <Card className="p-4 bg-slate-800/40 border-slate-700/50">
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Affärsvärde</h3>
                   <div className="space-y-2">
                     <div className="text-lg font-semibold text-white">
@@ -397,31 +397,31 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               </div>
 
               {/* BANT Kvalificering */}
-              <Card className="p-4 bg-slate-800/50 border-slate-700/30 mb-4">
+              <Card className="p-4 bg-slate-800/40 border-slate-700/50 mb-4">
                 <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-green-400" />
                   BANT-kvalificering
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className={`p-3 rounded-lg border ${currentLead.budget_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
+                  <div className={`p-3 rounded-lg border ${currentLead.budget_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
                     <div className="text-sm font-medium text-slate-300">Budget</div>
                     <div className={currentLead.budget_confirmed ? 'text-green-400' : 'text-slate-400'}>
                       {currentLead.budget_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg border ${currentLead.authority_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
+                  <div className={`p-3 rounded-lg border ${currentLead.authority_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
                     <div className="text-sm font-medium text-slate-300">Befogenhet</div>
                     <div className={currentLead.authority_confirmed ? 'text-green-400' : 'text-slate-400'}>
                       {currentLead.authority_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg border ${currentLead.needs_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
+                  <div className={`p-3 rounded-lg border ${currentLead.needs_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
                     <div className="text-sm font-medium text-slate-300">Behov</div>
                     <div className={currentLead.needs_confirmed ? 'text-green-400' : 'text-slate-400'}>
                       {currentLead.needs_confirmed ? 'Bekräftat' : 'Ej bekräftat'}
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg border ${currentLead.timeline_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
+                  <div className={`p-3 rounded-lg border ${currentLead.timeline_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
                     <div className="text-sm font-medium text-slate-300">Tidslinje</div>
                     <div className={currentLead.timeline_confirmed ? 'text-green-400' : 'text-slate-400'}>
                       {currentLead.timeline_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
@@ -432,7 +432,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
               {/* Customer Information + Timeline (merged) */}
               {(currentLead.phone_number || currentLead.email || currentLead.organization_number || currentLead.business_type || currentLead.problem_type || currentLead.company_size || currentLead.website || currentLead.address || currentLead.business_description || currentLead.sni07_label || currentLead.source || currentLead.decision_maker || currentLead.contract_with || currentLead.contact_date || currentLead.follow_up_date || currentLead.quote_provided_date || currentLead.contact_method) && (
-                <Card className="p-4 bg-slate-800/50 border-slate-700/30 mb-4">
+                <Card className="p-4 bg-slate-800/40 border-slate-700/50 mb-4">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                     <Building className="w-5 h-5 text-blue-400" />
                     Kunduppgifter
@@ -516,7 +516,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   {currentLead.business_description && (
                     <div className="mb-4">
                       <div className="text-slate-300 font-medium mb-2">Verksamhetsbeskrivning</div>
-                      <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30 whitespace-pre-wrap">
+                      <div className="text-white bg-slate-800/30 rounded-lg p-3 border border-slate-700/40 whitespace-pre-wrap">
                         {currentLead.business_description}
                       </div>
                     </div>
@@ -529,7 +529,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         <Factory className="w-4 h-4" />
                         SNI-kod (Branschklassning)
                       </div>
-                      <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30 space-y-1">
+                      <div className="text-white bg-slate-800/30 rounded-lg p-3 border border-slate-700/40 space-y-1">
                         {currentLead.sni07_label.split(/(?=\d{5}\s)/).filter(sni => sni.trim()).map((sni, index) => (
                           <div key={index} className="text-sm leading-relaxed border-l-2 border-blue-400/30 pl-3">
                             {sni.trim()}
@@ -562,7 +562,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
                   {/* Timeline & Dates (merged into this card) */}
                   {(currentLead.contact_date || currentLead.follow_up_date || currentLead.quote_provided_date || currentLead.contact_method) && (
-                    <div className="border-t border-slate-700/30 pt-3 mt-3">
+                    <div className="border-t border-slate-700/50 pt-3 mt-3">
                       <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-purple-400" />
                         Tidslinje & Datum
@@ -604,7 +604,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
               {/* Contract Information + Notes (merged) */}
               {(currentLead.contract_status !== null || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null || currentLead.contract_with || assignedTechnicians.length > 0 || technician || currentLead.notes) && (
-                <Card className="p-4 bg-slate-800/50 border-slate-700/30 mb-4">
+                <Card className="p-4 bg-slate-800/40 border-slate-700/50 mb-4">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-yellow-400" />
                     Avtalsinfo
@@ -663,7 +663,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       <div className="text-slate-300 font-medium mb-2">Tilldelade kollegor</div>
                       <div className="space-y-2">
                         {assignedTechnicians.map((assignment) => (
-                          <div key={assignment.id} className="flex items-center justify-between bg-slate-700/30 rounded-lg p-2 border border-slate-600/30">
+                          <div key={assignment.id} className="flex items-center justify-between bg-slate-800/30 rounded-lg p-2 border border-slate-700/40">
                             <div className="flex items-center gap-3">
                               <div className="flex items-center justify-center w-7 h-7 bg-green-600/10 rounded-full">
                                 <Users className="w-3.5 h-3.5 text-green-400" />
@@ -686,7 +686,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         ))}
 
                         {assignedTechnicians.length === 0 && technician && (
-                          <div className="flex items-center gap-3 bg-slate-700/30 rounded-lg p-2 border border-slate-600/30">
+                          <div className="flex items-center gap-3 bg-slate-800/30 rounded-lg p-2 border border-slate-700/40">
                             <div className="flex items-center justify-center w-7 h-7 bg-green-600/10 rounded-full">
                               <Users className="w-3.5 h-3.5 text-green-400" />
                             </div>
@@ -699,13 +699,13 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
                   {/* Notes (merged into this card) */}
                   {currentLead.notes && (
-                    <div className="border-t border-slate-700/30 pt-3 mt-3">
+                    <div className="border-t border-slate-700/50 pt-3 mt-3">
                       <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-1">
                         <FileText className="w-3.5 h-3.5 text-green-400" />
                         Anteckningar
                       </h4>
                       <div className="text-sm">
-                        <div className="text-white whitespace-pre-wrap bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                        <div className="text-white whitespace-pre-wrap bg-slate-800/30 rounded-lg p-3 border border-slate-700/40">
                           {currentLead.notes}
                         </div>
                       </div>
