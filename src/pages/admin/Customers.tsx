@@ -2,16 +2,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
+import {
   Search, Filter, RefreshCw, ChevronDown, ChevronUp,
-  Mail, Phone, Building2, User, Calendar, DollarSign,
-  TrendingUp, AlertTriangle, Activity, Send, Edit3, Users
+  Mail, Phone, Building2, User, Calendar, Coins,
+  AlertTriangle, Activity, Send, Edit3, Users
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import { PageHeader } from '../../components/shared'
 import CustomerKpiCards from '../../components/admin/customers/CustomerKpiCards'
 import CustomerRevenueModal from '../../components/admin/customers/CustomerRevenueModal'
 import EmailCampaignModal from '../../components/admin/customers/EmailCampaignModal'
@@ -453,7 +451,7 @@ export default function Customers() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center py-32">
         <LoadingSpinner size="lg" />
       </div>
     )
@@ -461,7 +459,7 @@ export default function Customers() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center py-32">
         <Card className="p-8 bg-red-500/10 border-red-500/20">
           <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <p className="text-red-400 text-center">{error}</p>
@@ -474,48 +472,39 @@ export default function Customers() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader 
-        title="Success Management"
-        subtitle="Hantera kundrelationer och maximera kundvärde"
-        icon={TrendingUp}
-        iconColor="text-green-500"
-        showBackButton={true}
-        backPath="/admin/dashboard"
-        rightContent={
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setEmailCampaignOpen(true)}
-              className="flex items-center gap-2 text-slate-400 hover:text-green-400 hover:bg-green-400/10"
-              title="Skicka e-postkampanj"
-            >
-              <Send className="w-4 h-4" />
-              <span className="hidden md:inline">E-postkampanj</span>
-            </Button>
-            <div className="w-px h-6 bg-slate-700"></div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={refresh}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Uppdatera
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate('/admin/customers/analytics')}
-              className="flex items-center gap-2"
-            >
-              <Activity className="w-4 h-4" />
-              Detaljerad Analytics
-            </Button>
-          </div>
-        }
-      />
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Sidtitel + åtgärdsknappar */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Kunder</h1>
+          <p className="text-sm text-slate-400 mt-1">Hantera kundrelationer och maximera kundvärde</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setEmailCampaignOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-green-400 hover:bg-green-400/10 transition-colors"
+            title="Skicka e-postkampanj"
+          >
+            <Send className="w-4 h-4" />
+            <span className="hidden md:inline">E-postkampanj</span>
+          </button>
+          <div className="w-px h-6 bg-slate-700" />
+          <button
+            onClick={refresh}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span className="hidden md:inline">Uppdatera</span>
+          </button>
+          <button
+            onClick={() => navigate('/admin/customers/analytics')}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+          >
+            <Activity className="w-4 h-4" />
+            <span className="hidden md:inline">Detaljerad Analytics</span>
+          </button>
+        </div>
+      </div>
 
       {/* KPI Cards */}
       <CustomerKpiCards analytics={consolidatedAnalytics} />
@@ -568,9 +557,8 @@ export default function Customers() {
         </div>
       )}
 
-      {/* Main content with sidebar */}
-      <div className="relative">
-        <div>
+      {/* Main content */}
+      <div>
           {/* Filters */}
           <Card className="p-4 mb-6 overflow-visible relative z-20">
             <div className="flex gap-3">
@@ -755,7 +743,7 @@ export default function Customers() {
                     {visibleColumns.has('annualValue') && (
                       <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalAnnualValue')}>
                         <div className="flex items-center justify-end gap-2">
-                          <DollarSign className="w-4 h-4 text-green-400" />
+                          <Coins className="w-4 h-4 text-green-400" />
                           Årspremie
                           {sortField === 'totalAnnualValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                         </div>
@@ -764,7 +752,7 @@ export default function Customers() {
                     {visibleColumns.has('casesValue') && (
                       <th className="hidden lg:table-cell px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalCasesValue')}>
                         <div className="flex items-center justify-end gap-2">
-                          <DollarSign className="w-4 h-4 text-blue-400" />
+                          <Coins className="w-4 h-4 text-blue-400" />
                           Debiterat utöver avtal
                           {sortField === 'totalCasesValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                         </div>
@@ -773,7 +761,7 @@ export default function Customers() {
                     {visibleColumns.has('contractValue') && (
                       <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalContractValue')}>
                         <div className="flex items-center justify-end gap-2">
-                          <DollarSign className="w-4 h-4 text-yellow-400" />
+                          <Coins className="w-4 h-4 text-yellow-400" />
                           Avtalsvärde
                           {sortField === 'totalContractValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                         </div>
@@ -922,8 +910,6 @@ export default function Customers() {
               )}
             </div>
           </Card>
-        </div>
-
       </div>
 
       {/* Email Campaign Modal */}

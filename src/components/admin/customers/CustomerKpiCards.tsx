@@ -2,7 +2,7 @@
 
 import React from 'react'
 import {
-  DollarSign, Users, AlertTriangle,
+  Coins, Users, AlertTriangle,
   Activity, Info
 } from 'lucide-react'
 import Card from '../../ui/Card'
@@ -29,7 +29,7 @@ export default function CustomerKpiCards({ analytics }: KpiCardsProps) {
       title: 'Totalt Portföljvärde',
       value: formatCurrency(analytics.portfolioValue),
       subtitle: `${analytics.totalCustomers} kunder totalt`,
-      icon: DollarSign,
+      icon: Coins,
       color: 'from-green-500/10 to-green-600/5 border-green-500/20',
       iconColor: 'text-green-500',
       trend: analytics.monthlyGrowth > 0 ? {
