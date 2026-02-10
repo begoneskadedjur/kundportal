@@ -76,7 +76,6 @@ export function useContracts(): UseContractsReturn {
       
       // Använd cache om tillgängligt
       if (isCached && cached.data) {
-        console.log(`🔄 Använder cachade kontrakt för filter: ${filterKey}`)
         setContracts(cached.data)
         setCurrentFilters(filters)
         setLoading(false)
@@ -85,11 +84,9 @@ export function useContracts(): UseContractsReturn {
       
       // Förhindra multipla samtidiga requests för samma filter
       if (loadingRef.current.has(filterKey)) {
-        console.log(`⏳ Väntar på pågående request för filter: ${filterKey}`)
         return
       }
       
-      console.log(`📄 Hämtar kontrakt från API med filter: ${filterKey}`)
       setLoading(true)
       setError(null)
       loadingRef.current.add(filterKey) // Mark as loading
@@ -191,13 +188,11 @@ export function useContracts(): UseContractsReturn {
       const isCached = cacheTime && (Date.now() - cacheTime < 5 * 60 * 1000) // 5 minuter cache
       
       if (!forceRefresh && isCached && contractFiles[contractId]) {
-        console.log(`🔄 Använder cachade filer för kontrakt ${contractId} (${contractFiles[contractId].length} filer)`)
         return contractFiles[contractId]
       }
       
       // Förhindra multipla samtidiga requests för samma kontrakt
       if (filesLoading[contractId]) {
-        console.log(`⏳ Väntar på pågående request för kontrakt ${contractId}`)
         // Vänta tills loading är klar och returnera cached result
         return new Promise((resolve) => {
           const checkInterval = setInterval(() => {
@@ -209,12 +204,10 @@ export function useContracts(): UseContractsReturn {
         })
       }
       
-      console.log(`📁 Hämtar filer från OneFlow API för kontrakt ${contractId} (forceRefresh: ${forceRefresh})`)
       setFilesLoading(prev => ({ ...prev, [contractId]: true }))
       
       // 🔧 FIX: Rensa gammal cache vid force refresh för att förhindra state conflicts
       if (forceRefresh) {
-        console.log(`🧹 Rensar cache för kontrakt ${contractId}`)
         setContractFiles(prev => {
           const updated = { ...prev }
           delete updated[contractId]
@@ -242,9 +235,6 @@ export function useContracts(): UseContractsReturn {
         return arr.findIndex(f => f.oneflow_file_id === file.oneflow_file_id) === index
       })
       
-      if (deduplicatedFiles.length !== rawFiles.length) {
-        console.log(`🧹 Deduplikation: ${rawFiles.length} → ${deduplicatedFiles.length} filer för kontrakt ${contractId}`)
-      }
       
       setContractFiles(prev => ({ ...prev, [contractId]: deduplicatedFiles }))
       setFilesLoadedAt(prev => ({ ...prev, [contractId]: Date.now() })) // Uppdatera cache timestamp
@@ -333,14 +323,12 @@ export function useContracts(): UseContractsReturn {
           correctedFileName = correctedFileName.includes('.') 
             ? correctedFileName.replace(/\.[^.]*$/, '.pdf') 
             : `${correctedFileName}.pdf`
-          console.log(`🔧 Frontend: Korrigerat filnamn ${apiResponse.data.fileName} → ${correctedFileName}`)
         }
         
         const downloadSuccess = await tryDirectDownload(contractId, fileId, correctedFileName)
         
         // Fallback till blob-metod om direktnedladdning misslyckas
         if (!downloadSuccess) {
-          console.log('Direktnedladdning misslyckades, använder blob-metod...')
           await downloadFileFromUrl(apiResponse.data.downloadUrl, correctedFileName)
         }
       }
@@ -446,8 +434,6 @@ export function useContracts(): UseContractsReturn {
 
   // Refresh kontrakt (rensa cache och ladda om)
   const refreshContracts = useCallback(async () => {
-    console.log('🔄 Explicit refresh - rensar cache och laddar om kontrakt')
-    
     // Rensa cache för att tvinga ny hämtning
     setContractsCache({})
     setFilesLoadedAt({}) // Rensa även filcache
@@ -479,7 +465,6 @@ export function useContracts(): UseContractsReturn {
   // Lyssna på deduplikations-events för att rensa filcache
   useEffect(() => {
     const handleContractsDeduplication = (event: any) => {
-      console.log('🧹 Kontrakt deduplikation detekterad, rensar filcache...', event.detail)
       setContractFiles({})
       setFilesLoadedAt({})
     }
@@ -554,8 +539,6 @@ export function useContracts(): UseContractsReturn {
 
   // Real-time subscription för contract_files
   useEffect(() => {
-    console.log('🔔 Sätter upp real-time subscription för contract files...')
-    
     const filesSubscription = supabase
       .channel('contract_files_changes')
       .on(
@@ -566,14 +549,11 @@ export function useContracts(): UseContractsReturn {
           table: 'contract_files'
         },
         (payload) => {
-          console.log('🔔 Contract files-förändring mottagen:', payload)
-          
           const fileData = payload.new as ContractFile || payload.old as ContractFile
           
           switch (payload.eventType) {
             case 'INSERT':
-              console.log('➕ Ny contract file skapad:', payload.new)
-              // 🔧 FIX: Förbättrad deduplikation med både ID och OneFlow ID kontroll
+              // Förbättrad deduplikation med både ID och OneFlow ID kontroll
               const newFile = payload.new as ContractFile
               setContractFiles(prev => {
                 const existingFiles = prev[fileData.contract_id] || []
@@ -585,20 +565,8 @@ export function useContracts(): UseContractsReturn {
                 )
                 
                 if (fileExists) {
-                  console.log('🚫 Duplikatfil upptäckt och ignorerad:', {
-                    id: newFile.id,
-                    oneflow_id: newFile.oneflow_file_id,
-                    name: newFile.file_name
-                  })
                   return prev // Ingen förändring
                 }
-                
-                console.log('✅ Lägger till ny fil:', {
-                  id: newFile.id,
-                  name: newFile.file_name,
-                  contract_id: fileData.contract_id,
-                  total_files_after: existingFiles.length + 1
-                })
                 
                 return {
                   ...prev,
@@ -608,7 +576,6 @@ export function useContracts(): UseContractsReturn {
               break
               
             case 'UPDATE':
-              console.log('🔄 Contract file uppdaterad:', payload.new)
               // Uppdatera specifik fil i state
               const updatedFile = payload.new as ContractFile
               setContractFiles(prev => ({
@@ -625,7 +592,6 @@ export function useContracts(): UseContractsReturn {
               break
               
             case 'DELETE':
-              console.log('🗑️ Contract file borttagen:', payload.old)
               // Ta bort filen från state
               setContractFiles(prev => ({
                 ...prev,
@@ -638,7 +604,6 @@ export function useContracts(): UseContractsReturn {
       .subscribe()
 
     return () => {
-      console.log('🔕 Stänger av real-time subscription för contract files')
       filesSubscription.unsubscribe()
     }
   }, [])
@@ -763,7 +728,6 @@ export function useContract(id: string | null) {
           filter: `id=eq.${id}`
         },
         (payload) => {
-          console.log('🔄 Kontrakt uppdaterat (enstaka):', payload.new)
           setContract(prev => prev ? { ...prev, ...payload.new } : null)
         }
       )

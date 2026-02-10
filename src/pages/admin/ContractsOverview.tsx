@@ -5,7 +5,7 @@ import {
   FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, 
   ShoppingCart, Filter, Download, TrendingUp, Users, Package, 
   Calendar, Clock, AlertTriangle, BarChart3, Percent, Target, 
-  Award, User, ChevronLeft, ChevronRight, Tag, Layers, X,
+  Award, User, Tag, Layers, X,
   ArrowUp, ArrowDown, Menu, Building2, Mail, Phone, Info
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -15,7 +15,6 @@ import ContractFilesModal from '../../components/admin/contracts/ContractFilesMo
 import ContractImportModal from '../../components/admin/contracts/ContractImportModal'
 import FilesColumn from '../../components/admin/contracts/FilesColumn'
 import FileDownloadButton from '../../components/admin/contracts/FileDownloadButton'
-import { PageHeader } from '../../components/shared'
 import { useContracts } from '../../hooks/useContracts'
 import { ContractFilters, ContractWithSourceData } from '../../services/contractService'
 import { formatContractValue, getContractStatusColor, getContractStatusText, getContractTypeText } from '../../services/contractService'
@@ -477,11 +476,6 @@ export default function ContractsOverview() {
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set())
   
-  // Sidopanel state
-  const [sidePanelOpen, setSidePanelOpen] = useState(() => {
-    const saved = localStorage.getItem('contractsSidePanelOpen')
-    return saved ? saved === 'true' : false
-  })
   
   // Modal states
   const [filesModalOpen, setFilesModalOpen] = useState(false)
@@ -528,10 +522,6 @@ export default function ContractsOverview() {
     fetchPriceLists()
   }, [contracts])
 
-  // Spara sidopanel-preferens
-  useEffect(() => {
-    localStorage.setItem('contractsSidePanelOpen', sidePanelOpen.toString())
-  }, [sidePanelOpen])
 
   // Filtrera kontrakt
   const filteredContracts = useMemo(() => {
@@ -606,13 +596,11 @@ export default function ContractsOverview() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <PageHeader 
-          title="Försäljningspipeline"
-          icon={FileText}
-          iconColor="text-green-500"
-          showBackButton={false}
-        />
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Avtalsöversikt</h1>
+          <p className="text-sm text-slate-400 mt-1">Hantera kontrakt och försäljningsprocesser</p>
+        </div>
         
         {/* Skeleton KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -667,37 +655,22 @@ export default function ContractsOverview() {
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <PageHeader
-        title="Försäljningspipeline"
-        subtitle="Hantera kontrakt och försäljningsprocesser"
-        icon={FileText}
-        iconColor="text-green-500"
-        showBackButton={true}
-        backPath="/admin/dashboard"
-        rightContent={
-          <div className="flex items-center gap-3">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setImportModalOpen(true)}
-              className="flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Importera
-            </Button>
-            
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setSidePanelOpen(!sidePanelOpen)}
-              className="flex items-center gap-2"
-            >
-              {sidePanelOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-              Statistik
-            </Button>
-          </div>
-        }
-      />
+      {/* Sidtitel + åtgärdsknappar */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Avtalsöversikt</h1>
+          <p className="text-sm text-slate-400 mt-1">Hantera kontrakt och försäljningsprocesser</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setImportModalOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-green-400 hover:bg-green-400/10 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden md:inline">Importera</span>
+          </button>
+        </div>
+      </div>
       
       <div className="flex gap-6">
         {/* Huvudinnehåll */}
@@ -1042,24 +1015,13 @@ export default function ContractsOverview() {
         </div>
 
         {/* Sidopanel */}
-        {sidePanelOpen && (
         <aside className="hidden lg:block w-80 xl:w-96 flex-shrink-0">
           <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto p-4 space-y-4">
           {/* Sidopanel header */}
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-              <BarChart3 className="w-4 h-4 text-[#20c58f]" />
-              Analys & Insikter
-            </h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidePanelOpen(false)}
-              className="text-slate-400 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+            <BarChart3 className="w-4 h-4 text-[#20c58f]" />
+            Analys & Insikter
+          </h3>
 
           {/* Pipeline översikt */}
           <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
@@ -1193,7 +1155,6 @@ export default function ContractsOverview() {
           </div>
           </div>
         </aside>
-        )}
 
         {/* Modals */}
         <ContractImportModal
