@@ -34,7 +34,7 @@ const LeadsExpandedRow: React.FC<LeadsExpandedRowProps> = ({
 
   return (
     <tr className="bg-slate-800/30 border-b border-slate-700/30">
-      <td colSpan={colSpan} className="px-4 py-3 border-l-4 border-purple-400/50">
+      <td colSpan={colSpan} className="px-4 py-3 border-l-4 border-[#20c58f]/50">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
 
           {/* Sektion 1: Kontakt & Affärsinformation */}

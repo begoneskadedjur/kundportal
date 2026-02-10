@@ -154,7 +154,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
               size="sm"
               className={`text-xs transition-all duration-200 ${
                 filter.active 
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500' 
+                  ? 'bg-[#20c58f] hover:bg-[#1ba876] text-white border-[#20c58f]'
                   : 'border-slate-600 text-slate-300 hover:text-white hover:border-slate-500'
               }`}
             >
@@ -172,7 +172,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <Filter className="w-4 h-4" />
           Avancerade filter
           {activeFilterCount > 0 && (
-            <span className="bg-purple-500 text-white text-xs rounded-full px-2 py-1">
+            <span className="bg-[#20c58f] text-white text-xs rounded-full px-2 py-1">
               {activeFilterCount}
             </span>
           )}
@@ -185,7 +185,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
     <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Filter className="w-5 h-5 text-purple-400" />
+          <Filter className="w-5 h-5 text-[#20c58f]" />
           Filter & Sök ({resultCount} resultat)
         </h3>
         <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             value={localFilters.search}
             onChange={(e) => handleFilterChange('search', e.target.value)}
             placeholder="Företag, kontaktperson, email..."
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           />
         </div>
 
@@ -231,7 +231,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <select
             value={localFilters.status}
             onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           >
             <option value="all">Alla statusar</option>
             <option value="red_lost">🔴 Förlorad</option>
@@ -250,7 +250,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <select
             value={localFilters.priority}
             onChange={(e) => handleFilterChange('priority', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           >
             <option value="all">Alla prioriteter</option>
             <option value="urgent">🔥 Brådskande</option>
@@ -269,7 +269,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <select
             value={localFilters.assignedTo}
             onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           >
             <option value="all">Alla användare</option>
             <option value="me">Mina leads</option>
@@ -285,7 +285,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <select
             value={localFilters.createdBy}
             onChange={(e) => handleFilterChange('createdBy', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           >
             <option value="all">Alla användare</option>
             <option value="me">Skapade av mig</option>
@@ -301,7 +301,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <select
             value={localFilters.companySize}
             onChange={(e) => handleFilterChange('companySize', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           >
             <option value="all">Alla storlekar</option>
             <option value="small">Litet</option>
@@ -319,7 +319,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <select
             value={localFilters.contactMethod}
             onChange={(e) => handleFilterChange('contactMethod', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           >
             <option value="all">Alla metoder</option>
             <option value="mail">📧 Email</option>
@@ -338,7 +338,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             value={localFilters.source}
             onChange={(e) => handleFilterChange('source', e.target.value)}
             placeholder="Webbplats, referral, etc."
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           />
         </div>
 
@@ -353,7 +353,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             value={localFilters.estimatedValueMin || ''}
             onChange={(e) => handleFilterChange('estimatedValueMin', e.target.value ? parseInt(e.target.value) : null)}
             placeholder="0"
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           />
         </div>
 
@@ -367,7 +367,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             value={localFilters.estimatedValueMax || ''}
             onChange={(e) => handleFilterChange('estimatedValueMax', e.target.value ? parseInt(e.target.value) : null)}
             placeholder="1000000"
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           />
         </div>
 
@@ -380,7 +380,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <select
             value={localFilters.dateRange}
             onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           >
             <option value="all">Alla datum</option>
             <option value="today">Idag</option>
@@ -398,7 +398,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             type="checkbox"
             checked={localFilters.followUpToday}
             onChange={(e) => handleFilterChange('followUpToday', e.target.checked)}
-            className="rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500/50"
+            className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]/50"
           />
           <Target className="w-4 h-4" />
           Uppföljning idag
@@ -409,7 +409,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             type="checkbox"
             checked={localFilters.hasEstimatedValue !== 'all' ? localFilters.hasEstimatedValue : false}
             onChange={(e) => handleFilterChange('hasEstimatedValue', e.target.checked)}
-            className="rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500/50"
+            className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]/50"
           />
           <DollarSign className="w-4 h-4" />
           Har uppskattat värde
@@ -427,7 +427,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
               type="date"
               value={localFilters.customStartDate}
               onChange={(e) => handleFilterChange('customStartDate', e.target.value)}
-              className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
             />
           </div>
           <div>
@@ -438,7 +438,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
               type="date"
               value={localFilters.customEndDate}
               onChange={(e) => handleFilterChange('customEndDate', e.target.value)}
-              className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
             />
           </div>
         </div>

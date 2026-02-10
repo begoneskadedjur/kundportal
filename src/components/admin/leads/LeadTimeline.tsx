@@ -243,7 +243,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
         <Button
           onClick={() => setShowForm(!showForm)}
           size="sm"
-          className="bg-purple-600 hover:bg-purple-700 text-white"
+          className=""
         >
           <Plus className="w-4 h-4 mr-2" />
           Lägg till händelse
@@ -332,7 +332,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
+                className=""
               >
                 {loading ? (
                   <>

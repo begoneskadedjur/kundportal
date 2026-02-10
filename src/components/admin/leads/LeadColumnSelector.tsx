@@ -85,14 +85,14 @@ export default function LeadColumnSelector({ visibleColumns, onToggle, onReset }
         onClick={() => setOpen(!open)}
         className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm font-medium ${
           hiddenCount > 0
-            ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+            ? 'bg-[#20c58f]/10 border-[#20c58f]/30 text-[#20c58f]'
             : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'
         }`}
       >
         <Settings className="w-4 h-4" />
         Kolumner
         {hiddenCount > 0 && (
-          <span className="bg-purple-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="bg-[#20c58f] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
             {hiddenCount}
           </span>
         )}
@@ -117,7 +117,7 @@ export default function LeadColumnSelector({ visibleColumns, onToggle, onReset }
                   checked={visibleColumns.has(column.id)}
                   onChange={() => onToggle(column.id)}
                   disabled={column.required}
-                  className="rounded bg-slate-700 border-slate-600 text-purple-500 focus:ring-purple-500"
+                  className="rounded bg-slate-700 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                 />
                 <span className="text-sm text-slate-300">{column.label}</span>
                 {column.required && (
@@ -130,7 +130,7 @@ export default function LeadColumnSelector({ visibleColumns, onToggle, onReset }
             <button onClick={onReset} className="text-xs text-slate-400 hover:text-white transition-colors">
               Återställ
             </button>
-            <button onClick={() => setOpen(false)} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+            <button onClick={() => setOpen(false)} className="text-xs text-[#20c58f] hover:text-[#20c58f]/80 transition-colors">
               Stäng
             </button>
           </div>

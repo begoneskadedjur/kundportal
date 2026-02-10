@@ -187,7 +187,7 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
             size="sm"
             variant={activeView === 'forecast' ? 'default' : 'outline'}
             onClick={() => setActiveView('forecast')}
-            className={activeView === 'forecast' ? 'bg-purple-600' : 'border-slate-600 text-slate-300'}
+            className={activeView === 'forecast' ? 'bg-[#20c58f]' : 'border-slate-600 text-slate-300'}
           >
             <TrendingUp className="w-4 h-4 mr-2" />
             Prognos
@@ -196,7 +196,7 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
             size="sm"
             variant={activeView === 'breakdown' ? 'default' : 'outline'}
             onClick={() => setActiveView('breakdown')}
-            className={activeView === 'breakdown' ? 'bg-purple-600' : 'border-slate-600 text-slate-300'}
+            className={activeView === 'breakdown' ? 'bg-[#20c58f]' : 'border-slate-600 text-slate-300'}
           >
             <PieChart className="w-4 h-4 mr-2" />
             Fördelning
@@ -205,7 +205,7 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
             size="sm"
             variant={activeView === 'monthly' ? 'default' : 'outline'}
             onClick={() => setActiveView('monthly')}
-            className={activeView === 'monthly' ? 'bg-purple-600' : 'border-slate-600 text-slate-300'}
+            className={activeView === 'monthly' ? 'bg-[#20c58f]' : 'border-slate-600 text-slate-300'}
           >
             <Calendar className="w-4 h-4 mr-2" />
             Månadsvis

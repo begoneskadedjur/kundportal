@@ -258,7 +258,7 @@ export default function SNIBranchManager({
                 className={`
                   flex items-center gap-2 px-3 py-1.5 rounded-full text-sm
                   ${sniCode.is_primary 
-                    ? 'bg-blue-600 text-white border border-blue-500' 
+                    ? 'bg-[#20c58f] text-white border border-[#20c58f]/70'
                     : 'bg-slate-700 text-slate-300 border border-slate-600'
                   }
                 `}
@@ -269,7 +269,7 @@ export default function SNIBranchManager({
                 </span>
                 
                 {sniCode.is_primary && (
-                  <span className="text-xs bg-blue-500 px-2 py-0.5 rounded">
+                  <span className="text-xs bg-[#20c58f]/80 px-2 py-0.5 rounded">
                     Primär
                   </span>
                 )}
@@ -440,7 +440,7 @@ export default function SNIBranchManager({
                   size="sm"
                   onClick={handleManualSniSubmit}
                   disabled={disabled || !manualInputText.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className=""
                 >
                   Lägg till koder
                 </Button>

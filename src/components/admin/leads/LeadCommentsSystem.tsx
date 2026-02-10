@@ -261,7 +261,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
         <Button
           onClick={() => setShowForm(!showForm)}
           size="sm"
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          className=""
         >
           <Plus className="w-4 h-4 mr-2" />
           Ny kommentar
@@ -329,7 +329,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className=""
               >
                 {loading ? (
                   <>

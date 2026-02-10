@@ -49,7 +49,7 @@ const LeadsFilters: React.FC<LeadsFiltersProps> = ({
             value={filters.search}
             onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
             placeholder="Sök företag, kontakt, email..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50"
+            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50 focus:border-[#20c58f]/50"
           />
         </div>
 
@@ -75,7 +75,7 @@ const LeadsFilters: React.FC<LeadsFiltersProps> = ({
         <Button
           onClick={onCreateLead}
           size="sm"
-          className="bg-purple-600 hover:bg-purple-700 text-white flex-shrink-0"
+          className="flex-shrink-0"
         >
           <Plus className="w-4 h-4 mr-1.5" />
           Nytt Lead

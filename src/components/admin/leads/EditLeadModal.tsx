@@ -682,7 +682,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
             type="submit"
             form="edit-lead-form"
             disabled={loading || deleting}
-            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+            className="flex items-center gap-2"
           >
             {loading ? (
               <>
@@ -878,7 +878,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     type="checkbox"
                     checked={formData.interested_in_quote || false}
                     onChange={(e) => handleInputChange('interested_in_quote', e.target.checked)}
-                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                    className="rounded bg-slate-700 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                   />
                   Intresserad av offert
                 </label>
@@ -888,7 +888,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     type="checkbox"
                     checked={formData.procurement || false}
                     onChange={(e) => handleInputChange('procurement', e.target.checked)}
-                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                    className="rounded bg-slate-700 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                   />
                   Upphandling
                 </label>
@@ -904,7 +904,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                         name="hasContract"
                         checked={!formData.contract_status}
                         onChange={() => handleInputChange('contract_status', false)}
-                        className="text-purple-600 focus:ring-purple-500"
+                        className="text-[#20c58f] focus:ring-[#20c58f]"
                       />
                       Nej - inget befintligt avtal
                     </label>
@@ -914,7 +914,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                         name="hasContract"
                         checked={formData.contract_status || false}
                         onChange={() => handleInputChange('contract_status', true)}
-                        className="text-purple-600 focus:ring-purple-500"
+                        className="text-[#20c58f] focus:ring-[#20c58f]"
                       />
                       Ja - har befintligt avtal
                     </label>
@@ -1176,7 +1176,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     type="checkbox"
                     checked={formData.budget_confirmed || false}
                     onChange={(e) => handleInputChange('budget_confirmed', e.target.checked)}
-                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                    className="rounded bg-slate-700 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                   />
                   Budget bekräftad
                 </label>
@@ -1186,7 +1186,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     type="checkbox"
                     checked={formData.authority_confirmed || false}
                     onChange={(e) => handleInputChange('authority_confirmed', e.target.checked)}
-                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                    className="rounded bg-slate-700 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                   />
                   Befogenhet bekräftad
                 </label>
@@ -1196,7 +1196,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     type="checkbox"
                     checked={formData.needs_confirmed || false}
                     onChange={(e) => handleInputChange('needs_confirmed', e.target.checked)}
-                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                    className="rounded bg-slate-700 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                   />
                   Behov bekräftat
                 </label>
@@ -1206,7 +1206,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     type="checkbox"
                     checked={formData.timeline_confirmed || false}
                     onChange={(e) => handleInputChange('timeline_confirmed', e.target.checked)}
-                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                    className="rounded bg-slate-700 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                   />
                   Tidslinje bekräftad
                 </label>

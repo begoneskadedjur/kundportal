@@ -308,21 +308,21 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
             <Crown className="w-4 h-4 text-yellow-400" />
             <h4 className="text-sm font-medium text-slate-300">Huvudkontakt</h4>
           </div>
-          <div className="p-4 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30">
+          <div className="p-4 bg-gradient-to-r from-[#20c58f]/15 to-[#20c58f]/5 rounded-lg border border-[#20c58f]/30">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-3">
                   <h4 className="font-semibold text-white text-lg">{primaryContact.name}</h4>
-                  <span className="px-3 py-1 text-xs bg-blue-600/30 text-blue-300 rounded-full border border-blue-500/50 font-medium">
+                  <span className="px-3 py-1 text-xs bg-[#20c58f]/20 text-emerald-300 rounded-full border border-[#20c58f]/40 font-medium">
                     PRIMÄR KONTAKT
                   </span>
                 </div>
                 {primaryContact.title && (
-                  <p className="text-blue-200 mt-1">{primaryContact.title}</p>
+                  <p className="text-emerald-200 mt-1">{primaryContact.title}</p>
                 )}
                 <div className="flex items-center gap-6 mt-3 text-sm">
                   {primaryContact.email && (
-                    <div className="flex items-center gap-2 text-blue-200">
+                    <div className="flex items-center gap-2 text-emerald-200">
                       <Mail className="w-4 h-4" />
                       <a href={`mailto:${primaryContact.email}`} className="hover:text-white">
                         {primaryContact.email}
@@ -330,7 +330,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
                     </div>
                   )}
                   {primaryContact.phone && (
-                    <div className="flex items-center gap-2 text-blue-200">
+                    <div className="flex items-center gap-2 text-emerald-200">
                       <Phone className="w-4 h-4" />
                       <a href={`tel:${primaryContact.phone}`} className="hover:text-white">
                         {primaryContact.phone}
@@ -339,7 +339,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
                   )}
                 </div>
                 {primaryContact.notes && (
-                  <p className="text-blue-200/80 text-sm mt-2 italic">{primaryContact.notes}</p>
+                  <p className="text-emerald-200/80 text-sm mt-2 italic">{primaryContact.notes}</p>
                 )}
               </div>
               
@@ -349,7 +349,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
                   variant="ghost"
                   onClick={() => setEditingContact(primaryContact)}
                   disabled={loading}
-                  className="text-blue-300 hover:text-white hover:bg-blue-600/30"
+                  className="text-emerald-300 hover:text-white hover:bg-[#20c58f]/20"
                 >
                   <Edit3 className="w-4 h-4" />
                 </Button>

@@ -77,8 +77,8 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
       return <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
     }
     return sortDirection === 'asc'
-      ? <ArrowUp className="w-3.5 h-3.5 text-purple-400" />
-      : <ArrowDown className="w-3.5 h-3.5 text-purple-400" />
+      ? <ArrowUp className="w-3.5 h-3.5 text-[#20c58f]" />
+      : <ArrowDown className="w-3.5 h-3.5 text-[#20c58f]" />
   }
 
   const getScoreColor = (score: number) => {
@@ -121,7 +121,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
               {isVisible('statusScore') && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('status')}>
                   <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-purple-400" />
+                    <Target className="w-4 h-4 text-[#20c58f]" />
                     Status & Score
                     {getSortIcon('status')}
                   </div>
@@ -164,7 +164,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
               {isVisible('nextStep') && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('follow_up_date')}>
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-purple-400" />
+                    <Calendar className="w-4 h-4 text-[#20c58f]" />
                     Nästa steg
                     {getSortIcon('follow_up_date')}
                   </div>
@@ -197,7 +197,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
               {isVisible('closingDate') && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => onSort('closing_date_estimate')}>
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-purple-400" />
+                    <Calendar className="w-4 h-4 text-[#20c58f]" />
                     Deadline
                     {getSortIcon('closing_date_estimate')}
                   </div>
@@ -432,7 +432,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                           size="sm"
                           variant="ghost"
                           onClick={() => onViewLead(lead)}
-                          className="text-slate-400 hover:text-purple-400 hover:bg-purple-400/10 p-1.5 rounded-md"
+                          className="text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 p-1.5 rounded-md"
                           title="Visa detaljer"
                         >
                           <Eye className="w-3.5 h-3.5" />

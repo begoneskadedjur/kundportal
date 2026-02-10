@@ -321,7 +321,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         headerActions={
           <Button
             onClick={() => setShowEditModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className=""
             size="sm"
           >
             <Edit3 className="w-4 h-4 mr-1" />

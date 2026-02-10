@@ -203,7 +203,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             size="sm"
             variant={activeChart === 'volume' ? 'default' : 'outline'}
             onClick={() => setActiveChart('volume')}
-            className={activeChart === 'volume' ? 'bg-purple-600' : 'border-slate-600 text-slate-300'}
+            className={activeChart === 'volume' ? 'bg-[#20c58f]' : 'border-slate-600 text-slate-300'}
           >
             <LineChart className="w-4 h-4 mr-2" />
             Volym över tid
@@ -212,7 +212,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             size="sm"
             variant={activeChart === 'sources' ? 'default' : 'outline'}
             onClick={() => setActiveChart('sources')}
-            className={activeChart === 'sources' ? 'bg-purple-600' : 'border-slate-600 text-slate-300'}
+            className={activeChart === 'sources' ? 'bg-[#20c58f]' : 'border-slate-600 text-slate-300'}
           >
             <BarChart3 className="w-4 h-4 mr-2" />
             Källor
@@ -221,7 +221,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             size="sm"
             variant={activeChart === 'status' ? 'default' : 'outline'}
             onClick={() => setActiveChart('status')}
-            className={activeChart === 'status' ? 'bg-purple-600' : 'border-slate-600 text-slate-300'}
+            className={activeChart === 'status' ? 'bg-[#20c58f]' : 'border-slate-600 text-slate-300'}
           >
             <PieChart className="w-4 h-4 mr-2" />
             Status

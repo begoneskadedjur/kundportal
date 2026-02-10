@@ -217,8 +217,8 @@ const LeadTeamPerformance: React.FC<LeadTeamPerformanceProps> = ({ data }) => {
       return <Minus className="w-4 h-4 text-slate-400" />
     }
     return sortDirection === 'asc' 
-      ? <ArrowUp className="w-4 h-4 text-purple-400" />
-      : <ArrowDown className="w-4 h-4 text-purple-400" />
+      ? <ArrowUp className="w-4 h-4 text-[#20c58f]" />
+      : <ArrowDown className="w-4 h-4 text-[#20c58f]" />
   }
 
   const getPerformanceIcon = (conversionRate: number) => {

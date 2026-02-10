@@ -203,7 +203,7 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
               size="sm"
               variant={viewMode === 'regions' ? 'default' : 'outline'}
               onClick={() => setViewMode('regions')}
-              className={viewMode === 'regions' ? 'bg-purple-600' : 'border-slate-600 text-slate-300'}
+              className={viewMode === 'regions' ? 'bg-[#20c58f]' : 'border-slate-600 text-slate-300'}
             >
               Regioner
             </Button>
@@ -211,7 +211,7 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
               size="sm"
               variant={viewMode === 'cities' ? 'default' : 'outline'}
               onClick={() => setViewMode('cities')}
-              className={viewMode === 'cities' ? 'bg-purple-600' : 'border-slate-600 text-slate-300'}
+              className={viewMode === 'cities' ? 'bg-[#20c58f]' : 'border-slate-600 text-slate-300'}
               disabled
             >
               Städer (kommer snart)
@@ -221,7 +221,7 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'leads' | 'conversion' | 'value')}
-            className="bg-slate-800 border border-slate-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="bg-slate-800 border border-slate-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
           >
             <option value="leads">Sortera efter antal leads</option>
             <option value="conversion">Sortera efter konvertering</option>
