@@ -16,13 +16,13 @@ const EXCLUDED_PATHS = [
   '/set-password',
   '/forgot-password',
   '/reset-password',
-  '/admin/dashboard-demo',
 ];
 
 // Prefix för portaler som har egen layout
 const EXCLUDED_PREFIXES = [
   '/customer',
   '/organisation',
+  '/admin',
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {

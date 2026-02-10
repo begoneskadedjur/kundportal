@@ -17,6 +17,7 @@ import UserProfile from './pages/shared/UserProfile';
 // Admin pages
 import AdminDashboard from './pages/admin/Dashboard';
 import DashboardDemo from './pages/admin/DashboardDemo';
+import { AdminLayout } from './components/admin/layout';
 import Customers from './pages/admin/Customers';
 import CustomerDetails from './pages/admin/CustomerDetails';
 import Economics from './pages/admin/Economics';
@@ -116,220 +117,46 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Admin routes */}
-            <Route 
-              path="/admin/dashboard" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/dashboard-demo"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <DashboardDemo />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/customers" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <Customers />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/leads" 
-              element={
-                <ProtectedRoute requiredRole={["admin", "koordinator", "technician"]}>
-                  <Leads />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/leads/analytics" 
-              element={
-                <ProtectedRoute requiredRole={["admin", "koordinator", "technician"]}>
-                  <LeadAnalytics />
-                </ProtectedRoute>
-              } 
-            />
-            <Route
-              path="/admin/customers/analytics"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <CustomerAnalytics />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/customers/:id"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <CustomerDetails />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/economics" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <Economics />
-                </ProtectedRoute>
-              } 
-            />
-            <Route
-              path="/admin/technicians" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <Technicians />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/technician-management" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <TechnicianManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/commissions" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <TechnicianCommissions />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/sales-opportunities" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <SalesOpportunities />
-                </ProtectedRoute>
-              } 
-            />
-            <Route
-              path="/admin/image-bank"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <ImageBank />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/team-chat"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <TeamChat />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/settings/station-types"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <StationTypesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/settings/preparations"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <PreparationsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/settings/articles"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <ArticlesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/settings/price-lists"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <PriceListsPage />
-                </ProtectedRoute>
-              }
-            />
-            {/* Faktureringssystem */}
-            <Route
-              path="/admin/invoicing"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <InvoicingPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/invoicing/*"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <InvoicingPage />
-                </ProtectedRoute>
-              }
-            />
+            {/* Admin routes — nasted under AdminLayout med persistent sidebar */}
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
+              <Route path="dashboard-demo" element={<ProtectedRoute requiredRole="admin"><DashboardDemo /></ProtectedRoute>} />
+              <Route path="customers" element={<ProtectedRoute requiredRole="admin"><Customers /></ProtectedRoute>} />
+              <Route path="customers/:id" element={<ProtectedRoute requiredRole="admin"><CustomerDetails /></ProtectedRoute>} />
+              <Route path="customers/analytics" element={<ProtectedRoute requiredRole="admin"><CustomerAnalytics /></ProtectedRoute>} />
+              <Route path="leads" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><Leads /></ProtectedRoute>} />
+              <Route path="leads/analytics" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><LeadAnalytics /></ProtectedRoute>} />
+              <Route path="economics" element={<ProtectedRoute requiredRole="admin"><Economics /></ProtectedRoute>} />
+              <Route path="technicians" element={<ProtectedRoute requiredRole="admin"><Technicians /></ProtectedRoute>} />
+              <Route path="technician-management" element={<ProtectedRoute requiredRole="admin"><TechnicianManagement /></ProtectedRoute>} />
+              <Route path="commissions" element={<ProtectedRoute requiredRole="admin"><TechnicianCommissions /></ProtectedRoute>} />
+              <Route path="sales-opportunities" element={<ProtectedRoute requiredRole="admin"><SalesOpportunities /></ProtectedRoute>} />
+              <Route path="image-bank" element={<ProtectedRoute requiredRole="admin"><ImageBank /></ProtectedRoute>} />
+              <Route path="team-chat" element={<ProtectedRoute requiredRole="admin"><TeamChat /></ProtectedRoute>} />
+              <Route path="settings/station-types" element={<ProtectedRoute requiredRole="admin"><StationTypesPage /></ProtectedRoute>} />
+              <Route path="settings/preparations" element={<ProtectedRoute requiredRole="admin"><PreparationsPage /></ProtectedRoute>} />
+              <Route path="settings/articles" element={<ProtectedRoute requiredRole="admin"><ArticlesPage /></ProtectedRoute>} />
+              <Route path="settings/price-lists" element={<ProtectedRoute requiredRole="admin"><PriceListsPage /></ProtectedRoute>} />
+              <Route path="invoicing" element={<ProtectedRoute requiredRole="admin"><InvoicingPage /></ProtectedRoute>} />
+              <Route path="invoicing/*" element={<ProtectedRoute requiredRole="admin"><InvoicingPage /></ProtectedRoute>} />
+              <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="admin"><OneflowContractCreator /></ProtectedRoute>} />
+              <Route path="oneflow-diagnostics" element={<ProtectedRoute requiredRole="admin"><OneflowDiagnostics /></ProtectedRoute>} />
+              <Route path="contracts-overview" element={<ProtectedRoute requiredRole="admin"><ContractsOverview /></ProtectedRoute>} />
+              <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
+              <Route path="oneflow-test" element={<Navigate to="/admin/oneflow-contract-creator" replace />} />
+              <Route path="tickets" element={<ProtectedRoute requiredRole="admin"><InternAdministration /></ProtectedRoute>} />
+              <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="admin"><CaseDeletionGuide /></ProtectedRoute>} />
+              <Route path="guides/ticket-system" element={<ProtectedRoute requiredRole="admin"><TicketSystemGuide /></ProtectedRoute>} />
+              {/* Organisation routes (admin + koordinator) */}
+              <Route path="organisation/register" element={<AdminOrKoordinatorRoute><MultisiteRegistrationPage /></AdminOrKoordinatorRoute>} />
+              <Route path="organisation/organizations" element={<AdminOrKoordinatorRoute><AdminOrganizationsPage /></AdminOrKoordinatorRoute>} />
+              <Route path="organisation/organizations-manage" element={<AdminOrKoordinatorRoute><OrganizationManagement /></AdminOrKoordinatorRoute>} />
+              <Route path="organisation/traffic-light" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
+              <Route path="organisation/billing" element={<AdminOrKoordinatorRoute><MultisiteBillingManagement /></AdminOrKoordinatorRoute>} />
+            </Route>
 
-            {/* Organisation Management Routes - Admin */}
-            <Route 
-              path="/admin/organisation/register" 
-              element={
-                <AdminOrKoordinatorRoute>
-                  <MultisiteRegistrationPage />
-                </AdminOrKoordinatorRoute>
-              } 
-            />
-            <Route 
-              path="/admin/organisation/organizations" 
-              element={
-                <AdminOrKoordinatorRoute>
-                  <AdminOrganizationsPage />
-                </AdminOrKoordinatorRoute>
-              } 
-            />
-            <Route 
-              path="/admin/organisation/organizations-manage" 
-              element={
-                <AdminOrKoordinatorRoute>
-                  <OrganizationManagement />
-                </AdminOrKoordinatorRoute>
-              } 
-            />
-            <Route 
-              path="/admin/organisation/traffic-light" 
-              element={
-                <AdminOrKoordinatorRoute>
-                  <TrafficLightOverview />
-                </AdminOrKoordinatorRoute>
-              } 
-            />
-            <Route 
-              path="/admin/organisation/billing" 
-              element={
-                <AdminOrKoordinatorRoute>
-                  <MultisiteBillingManagement />
-                </AdminOrKoordinatorRoute>
-              } 
-            />
-            
-            {/* OneflowContractCreator - TILLGÄNGLIG FÖR ADMIN, KOORDINATOR OCH TEKNIKER */}
-            <Route 
-              path="/admin/oneflow-contract-creator" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <OneflowContractCreator />
-                </ProtectedRoute>
-              } 
-            />
+            {/* OneflowContractCreator - TILLGÄNGLIG FÖR KOORDINATOR OCH TEKNIKER (utanfor admin-layout) */}
             <Route 
               path="/koordinator/oneflow-contract-creator" 
               element={
@@ -345,34 +172,6 @@ function App() {
                   <OneflowContractCreator />
                 </ProtectedRoute>
               } 
-            />
-            <Route 
-              path="/admin/oneflow-diagnostics" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <OneflowDiagnostics />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/contracts-overview" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <ContractsOverview />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/webhook-config" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <WebhookConfig />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/oneflow-test" 
-              element={<Navigate to="/admin/oneflow-contract-creator" replace />}
             />
 
             {/* Koordinator-rutter (skyddas av 'koordinator'-rollen) */}
@@ -580,16 +379,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/guides/case-deletion"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <CaseDeletionGuide />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Ticket System guide for all internal roles */}
+            {/* Ticket System guide for non-admin roles (admin guides are inside AdminLayout) */}
             <Route
               path="/technician/guides/ticket-system"
               element={
@@ -602,14 +392,6 @@ function App() {
               path="/koordinator/guides/ticket-system"
               element={
                 <ProtectedRoute requiredRole="koordinator">
-                  <TicketSystemGuide />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/guides/ticket-system"
-              element={
-                <ProtectedRoute requiredRole="admin">
                   <TicketSystemGuide />
                 </ProtectedRoute>
               }
@@ -832,7 +614,6 @@ function App() {
 
             {/* Default redirects */}
             <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/technician" element={<Navigate to="/technician/dashboard" replace />} />
             <Route path="/koordinator" element={<Navigate to="/koordinator/dashboard" replace />} />
             
@@ -840,15 +621,7 @@ function App() {
             <Route path="/portal" element={<Navigate to="/customer" replace />} />
             <Route path="/customer/portal" element={<Navigate to="/customer" replace />} />
 
-            {/* Tickets Routes */}
-            <Route
-              path="/admin/tickets"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <InternAdministration />
-                </ProtectedRoute>
-              }
-            />
+            {/* Tickets Routes (admin tickets are inside AdminLayout) */}
             <Route
               path="/koordinator/tickets"
               element={
