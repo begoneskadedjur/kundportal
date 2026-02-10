@@ -1,5 +1,5 @@
 // src/components/admin/contracts/FilesColumn.tsx - Kolumn för filstatus i kontraktstabell
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { FileText, Download, CheckCircle, Clock, XCircle, Eye } from 'lucide-react'
 import FileDownloadButton from './FileDownloadButton'
 import { useContracts } from '../../../hooks/useContracts'
@@ -22,14 +22,7 @@ export default function FilesColumn({
   const isLoading = filesLoading[contractId] || false
   const hasCachedFiles = hasContractFiles(contractId)
 
-  // Ladda filer automatiskt när komponenten monteras
-  useEffect(() => {
-    if (!hasCachedFiles && !isLoading) {
-      loadContractFiles(contractId).catch(console.error)
-    }
-  }, [contractId, hasCachedFiles, isLoading, loadContractFiles])
-
-  // Hämta filer manuellt (för refresh)
+  // Hämta filer manuellt (för refresh / on-demand)
   const handleLoadFiles = async () => {
     if (!isLoading) {
       await loadContractFiles(contractId, true) // Force refresh
@@ -52,11 +45,6 @@ export default function FilesColumn({
       arr.findIndex(f => f.oneflow_file_id === file.oneflow_file_id) === index
     )
 
-    // Logga om deduplikation skedde
-    if (deduplicatedFiles.length !== currentFiles.length) {
-      console.warn(`🔧 FilesColumn deduplikation för ${contractId}: ${currentFiles.length} → ${deduplicatedFiles.length} filer`)
-    }
-
     const stats = deduplicatedFiles.reduce((stats, file) => {
       stats.total++
       switch (file.download_status) {
@@ -73,27 +61,6 @@ export default function FilesColumn({
       }
       return stats
     }, { total: 0, completed: 0, pending: 0, failed: 0 })
-
-    // 🔧 DEBUG: Logga filstatistik för felsökning av "1/2 nedladdade" problemet
-    if (stats.total > 0 && process.env.NODE_ENV === 'development') {
-      console.log(`📊 Filstatus för kontrakt ${contractId}:`, {
-        stats,
-        originalCount: currentFiles.length,
-        deduplicatedCount: deduplicatedFiles.length,
-        originalFiles: currentFiles.map(f => ({
-          id: f.id,
-          name: f.file_name,
-          status: f.download_status,
-          oneflow_id: f.oneflow_file_id
-        })),
-        deduplicatedFiles: deduplicatedFiles.map(f => ({
-          id: f.id,
-          name: f.file_name,
-          status: f.download_status,
-          oneflow_id: f.oneflow_file_id
-        }))
-      })
-    }
 
     return stats
   }

@@ -1,9 +1,8 @@
 // src/components/admin/contracts/FileDownloadButton.tsx - Knapp för att ladda ner kontraktsfiler
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { FileText, Loader, Download } from 'lucide-react'
 import Button from '../../ui/Button'
 import { useContracts } from '../../../hooks/useContracts'
-import { ContractFile } from '../../../types/database'
 
 interface FileDownloadButtonProps {
   contractId: string
@@ -38,14 +37,7 @@ export default function FileDownloadButton({
     downloadingFiles[fileId] && currentFiles.some(f => f.id === fileId)
   )
 
-  // Ladda filer automatiskt när komponenten monteras
-  useEffect(() => {
-    if (!hasCachedFiles && !isLoading) {
-      loadContractFiles(contractId).catch(console.error)
-    }
-  }, [contractId, hasCachedFiles, isLoading, loadContractFiles])
-
-  // Hantera fil-laddning och nedladdning
+  // Hantera fil-laddning och nedladdning (on-demand vid klick)
   const handleQuickDownload = async () => {
     try {
       // Om filer inte är laddade, ladda dem först
