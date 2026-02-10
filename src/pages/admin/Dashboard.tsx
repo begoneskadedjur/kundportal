@@ -29,15 +29,15 @@ import AdminKpiModal from '../../components/admin/AdminKpiModal'
 
 interface DashboardStats {
   totalCustomers: number
-  totalCases: number
-  totalPrivateCases: number
-  totalBusinessCases: number
   totalRevenue: number
+  activeCases: number
   activeTechnicians: number
   pendingCases: number
   scheduledToday: number
   completedToday: number
   teamToday: Array<{ initials: string; name: string; gradient: string }>
+  revenueTrend: string
+  casesTrend: string
   recentActivity: Array<{
     id: string
     type: string
@@ -53,6 +53,8 @@ interface DashboardStats {
     privateCases: number
     businessCases: number
     legacyCases: number
+    contractBilling: number
+    caseBilling: number
   }
 }
 
@@ -60,42 +62,8 @@ interface DashboardStats {
 // HELPER COMPONENTS
 // ============================================================
 
-function MiniSparkline({ data, color }: { data: number[]; color: string }) {
-  const max = Math.max(...data)
-  const min = Math.min(...data)
-  const range = max - min || 1
-  const w = 80
-  const h = 28
-  const padding = 2
-  const points = data.map((v, i) => {
-    const x = padding + (i / (data.length - 1)) * (w - padding * 2)
-    const y = h - padding - ((v - min) / range) * (h - padding * 2)
-    return `${x},${y}`
-  }).join(' ')
-
-  const colorMap: Record<string, string> = {
-    teal: '#2dd4bf',
-    emerald: '#34d399',
-    cyan: '#22d3ee',
-    blue: '#60a5fa',
-  }
-
-  return (
-    <svg width={w} height={h} className="mt-2 opacity-60">
-      <polyline
-        points={points}
-        fill="none"
-        stroke={colorMap[color] || '#2dd4bf'}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function KpiCard({ title, value, icon: Icon, trend, color, href, sparkData, onClick }: {
-  title: string; value: string; icon: React.ElementType; trend: string; color: string; href: string; sparkData: number[]; onClick?: () => void
+function KpiCard({ title, value, icon: Icon, trend, color, onClick }: {
+  title: string; value: string; icon: React.ElementType; trend: string; color: string; onClick?: () => void
 }) {
   const colorMap: Record<string, string> = {
     teal: 'from-teal-500/20 to-teal-600/5 border-teal-500/30',
@@ -118,10 +86,9 @@ function KpiCard({ title, value, icon: Icon, trend, color, href, sparkData, onCl
     >
       <div className="flex items-center justify-between mb-2">
         <Icon className={`w-5 h-5 ${iconColorMap[color]}`} />
-        <span className={`text-xs font-medium ${trendColor}`}>{trend}</span>
+        {trend && <span className={`text-xs font-medium ${trendColor}`}>{trend}</span>}
       </div>
       <p className="text-2xl font-bold text-white">{value}</p>
-      <MiniSparkline data={sparkData} color={color} />
       <p className="text-sm text-slate-400 mt-2">{title}</p>
     </div>
   )
@@ -232,77 +199,180 @@ const AdminDashboard: React.FC = () => {
     day: 'numeric'
   })
 
-  useEffect(() => {
-    fetchDashboardStats()
-  }, [])
+  const [refreshing, setRefreshing] = useState(false)
 
-  const fetchDashboardStats = async () => {
+  useEffect(() => {
+    fetchDashboardStats(timePeriod)
+  }, [timePeriod])
+
+  const fetchDashboardStats = async (period: 'day' | 'week' | 'month' = 'month') => {
     try {
-      setLoading(true)
+      // Första laddningen: visa spinner. Periodbyte: subtil refresh.
+      if (!stats) setLoading(true)
+      else setRefreshing(true)
       setError(null)
 
-      const todayDate = new Date().toISOString().split('T')[0]
       const now = new Date()
+      const todayDate = now.toISOString().split('T')[0]
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString()
 
+      // Beräkna periodstart och föregående period
+      const periodStart = new Date(now)
+      const prevPeriodStart = new Date(now)
+      const prevPeriodEnd = new Date(now)
+
+      if (period === 'day') {
+        periodStart.setHours(0, 0, 0, 0)
+        prevPeriodStart.setDate(prevPeriodStart.getDate() - 1)
+        prevPeriodStart.setHours(0, 0, 0, 0)
+        prevPeriodEnd.setDate(prevPeriodEnd.getDate() - 1)
+        prevPeriodEnd.setHours(23, 59, 59, 999)
+      } else if (period === 'week') {
+        const dayOfWeek = periodStart.getDay()
+        const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1 // Måndag = start
+        periodStart.setDate(periodStart.getDate() - diff)
+        periodStart.setHours(0, 0, 0, 0)
+        prevPeriodStart.setDate(periodStart.getDate() - 7)
+        prevPeriodStart.setHours(0, 0, 0, 0)
+        prevPeriodEnd.setDate(periodStart.getDate() - 1)
+        prevPeriodEnd.setHours(23, 59, 59, 999)
+      } else {
+        periodStart.setDate(1)
+        periodStart.setHours(0, 0, 0, 0)
+        prevPeriodStart.setMonth(prevPeriodStart.getMonth() - 1)
+        prevPeriodStart.setDate(1)
+        prevPeriodStart.setHours(0, 0, 0, 0)
+        prevPeriodEnd.setDate(0) // Sista dagen föregående månad
+        prevPeriodEnd.setHours(23, 59, 59, 999)
+      }
+      const periodStartISO = periodStart.toISOString()
+      const prevStartISO = prevPeriodStart.toISOString()
+      const prevEndISO = prevPeriodEnd.toISOString()
+
       const [
         customersResult,
-        casesResult,
-        privateCasesResult,
-        businessCasesResult,
         techniciansResult,
         absencesResult,
+        profilesResult,
+        // Aktiva ärenden (ej avslutade/stängda)
+        privateActiveResult,
+        businessActiveResult,
+        // Inbokade/slutförda idag
         privateScheduledResult,
         businessScheduledResult,
         privateCompletedResult,
         businessCompletedResult,
-        profilesResult
+        // Intäkt denna period (gamla systemet)
+        privatePeriodResult,
+        businessPeriodResult,
+        casesPeriodResult,
+        // Intäkt föregående period
+        privatePrevResult,
+        businessPrevResult,
+        casesPrevResult,
+        // Nya billing-systemet (denna period)
+        contractBillingResult,
+        caseBillingResult,
+        // Nya billing-systemet (föregående period)
+        contractBillingPrevResult,
+        caseBillingPrevResult,
       ] = await Promise.all([
         supabase.from('customers').select('id, company_name, annual_value').eq('is_active', true),
-        supabase.from('cases').select('id, price').not('completed_date', 'is', null),
-        supabase.from('private_cases').select('id, title, kontaktperson, pris').eq('status', 'Avslutat').not('pris', 'is', null),
-        supabase.from('business_cases').select('id, title, kontaktperson, pris').eq('status', 'Avslutat').not('pris', 'is', null),
         supabase.from('technicians').select('id, name, role').eq('is_active', true).eq('role', 'Skadedjurstekniker'),
         supabase.from('technician_absences').select('technician_id')
           .lte('start_date', todayDate + ' 23:59:59')
           .gte('end_date', todayDate + ' 00:00:00'),
-        // Inbokade ärenden idag
-        supabase.from('private_cases').select('id', { count: 'exact', head: true })
-          .gte('start_date', todayStart).lte('start_date', todayEnd),
-        supabase.from('business_cases').select('id', { count: 'exact', head: true })
-          .gte('start_date', todayStart).lte('start_date', todayEnd),
-        // Slutförda ärenden idag
-        supabase.from('private_cases').select('id', { count: 'exact', head: true })
-          .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
-        supabase.from('business_cases').select('id', { count: 'exact', head: true })
-          .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
-        // Alla interna profiler (med tekniker-namn som fallback)
         supabase.from('profiles').select('id, display_name, role, technician_id, email, technicians(name)')
-          .in('role', ['admin', 'koordinator', 'technician']).eq('is_active', true)
+          .in('role', ['admin', 'koordinator', 'technician']).eq('is_active', true),
+        // Aktiva ärenden
+        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
+        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
+        // Inbokade idag
+        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+          .gte('start_date', todayStart).lte('start_date', todayEnd),
+        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+          .gte('start_date', todayStart).lte('start_date', todayEnd),
+        // Slutförda idag
+        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+          .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
+        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+          .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
+        // Intäkt denna period (gamla systemet)
+        supabase.from('private_cases').select('id, title, kontaktperson, pris')
+          .eq('status', 'Avslutat').not('pris', 'is', null)
+          .gte('completed_date', periodStartISO),
+        supabase.from('business_cases').select('id, title, kontaktperson, pris')
+          .eq('status', 'Avslutat').not('pris', 'is', null)
+          .gte('completed_date', periodStartISO),
+        supabase.from('cases').select('id, price')
+          .not('completed_date', 'is', null).not('price', 'is', null)
+          .gte('completed_date', periodStartISO),
+        // Intäkt föregående period
+        supabase.from('private_cases').select('pris')
+          .eq('status', 'Avslutat').not('pris', 'is', null)
+          .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
+        supabase.from('business_cases').select('pris')
+          .eq('status', 'Avslutat').not('pris', 'is', null)
+          .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
+        supabase.from('cases').select('price')
+          .not('completed_date', 'is', null).not('price', 'is', null)
+          .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
+        // Nya billing denna period
+        supabase.from('contract_billing_items').select('total_price')
+          .in('status', ['invoiced', 'paid'])
+          .gte('billing_period_start', periodStartISO),
+        supabase.from('case_billing_items').select('total_price')
+          .eq('status', 'billed')
+          .gte('created_at', periodStartISO),
+        // Nya billing föregående period
+        supabase.from('contract_billing_items').select('total_price')
+          .in('status', ['invoiced', 'paid'])
+          .gte('billing_period_start', prevStartISO).lte('billing_period_start', prevEndISO),
+        supabase.from('case_billing_items').select('total_price')
+          .eq('status', 'billed')
+          .gte('created_at', prevStartISO).lte('created_at', prevEndISO),
       ])
 
       if (customersResult.error) throw customersResult.error
-      if (casesResult.error) throw casesResult.error
-      if (privateCasesResult.error) throw privateCasesResult.error
-      if (businessCasesResult.error) throw businessCasesResult.error
       if (techniciansResult.error) throw techniciansResult.error
-      if (absencesResult.error) throw absencesResult.error
 
+      // Intäkt denna period
+      const privateRevenue = privatePeriodResult.data?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0
+      const businessRevenue = businessPeriodResult.data?.reduce((sum, c) => sum + ((c.pris || 0) * 1.25), 0) || 0
+      const caseRevenue = casesPeriodResult.data?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
+      const contractBillingRevenue = contractBillingResult.data?.reduce((sum, c) => sum + (c.total_price || 0), 0) || 0
+      const caseBillingRevenue = caseBillingResult.data?.reduce((sum, c) => sum + (c.total_price || 0), 0) || 0
+      const totalRevenue = privateRevenue + businessRevenue + caseRevenue + contractBillingRevenue + caseBillingRevenue
+
+      // Intäkt föregående period
+      const prevPrivateRevenue = privatePrevResult.data?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0
+      const prevBusinessRevenue = businessPrevResult.data?.reduce((sum, c) => sum + ((c.pris || 0) * 1.25), 0) || 0
+      const prevCaseRevenue = casesPrevResult.data?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
+      const prevContractBilling = contractBillingPrevResult.data?.reduce((sum, c) => sum + (c.total_price || 0), 0) || 0
+      const prevCaseBilling = caseBillingPrevResult.data?.reduce((sum, c) => sum + (c.total_price || 0), 0) || 0
+      const prevTotalRevenue = prevPrivateRevenue + prevBusinessRevenue + prevCaseRevenue + prevContractBilling + prevCaseBilling
+
+      // Trendberäkning
+      const calcTrend = (current: number, previous: number): string => {
+        if (previous === 0) return current > 0 ? '+100%' : '0%'
+        const pct = Math.round(((current - previous) / previous) * 100)
+        return pct >= 0 ? `+${pct}%` : `${pct}%`
+      }
+      const revenueTrend = calcTrend(totalRevenue, prevTotalRevenue)
+
+      // Aktiva ärenden
+      const activeCases = (privateActiveResult.count || 0) + (businessActiveResult.count || 0)
+
+      // Kontraktsintäkt (för breakdown)
       const contractRevenue = customersResult.data?.reduce((sum, c) => sum + (c.annual_value || 0), 0) || 0
-      const caseRevenue = casesResult.data?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
-      const privateRevenue = privateCasesResult.data?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0
-      const businessRevenue = businessCasesResult.data?.reduce((sum, c) => sum + (c.pris * 1.25 || 0), 0) || 0
-      const totalRevenue = contractRevenue + caseRevenue + privateRevenue + businessRevenue
-
-      const [activeCasesResult] = await Promise.all([
-        supabase.from('cases').select('id').is('completed_date', null)
-      ])
 
       const absentTechnicianIds = absencesResult.data?.map(absence => absence.technician_id) || []
       const availableTechnicians = techniciansResult.data?.filter(tech => !absentTechnicianIds.includes(tech.id)) || []
 
-      // Teamet idag: filtrera bort profiler med frånvaro (via technician_id)
+      // Teamet idag
       const gradients = [
         'from-blue-500 to-cyan-500',
         'from-purple-500 to-pink-500',
@@ -332,25 +402,27 @@ const AdminDashboard: React.FC = () => {
 
       setStats({
         totalCustomers: customersResult.data?.length || 0,
-        totalCases: casesResult.data?.length || 0,
-        totalPrivateCases: privateCasesResult.data?.length || 0,
-        totalBusinessCases: businessCasesResult.data?.length || 0,
         totalRevenue,
+        activeCases,
         activeTechnicians: availableTechnicians.length || 0,
-        pendingCases: activeCasesResult.data?.length || 0,
+        pendingCases: activeCases,
         scheduledToday,
         completedToday,
         teamToday,
+        revenueTrend,
+        casesTrend: '', // Ärenden är ögonblicksbild, ingen trend
         recentActivity: [],
         customers: customersResult.data || [],
         technicians: availableTechnicians || [],
-        privateCases: privateCasesResult.data || [],
-        businessCases: businessCasesResult.data || [],
+        privateCases: privatePeriodResult.data || [],
+        businessCases: businessPeriodResult.data || [],
         revenueBreakdown: {
           contracts: contractRevenue,
           privateCases: privateRevenue,
           businessCases: businessRevenue,
-          legacyCases: caseRevenue
+          legacyCases: caseRevenue,
+          contractBilling: contractBillingRevenue,
+          caseBilling: caseBillingRevenue,
         }
       })
     } catch (err) {
@@ -358,6 +430,7 @@ const AdminDashboard: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Ett fel uppstod')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -381,7 +454,7 @@ const AdminDashboard: React.FC = () => {
         <div className="p-8 max-w-md backdrop-blur-sm bg-slate-800/70 border border-slate-700/50 rounded-2xl shadow-2xl text-center">
           <div className="text-red-400 mb-4">Fel vid laddning av dashboard</div>
           <p className="text-slate-400 mb-6">{error}</p>
-          <Button onClick={fetchDashboardStats}>Forsok igen</Button>
+          <Button onClick={() => fetchDashboardStats(timePeriod)}>Forsok igen</Button>
         </div>
       </div>
     )
@@ -427,38 +500,32 @@ const AdminDashboard: React.FC = () => {
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity duration-300 ${refreshing ? 'opacity-60' : ''}`}>
             {[
               {
                 title: 'Avtalskunder',
                 value: String(stats?.totalCustomers || 0),
                 icon: Users,
-                trend: '+5%',
+                trend: '',
                 color: 'teal' as const,
-                href: '/admin/customers',
-                sparkData: [30, 35, 32, 38, 42, 40, stats?.totalCustomers || 47],
                 kpiType: 'customers' as const,
                 kpiTitle: 'Avtalskunder',
               },
               {
-                title: 'Total intakt',
+                title: timePeriod === 'day' ? 'Intakt idag' : timePeriod === 'week' ? 'Intakt veckan' : 'Intakt manaden',
                 value: formatCurrency(stats?.totalRevenue || 0),
                 icon: DollarSign,
-                trend: '+12%',
+                trend: stats?.revenueTrend || '',
                 color: 'emerald' as const,
-                href: '/admin/economics',
-                sparkData: [800000, 920000, 880000, 1050000, 1100000, 1180000, stats?.totalRevenue || 1245000],
                 kpiType: 'revenue' as const,
-                kpiTitle: 'Total Intakt',
+                kpiTitle: 'Intakt',
               },
               {
                 title: 'Aktiva arenden',
-                value: String((stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)),
+                value: String(stats?.activeCases || 0),
                 icon: FileText,
-                trend: '+3',
+                trend: '',
                 color: 'cyan' as const,
-                href: '/admin/customers',
-                sparkData: [100, 108, 115, 110, 120, 125, (stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)],
                 kpiType: 'cases' as const,
                 kpiTitle: 'BeGone Arenden',
               },
@@ -466,10 +533,8 @@ const AdminDashboard: React.FC = () => {
                 title: 'Aktiva tekniker',
                 value: String(stats?.activeTechnicians || 0),
                 icon: UserCheck,
-                trend: '+2',
+                trend: '',
                 color: 'blue' as const,
-                href: '/admin/technicians',
-                sparkData: [5, 6, 6, 7, 7, 7, stats?.activeTechnicians || 8],
                 kpiType: 'technicians' as const,
                 kpiTitle: 'Aktiva Tekniker',
               },
@@ -486,8 +551,6 @@ const AdminDashboard: React.FC = () => {
                   icon={kpi.icon}
                   trend={kpi.trend}
                   color={kpi.color}
-                  href={kpi.href}
-                  sparkData={kpi.sparkData}
                   onClick={() => handleKpiClick(kpi.kpiType, kpi.kpiTitle)}
                 />
               </motion.div>
@@ -608,7 +671,9 @@ const AdminDashboard: React.FC = () => {
               contracts: 0,
               privateCases: 0,
               businessCases: 0,
-              legacyCases: 0
+              legacyCases: 0,
+              contractBilling: 0,
+              caseBilling: 0,
             }
           }
         }}
