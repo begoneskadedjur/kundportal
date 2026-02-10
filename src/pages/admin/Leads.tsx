@@ -18,7 +18,6 @@ import { toast } from 'react-hot-toast'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import { PageHeader } from '../../components/shared'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
 import StaggeredGrid from '../../components/shared/StaggeredGrid'
 
@@ -725,47 +724,33 @@ const Leads: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-purple-500/5" />
-        
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <PageHeader title="Lead Pipeline" />
-          <div className="flex items-center justify-center h-64">
-            <LoadingSpinner size="lg" />
-          </div>
-        </div>
+      <div className="flex items-center justify-center py-32">
+        <LoadingSpinner size="lg" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <PageHeader title="Lead Pipeline" />
-          <Card className="p-8 backdrop-blur-sm bg-slate-800/70 border-slate-700/50">
-            <div className="text-center">
-              <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Fel vid laddning</h3>
-              <p className="text-slate-400 mb-6">{error}</p>
-              <Button onClick={fetchLeads}>Försök igen</Button>
-            </div>
-          </Card>
-        </div>
+      <div className="flex items-center justify-center py-32">
+        <Card className="p-8 backdrop-blur-sm bg-slate-800/70 border-slate-700/50">
+          <div className="text-center">
+            <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Fel vid laddning</h3>
+            <p className="text-slate-400 mb-6">{error}</p>
+            <Button onClick={fetchLeads}>Försök igen</Button>
+          </div>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="max-w-[1600px] space-y-6">
-        <PageHeader 
-          title="Lead Pipeline" 
-          description="Hantera potentiella kunder och lead-processen"
-          showBackButton={true}
-          backPath="/admin/dashboard"
-        />
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Lead Pipeline</h1>
+          <p className="text-sm text-slate-400 mt-1">Hantera potentiella kunder och lead-processen</p>
+        </div>
 
         {/* KPI Cards */}
         <StaggeredGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">

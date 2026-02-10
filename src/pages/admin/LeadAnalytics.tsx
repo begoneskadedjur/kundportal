@@ -1,16 +1,13 @@
 // src/pages/admin/LeadAnalytics.tsx - Comprehensive Lead Analytics Dashboard
 
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import {
-  ArrowLeft,
   BarChart3,
   TrendingUp,
   Users,
   Target,
-  DollarSign,
   MapPin,
   Calendar,
   Filter,
@@ -22,7 +19,6 @@ import { toast } from 'react-hot-toast'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import { PageHeader } from '../../components/shared'
 
 // Analytics components (to be implemented)
 import LeadKpiOverview from '../../components/admin/leads/analytics/LeadKpiOverview'
@@ -49,7 +45,6 @@ interface AnalyticsData {
 }
 
 const LeadAnalytics: React.FC = () => {
-  const navigate = useNavigate()
   const { user } = useAuth()
   
   const [loading, setLoading] = useState(true)
@@ -252,157 +247,96 @@ const LeadAnalytics: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-purple-500/5" />
-        
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center gap-4 mb-8">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/admin/dashboard')}
-              className="text-slate-400 hover:text-white"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Tillbaka till Dashboard
-            </Button>
-          </div>
-          
-          <PageHeader 
-            title="Lead Analytics" 
-            description="Analyser och insikter från lead-pipelinen"
-          />
-          <div className="flex items-center justify-center h-64">
-            <LoadingSpinner size="lg" />
-          </div>
-        </div>
+      <div className="flex items-center justify-center py-32">
+        <LoadingSpinner size="lg" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center gap-4 mb-8">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/admin/dashboard')}
-              className="text-slate-400 hover:text-white"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Tillbaka till Dashboard
-            </Button>
+      <div className="flex items-center justify-center py-32">
+        <Card className="p-8 backdrop-blur-sm bg-slate-800/70 border-slate-700/50">
+          <div className="text-center">
+            <BarChart3 className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Fel vid laddning</h3>
+            <p className="text-slate-400 mb-6">{error}</p>
+            <Button onClick={() => fetchAnalyticsData()}>Försök igen</Button>
           </div>
-          
-          <PageHeader title="Lead Analytics" />
-          <Card className="p-8 backdrop-blur-sm bg-slate-800/70 border-slate-700/50">
-            <div className="text-center">
-              <BarChart3 className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Fel vid laddning</h3>
-              <p className="text-slate-400 mb-6">{error}</p>
-              <Button onClick={() => fetchAnalyticsData()}>Försök igen</Button>
-            </div>
-          </Card>
-        </div>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Premium Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-purple-500/5" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-500/10 via-transparent to-transparent" />
-      
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header with Navigation */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/admin/dashboard')}
-              className="text-slate-400 hover:text-white"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Tillbaka till Dashboard
-            </Button>
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Sidtitel + åtgärdsknappar */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Leadanalys</h1>
+          <p className="text-sm text-slate-400 mt-1">Analyser och insikter från lead-pipelinen</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value as any)}
+            className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="7d">Senaste 7 dagarna</option>
+            <option value="30d">Senaste 30 dagarna</option>
+            <option value="90d">Senaste 90 dagarna</option>
+            <option value="1y">Senaste året</option>
+          </select>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={handleExport}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Analytics Dashboard Grid */}
+      {analyticsData && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* KPI Overview - Full width top section */}
+          <div className="lg:col-span-12">
+            <LeadKpiOverview data={analyticsData} />
           </div>
-          
-          <div className="flex items-center gap-3">
-            {/* Date Range Filter */}
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value as any)}
-              className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-            >
-              <option value="7d">Senaste 7 dagarna</option>
-              <option value="30d">Senaste 30 dagarna</option>
-              <option value="90d">Senaste 90 dagarna</option>
-              <option value="1y">Senaste året</option>
-            </select>
-            
-            <Button
-              variant="ghost"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="text-slate-400 hover:text-white"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-            
-            <Button
-              variant="ghost"
-              onClick={handleExport}
-              className="text-slate-400 hover:text-white"
-            >
-              <Download className="w-5 h-5" />
-            </Button>
+
+          {/* Conversion Funnel - Left side */}
+          <div className="lg:col-span-6">
+            <LeadConversionFunnel data={analyticsData} />
+          </div>
+
+          {/* Revenue Analytics - Right side */}
+          <div className="lg:col-span-6">
+            <LeadRevenueAnalytics data={analyticsData} />
+          </div>
+
+          {/* Trend Analysis - Full width */}
+          <div className="lg:col-span-12">
+            <LeadTrendAnalysis data={analyticsData} />
+          </div>
+
+          {/* Team Performance - Left side */}
+          <div className="lg:col-span-7">
+            <LeadTeamPerformance data={analyticsData} />
+          </div>
+
+          {/* Geographic Distribution - Right side */}
+          <div className="lg:col-span-5">
+            <LeadGeographicDistribution data={analyticsData} />
           </div>
         </div>
-
-        <PageHeader 
-          title="Lead Analytics" 
-          description="Analyser och insikter från lead-pipelinen"
-        />
-
-        {/* Analytics Dashboard Grid */}
-        {analyticsData && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* KPI Overview - Full width top section */}
-            <div className="lg:col-span-12">
-              <LeadKpiOverview data={analyticsData} />
-            </div>
-
-            {/* Conversion Funnel - Left side */}
-            <div className="lg:col-span-6">
-              <LeadConversionFunnel data={analyticsData} />
-            </div>
-
-            {/* Revenue Analytics - Right side */}
-            <div className="lg:col-span-6">
-              <LeadRevenueAnalytics data={analyticsData} />
-            </div>
-
-            {/* Trend Analysis - Full width */}
-            <div className="lg:col-span-12">
-              <LeadTrendAnalysis data={analyticsData} />
-            </div>
-
-            {/* Team Performance - Left side */}
-            <div className="lg:col-span-7">
-              <LeadTeamPerformance data={analyticsData} />
-            </div>
-
-            {/* Geographic Distribution - Right side */}
-            <div className="lg:col-span-5">
-              <LeadGeographicDistribution data={analyticsData} />
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
