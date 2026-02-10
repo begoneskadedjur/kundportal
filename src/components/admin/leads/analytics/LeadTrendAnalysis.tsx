@@ -228,7 +228,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
         </div>
       </div>
 
-      <div className="h-64">
+      <div>
         {activeChart === 'volume' && (
           <div>
             <div className="mb-4">
@@ -238,7 +238,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
               )}
             </div>
             {volumeTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
+              <ResponsiveContainer width="100%" height={280}>
                 <RechartsLineChart data={volumeTrendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis 
@@ -301,8 +301,8 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
               )}
             </div>
             {sourceData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <RechartsBarChart data={sourceData} layout="horizontal">
+              <ResponsiveContainer width="100%" height={280}>
+                <RechartsBarChart data={sourceData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis 
                     type="number"
@@ -345,13 +345,13 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
               )}
             </div>
             {statusData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
+              <ResponsiveContainer width="100%" height={300}>
                 <RechartsPieChart>
                   <Pie
                     data={statusData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={120}
+                    outerRadius={90}
                     dataKey="count"
                     nameKey="status"
                     label={({ status, percentage }) => `${status}: ${percentage}%`}

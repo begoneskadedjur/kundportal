@@ -248,7 +248,7 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
         </div>
       </div>
 
-      <div className="min-h-64">
+      <div>
         {activeView === 'forecast' && (
           <div className="space-y-4">
             <div className="mb-4">
@@ -328,7 +328,7 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
             <div className="mb-4">
               <p className="text-slate-400">Pipeline-värde fördelat per status</p>
             </div>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <RechartsPieChart>
                 <Pie
                   data={revenueBreakdown}
@@ -363,7 +363,7 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
             <div className="mb-4">
               <p className="text-slate-400">Månadsvis intäktsutveckling</p>
             </div>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={monthlyData}>
                 <defs>
                   <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
