@@ -246,10 +246,10 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
   const availablePredefinedTags = PREDEFINED_TAGS.filter(tag => !tags.includes(tag))
 
   return (
-    <div className="p-5 bg-slate-800/30 border border-slate-700 rounded-xl">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Tag className="w-5 h-5 text-orange-400" />
+    <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+          <Tag className="w-4 h-4 text-orange-400" />
           Taggar ({tags.length})
         </h3>
         <Button
@@ -264,7 +264,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
 
       {/* Current Tags */}
       {tags.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-3">
           <div className="flex flex-wrap gap-2">
             {tags.map((tag, index) => (
               <span
@@ -288,9 +288,9 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
 
       {/* Add Tag Form */}
       {showForm && (
-        <div className="p-4 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
+        <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-3">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-white flex items-center gap-2">
                 <Tag className="w-4 h-4" />
                 Lägg till ny tagg
@@ -298,7 +298,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-xs font-medium text-slate-400 mb-1">
                 Tagg namn *
               </label>
               <Input
@@ -323,7 +323,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-700/50">
               <Button
                 type="button"
                 variant="ghost"
@@ -361,7 +361,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
       {/* Predefined Tags */}
       {availablePredefinedTags.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-slate-300 mb-3">
+          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">
             Fördefinierade taggar:
           </h4>
           <div className="flex flex-wrap gap-2">
@@ -382,10 +382,9 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
 
       {/* Empty State */}
       {tags.length === 0 && !showForm && (
-        <div className="text-center py-8">
-          <Tag className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-          <p className="text-slate-400">Inga taggar än</p>
-          <p className="text-slate-500 text-sm">Taggar hjälper till att kategorisera och filtrera leads</p>
+        <div className="text-center py-4">
+          <Tag className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+          <p className="text-slate-400 text-sm">Inga taggar. Taggar hjälper att kategorisera och filtrera leads.</p>
         </div>
       )}
     </div>

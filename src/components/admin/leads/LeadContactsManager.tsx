@@ -284,10 +284,10 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
   const secondaryContacts = contacts.filter(contact => !contact.is_primary)
 
   return (
-    <div className="p-5 bg-slate-800/30 border border-slate-700 rounded-xl">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Users className="w-5 h-5 text-green-400" />
+    <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+          <Users className="w-4 h-4 text-green-400" />
           Kontaktpersoner ({contacts.length})
         </h3>
         <Button
@@ -302,24 +302,24 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
 
       {/* Primary Contact Section */}
       {primaryContact && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Crown className="w-4 h-4 text-yellow-400" />
-            <h4 className="text-sm font-medium text-slate-300">Huvudkontakt</h4>
+        <div className="mb-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Crown className="w-3.5 h-3.5 text-yellow-400" />
+            <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Huvudkontakt</h4>
           </div>
-          <div className="p-4 bg-gradient-to-r from-[#20c58f]/15 to-[#20c58f]/5 rounded-lg border border-[#20c58f]/30">
+          <div className="px-3 py-2 bg-gradient-to-r from-[#20c58f]/15 to-[#20c58f]/5 rounded-lg border border-[#20c58f]/30">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <h4 className="font-semibold text-white text-lg">{primaryContact.name}</h4>
-                  <span className="px-3 py-1 text-xs bg-[#20c58f]/20 text-emerald-300 rounded-full border border-[#20c58f]/40 font-medium">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold text-white text-sm">{primaryContact.name}</h4>
+                  <span className="px-2 py-0.5 text-xs bg-[#20c58f]/20 text-emerald-300 rounded-full border border-[#20c58f]/40 font-medium">
                     PRIMÄR KONTAKT
                   </span>
                 </div>
                 {primaryContact.title && (
                   <p className="text-emerald-200 mt-1">{primaryContact.title}</p>
                 )}
-                <div className="flex items-center gap-6 mt-3 text-sm">
+                <div className="flex items-center gap-4 mt-1.5 text-sm">
                   {primaryContact.email && (
                     <div className="flex items-center gap-2 text-emerald-200">
                       <Mail className="w-4 h-4" />
@@ -360,18 +360,18 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
 
       {/* Secondary Contacts List */}
       {secondaryContacts.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <User className="w-4 h-4 text-slate-400" />
-            <h4 className="text-sm font-medium text-slate-300">
+        <div className="mb-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <User className="w-3.5 h-3.5 text-slate-400" />
+            <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">
               Ytterligare kontakter ({secondaryContacts.length})
             </h4>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {secondaryContacts.map((contact) => (
               <div
                 key={contact.id}
-                className="flex items-center justify-between p-4 bg-slate-800/30 rounded-lg border border-slate-700/40"
+                className="flex items-center justify-between px-3 py-2 bg-slate-800/30 rounded-lg border border-slate-700/40"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -423,30 +423,26 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
 
       {/* Show message if no contacts */}
       {contacts.length === 0 && (
-        <div className="text-center py-8">
-          <Users className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">
-            Inga kontaktpersoner tillagda ännu. 
-            <br />
-            Klicka på "Lägg till" för att lägga till den första kontakten.
-          </p>
+        <div className="text-center py-4">
+          <Users className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+          <p className="text-slate-400 text-sm">Inga kontaktpersoner tillagda. Klicka "Lägg till" för att börja.</p>
         </div>
       )}
 
       {/* Add/Edit Form */}
       {showForm && (
-        <div className="p-4 bg-slate-800/20 border border-slate-700/50 rounded-xl">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
+        <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-white flex items-center gap-2">
                 <User className="w-4 h-4" />
                 {editingContact ? 'Redigera kontaktperson' : 'Ny kontaktperson'}
               </h4>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Namn *
                 </label>
                 <Input
@@ -464,7 +460,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Titel
                 </label>
                 <Input
@@ -475,7 +471,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Telefon
                 </label>
                 <Input
@@ -486,7 +482,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   E-post
                 </label>
                 <Input
@@ -526,11 +522,11 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
                 onChange={(e) => handleInputChange('notes', e.target.value)}
                 placeholder="Ytterligare information om kontaktpersonen..."
                 rows={2}
-                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
+                className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-700/50">
               <Button
                 type="button"
                 variant="ghost"
@@ -561,10 +557,9 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
       )}
 
       {contacts.length === 0 && !showForm && (
-        <div className="text-center py-8">
-          <Users className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-          <p className="text-slate-400">Inga kontaktpersoner tillagda än</p>
-          <p className="text-slate-500 text-sm">Klicka på "Lägg till" för att lägga till första kontaktpersonen</p>
+        <div className="text-center py-4">
+          <Users className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+          <p className="text-slate-400 text-sm">Inga kontaktpersoner tillagda. Klicka "Lägg till" för att börja.</p>
         </div>
       )}
     </div>

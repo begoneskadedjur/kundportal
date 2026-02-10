@@ -233,10 +233,10 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
   }, [allSortedEvents.length])
 
   return (
-    <div className="p-5 bg-slate-800/30 border border-slate-700 rounded-xl">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Clock className="w-5 h-5 text-purple-400" />
+    <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+          <Clock className="w-4 h-4 text-purple-400" />
           Händelser ({allSortedEvents.length} totalt)
         </h3>
         <Button
@@ -251,9 +251,9 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
       {/* Add Event Form */}
       {showForm && (
-        <div className="p-4 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
+        <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-3">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-white flex items-center gap-2">
                 <Plus className="w-4 h-4" />
                 Ny händelse
@@ -261,13 +261,13 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-xs font-medium text-slate-400 mb-1">
                 Händelsetyp
               </label>
               <select
                 value={formData.event_type}
                 onChange={(e) => handleInputChange('event_type', e.target.value as EventType)}
-                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
               >
                 {Object.entries(EVENT_TYPE_DISPLAY).map(([value, config]) => (
                   <option key={value} value={value}>
@@ -278,7 +278,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-xs font-medium text-slate-400 mb-1">
                 Titel *
               </label>
               <input
@@ -286,7 +286,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
                 value={formData.title}
                 onChange={(e) => handleInputChange('title', e.target.value)}
                 placeholder="Kort sammanfattning av händelsen..."
-                className={`w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${
+                className={`w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${
                   errors.title ? 'border-red-500' : ''
                 }`}
               />
@@ -299,15 +299,15 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-xs font-medium text-slate-400 mb-1">
                 Beskrivning
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Detaljerad beskrivning av vad som hände..."
-                rows={3}
-                className={`w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none ${
+                rows={2}
+                className={`w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none ${
                   errors.description ? 'border-red-500' : ''
                 }`}
               />
@@ -319,7 +319,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-700/50">
               <Button
                 type="button"
                 variant="ghost"
@@ -354,20 +354,20 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
       {allSortedEvents.length > 0 ? (
         <div className="relative">
           {/* Timeline line */}
-          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-600"></div>
-          
-          <div className="space-y-6">
+          <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-600"></div>
+
+          <div className="space-y-3">
             {visibleEvents.map((event, index) => (
-              <div key={event.id} className="relative flex items-start gap-4">
+              <div key={event.id} className="relative flex items-start gap-3">
                 {/* Timeline dot */}
-                <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full border-2 ${EVENT_TYPE_DISPLAY[event.event_type].iconClass}`}>
+                <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 ${EVENT_TYPE_DISPLAY[event.event_type].iconClass}`}>
                   {getEventTypeIcon(event.event_type)}
                 </div>
 
                 {/* Event content */}
-                <div className="flex-1 min-w-0 pb-6">
-                  <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/40">
-                    <div className="flex items-start justify-between mb-2">
+                <div className="flex-1 min-w-0 pb-3">
+                  <div className="bg-slate-800/30 rounded-lg px-3 py-2 border border-slate-700/40">
+                    <div className="flex items-start justify-between mb-1">
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-1 text-xs rounded-full ${EVENT_TYPE_DISPLAY[event.event_type].badgeClass}`}>
                           {EVENT_TYPE_DISPLAY[event.event_type].label}
@@ -379,13 +379,13 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
                     </div>
                     
                     {event.title && (
-                      <h4 className="text-slate-100 font-medium mb-2">
+                      <h4 className="text-slate-100 font-medium mb-1">
                         {event.title}
                       </h4>
                     )}
                     
                     {event.description && (
-                      <p className="text-slate-300 mb-2">
+                      <p className="text-slate-300 mb-1">
                         {event.description}
                       </p>
                     )}
@@ -455,10 +455,10 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
           {/* Load More Events Button */}
           {hasMoreEvents && (
-            <div className="mt-6">
-              <button 
+            <div className="mt-3">
+              <button
                 onClick={loadMoreEvents}
-                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 hover:text-slate-200 hover:bg-slate-800/80 transition-colors duration-200 flex items-center justify-between group"
+                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 hover:text-slate-200 hover:bg-slate-800/80 transition-colors duration-200 flex items-center justify-between group text-sm"
               >
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-blue-400" />
@@ -476,15 +476,15 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
           {/* Completion indicator when all events are loaded */}
           {!hasMoreEvents && allSortedEvents.length > INITIAL_EVENT_COUNT && (
-            <div className="mt-6 flex items-center justify-center gap-2 text-slate-500 text-sm">
+            <div className="mt-3 flex items-center justify-center gap-2 text-slate-500 text-sm">
               <CheckCircle className="w-4 h-4" />
               <span>Alla händelser visas</span>
             </div>
           )}
 
           {/* Timeline end marker */}
-          <div className="relative flex items-start gap-4 mt-6">
-            <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/30 border-2 border-slate-700/40">
+          <div className="relative flex items-start gap-3 mt-3">
+            <div className="relative z-10 flex items-center justify-center w-8 h-8 rounded-full bg-slate-800/30 border-2 border-slate-700/40">
               <CheckCircle className="w-4 h-4 text-slate-500" />
             </div>
             <div className="flex-1 min-w-0">
@@ -496,10 +496,9 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
         </div>
       ) : (
         !showForm && (
-          <div className="text-center py-8">
-            <Clock className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-            <p className="text-slate-400">Inga händelser i timeline än</p>
-            <p className="text-slate-500 text-sm">Klicka på "Lägg till händelse" för att börja dokumentera utvecklingen av detta lead</p>
+          <div className="text-center py-4">
+            <Clock className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+            <p className="text-slate-400 text-sm">Inga händelser. Klicka "Lägg till händelse" för att börja.</p>
           </div>
         )
       )}

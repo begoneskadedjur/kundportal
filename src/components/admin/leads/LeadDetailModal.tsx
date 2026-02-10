@@ -333,12 +333,12 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               <LoadingSpinner size="lg" />
             </div>
           ) : (
-            <div className="p-5">
+            <div className="p-4">
               {/* Lead Overview */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
                 {/* Status & Priority */}
-                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-                  <h3 className="text-sm font-medium text-slate-300 mb-3">Status & Prioritet</h3>
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Status & Prioritet</h3>
                   <div className="space-y-3">
                     <div>
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${statusConfig.badgeClass}`}>
@@ -357,8 +357,8 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </div>
 
                 {/* Lead Score */}
-                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-                  <h3 className="text-sm font-medium text-slate-300 mb-3">Lead Score</h3>
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Lead Score</h3>
                   <div className="space-y-2">
                     <div className="text-2xl font-bold text-white">{leadScore}/100</div>
                     <div className={`text-sm px-2 py-1 rounded font-medium ${leadQuality.bgColor}`}>
@@ -374,10 +374,10 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </div>
 
                 {/* Value & Probability */}
-                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-                  <h3 className="text-sm font-medium text-slate-300 mb-3">Affärsvärde</h3>
-                  <div className="space-y-2">
-                    <div className="text-lg font-semibold text-white">
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Affärsvärde</h3>
+                  <div className="space-y-1">
+                    <div className="text-sm font-semibold text-white">
                       {currentLead.estimated_value ? formatCurrency(currentLead.estimated_value) : 'Ej angivet'}
                     </div>
                     {currentLead.probability && (
@@ -395,31 +395,31 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               </div>
 
               {/* BANT Kvalificering */}
-              <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl mb-4">
-                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-green-400" />
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl mb-3">
+                <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-green-400" />
                   BANT-kvalificering
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className={`p-3 rounded-lg border ${currentLead.budget_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className={`px-2.5 py-1.5 rounded-lg border ${currentLead.budget_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
                     <div className="text-sm font-medium text-slate-300">Budget</div>
                     <div className={currentLead.budget_confirmed ? 'text-green-400' : 'text-slate-400'}>
                       {currentLead.budget_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg border ${currentLead.authority_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
+                  <div className={`px-2.5 py-1.5 rounded-lg border ${currentLead.authority_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
                     <div className="text-sm font-medium text-slate-300">Befogenhet</div>
                     <div className={currentLead.authority_confirmed ? 'text-green-400' : 'text-slate-400'}>
                       {currentLead.authority_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg border ${currentLead.needs_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
+                  <div className={`px-2.5 py-1.5 rounded-lg border ${currentLead.needs_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
                     <div className="text-sm font-medium text-slate-300">Behov</div>
                     <div className={currentLead.needs_confirmed ? 'text-green-400' : 'text-slate-400'}>
                       {currentLead.needs_confirmed ? 'Bekräftat' : 'Ej bekräftat'}
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg border ${currentLead.timeline_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
+                  <div className={`px-2.5 py-1.5 rounded-lg border ${currentLead.timeline_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800/30 border-slate-600/40'}`}>
                     <div className="text-sm font-medium text-slate-300">Tidslinje</div>
                     <div className={currentLead.timeline_confirmed ? 'text-green-400' : 'text-slate-400'}>
                       {currentLead.timeline_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
@@ -430,14 +430,14 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
               {/* Customer Information + Timeline (merged) */}
               {(currentLead.phone_number || currentLead.email || currentLead.organization_number || currentLead.business_type || currentLead.problem_type || currentLead.company_size || currentLead.website || currentLead.address || currentLead.business_description || currentLead.sni07_label || currentLead.source || currentLead.decision_maker || currentLead.contract_with || currentLead.contact_date || currentLead.follow_up_date || currentLead.quote_provided_date || currentLead.contact_method) && (
-                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl mb-4">
-                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                    <Building className="w-5 h-5 text-blue-400" />
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl mb-3">
+                  <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                    <Building className="w-4 h-4 text-blue-400" />
                     Kunduppgifter
                   </h3>
 
                   {/* Basic Contact Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm mb-3">
                     {currentLead.phone_number && (
                       <div>
                         <div className="text-slate-300 font-medium flex items-center gap-1">
@@ -512,8 +512,8 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
                   {/* Business Description */}
                   {currentLead.business_description && (
-                    <div className="mb-4">
-                      <div className="text-slate-300 font-medium mb-2">Verksamhetsbeskrivning</div>
+                    <div className="mb-3">
+                      <div className="text-xs font-medium text-slate-400 mb-1">Verksamhetsbeskrivning</div>
                       <div className="text-white bg-slate-800/30 rounded-lg p-3 border border-slate-700/40 whitespace-pre-wrap">
                         {currentLead.business_description}
                       </div>
@@ -522,8 +522,8 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
                   {/* SNI Classification */}
                   {currentLead.sni07_label && (
-                    <div className="mb-4">
-                      <div className="text-slate-300 font-medium mb-2 flex items-center gap-1">
+                    <div className="mb-3">
+                      <div className="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1">
                         <Factory className="w-4 h-4" />
                         SNI-kod (Branschklassning)
                       </div>
@@ -539,9 +539,9 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
                   {/* Additional Customer Info */}
                   {(currentLead.source || currentLead.decision_maker) && (
-                    <div className="mb-4">
-                      <div className="text-slate-300 font-medium mb-2">Övrig information</div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    <div className="mb-3">
+                      <div className="text-xs font-medium text-slate-400 mb-1">Övrig information</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
                         {currentLead.source && (
                           <div>
                             <div className="text-slate-300 font-medium">Källa</div>
@@ -565,7 +565,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         <Calendar className="w-3.5 h-3.5 text-purple-400" />
                         Tidslinje & Datum
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
                         {currentLead.contact_date && (
                           <div>
                             <div className="text-slate-300 font-medium">Kontaktdatum</div>
@@ -602,14 +602,14 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
               {/* Contract Information + Notes (merged) */}
               {(currentLead.contract_status !== null || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null || currentLead.contract_with || assignedTechnicians.length > 0 || technician || currentLead.notes) && (
-                <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl mb-4">
-                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-yellow-400" />
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl mb-3">
+                  <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-yellow-400" />
                     Avtalsinfo
                   </h3>
 
                   {/* Contract Status Section */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm mb-3">
                     {currentLead.contract_status !== null && (
                       <div>
                         <div className="text-slate-300 font-medium">Befintligt avtal hos kunden</div>
@@ -635,7 +635,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   </div>
 
                   {/* Quote & Procurement Section */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm mb-3">
                     {currentLead.interested_in_quote !== null && (
                       <div>
                         <div className="text-slate-300 font-medium">Intresserad av offert</div>
@@ -657,8 +657,8 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
                   {/* Assigned Colleagues Section */}
                   {(assignedTechnicians.length > 0 || technician) && (
-                    <div className="mb-4">
-                      <div className="text-slate-300 font-medium mb-2">Tilldelade kollegor</div>
+                    <div className="mb-3">
+                      <div className="text-xs font-medium text-slate-400 mb-1">Tilldelade kollegor</div>
                       <div className="space-y-2">
                         {assignedTechnicians.map((assignment) => (
                           <div key={assignment.id} className="flex items-center justify-between bg-slate-800/30 rounded-lg p-2 border border-slate-700/40">
@@ -713,9 +713,9 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               )}
 
               {/* Management Components */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                 {/* Left Column */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <LeadTechnicianManager
                     leadId={currentLead.id}
                     assignedTechnicians={assignedTechnicians}
@@ -739,7 +739,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </div>
 
                 {/* Right Column */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <LeadCommentsSystem
                     leadId={currentLead.id}
                     comments={comments}

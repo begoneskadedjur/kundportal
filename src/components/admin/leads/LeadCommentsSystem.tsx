@@ -251,10 +251,10 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
   )
 
   return (
-    <div className="p-5 bg-slate-800/30 border border-slate-700 rounded-xl">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <MessageSquare className="w-5 h-5 text-blue-400" />
+    <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+          <MessageSquare className="w-4 h-4 text-blue-400" />
           Kommentarer & Anteckningar ({comments.length})
         </h3>
         <Button
@@ -269,9 +269,9 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
 
       {/* Add/Edit Form */}
       {showForm && (
-        <div className="p-4 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
+        <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-3">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-white flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
                 {editingComment ? 'Redigera kommentar' : 'Ny kommentar'}
@@ -279,13 +279,13 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-xs font-medium text-slate-400 mb-1">
                 Typ av kommentar
               </label>
               <select
                 value={formData.comment_type}
                 onChange={(e) => handleInputChange('comment_type', e.target.value as CommentType)}
-                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
               >
                 {Object.entries(COMMENT_TYPE_DISPLAY).map(([value, config]) => (
                   <option key={value} value={value}>
@@ -296,15 +296,15 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-xs font-medium text-slate-400 mb-1">
                 Kommentar *
               </label>
               <textarea
                 value={formData.content}
                 onChange={(e) => handleInputChange('content', e.target.value)}
                 placeholder="Skriv din kommentar här..."
-                rows={4}
-                className={`w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none ${
+                rows={2}
+                className={`w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none ${
                   errors.content ? 'border-red-500' : ''
                 }`}
               />
@@ -316,7 +316,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-700/50">
               <Button
                 type="button"
                 variant="ghost"
@@ -348,13 +348,13 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
 
       {/* Comments List */}
       {sortedComments.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {sortedComments.map((comment) => (
             <div
               key={comment.id}
-              className="p-4 bg-slate-800/30 rounded-lg border border-slate-700/40"
+              className="px-3 py-2 bg-slate-800/30 rounded-lg border border-slate-700/40"
             >
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start justify-between mb-1.5">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${COMMENT_TYPE_DISPLAY[comment.comment_type].iconBgClass}`}>
                     {getCommentTypeIcon(comment.comment_type)}
@@ -412,10 +412,9 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
         </div>
       ) : (
         !showForm && (
-          <div className="text-center py-8">
-            <MessageSquare className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-            <p className="text-slate-400">Inga kommentarer än</p>
-            <p className="text-slate-500 text-sm">Klicka på "Ny kommentar" för att lägga till första kommentaren</p>
+          <div className="text-center py-4">
+            <MessageSquare className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+            <p className="text-slate-400 text-sm">Inga kommentarer. Klicka "Ny kommentar" för att börja.</p>
           </div>
         )
       )}

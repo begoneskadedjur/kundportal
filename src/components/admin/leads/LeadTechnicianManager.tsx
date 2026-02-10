@@ -271,10 +271,10 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   }
 
   return (
-    <div className="p-5 bg-slate-800/30 border border-slate-700 rounded-xl">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Users className="w-5 h-5 text-green-400" />
+    <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+          <Users className="w-4 h-4 text-green-400" />
           Tilldelade kollegor ({assignedTechnicians.length})
         </h3>
         <Button
@@ -297,8 +297,8 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
 
       {/* Add Technician Form */}
       {showAddForm && (
-        <div className="p-4 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-6">
-          <h4 className="font-medium text-white mb-4 flex items-center gap-2">
+        <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl mb-3">
+          <h4 className="font-medium text-white mb-2 flex items-center gap-2">
             <Users className="w-4 h-4" />
             Tilldela ny kollega
           </h4>
@@ -315,15 +315,15 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
               </Button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Välj kollega ({unassignedTechnicians.length} tillgängliga)
                 </label>
                 <select
                   value={selectedTechnicianId}
                   onChange={(e) => setSelectedTechnicianId(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj kollega...</option>
                   {unassignedTechnicians.map(tech => (
@@ -335,19 +335,19 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
               </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-xs font-medium text-slate-400 mb-1">
                 Anteckningar (valfritt)
               </label>
               <textarea
                 value={assignmentNotes}
                 onChange={(e) => setAssignmentNotes(e.target.value)}
                 placeholder="Anledning till tilldelning, specialområde, etc..."
-                rows={3}
-                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
+                rows={2}
+                className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
               />
             </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-700/50">
                 <Button
                   type="button"
                   variant="ghost"
@@ -388,14 +388,14 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
 
       {/* Assigned Technicians List */}
       {assignedTechnicians.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {assignedTechnicians.map((assignment) => {
             const technician = availableTechnicians.find(t => t.id === assignment.technician_id)
             
             return (
               <div
                 key={assignment.id}
-                className="p-4 bg-slate-800/30 rounded-lg border border-slate-700/40"
+                className="px-3 py-2 bg-slate-800/30 rounded-lg border border-slate-700/40"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
@@ -469,12 +469,11 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
         </div>
       ) : (
         !showAddForm && (
-          <div className="text-center py-8">
-            <Users className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-            <p className="text-slate-400">Inga kollegor tilldelade än</p>
-            <p className="text-slate-500 text-sm">
-              {unassignedTechnicians.length > 0 
-                ? 'Klicka på "Lägg till kollega" för att tilldela första kollegan'
+          <div className="text-center py-4">
+            <Users className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+            <p className="text-slate-400 text-sm">
+              {unassignedTechnicians.length > 0
+                ? 'Inga kollegor tilldelade. Klicka "Lägg till kollega" för att börja.'
                 : 'Alla tillgängliga kollegor är redan tilldelade'
               }
             </p>

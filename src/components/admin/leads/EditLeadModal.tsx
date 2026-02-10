@@ -673,7 +673,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         </Button>
       }
       footer={
-        <div className="flex items-center justify-end gap-3 px-5 py-3">
+        <div className="flex items-center justify-end gap-3 px-4 py-2.5">
           <Button type="button" variant="ghost" onClick={handleClose} disabled={loading || deleting}>
             Avbryt
           </Button>
@@ -698,19 +698,19 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         </div>
       }
     >
-      <div className="p-5">
-        <form id="edit-lead-form" onSubmit={handleSubmit} className="space-y-5">
+      <div className="p-4">
+        <form id="edit-lead-form" onSubmit={handleSubmit} className="space-y-3">
           
           {/* Obligatorisk huvudinformation */}
-          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-purple-400" />
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-purple-400" />
               Obligatorisk huvudinformation
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Företagsnamn *
                 </label>
                 <Input
@@ -728,7 +728,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Organisationsnummer
                 </label>
                 <Input
@@ -739,7 +739,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Kontaktperson *
                 </label>
                 <Input
@@ -757,7 +757,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Telefonnummer *
                 </label>
                 <Input
@@ -775,7 +775,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   E-post *
                 </label>
                 <Input
@@ -794,13 +794,13 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Status
                 </label>
                 <select
                   value={formData.status || 'blue_cold'}
                   onChange={(e) => handleInputChange('status', e.target.value as LeadStatus)}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   {Object.entries(LEAD_STATUS_DISPLAY).map(([value, config]) => (
                     <option key={value} value={value}>
@@ -813,21 +813,21 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           </div>
 
           {/* Lead-hantering & uppföljning */}
-          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-green-400" />
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-green-400" />
               Lead-hantering & uppföljning
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Kontaktmetod
                 </label>
                 <select
                   value={formData.contact_method || ''}
                   onChange={(e) => handleInputChange('contact_method', e.target.value as ContactMethod || null)}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj metod</option>
                   {Object.entries(CONTACT_METHOD_DISPLAY).map(([value, config]) => (
@@ -839,7 +839,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Kontaktad datum
                 </label>
                 <Input
@@ -850,7 +850,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Ta kontakt igen datum
                 </label>
                 <Input
@@ -861,7 +861,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Offert lämnad datum
                 </label>
                 <Input
@@ -923,7 +923,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 {formData.contract_status && (
                   <div className="bg-slate-800/30 p-3 rounded-lg space-y-3 border border-slate-700/40">
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">
                         Nuvarande leverantör
                         <span className="text-slate-500 text-xs ml-2">(Namnet på företaget de har avtal med)</span>
                       </label>
@@ -935,7 +935,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">
                         Avtal löper ut
                         <span className="text-slate-500 text-xs ml-2">(När avtalet kan sägas upp eller löper ut)</span>
                       </label>
@@ -947,7 +947,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">
                         Avtalsdetaljer
                       </label>
                       <textarea
@@ -955,7 +955,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                         onChange={(e) => handleInputChange('competitor', e.target.value)}
                         placeholder="Ytterligare information om avtalet, uppsägningstid, etc."
                         rows={2}
-                        className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
+                        className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
                       />
                     </div>
                   </div>
@@ -965,15 +965,15 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           </div>
 
           {/* Företagsinformation + Anteckningar (merged) */}
-          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-blue-400" />
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-blue-400" />
               Företagsinformation
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Verksamhetstyp
                 </label>
                 <Input
@@ -984,7 +984,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Typ av problem
                 </label>
                 <Input
@@ -995,13 +995,13 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Företagsstorlek
                 </label>
                 <select
                   value={formData.company_size || ''}
                   onChange={(e) => handleInputChange('company_size', e.target.value as CompanySize || null)}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj storlek</option>
                   {Object.entries(COMPANY_SIZE_DISPLAY).map(([value, config]) => (
@@ -1013,7 +1013,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Hemsida
                 </label>
                 <Input
@@ -1031,7 +1031,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Adress
                 </label>
                 <Input
@@ -1051,7 +1051,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Verksamhetsbeskrivning
                 </label>
                 <textarea
@@ -1059,7 +1059,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                   onChange={(e) => handleInputChange('business_description', e.target.value)}
                   placeholder="Beskriv verksamheten och eventuella särskilda omständigheter"
                   rows={3}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
+                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
                 />
               </div>
               {/* Anteckningar (merged into this card) */}
@@ -1070,28 +1070,28 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                   onChange={(e) => handleInputChange('notes', e.target.value)}
                   placeholder="Lägg till kommentarer, mötesinformation eller andra anteckningar här..."
                   rows={3}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
+                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Lead-hantering & prioritering + BANT (merged) */}
-          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-              <Target className="w-5 h-5 text-orange-400" />
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+              <Target className="w-4 h-4 text-orange-400" />
               Lead-hantering & prioritering
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Prioritet
                 </label>
                 <select
                   value={formData.priority || ''}
                   onChange={(e) => handleInputChange('priority', e.target.value as LeadPriority || null)}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="">Välj prioritet</option>
                   {Object.entries(LEAD_PRIORITY_DISPLAY).map(([value, config]) => (
@@ -1103,7 +1103,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Källa
                 </label>
                 <Input
@@ -1114,7 +1114,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Uppskattat värde (SEK)
                 </label>
                 <Input
@@ -1126,7 +1126,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Sannolikhet (0-100%)
                 </label>
                 <Input
@@ -1140,7 +1140,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Förhoppning om att slutföra affär till
                   <span className="text-slate-500 text-xs ml-2">(Ungefärligt datum när affären kan avslutas)</span>
                 </label>
@@ -1152,7 +1152,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Beslutsfattare
                 </label>
                 <Input
@@ -1165,11 +1165,11 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
 
             {/* BANT-kvalificering (merged into this card) */}
             <div className="border-t border-slate-700/50 pt-3 mt-3">
-              <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-1">
+              <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
                 <Star className="w-3.5 h-3.5 text-yellow-400" />
                 BANT-kvalificering
               </h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <label className="flex items-center gap-2 text-slate-300 text-sm">
                   <input
                     type="checkbox"
