@@ -24,7 +24,6 @@ import {
   Legend
 } from 'recharts'
 
-import Card from '../../../ui/Card'
 import Button from '../../../ui/Button'
 
 interface AnalyticsData {
@@ -190,10 +189,10 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
   }
 
   return (
-    <Card className="p-6">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold text-white flex items-center gap-3 mb-4">
-          <TrendingUp className="w-6 h-6 text-purple-400" />
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+          <TrendingUp className="w-4 h-4 text-purple-400" />
           Trendanalys
         </h3>
         
@@ -229,21 +228,13 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
         </div>
       </div>
 
-      <div className="h-80">
+      <div className="h-64">
         {activeChart === 'volume' && (
           <div>
             <div className="mb-4">
               <p className="text-slate-400">Lead-volym och pipeline-värde över tid</p>
               {volumeTrendData.length === 0 && (
-                <div className="text-slate-500 text-sm mt-2">
-                  <p>Ingen data tillgänglig för vald tidsperiod</p>
-                  <p className="text-xs mt-1">
-                    Debug: {data.totalLeads} totala leads, {Object.keys(data.leadsByMonth).length} månader med data
-                  </p>
-                  <p className="text-xs">
-                    Månader: {Object.keys(data.leadsByMonth).join(', ')}
-                  </p>
-                </div>
+                <p className="text-slate-500 text-sm mt-1">Ingen data tillgänglig för vald tidsperiod</p>
               )}
             </div>
             {volumeTrendData.length > 0 ? (
@@ -293,7 +284,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400">
                 <div className="text-center">
-                  <LineChart className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <LineChart className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>Ingen data att visa för vald tidsperiod</p>
                 </div>
               </div>
@@ -306,15 +297,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             <div className="mb-4">
               <p className="text-slate-400">Topp lead-källor efter volym</p>
               {sourceData.length === 0 && (
-                <div className="text-slate-500 text-sm mt-2">
-                  <p>Ingen källdata tillgänglig</p>
-                  <p className="text-xs mt-1">
-                    Debug: {Object.keys(data.leadsBySource).length} källor totalt
-                  </p>
-                  <p className="text-xs">
-                    Källor: {Object.entries(data.leadsBySource).map(([k,v]) => `${k}:${v}`).join(', ')}
-                  </p>
-                </div>
+                <p className="text-slate-500 text-sm mt-1">Ingen källdata tillgänglig</p>
               )}
             </div>
             {sourceData.length > 0 ? (
@@ -345,7 +328,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400">
                 <div className="text-center">
-                  <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>Ingen källdata att visa</p>
                 </div>
               </div>
@@ -358,15 +341,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             <div className="mb-4">
               <p className="text-slate-400">Fördelning av lead-status</p>
               {statusData.length === 0 && (
-                <div className="text-slate-500 text-sm mt-2">
-                  <p>Ingen statusdata tillgänglig</p>
-                  <p className="text-xs mt-1">
-                    Debug: {Object.keys(data.leadsByStatus).length} statuser totalt
-                  </p>
-                  <p className="text-xs">
-                    Status: {Object.entries(data.leadsByStatus).map(([k,v]) => `${k}:${v}`).join(', ')}
-                  </p>
-                </div>
+                <p className="text-slate-500 text-sm mt-1">Ingen statusdata tillgänglig</p>
               )}
             </div>
             {statusData.length > 0 ? (
@@ -397,7 +372,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400">
                 <div className="text-center">
-                  <PieChart className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <PieChart className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>Ingen statusdata att visa</p>
                 </div>
               </div>
@@ -407,7 +382,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
       </div>
 
       {/* Chart Insights */}
-      <div className="mt-6 p-4 bg-slate-700/30 rounded-lg border border-slate-700">
+      <div className="mt-3 p-3 bg-slate-700/30 rounded-lg border border-slate-700">
         <h4 className="text-white font-medium mb-2 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-blue-400" />
           Insikter
@@ -431,7 +406,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
           </p>
         )}
       </div>
-    </Card>
+    </div>
   )
 }
 

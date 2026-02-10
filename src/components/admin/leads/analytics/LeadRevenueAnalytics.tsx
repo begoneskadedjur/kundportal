@@ -1,8 +1,8 @@
 // src/components/admin/leads/analytics/LeadRevenueAnalytics.tsx - Revenue Analytics Panel
 
 import React, { useState } from 'react'
-import { 
-  DollarSign,
+import {
+  Banknote,
   TrendingUp,
   Calendar,
   Target,
@@ -27,7 +27,6 @@ import {
   Bar
 } from 'recharts'
 
-import Card from '../../../ui/Card'
 import Button from '../../../ui/Button'
 
 interface AnalyticsData {
@@ -174,10 +173,10 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
   }
 
   return (
-    <Card className="backdrop-blur-sm bg-slate-800/70 border-slate-700/50 p-6">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold text-white flex items-center gap-3 mb-4">
-          <DollarSign className="w-6 h-6 text-yellow-400" />
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+          <Banknote className="w-4 h-4 text-yellow-400" />
           Intäktsanalys
         </h3>
         
@@ -214,42 +213,42 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
       </div>
 
       {/* Revenue Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-700">
-          <div className="flex items-center gap-3 mb-2">
-            <Target className="w-5 h-5 text-green-400" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <div className="bg-slate-700/30 p-3 rounded-lg border border-slate-700">
+          <div className="flex items-center gap-2 mb-1">
+            <Target className="w-4 h-4 text-green-400" />
             <span className="text-slate-300 text-sm">Aktuell Pipeline</span>
           </div>
-          <div className="text-xl font-bold text-white">
+          <div className="text-lg font-bold text-white">
             {formatCompactCurrency(totalPipelineValue)}
           </div>
           <p className="text-xs text-slate-400 mt-1">Totalt potential</p>
         </div>
 
-        <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-700">
-          <div className="flex items-center gap-3 mb-2">
-            <TrendingUp className="w-5 h-5 text-blue-400" />
+        <div className="bg-slate-700/30 p-3 rounded-lg border border-slate-700">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-4 h-4 text-blue-400" />
             <span className="text-slate-300 text-sm">Viktad Prognos</span>
           </div>
-          <div className="text-xl font-bold text-white">
+          <div className="text-lg font-bold text-white">
             {formatCompactCurrency(metrics.weightedForecast)}
           </div>
           <p className="text-xs text-slate-400 mt-1">Förväntad intäkt</p>
         </div>
 
-        <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-700">
-          <div className="flex items-center gap-3 mb-2">
-            <CheckCircle className="w-5 h-5 text-yellow-400" />
+        <div className="bg-slate-700/30 p-3 rounded-lg border border-slate-700">
+          <div className="flex items-center gap-2 mb-1">
+            <CheckCircle className="w-4 h-4 text-yellow-400" />
             <span className="text-slate-300 text-sm">Vunna Affärer</span>
           </div>
-          <div className="text-xl font-bold text-white">
+          <div className="text-lg font-bold text-white">
             {formatCompactCurrency(metrics.wonDealsValue)}
           </div>
           <p className="text-xs text-slate-400 mt-1">Realiserat värde</p>
         </div>
       </div>
 
-      <div className="min-h-80">
+      <div className="min-h-64">
         {activeView === 'forecast' && (
           <div className="space-y-4">
             <div className="mb-4">
@@ -399,8 +398,8 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
         )}
       </div>
 
-      {/* Insights - Separated with clear border and spacing */}
-      <div className="mt-8 p-4 bg-slate-700/30 rounded-lg border border-slate-700 clear-both">
+      {/* Insights */}
+      <div className="mt-3 p-3 bg-slate-700/30 rounded-lg border border-slate-700 clear-both">
         <h4 className="text-white font-medium mb-3 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-yellow-400" />
           Insikter
@@ -432,7 +431,7 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
           </p>
         )}
       </div>
-    </Card>
+    </div>
   )
 }
 

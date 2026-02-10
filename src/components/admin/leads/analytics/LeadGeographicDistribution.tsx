@@ -21,7 +21,6 @@ import {
   Cell
 } from 'recharts'
 
-import Card from '../../../ui/Card'
 import Button from '../../../ui/Button'
 
 interface AnalyticsData {
@@ -190,10 +189,10 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
   }
 
   return (
-    <Card className="backdrop-blur-sm bg-slate-800/70 border-slate-700/50 p-6">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold text-white flex items-center gap-3 mb-4">
-          <MapPin className="w-6 h-6 text-blue-400" />
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+          <MapPin className="w-4 h-4 text-blue-400" />
           Geografisk fördelning
         </h3>
         
@@ -231,8 +230,8 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
       </div>
 
       {regionData.length === 0 ? (
-        <div className="text-center py-12">
-          <MapPin className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+        <div className="text-center py-4">
+          <MapPin className="w-8 h-8 text-slate-500 mx-auto mb-2" />
           <p className="text-slate-400">Ingen geografisk data tillgänglig</p>
           <p className="text-slate-500 text-sm mt-2">
             Kontrollera att leads har adressinformation
@@ -241,7 +240,7 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
       ) : (
         <>
           {/* Chart */}
-          <div className="h-64 mb-6">
+          <div className="h-48 mb-3">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sortedRegionData.slice(0, 8)} layout="horizontal">
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -351,23 +350,23 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
           </div>
 
           {/* Summary Stats */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-slate-700/30 rounded-lg">
-              <div className="text-2xl font-bold text-white">
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="text-center p-3 bg-slate-700/30 rounded-lg">
+              <div className="text-lg font-bold text-white">
                 {regionData.length}
               </div>
               <div className="text-sm text-slate-400">Aktiva regioner</div>
             </div>
             
-            <div className="text-center p-4 bg-slate-700/30 rounded-lg">
-              <div className="text-2xl font-bold text-white">
+            <div className="text-center p-3 bg-slate-700/30 rounded-lg">
+              <div className="text-lg font-bold text-white">
                 {sortedRegionData[0]?.region || 'N/A'}
               </div>
               <div className="text-sm text-slate-400">Ledande region</div>
             </div>
             
-            <div className="text-center p-4 bg-slate-700/30 rounded-lg">
-              <div className="text-2xl font-bold text-white">
+            <div className="text-center p-3 bg-slate-700/30 rounded-lg">
+              <div className="text-lg font-bold text-white">
                 {regionData.length > 0 ? 
                   (regionData.reduce((sum, region) => sum + region.conversionRate, 0) / regionData.length).toFixed(1) : 0
                 }%
@@ -377,7 +376,7 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
           </div>
 
           {/* Insights */}
-          <div className="mt-6 p-4 bg-slate-700/30 rounded-lg border border-slate-700">
+          <div className="mt-3 p-3 bg-slate-700/30 rounded-lg border border-slate-700">
             <h4 className="text-white font-medium mb-2 flex items-center gap-2">
               <Award className="w-4 h-4 text-blue-400" />
               Geografiska insikter
@@ -402,7 +401,7 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
           </div>
         </>
       )}
-    </Card>
+    </div>
   )
 }
 

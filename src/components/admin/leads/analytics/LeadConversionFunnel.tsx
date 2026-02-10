@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
-import Card from '../../../ui/Card'
 import { LEAD_STATUS_DISPLAY } from '../../../../types/database'
 
 interface AnalyticsData {
@@ -98,17 +97,15 @@ const LeadConversionFunnel: React.FC<LeadConversionFunnelProps> = ({ data }) => 
   const lostPercentage = totalLeads > 0 ? ((lostLeads / totalLeads) * 100) : 0
 
   return (
-    <Card className="backdrop-blur-sm bg-slate-800/70 border-slate-700/50 p-6">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold text-white flex items-center gap-3 mb-2">
-          <TrendingUp className="w-6 h-6 text-purple-400" />
-          Konverteringstratt
-        </h3>
-        <p className="text-slate-400">Lead-flöde genom försäljningsprocessen</p>
-      </div>
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+        <TrendingUp className="w-4 h-4 text-purple-400" />
+        Konverteringstratt
+      </h3>
+      <p className="text-xs text-slate-400 mb-3">Lead-flöde genom försäljningsprocessen</p>
 
       {/* Funnel Visualization */}
-      <div className="space-y-4 mb-8">
+      <div className="space-y-3 mb-4">
         {funnelStages.map((stage, index) => (
           <motion.div
             key={stage.id}
@@ -120,8 +117,8 @@ const LeadConversionFunnel: React.FC<LeadConversionFunnelProps> = ({ data }) => 
             {/* Stage Bar */}
             <div className="flex items-center gap-4">
               {/* Icon */}
-              <div className={`p-3 rounded-lg ${stage.bgColor}/20 border ${stage.borderColor} flex-shrink-0`}>
-                <stage.icon className={`w-6 h-6 ${stage.textColor}`} />
+              <div className={`p-2 rounded-lg ${stage.bgColor}/20 border ${stage.borderColor} flex-shrink-0`}>
+                <stage.icon className={`w-4 h-4 ${stage.textColor}`} />
               </div>
 
               {/* Progress Bar */}
@@ -166,11 +163,11 @@ const LeadConversionFunnel: React.FC<LeadConversionFunnelProps> = ({ data }) => 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="border-t border-slate-700 pt-6"
+          className="border-t border-slate-700 pt-3"
         >
-          <div className="flex items-center gap-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-            <div className="p-3 rounded-lg bg-red-500/20 border border-red-500">
-              <XCircle className="w-6 h-6 text-red-400" />
+          <div className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <div className="p-2 rounded-lg bg-red-500/20 border border-red-500">
+              <XCircle className="w-4 h-4 text-red-400" />
             </div>
             
             <div className="flex-1">
@@ -192,29 +189,29 @@ const LeadConversionFunnel: React.FC<LeadConversionFunnelProps> = ({ data }) => 
       )}
 
       {/* Summary Stats */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="text-center p-4 bg-slate-700/50 rounded-lg">
-          <div className="text-2xl font-bold text-white">
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="text-center p-3 bg-slate-700/50 rounded-lg">
+          <div className="text-lg font-bold text-white">
             {data.conversionRate.toFixed(1)}%
           </div>
           <div className="text-sm text-slate-400">Total Konvertering</div>
         </div>
         
-        <div className="text-center p-4 bg-slate-700/50 rounded-lg">
-          <div className="text-2xl font-bold text-white">
+        <div className="text-center p-3 bg-slate-700/50 rounded-lg">
+          <div className="text-lg font-bold text-white">
             {totalLeads}
           </div>
           <div className="text-sm text-slate-400">Totala Leads</div>
         </div>
-        
-        <div className="text-center p-4 bg-slate-700/50 rounded-lg">
-          <div className="text-2xl font-bold text-white">
+
+        <div className="text-center p-3 bg-slate-700/50 rounded-lg">
+          <div className="text-lg font-bold text-white">
             {((funnelStages[2].count + funnelStages[3].count) / Math.max(totalLeads, 1) * 100).toFixed(1)}%
           </div>
           <div className="text-sm text-slate-400">Kvalificerade Leads</div>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 

@@ -1,10 +1,10 @@
 // src/components/admin/leads/analytics/LeadKpiOverview.tsx - KPI Overview Cards for Lead Analytics
 
 import React from 'react'
-import { 
+import {
   Target,
   TrendingUp,
-  DollarSign,
+  Banknote,
   Users,
   Calendar,
   Award,
@@ -80,16 +80,13 @@ const LeadKpiOverview: React.FC<LeadKpiOverviewProps> = ({ data }) => {
   }
 
   return (
-    <div className="mb-8">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold text-white flex items-center gap-3 mb-2">
-          <Target className="w-6 h-6 text-blue-400" />
-          Nyckeltal - Översikt
-        </h3>
-        <p className="text-slate-400">Viktigaste mätvärdena för lead-prestanda</p>
-      </div>
+    <div>
+      <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+        <Target className="w-4 h-4 text-blue-400" />
+        Nyckeltal - Översikt
+      </h3>
 
-      <StaggeredGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <StaggeredGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total Active Leads */}
         <EnhancedKpiCard
           title="Aktiva Leads"
@@ -118,7 +115,7 @@ const LeadKpiOverview: React.FC<LeadKpiOverviewProps> = ({ data }) => {
         <EnhancedKpiCard
           title="Pipeline-värde"
           value={formatCurrency(totalPipelineValue)}
-          icon={DollarSign}
+          icon={Banknote}
           trend={getTrend(totalPipelineValue, 1000000)}
           trendValue="aktivt värde"
           delay={0.2}
@@ -139,8 +136,8 @@ const LeadKpiOverview: React.FC<LeadKpiOverviewProps> = ({ data }) => {
       </StaggeredGrid>
 
       {/* Secondary KPI Row */}
-      <div className="mt-6">
-        <StaggeredGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="mt-3">
+        <StaggeredGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Weekly New Leads */}
           <EnhancedKpiCard
             title="Nya denna vecka"

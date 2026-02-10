@@ -5,18 +5,11 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   BarChart3,
-  TrendingUp,
-  Users,
-  Target,
-  MapPin,
-  Calendar,
-  Filter,
   Download,
   RefreshCw
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
-import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 
@@ -51,7 +44,7 @@ const LeadAnalytics: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false)
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d')
+  const [dateRange, setDateRange] = useState<'all' | '7d' | '30d' | '90d' | '1y'>('all')
 
   useEffect(() => {
     fetchAnalyticsData()
@@ -66,13 +59,8 @@ const LeadAnalytics: React.FC = () => {
       }
       setError(null)
 
-      // Calculate date range
-      const now = new Date()
-      const daysBack = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : 365
-      const startDate = new Date(now.getTime() - (daysBack * 24 * 60 * 60 * 1000))
-
-      // Fetch leads data with relations and better error handling
-      const { data: leads, error: leadsError } = await supabase
+      // Fetch leads data with relations
+      let query = supabase
         .from('leads')
         .select(`
           *,
@@ -91,8 +79,17 @@ const LeadAnalytics: React.FC = () => {
           lead_comments(count),
           lead_events(count)
         `)
-        .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false })
+
+      // Apply date filter only when a specific range is selected
+      if (dateRange !== 'all') {
+        const now = new Date()
+        const daysBack = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : 365
+        const startDate = new Date(now.getTime() - (daysBack * 24 * 60 * 60 * 1000))
+        query = query.gte('created_at', startDate.toISOString())
+      }
+
+      const { data: leads, error: leadsError } = await query
 
       if (leadsError) {
         console.error('Supabase error details:', leadsError)
@@ -247,7 +244,7 @@ const LeadAnalytics: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-32">
+      <div className="flex items-center justify-center py-12">
         <LoadingSpinner size="lg" />
       </div>
     )
@@ -255,15 +252,15 @@ const LeadAnalytics: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center py-32">
-        <Card className="p-8 backdrop-blur-sm bg-slate-800/70 border-slate-700/50">
-          <div className="text-center">
-            <BarChart3 className="w-16 h-16 text-red-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">Fel vid laddning</h3>
-            <p className="text-slate-400 mb-6">{error}</p>
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <div className="text-center py-4">
+            <BarChart3 className="w-8 h-8 text-red-400 mx-auto mb-2" />
+            <h3 className="text-sm font-semibold text-white mb-1">Fel vid laddning</h3>
+            <p className="text-slate-400 text-sm mb-3">{error}</p>
             <Button onClick={() => fetchAnalyticsData()}>Försök igen</Button>
           </div>
-        </Card>
+        </div>
       </div>
     )
   }
@@ -280,8 +277,9 @@ const LeadAnalytics: React.FC = () => {
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value as any)}
-            className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
           >
+            <option value="all">Alla leads</option>
             <option value="7d">Senaste 7 dagarna</option>
             <option value="30d">Senaste 30 dagarna</option>
             <option value="90d">Senaste 90 dagarna</option>
@@ -305,7 +303,7 @@ const LeadAnalytics: React.FC = () => {
 
       {/* Analytics Dashboard Grid */}
       {analyticsData && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* KPI Overview - Full width top section */}
           <div className="lg:col-span-12">
             <LeadKpiOverview data={analyticsData} />

@@ -17,7 +17,6 @@ import { supabase } from '../../../../lib/supabase'
 import { toast } from 'react-hot-toast'
 import { calculateLeadScore } from '../../../../types/database'
 
-import Card from '../../../ui/Card'
 import LoadingSpinner from '../../../shared/LoadingSpinner'
 
 interface AnalyticsData {
@@ -230,33 +229,28 @@ const LeadTeamPerformance: React.FC<LeadTeamPerformanceProps> = ({ data }) => {
 
   if (loading) {
     return (
-      <Card className="backdrop-blur-sm bg-slate-800/70 border-slate-700/50 p-6">
-        <div className="mb-6">
-          <h3 className="text-xl font-semibold text-white flex items-center gap-3">
-            <Users className="w-6 h-6 text-green-400" />
-            Teamprestation
-          </h3>
-        </div>
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+          <Users className="w-4 h-4 text-green-400" />
+          Teamprestation
+        </h3>
         <div className="flex items-center justify-center h-64">
           <LoadingSpinner size="lg" />
         </div>
-      </Card>
+      </div>
     )
   }
 
   return (
-    <Card className="backdrop-blur-sm bg-slate-800/70 border-slate-700/50 p-6">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold text-white flex items-center gap-3 mb-2">
-          <Users className="w-6 h-6 text-green-400" />
-          Teamprestation
-        </h3>
-        <p className="text-slate-400">Individuella resultat och konverteringseffektivitet</p>
-      </div>
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+        <Users className="w-4 h-4 text-green-400" />
+        Teamprestation
+      </h3>
 
       {teamMembers.length === 0 ? (
-        <div className="text-center py-12">
-          <Users className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+        <div className="text-center py-4">
+          <Users className="w-8 h-8 text-slate-500 mx-auto mb-2" />
           <p className="text-slate-400">Ingen teamdata tillgänglig</p>
         </div>
       ) : (
@@ -402,30 +396,30 @@ const LeadTeamPerformance: React.FC<LeadTeamPerformanceProps> = ({ data }) => {
 
       {/* Team Summary */}
       {teamMembers.length > 0 && (
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-slate-700/30 rounded-lg">
-            <div className="text-2xl font-bold text-white">
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="text-center p-3 bg-slate-700/30 rounded-lg">
+            <div className="text-lg font-bold text-white">
               {teamMembers.length}
             </div>
             <div className="text-sm text-slate-400">Aktiva medlemmar</div>
           </div>
           
-          <div className="text-center p-4 bg-slate-700/30 rounded-lg">
-            <div className="text-2xl font-bold text-white">
+          <div className="text-center p-3 bg-slate-700/30 rounded-lg">
+            <div className="text-lg font-bold text-white">
               {(teamMembers.reduce((sum, member) => sum + member.conversionRate, 0) / teamMembers.length).toFixed(1)}%
             </div>
             <div className="text-sm text-slate-400">Genomsnittlig konvertering</div>
           </div>
           
-          <div className="text-center p-4 bg-slate-700/30 rounded-lg">
-            <div className="text-2xl font-bold text-white">
+          <div className="text-center p-3 bg-slate-700/30 rounded-lg">
+            <div className="text-lg font-bold text-white">
               {teamMembers.filter(member => member.conversionRate >= 20).length}
             </div>
             <div className="text-sm text-slate-400">Topprestationer (≥20%)</div>
           </div>
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 
