@@ -2,14 +2,13 @@
 import React, { useEffect, useState } from 'react'
 import { X, Download, File, Loader, RefreshCw } from 'lucide-react'
 import Button from '../../ui/Button'
-import Card from '../../ui/Card'
 import { ContractFile } from '../../../types/database'
-import { 
-  getFileTypeIcon, 
-  getFileTypeLabel, 
-  getDownloadStatusColor, 
+import {
+  getFileTypeIcon,
+  getFileTypeLabel,
+  getDownloadStatusColor,
   getDownloadStatusLabel,
-  formatFileSize 
+  formatFileSize
 } from '../../../services/contractFilesService'
 import { useContracts } from '../../../hooks/useContracts'
 import toast from 'react-hot-toast'
@@ -28,21 +27,19 @@ const FileRow: React.FC<{
   isDownloading: boolean
 }> = ({ file, onDownload, isDownloading }) => {
   const statusColor = getDownloadStatusColor(file.download_status)
-  
+
   return (
-    <div className="flex items-center justify-between p-4 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors">
+    <div className="flex items-center justify-between px-3 py-2 bg-slate-800/30 rounded-lg border border-slate-700/40 hover:bg-slate-800/50 transition-colors">
       <div className="flex items-center gap-3 flex-1">
-        {/* Filikon */}
-        <span className="text-2xl" title={getFileTypeLabel(file.file_type)}>
+        <span className="text-lg" title={getFileTypeLabel(file.file_type)}>
           {getFileTypeIcon(file.file_type)}
         </span>
-        
-        {/* Filinfo */}
+
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-white truncate">
+          <div className="text-sm font-medium text-white truncate">
             {file.file_name}
           </div>
-          <div className="flex items-center gap-3 text-sm text-slate-400">
+          <div className="flex items-center gap-3 text-xs text-slate-400">
             <span>{getFileTypeLabel(file.file_type)}</span>
             {file.file_size && <span>{formatFileSize(file.file_size)}</span>}
             {file.downloaded_at && (
@@ -51,13 +48,11 @@ const FileRow: React.FC<{
           </div>
         </div>
       </div>
-      
-      {/* Status och åtgärder */}
-      <div className="flex items-center gap-3">
-        {/* Status badge */}
-        <span 
-          className="px-2 py-1 rounded-full text-xs font-medium border"
-          style={{ 
+
+      <div className="flex items-center gap-2">
+        <span
+          className="px-2 py-0.5 rounded-full text-xs font-medium border"
+          style={{
             color: statusColor,
             backgroundColor: `${statusColor}20`,
             borderColor: `${statusColor}30`
@@ -65,8 +60,7 @@ const FileRow: React.FC<{
         >
           {getDownloadStatusLabel(file.download_status)}
         </span>
-        
-        {/* Download knapp */}
+
         <Button
           variant="ghost"
           size="sm"
@@ -86,20 +80,19 @@ const FileRow: React.FC<{
 }
 
 export default function ContractFilesModal({ isOpen, onClose, contractId, contractName }: ContractFilesModalProps) {
-  const { 
-    contractFiles, 
-    filesLoading, 
-    downloadingFiles, 
-    loadContractFiles, 
-    downloadContractFile 
+  const {
+    contractFiles,
+    filesLoading,
+    downloadingFiles,
+    loadContractFiles,
+    downloadContractFile
   } = useContracts()
-  
+
   const [isRefreshing, setIsRefreshing] = useState(false)
-  
+
   const currentContractFiles = contractId ? contractFiles[contractId] || [] : []
   const isLoading = contractId ? filesLoading[contractId] || false : false
 
-  // Ladda filer när modal öppnas
   useEffect(() => {
     if (isOpen && contractId) {
       handleLoadFiles()
@@ -108,7 +101,7 @@ export default function ContractFilesModal({ isOpen, onClose, contractId, contra
 
   const handleLoadFiles = async () => {
     if (!contractId) return
-    
+
     try {
       setIsRefreshing(true)
       await loadContractFiles(contractId)
@@ -122,12 +115,11 @@ export default function ContractFilesModal({ isOpen, onClose, contractId, contra
 
   const handleDownload = async (fileId: string) => {
     if (!contractId) return
-    
+
     try {
       await downloadContractFile(contractId, fileId)
     } catch (error) {
       console.error('Fel vid nedladdning:', error)
-      // Toast hanteras i hook:en
     }
   }
 
@@ -141,20 +133,20 @@ export default function ContractFilesModal({ isOpen, onClose, contractId, contra
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
           <div className="flex items-center gap-2">
-            <File className="w-5 h-5 text-blue-400" />
+            <File className="w-4 h-4 text-blue-400" />
             <div>
-              <h3 className="text-lg font-semibold text-white">Kontraktsfiler</h3>
+              <h3 className="text-sm font-semibold text-white">Kontraktsfiler</h3>
               {contractName && (
-                <p className="text-sm text-slate-400">{contractName}</p>
+                <p className="text-xs text-slate-400">{contractName}</p>
               )}
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -165,7 +157,7 @@ export default function ContractFilesModal({ isOpen, onClose, contractId, contra
             >
               <RefreshCw className={`w-4 h-4 ${(isLoading || isRefreshing) ? 'animate-spin' : ''}`} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -178,22 +170,22 @@ export default function ContractFilesModal({ isOpen, onClose, contractId, contra
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              <span className="ml-3 text-slate-400">Laddar filer...</span>
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <span className="ml-3 text-slate-400 text-sm">Laddar filer...</span>
             </div>
           ) : currentContractFiles.length === 0 ? (
-            <div className="text-center py-12">
-              <File className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-              <p className="text-slate-400">Inga filer tillgängliga</p>
-              <p className="text-sm text-slate-500 mt-1">
+            <div className="text-center py-4">
+              <File className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+              <p className="text-slate-400 text-sm">Inga filer tillgängliga</p>
+              <p className="text-xs text-slate-500 mt-1">
                 Detta kontrakt har inga associerade filer i OneFlow
               </p>
             </div>
           ) : (
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
               {currentContractFiles.map(file => (
                 <FileRow
                   key={file.id}
@@ -204,11 +196,11 @@ export default function ContractFilesModal({ isOpen, onClose, contractId, contra
               ))}
             </div>
           )}
-          
+
           {/* Stats */}
           {currentContractFiles.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-slate-700">
-              <div className="flex justify-between text-sm text-slate-400">
+            <div className="mt-3 pt-2 border-t border-slate-700/50">
+              <div className="flex justify-between text-xs text-slate-400">
                 <span>
                   {currentContractFiles.length} fil{currentContractFiles.length !== 1 ? 'er' : ''} totalt
                 </span>
@@ -219,7 +211,7 @@ export default function ContractFilesModal({ isOpen, onClose, contractId, contra
             </div>
           )}
         </div>
-      </Card>
+      </div>
     </div>
   )
 }

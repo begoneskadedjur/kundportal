@@ -16,6 +16,7 @@ export interface ContractWithSourceData extends Contract {
     company_name?: string
     contact_person?: string
     contact_email?: string
+    price_list_id?: string | null
   }
   // Creator tracking (från nya databas-kolumner)
   created_by_email?: string | null
@@ -77,7 +78,16 @@ export interface ContractStats {
     count: number
     total_value: number
   }>
-  
+
+  // Article insights (from price lists)
+  popular_articles?: Array<{
+    name: string
+    code: string
+    unit: string
+    count: number
+    avg_price: number
+  }>
+
   // Pipeline health
   avg_signing_time_days: number
   overdue_count: number
@@ -97,7 +107,7 @@ export class ContractService {
         .select(`
           *,
           customers!contracts_customer_id_fkey (
-            id, company_name, contact_person, contact_email, products
+            id, company_name, contact_person, contact_email, products, price_list_id
           )
         `)
         .order('created_at', { ascending: false })
@@ -707,7 +717,64 @@ export class ContractService {
       const popular_products = Array.from(productStats.values())
         .sort((a, b) => b.count - a.count)
         .slice(0, 5)
-        
+
+      // Artikelinsikter (från prislistor via kunder)
+      let popular_articles: Array<{ name: string, code: string, unit: string, count: number, avg_price: number }> = []
+      try {
+        // Hämta alla kunder med price_list_id
+        const { data: customersWithPriceLists } = await supabase
+          .from('customers')
+          .select('id, price_list_id')
+          .not('price_list_id', 'is', null)
+
+        if (customersWithPriceLists && customersWithPriceLists.length > 0) {
+          const uniquePriceListIds = [...new Set(customersWithPriceLists.map(c => c.price_list_id).filter(Boolean))]
+
+          // Hämta alla prislisteposter med artikeldata
+          const { data: allItems } = await supabase
+            .from('price_list_items')
+            .select('price_list_id, custom_price, article:articles(name, code, unit)')
+            .in('price_list_id', uniquePriceListIds)
+
+          if (allItems && allItems.length > 0) {
+            // Räkna hur många prislistor varje artikel förekommer i
+            const articleStats = new Map<string, { name: string, code: string, unit: string, count: number, totalPrice: number }>()
+
+            allItems.forEach((item: any) => {
+              if (item.article) {
+                const key = item.article.code || item.article.name
+                const existing = articleStats.get(key)
+                if (existing) {
+                  existing.count++
+                  existing.totalPrice += item.custom_price || 0
+                } else {
+                  articleStats.set(key, {
+                    name: item.article.name,
+                    code: item.article.code || '',
+                    unit: item.article.unit || 'st',
+                    count: 1,
+                    totalPrice: item.custom_price || 0
+                  })
+                }
+              }
+            })
+
+            popular_articles = Array.from(articleStats.values())
+              .map(a => ({
+                name: a.name,
+                code: a.code,
+                unit: a.unit,
+                count: a.count,
+                avg_price: a.count > 0 ? Math.round(a.totalPrice / a.count) : 0
+              }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 5)
+          }
+        }
+      } catch (articleError) {
+        console.warn('Kunde inte hämta artikelstatistik:', articleError)
+      }
+
       // Pipeline hälsa
       const overdue_count = contracts.filter(c => c.status === 'overdue').length
       
@@ -762,7 +829,10 @@ export class ContractService {
         
         // Product insights
         popular_products,
-        
+
+        // Article insights
+        popular_articles,
+
         // Pipeline health
         avg_signing_time_days,
         overdue_count,

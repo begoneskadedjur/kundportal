@@ -19,6 +19,8 @@ import { PageHeader } from '../../components/shared'
 import { useContracts } from '../../hooks/useContracts'
 import { ContractFilters, ContractWithSourceData } from '../../services/contractService'
 import { formatContractValue, getContractStatusColor, getContractStatusText, getContractTypeText } from '../../services/contractService'
+import { PriceListService } from '../../services/priceListService'
+import type { PriceList, PriceListItemWithArticle } from '../../types/articles'
 import toast from 'react-hot-toast'
 
 // Parse products från JSON-fält
@@ -316,6 +318,124 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
   )
 }
 
+// Prislista/Artiklar-cell med fallback till produkter
+interface PriceListCellData {
+  priceList: PriceList
+  items: PriceListItemWithArticle[]
+}
+
+const PriceListCell: React.FC<{
+  contract: ContractWithSourceData
+  priceListData?: PriceListCellData | null
+}> = ({ contract, priceListData }) => {
+  const [showPopover, setShowPopover] = useState(false)
+  const [backdropClickable, setBackdropClickable] = useState(false)
+  const buttonRef = React.useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (showPopover) {
+      setBackdropClickable(false)
+      const timer = setTimeout(() => setBackdropClickable(true), 200)
+      return () => clearTimeout(timer)
+    }
+  }, [showPopover])
+
+  // Om prislista finns → visa den
+  if (priceListData && priceListData.items.length > 0) {
+    const items = priceListData.items
+    const maxVisible = 2
+
+    const getPopoverStyle = () => {
+      if (!buttonRef.current) return {}
+      const rect = buttonRef.current.getBoundingClientRect()
+      return {
+        position: 'fixed' as const,
+        left: `${rect.left}px`,
+        top: `${rect.bottom + 8}px`,
+        zIndex: 99999
+      }
+    }
+
+    return (
+      <div className="relative">
+        <div className="flex flex-wrap gap-1">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 mb-1">
+            {priceListData.priceList.name}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {items.slice(0, maxVisible).map((item) => (
+            <span
+              key={item.id}
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-slate-700 text-slate-300"
+            >
+              {item.article?.name || 'Okänd'}
+            </span>
+          ))}
+          {items.length > maxVisible && (
+            <button
+              ref={buttonRef}
+              type="button"
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-600/20 text-green-400 cursor-pointer hover:bg-green-500/30 hover:text-green-300 transition-all duration-200 font-medium select-none focus:outline-none focus:ring-2 focus:ring-green-500/50"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowPopover(!showPopover)
+              }}
+              title={`Visa alla ${items.length} artiklar`}
+            >
+              +{items.length - maxVisible} till
+            </button>
+          )}
+        </div>
+
+        {showPopover && items.length > maxVisible && ReactDOM.createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[9998]"
+              onClick={() => { if (backdropClickable) setShowPopover(false) }}
+            />
+            <div
+              className="fixed bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-2xl w-80 z-[9999]"
+              style={getPopoverStyle()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-purple-400" />
+                  <h4 className="text-sm font-medium text-white">{priceListData.priceList.name}</h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setShowPopover(false) }}
+                  className="text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-all p-1 -m-1"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {items.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-slate-700/50 transition-colors">
+                    <span className="text-slate-300 truncate flex-1">{item.article?.name || 'Okänd'}</span>
+                    <span className="text-slate-400 font-mono bg-slate-700/50 px-1.5 py-0.5 rounded ml-2 text-xs">
+                      {new Intl.NumberFormat('sv-SE').format(item.custom_price)} kr/{item.article?.unit || 'st'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-slate-600 rotate-45 border-l border-t border-slate-600" />
+            </div>
+          </>,
+          document.body
+        )}
+      </div>
+    )
+  }
+
+  // Fallback: visa gamla OneFlow-produkter
+  const products = parseContractProducts(contract)
+  return <ProductsCell products={products} />
+}
+
 // Pipeline filter pills
 const PipelineFilters: React.FC<{
   activeFilter: string,
@@ -373,6 +493,45 @@ export default function ContractsOverview() {
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null)
   const [selectedContractName, setSelectedContractName] = useState<string>('')
   const [importModalOpen, setImportModalOpen] = useState(false)
+
+  // Prisliste-cache för tabellceller
+  const [priceListCache, setPriceListCache] = useState<Map<string, PriceListCellData>>(new Map())
+
+  // Hämta prislistedata för kontrakt som har price_list_id (direkt eller via kund)
+  useEffect(() => {
+    if (!contracts.length) return
+
+    const fetchPriceLists = async () => {
+      // Samla unika price_list_id:s (från kontrakt eller kundrelation)
+      const priceListIds = new Set<string>()
+      contracts.forEach(c => {
+        const plId = (c as any).price_list_id || c.customer_data?.price_list_id
+        if (plId) priceListIds.add(plId)
+      })
+
+      if (priceListIds.size === 0) return
+
+      const cache = new Map<string, PriceListCellData>()
+      await Promise.all(
+        Array.from(priceListIds).map(async (plId) => {
+          try {
+            const [priceList, items] = await Promise.all([
+              PriceListService.getPriceListById(plId),
+              PriceListService.getPriceListItems(plId)
+            ])
+            if (priceList) {
+              cache.set(plId, { priceList, items })
+            }
+          } catch (err) {
+            console.warn('Kunde inte hämta prislista:', plId, err)
+          }
+        })
+      )
+      if (cache.size > 0) setPriceListCache(cache)
+    }
+
+    fetchPriceLists()
+  }, [contracts])
 
   // Spara sidopanel-preferens
   useEffect(() => {
@@ -726,7 +885,7 @@ export default function ContractsOverview() {
                       Företag / Kontakt
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Produkter
+                      Prislista / Artiklar
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Kontraktsvärde
@@ -747,9 +906,10 @@ export default function ContractsOverview() {
                 </thead>
                 <tbody className="divide-y divide-slate-700">
                   {filteredContracts.map((contract) => {
-                    const products = parseContractProducts(contract)
                     const isMultiYear = contract.contract_length && parseInt(contract.contract_length) > 12
-                    
+                    const priceListId = (contract as any).price_list_id || contract.customer_data?.price_list_id
+                    const plData = priceListId ? priceListCache.get(priceListId) || null : null
+
                     return (
                       <tr key={contract.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="px-4 py-4">
@@ -780,7 +940,7 @@ export default function ContractsOverview() {
                         </td>
                         
                         <td className="px-4 py-4">
-                          <ProductsCell products={products} />
+                          <PriceListCell contract={contract} priceListData={plData} />
                         </td>
                         
                         <td className="px-4 py-4">
@@ -884,11 +1044,11 @@ export default function ContractsOverview() {
         transform transition-transform duration-300 z-40 overflow-y-auto
         ${sidePanelOpen ? 'translate-x-0' : 'translate-x-full'}
       `}>
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-4">
           {/* Sidopanel header */}
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-green-500" />
+            <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+              <BarChart3 className="w-4 h-4 text-green-500" />
               Analys & Insikter
             </h3>
             <Button
@@ -897,13 +1057,13 @@ export default function ContractsOverview() {
               onClick={() => setSidePanelOpen(false)}
               className="text-slate-400 hover:text-white"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </Button>
           </div>
 
           {/* Pipeline översikt */}
-          <Card className="p-4 bg-gradient-to-br from-slate-800 to-slate-800/50">
-            <h4 className="text-sm font-medium text-slate-300 mb-3">Pipeline-stadier</h4>
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <h4 className="text-xs font-semibold text-slate-300 mb-2">Pipeline-stadier</h4>
             <div className="space-y-2">
               {Object.entries(pipelineStats).map(([stage, data]) => (
                 <div key={stage} className="flex items-center justify-between">
@@ -918,11 +1078,11 @@ export default function ContractsOverview() {
                 </div>
               ))}
             </div>
-          </Card>
+          </div>
 
           {/* Top säljare */}
           <div>
-            <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+            <h4 className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
               <Users className="w-4 h-4 text-blue-400" />
               Top 3 Säljare
             </h4>
@@ -946,16 +1106,36 @@ export default function ContractsOverview() {
             </div>
           </div>
 
-          {/* Populära produkter */}
+          {/* Top 5 Artiklar (från prislistor) med fallback till produkter */}
           <div>
-            <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+            <h4 className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
               <Package className="w-4 h-4 text-green-400" />
-              Top 5 Produkter
+              {stats?.popular_articles && stats.popular_articles.length > 0 ? 'Top 5 Artiklar' : 'Top 5 Produkter'}
             </h4>
             <div className="space-y-2">
-              {stats?.popular_products && stats.popular_products.length > 0 ? (
+              {stats?.popular_articles && stats.popular_articles.length > 0 ? (
+                stats.popular_articles.slice(0, 5).map((article: any, index: number) => (
+                  <div
+                    key={`${article.code}-${index}`}
+                    className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">#{index + 1}</span>
+                      <p className="text-sm text-white truncate">{article.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-green-400">
+                        {article.count} st
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Snitt: {new Intl.NumberFormat('sv-SE').format(article.avg_price)} kr/{article.unit}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : stats?.popular_products && stats.popular_products.length > 0 ? (
                 stats.popular_products.slice(0, 5).map((product: any, index: number) => (
-                  <div 
+                  <div
                     key={`${product.name}-${index}`}
                     className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
                   >
@@ -967,9 +1147,6 @@ export default function ContractsOverview() {
                       <p className="text-xs font-medium text-green-400">
                         {product.count} st
                       </p>
-                      <p className="text-xs text-slate-500">
-                        {formatContractValue(product.total_value)}
-                      </p>
                     </div>
                   </div>
                 ))
@@ -977,53 +1154,43 @@ export default function ContractsOverview() {
                 <div className="text-center py-4">
                   <Package className="w-8 h-8 text-slate-600 mx-auto mb-2" />
                   <p className="text-xs text-slate-500">
-                    Ingen produktdata tillgänglig
+                    Ingen artikel- eller produktdata tillgänglig
                   </p>
-                  <details className="mt-2">
-                    <summary className="text-xs text-slate-600 cursor-pointer hover:text-slate-400">
-                      Debug info
-                    </summary>
-                    <div className="text-xs text-slate-600 mt-1 font-mono bg-slate-800 p-2 rounded">
-                      <p>Stats exists: {!!stats ? 'Yes' : 'No'}</p>
-                      <p>Popular products: {JSON.stringify(stats?.popular_products)}</p>
-                      <p>Contracts count: {contracts.length}</p>
-                    </div>
-                  </details>
                 </div>
               )}
             </div>
           </div>
 
           {/* Quick stats */}
-          <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-            <h4 className="text-sm font-medium text-slate-300 mb-3">Snabbstatistik</h4>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 bg-slate-800/30 border border-green-500/20 rounded-xl">
+            <h4 className="text-xs font-semibold text-slate-300 mb-2">Snabbstatistik</h4>
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <p className="text-xs text-slate-500">Snitt signeringstid</p>
-                <p className="text-lg font-bold text-white">
+                <p className="text-sm font-bold text-white">
                   {stats?.avg_signing_time_days || 0} dagar
                 </p>
               </div>
               <div>
                 <p className="text-xs text-slate-500">Utgår snart</p>
-                <p className="text-lg font-bold text-orange-400">
+                <p className="text-sm font-bold text-orange-400">
                   {stats?.contracts_expiring_soon || 0} st
                 </p>
               </div>
               <div>
                 <p className="text-xs text-slate-500">Denna månad</p>
-                <p className="text-lg font-bold text-white">
+                <p className="text-sm font-bold text-white">
                   {stats?.contracts_this_month || 0} avtal
                 </p>
               </div>
               <div>
                 <p className="text-xs text-slate-500">Tillväxt</p>
-                <p className="text-lg font-bold text-green-400">
+                <p className="text-sm font-bold text-green-400">
                   {stats?.growth_rate ? `${stats.growth_rate > 0 ? '+' : ''}${stats.growth_rate}%` : '0%'}
                 </p>
               </div>
             </div>
-          </Card>
+          </div>
         </div>
         </div>
 

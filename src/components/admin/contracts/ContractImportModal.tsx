@@ -1,8 +1,7 @@
 // src/components/admin/contracts/ContractImportModal.tsx - Modal för import av OneFlow-kontrakt
 import React, { useState, useEffect } from 'react'
-import { X, Download, Upload, RefreshCw, CheckCircle, AlertCircle, Eye, ExternalLink, Filter } from 'lucide-react'
+import { X, Download, Upload, RefreshCw, CheckCircle, AlertCircle, ExternalLink, Filter } from 'lucide-react'
 import Button from '../../ui/Button'
-import Card from '../../ui/Card'
 import toast from 'react-hot-toast'
 
 interface OneFlowContract {
@@ -249,23 +248,21 @@ export default function ContractImportModal({
   const availableForImport = filteredContracts.filter(c => !c.is_imported)
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-500/20 p-2 rounded-lg">
-              <Download className="w-5 h-5 text-blue-400" />
-            </div>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+          <div className="flex items-center gap-2">
+            <Download className="w-4 h-4 text-blue-400" />
             <div>
-              <h3 className="text-xl font-semibold text-white">Importera OneFlow Kontrakt</h3>
-              <p className="text-sm text-slate-400">
+              <h3 className="text-sm font-semibold text-white">Importera OneFlow Kontrakt</h3>
+              <p className="text-xs text-slate-400">
                 {totalCount > 0 ? `${totalCount} relevanta kontrakt tillgängliga (draft och oanvända mallar exkluderade)` : 'Laddar kontrakt...'}
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -275,7 +272,7 @@ export default function ContractImportModal({
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -288,17 +285,17 @@ export default function ContractImportModal({
         </div>
 
         {/* Filters */}
-        <div className="p-4 bg-slate-800/30 border-b border-slate-700">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-400" />
-              <span className="text-sm text-slate-400">Filter:</span>
+        <div className="p-3 bg-slate-800/30 border-b border-slate-700">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-xs text-slate-400">Filter:</span>
             </div>
             
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as any)}
-              className="px-3 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:ring-2 focus:ring-blue-500"
+              className="px-2.5 py-1 bg-slate-800/50 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
             >
               <option value="all">Alla typer</option>
               <option value="contract">Avtal</option>
@@ -308,7 +305,7 @@ export default function ContractImportModal({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="px-3 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:ring-2 focus:ring-blue-500"
+              className="px-2.5 py-1 bg-slate-800/50 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
             >
               <option value="all">Alla status</option>
               <option value="not_imported">Inte importerade</option>
@@ -333,27 +330,27 @@ export default function ContractImportModal({
         {/* Content */}
         <div className="flex-1 overflow-hidden">
           {loading && contracts.length === 0 ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              <span className="ml-3 text-slate-400">Laddar kontrakt från OneFlow...</span>
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <span className="ml-3 text-slate-400 text-sm">Laddar kontrakt från OneFlow...</span>
             </div>
           ) : filteredContracts.length === 0 ? (
-            <div className="text-center py-20">
-              <Upload className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-              <p className="text-slate-400">Inga kontrakt matchade filtren</p>
+            <div className="text-center py-4">
+              <Upload className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+              <p className="text-slate-400 text-sm">Inga kontrakt matchade filtren</p>
             </div>
           ) : (
             <div className="overflow-y-auto max-h-[500px]">
-              <div className="space-y-2 p-4">
+              <div className="space-y-1.5 p-3">
                 {filteredContracts.map(contract => (
                   <div
                     key={contract.id}
-                    className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${
                       contract.is_imported
                         ? 'bg-green-500/10 border-green-500/20'
                         : selectedContracts.has(contract.id)
-                          ? 'bg-blue-500/10 border-blue-500/30'
-                          : 'bg-slate-800 border-slate-700 hover:bg-slate-700/50'
+                          ? 'bg-[#20c58f]/10 border-[#20c58f]/30'
+                          : 'bg-slate-800/30 border-slate-700/40 hover:bg-slate-800/50'
                     }`}
                   >
                     {/* Checkbox */}
@@ -362,7 +359,7 @@ export default function ContractImportModal({
                         type="checkbox"
                         checked={selectedContracts.has(contract.id)}
                         onChange={() => toggleContractSelection(contract.id)}
-                        className="rounded border-slate-600 text-blue-500 focus:ring-blue-500"
+                        className="rounded border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                       />
                     )}
                     
@@ -373,9 +370,9 @@ export default function ContractImportModal({
                     
                     {/* Contract Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium text-white truncate">{contract.name}</h4>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-medium text-white truncate">{contract.name}</h4>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                           contract.type === 'offer' 
                             ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                             : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
@@ -384,7 +381,7 @@ export default function ContractImportModal({
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-4 text-sm text-slate-400">
+                      <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
                         <span>Mall: {contract.template_name}</span>
                         <span className={getStateColor(contract.state)}>
                           Status: {contract.state}
@@ -414,7 +411,7 @@ export default function ContractImportModal({
 
               {/* Load More */}
               {hasMore && (
-                <div className="text-center p-4 border-t border-slate-700">
+                <div className="text-center py-3 border-t border-slate-700/50">
                   <Button
                     variant="outline"
                     onClick={loadMoreContracts}
@@ -438,8 +435,8 @@ export default function ContractImportModal({
 
         {/* Import Results */}
         {importResults.length > 0 && (
-          <div className="border-t border-slate-700 p-4 bg-slate-900/50 max-h-40 overflow-y-auto">
-            <h4 className="font-medium text-white mb-3">Import Resultat:</h4>
+          <div className="border-t border-slate-700/50 p-3 bg-slate-800/20 max-h-36 overflow-y-auto">
+            <h4 className="text-xs font-semibold text-white mb-2">Import Resultat:</h4>
             <div className="space-y-1 text-sm">
               {importResults.map((result, index) => (
                 <div key={index} className="flex items-center gap-2">
@@ -461,8 +458,8 @@ export default function ContractImportModal({
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-slate-700">
-          <div className="text-sm text-slate-400">
+        <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-700">
+          <div className="text-xs text-slate-400">
             {selectedContracts.size > 0 ? (
               `${selectedContracts.size} kontrakt valda för import`
             ) : (
@@ -470,9 +467,10 @@ export default function ContractImportModal({
             )}
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
+              size="sm"
               onClick={onClose}
               disabled={importing}
             >
@@ -481,6 +479,7 @@ export default function ContractImportModal({
             
             {selectedContracts.size > 0 && (
               <Button
+                size="sm"
                 onClick={importSelectedContracts}
                 disabled={importing}
                 className="flex items-center gap-2"
@@ -500,7 +499,7 @@ export default function ContractImportModal({
             )}
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   )
 }
