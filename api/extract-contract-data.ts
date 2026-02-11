@@ -72,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('PDF base64 length:', pdfBase64.length)
 
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: [
         {
           role: 'user',
@@ -88,7 +88,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       ],
       config: {
-        temperature: 0.1,
         maxOutputTokens: 4000,
         responseMimeType: 'application/json',
       },
