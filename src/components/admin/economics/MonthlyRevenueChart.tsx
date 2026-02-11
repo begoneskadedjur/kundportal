@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { TrendingUp, Calendar, Filter, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react'
-import Card from '../../ui/Card'
 import Button from '../../ui/Button'
 import { useMonthlyRevenue } from '../../../hooks/useEconomicsDashboard'
 import { formatCurrency } from '../../../utils/formatters'
@@ -80,7 +79,7 @@ const MonthlyRevenueChart: React.FC = () => {
 
   if (loading) {
     return (
-      <Card>
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
         <div className="flex items-center mb-6">
           <BarChart3 className="w-5 h-5 text-purple-400 mr-2" />
           <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
@@ -88,13 +87,13 @@ const MonthlyRevenueChart: React.FC = () => {
         <div className="h-80 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
         </div>
-      </Card>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Card>
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
         <div className="flex items-center mb-6">
           <BarChart3 className="w-5 h-5 text-red-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
@@ -105,13 +104,13 @@ const MonthlyRevenueChart: React.FC = () => {
             <p className="text-sm text-slate-400">Kontrollera nätverksanslutningen och försök igen</p>
           </div>
         </div>
-      </Card>
+      </div>
     )
   }
 
   if (!Array.isArray(monthlyData) || monthlyData.length === 0) {
     return (
-      <Card>
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
         <div className="flex items-center mb-6">
           <BarChart3 className="w-5 h-5 text-slate-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
@@ -123,7 +122,7 @@ const MonthlyRevenueChart: React.FC = () => {
             <p className="text-sm mt-2">Data kommer att visas när ärenden registreras</p>
           </div>
         </div>
-      </Card>
+      </div>
     )
   }
 
@@ -214,7 +213,7 @@ const MonthlyRevenueChart: React.FC = () => {
   }
 
   return (
-    <Card>
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
       {/* Header med månadnavigation */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
@@ -289,7 +288,7 @@ const MonthlyRevenueChart: React.FC = () => {
           }
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+          <div className="text-center p-3 bg-slate-800/20 border border-slate-700/50 rounded-lg">
             <p className="text-slate-300 font-bold text-lg">
               {selectedPeriod === '1m' ? formatCurrency(selectedMonthTotal) : formatCurrency(totalRevenue)}
             </p>
@@ -297,19 +296,19 @@ const MonthlyRevenueChart: React.FC = () => {
               {selectedPeriod === '1m' ? 'Total intäkt' : `Total intäkt (${selectedPeriod})`}
             </p>
           </div>
-          <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+          <div className="text-center p-3 bg-slate-800/20 border border-slate-700/50 rounded-lg">
             <p className="text-slate-300 font-bold text-lg">
               {selectedPeriod === '1m' ? formatCurrency(selectedMonthContract) : formatCurrency(totalContractRevenue)}
             </p>
             <p className="text-slate-400 text-sm">Kontraktsintäkter</p>
           </div>
-          <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+          <div className="text-center p-3 bg-slate-800/20 border border-slate-700/50 rounded-lg">
             <p className="text-slate-300 font-bold text-lg">
               {selectedPeriod === '1m' ? formatCurrency(selectedMonthCase) : formatCurrency(totalCaseRevenue)}
             </p>
             <p className="text-slate-400 text-sm">Merförsäljning Avtal</p>
           </div>
-          <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+          <div className="text-center p-3 bg-slate-800/20 border border-slate-700/50 rounded-lg">
             <p className="text-slate-300 font-bold text-lg">
               {selectedPeriod === '1m' ? formatCurrency(selectedMonthEngangsjobb) : formatCurrency(totalEngangsjobb)}
             </p>
@@ -421,7 +420,7 @@ const MonthlyRevenueChart: React.FC = () => {
       </div>
 
       {/* 🆕 Tillväxt jämfört med föregående månad - visar alltid för vald månad */}
-      <div className="mt-4 pt-4 border-t border-slate-800">
+      <div className="mt-4 pt-4 border-t border-slate-700/50">
         <div className="flex items-center justify-between text-sm">
           <span className="text-slate-400">
             {formatSelectedMonth(selectedMonth)} jämfört med föregående månad:
@@ -441,7 +440,7 @@ const MonthlyRevenueChart: React.FC = () => {
           </div>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 

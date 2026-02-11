@@ -15,7 +15,6 @@ import {
   Wrench 
 } from 'lucide-react'
 
-import Card from '../../ui/Card'  // ✅ Använder befintlig Card istället för ModernCard
 import LoadingSpinner from '../../shared/LoadingSpinner'
 
 // 🎯 Interfaces
@@ -122,7 +121,7 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-4">
           {/* Pricing */}
-          <div className="bg-slate-500/10 border border-slate-500/20 rounded-lg p-4">
+          <div className="bg-slate-800/20 border border-slate-700/50 rounded-lg p-4">
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm text-slate-400">Ärendets värde</p>
@@ -427,27 +426,27 @@ const EconomicInsightsChart: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <Card className="p-6">
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
         <div className="flex items-center justify-center py-12">
           <LoadingSpinner />
         </div>
-      </Card>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Card className="p-6">
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
         <div className="text-center py-12">
           <p className="text-red-400 mb-4">{error}</p>
           <button 
             onClick={fetchInsightsData}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            className="px-4 py-2 bg-[#20c58f] text-white rounded-lg hover:bg-[#1aa87a] transition-colors"
           >
             Försök igen
           </button>
         </div>
-      </Card>
+      </div>
     )
   }
 
@@ -486,7 +485,7 @@ const EconomicInsightsChart: React.FC = () => {
                 onClick={() => setSelectedPeriod(period.key)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedPeriod === period.key
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-[#20c58f] text-white'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
@@ -520,7 +519,7 @@ const EconomicInsightsChart: React.FC = () => {
             {!isCurrentMonth() && (
               <button 
                 onClick={goToCurrentMonth}
-                className="ml-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                className="ml-2 px-3 py-2 bg-[#20c58f] text-white rounded-lg hover:bg-[#1aa87a] transition-colors text-sm"
               >
                 Idag
               </button>
@@ -531,7 +530,7 @@ const EconomicInsightsChart: React.FC = () => {
 
       {/* Content */}
       {selectedView === 'cases' && (
-        <Card className="p-6">
+        <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
           <div className="flex items-center gap-2 mb-6">
             <Award className="w-5 h-5 text-yellow-400" />
             <h3 className="text-lg font-semibold text-white">Topp Ärenden</h3>
@@ -604,11 +603,11 @@ const EconomicInsightsChart: React.FC = () => {
               <p>Inga ärenden för vald period</p>
             </div>
           )}
-        </Card>
+        </div>
       )}
 
       {selectedView === 'skadedjur' && (
-        <Card className="p-6">
+        <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
           <div className="flex items-center gap-2 mb-6">
             <Bug className="w-5 h-5 text-red-400" />
             <h3 className="text-lg font-semibold text-white">Mest Lönsamma Skadedjur</h3>
@@ -655,7 +654,7 @@ const EconomicInsightsChart: React.FC = () => {
               <p>Inga skadedjur för vald period</p>
             </div>
           )}
-        </Card>
+        </div>
       )}
 
       {/* Case Details Modal */}

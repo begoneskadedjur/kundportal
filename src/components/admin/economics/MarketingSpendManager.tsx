@@ -1,7 +1,6 @@
 // 📁 src/components/admin/economics/MarketingSpendManager.tsx
 import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit3, Save, X, DollarSign, Calendar, TrendingUp, Activity } from 'lucide-react'
-import Card from '../../ui/Card'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import { supabase } from '../../../lib/supabase'
@@ -236,7 +235,7 @@ const MarketingSpendManager: React.FC = () => {
   const totalSpend = spendData.reduce((sum, item) => sum + item.spend, 0)
 
   return (
-    <Card data-testid="marketing-spend-manager">
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl" data-testid="marketing-spend-manager">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <DollarSign className="w-5 h-5 text-purple-500 mr-2" />
@@ -299,7 +298,7 @@ const MarketingSpendManager: React.FC = () => {
                 value={formData.notes}
                 onChange={handleInputChange}
                 rows={1}
-                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-purple-500"
+                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-[#20c58f]"
                 placeholder="Valfri beskrivning..."
               />
             </div>
@@ -361,7 +360,7 @@ const MarketingSpendManager: React.FC = () => {
                     value={formData.notes}
                     onChange={handleInputChange}
                     rows={1}
-                    className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-[#20c58f]"
                     placeholder="Anteckningar..."
                   />
                 </div>
@@ -446,7 +445,7 @@ const MarketingSpendManager: React.FC = () => {
           </div>
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 

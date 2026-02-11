@@ -5,8 +5,6 @@ import { Briefcase, TrendingUp, Users, Calendar, DollarSign, Bug, AlertTriangle,
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../utils/formatters'
 
-// Standard komponenter
-import Card from '../../ui/Card'
 import { CombinedNavigation } from '../../ui/ModernNavigation'
 
 // 🎯 Interface structure
@@ -374,10 +372,10 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <BarChart3 className="w-5 h-5 text-purple-400 mr-2" />
-          <h3 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h3>
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+        <div className="flex items-center mb-4">
+          <BarChart3 className="w-4 h-4 text-purple-400 mr-2" />
+          <h3 className="text-sm font-semibold text-white">Intäkter Engångsjobb</h3>
         </div>
         <div className="h-80 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
@@ -385,58 +383,52 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
             <p className="text-slate-400 text-sm">Laddar engångsjobb statistik...</p>
           </div>
         </div>
-      </Card>
+      </div>
     )
   }
 
   // Error state
   if (error) {
     return (
-      <ModernCard gradient="red" glowing>
-        <ModernCard.Header
-          icon={Briefcase}
-          iconColor="text-red-500"
-          title="Intäkter Engångsjobb"
-          subtitle="Fel vid laddning"
-        />
-        <ModernCard.Content>
-          <div className="h-80 flex items-center justify-center text-red-400">
-            <div className="text-center">
-              <AlertTriangle className="w-12 h-12 mx-auto mb-4" />
-              <p className="mb-2">Fel vid laddning: {error}</p>
-              <button
-                onClick={fetchBeGoneData}
-                className="flex items-center gap-2 mx-auto px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Försök igen
-              </button>
-            </div>
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+        <div className="flex items-center mb-4">
+          <Briefcase className="w-4 h-4 text-red-500 mr-2" />
+          <h3 className="text-sm font-semibold text-white">Intäkter Engångsjobb</h3>
+          <span className="ml-2 text-xs text-red-400">Fel vid laddning</span>
+        </div>
+        <div className="h-80 flex items-center justify-center text-red-400">
+          <div className="text-center">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-4" />
+            <p className="mb-2">Fel vid laddning: {error}</p>
+            <button
+              onClick={fetchBeGoneData}
+              className="flex items-center gap-2 mx-auto px-4 py-2 bg-[#20c58f] hover:bg-[#1aa87a] text-white rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Försök igen
+            </button>
           </div>
-        </ModernCard.Content>
-      </ModernCard>
+        </div>
+      </div>
     )
   }
 
   // Empty state
   if (!data.monthlyData || data.monthlyData.length === 0) {
     return (
-      <ModernCard>
-        <ModernCard.Header
-          icon={Briefcase}
-          iconColor="text-slate-500"
-          title="Intäkter Engångsjobb"
-          subtitle="Ingen data tillgänglig"
-        />
-        <ModernCard.Content>
-          <div className="h-80 flex items-center justify-center text-slate-400">
-            <div className="text-center">
-              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Ingen engångsjobb data tillgänglig</p>
-            </div>
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+        <div className="flex items-center mb-4">
+          <Briefcase className="w-4 h-4 text-slate-500 mr-2" />
+          <h3 className="text-sm font-semibold text-white">Intäkter Engångsjobb</h3>
+          <span className="ml-2 text-xs text-slate-400">Ingen data tillgänglig</span>
+        </div>
+        <div className="h-80 flex items-center justify-center text-slate-400">
+          <div className="text-center">
+            <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>Ingen engångsjobb data tillgänglig</p>
           </div>
-        </ModernCard.Content>
-      </ModernCard>
+        </div>
+      </div>
     )
   }
 
@@ -519,8 +511,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Huvudkort med modern design */}
-      <Card>
-        <div className="p-6">
+      <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
           <div className="flex flex-col gap-4 mb-6">
             {/* Titel rad */}
             <div className="flex items-center gap-3">
@@ -580,7 +571,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
               }
             </h3>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+              <div className="text-center p-3 bg-slate-800/20 border border-slate-700/50 rounded-lg">
                 <p className="text-slate-300 font-bold text-sm">
                   {selectedPeriod === '1m' 
                     ? (selectedMonthData?.total_cases || 0)
@@ -589,7 +580,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                 </p>
                 <p className="text-slate-400 text-xs">Totala ärenden</p>
               </div>
-              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+              <div className="text-center p-3 bg-slate-800/20 border border-slate-700/50 rounded-lg">
                 <p className="text-slate-300 font-bold text-sm">
                   {selectedPeriod === '1m' 
                     ? (selectedMonthData?.private_cases || 0)
@@ -598,7 +589,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                 </p>
                 <p className="text-slate-400 text-xs">Privatpersoner</p>
               </div>
-              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+              <div className="text-center p-3 bg-slate-800/20 border border-slate-700/50 rounded-lg">
                 <p className="text-slate-300 font-bold text-sm">
                   {selectedPeriod === '1m' 
                     ? (selectedMonthData?.business_cases || 0)
@@ -607,7 +598,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                 </p>
                 <p className="text-slate-400 text-xs">Företag</p>
               </div>
-              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+              <div className="text-center p-3 bg-slate-800/20 border border-slate-700/50 rounded-lg">
                 <p className="text-slate-300 font-bold text-sm">
                   {formatCurrency(
                     selectedPeriod === '1m' 
@@ -617,7 +608,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                 </p>
                 <p className="text-slate-400 text-xs">Total intäkt</p>
               </div>
-              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+              <div className="text-center p-3 bg-slate-800/20 border border-slate-700/50 rounded-lg">
                 <p className="text-slate-300 font-bold text-sm">
                   {formatCurrency(
                     selectedPeriod === '1m' 
@@ -779,8 +770,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
               )}
             </div>
           )}
-        </div>
-      </Card>
+      </div>
     </div>
   )
 }

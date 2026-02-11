@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from 'react'
 import { Activity, Clock, Database, TrendingUp, CheckCircle, AlertTriangle, BarChart3 } from 'lucide-react'
-import Card from '../../ui/Card'
 import Button from '../../ui/Button'
 import { performanceTester } from '../../../utils/performanceTestRunner'
 
@@ -83,7 +82,7 @@ const PerformanceTestReport: React.FC = () => {
   const summary = calculateSummary()
 
   return (
-    <Card>
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <BarChart3 className="w-5 h-5 text-cyan-500 mr-2" />
@@ -312,7 +311,7 @@ const PerformanceTestReport: React.FC = () => {
           <p className="text-sm">Klicka på "Kör Performance Tester" för att börja</p>
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 
