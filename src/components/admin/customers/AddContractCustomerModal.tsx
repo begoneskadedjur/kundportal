@@ -419,15 +419,24 @@ export default function AddContractCustomerModal({
             className="p-4 flex flex-col items-center justify-center min-h-[300px]"
           >
             <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               className="w-16 h-16 rounded-xl bg-[#20c58f]/10 flex items-center justify-center mb-6"
             >
               <Sparkles className="w-8 h-8 text-[#20c58f]" />
             </motion.div>
             <p className="text-lg font-medium text-white mb-2">Analyserar avtalsdokument...</p>
-            <p className="text-sm text-slate-400 mb-6">Gemini AI extraherar kunddata från PDF:en</p>
-            <LoadingSpinner size="sm" />
+            <p className="text-sm text-slate-400 mb-6">Vi extraherar kunddata från PDF:en</p>
+            <div className="flex gap-1.5">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-2 h-2 rounded-full bg-[#20c58f]"
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+                />
+              ))}
+            </div>
           </motion.div>
         )}
 

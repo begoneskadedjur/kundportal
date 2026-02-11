@@ -1,17 +1,15 @@
 import React, { useState } from 'react'
-import { 
-  ChevronDown, 
-  ChevronRight, 
-  MoreVertical, 
-  CheckCircle2, 
+import {
+  ChevronDown,
+  ChevronRight,
+  MoreVertical,
+  CheckCircle2,
   AlertTriangle,
   Circle,
   Users,
   MapPin,
-  TrendingUp,
   Mail,
   Phone,
-  Calendar,
   Edit2,
   Trash2,
   XCircle,
@@ -20,11 +18,12 @@ import {
   UserCheck,
   Shield,
   Building2,
-  Plus
+  Plus,
+  CheckCircle,
+  Clock
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import { useNavigate } from 'react-router-dom'
-import { getTemplateById } from '../../../constants/oneflowTemplates'
 import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsModal'
 
 interface Organization {
@@ -41,9 +40,7 @@ interface Organization {
   sites_count?: number
   users_count?: number
   total_value?: number
-  // Organisationstyp för unified view
   organizationType?: 'multisite' | 'single'
-  // Avtalsinfo
   contract_type?: string
   contract_end_date?: string
   contract_length?: number
@@ -53,7 +50,6 @@ interface Organization {
   account_manager_email?: string
   sales_person?: string
   sales_person_email?: string
-  // Enheter
   sites?: any[]
   contact_phone?: string
   contact_person?: string
@@ -63,13 +59,15 @@ interface Organization {
   unacknowledgedCount?: number
   criticalCasesCount?: number
   warningCasesCount?: number
-  // Portal access fält (för kompatibilitet)
-  portalAccessStatus?: 'full' | 'partial' | 'none'
+  // Portal-data
+  portalStatus?: 'active' | 'invited' | 'not_invited' | 'inactive'
+  lastLoginDate?: string | null
+  emailVerified?: boolean
   activeUsersCount?: number
-  hasLoggedIn?: boolean
-  lastLoginDate?: string
+  portal_access_enabled?: boolean
+  portal_notifications_enabled?: boolean
+  portal_access_level?: string
   primary_contact_email?: string
-  primary_contact_phone?: string
   contact_email?: string
 }
 
@@ -114,23 +112,7 @@ interface CompactOrganizationTableProps {
   onEditSite: (org: Organization, site: Site) => void
   onDeleteSite: (orgId: string, siteId: string) => void
   expandedOrgId: string | null
-  getDaysUntilContractEnd: (endDate: string | undefined) => number | null
-  formatContractLength: (length: number | null | undefined) => string
-  // Nya callbacks för portal-hantering
   onInviteToPortal?: (org: Organization) => void
-  onViewMultiSiteDetails?: (org: Organization) => void
-  onViewSingleCustomerDetails?: (org: Organization) => void
-}
-
-// Mappning för contract_types från databasen
-const CONTRACT_TYPE_MAPPING: Record<string, string> = {
-  '242dff01-ecf7-4de1-ab5f-7fad11cb8812': 'Skadedjursavtal',
-  '21ed7bc7-e767-48e3-b981-4305b1ae7141': 'Betongstationer',
-  '37eeca21-f8b3-45f7-810a-7f616f84e71e': 'Mekaniska råttfällor',
-  '73c7c42b-a302-4da2-abf2-8d6080045bc8': 'Fågelavtal',
-  'bc612355-b6ce-4ca8-82cd-4f82a8538b71': 'Avloppsfällor',
-  'e3a610c9-15b9-42fe-8085-d0a7e17d4465': 'Betesstationer',
-  '3d749768-63be-433f-936d-be070edf4876': 'Avrop - 2.490kr'
 }
 
 const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
@@ -149,11 +131,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   onEditSite,
   onDeleteSite,
   expandedOrgId,
-  getDaysUntilContractEnd,
-  formatContractLength,
-  onInviteToPortal,
-  onViewMultiSiteDetails,
-  onViewSingleCustomerDetails
+  onInviteToPortal
 }) => {
   const navigate = useNavigate()
   const [hoveredOrgId, setHoveredOrgId] = useState<string | null>(null)
@@ -161,7 +139,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   const [showRecommendationsModal, setShowRecommendationsModal] = useState(false)
   const [selectedOrgForModal, setSelectedOrgForModal] = useState<Organization | null>(null)
 
-  // Hjälpfunktion för bekräftelsestatus
+  // Hjälpfunktion för bekräftelsestatus (trafikljus)
   const getAcknowledgmentStatus = (org: Organization) => {
     if (org.unacknowledgedCount && org.unacknowledgedCount > 0) {
       return {
@@ -172,8 +150,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
         tooltip: `${org.unacknowledgedCount} obekräftade rekommendationer`
       }
     }
-    
-    // Om det finns cases men alla är bekräftade
+
     if ((org.criticalCasesCount || 0) + (org.warningCasesCount || 0) > 0) {
       return {
         icon: <CheckCircle2 className="w-4 h-4 text-green-400" />,
@@ -183,7 +160,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
         tooltip: 'Alla rekommendationer bekräftade'
       }
     }
-    
+
     return {
       icon: <Circle className="w-4 h-4 text-slate-600" />,
       text: '',
@@ -193,67 +170,36 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
     }
   }
 
-  // Hjälpfunktion för avtalsstatus
-  const getContractStatus = (org: Organization) => {
-    const daysLeft = getDaysUntilContractEnd(org.contract_end_date)
-    
-    if (!daysLeft || !org.contract_end_date) return { text: '-', color: 'text-slate-400' }
-    
-    if (daysLeft < 0) {
-      return { 
-        text: `Utgått`, 
-        color: 'text-red-400 font-medium' 
-      }
-    } else if (daysLeft <= 30) {
-      // Visa i dagar om mindre än 30 dagar
-      return { 
-        text: `${daysLeft} dagar`, 
-        color: 'text-amber-400 font-medium' 
-      }
-    } else if (daysLeft <= 90) {
-      // Beräkna exakta månader för kort tid
-      const today = new Date()
-      const endDate = new Date(org.contract_end_date)
-      
-      let months = 0
-      const tempDate = new Date(today)
-      
-      while (tempDate < endDate) {
-        tempDate.setMonth(tempDate.getMonth() + 1)
-        if (tempDate <= endDate) {
-          months++
-        }
-      }
-      
-      return { 
-        text: `${months} mån`, 
-        color: 'text-yellow-400' 
-      }
-    } else {
-      // Visa datum för längre tid
-      const endDate = new Date(org.contract_end_date)
-      const formattedDate = endDate.toLocaleDateString('sv-SE', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
-      
-      return { 
-        text: formattedDate, 
-        color: 'text-slate-300' 
-      }
+  // Portal-status badge
+  const getPortalStatusBadge = (org: Organization) => {
+    switch (org.portalStatus) {
+      case 'active':
+        return { text: 'Aktiv', className: 'bg-green-500/20 text-green-400 border border-green-500/30' }
+      case 'invited':
+        return { text: 'Inbjuden', className: 'bg-amber-500/20 text-amber-400 border border-amber-500/30' }
+      case 'inactive':
+        return { text: 'Inaktiv', className: 'bg-red-500/20 text-red-400 border border-red-500/30' }
+      case 'not_invited':
+      default:
+        return { text: 'Ej inbjuden', className: 'bg-slate-500/20 text-slate-400 border border-slate-500/30' }
     }
   }
 
-  // Formatera valuta
-  const formatCurrency = (value: number | undefined) => {
-    if (!value) return '-'
-    return new Intl.NumberFormat('sv-SE', { 
-      style: 'currency', 
-      currency: 'SEK',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value)
+  // Formatera senaste inloggning som relativ tid
+  const formatLastLogin = (dateStr: string | null | undefined) => {
+    if (!dateStr) return { text: 'Aldrig', color: 'text-slate-500' }
+
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return { text: 'Idag', color: 'text-green-400' }
+    if (diffDays === 1) return { text: 'Igår', color: 'text-green-400' }
+    if (diffDays < 7) return { text: `${diffDays} dagar sedan`, color: 'text-green-400' }
+    if (diffDays < 30) return { text: `${Math.floor(diffDays / 7)} v sedan`, color: 'text-amber-400' }
+    if (diffDays < 90) return { text: `${Math.floor(diffDays / 30)} mån sedan`, color: 'text-amber-400' }
+    return { text: `${Math.floor(diffDays / 30)} mån sedan`, color: 'text-red-400' }
   }
 
   const getRoleName = (roleType: string) => {
@@ -268,29 +214,6 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
     return roleNames[roleType] || roleType
   }
 
-  // Hjälpfunktion för att hämta avtalsnamn
-  const getContractTypeName = (contractType: string | undefined) => {
-    if (!contractType) return null
-    
-    // Kolla först om det är en UUID från contract_types tabellen
-    if (CONTRACT_TYPE_MAPPING[contractType]) {
-      return CONTRACT_TYPE_MAPPING[contractType]
-    }
-    
-    // Fallback till OneFlow templates
-    const template = getTemplateById(contractType)
-    if (template) {
-      return template.name
-    }
-    
-    // Om det redan är ett namn (inte UUID), returnera det
-    if (!contractType.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-      return contractType
-    }
-    
-    return contractType
-  }
-
   const handleViewDetails = (orgId: string) => {
     navigate(`/admin/organisation/organizations-manage`, { state: { selectedOrgId: orgId } })
   }
@@ -302,13 +225,12 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
       <div className="bg-slate-800/50 border border-slate-700 rounded-t-lg">
         <div className="grid grid-cols-12 gap-3 px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
           <div className="col-span-1">Status</div>
-          <div className="col-span-2">Kund</div>
-          <div className="col-span-1 text-center">Enheter</div>
-          <div className="col-span-1 text-center">Portal</div>
-          <div className="col-span-2 text-right">Årspremie</div>
-          <div className="col-span-2 text-right">Totalt värde</div>
-          <div className="col-span-1 text-center">Längd</div>
-          <div className="col-span-1 text-right">Löper ut</div>
+          <div className="col-span-3">Kund</div>
+          <div className="col-span-1 text-center">Typ</div>
+          <div className="col-span-2 text-center">Portal-status</div>
+          <div className="col-span-1 text-center">Användare</div>
+          <div className="col-span-2">Senaste inloggning</div>
+          <div className="col-span-1 text-center">E-post</div>
           <div className="col-span-1 text-center">Åtgärder</div>
         </div>
       </div>
@@ -317,7 +239,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
       <div className="border-x border-b border-slate-700 rounded-b-lg overflow-hidden">
         {organizations.map((org, index) => {
           const ackStatus = getAcknowledgmentStatus(org)
-          const contractStatus = getContractStatus(org)
+          const portalBadge = getPortalStatusBadge(org)
+          const lastLogin = formatLastLogin(org.lastLoginDate)
           const isExpanded = expandedOrgId === org.id
           const isHovered = hoveredOrgId === org.id
           const showActions = showActionsForOrg === org.id
@@ -337,14 +260,13 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                 onMouseLeave={() => setHoveredOrgId(null)}
                 onClick={() => {
                   onToggleExpand(org)
-                  // Stäng åtgärdsmenyn om kortet kollapsas
                   if (expandedOrgId === org.id) {
                     setShowActionsForOrg(null)
                   }
                 }}
               >
                 {/* Status */}
-                <div 
+                <div
                   className={`col-span-1 flex items-center gap-1 ${
                     org.unacknowledgedCount > 0 ? 'cursor-pointer hover:opacity-80' : ''
                   }`}
@@ -365,31 +287,17 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                   )}
                 </div>
 
-                {/* Organisation */}
-                <div className="col-span-2">
+                {/* Kund (3 cols) */}
+                <div className="col-span-3">
                   <div className="flex items-center gap-2">
                     {isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                      <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                      <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        {org.organizationType === 'multisite' ? (
-                          <Building2 className="w-4 h-4 text-blue-400" />
-                        ) : (
-                          <div className="w-4 h-4 rounded-full bg-green-500/20 flex items-center justify-center">
-                            <div className="w-2 h-2 rounded-full bg-green-400" />
-                          </div>
-                        )}
-                        <div className="font-medium text-white text-sm truncate">
-                          {org.name}
-                          {org.organizationType === 'multisite' && (
-                            <span className="ml-2 text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">
-                              {org.sites_count} enheter
-                            </span>
-                          )}
-                        </div>
+                      <div className="font-medium text-white text-sm truncate">
+                        {org.name}
                       </div>
                       <div className="text-xs text-slate-400">
                         {org.organization_number}
@@ -398,52 +306,48 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                   </div>
                 </div>
 
-                {/* Enheter */}
-                <div className="col-span-1 text-center text-sm text-slate-300">
-                  {org.sites_count || 0}
-                </div>
-
-                {/* Användare / Portal-status */}
-                <div className="col-span-1 text-center text-sm">
+                {/* Typ */}
+                <div className="col-span-1 text-center">
                   {org.organizationType === 'multisite' ? (
-                    <span className="text-slate-300">
-                      {org.activeUsersCount || 0}
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                      Multisite
                     </span>
                   ) : (
-                    <div className="flex flex-col items-center gap-1">
-                      <div className={`text-xs px-2 py-1 rounded ${
-                        org.activeUsersCount && org.activeUsersCount > 0
-                          ? 'bg-green-500/20 text-green-400' 
-                          : 'bg-slate-500/20 text-slate-400'
-                      }`}>
-                        {org.activeUsersCount && org.activeUsersCount > 0 ? '✓ Portal' : 'Ingen portal'}
-                      </div>
-                    </div>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
+                      Kund
+                    </span>
                   )}
                 </div>
 
-                {/* Årspremie */}
-                <div className="col-span-2 text-right text-sm text-slate-300">
-                  {formatCurrency(org.annual_value)}
+                {/* Portal-status */}
+                <div className="col-span-2 text-center">
+                  <span className={`text-xs px-2 py-1 rounded ${portalBadge.className}`}>
+                    {portalBadge.text}
+                  </span>
                 </div>
 
-                {/* Totalt värde */}
-                <div className="col-span-2 text-right text-sm font-medium text-white">
-                  {formatCurrency(org.total_value)}
-                </div>
-
-                {/* Avtalslängd */}
+                {/* Användare */}
                 <div className="col-span-1 text-center text-sm text-slate-300">
-                  {formatContractLength(org.contract_length)}
+                  {org.activeUsersCount || 0}/{org.users_count || 0}
                 </div>
 
-                {/* Löper ut */}
-                <div className={`col-span-1 text-right text-sm ${contractStatus.color}`}>
-                  {contractStatus.text}
+                {/* Senaste inloggning */}
+                <div className={`col-span-2 text-sm ${lastLogin.color} flex items-center gap-1.5`}>
+                  <Clock className="w-3.5 h-3.5" />
+                  {lastLogin.text}
+                </div>
+
+                {/* E-post verifierad */}
+                <div className="col-span-1 text-center">
+                  {org.emailVerified ? (
+                    <CheckCircle className="w-4 h-4 text-green-400 mx-auto" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-400 mx-auto" />
+                  )}
                 </div>
 
                 {/* Åtgärder */}
-                <div 
+                <div
                   className="col-span-1 flex justify-center"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -452,7 +356,6 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                       onClick={(e) => {
                         e.stopPropagation()
                         setShowActionsForOrg(showActions ? null : org.id)
-                        // Expandera kortet automatiskt om det inte redan är expanderat
                         if (!showActions && expandedOrgId !== org.id) {
                           onToggleExpand(org)
                         }
@@ -461,25 +364,25 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     >
                       <MoreVertical className="w-4 h-4 text-slate-400" />
                     </button>
-                    
+
                     {showActions && (
                       <div className="absolute right-0 top-8 z-10 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1">
-                        {/* Portal-specifika åtgärder för vanliga kunder */}
+                        {/* Portal-specifika åtgärder */}
                         {org.organizationType === 'single' && (
                           <>
-                            {(!org.activeUsersCount || org.activeUsersCount === 0) && (
+                            {org.portalStatus === 'not_invited' && (
                               <button
                                 onClick={() => {
                                   onInviteToPortal?.(org)
                                   setShowActionsForOrg(null)
                                 }}
-                                className="w-full px-3 py-2 text-left text-sm text-green-400 hover:bg-slate-700 flex items-center gap-2"
+                                className="w-full px-3 py-2 text-left text-sm text-[#20c58f] hover:bg-slate-700 flex items-center gap-2"
                               >
                                 <UserPlus className="w-4 h-4" />
                                 Bjud in till portal
                               </button>
                             )}
-                            {org.activeUsersCount && org.activeUsersCount > 0 && (
+                            {(org.portalStatus === 'active' || org.portalStatus === 'inactive') && (
                               <button
                                 onClick={() => {
                                   onResetPassword(org.billing_email || '', org.name || '')
@@ -494,8 +397,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                             <div className="border-t border-slate-700 my-1"></div>
                           </>
                         )}
-                        
-                        {/* Gemensamma åtgärder */}
+
                         <button
                           onClick={() => {
                             onEdit(org)
@@ -544,9 +446,6 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                           <div className="flex items-center gap-2 text-slate-400">
                             <Mail className="w-4 h-4" />
                             <span>{org.contact_email || org.primary_contact_email || org.billing_email}</span>
-                            {org.contact_email !== org.billing_email && org.billing_email && (
-                              <span className="text-xs text-slate-500">(Faktura: {org.billing_email})</span>
-                            )}
                           </div>
                         )}
                         {org.contact_phone && (
@@ -564,25 +463,29 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                       </div>
                     </div>
 
-                    {/* Affärsdata */}
+                    {/* Portal-information */}
                     <div>
-                      <h4 className="text-sm font-semibold text-slate-300 mb-3">Affärsdata</h4>
+                      <h4 className="text-sm font-semibold text-slate-300 mb-3">Portal-information</h4>
                       <div className="space-y-2 text-sm">
-                        {org.account_manager && (
-                          <div className="text-slate-400">
-                            <span className="text-slate-500">Account Manager:</span> {org.account_manager}
-                          </div>
-                        )}
-                        {org.sales_person && (
-                          <div className="text-slate-400">
-                            <span className="text-slate-500">Säljare:</span> {org.sales_person}
-                          </div>
-                        )}
-                        {org.contract_type && (
-                          <div className="text-slate-400">
-                            <span className="text-slate-500">Avtalstyp:</span> {getContractTypeName(org.contract_type)}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Shield className="w-4 h-4 text-[#20c58f]" />
+                          <span className="text-slate-500">Åtkomst:</span>
+                          <span className={org.portal_access_enabled !== false ? 'text-green-400' : 'text-red-400'}>
+                            {org.portal_access_enabled !== false ? 'Aktiverad' : 'Avstängd'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Users className="w-4 h-4" />
+                          <span className="text-slate-500">Åtkomstnivå:</span>
+                          <span>{org.portal_access_level === 'read_only' ? 'Endast läsning' : 'Full åtkomst'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Mail className="w-4 h-4" />
+                          <span className="text-slate-500">Notiser:</span>
+                          <span className={org.portal_notifications_enabled !== false ? 'text-green-400' : 'text-slate-400'}>
+                            {org.portal_notifications_enabled !== false ? 'Aktiverade' : 'Avstängda'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -658,7 +561,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     <div className="mt-4">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                          <Users className="w-4 h-4 text-purple-400" />
+                          <Users className="w-4 h-4 text-[#20c58f]" />
                           Användare ({organizationUsers[org.id]?.length || 0})
                         </h4>
                         <Button
@@ -680,8 +583,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                               className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
                             >
                               <div className="flex items-center gap-2">
-                                <div className="p-1.5 bg-purple-500/20 rounded">
-                                  <UserCheck className="w-3 h-3 text-purple-400" />
+                                <div className="p-1.5 bg-[#20c58f]/20 rounded">
+                                  <UserCheck className="w-3 h-3 text-[#20c58f]" />
                                 </div>
                                 <div className="min-w-0">
                                   <p className="text-sm text-white font-medium truncate">{user.name}</p>
@@ -694,10 +597,10 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => onResetPassword(user.email || '', user.name || '')}
-                                  className="p-1 hover:bg-purple-500/20 rounded transition-colors"
+                                  className="p-1 hover:bg-[#20c58f]/20 rounded transition-colors"
                                   title="Återställ lösenord"
                                 >
-                                  <Key className="w-3 h-3 text-purple-400" />
+                                  <Key className="w-3 h-3 text-[#20c58f]" />
                                 </button>
                                 <button
                                   onClick={() => onEditUser(org, user)}
@@ -729,22 +632,18 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                   <div className="mt-4">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                        <Key className="w-4 h-4 text-green-400" />
+                        <Key className="w-4 h-4 text-[#20c58f]" />
                         Portalåtkomst
                       </h4>
                       {org.organizationType === 'single' && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">
-                            Vanlig avtalskund
-                          </span>
-                        </div>
+                        <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">
+                          Vanlig avtalskund
+                        </span>
                       )}
                       {org.organizationType === 'multisite' && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400">
-                            Multisite-organisation
-                          </span>
-                        </div>
+                        <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400">
+                          Multisite-organisation
+                        </span>
                       )}
                     </div>
 

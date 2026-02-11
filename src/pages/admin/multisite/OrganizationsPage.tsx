@@ -1,34 +1,23 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
-import { PageHeader } from '../../../components/shared'
 import Button from '../../../components/ui/Button'
-import Card from '../../../components/ui/Card'
 import toast from 'react-hot-toast'
-import { 
-  Building2, 
-  Users, 
-  MapPin, 
-  Edit2, 
-  Trash2, 
+import {
+  Building2,
+  Users,
   Plus,
   Search,
-  Filter,
-  ChevronRight,
-  ChevronDown,
   Mail,
-  Phone,
-  Calendar,
-  TrendingUp,
   Loader2,
-  CheckCircle,
   XCircle,
-  UserPlus,
   Shield,
   UserCheck,
-  Key
+  UserX,
+  AlertTriangle,
+  Bell,
+  User
 } from 'lucide-react'
-import Input from '../../../components/ui/Input'
 import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
 import UserModal from '../../../components/admin/multisite/UserModal'
 import SiteModal from '../../../components/admin/multisite/SiteModal'
@@ -72,6 +61,13 @@ interface Organization {
   unacknowledgedCount?: number
   criticalCasesCount?: number
   warningCasesCount?: number
+  // Portal-data
+  portalStatus?: 'active' | 'invited' | 'not_invited' | 'inactive'
+  lastLoginDate?: string | null
+  emailVerified?: boolean
+  portal_access_enabled?: boolean
+  portal_notifications_enabled?: boolean
+  portal_access_level?: string
 }
 
 interface OrganizationUser {
@@ -115,52 +111,6 @@ export default function OrganizationsPage() {
   const [editingUser, setEditingUser] = useState<OrganizationUser | null>(null)
   const [showSiteModal, setShowSiteModal] = useState(false)
   const [editingSite, setEditingSite] = useState<OrganizationSite | null>(null)
-
-  // Hjälpfunktion för att beräkna dagar kvar på avtal
-  const getDaysUntilContractEnd = (endDate: string | undefined) => {
-    if (!endDate) return null
-    
-    const today = new Date()
-    const contractEnd = new Date(endDate)
-    const diffTime = contractEnd.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    return diffDays
-  }
-
-  // Hjälpfunktion för att formattera avtalslängd med enheter
-  const formatContractLength = (length: number | string | null | undefined) => {
-    if (!length) return '-'
-    
-    // Om längden är redan en sträng med enhet, returnera den direkt
-    if (typeof length === 'string') {
-      // Om strängen redan innehåller "år" eller "månader"/"mån", behåll som den är
-      if (length.includes('år') || length.includes('månader') || length.includes('mån')) {
-        return length
-      }
-      
-      // Om det är bara en siffra som sträng, försök konvertera
-      const numValue = parseInt(length, 10)
-      if (isNaN(numValue)) return length // Om konvertering misslyckas, returnera ursprunglig sträng
-      
-      // För enskilda siffror som sträng, anta att det är år (vanliga avtal)
-      return `${numValue} år`
-    }
-    
-    // Om längden är ett nummer
-    if (typeof length === 'number') {
-      // Om längden är 12 eller större, anta att det är månader och konvertera till år
-      if (length >= 12 && length % 12 === 0) {
-        const years = length / 12
-        return `${years} år`
-      }
-      
-      // Annars visa som månader
-      return `${length} mån`
-    }
-    
-    return '-'
-  }
 
   useEffect(() => {
     fetchOrganizations()
@@ -273,10 +223,31 @@ export default function OrganizationsPage() {
             profiles!inner (
               last_sign_in_at,
               email_verified,
-              last_login
+              last_login,
+              has_ever_signed_in
             )
           `)
           .eq('organization_id', org.organization_id)
+
+        // Beräkna portal-status för multisite
+        const msHasUsers = activeUsers && activeUsers.length > 0
+        const msHasEverSignedIn = activeUsers?.some((u: any) => u.profiles?.has_ever_signed_in || u.profiles?.last_sign_in_at || u.profiles?.last_login)
+        const msLastLogin = activeUsers?.reduce((latest: string | null, u: any) => {
+          const pLogin = u.profiles?.last_sign_in_at || u.profiles?.last_login
+          if (!pLogin) return latest
+          if (!latest) return pLogin
+          return new Date(pLogin) > new Date(latest) ? pLogin : latest
+        }, null as string | null) || null
+        const msDaysSinceLogin = msLastLogin ? Math.floor((Date.now() - new Date(msLastLogin).getTime()) / (1000 * 60 * 60 * 24)) : null
+
+        let msPortalStatus: 'active' | 'invited' | 'not_invited' | 'inactive' = 'not_invited'
+        if (msHasEverSignedIn && msDaysSinceLogin !== null && msDaysSinceLogin <= 90) {
+          msPortalStatus = 'active'
+        } else if (msHasEverSignedIn && (msDaysSinceLogin === null || msDaysSinceLogin > 90)) {
+          msPortalStatus = 'inactive'
+        } else if (msHasUsers && !msHasEverSignedIn) {
+          msPortalStatus = 'invited'
+        }
 
         // Hämta trafikljusdata för alla enheter i organisationen
         let worstPestLevel: number | null = null
@@ -363,7 +334,14 @@ export default function OrganizationsPage() {
           worstProblemRating,
           unacknowledgedCount,
           criticalCasesCount,
-          warningCasesCount
+          warningCasesCount,
+          // Portal-data
+          portalStatus: msPortalStatus,
+          lastLoginDate: msLastLogin,
+          emailVerified: activeUsers?.some((u: any) => u.profiles?.email_verified) || false,
+          portal_access_enabled: org.portal_access_enabled ?? true,
+          portal_notifications_enabled: org.portal_notifications_enabled ?? true,
+          portal_access_level: org.portal_access_level || 'full',
         }
       }))
 
@@ -400,8 +378,28 @@ export default function OrganizationsPage() {
         // Hämta portal access information för denna kund
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('last_sign_in_at, email_verified, last_login')
+          .select('last_sign_in_at, email_verified, last_login, has_ever_signed_in')
           .eq('customer_id', customer.id)
+
+        // Beräkna portal-status
+        const hasProfiles = profiles && profiles.length > 0
+        const hasEverSignedIn = profiles?.some(p => p.has_ever_signed_in || p.last_sign_in_at || p.last_login)
+        const lastLogin = profiles?.reduce((latest: string | null, p) => {
+          const pLogin = p.last_sign_in_at || p.last_login
+          if (!pLogin) return latest
+          if (!latest) return pLogin
+          return new Date(pLogin) > new Date(latest) ? pLogin : latest
+        }, null as string | null)
+        const daysSinceLogin = lastLogin ? Math.floor((Date.now() - new Date(lastLogin).getTime()) / (1000 * 60 * 60 * 24)) : null
+
+        let portalStatus: 'active' | 'invited' | 'not_invited' | 'inactive' = 'not_invited'
+        if (hasEverSignedIn && daysSinceLogin !== null && daysSinceLogin <= 90) {
+          portalStatus = 'active'
+        } else if (hasEverSignedIn && (daysSinceLogin === null || daysSinceLogin > 90)) {
+          portalStatus = 'inactive'
+        } else if (hasProfiles && !hasEverSignedIn) {
+          portalStatus = 'invited'
+        }
 
         let worstPestLevel: number | null = null
         let worstProblemRating: number | null = null
@@ -479,7 +477,14 @@ export default function OrganizationsPage() {
           worstProblemRating,
           unacknowledgedCount,
           criticalCasesCount,
-          warningCasesCount
+          warningCasesCount,
+          // Portal-data
+          portalStatus,
+          lastLoginDate: lastLogin || null,
+          emailVerified: profiles?.some(p => p.email_verified) || false,
+          portal_access_enabled: customer.portal_access_enabled ?? true,
+          portal_notifications_enabled: customer.portal_notifications_enabled ?? true,
+          portal_access_level: customer.portal_access_level || 'full',
         }
       }))
 
@@ -824,238 +829,232 @@ export default function OrganizationsPage() {
     }
   }
 
+  // Beräkna portal-KPIs
+  const portalActiveCount = organizations.filter(org => org.portalStatus === 'active').length
+  const portalInvitedCount = organizations.filter(org => org.portalStatus === 'invited').length
+  const portalInactiveCount = organizations.filter(org => org.portalStatus === 'inactive').length
+  const totalUsersCount = organizations.reduce((sum, org) => sum + (org.users_count || 0), 0)
+  const portalAdoptionPercent = organizations.length > 0
+    ? Math.round((portalActiveCount / organizations.length) * 100)
+    : 0
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      <div className="flex items-center justify-center py-32">
+        <Loader2 className="w-8 h-8 animate-spin text-[#20c58f]" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PageHeader 
-          title="Organisationer & Kunder" 
-          description="Hantera alla avtalskunder - både multisite-organisationer och vanliga kunder"
-        />
-
-        {/* Actions Bar */}
-        <div className="mb-8 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <Input
-                type="text"
-                placeholder="Sök organisation, org.nr eller e-post..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Button
-              onClick={() => navigate('/admin/organisation/register')}
-              variant="primary"
-              className="flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Ny Organisation
-            </Button>
-          </div>
-
-          {/* Snabbfilter för prioriterade organisationer */}
-          <div className="flex flex-wrap gap-2">
-            <span className="text-sm text-slate-400 py-2">Snabbfilter:</span>
-            
-            {/* Organisationstyp filter */}
-            <button 
-              className="px-3 py-1 text-xs bg-blue-500/20 border border-blue-500/50 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
-              onClick={() => {
-                const multisiteOrgs = organizations.filter(org => org.organizationType === 'multisite')
-                setFilteredOrganizations(multisiteOrgs)
-              }}
-            >
-              🏢 {organizations.filter(org => org.organizationType === 'multisite').length} multisite-organisationer
-            </button>
-            <button 
-              className="px-3 py-1 text-xs bg-green-500/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors"
-              onClick={() => {
-                const singleOrgs = organizations.filter(org => org.organizationType === 'single')
-                setFilteredOrganizations(singleOrgs)
-              }}
-            >
-              👤 {organizations.filter(org => org.organizationType === 'single').length} vanliga kunder
-            </button>
-            
-            {/* Problem-baserade filter */}
-            <button 
-              className="px-3 py-1 text-xs bg-red-500/20 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
-              onClick={() => {
-                const criticalOrgs = organizations.filter(org => org.criticalCasesCount > 0)
-                setFilteredOrganizations(criticalOrgs)
-              }}
-            >
-              🔴 {organizations.filter(org => org.criticalCasesCount > 0).length} med kritiska ärenden
-            </button>
-            <button 
-              className="px-3 py-1 text-xs bg-amber-500/20 border border-amber-500/50 text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors"
-              onClick={() => {
-                const unconfirmedOrgs = organizations.filter(org => org.unacknowledgedCount > 0)
-                setFilteredOrganizations(unconfirmedOrgs)
-              }}
-            >
-              ⚠️ {organizations.filter(org => org.unacknowledgedCount > 0).length} med obekräftade
-            </button>
-            
-            {/* Status filter */}
-            <button 
-              className="px-3 py-1 text-xs bg-slate-700 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
-              onClick={() => {
-                const inactiveOrgs = organizations.filter(org => !org.is_active)
-                setFilteredOrganizations(inactiveOrgs)
-              }}
-            >
-              🚫 {organizations.filter(org => !org.is_active).length} inaktiva
-            </button>
-            <button 
-              className="px-3 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-400 rounded-lg hover:bg-slate-500 transition-colors"
-              onClick={() => setFilteredOrganizations(organizations)}
-            >
-              Visa alla
-            </button>
-          </div>
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Portal-administration</h1>
+          <p className="text-sm text-slate-400 mt-1">Hantera portalåtkomst, användare och inloggningar</p>
         </div>
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Totalt avtalskunder</p>
-                <p className="text-2xl font-bold text-white mt-1">
-                  {organizations.length}
-                </p>
-                <div className="flex gap-3 mt-2 text-xs">
-                  <span className="text-blue-400">
-                    {organizations.filter(org => org.organizationType === 'multisite').length} multisite
-                  </span>
-                  <span className="text-green-400">
-                    {organizations.filter(org => org.organizationType === 'single').length} vanliga
-                  </span>
-                </div>
-              </div>
-              <Building2 className="w-8 h-8 text-purple-500" />
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Totalt anläggningar</p>
-                <p className="text-2xl font-bold text-white mt-1">
-                  {organizations.reduce((sum, org) => sum + (org.sites_count || 0), 0)}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Från multisite-organisationer
-                </p>
-              </div>
-              <MapPin className="w-8 h-8 text-blue-500" />
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Totalt användare</p>
-                <p className="text-2xl font-bold text-white mt-1">
-                  {organizations.reduce((sum, org) => sum + (org.users_count || 0), 0)}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Multisite portal-användare
-                </p>
-              </div>
-              <Users className="w-8 h-8 text-green-500" />
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Årlig omsättning</p>
-                <p className="text-2xl font-bold text-white mt-1">
-                  {new Intl.NumberFormat('sv-SE', { 
-                    style: 'currency', 
-                    currency: 'SEK',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                    notation: 'compact'
-                  }).format(organizations.reduce((sum, org) => sum + (org.annual_value || 0), 0))}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Alla avtalskunder
-                </p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-amber-500" />
-            </div>
-          </Card>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => navigate('/admin/organisation/register')}
+            variant="primary"
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Ny Organisation
+          </Button>
         </div>
-
-        {/* Organizations List */}
-        {filteredOrganizations.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Building2 className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">
-              {searchTerm ? 'Inga kunder hittades' : 'Inga kunder än'}
-            </h3>
-            <p className="text-slate-400 mb-6">
-              {searchTerm 
-                ? 'Prova att justera din sökning eller ändra filter' 
-                : 'Sidan visar alla avtalskunder - både multisite-organisationer och vanliga kunder'}
-            </p>
-            {!searchTerm && (
-              <div className="flex gap-4 justify-center">
-                <Button
-                  onClick={() => navigate('/admin/organisation/register')}
-                  variant="primary"
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Registrera Multisite-organisation
-                </Button>
-                <Button
-                  onClick={() => navigate('/admin/customers')}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Hantera Vanliga Kunder
-                </Button>
-              </div>
-            )}
-          </Card>
-        ) : (
-          <CompactOrganizationTable
-            organizations={filteredOrganizations}
-            organizationUsers={organizationUsers}
-            organizationSites={organizationSites}
-            onToggleExpand={handleToggleExpand}
-            onToggleActive={handleToggleActive}
-            onEdit={handleEditOrganization}
-            onDelete={handleDeleteOrganization}
-            onAddUser={handleAddUser}
-            onEditUser={handleEditUser}
-            onDeleteUser={handleDeleteUser}
-            onResetPassword={handleResetPassword}
-            onAddSite={handleAddSite}
-            onEditSite={handleEditSite}
-            onDeleteSite={handleDeleteSite}
-            expandedOrgId={expandedOrgId}
-            getDaysUntilContractEnd={getDaysUntilContractEnd}
-            formatContractLength={formatContractLength}
-            onInviteToPortal={handleInviteToPortal}
-          />
-        )}
       </div>
+
+      {/* KPI-kort */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-400">Portal-aktivering</p>
+              <p className="text-2xl font-bold text-white mt-1">
+                {portalActiveCount}/{organizations.length}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {portalAdoptionPercent}% av kunderna aktiva
+              </p>
+            </div>
+            <UserCheck className="w-7 h-7 text-[#20c58f]" />
+          </div>
+        </div>
+
+        <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-400">Väntande inbjudningar</p>
+              <p className="text-2xl font-bold text-white mt-1">
+                {portalInvitedCount}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Inbjudna men ej aktiverade
+              </p>
+            </div>
+            <Mail className="w-7 h-7 text-amber-400" />
+          </div>
+        </div>
+
+        <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-400">Inaktiva konton</p>
+              <p className="text-2xl font-bold text-white mt-1">
+                {portalInactiveCount}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Ej inloggade &gt;90 dagar
+              </p>
+            </div>
+            <Shield className="w-7 h-7 text-red-400" />
+          </div>
+        </div>
+
+        <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-400">Totalt användare</p>
+              <p className="text-2xl font-bold text-white mt-1">
+                {totalUsersCount}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Portal-användare
+              </p>
+            </div>
+            <Users className="w-7 h-7 text-blue-400" />
+          </div>
+        </div>
+      </div>
+
+      {/* Sök + Filter */}
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Sök organisation, org.nr eller e-post..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs text-slate-500 py-1.5">Filter:</span>
+          <button
+            className="px-2.5 py-1 text-xs bg-blue-500/20 border border-blue-500/50 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors flex items-center gap-1.5"
+            onClick={() => setFilteredOrganizations(organizations.filter(org => org.organizationType === 'multisite'))}
+          >
+            <Building2 className="w-3 h-3" />
+            {organizations.filter(org => org.organizationType === 'multisite').length} multisite
+          </button>
+          <button
+            className="px-2.5 py-1 text-xs bg-green-500/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors flex items-center gap-1.5"
+            onClick={() => setFilteredOrganizations(organizations.filter(org => org.organizationType === 'single'))}
+          >
+            <User className="w-3 h-3" />
+            {organizations.filter(org => org.organizationType === 'single').length} kunder
+          </button>
+          <button
+            className="px-2.5 py-1 text-xs bg-[#20c58f]/20 border border-[#20c58f]/50 text-[#20c58f] rounded-lg hover:bg-[#20c58f]/30 transition-colors flex items-center gap-1.5"
+            onClick={() => setFilteredOrganizations(organizations.filter(org => org.portalStatus === 'active'))}
+          >
+            <UserCheck className="w-3 h-3" />
+            {portalActiveCount} aktiv portal
+          </button>
+          <button
+            className="px-2.5 py-1 text-xs bg-slate-500/20 border border-slate-500/50 text-slate-400 rounded-lg hover:bg-slate-500/30 transition-colors flex items-center gap-1.5"
+            onClick={() => setFilteredOrganizations(organizations.filter(org => org.portalStatus === 'not_invited'))}
+          >
+            <UserX className="w-3 h-3" />
+            {organizations.filter(org => org.portalStatus === 'not_invited').length} ingen portal
+          </button>
+          <button
+            className="px-2.5 py-1 text-xs bg-red-500/20 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors flex items-center gap-1.5"
+            onClick={() => setFilteredOrganizations(organizations.filter(org => org.criticalCasesCount && org.criticalCasesCount > 0))}
+          >
+            <AlertTriangle className="w-3 h-3" />
+            {organizations.filter(org => org.criticalCasesCount && org.criticalCasesCount > 0).length} kritiska
+          </button>
+          <button
+            className="px-2.5 py-1 text-xs bg-amber-500/20 border border-amber-500/50 text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors flex items-center gap-1.5"
+            onClick={() => setFilteredOrganizations(organizations.filter(org => org.unacknowledgedCount && org.unacknowledgedCount > 0))}
+          >
+            <Bell className="w-3 h-3" />
+            {organizations.filter(org => org.unacknowledgedCount && org.unacknowledgedCount > 0).length} obekräftade
+          </button>
+          <button
+            className="px-2.5 py-1 text-xs bg-slate-700 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors flex items-center gap-1.5"
+            onClick={() => setFilteredOrganizations(organizations.filter(org => !org.is_active))}
+          >
+            <XCircle className="w-3 h-3" />
+            {organizations.filter(org => !org.is_active).length} inaktiva
+          </button>
+          <button
+            className="px-2.5 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-300 rounded-lg hover:bg-slate-500 transition-colors"
+            onClick={() => setFilteredOrganizations(organizations)}
+          >
+            Visa alla
+          </button>
+        </div>
+      </div>
+
+      {/* Organizations List */}
+      {filteredOrganizations.length === 0 ? (
+        <div className="p-8 bg-slate-800/30 border border-slate-700 rounded-xl text-center">
+          <Building2 className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+          <h3 className="text-lg font-semibold text-white mb-2">
+            {searchTerm ? 'Inga kunder hittades' : 'Inga kunder än'}
+          </h3>
+          <p className="text-slate-400 mb-6">
+            {searchTerm
+              ? 'Prova att justera din sökning eller ändra filter'
+              : 'Sidan visar alla avtalskunder - både multisite-organisationer och vanliga kunder'}
+          </p>
+          {!searchTerm && (
+            <div className="flex gap-4 justify-center">
+              <Button
+                onClick={() => navigate('/admin/organisation/register')}
+                variant="primary"
+                className="flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Registrera Multisite-organisation
+              </Button>
+              <Button
+                onClick={() => navigate('/admin/customers')}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Hantera Vanliga Kunder
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <CompactOrganizationTable
+          organizations={filteredOrganizations}
+          organizationUsers={organizationUsers}
+          organizationSites={organizationSites}
+          onToggleExpand={handleToggleExpand}
+          onToggleActive={handleToggleActive}
+          onEdit={handleEditOrganization}
+          onDelete={handleDeleteOrganization}
+          onAddUser={handleAddUser}
+          onEditUser={handleEditUser}
+          onDeleteUser={handleDeleteUser}
+          onResetPassword={handleResetPassword}
+          onAddSite={handleAddSite}
+          onEditSite={handleEditSite}
+          onDeleteSite={handleDeleteSite}
+          expandedOrgId={expandedOrgId}
+          onInviteToPortal={handleInviteToPortal}
+        />
+      )}
 
       {/* Edit Modal */}
       {showEditModal && selectedOrg && (
