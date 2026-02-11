@@ -83,10 +83,10 @@ const PerformanceTestReport: React.FC = () => {
 
   return (
     <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center">
-          <BarChart3 className="w-5 h-5 text-cyan-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Performance Test Report</h2>
+          <BarChart3 className="w-4 h-4 text-cyan-500 mr-2" />
+          <h2 className="text-sm font-semibold text-white">Performance Test Report</h2>
           <span className="ml-2 text-xs text-slate-400">RLS Optimering Validering</span>
         </div>
         <div className="flex items-center gap-3">
@@ -103,9 +103,9 @@ const PerformanceTestReport: React.FC = () => {
 
       {/* Test Status */}
       {isRunningTests && (
-        <div className="mb-6 p-4 bg-blue-900/20 rounded-lg border border-blue-700">
+        <div className="mb-3 p-4 bg-blue-900/20 rounded-lg border border-blue-700">
           <div className="flex items-center">
-            <Activity className="w-5 h-5 text-blue-400 animate-spin mr-3" />
+            <Activity className="w-4 h-4 text-blue-400 animate-spin mr-3" />
             <div>
               <h3 className="text-white font-medium">Kör Performance Tester</h3>
               <p className="text-sm text-slate-400">
@@ -118,7 +118,7 @@ const PerformanceTestReport: React.FC = () => {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="mb-3 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
             <div className="flex items-center justify-between">
               <div>
@@ -163,7 +163,7 @@ const PerformanceTestReport: React.FC = () => {
 
       {/* Performance Insights */}
       {summary && (
-        <div className="mb-6 p-4 bg-slate-800/20 rounded-lg border border-slate-700">
+        <div className="mb-3 p-4 bg-slate-800/20 rounded-lg border border-slate-700">
           <h3 className="text-white font-medium mb-3 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-yellow-400" />
             RLS-Optimering Insights
@@ -210,7 +210,7 @@ const PerformanceTestReport: React.FC = () => {
 
       {/* Test Results Table */}
       {testResults.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-3">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-medium">Test Results Detail</h3>
             <Button

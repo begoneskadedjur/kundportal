@@ -1,6 +1,6 @@
 // 📁 src/components/admin/economics/KpiCards.tsx - MODERNA KPI CARDS
 import React from 'react'
-import { TrendingUp, DollarSign, Users, BarChart3, AlertTriangle, Briefcase, ArrowUp, ArrowDown, Minus } from 'lucide-react'
+import { TrendingUp, Banknote, Users, BarChart3, AlertTriangle, Briefcase, ArrowUp, ArrowDown, Minus } from 'lucide-react'
 import { useKpiData } from '../../../hooks/useEconomicsDashboard'
 import { formatCurrency } from '../../../utils/formatters'
 
@@ -71,7 +71,7 @@ const KpiCards: React.FC = () => {
       title: 'MRR',
       value: formatCurrency(kpiData.monthly_recurring_revenue),
       description: 'Återkommande månatlig intäkt',
-      icon: DollarSign,
+      icon: Banknote,
       color: 'yellow',
       trend: {
         value: '5.4%',
@@ -99,7 +99,7 @@ const KpiCards: React.FC = () => {
       value: formatCurrency(kpiData.total_case_revenue_ytd),
       description: 'Extra intäkter från avtalskunder',
       icon: BarChart3,
-      color: 'purple',
+      color: 'green',
       trend: {
         value: '12.1%',
         direction: 'up',
@@ -113,7 +113,7 @@ const KpiCards: React.FC = () => {
       value: formatCurrency(kpiData.total_begone_revenue_ytd),
       description: 'Intäkter från engångskunder',
       icon: Briefcase,
-      color: 'purple',
+      color: 'green',
       trend: {
         value: `${((kpiData.total_begone_revenue_ytd / Math.max(kpiData.total_case_revenue_ytd, 1)) * 100).toFixed(1)}%`,
         direction: kpiData.total_begone_revenue_ytd > kpiData.total_case_revenue_ytd ? 'up' : 'down',

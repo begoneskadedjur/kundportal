@@ -374,12 +374,12 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     return (
       <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
         <div className="flex items-center mb-4">
-          <BarChart3 className="w-4 h-4 text-purple-400 mr-2" />
+          <BarChart3 className="w-4 h-4 text-[#20c58f] mr-2" />
           <h3 className="text-sm font-semibold text-white">Intäkter Engångsjobb</h3>
         </div>
         <div className="h-80 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#20c58f]" />
             <p className="text-slate-400 text-sm">Laddar engångsjobb statistik...</p>
           </div>
         </div>
@@ -512,12 +512,12 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     <div className="space-y-6">
       {/* Huvudkort med modern design */}
       <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-          <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col gap-4 mb-3">
             {/* Titel rad */}
-            <div className="flex items-center gap-3">
-              <BarChart3 className="w-5 h-5 text-purple-400" />
+            <div className="flex items-center gap-1.5">
+              <BarChart3 className="w-4 h-4 text-[#20c58f]" />
               <div>
-                <h3 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h3>
+                <h3 className="text-sm font-semibold text-white">Intäkter Engångsjobb</h3>
                 <p className="text-sm text-slate-400">Endast avslutade ärenden</p>
               </div>
             </div>
@@ -549,7 +549,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                       onClick={() => setActiveTab(tab.key as any)}
                       className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
                         isActive
-                          ? 'bg-slate-700 text-white border border-slate-600 shadow-sm'
+                          ? 'bg-[#20c58f] text-white shadow-sm'
                           : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                       }`}
                     >
@@ -563,7 +563,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
           </div>
 
           {/* KPI för vald period - UPPDATERAD för att visa period-data */}
-          <div className="mb-6">
+          <div className="mb-3">
             <h3 className="text-sm text-slate-400 mb-4">
               {selectedPeriod === '1m' 
                 ? `${formatSelectedMonth(selectedMonth)} - Engångsjobb översikt`

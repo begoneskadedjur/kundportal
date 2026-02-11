@@ -103,10 +103,10 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                 isBusiness ? 'bg-slate-500/20' : 'bg-slate-600/20'
               }`}>
-                {isBusiness ? <Building2 className="w-5 h-5 text-blue-400" /> : <User className="w-5 h-5 text-purple-400" />}
+                {isBusiness ? <Building2 className="w-4 h-4 text-blue-400" /> : <User className="w-4 h-4 text-purple-400" />}
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">{case_.case_number || case_.title}</h2>
+                <h2 className="text-sm font-semibold text-white">{case_.case_number || case_.title}</h2>
                 <p className="text-sm text-slate-400">
                   {isBusiness ? 'Företag' : 'Privatperson'} • {case_.skadedjur}
                 </p>
@@ -464,7 +464,7 @@ const EconomicInsightsChart: React.FC = () => {
                 onClick={() => setSelectedView(view.key as any)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedView === view.key
-                    ? 'bg-slate-700 text-white'
+                    ? 'bg-[#20c58f] text-white'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
@@ -531,9 +531,9 @@ const EconomicInsightsChart: React.FC = () => {
       {/* Content */}
       {selectedView === 'cases' && (
         <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-          <div className="flex items-center gap-2 mb-6">
-            <Award className="w-5 h-5 text-yellow-400" />
-            <h3 className="text-lg font-semibold text-white">Topp Ärenden</h3>
+          <div className="flex items-center gap-1.5 mb-2">
+            <Award className="w-4 h-4 text-yellow-400" />
+            <h3 className="text-sm font-semibold text-white">Topp Ärenden</h3>
           </div>
           {filteredData.topCases.length > 0 ? (
             <div className="space-y-3">
@@ -608,9 +608,9 @@ const EconomicInsightsChart: React.FC = () => {
 
       {selectedView === 'skadedjur' && (
         <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-          <div className="flex items-center gap-2 mb-6">
-            <Bug className="w-5 h-5 text-red-400" />
-            <h3 className="text-lg font-semibold text-white">Mest Lönsamma Skadedjur</h3>
+          <div className="flex items-center gap-1.5 mb-2">
+            <Bug className="w-4 h-4 text-red-400" />
+            <h3 className="text-sm font-semibold text-white">Mest Lönsamma Skadedjur</h3>
           </div>
           {filteredData.topSkadedjur.length > 0 ? (
             <div className="space-y-3">

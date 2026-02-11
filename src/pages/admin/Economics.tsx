@@ -1,6 +1,6 @@
 // 📁 src/pages/admin/Economics.tsx
 import React from 'react'
-import { RefreshCw, DollarSign, BarChart3, TrendingUp, Activity } from 'lucide-react'
+import { RefreshCw, Banknote, BarChart3, TrendingUp, Activity } from 'lucide-react'
 import Button from '../../components/ui/Button'
 
 // Importera komponenter som fungerar
@@ -40,7 +40,7 @@ const Economics: React.FC = () => {
       {/* 1. KPI Panel */}
       <section>
         <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-          <DollarSign className="w-4 h-4 text-yellow-400" />
+          <Banknote className="w-4 h-4 text-yellow-400" />
           Nyckeltal
         </h3>
         <KpiCards />
@@ -49,7 +49,7 @@ const Economics: React.FC = () => {
       {/* 2. FULLBREDD: Månadsvis Intäktsflöde */}
       <section>
         <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-          <BarChart3 className="w-4 h-4 text-purple-400" />
+          <BarChart3 className="w-4 h-4 text-[#20c58f]" />
           Månadsvis Intäktsflöde
           <span className="ml-2 text-xs text-slate-400 font-normal">Avtalskunder + Merförsäljning</span>
         </h3>
@@ -59,7 +59,7 @@ const Economics: React.FC = () => {
       {/* 3. FULLBREDD: Intäkter Engångsjobb */}
       <section>
         <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-          <BarChart3 className="w-4 h-4 text-purple-400" />
+          <BarChart3 className="w-4 h-4 text-[#20c58f]" />
           Intäkter Engångsjobb
           <span className="ml-2 text-xs text-slate-400 font-normal">Privatpersoner + Företag</span>
         </h3>
@@ -85,7 +85,7 @@ const Economics: React.FC = () => {
       <section>
         <div className="mb-3">
           <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-            <DollarSign className="w-4 h-4 text-purple-400" />
+            <Banknote className="w-4 h-4 text-[#20c58f]" />
             Marknadsföringskostnader
             <span className="ml-2 text-xs text-slate-400 font-normal">Monthly Marketing Spend Management</span>
           </h3>

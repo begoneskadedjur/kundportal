@@ -80,12 +80,12 @@ const MonthlyRevenueChart: React.FC = () => {
   if (loading) {
     return (
       <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-        <div className="flex items-center mb-6">
-          <BarChart3 className="w-5 h-5 text-purple-400 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
+        <div className="flex items-center mb-3">
+          <BarChart3 className="w-4 h-4 text-[#20c58f] mr-2" />
+          <h2 className="text-sm font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         <div className="h-80 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#20c58f]" />
         </div>
       </div>
     )
@@ -94,9 +94,9 @@ const MonthlyRevenueChart: React.FC = () => {
   if (error) {
     return (
       <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-        <div className="flex items-center mb-6">
-          <BarChart3 className="w-5 h-5 text-red-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
+        <div className="flex items-center mb-3">
+          <BarChart3 className="w-4 h-4 text-red-500 mr-2" />
+          <h2 className="text-sm font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         <div className="h-80 flex items-center justify-center text-red-400">
           <div className="text-center">
@@ -111,9 +111,9 @@ const MonthlyRevenueChart: React.FC = () => {
   if (!Array.isArray(monthlyData) || monthlyData.length === 0) {
     return (
       <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
-        <div className="flex items-center mb-6">
-          <BarChart3 className="w-5 h-5 text-slate-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
+        <div className="flex items-center mb-3">
+          <BarChart3 className="w-4 h-4 text-slate-500 mr-2" />
+          <h2 className="text-sm font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         <div className="h-80 flex items-center justify-center text-slate-400">
           <div className="text-center">
@@ -215,10 +215,10 @@ const MonthlyRevenueChart: React.FC = () => {
   return (
     <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
       {/* Header med månadnavigation */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center">
-          <BarChart3 className="w-5 h-5 text-purple-400 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
+          <BarChart3 className="w-4 h-4 text-[#20c58f] mr-2" />
+          <h2 className="text-sm font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         
         {/* 🆕 Månadnavigation */}
@@ -280,7 +280,7 @@ const MonthlyRevenueChart: React.FC = () => {
       </div>
 
       {/* 🆕 Statistik för vald månad/period */}
-      <div className="mb-6">
+      <div className="mb-3">
         <h3 className="text-sm text-slate-400 mb-3">
           {selectedPeriod === '1m' 
             ? `${formatSelectedMonth(selectedMonth)} - Detaljerade intäkter`
@@ -318,7 +318,7 @@ const MonthlyRevenueChart: React.FC = () => {
       </div>
 
       {/* Data typ filter */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-4 mb-3">
         <span className="text-sm text-slate-400 flex items-center gap-2">
           <Filter className="w-4 h-4" />
           Visa:

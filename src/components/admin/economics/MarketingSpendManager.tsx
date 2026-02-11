@@ -1,6 +1,6 @@
 // 📁 src/components/admin/economics/MarketingSpendManager.tsx
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit3, Save, X, DollarSign, Calendar, TrendingUp, Activity } from 'lucide-react'
+import { Plus, Trash2, Edit3, Save, X, Banknote, Calendar, TrendingUp, Activity } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import { supabase } from '../../../lib/supabase'
@@ -236,10 +236,10 @@ const MarketingSpendManager: React.FC = () => {
 
   return (
     <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl" data-testid="marketing-spend-manager">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center">
-          <DollarSign className="w-5 h-5 text-purple-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Marknadsföringskostnader</h2>
+          <Banknote className="w-4 h-4 text-[#20c58f] mr-2" />
+          <h2 className="text-sm font-semibold text-white">Marknadsföringskostnader</h2>
           
           {/* Performance indicator */}
           {!loading && (
@@ -254,7 +254,7 @@ const MarketingSpendManager: React.FC = () => {
         <div className="flex items-center gap-3">
           <div className="text-right">
             <p className="text-sm text-slate-400">Total kostnad</p>
-            <p className="text-lg font-bold text-purple-400">{formatCurrency(totalSpend)}</p>
+            <p className="text-lg font-bold text-[#20c58f]">{formatCurrency(totalSpend)}</p>
           </div>
           <Button
             onClick={() => setShowForm(!showForm)}
@@ -269,7 +269,7 @@ const MarketingSpendManager: React.FC = () => {
 
       {/* Formulär för att lägga till ny kostnad */}
       {showForm && (
-        <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700" data-testid="marketing-spend-form">
+        <div className="mb-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700" data-testid="marketing-spend-form">
           <h3 className="text-white font-medium mb-4">Lägg till marknadsföringskostnad</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
@@ -324,7 +324,7 @@ const MarketingSpendManager: React.FC = () => {
       {/* Lista över kostnader */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#20c58f]"></div>
         </div>
       ) : spendData.length === 0 ? (
         <div className="text-center py-8 text-slate-400">
@@ -373,7 +373,7 @@ const MarketingSpendManager: React.FC = () => {
                       <p className="text-sm text-slate-400">{spend.notes || 'Ingen beskrivning'}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-purple-400">{formatCurrency(spend.spend)}</p>
+                      <p className="text-lg font-bold text-[#20c58f]">{formatCurrency(spend.spend)}</p>
                       <p className="text-xs text-slate-500">
                         Uppdaterad: {new Date(spend.updated_at).toLocaleDateString('sv-SE')}
                       </p>
