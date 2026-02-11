@@ -90,6 +90,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       config: {
         maxOutputTokens: 4000,
         responseMimeType: 'application/json',
+        responseJsonSchema: {
+          type: 'object',
+          properties: {
+            company_name: { type: ['string', 'null'], description: 'Företagsnamn/kundnamn (uppdragsgivare, INTE BeGone)' },
+            organization_number: { type: ['string', 'null'], description: 'Organisationsnummer (format XXXXXX-XXXX)' },
+            contact_person: { type: ['string', 'null'], description: 'Kontaktperson hos kunden' },
+            contact_email: { type: ['string', 'null'], description: 'E-postadress till kontaktperson' },
+            contact_phone: { type: ['string', 'null'], description: 'Telefonnummer till kontaktperson' },
+            contact_address: { type: ['string', 'null'], description: 'Fullständig utförande-/besöksadress' },
+            billing_email: { type: ['string', 'null'], description: 'Faktura-epost om separat, annars null' },
+            billing_address: { type: ['string', 'null'], description: 'Faktureringsadress om separat, annars null' },
+            contract_start_date: { type: ['string', 'null'], description: 'Startdatum (YYYY-MM-DD)' },
+            contract_end_date: { type: ['string', 'null'], description: 'Slutdatum (YYYY-MM-DD)' },
+            contract_length: { type: ['string', 'null'], description: 'Avtalslängd (t.ex. "3 år")' },
+            annual_value: { type: ['number', 'null'], description: 'Årligt värde i SEK' },
+            monthly_value: { type: ['number', 'null'], description: 'Månatligt värde i SEK' },
+            total_contract_value: { type: ['number', 'null'], description: 'Totalt avtalsvärde i SEK' },
+            agreement_text: { type: ['string', 'null'], description: 'Sammanfattning av avtalets innehåll/tjänster' },
+            products: {
+              type: ['array', 'null'],
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  description: { type: ['string', 'null'] },
+                  quantity: { type: ['number', 'null'] },
+                  price: { type: ['number', 'null'] },
+                },
+                required: ['name'],
+              },
+            },
+            oneflow_contract_id: { type: ['string', 'null'], description: 'Oneflow avtalsnummer/ID' },
+            assigned_account_manager: { type: ['string', 'null'], description: 'Ansvarig tekniker/kontaktperson från BeGone' },
+            sales_person: { type: ['string', 'null'], description: 'Säljare från BeGone' },
+            business_type: { type: ['string', 'null'], description: '"business" eller "private"' },
+            industry_category: { type: ['string', 'null'], description: 'Branschkategori' },
+            service_frequency: { type: ['string', 'null'], description: 'Servicefrekvens' },
+            confidence_score: { type: 'integer', description: 'Konfidenspoäng 0-100' },
+            extraction_notes: { type: 'string', description: 'Noteringar om extraktionen (på svenska)' },
+          },
+          required: [
+            'company_name', 'organization_number', 'contact_person', 'contact_email',
+            'contact_phone', 'contact_address', 'billing_email', 'billing_address',
+            'contract_start_date', 'contract_end_date', 'contract_length',
+            'annual_value', 'monthly_value', 'total_contract_value',
+            'agreement_text', 'products', 'oneflow_contract_id',
+            'assigned_account_manager', 'sales_person', 'business_type',
+            'industry_category', 'service_frequency', 'confidence_score', 'extraction_notes',
+          ],
+        },
       },
     })
 
@@ -110,6 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('=== EXTRACT CONTRACT DATA SUCCESS ===')
     console.log('Extracted company:', extractedData.company_name)
     console.log('Confidence:', extractedData.confidence_score)
+    console.log('Extracted data preview:', JSON.stringify(extractedData).substring(0, 500))
 
     return res.status(200).json({
       success: true,
