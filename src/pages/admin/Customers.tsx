@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Search, Filter, RefreshCw, ChevronDown, ChevronUp,
   Mail, Phone, Building2, User, Calendar, Coins,
-  AlertTriangle, Activity, Send, Edit3, Users
+  AlertTriangle, Activity, Send, Edit3, Users, FilePlus
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -16,6 +16,7 @@ import EmailCampaignModal from '../../components/admin/customers/EmailCampaignMo
 import EditCustomerModal from '../../components/admin/customers/EditCustomerModal'
 import RenewalWorkflowModal from '../../components/admin/customers/RenewalWorkflowModal'
 import TerminateContractModal from '../../components/admin/customers/TerminateContractModal'
+import AddContractCustomerModal from '../../components/admin/customers/AddContractCustomerModal'
 import TooltipWrapper from '../../components/ui/TooltipWrapper'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers } from '../../hooks/useConsolidatedCustomers'
@@ -210,7 +211,8 @@ export default function Customers() {
   const [renewalOrganization, setRenewalOrganization] = useState<any>(null)
   const [terminateModalOpen, setTerminateModalOpen] = useState(false)
   const [terminateOrganization, setTerminateOrganization] = useState<any>(null)
-  
+  const [addContractCustomerOpen, setAddContractCustomerOpen] = useState(false)
+
   // Filter states — searchInput är UI-state, searchTerm debouncas för prestanda vid 3000+ kunder
   const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -480,6 +482,15 @@ export default function Customers() {
           <p className="text-sm text-slate-400 mt-1">Hantera kundrelationer och maximera kundvärde</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAddContractCustomerOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-green-400 hover:bg-green-400/10 transition-colors"
+            title="Lägg till avtalskund från PDF"
+          >
+            <FilePlus className="w-4 h-4" />
+            <span className="hidden md:inline">Lägg till avtalskund</span>
+          </button>
+          <div className="w-px h-6 bg-slate-700" />
           <button
             onClick={() => setEmailCampaignOpen(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-green-400 hover:bg-green-400/10 transition-colors"
@@ -979,6 +990,13 @@ export default function Customers() {
           setTerminateOrganization(null)
         }}
         onTerminated={refresh}
+      />
+
+      {/* Add Contract Customer Modal */}
+      <AddContractCustomerModal
+        isOpen={addContractCustomerOpen}
+        onClose={() => setAddContractCustomerOpen(false)}
+        onCustomerCreated={refresh}
       />
     </div>
   )
