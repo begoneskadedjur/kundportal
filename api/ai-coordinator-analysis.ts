@@ -152,9 +152,8 @@ Kom ihåg att svara i det exakta JSON-format som specificerats.`;
 
     // --- Anropa Google Gemini ---
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       generationConfig: {
-        temperature: 0.7,
         responseMimeType: 'application/json',
       },
     });
@@ -182,7 +181,7 @@ Kom ihåg att svara i det exakta JSON-format som specificerats.`;
     return res.status(200).json({
       success: true,
       analysis,
-      ai_model: "gemini-2.5-flash",
+      ai_model: "gemini-3-flash-preview",
       timestamp: new Date().toISOString()
     });
 

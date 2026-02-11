@@ -78,9 +78,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // --- Anropa Google Gemini ---
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       generationConfig: {
-        temperature: 0.5,
         maxOutputTokens: 3000,
         responseMimeType: 'application/json',
       },
@@ -121,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           data_points_analyzed: Object.keys(analysisContext).length,
         }
       },
-      ai_model: 'gemini-2.5-flash',
+      ai_model: 'gemini-3-flash-preview',
       timestamp: new Date().toISOString(),
     });
 
