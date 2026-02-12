@@ -1,7 +1,7 @@
 // src/components/technician/AddStationWizard.tsx
 // 3-stegs wizard för att lägga till station: Kund → Typ → Placera (Inomhus)
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X,
@@ -17,10 +17,13 @@ import {
   FileImage,
   Crosshair,
   Box,
-  Target
+  Target,
+  MoreVertical,
+  ImagePlus,
+  Trash2
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
-import { FloorPlanService } from '../../services/floorPlanService'
+import { FloorPlanService, ALLOWED_FLOOR_PLAN_TYPES } from '../../services/floorPlanService'
 import { IndoorStationService } from '../../services/indoorStationService'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
@@ -86,6 +89,9 @@ export function AddStationWizard({
   const [selectedTypeData, setSelectedTypeData] = useState<StationType | null>(null)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showFloorPlanMenu, setShowFloorPlanMenu] = useState(false)
+  const [replacingImage, setReplacingImage] = useState(false)
+  const replaceImageInputRef = useRef<HTMLInputElement>(null)
 
   // Ladda kunder när wizard öppnas
   useEffect(() => {
@@ -306,6 +312,62 @@ export function AddStationWizard({
   // Hämta byggnadsnamn för uppladdning
   const existingBuildings = [...new Set(floorPlans.map(p => p.building_name).filter(Boolean))] as string[]
 
+  // Byt ut planritningsbild
+  const handleReplaceImage = async (file: File) => {
+    if (!selectedFloorPlan) return
+    setReplacingImage(true)
+    try {
+      await FloorPlanService.replaceFloorPlanImage(selectedFloorPlan.id, file)
+      toast.success('Bilden har bytts ut!')
+      // Ladda om planritningar för att få ny signerad URL
+      await loadFloorPlans(selectedCustomerId!)
+      const updatedPlan = await FloorPlanService.getFloorPlanById(selectedFloorPlan.id)
+      if (updatedPlan) {
+        setSelectedFloorPlan(updatedPlan)
+      }
+    } catch (error) {
+      console.error('Fel vid byte av bild:', error)
+      toast.error(error instanceof Error ? error.message : 'Kunde inte byta bild')
+    } finally {
+      setReplacingImage(false)
+      if (replaceImageInputRef.current) replaceImageInputRef.current.value = ''
+    }
+  }
+
+  // Ta bort planritning
+  const handleDeleteFloorPlan = async () => {
+    if (!selectedFloorPlan) return
+    const stationCount = selectedFloorPlan.station_count || 0
+    const msg = stationCount > 0
+      ? `Är du säker? Planritningen "${selectedFloorPlan.name}" och ${stationCount} station${stationCount === 1 ? '' : 'er'} kommer att raderas permanent.`
+      : `Är du säker på att du vill ta bort planritningen "${selectedFloorPlan.name}"?`
+    if (!confirm(msg)) return
+
+    setIsSubmitting(true)
+    try {
+      await FloorPlanService.deleteFloorPlan(selectedFloorPlan.id)
+      toast.success('Planritning borttagen')
+      setShowFloorPlanMenu(false)
+      // Ladda om och välj nästa planritning
+      if (selectedCustomerId) {
+        const plans = await FloorPlanService.getFloorPlansByCustomer(selectedCustomerId)
+        setFloorPlans(plans)
+        if (plans.length > 0) {
+          setSelectedFloorPlan(plans[0])
+          loadStations(plans[0].id)
+        } else {
+          setSelectedFloorPlan(null)
+          setStations([])
+        }
+      }
+    } catch (error) {
+      console.error('Fel vid borttagning av planritning:', error)
+      toast.error('Kunde inte ta bort planritning')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const handleClose = () => {
     setCurrentStep(1)
     setSelectedCustomerId(null)
@@ -319,6 +381,7 @@ export function AddStationWizard({
     setShowUploadModal(false)
     setShowTypeSelector(false)
     setShowStationForm(false)
+    setShowFloorPlanMenu(false)
     resetPlacementMode()
     onClose()
   }
@@ -614,7 +677,58 @@ export function AddStationWizard({
                             <Plus className="w-3 h-3" />
                             Ny
                           </button>
+
+                          {/* Meny för aktiv planritning */}
+                          {selectedFloorPlan && (
+                            <div className="relative flex-shrink-0 ml-auto">
+                              <button
+                                onClick={() => setShowFloorPlanMenu(!showFloorPlanMenu)}
+                                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                              {showFloorPlanMenu && (
+                                <>
+                                  <div className="fixed inset-0 z-30" onClick={() => setShowFloorPlanMenu(false)} />
+                                  <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-600 rounded-xl shadow-xl z-40 overflow-hidden">
+                                    <button
+                                      onClick={() => {
+                                        setShowFloorPlanMenu(false)
+                                        replaceImageInputRef.current?.click()
+                                      }}
+                                      disabled={replacingImage}
+                                      className="w-full px-4 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2.5 disabled:opacity-50"
+                                    >
+                                      <ImagePlus className="w-4 h-4" />
+                                      {replacingImage ? 'Byter bild...' : 'Byt bild'}
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setShowFloorPlanMenu(false)
+                                        handleDeleteFloorPlan()
+                                      }}
+                                      className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors flex items-center gap-2.5"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Ta bort planritning
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
+                        {/* Dold filinput för bildutbyte */}
+                        <input
+                          ref={replaceImageInputRef}
+                          type="file"
+                          accept={ALLOWED_FLOOR_PLAN_TYPES.join(',')}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleReplaceImage(file)
+                          }}
+                          className="hidden"
+                        />
                       </div>
 
                       {/* Planritningsvisare */}

@@ -1,8 +1,8 @@
 // src/components/shared/indoor/IndoorEquipmentView.tsx
 // Huvudvy för inomhusplacering av stationer
 
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Upload, Home, ChevronDown } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Plus, Upload, Home, ChevronDown, MoreVertical, ImagePlus, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { FloorPlanViewer } from './FloorPlanViewer'
@@ -12,7 +12,7 @@ import { IndoorStationForm, StationTypeSelector } from './IndoorStationForm'
 import { IndoorStationDetailSheet, IndoorStationCard } from './IndoorStationDetailSheet'
 import { StationLegend } from './IndoorStationMarker'
 
-import { FloorPlanService } from '../../../services/floorPlanService'
+import { FloorPlanService, ALLOWED_FLOOR_PLAN_TYPES } from '../../../services/floorPlanService'
 import { IndoorStationService } from '../../../services/indoorStationService'
 
 import type {
@@ -54,6 +54,9 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
   const [selectedTypeData, setSelectedTypeData] = useState<StationType | null>(null)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showFloorPlanMenu, setShowFloorPlanMenu] = useState(false)
+  const [replacingImage, setReplacingImage] = useState(false)
+  const replaceImageInputRef = useRef<HTMLInputElement>(null)
 
   // Hämta planritningar när kund ändras
   useEffect(() => {
@@ -251,6 +254,61 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
     setSelectedStation(null)
   }
 
+  // Byt ut planritningsbild
+  const handleReplaceImage = async (file: File) => {
+    if (!selectedFloorPlan) return
+    setReplacingImage(true)
+    try {
+      await FloorPlanService.replaceFloorPlanImage(selectedFloorPlan.id, file)
+      toast.success('Bilden har bytts ut!')
+      if (customerId) {
+        await loadFloorPlans(customerId)
+        const updatedPlan = await FloorPlanService.getFloorPlanById(selectedFloorPlan.id)
+        if (updatedPlan) {
+          setSelectedFloorPlan(updatedPlan)
+        }
+      }
+    } catch (error) {
+      console.error('Fel vid byte av bild:', error)
+      toast.error(error instanceof Error ? error.message : 'Kunde inte byta bild')
+    } finally {
+      setReplacingImage(false)
+      if (replaceImageInputRef.current) replaceImageInputRef.current.value = ''
+    }
+  }
+
+  // Ta bort planritning
+  const handleDeleteFloorPlan = async () => {
+    if (!selectedFloorPlan) return
+    const stationCount = selectedFloorPlan.station_count || 0
+    const msg = stationCount > 0
+      ? `Är du säker? Planritningen "${selectedFloorPlan.name}" och ${stationCount} station${stationCount === 1 ? '' : 'er'} kommer att raderas permanent.`
+      : `Är du säker på att du vill ta bort planritningen "${selectedFloorPlan.name}"?`
+    if (!confirm(msg)) return
+
+    setIsSubmitting(true)
+    try {
+      await FloorPlanService.deleteFloorPlan(selectedFloorPlan.id)
+      toast.success('Planritning borttagen')
+      setShowFloorPlanMenu(false)
+      if (customerId) {
+        const plans = await FloorPlanService.getFloorPlansByCustomer(customerId)
+        setFloorPlans(plans)
+        if (plans.length > 0) {
+          setSelectedFloorPlan(plans[0])
+        } else {
+          setSelectedFloorPlan(null)
+          setStations([])
+        }
+      }
+    } catch (error) {
+      console.error('Fel vid borttagning av planritning:', error)
+      toast.error('Kunde inte ta bort planritning')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   // Hämta unika byggnadsnamn
   const existingBuildings = [...new Set(floorPlans.map(p => p.building_name).filter(Boolean))] as string[]
 
@@ -317,7 +375,58 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
             onAddNew={() => setModalType('upload')}
             variant="dropdown"
           />
+
+          {/* Meny för aktiv planritning */}
+          {selectedFloorPlan && (
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={() => setShowFloorPlanMenu(!showFloorPlanMenu)}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+              {showFloorPlanMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowFloorPlanMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-600 rounded-xl shadow-xl z-40 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setShowFloorPlanMenu(false)
+                        replaceImageInputRef.current?.click()
+                      }}
+                      disabled={replacingImage}
+                      className="w-full px-4 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2.5 disabled:opacity-50"
+                    >
+                      <ImagePlus className="w-4 h-4" />
+                      {replacingImage ? 'Byter bild...' : 'Byt bild'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowFloorPlanMenu(false)
+                        handleDeleteFloorPlan()
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors flex items-center gap-2.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Ta bort planritning
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
+        {/* Dold filinput för bildutbyte */}
+        <input
+          ref={replaceImageInputRef}
+          type="file"
+          accept={ALLOWED_FLOOR_PLAN_TYPES.join(',')}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) handleReplaceImage(file)
+          }}
+          className="hidden"
+        />
       </div>
 
       {/* Main viewer */}

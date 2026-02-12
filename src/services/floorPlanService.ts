@@ -247,6 +247,80 @@ export class FloorPlanService {
   }
 
   /**
+   * Byt ut bilden för en befintlig planritning
+   * Bevarar alla stationer och metadata — bara bilden byts ut
+   */
+  static async replaceFloorPlanImage(id: string, newImage: File): Promise<FloorPlan> {
+    try {
+      console.log('Byter bild för planritning:', id)
+
+      // Validera ny bild
+      this.validateImage(newImage)
+
+      // Hämta befintlig planritning
+      const { data: existing, error: fetchError } = await supabase
+        .from('floor_plans')
+        .select('image_path, customer_id')
+        .eq('id', id)
+        .single()
+
+      if (fetchError || !existing) {
+        throw new Error('Kunde inte hitta planritningen')
+      }
+
+      // Ladda upp ny bild
+      const tempId = crypto.randomUUID()
+      const fileExt = newImage.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const newImagePath = `${existing.customer_id}/${tempId}/image.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from(FLOOR_PLANS_BUCKET)
+        .upload(newImagePath, newImage, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (uploadError) {
+        throw new Error(`Kunde inte ladda upp bild: ${uploadError.message}`)
+      }
+
+      // Hämta nya bilddimensioner
+      const dimensions = await this.getImageDimensions(newImage)
+
+      // Uppdatera DB
+      const { data, error: updateError } = await supabase
+        .from('floor_plans')
+        .update({
+          image_path: newImagePath,
+          image_width: dimensions.width,
+          image_height: dimensions.height,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (updateError) {
+        // Rensa ny bild om DB-uppdatering misslyckas
+        await supabase.storage.from(FLOOR_PLANS_BUCKET).remove([newImagePath])
+        throw new Error(`Databasfel: ${updateError.message}`)
+      }
+
+      // Ta bort gammal bild från storage
+      if (existing.image_path) {
+        await supabase.storage.from(FLOOR_PLANS_BUCKET).remove([existing.image_path])
+      }
+
+      console.log('Planritningsbild utbytt:', id)
+      return data
+
+    } catch (error) {
+      console.error('FloorPlanService.replaceFloorPlanImage fel:', error)
+      throw error
+    }
+  }
+
+  /**
    * Hämta signerad URL för planritningsbild
    */
   static async getFloorPlanImageUrl(imagePath: string): Promise<string | undefined> {
