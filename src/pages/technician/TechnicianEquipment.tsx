@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   EquipmentPlacementWithRelations,
+  EquipmentType,
   getEquipmentTypeLabel
 } from '../../types/database'
 import { EquipmentService, CustomerStationSummary } from '../../services/equipmentService'
@@ -64,6 +65,8 @@ export default function TechnicianEquipment() {
   const [batchCustomerName, setBatchCustomerName] = useState('')
   const [showSuccessState, setShowSuccessState] = useState(false)
   const [formResetKey, setFormResetKey] = useState(0)
+  const [lastEquipmentType, setLastEquipmentType] = useState<EquipmentType | null>(null)
+  const [lastUsedMap, setLastUsedMap] = useState(false)
 
   // Borttagningsdialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -168,6 +171,8 @@ export default function TechnicianEquipment() {
     setBatchCustomerName(customers.find(c => c.id === customerId)?.company_name || '')
     setShowSuccessState(false)
     setFormResetKey(0)
+    setLastEquipmentType(null)
+    setLastUsedMap(false)
     setIsFormOpen(true)
     // För inomhus hanteras det i modalen via IndoorEquipmentView
   }
@@ -200,6 +205,8 @@ export default function TechnicianEquipment() {
     setBatchCustomerName(allCustomers.find(c => c.customer_id === customerId)?.customer_name || '')
     setShowSuccessState(false)
     setFormResetKey(0)
+    setLastEquipmentType(null)
+    setLastUsedMap(false)
     setIsFormOpen(true)
   }
 
@@ -287,6 +294,8 @@ export default function TechnicianEquipment() {
           || ''
         setBatchCustomerName(customerName)
         setBatchCount(prev => prev + 1)
+        setLastEquipmentType(formData.equipment_type)
+        setLastUsedMap(true)
         setShowSuccessState(true)
         setEditingEquipment(null)
         setPreviewPosition(null)
@@ -372,6 +381,8 @@ export default function TechnicianEquipment() {
     setWizardCustomerId(null)
     setBatchCount(0)
     setBatchCustomerName('')
+    setLastEquipmentType(null)
+    setLastUsedMap(false)
   }
 
   // Hantera klick på karta för att öppna utrustning
@@ -541,6 +552,8 @@ export default function TechnicianEquipment() {
                         customerId={wizardCustomerId || ''}
                         technicianId={technicianId}
                         existingEquipment={editingEquipment}
+                        initialEquipmentType={lastEquipmentType || undefined}
+                        autoShowMap={lastUsedMap}
                         onSubmit={handleFormSubmit}
                         onCancel={handleFinishBatch}
                         onLocationCapture={handleLocationCapture}

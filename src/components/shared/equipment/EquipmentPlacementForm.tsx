@@ -59,6 +59,9 @@ interface EquipmentPlacementFormProps {
   customers?: CustomerOption[]
   onCustomerChange?: (customerId: string) => void
   showCustomerPicker?: boolean
+  // Batch-placering: bevara val mellan stationer
+  initialEquipmentType?: EquipmentType
+  autoShowMap?: boolean
 }
 
 export interface FormData {
@@ -88,7 +91,9 @@ export function EquipmentPlacementForm({
   isSubmitting = false,
   customers = [],
   onCustomerChange,
-  showCustomerPicker = false
+  showCustomerPicker = false,
+  initialEquipmentType,
+  autoShowMap = false
 }: EquipmentPlacementFormProps) {
   const isEditing = !!existingEquipment
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -186,7 +191,7 @@ export function EquipmentPlacementForm({
   }, [filteredCustomers])
 
   const [formData, setFormData] = useState<FormData>({
-    equipment_type: existingEquipment?.equipment_type || 'mechanical_trap',
+    equipment_type: existingEquipment?.equipment_type || initialEquipmentType || 'mechanical_trap',
     serial_number: existingEquipment?.serial_number || '',
     latitude: existingEquipment?.latitude || 0,
     longitude: existingEquipment?.longitude || 0,
@@ -200,7 +205,7 @@ export function EquipmentPlacementForm({
     if (!isEditing && !loadingTypes && dynamicStationTypes.length > 0) {
       // Kolla om nuvarande typ finns bland dynamiska typer
       const currentTypeExists = dynamicStationTypes.some(t => t.code === formData.equipment_type)
-      if (!currentTypeExists) {
+      if (!currentTypeExists && !initialEquipmentType) {
         setFormData(prev => ({
           ...prev,
           equipment_type: dynamicStationTypes[0].code as EquipmentType
@@ -213,7 +218,7 @@ export function EquipmentPlacementForm({
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     existingEquipment?.photo_url || null
   )
-  const [showMapPicker, setShowMapPicker] = useState(false)
+  const [showMapPicker, setShowMapPicker] = useState(autoShowMap)
   const [manualLocationSet, setManualLocationSet] = useState(false)
 
   const {
