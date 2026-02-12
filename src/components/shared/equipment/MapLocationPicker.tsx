@@ -1,6 +1,6 @@
 // src/components/shared/equipment/MapLocationPicker.tsx - Interaktiv kartväljare för GPS-backup
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents, LayersControl } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { MapPin, Navigation, Search, Check, X, Crosshair } from 'lucide-react'
@@ -362,11 +362,22 @@ export function MapLocationPicker({
           style={{ height: '100%', width: '100%' }}
           className="z-0"
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maxZoom={18}
-          />
+          <LayersControl position="topright">
+            <LayersControl.BaseLayer name="Gatukarta" checked>
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maxZoom={18}
+              />
+            </LayersControl.BaseLayer>
+            <LayersControl.BaseLayer name="Satellit">
+              <TileLayer
+                attribution='&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={18}
+              />
+            </LayersControl.BaseLayer>
+          </LayersControl>
 
           <MapClickHandler onMapClick={handleMapClick} />
           <MapCenterController center={mapCenter} zoom={mapZoom} />
