@@ -317,17 +317,10 @@ export default function CoordinatorDashboard() {
               tag="Tillgänglig"
             />
             <CoordinatorDashboardCard
-              href="/koordinator/organisation/register"
-              icon={UserPlus}
-              title="Registrera Organisation"
-              description="Registrera ny multisite-organisation med flera anläggningar och sites."
-              tag="Ny"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/organisation/organizations"
+              href="/koordinator/customer-access"
               icon={Building2}
-              title="Organisationsöversikt"
-              description="Visa och hantera alla registrerade organisationer och deras anläggningar."
+              title="Kundåtkomst"
+              description="Hantera portalåtkomst, konton, användare och organisationer."
               tag="Hantering"
             />
             <CoordinatorDashboardCard

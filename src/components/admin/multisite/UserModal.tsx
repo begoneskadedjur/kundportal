@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
-import { X, User, Mail, Shield, MapPin, Loader2 } from 'lucide-react'
+import { X, User, Mail, Shield, MapPin, Loader2, Send } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface UserModalProps {
@@ -42,6 +42,7 @@ export default function UserModal({
   const [selectedSites, setSelectedSites] = useState<string[]>([])
   const [sites, setSites] = useState<Site[]>([])
   const [loadingSites, setLoadingSites] = useState(false)
+  const [sendInviteEmail, setSendInviteEmail] = useState(true)
 
   useEffect(() => {
     if (isOpen) {
@@ -57,6 +58,7 @@ export default function UserModal({
         setFullName('')
         setRoleType('platsansvarig')
         setSelectedSites([])
+        setSendInviteEmail(true)
       }
     }
   }, [isOpen, existingUser])
@@ -173,6 +175,7 @@ export default function UserModal({
           },
           body: JSON.stringify({
             organizationId: orgData.organization_id,
+            sendEmail: sendInviteEmail,
             users: [{
               id: userId,
               email,
@@ -192,7 +195,7 @@ export default function UserModal({
           throw new Error(error.error || 'Kunde inte skapa användare')
         }
 
-        toast.success('Användare skapad och inbjudan skickad')
+        toast.success(sendInviteEmail ? 'Användare skapad och inbjudan skickad' : 'Användare skapad (ingen inbjudan skickad)')
       }
 
       onSuccess()
@@ -279,7 +282,7 @@ export default function UserModal({
                   setSelectedSites([])
                 }
               }}
-              className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
               required
             >
               <option value="verksamhetschef">Verksamhetschef</option>
@@ -302,7 +305,7 @@ export default function UserModal({
               </label>
               {loadingSites ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                  <Loader2 className="w-6 h-6 animate-spin text-[#20c58f]" />
                 </div>
               ) : sites.length > 0 ? (
                 <div className="max-h-48 overflow-y-auto border border-slate-700 rounded-lg">
@@ -322,7 +325,7 @@ export default function UserModal({
                             setSelectedSites(selectedSites.filter(id => id !== site.id))
                           }
                         }}
-                        className="mr-3 rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500"
+                        className="mr-3 rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
                       />
                       <div>
                         <p className="text-white font-medium">{site.site_name}</p>
@@ -337,10 +340,35 @@ export default function UserModal({
                 </p>
               )}
               {selectedSites.length > 0 && (
-                <p className="text-xs text-purple-400 mt-2">
+                <p className="text-xs text-[#20c58f] mt-2">
                   {selectedSites.length} enhet(er) valda
                 </p>
               )}
+            </div>
+          )}
+
+          {/* E-post-inbjudan toggle (bara för nya användare) */}
+          {!existingUser && (
+            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sendInviteEmail}
+                  onChange={(e) => setSendInviteEmail(e.target.checked)}
+                  className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
+                />
+                <div className="flex items-center gap-2">
+                  <Send className="w-4 h-4 text-slate-400" />
+                  <div>
+                    <p className="text-sm font-medium text-white">Skicka inbjudan via e-post</p>
+                    <p className="text-xs text-slate-400">
+                      {sendInviteEmail
+                        ? 'Användaren får ett mail med inloggningsuppgifter'
+                        : 'Konto skapas utan att skicka e-post (du kan bjuda in senare)'}
+                    </p>
+                  </div>
+                </div>
+              </label>
             </div>
           )}
 
@@ -361,7 +389,7 @@ export default function UserModal({
               className="flex items-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {existingUser ? 'Uppdatera' : 'Lägg till och bjud in'}
+              {existingUser ? 'Uppdatera' : (sendInviteEmail ? 'Lägg till och bjud in' : 'Lägg till användare')}
             </Button>
           </div>
         </form>

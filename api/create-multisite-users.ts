@@ -39,7 +39,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       urlPrefix: SUPABASE_URL?.substring(0, 30)
     })
     
-    const { organizationId, users, roleAssignments } = req.body
+    const { organizationId, users, roleAssignments, sendEmail: sendEmailParam } = req.body
+    const shouldSendEmail = sendEmailParam !== false
     
     console.log('Request data:', {
       organizationId,
@@ -273,8 +274,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           console.log(`Created new role for ${userData.email}`)
         }
 
-        // Send invitation email via Resend API
-        if (canSendEmails) {
+        // Send invitation email via Resend API (only if sendEmail is not false)
+        if (canSendEmails && shouldSendEmail) {
           try {
             const loginLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/login`
             const isNewUser = !existingAuthUser
@@ -343,9 +344,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({
       success: results.success.length > 0,
-      message: results.success.length > 0 
+      message: results.success.length > 0
         ? `Created ${results.success.length} users successfully`
         : 'No users were created',
+      emails_sent: shouldSendEmail,
       summary: {
         successful: results.success.length,
         failed: results.errors.length,

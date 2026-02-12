@@ -16,12 +16,16 @@ import {
   UserX,
   AlertTriangle,
   Bell,
-  User
+  User,
+  X,
+  KeyRound,
+  Filter
 } from 'lucide-react'
 import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
 import UserModal from '../../../components/admin/multisite/UserModal'
 import SiteModal from '../../../components/admin/multisite/SiteModal'
 import CompactOrganizationTable from '../../../components/admin/multisite/CompactOrganizationTable'
+import MultisiteRegistrationWizard from '../../../components/admin/multisite/MultisiteRegistrationWizard'
 import { useAuth } from '../../../contexts/AuthContext'
 
 interface Organization {
@@ -111,45 +115,99 @@ export default function OrganizationsPage() {
   const [editingUser, setEditingUser] = useState<OrganizationUser | null>(null)
   const [showSiteModal, setShowSiteModal] = useState(false)
   const [editingSite, setEditingSite] = useState<OrganizationSite | null>(null)
+  const [wizardOpen, setWizardOpen] = useState(false)
+  // Dropdown-filter
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<'all' | 'multisite' | 'single'>('all')
+  const [portalStatusFilter, setPortalStatusFilter] = useState<'all' | 'active' | 'invited' | 'not_invited' | 'inactive'>('all')
+  const [loginStatusFilter, setLoginStatusFilter] = useState<'all' | 'logged_in' | 'never_logged_in'>('all')
+  // Quick-filter aktiv tag
+  const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null)
 
   useEffect(() => {
     fetchOrganizations()
   }, [])
 
   useEffect(() => {
-    // Filtrera och sortera organisationer
-    let filtered = searchTerm
-      ? organizations.filter(org => 
-          org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          org.organization_number.includes(searchTerm) ||
-          org.billing_email.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : [...organizations]
+    // Filtrera organisationer
+    let filtered = [...organizations]
+
+    // Textsökning
+    if (searchTerm) {
+      filtered = filtered.filter(org =>
+        org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        org.organization_number.includes(searchTerm) ||
+        org.billing_email.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Dropdown-filter: Kundtyp
+    if (customerTypeFilter !== 'all') {
+      filtered = filtered.filter(org => org.organizationType === customerTypeFilter)
+    }
+
+    // Dropdown-filter: Portalstatus
+    if (portalStatusFilter !== 'all') {
+      filtered = filtered.filter(org => org.portalStatus === portalStatusFilter)
+    }
+
+    // Dropdown-filter: Loginstatus
+    if (loginStatusFilter === 'logged_in') {
+      filtered = filtered.filter(org => org.portalStatus === 'active' || org.portalStatus === 'inactive')
+    } else if (loginStatusFilter === 'never_logged_in') {
+      filtered = filtered.filter(org => org.portalStatus === 'invited' || org.portalStatus === 'not_invited')
+    }
+
+    // Quick-filter tag (override)
+    if (activeQuickFilter) {
+      switch (activeQuickFilter) {
+        case 'multisite':
+          filtered = filtered.filter(org => org.organizationType === 'multisite')
+          break
+        case 'single':
+          filtered = filtered.filter(org => org.organizationType === 'single')
+          break
+        case 'active_portal':
+          filtered = filtered.filter(org => org.portalStatus === 'active')
+          break
+        case 'no_portal':
+          filtered = filtered.filter(org => org.portalStatus === 'not_invited')
+          break
+        case 'critical':
+          filtered = filtered.filter(org => org.criticalCasesCount && org.criticalCasesCount > 0)
+          break
+        case 'unacknowledged':
+          filtered = filtered.filter(org => org.unacknowledgedCount && org.unacknowledgedCount > 0)
+          break
+        case 'inactive':
+          filtered = filtered.filter(org => !org.is_active)
+          break
+      }
+    }
 
     // Smart sortering: Kritiska först, sedan varningar, sedan resten
     filtered.sort((a, b) => {
       // Prioritet 1: Kritiska ärenden
-      if (a.criticalCasesCount > 0 && b.criticalCasesCount === 0) return -1
-      if (b.criticalCasesCount > 0 && a.criticalCasesCount === 0) return 1
-      
+      if ((a.criticalCasesCount ?? 0) > 0 && (b.criticalCasesCount ?? 0) === 0) return -1
+      if ((b.criticalCasesCount ?? 0) > 0 && (a.criticalCasesCount ?? 0) === 0) return 1
+
       // Prioritet 2: Obekräftade rekommendationer
-      if (a.unacknowledgedCount > 0 && b.unacknowledgedCount === 0) return -1
-      if (b.unacknowledgedCount > 0 && a.unacknowledgedCount === 0) return 1
-      
+      if ((a.unacknowledgedCount ?? 0) > 0 && (b.unacknowledgedCount ?? 0) === 0) return -1
+      if ((b.unacknowledgedCount ?? 0) > 0 && (a.unacknowledgedCount ?? 0) === 0) return 1
+
       // Prioritet 3: Varningar
-      if (a.warningCasesCount > 0 && b.warningCasesCount === 0) return -1
-      if (b.warningCasesCount > 0 && a.warningCasesCount === 0) return 1
-      
+      if ((a.warningCasesCount ?? 0) > 0 && (b.warningCasesCount ?? 0) === 0) return -1
+      if ((b.warningCasesCount ?? 0) > 0 && (a.warningCasesCount ?? 0) === 0) return 1
+
       // Prioritet 4: Inaktiva sist
       if (a.is_active && !b.is_active) return -1
       if (!a.is_active && b.is_active) return 1
-      
+
       // Slutligen: Alphabetisk sortering på namn
       return a.name.localeCompare(b.name, 'sv-SE')
     })
 
     setFilteredOrganizations(filtered)
-  }, [searchTerm, organizations])
+  }, [searchTerm, organizations, customerTypeFilter, portalStatusFilter, loginStatusFilter, activeQuickFilter])
 
   const fetchOrganizations = async () => {
     setLoading(true)
@@ -577,10 +635,40 @@ export default function OrganizationsPage() {
     setShowEditModal(true)
   }
 
-  const handleViewDetails = (orgId: string) => {
-    // Navigate to the management page with the organization details
-    const basePath = profile?.role === 'admin' ? '/admin' : '/koordinator'
-    navigate(`${basePath}/organisation/organizations-manage`, { state: { selectedOrgId: orgId } })
+  // handleCreatePortalAccount - skapa portalkonto UTAN att skicka e-post
+  const handleCreatePortalAccount = async (org: Organization) => {
+    if (!confirm(`Vill du skapa ett portalkonto för ${org.name} utan att skicka inbjudan?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/create-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          company_name: org.name,
+          contact_person: org.contact_person,
+          contact_email: org.contact_email || org.primary_contact_email || org.billing_email,
+          contact_phone: org.contact_phone,
+          customer_id: org.id,
+          skip_customer_creation: true,
+          send_email: false
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Kunde inte skapa portalkonto')
+      }
+
+      toast.success(`Portalkonto skapat för ${org.name} (ingen inbjudan skickad)`)
+      fetchOrganizations()
+    } catch (error: any) {
+      console.error('Error creating portal account:', error)
+      toast.error(error.message || 'Kunde inte skapa portalkonto')
+    }
   }
 
   const fetchOrganizationUsers = async (orgId: string, organizationId: string) => {
@@ -850,13 +938,18 @@ export default function OrganizationsPage() {
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Portal-administration</h1>
-          <p className="text-sm text-slate-400 mt-1">Hantera portalåtkomst, användare och inloggningar</p>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-[#20c58f]/10 rounded-xl">
+            <KeyRound className="w-6 h-6 text-[#20c58f]" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Kundåtkomst</h1>
+            <p className="text-sm text-slate-400 mt-0.5">Hantera portalåtkomst, konton, användare och inloggningar</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            onClick={() => navigate('/admin/organisation/register')}
+            onClick={() => setWizardOpen(true)}
             variant="primary"
             className="flex items-center gap-2"
           >
@@ -931,75 +1024,107 @@ export default function OrganizationsPage() {
 
       {/* Sök + Filter */}
       <div className="space-y-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Sök organisation, org.nr eller e-post..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-          />
+        {/* Sök + Dropdown-filter */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Sök organisation, org.nr eller e-post..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-500" />
+            <select
+              value={customerTypeFilter}
+              onChange={(e) => { setCustomerTypeFilter(e.target.value as any); setActiveQuickFilter(null) }}
+              className="bg-slate-800/50 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+            >
+              <option value="all">Alla kundtyper</option>
+              <option value="multisite">Multisite</option>
+              <option value="single">Vanlig kund</option>
+            </select>
+            <select
+              value={portalStatusFilter}
+              onChange={(e) => { setPortalStatusFilter(e.target.value as any); setActiveQuickFilter(null) }}
+              className="bg-slate-800/50 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+            >
+              <option value="all">Alla portalstatus</option>
+              <option value="active">Aktiv</option>
+              <option value="invited">Inbjuden</option>
+              <option value="not_invited">Ingen portal</option>
+              <option value="inactive">Inaktiv</option>
+            </select>
+            <select
+              value={loginStatusFilter}
+              onChange={(e) => { setLoginStatusFilter(e.target.value as any); setActiveQuickFilter(null) }}
+              className="bg-slate-800/50 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+            >
+              <option value="all">Alla loginstatus</option>
+              <option value="logged_in">Har loggat in</option>
+              <option value="never_logged_in">Aldrig loggat in</option>
+            </select>
+          </div>
         </div>
 
+        {/* Quick-filter tags */}
         <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-slate-500 py-1.5">Filter:</span>
-          <button
-            className="px-2.5 py-1 text-xs bg-blue-500/20 border border-blue-500/50 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors flex items-center gap-1.5"
-            onClick={() => setFilteredOrganizations(organizations.filter(org => org.organizationType === 'multisite'))}
-          >
-            <Building2 className="w-3 h-3" />
-            {organizations.filter(org => org.organizationType === 'multisite').length} multisite
-          </button>
-          <button
-            className="px-2.5 py-1 text-xs bg-green-500/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors flex items-center gap-1.5"
-            onClick={() => setFilteredOrganizations(organizations.filter(org => org.organizationType === 'single'))}
-          >
-            <User className="w-3 h-3" />
-            {organizations.filter(org => org.organizationType === 'single').length} kunder
-          </button>
-          <button
-            className="px-2.5 py-1 text-xs bg-[#20c58f]/20 border border-[#20c58f]/50 text-[#20c58f] rounded-lg hover:bg-[#20c58f]/30 transition-colors flex items-center gap-1.5"
-            onClick={() => setFilteredOrganizations(organizations.filter(org => org.portalStatus === 'active'))}
-          >
-            <UserCheck className="w-3 h-3" />
-            {portalActiveCount} aktiv portal
-          </button>
-          <button
-            className="px-2.5 py-1 text-xs bg-slate-500/20 border border-slate-500/50 text-slate-400 rounded-lg hover:bg-slate-500/30 transition-colors flex items-center gap-1.5"
-            onClick={() => setFilteredOrganizations(organizations.filter(org => org.portalStatus === 'not_invited'))}
-          >
-            <UserX className="w-3 h-3" />
-            {organizations.filter(org => org.portalStatus === 'not_invited').length} ingen portal
-          </button>
-          <button
-            className="px-2.5 py-1 text-xs bg-red-500/20 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors flex items-center gap-1.5"
-            onClick={() => setFilteredOrganizations(organizations.filter(org => org.criticalCasesCount && org.criticalCasesCount > 0))}
-          >
-            <AlertTriangle className="w-3 h-3" />
-            {organizations.filter(org => org.criticalCasesCount && org.criticalCasesCount > 0).length} kritiska
-          </button>
-          <button
-            className="px-2.5 py-1 text-xs bg-amber-500/20 border border-amber-500/50 text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors flex items-center gap-1.5"
-            onClick={() => setFilteredOrganizations(organizations.filter(org => org.unacknowledgedCount && org.unacknowledgedCount > 0))}
-          >
-            <Bell className="w-3 h-3" />
-            {organizations.filter(org => org.unacknowledgedCount && org.unacknowledgedCount > 0).length} obekräftade
-          </button>
-          <button
-            className="px-2.5 py-1 text-xs bg-slate-700 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors flex items-center gap-1.5"
-            onClick={() => setFilteredOrganizations(organizations.filter(org => !org.is_active))}
-          >
-            <XCircle className="w-3 h-3" />
-            {organizations.filter(org => !org.is_active).length} inaktiva
-          </button>
-          <button
-            className="px-2.5 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-300 rounded-lg hover:bg-slate-500 transition-colors"
-            onClick={() => setFilteredOrganizations(organizations)}
-          >
-            Visa alla
-          </button>
+          <span className="text-xs text-slate-500 py-1.5">Snabbfilter:</span>
+          {[
+            { key: 'multisite', icon: Building2, label: `${organizations.filter(o => o.organizationType === 'multisite').length} multisite`, color: 'blue' },
+            { key: 'single', icon: User, label: `${organizations.filter(o => o.organizationType === 'single').length} kunder`, color: 'green' },
+            { key: 'active_portal', icon: UserCheck, label: `${portalActiveCount} aktiv portal`, color: 'brand' },
+            { key: 'no_portal', icon: UserX, label: `${organizations.filter(o => o.portalStatus === 'not_invited').length} ingen portal`, color: 'slate' },
+            { key: 'critical', icon: AlertTriangle, label: `${organizations.filter(o => o.criticalCasesCount && o.criticalCasesCount > 0).length} kritiska`, color: 'red' },
+            { key: 'unacknowledged', icon: Bell, label: `${organizations.filter(o => o.unacknowledgedCount && o.unacknowledgedCount > 0).length} obekräftade`, color: 'amber' },
+            { key: 'inactive', icon: XCircle, label: `${organizations.filter(o => !o.is_active).length} inaktiva`, color: 'gray' },
+          ].map(({ key, icon: Icon, label, color }) => {
+            const isActive = activeQuickFilter === key
+            const colorMap: Record<string, string> = {
+              blue: isActive ? 'bg-blue-500/30 border-blue-400 text-blue-300' : 'bg-blue-500/20 border-blue-500/50 text-blue-400 hover:bg-blue-500/30',
+              green: isActive ? 'bg-green-500/30 border-green-400 text-green-300' : 'bg-green-500/20 border-green-500/50 text-green-400 hover:bg-green-500/30',
+              brand: isActive ? 'bg-[#20c58f]/30 border-[#20c58f] text-[#20c58f]' : 'bg-[#20c58f]/20 border-[#20c58f]/50 text-[#20c58f] hover:bg-[#20c58f]/30',
+              slate: isActive ? 'bg-slate-500/30 border-slate-400 text-slate-300' : 'bg-slate-500/20 border-slate-500/50 text-slate-400 hover:bg-slate-500/30',
+              red: isActive ? 'bg-red-500/30 border-red-400 text-red-300' : 'bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30',
+              amber: isActive ? 'bg-amber-500/30 border-amber-400 text-amber-300' : 'bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30',
+              gray: isActive ? 'bg-slate-600 border-slate-500 text-slate-200' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600',
+            }
+            return (
+              <button
+                key={key}
+                className={`px-2.5 py-1 text-xs border rounded-lg transition-colors flex items-center gap-1.5 ${colorMap[color]}`}
+                onClick={() => setActiveQuickFilter(isActive ? null : key)}
+              >
+                <Icon className="w-3 h-3" />
+                {label}
+              </button>
+            )
+          })}
+          {(activeQuickFilter || customerTypeFilter !== 'all' || portalStatusFilter !== 'all' || loginStatusFilter !== 'all') && (
+            <button
+              className="px-2.5 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-300 rounded-lg hover:bg-slate-500 transition-colors"
+              onClick={() => {
+                setActiveQuickFilter(null)
+                setCustomerTypeFilter('all')
+                setPortalStatusFilter('all')
+                setLoginStatusFilter('all')
+                setSearchTerm('')
+              }}
+            >
+              Rensa filter
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Resultaträknare */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-500">
+          Visar {filteredOrganizations.length} av {organizations.length} kunder
+        </p>
       </div>
 
       {/* Organizations List */}
@@ -1007,17 +1132,17 @@ export default function OrganizationsPage() {
         <div className="p-8 bg-slate-800/30 border border-slate-700 rounded-xl text-center">
           <Building2 className="w-8 h-8 text-slate-600 mx-auto mb-2" />
           <h3 className="text-lg font-semibold text-white mb-2">
-            {searchTerm ? 'Inga kunder hittades' : 'Inga kunder än'}
+            {searchTerm || activeQuickFilter || customerTypeFilter !== 'all' ? 'Inga kunder hittades' : 'Inga kunder än'}
           </h3>
           <p className="text-slate-400 mb-6">
-            {searchTerm
+            {searchTerm || activeQuickFilter || customerTypeFilter !== 'all'
               ? 'Prova att justera din sökning eller ändra filter'
               : 'Sidan visar alla avtalskunder - både multisite-organisationer och vanliga kunder'}
           </p>
-          {!searchTerm && (
+          {!searchTerm && !activeQuickFilter && customerTypeFilter === 'all' && (
             <div className="flex gap-4 justify-center">
               <Button
-                onClick={() => navigate('/admin/organisation/register')}
+                onClick={() => setWizardOpen(true)}
                 variant="primary"
                 className="flex items-center gap-2"
               >
@@ -1053,6 +1178,7 @@ export default function OrganizationsPage() {
           onDeleteSite={handleDeleteSite}
           expandedOrgId={expandedOrgId}
           onInviteToPortal={handleInviteToPortal}
+          onCreatePortalAccount={handleCreatePortalAccount}
         />
       )}
 
@@ -1115,6 +1241,31 @@ export default function OrganizationsPage() {
           parentCustomerId={selectedOrg.id}
           existingSite={editingSite}
         />
+      )}
+
+      {/* Multisite Registration Wizard */}
+      {wizardOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">Registrera Multisite-organisation</h2>
+              <button
+                onClick={() => setWizardOpen(false)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-4">
+              <MultisiteRegistrationWizard
+                onSuccess={() => {
+                  setWizardOpen(false)
+                  fetchOrganizations()
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

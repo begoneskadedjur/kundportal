@@ -148,10 +148,13 @@ function App() {
               <Route path="tickets" element={<ProtectedRoute requiredRole="admin"><InternAdministration /></ProtectedRoute>} />
               <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="admin"><CaseDeletionGuide /></ProtectedRoute>} />
               <Route path="guides/ticket-system" element={<ProtectedRoute requiredRole="admin"><TicketSystemGuide /></ProtectedRoute>} />
-              {/* Organisation routes (admin + koordinator) */}
-              <Route path="organisation/register" element={<AdminOrKoordinatorRoute><MultisiteRegistrationPage /></AdminOrKoordinatorRoute>} />
-              <Route path="organisation/organizations" element={<AdminOrKoordinatorRoute><AdminOrganizationsPage /></AdminOrKoordinatorRoute>} />
-              <Route path="organisation/organizations-manage" element={<AdminOrKoordinatorRoute><OrganizationManagement /></AdminOrKoordinatorRoute>} />
+              {/* Kundåtkomst - konsoliderad portalhantering */}
+              <Route path="customer-access" element={<AdminOrKoordinatorRoute><AdminOrganizationsPage /></AdminOrKoordinatorRoute>} />
+              {/* Behåll gamla routes för bakåtkompatibilitet */}
+              <Route path="organisation/organizations" element={<Navigate to="/admin/customer-access" replace />} />
+              <Route path="organisation/organizations-manage" element={<Navigate to="/admin/customer-access" replace />} />
+              <Route path="organisation/register" element={<Navigate to="/admin/customer-access" replace />} />
+              {/* Organisation routes */}
               <Route path="organisation/traffic-light" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
               <Route path="organisation/billing" element={<AdminOrKoordinatorRoute><MultisiteBillingManagement /></AdminOrKoordinatorRoute>} />
             </Route>
@@ -183,31 +186,19 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* Organisation Management Routes - Koordinator */}
-            <Route 
-              path="/koordinator/organisation/register" 
-              element={
-                <AdminOrKoordinatorRoute>
-                  <CoordinatorMultisiteRegistrationPage />
-                </AdminOrKoordinatorRoute>
-              } 
-            />
-            <Route 
-              path="/koordinator/organisation/organizations" 
+            {/* Kundåtkomst - Koordinator */}
+            <Route
+              path="/koordinator/customer-access"
               element={
                 <AdminOrKoordinatorRoute>
                   <CoordinatorOrganizationsPage />
                 </AdminOrKoordinatorRoute>
-              } 
+              }
             />
-            <Route 
-              path="/koordinator/organisation/organizations-manage" 
-              element={
-                <AdminOrKoordinatorRoute>
-                  <OrganizationManagement />
-                </AdminOrKoordinatorRoute>
-              } 
-            />
+            {/* Behåll gamla routes för bakåtkompatibilitet */}
+            <Route path="/koordinator/organisation/register" element={<Navigate to="/koordinator/customer-access" replace />} />
+            <Route path="/koordinator/organisation/organizations" element={<Navigate to="/koordinator/customer-access" replace />} />
+            <Route path="/koordinator/organisation/organizations-manage" element={<Navigate to="/koordinator/customer-access" replace />} />
             <Route 
               path="/koordinator/organisation/traffic-light" 
               element={

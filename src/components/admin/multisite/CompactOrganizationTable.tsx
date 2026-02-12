@@ -23,7 +23,6 @@ import {
   Clock
 } from 'lucide-react'
 import Button from '../../ui/Button'
-import { useNavigate } from 'react-router-dom'
 import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsModal'
 
 interface Organization {
@@ -113,6 +112,7 @@ interface CompactOrganizationTableProps {
   onDeleteSite: (orgId: string, siteId: string) => void
   expandedOrgId: string | null
   onInviteToPortal?: (org: Organization) => void
+  onCreatePortalAccount?: (org: Organization) => void
 }
 
 const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
@@ -131,9 +131,9 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   onEditSite,
   onDeleteSite,
   expandedOrgId,
-  onInviteToPortal
+  onInviteToPortal,
+  onCreatePortalAccount
 }) => {
-  const navigate = useNavigate()
   const [hoveredOrgId, setHoveredOrgId] = useState<string | null>(null)
   const [showActionsForOrg, setShowActionsForOrg] = useState<string | null>(null)
   const [showRecommendationsModal, setShowRecommendationsModal] = useState(false)
@@ -212,10 +212,6 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
       'site_manager': 'Platsansvarig'
     }
     return roleNames[roleType] || roleType
-  }
-
-  const handleViewDetails = (orgId: string) => {
-    navigate(`/admin/organisation/organizations-manage`, { state: { selectedOrgId: orgId } })
   }
 
   return (
@@ -371,16 +367,28 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         {org.organizationType === 'single' && (
                           <>
                             {org.portalStatus === 'not_invited' && (
-                              <button
-                                onClick={() => {
-                                  onInviteToPortal?.(org)
-                                  setShowActionsForOrg(null)
-                                }}
-                                className="w-full px-3 py-2 text-left text-sm text-[#20c58f] hover:bg-slate-700 flex items-center gap-2"
-                              >
-                                <UserPlus className="w-4 h-4" />
-                                Bjud in till portal
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => {
+                                    onCreatePortalAccount?.(org)
+                                    setShowActionsForOrg(null)
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-slate-700 flex items-center gap-2"
+                                >
+                                  <Key className="w-4 h-4" />
+                                  Skapa portalkonto
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    onInviteToPortal?.(org)
+                                    setShowActionsForOrg(null)
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm text-[#20c58f] hover:bg-slate-700 flex items-center gap-2"
+                                >
+                                  <UserPlus className="w-4 h-4" />
+                                  Bjud in till portal
+                                </button>
+                              </>
                             )}
                             {(org.portalStatus === 'active' || org.portalStatus === 'inactive') && (
                               <button
@@ -682,18 +690,6 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     </div>
                   </div>
 
-                  {/* Visa fullständig hantering */}
-                  <div className="mt-4 pt-4 border-t border-slate-700">
-                    <Button
-                      onClick={() => handleViewDetails(org.id)}
-                      variant="outline"
-                      size="sm"
-                      className="w-full flex items-center justify-center gap-2"
-                    >
-                      Visa fullständig organisationshantering
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
                 </div>
               )}
             </div>

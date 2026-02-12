@@ -14,7 +14,7 @@ import {
   Building2,
   Settings,
   Activity,
-  UserPlus,
+  KeyRound,
   Sparkles,
   Image as ImageIcon,
   MessageSquareText,
@@ -41,6 +41,7 @@ export interface NavGroup {
 export const topLevelItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/admin/dashboard' },
   { label: 'Kunder', icon: Users, path: '/admin/customers' },
+  { label: 'Kundåtkomst', icon: KeyRound, path: '/admin/customer-access' },
   { label: 'Leads', icon: Target, path: '/admin/leads' },
 ]
 
@@ -76,11 +77,8 @@ export const navGroups: NavGroup[] = [
     label: 'Organisation',
     icon: Building2,
     items: [
-      { label: 'Kundkonton', icon: Building2, path: '/admin/organisation/organizations' },
-      { label: 'Hantera organisationer', icon: Settings, path: '/admin/organisation/organizations-manage' },
       { label: 'Trafikljusöversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
       { label: 'Multisite-fakturering', icon: Receipt, path: '/admin/organisation/billing' },
-      { label: 'Registrera multisite', icon: UserPlus, path: '/admin/organisation/register' },
     ]
   },
   {
@@ -135,11 +133,9 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/sales-opportunities': 'Försäljningsmöjligheter',
   '/admin/customers/analytics': 'Kundanalys',
   '/admin/leads/analytics': 'Leadanalys',
-  '/admin/organisation/organizations': 'Kundkonton',
-  '/admin/organisation/organizations-manage': 'Hantera organisationer',
+  '/admin/customer-access': 'Kundåtkomst',
   '/admin/organisation/traffic-light': 'Trafikljusöversikt',
   '/admin/organisation/billing': 'Multisite-fakturering',
-  '/admin/organisation/register': 'Registrera multisite',
   '/admin/team-chat': 'Team AI Chat',
   '/admin/image-bank': 'Bildbank',
   '/admin/tickets': 'Tickets',

@@ -101,11 +101,9 @@ const navGroups: NavGroup[] = [
     label: 'Organisation',
     icon: Building2,
     items: [
-      { label: 'Kundkonton', icon: Building2, path: '/admin/organisation/organizations' },
-      { label: 'Hantera organisationer', icon: Settings, path: '/admin/organisation/organizations-manage' },
+      { label: 'Kundåtkomst', icon: Building2, path: '/admin/customer-access' },
       { label: 'Trafikljusoversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
       { label: 'Multisite-fakturering', icon: Receipt, path: '/admin/organisation/billing' },
-      { label: 'Registrera multisite', icon: UserPlus, path: '/admin/organisation/register' },
     ]
   },
   {

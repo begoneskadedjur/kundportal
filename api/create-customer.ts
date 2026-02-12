@@ -363,62 +363,70 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Profile created/updated successfully')
 
-    // 11. Skicka välkomstmail med ny professionell mall
-    console.log('Preparing welcome email using professional template...')
-    
-    const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
-    
-    // Använd den nya professionella e-postmallen
-    const emailHtml = isNewUser 
-      ? getWelcomeEmailTemplate({
-          customer,
-          recipientEmail: customerData.contact_email,
-          recipientName: customer.contact_person,
-          loginLink,
-          isNewUser: true,
-          tempPassword: tempPassword
-        })
-      : getAccessEmailTemplate({
-          customer,
-          recipientEmail: customerData.contact_email,
-          recipientName: customer.contact_person,
-          loginLink,
-          isNewUser: false
-        })
+    // 11. Skicka välkomstmail med ny professionell mall (om send_email inte är false)
+    let emailSent = false
 
-    // FIXAD: Konfigurera Nodemailer med Resend - använd createTransport
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.resend.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'resend',
-        pass: RESEND_API_KEY
+    if (customerData.send_email !== false) {
+      console.log('Preparing welcome email using professional template...')
+
+      const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
+
+      // Använd den nya professionella e-postmallen
+      const emailHtml = isNewUser
+        ? getWelcomeEmailTemplate({
+            customer,
+            recipientEmail: customerData.contact_email,
+            recipientName: customer.contact_person,
+            loginLink,
+            isNewUser: true,
+            tempPassword: tempPassword
+          })
+        : getAccessEmailTemplate({
+            customer,
+            recipientEmail: customerData.contact_email,
+            recipientName: customer.contact_person,
+            loginLink,
+            isNewUser: false
+          })
+
+      // FIXAD: Konfigurera Nodemailer med Resend - använd createTransport
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.resend.com',
+        port: 587,
+        secure: false,
+        auth: {
+          user: 'resend',
+          pass: RESEND_API_KEY
+        }
+      })
+
+      // VIKTIGT: Skicka alltid till den email som användaren angav
+      const mailOptions = {
+        from: 'Begone Skadedjur & Sanering AB <info@begone.se>',
+        to: customerData.contact_email, // Skicka till original-emailen som kunden angav
+        subject: isNewUser
+          ? `Välkommen till Begone Kundportal - ${customer.company_name}`
+          : `Ny företagskoppling tillagd - ${customer.company_name}`,
+        html: emailHtml
       }
-    })
 
-    // VIKTIGT: Skicka alltid till den email som användaren angav
-    const mailOptions = {
-      from: 'Begone Skadedjur & Sanering AB <info@begone.se>',
-      to: customerData.contact_email, // Skicka till original-emailen som kunden angav
-      subject: isNewUser 
-        ? `Välkommen till Begone Kundportal - ${customer.company_name}` 
-        : `Ny företagskoppling tillagd - ${customer.company_name}`,
-      html: emailHtml
-    }
-
-    try {
-      await transporter.sendMail(mailOptions)
-      console.log('Welcome email sent successfully to:', customerData.contact_email)
-    } catch (emailError) {
-      console.error('Failed to send welcome email:', emailError)
-      // Fortsätt ändå - kunden är skapad
+      try {
+        await transporter.sendMail(mailOptions)
+        console.log('Welcome email sent successfully to:', customerData.contact_email)
+        emailSent = true
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError)
+        // Fortsätt ändå - kunden är skapad
+      }
+    } else {
+      console.log('Skipping email - send_email is false')
     }
 
     // 12. Returnera framgång
     console.log('=== CREATE CUSTOMER API SUCCESS ===')
     return res.status(200).json({
       success: true,
+      email_sent: emailSent,
       customer: {
         id: customer.id,
         company_name: customer.company_name,
