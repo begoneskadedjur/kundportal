@@ -26,6 +26,8 @@ import UserModal from '../../../components/admin/multisite/UserModal'
 import SiteModal from '../../../components/admin/multisite/SiteModal'
 import CompactOrganizationTable from '../../../components/admin/multisite/CompactOrganizationTable'
 import MultisiteRegistrationWizard from '../../../components/admin/multisite/MultisiteRegistrationWizard'
+import CreatePortalAccountModal from '../../../components/admin/multisite/CreatePortalAccountModal'
+import ConfirmModal from '../../../components/ui/ConfirmModal'
 import { useAuth } from '../../../contexts/AuthContext'
 
 interface Organization {
@@ -122,6 +124,17 @@ export default function OrganizationsPage() {
   const [loginStatusFilter, setLoginStatusFilter] = useState<'all' | 'logged_in' | 'never_logged_in'>('all')
   // Quick-filter aktiv tag
   const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null)
+  // Bekräftelse-modal
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string
+    message: string
+    variant: 'danger' | 'warning' | 'default'
+    confirmLabel: string
+    onConfirm: () => void
+  } | null>(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
+  // Skapa portalkonto-modal
+  const [createAccountOrg, setCreateAccountOrg] = useState<Organization | null>(null)
 
   useEffect(() => {
     fetchOrganizations()
@@ -553,64 +566,67 @@ export default function OrganizationsPage() {
     }
   }
 
-  const handleDeleteOrganization = async (org: Organization) => {
-    if (!confirm(`Är du säker på att du vill ta bort ${org.name}? Detta kommer även ta bort alla anläggningar och användare.`)) {
-      return
-    }
+  const handleDeleteOrganization = (org: Organization) => {
+    setConfirmModal({
+      title: 'Ta bort organisation',
+      message: `Är du säker på att du vill ta bort ${org.name}? Detta kommer även ta bort alla anläggningar och användare.`,
+      variant: 'danger',
+      confirmLabel: 'Ta bort',
+      onConfirm: async () => {
+        setConfirmLoading(true)
+        try {
+          const { data: huvudkontor, error: hkError } = await supabase
+            .from('customers')
+            .select('organization_id')
+            .eq('id', org.id)
+            .eq('site_type', 'huvudkontor')
+            .single()
 
-    try {
-      // Först måste vi hämta organization_id från huvudkontoret
-      const { data: huvudkontor, error: hkError } = await supabase
-        .from('customers')
-        .select('organization_id')
-        .eq('id', org.id)
-        .eq('site_type', 'huvudkontor')
-        .single()
+          if (hkError || !huvudkontor) {
+            throw new Error('Kunde inte hitta organisation')
+          }
 
-      if (hkError || !huvudkontor) {
-        throw new Error('Kunde inte hitta organisation')
+          const organizationId = huvudkontor.organization_id
+
+          const { error: sitesError } = await supabase
+            .from('customers')
+            .delete()
+            .eq('organization_id', organizationId)
+            .eq('site_type', 'enhet')
+
+          if (sitesError) {
+            console.error('Error deleting sites:', sitesError)
+            throw new Error('Kunde inte ta bort enheter')
+          }
+
+          const { error: rolesError } = await supabase
+            .from('multisite_user_roles')
+            .delete()
+            .eq('organization_id', organizationId)
+
+          if (rolesError) {
+            console.error('Error deleting user roles:', rolesError)
+          }
+
+          const { error: deleteError } = await supabase
+            .from('customers')
+            .delete()
+            .eq('id', org.id)
+            .eq('site_type', 'huvudkontor')
+
+          if (deleteError) throw deleteError
+
+          toast.success('Organisation och alla relaterade data borttagna')
+          setConfirmModal(null)
+          fetchOrganizations()
+        } catch (error) {
+          console.error('Error deleting organization:', error)
+          toast.error('Kunde inte ta bort organisation')
+        } finally {
+          setConfirmLoading(false)
+        }
       }
-
-      const organizationId = huvudkontor.organization_id
-
-      // 1. Ta bort alla enheter först (de har parent_customer_id som pekar på huvudkontoret)
-      const { error: sitesError } = await supabase
-        .from('customers')
-        .delete()
-        .eq('organization_id', organizationId)
-        .eq('site_type', 'enhet')
-
-      if (sitesError) {
-        console.error('Error deleting sites:', sitesError)
-        throw new Error('Kunde inte ta bort enheter')
-      }
-
-      // 2. Ta bort alla användare/roller
-      const { error: rolesError } = await supabase
-        .from('multisite_user_roles')
-        .delete()
-        .eq('organization_id', organizationId)
-
-      if (rolesError) {
-        console.error('Error deleting user roles:', rolesError)
-        // Fortsätt ändå, detta är inte kritiskt
-      }
-
-      // 3. Nu kan vi ta bort huvudkontoret
-      const { error: deleteError } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', org.id)
-        .eq('site_type', 'huvudkontor')
-
-      if (deleteError) throw deleteError
-
-      toast.success('Organisation och alla relaterade data borttagna')
-      fetchOrganizations()
-    } catch (error) {
-      console.error('Error deleting organization:', error)
-      toast.error('Kunde inte ta bort organisation')
-    }
+    })
   }
 
   const handleToggleActive = async (org: Organization) => {
@@ -635,40 +651,9 @@ export default function OrganizationsPage() {
     setShowEditModal(true)
   }
 
-  // handleCreatePortalAccount - skapa portalkonto UTAN att skicka e-post
-  const handleCreatePortalAccount = async (org: Organization) => {
-    if (!confirm(`Vill du skapa ett portalkonto för ${org.name} utan att skicka inbjudan?`)) {
-      return
-    }
-
-    try {
-      const response = await fetch('/api/create-customer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          company_name: org.name,
-          contact_person: org.contact_person,
-          contact_email: org.contact_email || org.primary_contact_email || org.billing_email,
-          contact_phone: org.contact_phone,
-          customer_id: org.id,
-          skip_customer_creation: true,
-          send_email: false
-        })
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Kunde inte skapa portalkonto')
-      }
-
-      toast.success(`Portalkonto skapat för ${org.name} (ingen inbjudan skickad)`)
-      fetchOrganizations()
-    } catch (error: any) {
-      console.error('Error creating portal account:', error)
-      toast.error(error.message || 'Kunde inte skapa portalkonto')
-    }
+  // handleCreatePortalAccount - öppna modal för att skapa portalkonto med lösenord
+  const handleCreatePortalAccount = (org: Organization) => {
+    setCreateAccountOrg(org)
   }
 
   const fetchOrganizationUsers = async (orgId: string, organizationId: string) => {
@@ -737,30 +722,36 @@ export default function OrganizationsPage() {
     setShowUserModal(true)
   }
 
-  const handleDeleteUser = async (orgId: string, userId: string) => {
-    if (!confirm('Är du säker på att du vill ta bort denna användare?')) {
-      return
-    }
+  const handleDeleteUser = (orgId: string, userId: string) => {
+    setConfirmModal({
+      title: 'Ta bort användare',
+      message: 'Är du säker på att du vill ta bort denna användare?',
+      variant: 'danger',
+      confirmLabel: 'Ta bort',
+      onConfirm: async () => {
+        setConfirmLoading(true)
+        try {
+          const { error } = await supabase
+            .from('multisite_user_roles')
+            .delete()
+            .eq('id', userId)
 
-    try {
-      const { error } = await supabase
-        .from('multisite_user_roles')
-        .delete()
-        .eq('id', userId)
+          if (error) throw error
 
-      if (error) throw error
-
-      toast.success('Användare borttagen')
-      
-      // Uppdatera lokal state
-      setOrganizationUsers(prev => ({
-        ...prev,
-        [orgId]: prev[orgId].filter(u => u.id !== userId)
-      }))
-    } catch (error) {
-      console.error('Error deleting user:', error)
-      toast.error('Kunde inte ta bort användare')
-    }
+          toast.success('Användare borttagen')
+          setConfirmModal(null)
+          setOrganizationUsers(prev => ({
+            ...prev,
+            [orgId]: prev[orgId].filter(u => u.id !== userId)
+          }))
+        } catch (error) {
+          console.error('Error deleting user:', error)
+          toast.error('Kunde inte ta bort användare')
+        } finally {
+          setConfirmLoading(false)
+        }
+      }
+    })
   }
 
   const fetchOrganizationSites = async (orgId: string, organizationId: string) => {
@@ -809,64 +800,73 @@ export default function OrganizationsPage() {
     setShowSiteModal(true)
   }
 
-  const handleDeleteSite = async (orgId: string, siteId: string) => {
-    if (!confirm('Är du säker på att du vill ta bort denna enhet?')) {
-      return
-    }
+  const handleDeleteSite = (orgId: string, siteId: string) => {
+    setConfirmModal({
+      title: 'Ta bort enhet',
+      message: 'Är du säker på att du vill ta bort denna enhet?',
+      variant: 'danger',
+      confirmLabel: 'Ta bort',
+      onConfirm: async () => {
+        setConfirmLoading(true)
+        try {
+          const { error } = await supabase
+            .from('customers')
+            .delete()
+            .eq('id', siteId)
 
-    try {
-      const { error } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', siteId)
+          if (error) throw error
 
-      if (error) throw error
-
-      toast.success('Enhet borttagen')
-      
-      // Uppdatera lokal state
-      setOrganizationSites(prev => ({
-        ...prev,
-        [orgId]: prev[orgId].filter(s => s.id !== siteId)
-      }))
-      
-      // Uppdatera sites_count i organisations-listan
-      setOrganizations(prev => prev.map(org => 
-        org.id === orgId 
-          ? { ...org, sites_count: (org.sites_count || 1) - 1 }
-          : org
-      ))
-    } catch (error) {
-      console.error('Error deleting site:', error)
-      toast.error('Kunde inte ta bort enhet')
-    }
+          toast.success('Enhet borttagen')
+          setConfirmModal(null)
+          setOrganizationSites(prev => ({
+            ...prev,
+            [orgId]: prev[orgId].filter(s => s.id !== siteId)
+          }))
+          setOrganizations(prev => prev.map(org =>
+            org.id === orgId
+              ? { ...org, sites_count: (org.sites_count || 1) - 1 }
+              : org
+          ))
+        } catch (error) {
+          console.error('Error deleting site:', error)
+          toast.error('Kunde inte ta bort enhet')
+        } finally {
+          setConfirmLoading(false)
+        }
+      }
+    })
   }
 
-  const handleResetPassword = async (email: string, userName: string) => {
-    if (!confirm(`Vill du skicka lösenordsåterställning till ${userName}?`)) {
-      return
-    }
+  const handleResetPassword = (email: string, userName: string) => {
+    setConfirmModal({
+      title: 'Återställ lösenord',
+      message: `Vill du skicka lösenordsåterställning till ${userName} (${email})?`,
+      variant: 'default',
+      confirmLabel: 'Skicka',
+      onConfirm: async () => {
+        setConfirmLoading(true)
+        try {
+          const response = await fetch('/api/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+          })
 
-    try {
-      // Använd vår egen API med Resend för snyggare e-postmallar
-      const response = await fetch('/api/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email })
-      })
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Kunde inte skicka återställningsmail')
+          }
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Kunde inte skicka återställningsmail')
+          toast.success(`Lösenordsåterställning skickad till ${email}`)
+          setConfirmModal(null)
+        } catch (error: any) {
+          console.error('Error sending password reset:', error)
+          toast.error(error.message || 'Kunde inte skicka lösenordsåterställning')
+        } finally {
+          setConfirmLoading(false)
+        }
       }
-
-      toast.success(`Lösenordsåterställning skickad till ${email}`)
-    } catch (error: any) {
-      console.error('Error sending password reset:', error)
-      toast.error(error.message || 'Kunde inte skicka lösenordsåterställning')
-    }
+    })
   }
 
   const getRoleName = (roleType: string) => {
@@ -881,40 +881,47 @@ export default function OrganizationsPage() {
     return roleNames[roleType] || roleType
   }
 
-  const handleInviteToPortal = async (org: Organization) => {
-    if (!confirm(`Vill du bjuda in ${org.name} till kundportalen?`)) {
-      return
-    }
+  const handleInviteToPortal = (org: Organization) => {
+    const email = org.contact_email || org.primary_contact_email || org.billing_email
+    setConfirmModal({
+      title: 'Bjud in till portal',
+      message: `Vill du bjuda in ${org.name} till kundportalen? Ett nytt säkert lösenord genereras och skickas till ${email}.`,
+      variant: 'default',
+      confirmLabel: 'Bjud in',
+      onConfirm: async () => {
+        setConfirmLoading(true)
+        try {
+          const response = await fetch('/api/create-customer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              company_name: org.name,
+              contact_person: org.contact_person,
+              contact_email: email,
+              contact_phone: org.contact_phone,
+              customer_id: org.id,
+              skip_customer_creation: true,
+              force_new_password: true,
+              send_email: true
+            })
+          })
 
-    try {
-      // För vanliga avtalskunder, använd create-customer API:et
-      const response = await fetch('/api/create-customer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          company_name: org.name,
-          contact_person: org.contact_person,
-          contact_email: org.contact_email || org.primary_contact_email || org.billing_email,
-          contact_phone: org.contact_phone,
-          customer_id: org.id,
-          skip_customer_creation: true // Kunden finns redan, bara skicka inbjudan
-        })
-      })
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Kunde inte skicka inbjudan')
+          }
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Kunde inte skicka inbjudan')
+          toast.success(`Portal-inbjudan skickad till ${email}`)
+          setConfirmModal(null)
+          fetchOrganizations()
+        } catch (error: any) {
+          console.error('Error sending portal invitation:', error)
+          toast.error(error.message || 'Kunde inte skicka inbjudan till portal')
+        } finally {
+          setConfirmLoading(false)
+        }
       }
-
-      toast.success(`Portal-inbjudan skickad till ${org.contact_email || org.primary_contact_email || org.billing_email}`)
-      // Uppdatera organisationer för att reflektera ny portal status
-      fetchOrganizations()
-    } catch (error: any) {
-      console.error('Error sending portal invitation:', error)
-      toast.error(error.message || 'Kunde inte skicka inbjudan till portal')
-    }
+    })
   }
 
   // Beräkna portal-KPIs
@@ -1266,6 +1273,31 @@ export default function OrganizationsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bekräftelse-modal */}
+      <ConfirmModal
+        isOpen={!!confirmModal}
+        onClose={() => { setConfirmModal(null); setConfirmLoading(false) }}
+        onConfirm={confirmModal?.onConfirm || (() => {})}
+        title={confirmModal?.title || ''}
+        message={confirmModal?.message || ''}
+        variant={confirmModal?.variant || 'default'}
+        confirmLabel={confirmModal?.confirmLabel || 'Bekräfta'}
+        loading={confirmLoading}
+      />
+
+      {/* Skapa portalkonto-modal */}
+      {createAccountOrg && (
+        <CreatePortalAccountModal
+          isOpen={!!createAccountOrg}
+          onClose={() => setCreateAccountOrg(null)}
+          onSuccess={() => {
+            setCreateAccountOrg(null)
+            fetchOrganizations()
+          }}
+          organization={createAccountOrg}
+        />
       )}
     </div>
   )

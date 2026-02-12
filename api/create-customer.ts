@@ -235,7 +235,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (existingAuthUser) {
       console.log('Found existing auth user:', existingAuthUser.id)
       userId = existingAuthUser.id
-      
+
+      // force_new_password: generera nytt lösenord och uppdatera befintligt konto
+      if (customerData.force_new_password) {
+        tempPassword = Math.random().toString(36).slice(-12) + 'A1!'
+        console.log('Force new password requested, updating user password...')
+        const { error: pwError } = await supabase.auth.admin.updateUserById(userId, {
+          password: tempPassword
+        })
+        if (pwError) {
+          console.error('Error updating password:', pwError)
+          return res.status(500).json({ error: `Kunde inte uppdatera lösenord: ${pwError.message}` })
+        }
+        isNewUser = true // Treat as new so welcome email includes password
+      }
+
       // Kolla om användaren redan har en profil
       const { data: existingProfile } = await supabase
         .from('profiles')
@@ -244,11 +258,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .single()
 
       if (existingProfile) {
-        // Om profilen redan är kopplad till samma kund, är vi klara
-        if (existingProfile.customer_id === customer.id) {
+        // Om profilen redan är kopplad till samma kund, är vi klara (om inte force_new_password)
+        if (existingProfile.customer_id === customer.id && !customerData.force_new_password) {
           console.log('User already has profile for this customer, skipping...')
-          return res.status(200).json({ 
-            success: true, 
+          return res.status(200).json({
+            success: true,
             message: 'Användaren har redan portal-access',
             customer,
             userId
@@ -285,7 +299,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Skapa helt ny användare
       console.log('Creating new auth user...')
       isNewUser = true
-      tempPassword = Math.random().toString(36).slice(-12) + 'A1!'
+      tempPassword = customerData.password || (Math.random().toString(36).slice(-12) + 'A1!')
 
       const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
         email: customerData.contact_email,

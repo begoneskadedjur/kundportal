@@ -20,7 +20,8 @@ import {
   Building2,
   Plus,
   CheckCircle,
-  Clock
+  Clock,
+  Send
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsModal'
@@ -389,6 +390,18 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                                   Bjud in till portal
                                 </button>
                               </>
+                            )}
+                            {org.portalStatus === 'invited' && (
+                              <button
+                                onClick={() => {
+                                  onInviteToPortal?.(org)
+                                  setShowActionsForOrg(null)
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-[#20c58f] hover:bg-slate-700 flex items-center gap-2"
+                              >
+                                <Send className="w-4 h-4" />
+                                Bjud in till portal
+                              </button>
                             )}
                             {(org.portalStatus === 'active' || org.portalStatus === 'inactive') && (
                               <button
