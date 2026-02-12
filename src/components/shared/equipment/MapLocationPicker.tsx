@@ -1,53 +1,12 @@
-// src/components/shared/equipment/MapLocationPicker.tsx - Interaktiv kartväljare för GPS-backup
+// src/components/shared/equipment/MapLocationPicker.tsx - Interaktiv kartväljare med Google Maps
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents, LayersControl } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
-import { MapPin, Navigation, Search, Check, X, Crosshair } from 'lucide-react'
+import { MapPin, Navigation, Search, Check, X, Crosshair, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { searchAddresses, type GeocodeResult } from '../../../services/geocoding'
-
-// Fix för Leaflet standardikoner
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-})
-
-// Skapa draggable markör-ikon
-const createDraggableIcon = () => {
-  return L.divIcon({
-    className: 'custom-draggable-marker',
-    html: `
-      <div style="
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        border: 3px solid white;
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      ">
-        <div style="
-          transform: rotate(45deg);
-          width: 12px;
-          height: 12px;
-          background: white;
-          border-radius: 50%;
-        "></div>
-      </div>
-    `,
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-  })
-}
+import { useGoogleMaps } from '../../../hooks/useGoogleMaps'
 
 // Stockholm som default center
-const SWEDEN_CENTER: [number, number] = [59.3293, 18.0686]
+const SWEDEN_CENTER = { lat: 59.3293, lng: 18.0686 }
 const DEFAULT_ZOOM = 13
 const DETAIL_ZOOM = 17
 
@@ -59,78 +18,6 @@ interface MapLocationPickerProps {
   height?: string
 }
 
-// Komponent för att hantera kartklick
-function MapClickHandler({
-  onMapClick
-}: {
-  onMapClick: (lat: number, lng: number) => void
-}) {
-  useMapEvents({
-    click: (e) => {
-      onMapClick(e.latlng.lat, e.latlng.lng)
-    }
-  })
-  return null
-}
-
-// Komponent för att centrera kartan
-function MapCenterController({
-  center,
-  zoom
-}: {
-  center: [number, number] | null
-  zoom: number | null
-}) {
-  const map = useMap()
-
-  useEffect(() => {
-    if (center && zoom) {
-      map.setView(center, zoom)
-    }
-  }, [center, zoom, map])
-
-  return null
-}
-
-// Draggable markör-komponent
-function DraggableMarker({
-  position,
-  onPositionChange
-}: {
-  position: [number, number]
-  onPositionChange: (lat: number, lng: number) => void
-}) {
-  const markerRef = useRef<L.Marker | null>(null)
-  const map = useMap()
-
-  const eventHandlers = {
-    dragend: () => {
-      const marker = markerRef.current
-      if (marker) {
-        const newPos = marker.getLatLng()
-        onPositionChange(newPos.lat, newPos.lng)
-      }
-    }
-  }
-
-  // Centrera kartan när markören dras
-  useEffect(() => {
-    if (markerRef.current) {
-      map.panTo(position, { animate: true })
-    }
-  }, [position, map])
-
-  return (
-    <Marker
-      ref={markerRef}
-      position={position}
-      icon={createDraggableIcon()}
-      draggable={true}
-      eventHandlers={eventHandlers}
-    />
-  )
-}
-
 export function MapLocationPicker({
   initialPosition,
   initialAddress,
@@ -138,13 +25,13 @@ export function MapLocationPicker({
   onCancel,
   height = '400px'
 }: MapLocationPickerProps) {
+  const { isLoaded } = useGoogleMaps({ libraries: ['marker'] })
+
   const [markerPosition, setMarkerPosition] = useState<[number, number]>(
     initialPosition
       ? [initialPosition.lat, initialPosition.lng]
-      : SWEDEN_CENTER
+      : [SWEDEN_CENTER.lat, SWEDEN_CENTER.lng]
   )
-  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null)
-  const [mapZoom, setMapZoom] = useState<number | null>(null)
   const [isLocating, setIsLocating] = useState(false)
   const [searchQuery, setSearchQuery] = useState(initialAddress || '')
   const [isSearching, setIsSearching] = useState(false)
@@ -153,6 +40,80 @@ export function MapLocationPicker({
   const [showResults, setShowResults] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
+
+  // Google Maps refs
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<google.maps.Map | null>(null)
+  const markerRef = useRef<google.maps.Marker | null>(null)
+
+  // Uppdatera markörposition (state + Google Maps marker)
+  const updateMarkerPosition = useCallback((lat: number, lng: number) => {
+    setMarkerPosition([lat, lng])
+    if (markerRef.current) {
+      markerRef.current.setPosition({ lat, lng })
+    }
+  }, [])
+
+  // Centrera karta
+  const panTo = useCallback((lat: number, lng: number, zoom?: number) => {
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat, lng })
+      if (zoom) mapRef.current.setZoom(zoom)
+    }
+  }, [])
+
+  // Initiera Google Maps
+  useEffect(() => {
+    if (!isLoaded || !mapContainerRef.current || mapRef.current) return
+
+    const center = initialPosition || SWEDEN_CENTER
+    const zoom = initialPosition ? DETAIL_ZOOM : DEFAULT_ZOOM
+
+    const map = new google.maps.Map(mapContainerRef.current, {
+      center,
+      zoom,
+      mapTypeId: google.maps.MapTypeId.HYBRID,
+      mapTypeControl: true,
+      mapTypeControlOptions: {
+        position: google.maps.ControlPosition.TOP_RIGHT,
+        style: google.maps.MapTypeControlStyle.DROPDOWN_MENU
+      },
+      streetViewControl: false,
+      fullscreenControl: false,
+      zoomControl: true,
+      scaleControl: true
+    })
+    mapRef.current = map
+
+    // Klick → flytta markör
+    map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (e.latLng) {
+        const lat = e.latLng.lat()
+        const lng = e.latLng.lng()
+        setMarkerPosition([lat, lng])
+        if (markerRef.current) {
+          markerRef.current.setPosition({ lat, lng })
+        }
+      }
+    })
+
+    // Skapa draggable markör
+    const marker = new google.maps.Marker({
+      position: center,
+      map,
+      draggable: true,
+      title: 'Dra till rätt position'
+    })
+
+    marker.addListener('dragend', () => {
+      const pos = marker.getPosition()
+      if (pos) {
+        setMarkerPosition([pos.lat(), pos.lng()])
+      }
+    })
+
+    markerRef.current = marker
+  }, [isLoaded, initialPosition])
 
   // Stäng dropdown vid klick utanför
   useEffect(() => {
@@ -167,13 +128,12 @@ export function MapLocationPicker({
 
   // Välj ett sökresultat
   const selectResult = useCallback((result: GeocodeResult) => {
-    setMarkerPosition([result.location.lat, result.location.lng])
-    setMapCenter([result.location.lat, result.location.lng])
-    setMapZoom(DETAIL_ZOOM)
+    updateMarkerPosition(result.location.lat, result.location.lng)
+    panTo(result.location.lat, result.location.lng, DETAIL_ZOOM)
     setSearchQuery(result.formatted_address)
     setShowResults(false)
     setSearchError(null)
-  }, [])
+  }, [updateMarkerPosition, panTo])
 
   // Sök adress med Google Geocoding
   const searchAddressInternal = useCallback(async (query: string) => {
@@ -212,21 +172,11 @@ export function MapLocationPicker({
 
   // Automatisk sökning vid mount om initialAddress finns och ingen initialPosition
   useEffect(() => {
-    if (initialAddress && !initialPosition && !hasAutoSearched) {
+    if (initialAddress && !initialPosition && !hasAutoSearched && isLoaded) {
       setHasAutoSearched(true)
       searchAddressInternal(initialAddress)
     }
-  }, [initialAddress, initialPosition, hasAutoSearched, searchAddressInternal])
-
-  // Hantera kartklick - flytta markören dit
-  const handleMapClick = useCallback((lat: number, lng: number) => {
-    setMarkerPosition([lat, lng])
-  }, [])
-
-  // Hantera markör-drag
-  const handleMarkerDrag = useCallback((lat: number, lng: number) => {
-    setMarkerPosition([lat, lng])
-  }, [])
+  }, [initialAddress, initialPosition, hasAutoSearched, searchAddressInternal, isLoaded])
 
   // Centrera på användarens position
   const centerOnUserLocation = useCallback(() => {
@@ -240,9 +190,8 @@ export function MapLocationPicker({
       (position) => {
         const lat = position.coords.latitude
         const lng = position.coords.longitude
-        setMarkerPosition([lat, lng])
-        setMapCenter([lat, lng])
-        setMapZoom(DETAIL_ZOOM)
+        updateMarkerPosition(lat, lng)
+        panTo(lat, lng, DETAIL_ZOOM)
         setIsLocating(false)
       },
       (error) => {
@@ -256,7 +205,7 @@ export function MapLocationPicker({
         maximumAge: 0
       }
     )
-  }, [])
+  }, [updateMarkerPosition, panTo])
 
   // Sök efter adress - wrapper för användaren
   const searchAddress = useCallback(async () => {
@@ -355,37 +304,13 @@ export function MapLocationPicker({
 
       {/* Karta */}
       <div className="relative rounded-lg overflow-hidden border border-slate-700" style={{ height }}>
-        <MapContainer
-          center={initialPosition ? [initialPosition.lat, initialPosition.lng] : SWEDEN_CENTER}
-          zoom={initialPosition ? DETAIL_ZOOM : DEFAULT_ZOOM}
-          maxZoom={18}
-          style={{ height: '100%', width: '100%' }}
-          className="z-0"
-        >
-          <LayersControl position="topright">
-            <LayersControl.BaseLayer name="Gatukarta" checked>
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                maxZoom={18}
-              />
-            </LayersControl.BaseLayer>
-            <LayersControl.BaseLayer name="Satellit">
-              <TileLayer
-                attribution='&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
-                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                maxZoom={18}
-              />
-            </LayersControl.BaseLayer>
-          </LayersControl>
-
-          <MapClickHandler onMapClick={handleMapClick} />
-          <MapCenterController center={mapCenter} zoom={mapZoom} />
-          <DraggableMarker
-            position={markerPosition}
-            onPositionChange={handleMarkerDrag}
-          />
-        </MapContainer>
+        {!isLoaded ? (
+          <div className="flex items-center justify-center bg-slate-800 h-full">
+            <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+          </div>
+        ) : (
+          <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} />
+        )}
 
         {/* Koordinatvisning överlagd på kartan */}
         <div className="absolute bottom-3 left-3 z-[1000] bg-slate-900/90 backdrop-blur-sm rounded-lg px-3 py-2">
