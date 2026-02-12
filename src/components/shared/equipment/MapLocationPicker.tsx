@@ -5,6 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { MapPin, Navigation, Search, Check, X, Crosshair } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { searchAddresses, type GeocodeResult } from '../../../services/geocoding'
 
 // Fix för Leaflet standardikoner
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -148,39 +149,66 @@ export function MapLocationPicker({
   const [searchQuery, setSearchQuery] = useState(initialAddress || '')
   const [isSearching, setIsSearching] = useState(false)
   const [hasAutoSearched, setHasAutoSearched] = useState(false)
+  const [searchResults, setSearchResults] = useState<GeocodeResult[]>([])
+  const [showResults, setShowResults] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const searchContainerRef = useRef<HTMLDivElement>(null)
 
-  // Sök efter adress med Nominatim (OpenStreetMap) - useCallback för att kunna användas i useEffect
+  // Stäng dropdown vid klick utanför
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowResults(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Välj ett sökresultat
+  const selectResult = useCallback((result: GeocodeResult) => {
+    setMarkerPosition([result.location.lat, result.location.lng])
+    setMapCenter([result.location.lat, result.location.lng])
+    setMapZoom(DETAIL_ZOOM)
+    setSearchQuery(result.formatted_address)
+    setShowResults(false)
+    setSearchError(null)
+  }, [])
+
+  // Sök adress med Google Geocoding
   const searchAddressInternal = useCallback(async (query: string) => {
     if (!query.trim()) return false
 
     setIsSearching(true)
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=se&limit=1`,
-        {
-          headers: {
-            'Accept-Language': 'sv'
-          }
-        }
-      )
-      const results = await response.json()
+    setSearchError(null)
+    setSearchResults([])
+    setShowResults(false)
 
-      if (results.length > 0) {
-        const lat = parseFloat(results[0].lat)
-        const lng = parseFloat(results[0].lon)
-        setMarkerPosition([lat, lng])
-        setMapCenter([lat, lng])
-        setMapZoom(DETAIL_ZOOM)
+    try {
+      const response = await searchAddresses(query)
+
+      if (!response.success || response.results.length === 0) {
+        setSearchError(response.error || 'Ingen adress hittades')
+        return false
+      }
+
+      if (response.results.length === 1) {
+        selectResult(response.results[0])
         return true
       }
-      return false
+
+      // Flera resultat - visa dropdown
+      setSearchResults(response.results)
+      setShowResults(true)
+      return true
     } catch (error) {
       console.error('Sökfel:', error)
+      setSearchError('Ett fel uppstod vid sökning')
       return false
     } finally {
       setIsSearching(false)
     }
-  }, [])
+  }, [selectResult])
 
   // Automatisk sökning vid mount om initialAddress finns och ingen initialPosition
   useEffect(() => {
@@ -232,10 +260,7 @@ export function MapLocationPicker({
 
   // Sök efter adress - wrapper för användaren
   const searchAddress = useCallback(async () => {
-    const found = await searchAddressInternal(searchQuery)
-    if (!found && searchQuery.trim()) {
-      alert('Kunde inte hitta adressen. Prova en annan sökning.')
-    }
+    await searchAddressInternal(searchQuery)
   }, [searchQuery, searchAddressInternal])
 
   // Bekräfta vald position
@@ -267,17 +292,36 @@ export function MapLocationPicker({
       </div>
 
       {/* Sökfält */}
-      <div className="flex gap-2">
+      <div className="flex gap-2" ref={searchContainerRef}>
         <div className="flex-1 relative">
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setSearchError(null) }}
             onKeyDown={handleSearchKeyDown}
-            placeholder="Sök adress (t.ex. Kungsgatan 1, Stockholm)"
-            className="w-full px-4 py-2 pl-10 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Sök adress eller platsnamn (t.ex. Kungsgatan 1, Stockholm)"
+            className={`w-full px-4 py-2 pl-10 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${searchError ? 'border-red-500/50' : 'border-slate-700'}`}
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+
+          {/* Dropdown med sökresultat */}
+          {showResults && searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+              <p className="px-3 py-1.5 text-xs text-slate-500 border-b border-slate-700/50">
+                {searchResults.length} resultat — välj rätt adress:
+              </p>
+              {searchResults.map((result, i) => (
+                <button
+                  key={result.place_id || i}
+                  type="button"
+                  onClick={() => selectResult(result)}
+                  className="w-full px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-700 transition-colors border-b border-slate-700/30 last:border-b-0"
+                >
+                  {result.formatted_address}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <button
           onClick={searchAddress}
@@ -304,6 +348,10 @@ export function MapLocationPicker({
           )}
         </button>
       </div>
+      {/* Inline felmeddelande */}
+      {searchError && (
+        <p className="text-xs text-red-400 -mt-2">{searchError}</p>
+      )}
 
       {/* Karta */}
       <div className="relative rounded-lg overflow-hidden border border-slate-700" style={{ height }}>

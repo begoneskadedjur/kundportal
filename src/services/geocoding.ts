@@ -137,6 +137,56 @@ export async function geocodeAddress(address: string): Promise<GeocodingResponse
 }
 
 /**
+ * Sök adresser med Google Geocoding - returnerar flera resultat för val
+ * Används av MapLocationPicker för interaktiv adressökning
+ */
+export async function searchAddresses(query: string, maxResults = 5): Promise<{
+  success: boolean
+  results: GeocodeResult[]
+  error?: string
+}> {
+  if (!query || query.trim() === '') {
+    return { success: false, results: [], error: 'Tom sökning' }
+  }
+
+  try {
+    const apiKey = typeof window !== 'undefined'
+      ? import.meta.env.VITE_GOOGLE_GEOCODING
+      : process.env.GOOGLE_GEOCODING
+
+    if (!apiKey) {
+      return { success: false, results: [], error: 'Google Geocoding API-nyckel saknas' }
+    }
+
+    const encodedQuery = encodeURIComponent(query)
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedQuery}&key=${apiKey}&language=sv&region=se`
+
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+    const data = await response.json()
+
+    if (data.status === 'ZERO_RESULTS') {
+      return { success: false, results: [], error: 'Ingen adress hittades' }
+    }
+
+    if (data.status !== 'OK' || !data.results?.length) {
+      return { success: false, results: [], error: data.error_message || 'Sökningen misslyckades' }
+    }
+
+    const results: GeocodeResult[] = data.results.slice(0, maxResults).map((r: any) => ({
+      location: { lat: r.geometry.location.lat, lng: r.geometry.location.lng },
+      formatted_address: r.formatted_address,
+      place_id: r.place_id
+    }))
+
+    return { success: true, results }
+  } catch (error) {
+    return { success: false, results: [], error: error instanceof Error ? error.message : 'Sökfel' }
+  }
+}
+
+/**
  * Batch geocoding för flera adresser samtidigt
  * Använder Promise.allSettled för att hantera partiella fel
  */
