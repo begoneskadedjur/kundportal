@@ -2250,7 +2250,7 @@ export default function StationInspectionModule() {
               {(() => {
                 const stationTypeId = selectedStation.station_type_data?.id
                 const filteredPreparations = preparations.filter(p =>
-                  !p.station_type_ids?.length || (stationTypeId && p.station_type_ids.includes(stationTypeId))
+                  stationTypeId && p.station_type_ids?.length > 0 && p.station_type_ids.includes(stationTypeId)
                 )
                 if (filteredPreparations.length === 0) return null
                 return (
