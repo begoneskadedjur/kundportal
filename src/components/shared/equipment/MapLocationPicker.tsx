@@ -10,12 +10,22 @@ const SWEDEN_CENTER = { lat: 59.3293, lng: 18.0686 }
 const DEFAULT_ZOOM = 13
 const DETAIL_ZOOM = 17
 
+export interface ExistingStation {
+  id: string
+  latitude: number
+  longitude: number
+  number: number
+  equipment_type: string
+  color?: string
+}
+
 interface MapLocationPickerProps {
   initialPosition?: { lat: number; lng: number } | null
   initialAddress?: string | null // Kundens adress för automatisk sökning
   onPositionSelect: (lat: number, lng: number) => void
   onCancel: () => void
   height?: string
+  existingStations?: ExistingStation[]
 }
 
 export function MapLocationPicker({
@@ -23,7 +33,8 @@ export function MapLocationPicker({
   initialAddress,
   onPositionSelect,
   onCancel,
-  height = '400px'
+  height = '400px',
+  existingStations
 }: MapLocationPickerProps) {
   const { isLoaded } = useGoogleMaps({ libraries: ['marker'] })
 
@@ -45,6 +56,7 @@ export function MapLocationPicker({
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markerRef = useRef<google.maps.Marker | null>(null)
+  const existingMarkersRef = useRef<google.maps.Marker[]>([])
 
   // Uppdatera markörposition (state + Google Maps marker)
   const updateMarkerPosition = useCallback((lat: number, lng: number) => {
@@ -113,7 +125,53 @@ export function MapLocationPicker({
     })
 
     markerRef.current = marker
+
+    // Anpassa kartvy till befintliga stationer om det finns
+    if (!initialPosition && existingStations?.length) {
+      const bounds = new google.maps.LatLngBounds()
+      existingStations.forEach(s => bounds.extend({ lat: s.latitude, lng: s.longitude }))
+      map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 })
+    }
   }, [isLoaded, initialPosition])
+
+  // Rendera befintliga stationer som numrerade markörer
+  useEffect(() => {
+    if (!mapRef.current || !existingStations?.length) return
+
+    // Rensa gamla markörer
+    existingMarkersRef.current.forEach(m => m.setMap(null))
+    existingMarkersRef.current = []
+
+    existingStations.forEach(station => {
+      const marker = new google.maps.Marker({
+        position: { lat: station.latitude, lng: station.longitude },
+        map: mapRef.current!,
+        draggable: false,
+        clickable: false,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 14,
+          fillColor: station.color || '#6b7280',
+          fillOpacity: 0.9,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+        },
+        label: {
+          text: String(station.number),
+          color: '#ffffff',
+          fontSize: '11px',
+          fontWeight: 'bold'
+        },
+        zIndex: 1
+      })
+      existingMarkersRef.current.push(marker)
+    })
+
+    return () => {
+      existingMarkersRef.current.forEach(m => m.setMap(null))
+      existingMarkersRef.current = []
+    }
+  }, [existingStations, isLoaded])
 
   // Stäng dropdown vid klick utanför
   useEffect(() => {

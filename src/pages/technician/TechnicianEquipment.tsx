@@ -13,7 +13,8 @@ import {
 import { EquipmentService, CustomerStationSummary } from '../../services/equipmentService'
 import {
   EquipmentPlacementForm,
-  EquipmentFormData
+  EquipmentFormData,
+  type ExistingStation
 } from '../../components/shared/equipment'
 import {
   Plus,
@@ -97,6 +98,29 @@ export default function TechnicianEquipment() {
       customerCount: allCustomers.length
     }
   }, [allEquipment, allCustomers])
+
+  // Befintliga stationer för vald kund — visas på kartväljaren under placering
+  const customerExistingStations = useMemo<ExistingStation[]>(() => {
+    const cid = wizardCustomerId
+    if (!cid) return []
+
+    const customerStations = allEquipment.filter(
+      e => e.customer_id === cid && e.latitude && e.longitude
+    )
+
+    const sorted = [...customerStations].sort((a, b) =>
+      new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
+    )
+
+    return sorted.map((e, i) => ({
+      id: e.id,
+      latitude: e.latitude,
+      longitude: e.longitude,
+      number: i + 1,
+      equipment_type: e.equipment_type,
+      color: e.station_type_data?.color || undefined
+    }))
+  }, [allEquipment, wizardCustomerId])
 
   // Hämta alla teknikerns placeringar och kunder med stationer vid mount
   useEffect(() => {
@@ -554,6 +578,7 @@ export default function TechnicianEquipment() {
                         existingEquipment={editingEquipment}
                         initialEquipmentType={lastEquipmentType || undefined}
                         autoShowMap={lastUsedMap}
+                        existingStations={customerExistingStations}
                         onSubmit={handleFormSubmit}
                         onCancel={handleFinishBatch}
                         onLocationCapture={handleLocationCapture}

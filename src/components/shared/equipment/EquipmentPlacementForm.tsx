@@ -10,7 +10,7 @@ import {
   requiresSerialNumber
 } from '../../../types/database'
 import { useGpsLocation } from '../../../hooks/useGpsLocation'
-import { MapLocationPicker } from './MapLocationPicker'
+import { MapLocationPicker, type ExistingStation } from './MapLocationPicker'
 import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
 import {
@@ -62,6 +62,8 @@ interface EquipmentPlacementFormProps {
   // Batch-placering: bevara val mellan stationer
   initialEquipmentType?: EquipmentType
   autoShowMap?: boolean
+  // Befintliga stationer att visa på kartan
+  existingStations?: ExistingStation[]
 }
 
 export interface FormData {
@@ -93,7 +95,8 @@ export function EquipmentPlacementForm({
   onCustomerChange,
   showCustomerPicker = false,
   initialEquipmentType,
-  autoShowMap = false
+  autoShowMap = false,
+  existingStations
 }: EquipmentPlacementFormProps) {
   const isEditing = !!existingEquipment
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -558,6 +561,7 @@ export function EquipmentPlacementForm({
                 onPositionSelect={handleMapPositionSelect}
                 onCancel={() => setShowMapPicker(false)}
                 height="350px"
+                existingStations={existingStations}
               />
             </motion.div>
           )}
