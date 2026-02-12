@@ -579,11 +579,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           contact_person: formData.kontaktperson || customer?.contact_person || null,
           contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
           contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
-          organization_number: formData.org_nr || customer?.organization_number || null,
           address: formData.adress ? { formatted_address: formData.adress } : null,
           price: null,
           case_number: `INS-${Date.now().toString().slice(-6)}`,
-          send_confirmation: formData.skicka_bokningsbekraftelse || 'Nej'
+          send_booking_confirmation: formData.skicka_bokningsbekraftelse === 'Ja'
         };
 
         // Skapa case
