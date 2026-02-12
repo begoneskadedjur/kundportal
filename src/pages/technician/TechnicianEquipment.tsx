@@ -21,7 +21,8 @@ import {
   X,
   AlertCircle,
   ArrowLeft,
-  MapPin
+  MapPin,
+  Check
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
@@ -57,6 +58,12 @@ export default function TechnicianEquipment() {
   // Wizard state
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [wizardCustomerId, setWizardCustomerId] = useState<string | null>(null)
+
+  // Batch-placering state
+  const [batchCount, setBatchCount] = useState(0)
+  const [batchCustomerName, setBatchCustomerName] = useState('')
+  const [showSuccessState, setShowSuccessState] = useState(false)
+  const [formResetKey, setFormResetKey] = useState(0)
 
   // Borttagningsdialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -157,6 +164,10 @@ export default function TechnicianEquipment() {
     setWizardCustomerId(customerId)
     setEditingEquipment(null)
     setPreviewPosition(null)
+    setBatchCount(0)
+    setBatchCustomerName(customers.find(c => c.id === customerId)?.company_name || '')
+    setShowSuccessState(false)
+    setFormResetKey(0)
     setIsFormOpen(true)
     // För inomhus hanteras det i modalen via IndoorEquipmentView
   }
@@ -185,6 +196,10 @@ export default function TechnicianEquipment() {
     setWizardCustomerId(customerId)
     setEditingEquipment(null)
     setPreviewPosition(null)
+    setBatchCount(0)
+    setBatchCustomerName(allCustomers.find(c => c.customer_id === customerId)?.customer_name || '')
+    setShowSuccessState(false)
+    setFormResetKey(0)
     setIsFormOpen(true)
   }
 
@@ -256,12 +271,28 @@ export default function TechnicianEquipment() {
         toast.success('Utrustning placerad!')
       }
 
-      // Stäng formulär och uppdatera lista
-      setIsFormOpen(false)
-      setEditingEquipment(null)
-      setPreviewPosition(null)
-      setWizardCustomerId(null)
-      await refreshData()
+      if (editingEquipment) {
+        // Redigering — stäng allt direkt
+        setIsFormOpen(false)
+        setEditingEquipment(null)
+        setPreviewPosition(null)
+        setWizardCustomerId(null)
+        setBatchCount(0)
+        setBatchCustomerName('')
+        await refreshData()
+      } else {
+        // Ny station — visa success-state för batch-placering
+        const customerName = customers.find(c => c.id === customerId)?.company_name
+          || allCustomers.find(c => c.customer_id === customerId)?.customer_name
+          || ''
+        setBatchCustomerName(customerName)
+        setBatchCount(prev => prev + 1)
+        setShowSuccessState(true)
+        setEditingEquipment(null)
+        setPreviewPosition(null)
+        // Behåll wizardCustomerId och isFormOpen!
+        refreshData() // Uppdatera i bakgrunden (utan await)
+      }
     } catch (error) {
       console.error('Fel vid sparande:', error)
       toast.error(error instanceof Error ? error.message : 'Kunde inte spara utrustning')
@@ -322,6 +353,25 @@ export default function TechnicianEquipment() {
   // Hantera GPS-fångst
   const handleLocationCapture = (lat: number, lng: number) => {
     setPreviewPosition({ lat, lng })
+  }
+
+  // Batch-placering: placera ytterligare en station
+  const handlePlaceAnother = () => {
+    setShowSuccessState(false)
+    setEditingEquipment(null)
+    setPreviewPosition(null)
+    setFormResetKey(prev => prev + 1) // Tvinga ommontering av formuläret
+  }
+
+  // Batch-placering: klar, stäng allt
+  const handleFinishBatch = () => {
+    setShowSuccessState(false)
+    setIsFormOpen(false)
+    setEditingEquipment(null)
+    setPreviewPosition(null)
+    setWizardCustomerId(null)
+    setBatchCount(0)
+    setBatchCustomerName('')
   }
 
   // Hantera klick på karta för att öppna utrustning
@@ -412,12 +462,8 @@ export default function TechnicianEquipment() {
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
               onClick={(e) => {
-                // Endast stäng om klicket är direkt på backdropen, inte på barn-element
                 if (e.target === e.currentTarget) {
-                  setIsFormOpen(false)
-                  setEditingEquipment(null)
-                  setPreviewPosition(null)
-                  setWizardCustomerId(null)
+                  handleFinishBatch()
                 }
               }}
             >
@@ -428,44 +474,84 @@ export default function TechnicianEquipment() {
                 className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-slate-700">
-                  <h2 className="text-xl font-semibold text-white">
-                    {editingEquipment ? 'Redigera utrustning' : 'Ny utrustningsplacering'}
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setIsFormOpen(false)
-                      setEditingEquipment(null)
-                      setPreviewPosition(null)
-                      setWizardCustomerId(null)
-                    }}
-                    className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
-                  >
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
+                {showSuccessState ? (
+                  /* Success-state för batch-placering */
+                  <div className="p-8 flex flex-col items-center text-center">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', damping: 15 }}
+                      className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mb-4"
+                    >
+                      <Check className="w-8 h-8 text-emerald-400" />
+                    </motion.div>
 
-                {/* Formulär */}
-                <div className="p-6">
-                  <EquipmentPlacementForm
-                    customerId={wizardCustomerId || ''}
-                    technicianId={technicianId}
-                    existingEquipment={editingEquipment}
-                    onSubmit={handleFormSubmit}
-                    onCancel={() => {
-                      setIsFormOpen(false)
-                      setEditingEquipment(null)
-                      setPreviewPosition(null)
-                      setWizardCustomerId(null)
-                    }}
-                    onLocationCapture={handleLocationCapture}
-                    isSubmitting={isSubmitting}
-                    customers={customers}
-                    onCustomerChange={(id) => setWizardCustomerId(id)}
-                    showCustomerPicker={!editingEquipment && !wizardCustomerId}
-                  />
-                </div>
+                    <h3 className="text-lg font-semibold text-white mb-1">
+                      Station placerad!
+                    </h3>
+                    <p className="text-slate-400 text-sm mb-1">
+                      {batchCustomerName}
+                    </p>
+                    <p className="text-slate-500 text-xs mb-6">
+                      {batchCount} {batchCount === 1 ? 'station' : 'stationer'} placerade denna session
+                    </p>
+
+                    <div className="w-full space-y-3">
+                      <button
+                        onClick={handlePlaceAnother}
+                        className="w-full py-3 px-4 bg-[#20c58f] hover:bg-[#1ab07f] text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Placera ytterligare
+                      </button>
+                      <button
+                        onClick={handleFinishBatch}
+                        className="w-full py-3 px-4 border border-slate-700 text-slate-300 hover:bg-slate-800 rounded-xl transition-colors"
+                      >
+                        Klar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-6 border-b border-slate-700">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-semibold text-white">
+                          {editingEquipment ? 'Redigera utrustning' : 'Ny utrustningsplacering'}
+                        </h2>
+                        {batchCount > 0 && !editingEquipment && (
+                          <span className="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded-lg">
+                            Station #{batchCount + 1}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={handleFinishBatch}
+                        className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
+                      >
+                        <X className="w-5 h-5 text-slate-400" />
+                      </button>
+                    </div>
+
+                    {/* Formulär */}
+                    <div className="p-6">
+                      <EquipmentPlacementForm
+                        key={formResetKey}
+                        customerId={wizardCustomerId || ''}
+                        technicianId={technicianId}
+                        existingEquipment={editingEquipment}
+                        onSubmit={handleFormSubmit}
+                        onCancel={handleFinishBatch}
+                        onLocationCapture={handleLocationCapture}
+                        isSubmitting={isSubmitting}
+                        customers={customers}
+                        onCustomerChange={(id) => setWizardCustomerId(id)}
+                        showCustomerPicker={!editingEquipment && !wizardCustomerId}
+                      />
+                    </div>
+                  </>
+                )}
               </motion.div>
             </motion.div>
           )}
