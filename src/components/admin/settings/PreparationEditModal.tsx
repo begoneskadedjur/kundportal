@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { X, Loader2, Save, Beaker, Check } from 'lucide-react'
 import { PreparationService } from '../../../services/preparationService'
+import { StationTypeService } from '../../../services/stationTypeService'
+import type { StationType } from '../../../types/stationTypes'
 import {
   Preparation,
   PreparationCategory,
@@ -37,9 +39,18 @@ export function PreparationEditModal({
   const [pestTypes, setPestTypes] = useState<string[]>([])
   const [activeSubstances, setActiveSubstances] = useState('')
   const [dosage, setDosage] = useState('')
+  const [stationTypeIds, setStationTypeIds] = useState<string[]>([])
   const [isActive, setIsActive] = useState(true)
   const [showOnWebsite, setShowOnWebsite] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [stationTypes, setStationTypes] = useState<StationType[]>([])
+
+  // Hämta stationstyper vid mount
+  useEffect(() => {
+    StationTypeService.getActiveStationTypes()
+      .then(setStationTypes)
+      .catch(() => setStationTypes([]))
+  }, [])
 
   // Fyll i formulär när preparat ändras
   useEffect(() => {
@@ -48,6 +59,7 @@ export function PreparationEditModal({
       setCategory(preparation.category)
       setRegistrationNumber(preparation.registration_number || '')
       setPestTypes(preparation.pest_types || [])
+      setStationTypeIds(preparation.station_type_ids || [])
       setActiveSubstances(preparation.active_substances || '')
       setDosage(preparation.dosage || '')
       setIsActive(preparation.is_active)
@@ -58,6 +70,7 @@ export function PreparationEditModal({
       setCategory('biocidprodukt')
       setRegistrationNumber('')
       setPestTypes([])
+      setStationTypeIds([])
       setActiveSubstances('')
       setDosage('')
       setIsActive(true)
@@ -71,6 +84,15 @@ export function PreparationEditModal({
       setPestTypes(pestTypes.filter(p => p !== pest))
     } else {
       setPestTypes([...pestTypes, pest])
+    }
+  }
+
+  // Toggle stationstyp
+  const toggleStationType = (id: string) => {
+    if (stationTypeIds.includes(id)) {
+      setStationTypeIds(stationTypeIds.filter(s => s !== id))
+    } else {
+      setStationTypeIds([...stationTypeIds, id])
     }
   }
 
@@ -91,6 +113,7 @@ export function PreparationEditModal({
         category,
         registration_number: registrationNumber.trim() || null,
         pest_types: pestTypes,
+        station_type_ids: stationTypeIds,
         active_substances: activeSubstances.trim() || null,
         dosage: dosage.trim() || null,
         is_active: isActive,
@@ -257,6 +280,44 @@ export function PreparationEditModal({
               </p>
             )}
           </div>
+
+          {/* Stationstyper */}
+          {stationTypes.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Stationstyper som preparatet används i
+              </label>
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg">
+                {stationTypes.map((st) => {
+                  const isSelected = stationTypeIds.includes(st.id)
+                  return (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => toggleStationType(st.id)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                          : 'bg-slate-700/50 text-slate-400 border border-slate-600 hover:border-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3.5 h-3.5" />}
+                      <span
+                        className="w-2.5 h-2.5 rounded-full inline-block"
+                        style={{ backgroundColor: st.color }}
+                      />
+                      {st.name}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                {stationTypeIds.length === 0
+                  ? 'Alla stationstyper (lämna tomt för att visa överallt)'
+                  : `${stationTypeIds.length} stationstyper valda`}
+              </p>
+            </div>
+          )}
 
           {/* Toggles */}
           <div className="flex items-center gap-6 p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">

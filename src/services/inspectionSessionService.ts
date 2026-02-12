@@ -638,6 +638,7 @@ export async function createOutdoorInspection(
       photo_path: input.photo_path || null,
       measurement_value: input.measurement_value || null,
       measurement_unit: input.measurement_unit || null,
+      preparation_id: input.preparation_id || null,
       inspected_by: technicianId || null
     }])
     .select()
@@ -810,6 +811,7 @@ export async function createIndoorInspection(
       photo_path: input.photo_path || null,
       measurement_value: input.measurement_value || null,
       measurement_unit: input.measurement_unit || null,
+      preparation_id: input.preparation_id || null,
       inspected_by: technicianId || null
     }])
     .select()

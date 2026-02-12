@@ -36,7 +36,8 @@ import {
   ExternalLink,
   BarChart2,
   SkipForward,
-  Unlock
+  Unlock,
+  Beaker
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -67,6 +68,8 @@ import {
   reopenInspectionSession,
   updateCaseStatusToCompleted
 } from '../../services/inspectionSessionService'
+import { PreparationService } from '../../services/preparationService'
+import type { Preparation } from '../../types/preparations'
 
 // Typer
 import type {
@@ -176,8 +179,12 @@ export default function StationInspectionModule() {
   const [measurementValue, setMeasurementValue] = useState<string>('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [selectedPreparationId, setSelectedPreparationId] = useState<string | null>(null)
   const [inspectedStationIds, setInspectedStationIds] = useState<Set<string>>(new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Preparatdata
+  const [preparations, setPreparations] = useState<Preparation[]>([])
 
   // Sammanställningspanel state - spara inspektionsresultat per station
   // OBS: Använder Record istället för Map för att undvika Vite/Terser minifieringsproblem
@@ -187,6 +194,8 @@ export default function StationInspectionModule() {
     findings: string | null
     measurementValue: number | null
     measurementUnit: string | null
+    preparationId: string | null
+    preparationName: string | null
     hasPhoto: boolean
     timestamp: string
   }>>({})
@@ -249,15 +258,17 @@ export default function StationInspectionModule() {
 
         setSession(sessionData)
 
-        const [outdoor, indoor, plans] = await Promise.all([
+        const [outdoor, indoor, plans, preps] = await Promise.all([
           getOutdoorStationsForCustomer(sessionData.customer_id),
           getIndoorStationsForCustomer(sessionData.customer_id),
-          getFloorPlansForCustomer(sessionData.customer_id)
+          getFloorPlansForCustomer(sessionData.customer_id),
+          PreparationService.getActivePreparations().catch(() => [] as Preparation[])
         ])
 
         setOutdoorStations(outdoor)
         setIndoorStations(indoor)
         setFloorPlans(plans)
+        setPreparations(preps)
 
         // Välj första fliken med stationer
         if (outdoor.length === 0 && indoor.length > 0) {
@@ -293,6 +304,8 @@ export default function StationInspectionModule() {
             findings: string | null
             measurementValue: number | null
             measurementUnit: string | null
+            preparationId: string | null
+            preparationName: string | null
             hasPhoto: boolean
             timestamp: string
           }> = {}
@@ -300,11 +313,14 @@ export default function StationInspectionModule() {
           // Utomhusinspektioner
           existingOutdoor.forEach(insp => {
             alreadyInspectedIds.add(insp.station_id)
+            const prep = preps.find(p => p.id === (insp as any).preparation_id)
             existingResults[insp.station_id] = {
               status: insp.status as InspectionStatus,
               findings: insp.findings,
               measurementValue: insp.measurement_value,
               measurementUnit: insp.measurement_unit,
+              preparationId: (insp as any).preparation_id || null,
+              preparationName: prep?.name || null,
               hasPhoto: !!insp.photo_path,
               timestamp: insp.inspected_at
             }
@@ -313,11 +329,14 @@ export default function StationInspectionModule() {
           // Inomhusinspektioner
           existingIndoor.forEach(insp => {
             alreadyInspectedIds.add(insp.station_id)
+            const prep = preps.find(p => p.id === (insp as any).preparation_id)
             existingResults[insp.station_id] = {
               status: insp.status as InspectionStatus,
               findings: insp.findings,
               measurementValue: insp.measurement_value,
               measurementUnit: insp.measurement_unit,
+              preparationId: (insp as any).preparation_id || null,
+              preparationName: prep?.name || null,
               hasPhoto: !!insp.photo_path,
               timestamp: insp.inspected_at
             }
@@ -897,7 +916,8 @@ export default function StationInspectionModule() {
         findings: inspectionNotes || undefined,
         photo_path: photoPath || undefined,
         measurement_value: measurementValue ? parseFloat(measurementValue) : undefined,
-        measurement_unit: measurementUnit || undefined
+        measurement_unit: measurementUnit || undefined,
+        preparation_id: selectedPreparationId || undefined
       }
 
       if (isOutdoor) {
@@ -929,6 +949,7 @@ export default function StationInspectionModule() {
       setInspectedStationIds(prev => new Set(prev).add(selectedStation.id))
 
       // Spara resultat till sammanställning
+      const selectedPrep = preparations.find(p => p.id === selectedPreparationId)
       setInspectionResults(prev => ({
         ...prev,
         [selectedStation.id]: {
@@ -936,6 +957,8 @@ export default function StationInspectionModule() {
           findings: inspectionNotes || null,
           measurementValue: measurementValue ? parseFloat(measurementValue) : null,
           measurementUnit: measurementUnit || null,
+          preparationId: selectedPreparationId,
+          preparationName: selectedPrep?.name || null,
           hasPhoto: !!photoPath,
           timestamp: new Date().toISOString()
         }
@@ -948,6 +971,7 @@ export default function StationInspectionModule() {
       setMeasurementValue('')
       setPhotoFile(null)
       setPhotoPreview(null)
+      setSelectedPreparationId(null)
 
     } catch (err) {
       console.error('Error saving inspection:', err)
@@ -1020,6 +1044,8 @@ export default function StationInspectionModule() {
           findings: null,
           measurementValue: null,
           measurementUnit: null,
+          preparationId: null,
+          preparationName: null,
           hasPhoto: false,
           timestamp: new Date().toISOString()
         }
@@ -1298,6 +1324,11 @@ export default function StationInspectionModule() {
                                         {result.measurementValue} {result.measurementUnit === 'gram' ? 'g' : result.measurementUnit}
                                       </span>
                                     )}
+                                    {result.preparationName && (
+                                      <span className="text-emerald-400/70 text-xs flex items-center gap-0.5">
+                                        <Beaker className="w-3 h-3" />{result.preparationName}
+                                      </span>
+                                    )}
                                     {result.hasPhoto && <Camera className="w-3.5 h-3.5 text-slate-500" />}
                                     {result.findings && (
                                       <span className="text-slate-400 text-xs truncate max-w-24" title={result.findings}>
@@ -1347,6 +1378,11 @@ export default function StationInspectionModule() {
                                     {result.measurementValue !== null && (
                                       <span className="text-slate-400 text-xs">
                                         {result.measurementValue} {result.measurementUnit === 'gram' ? 'g' : result.measurementUnit}
+                                      </span>
+                                    )}
+                                    {result.preparationName && (
+                                      <span className="text-emerald-400/70 text-xs flex items-center gap-0.5">
+                                        <Beaker className="w-3 h-3" />{result.preparationName}
                                       </span>
                                     )}
                                     {result.hasPhoto && <Camera className="w-3.5 h-3.5 text-slate-500" />}
@@ -2206,6 +2242,54 @@ export default function StationInspectionModule() {
                         )}
                       </div>
                     )}
+                  </div>
+                )
+              })()}
+
+              {/* Preparatval — filtrerat efter stationstyp */}
+              {(() => {
+                const stationTypeId = selectedStation.station_type_data?.id
+                const filteredPreparations = preparations.filter(p =>
+                  !p.station_type_ids?.length || (stationTypeId && p.station_type_ids.includes(stationTypeId))
+                )
+                if (filteredPreparations.length === 0) return null
+                return (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-1.5">
+                      <Beaker className="w-4 h-4" />
+                      Preparat (valfritt)
+                    </label>
+                    <select
+                      value={selectedPreparationId || ''}
+                      onChange={(e) => setSelectedPreparationId(e.target.value || null)}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                    >
+                      <option value="">Inget preparat</option>
+                      {(['biocidprodukt', 'giftfritt', 'desinfektionsmedel'] as const).map(cat => {
+                        const catPreps = filteredPreparations.filter(p => p.category === cat)
+                        if (catPreps.length === 0) return null
+                        const catLabel = cat === 'biocidprodukt' ? 'Biocidprodukt' : cat === 'giftfritt' ? 'Giftfritt' : 'Desinfektionsmedel'
+                        return (
+                          <optgroup key={cat} label={catLabel}>
+                            {catPreps.map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}{p.registration_number ? ` (${p.registration_number})` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )
+                      })}
+                    </select>
+                    {selectedPreparationId && (() => {
+                      const prep = preparations.find(p => p.id === selectedPreparationId)
+                      if (!prep) return null
+                      return (
+                        <div className="mt-2 text-xs text-slate-400 space-y-0.5">
+                          {prep.active_substances && <p>Verksamt ämne: {prep.active_substances}</p>}
+                          {prep.dosage && <p>Dosering: {prep.dosage}</p>}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })()}

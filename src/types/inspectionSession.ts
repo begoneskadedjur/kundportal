@@ -87,6 +87,7 @@ export interface OutdoorStationInspection {
   photo_path: string | null
   measurement_value: number | null
   measurement_unit: string | null
+  preparation_id: string | null
   created_at: string
 }
 
@@ -199,6 +200,7 @@ export interface CreateOutdoorInspectionInput {
   photo_path?: string
   measurement_value?: number
   measurement_unit?: MeasurementUnit
+  preparation_id?: string
 }
 
 /**
@@ -212,6 +214,7 @@ export interface CreateIndoorInspectionInput {
   photo_path?: string
   measurement_value?: number
   measurement_unit?: MeasurementUnit
+  preparation_id?: string
 }
 
 // ============================================

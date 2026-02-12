@@ -40,6 +40,7 @@ export interface Preparation {
   category: PreparationCategory
   registration_number: string | null
   pest_types: string[]
+  station_type_ids: string[]
   active_substances: string | null
   dosage: string | null
   is_active: boolean
@@ -57,6 +58,7 @@ export interface CreatePreparationInput {
   category: PreparationCategory
   registration_number?: string | null
   pest_types?: string[]
+  station_type_ids?: string[]
   active_substances?: string | null
   dosage?: string | null
   is_active?: boolean
@@ -72,6 +74,7 @@ export interface UpdatePreparationInput {
   category?: PreparationCategory
   registration_number?: string | null
   pest_types?: string[]
+  station_type_ids?: string[]
   active_substances?: string | null
   dosage?: string | null
   is_active?: boolean
