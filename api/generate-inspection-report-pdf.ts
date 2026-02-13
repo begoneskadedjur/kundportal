@@ -66,12 +66,20 @@ const getStatusLabel = (status: string) => {
 // Hämta Google Maps Static API kartbild som base64 data-URI
 async function fetchStaticMapBase64(inspections: any[]): Promise<string | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
-  if (!apiKey) return null
+  if (!apiKey) {
+    console.log('[StaticMap] No GOOGLE_MAPS_API_KEY found')
+    return null
+  }
 
   const stationsWithCoords = inspections.filter(
     (insp: any) => insp.station?.latitude && insp.station?.longitude
   )
-  if (stationsWithCoords.length === 0) return null
+  if (stationsWithCoords.length === 0) {
+    console.log('[StaticMap] No stations with coordinates found. Sample station:', JSON.stringify(inspections[0]?.station))
+    return null
+  }
+
+  console.log(`[StaticMap] Found ${stationsWithCoords.length} stations with coordinates`)
 
   // Sortera efter placed_at för korrekt numrering
   const sorted = [...stationsWithCoords].sort((a: any, b: any) =>
@@ -88,14 +96,25 @@ async function fetchStaticMapBase64(inspections: any[]): Promise<string | null> 
   }).join('&')
 
   const url = `https://maps.googleapis.com/maps/api/staticmap?size=900x400&maptype=satellite&${markers}&key=${apiKey}`
+  console.log(`[StaticMap] Fetching URL (${url.length} chars), first marker: ${sorted[0]?.station?.latitude},${sorted[0]?.station?.longitude}`)
 
   try {
     const response = await fetch(url)
-    if (!response.ok) return null
+    console.log(`[StaticMap] Response: ${response.status} ${response.statusText}, content-type: ${response.headers.get('content-type')}`)
+    if (!response.ok) {
+      const text = await response.text()
+      console.log(`[StaticMap] Error body: ${text.substring(0, 500)}`)
+      return null
+    }
     const buffer = await response.arrayBuffer()
+    console.log(`[StaticMap] Image size: ${buffer.byteLength} bytes`)
+    if (buffer.byteLength < 1000) {
+      console.log(`[StaticMap] Warning: image suspiciously small`)
+    }
     const base64 = Buffer.from(buffer).toString('base64')
     return `data:image/png;base64,${base64}`
-  } catch {
+  } catch (err) {
+    console.error('[StaticMap] Fetch error:', err)
     return null
   }
 }
