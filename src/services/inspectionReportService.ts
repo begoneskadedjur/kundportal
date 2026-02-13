@@ -90,7 +90,7 @@ export async function generateInspectionPDF(sessionId: string): Promise<void> {
     body: JSON.stringify({
       session: {
         id: session.id,
-        completed_at: session.completed_at,
+        completed_at: session.completed_at || session.created_at,
         notes: session.notes
       },
       customer: session.customer ? {
@@ -158,7 +158,7 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
     ['Kundtelefon', session.customer?.contact_phone || '-'],
     ['Kundemail', session.customer?.contact_email || '-'],
     [],
-    ['Kontrolldatum', formatDate(session.completed_at)],
+    ['Kontrolldatum', formatDate(session.completed_at || session.created_at)],
     ['Anteckningar', session.notes || '-'],
     [],
     ['Totalt inspekterade', summary.total],
@@ -230,7 +230,8 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
 
   // === SAVE ===
   const customerName = (session.customer?.company_name || 'kund').replace(/[^a-zåäöA-ZÅÄÖ0-9]/g, '_')
-  const dateStr = session.completed_at ? new Date(session.completed_at).toISOString().slice(0, 10) : 'okänt-datum'
+  const sessionDate = session.completed_at || session.created_at
+  const dateStr = sessionDate ? new Date(sessionDate).toISOString().slice(0, 10) : 'okänt-datum'
   const filename = `Kontrollrapport_${customerName}_${dateStr}.xlsx`
 
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })

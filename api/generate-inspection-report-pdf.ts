@@ -422,7 +422,7 @@ function generateInspectionReportHTML(data: {
       </div>
       <div class="header-meta">
         <div class="header-title">Kontrollrapport</div>
-        <div class="header-date">${formatDate(session?.completed_at)}</div>
+        <div class="header-date">${formatDate(session?.completed_at || session?.created_at)}</div>
       </div>
     </div>
 
@@ -526,7 +526,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     const customerName = (customer?.company_name || 'kund').replace(/[^a-zåäöA-ZÅÄÖ0-9]/g, '_')
-    const dateStr = session.completed_at ? new Date(session.completed_at).toISOString().slice(0, 10) : 'okänt-datum'
+    const sessionDate = session.completed_at || session.created_at
+    const dateStr = sessionDate ? new Date(sessionDate).toISOString().slice(0, 10) : 'okänt-datum'
     const filename = `Kontrollrapport_${customerName}_${dateStr}.pdf`
 
     const browser = await puppeteer.launch({

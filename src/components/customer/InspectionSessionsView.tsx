@@ -191,10 +191,10 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         getCompletedSessionsForCustomer(customerId, 1) // Senaste session för sammanfattning
       ])
 
-      // Sätt senaste session-info
+      // Sätt senaste session-info (inkl. in_progress sessioner)
       if (sessionsData.length > 0) {
         setLatestSessionId(sessionsData[0].id)
-        setLastInspectionDate(sessionsData[0].completed_at)
+        setLastInspectionDate(sessionsData[0].completed_at || sessionsData[0].created_at || null)
         setLastTechnicianName(sessionsData[0].technician?.name || null)
       }
 

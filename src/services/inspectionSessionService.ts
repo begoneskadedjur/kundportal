@@ -95,8 +95,8 @@ export async function getLastInspectionSummary(
       technician:technicians(name)
     `)
     .eq('customer_id', customerId)
-    .eq('status', 'completed')
-    .order('completed_at', { ascending: false })
+    .in('status', ['completed', 'in_progress'])
+    .order('completed_at', { ascending: false, nullsFirst: false })
     .limit(1)
 
   if (excludeSessionId) {
@@ -145,8 +145,8 @@ export async function getStationsWithRecentActivity(
     .from('station_inspection_sessions')
     .select('id')
     .eq('customer_id', customerId)
-    .eq('status', 'completed')
-    .order('completed_at', { ascending: false })
+    .in('status', ['completed', 'in_progress'])
+    .order('completed_at', { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle()
 
@@ -190,8 +190,8 @@ export async function getCompletedSessionsForCustomer(
       customer:customers(id, company_name, contact_address, contact_person, contact_phone, contact_email)
     `)
     .eq('customer_id', customerId)
-    .eq('status', 'completed')
-    .order('completed_at', { ascending: false })
+    .in('status', ['completed', 'in_progress'])
+    .order('completed_at', { ascending: false, nullsFirst: false })
     .limit(limit)
 
   if (error) {
@@ -654,6 +654,52 @@ export async function createOutdoorInspection(
 }
 
 /**
+ * Upsert utomhusinspektion — uppdatera om inspektion redan finns för station+session, annars skapa ny
+ */
+export async function upsertOutdoorInspection(
+  input: CreateOutdoorInspectionInput,
+  technicianId?: string
+): Promise<{ data: OutdoorStationInspection | null; isNew: boolean }> {
+  // Kolla om inspektion redan finns för denna station + session
+  if (input.session_id) {
+    const { data: existing } = await supabase
+      .from('outdoor_station_inspections')
+      .select('id')
+      .eq('station_id', input.station_id)
+      .eq('session_id', input.session_id)
+      .maybeSingle()
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('outdoor_station_inspections')
+        .update({
+          status: input.status,
+          findings: input.findings || null,
+          photo_path: input.photo_path || null,
+          measurement_value: input.measurement_value ?? null,
+          measurement_unit: input.measurement_unit || null,
+          preparation_id: input.preparation_id || null,
+          inspected_by: technicianId || null,
+          inspected_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error updating outdoor inspection:', error)
+        return { data: null, isNew: false }
+      }
+      return { data: data as OutdoorStationInspection, isNew: false }
+    }
+  }
+
+  // Ingen befintlig — skapa ny
+  const result = await createOutdoorInspection(input, technicianId)
+  return { data: result, isNew: true }
+}
+
+/**
  * Hämta senaste utomhusinspektion för en station
  */
 export async function getLatestOutdoorInspection(
@@ -826,6 +872,50 @@ export async function createIndoorInspection(
   }
 
   return data
+}
+
+/**
+ * Upsert inomhusinspektion — uppdatera om inspektion redan finns för station+session, annars skapa ny
+ */
+export async function upsertIndoorInspection(
+  input: CreateIndoorInspectionInput,
+  technicianId?: string
+): Promise<{ data: any | null; isNew: boolean }> {
+  if (input.session_id) {
+    const { data: existing } = await supabase
+      .from('indoor_station_inspections')
+      .select('id')
+      .eq('station_id', input.station_id)
+      .eq('session_id', input.session_id)
+      .maybeSingle()
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('indoor_station_inspections')
+        .update({
+          status: input.status,
+          findings: input.findings || null,
+          photo_path: input.photo_path || null,
+          measurement_value: input.measurement_value ?? null,
+          measurement_unit: input.measurement_unit || null,
+          preparation_id: input.preparation_id || null,
+          inspected_by: technicianId || null,
+          inspected_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error updating indoor inspection:', error)
+        return { data: null, isNew: false }
+      }
+      return { data, isNew: false }
+    }
+  }
+
+  const result = await createIndoorInspection(input, technicianId)
+  return { data: result, isNew: true }
 }
 
 // ============================================

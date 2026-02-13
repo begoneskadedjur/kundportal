@@ -58,6 +58,8 @@ import {
   completeInspectionSession,
   createOutdoorInspection,
   createIndoorInspection,
+  upsertOutdoorInspection,
+  upsertIndoorInspection,
   updateInspectionSession,
   uploadInspectionPhoto,
   getInspectionPhotoUrl,
@@ -586,9 +588,20 @@ export default function StationInspectionModule() {
     }
 
     setSelectedStation(station)
-    setSelectedStatus('ok')
-    setInspectionNotes('')
-    setMeasurementValue('')
+
+    // Ladda befintlig data om stationen redan inspekterats i denna session
+    const existing = inspectionResults[station.id]
+    if (existing) {
+      setSelectedStatus(existing.status)
+      setInspectionNotes(existing.findings || '')
+      setMeasurementValue(existing.measurementValue !== null ? String(existing.measurementValue) : '')
+      setSelectedPreparationId(existing.preparationId)
+    } else {
+      setSelectedStatus('ok')
+      setInspectionNotes('')
+      setMeasurementValue('')
+      setSelectedPreparationId(null)
+    }
     setPhotoFile(null)
     setPhotoPreview(null)
     setShowHistory(true) // Visa historik inline automatiskt
@@ -951,28 +964,30 @@ export default function StationInspectionModule() {
       }
 
       if (isOutdoor) {
-        await createOutdoorInspection(inspectionData, currentSession.technician_id || undefined)
+        const { isNew } = await upsertOutdoorInspection(inspectionData, currentSession.technician_id || undefined)
 
-        // Uppdatera session count
-        await updateInspectionSession(currentSession.id, {
-          inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
-        })
-
-        setSession({
-          ...currentSession,
-          inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
-        })
+        // Uppdatera session count ENBART vid ny inspektion
+        if (isNew) {
+          await updateInspectionSession(currentSession.id, {
+            inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
+          })
+          setSession({
+            ...currentSession,
+            inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
+          })
+        }
       } else {
-        await createIndoorInspection(inspectionData, currentSession.technician_id || undefined)
+        const { isNew } = await upsertIndoorInspection(inspectionData, currentSession.technician_id || undefined)
 
-        await updateInspectionSession(currentSession.id, {
-          inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
-        })
-
-        setSession({
-          ...currentSession,
-          inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
-        })
+        if (isNew) {
+          await updateInspectionSession(currentSession.id, {
+            inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
+          })
+          setSession({
+            ...currentSession,
+            inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
+          })
+        }
       }
 
       // Markera som inspekterad
@@ -1047,23 +1062,27 @@ export default function StationInspectionModule() {
       }
 
       if (isOutdoor) {
-        await createOutdoorInspection(inspectionData, currentSession.technician_id || undefined)
-        await updateInspectionSession(currentSession.id, {
-          inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
-        })
-        setSession({
-          ...currentSession,
-          inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
-        })
+        const { isNew } = await upsertOutdoorInspection(inspectionData, currentSession.technician_id || undefined)
+        if (isNew) {
+          await updateInspectionSession(currentSession.id, {
+            inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
+          })
+          setSession({
+            ...currentSession,
+            inspected_outdoor_stations: currentSession.inspected_outdoor_stations + 1
+          })
+        }
       } else {
-        await createIndoorInspection(inspectionData, currentSession.technician_id || undefined)
-        await updateInspectionSession(currentSession.id, {
-          inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
-        })
-        setSession({
-          ...currentSession,
-          inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
-        })
+        const { isNew } = await upsertIndoorInspection(inspectionData, currentSession.technician_id || undefined)
+        if (isNew) {
+          await updateInspectionSession(currentSession.id, {
+            inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
+          })
+          setSession({
+            ...currentSession,
+            inspected_indoor_stations: currentSession.inspected_indoor_stations + 1
+          })
+        }
       }
 
       setInspectedStationIds(prev => new Set(prev).add(quickOkStation.id))
