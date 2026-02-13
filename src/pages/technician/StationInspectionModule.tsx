@@ -627,6 +627,7 @@ export default function StationInspectionModule() {
           technician:technicians(id, name)
         `)
         .eq('station_id', station.id)
+        .neq('session_id', session.id)
         .order('inspected_at', { ascending: false })
         .limit(5)
 
@@ -2117,9 +2118,9 @@ export default function StationInspectionModule() {
                     onClick={() => setSelectedStation(null)}
                     className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
                   >
-                    {session?.status === 'completed' ? 'Stäng' : 'Avbryt'}
+                    Stäng
                   </button>
-                  {session?.status !== 'completed' && (
+                  {session?.status !== 'scheduled' && (
                     <Button
                       size="sm"
                       onClick={handleSaveInspection}
