@@ -63,58 +63,77 @@ const getStatusLabel = (status: string) => {
   return labels[status] || status || '-'
 }
 
-// Hämta Google Maps Static API kartbild som base64 data-URI
-async function fetchStaticMapBase64(inspections: any[]): Promise<string | null> {
+// Rendera Google Maps satellitbild via Puppeteer + JavaScript API (Static API blockerar satellit i EU/EEA)
+async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): Promise<string | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
-  if (!apiKey) {
-    console.log('[StaticMap] No GOOGLE_MAPS_API_KEY found')
-    return null
-  }
+  if (!apiKey) return null
 
-  const stationsWithCoords = inspections.filter(
-    (insp: any) => insp.station?.latitude && insp.station?.longitude
-  )
-  if (stationsWithCoords.length === 0) {
-    console.log('[StaticMap] No stations with coordinates found. Sample station:', JSON.stringify(inspections[0]?.station))
-    return null
-  }
+  const stations = inspections
+    .filter((i: any) => i.station?.latitude && i.station?.longitude)
+    .sort((a: any, b: any) =>
+      new Date(a.station.placed_at).getTime() - new Date(b.station.placed_at).getTime()
+    )
 
-  console.log(`[StaticMap] Found ${stationsWithCoords.length} stations with coordinates`)
+  if (stations.length === 0) return null
 
-  // Sortera efter placed_at för korrekt numrering
-  const sorted = [...stationsWithCoords].sort((a: any, b: any) =>
-    new Date(a.station.placed_at).getTime() - new Date(b.station.placed_at).getTime()
-  )
+  const markersJSON = JSON.stringify(stations.map((s: any, i: number) => ({
+    lat: parseFloat(s.station.latitude),
+    lng: parseFloat(s.station.longitude),
+    label: String(i + 1),
+    color: s.status === 'ok' ? '#22C55E' : s.status === 'activity' ? '#F59E0B' : s.status === 'needs_service' ? '#EF4444' : '#3B82F6'
+  })))
 
-  // Bygg markörer - Static Maps stöder labels 0-9 och A-Z
-  const markers = sorted.map((insp: any, index: number) => {
-    const lat = insp.station.latitude
-    const lng = insp.station.longitude
-    const color = insp.status === 'ok' ? 'green' : insp.status === 'activity' ? 'orange' : insp.status === 'needs_service' ? 'red' : 'blue'
-    const label = index < 9 ? String(index + 1) : String.fromCharCode(65 + index - 9) // 1-9, then A-Z
-    return `markers=color:${color}|label:${label}|${lat},${lng}`
-  }).join('&')
+  const mapHtml = `<!DOCTYPE html>
+<html><head>
+  <style>* { margin: 0; padding: 0; } #map { width: 900px; height: 450px; }</style>
+</head><body>
+  <div id="map"></div>
+  <script>
+    function initMap() {
+      var markers = ${markersJSON};
+      var bounds = new google.maps.LatLngBounds();
+      var map = new google.maps.Map(document.getElementById('map'), {
+        mapTypeId: 'satellite',
+        disableDefaultUI: true
+      });
+      markers.forEach(function(m) {
+        var pos = { lat: m.lat, lng: m.lng };
+        bounds.extend(pos);
+        new google.maps.Marker({
+          position: pos,
+          map: map,
+          label: { text: m.label, color: 'white', fontWeight: 'bold', fontSize: '11px' },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: m.color,
+            fillOpacity: 1,
+            strokeColor: 'white',
+            strokeWeight: 2,
+            scale: 14
+          }
+        });
+      });
+      map.fitBounds(bounds, 50);
+      google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
+        setTimeout(function() { window.__MAP_READY = true; }, 500);
+      });
+    }
+  </script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initMap" async defer></script>
+</body></html>`
 
-  const url = `https://maps.googleapis.com/maps/api/staticmap?size=900x400&maptype=roadmap&${markers}&key=${apiKey}`
-  console.log(`[StaticMap] Fetching URL (${url.length} chars), first marker: ${sorted[0]?.station?.latitude},${sorted[0]?.station?.longitude}`)
-
+  let page: any = null
   try {
-    const response = await fetch(url)
-    console.log(`[StaticMap] Response: ${response.status} ${response.statusText}, content-type: ${response.headers.get('content-type')}`)
-    if (!response.ok) {
-      const text = await response.text()
-      console.log(`[StaticMap] Error body: ${text.substring(0, 500)}`)
-      return null
-    }
-    const buffer = await response.arrayBuffer()
-    console.log(`[StaticMap] Image size: ${buffer.byteLength} bytes`)
-    if (buffer.byteLength < 1000) {
-      console.log(`[StaticMap] Warning: image suspiciously small`)
-    }
-    const base64 = Buffer.from(buffer).toString('base64')
-    return `data:image/png;base64,${base64}`
+    page = await browser.newPage()
+    await page.setViewport({ width: 900, height: 450 })
+    await page.setContent(mapHtml, { waitUntil: 'networkidle0', timeout: 20000 })
+    await page.waitForFunction('window.__MAP_READY === true', { timeout: 15000 })
+    const screenshot = await page.screenshot({ type: 'png' })
+    await page.close()
+    return `data:image/png;base64,${Buffer.from(screenshot).toString('base64')}`
   } catch (err) {
-    console.error('[StaticMap] Fetch error:', err)
+    console.error('[MapScreenshot] Error:', err)
+    if (page) await page.close().catch(() => {})
     return null
   }
 }
@@ -145,7 +164,7 @@ async function generateInspectionReportHTML(data: {
   outdoorInspections: any[]
   indoorInspections: any[]
   summary: { ok: number; warning: number; critical: number; total: number }
-}) {
+}, browser: any) {
   const { session, customer, technician, outdoorInspections, indoorInspections, summary } = data
 
   // Sortera utomhusinspektioner efter placed_at för korrekt numrering (samma som kundportalen)
@@ -153,8 +172,8 @@ async function generateInspectionReportHTML(data: {
     new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
   )
 
-  // Hämta Google Maps Static kartbild som base64
-  const mapBase64 = await fetchStaticMapBase64(sortedOutdoor)
+  // Rendera Google Maps satellitbild via Puppeteer
+  const mapBase64 = await renderSatelliteMapScreenshot(browser, sortedOutdoor)
   const mapImageHtml = mapBase64 ? `
     <div style="margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
       <img src="${mapBase64}" style="width: 100%; height: auto; display: block;" alt="Stationskarta" />
@@ -665,6 +684,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing session or summary data' })
     }
 
+    const customerName = (customer?.company_name || 'kund').replace(/[^a-zåäöA-ZÅÄÖ0-9]/g, '_')
+    const sessionDate = session.completed_at || session.created_at
+    const dateStr = sessionDate ? new Date(sessionDate).toISOString().slice(0, 10) : 'okänt-datum'
+    const filename = `Kontrollrapport_${customerName}_${dateStr}.pdf`
+
+    // Starta browser FÖRE HTML-generering — behövs för satellitkartan
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    })
+
     const html = await generateInspectionReportHTML({
       session,
       customer,
@@ -672,19 +704,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       outdoorInspections: outdoorInspections || [],
       indoorInspections: indoorInspections || [],
       summary
-    })
-
-    const customerName = (customer?.company_name || 'kund').replace(/[^a-zåäöA-ZÅÄÖ0-9]/g, '_')
-    const sessionDate = session.completed_at || session.created_at
-    const dateStr = sessionDate ? new Date(sessionDate).toISOString().slice(0, 10) : 'okänt-datum'
-    const filename = `Kontrollrapport_${customerName}_${dateStr}.pdf`
-
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    })
+    }, browser)
 
     const page = await browser.newPage()
 
