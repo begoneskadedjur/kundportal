@@ -3,6 +3,7 @@
 // Med inline inomhusplacering för att lägga till stationer direkt på planritningar
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -757,12 +758,12 @@ export function CustomerStationsModal({
                                             >
                                               <MoreVertical className="w-4 h-4" />
                                             </button>
-                                            {menuOpenForPlan === plan.id && (
+                                            {menuOpenForPlan === plan.id && menuPosition && createPortal(
                                               <>
                                                 <div className="fixed inset-0 z-[9998]" onClick={() => { setMenuOpenForPlan(null); setMenuPosition(null) }} />
                                                 <div
                                                   className="fixed w-48 bg-slate-800 border border-slate-600 rounded-xl shadow-xl z-[9999] overflow-hidden"
-                                                  style={{ top: menuPosition?.top, right: menuPosition?.right }}
+                                                  style={{ top: menuPosition.top, right: menuPosition.right }}
                                                 >
                                                   <button
                                                     onClick={() => {
@@ -787,7 +788,8 @@ export function CustomerStationsModal({
                                                     Ta bort planritning
                                                   </button>
                                                 </div>
-                                              </>
+                                              </>,
+                                              document.body
                                             )}
                                           </div>
                                         </div>
