@@ -4,6 +4,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+)
 
 const beGoneColors = {
   primary: '#0A1328',
@@ -57,7 +63,47 @@ const getStatusLabel = (status: string) => {
   return labels[status] || status || '-'
 }
 
-function generateInspectionReportHTML(data: {
+// Bygg Google Maps Static API URL med numrerade markörer
+function buildStaticMapUrl(inspections: any[]): string | null {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY
+  if (!apiKey) return null
+
+  const stationsWithCoords = inspections.filter(
+    (insp: any) => insp.station?.latitude && insp.station?.longitude
+  )
+  if (stationsWithCoords.length === 0) return null
+
+  // Sortera efter placed_at för korrekt numrering
+  const sorted = [...stationsWithCoords].sort((a: any, b: any) =>
+    new Date(a.station.placed_at).getTime() - new Date(b.station.placed_at).getTime()
+  )
+
+  // Bygg markörer - Static Maps stöder labels 0-9 och A-Z
+  const markers = sorted.map((insp: any, index: number) => {
+    const lat = insp.station.latitude
+    const lng = insp.station.longitude
+    const color = insp.status === 'ok' ? 'green' : insp.status === 'activity' ? 'orange' : insp.status === 'needs_service' ? 'red' : 'blue'
+    const label = index < 9 ? String(index + 1) : String.fromCharCode(65 + index - 9) // 1-9, then A-Z
+    return `markers=color:${color}|label:${label}|${lat},${lng}`
+  }).join('&')
+
+  return `https://maps.googleapis.com/maps/api/staticmap?size=900x400&maptype=satellite&${markers}&key=${apiKey}`
+}
+
+// Hämta floor plan signed URL
+async function getFloorPlanImageUrl(imagePath: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from('floor-plans')
+      .createSignedUrl(imagePath, 3600)
+    if (error || !data?.signedUrl) return null
+    return data.signedUrl
+  } catch {
+    return null
+  }
+}
+
+async function generateInspectionReportHTML(data: {
   session: any
   customer: any
   technician: any
@@ -67,26 +113,26 @@ function generateInspectionReportHTML(data: {
 }) {
   const { session, customer, technician, outdoorInspections, indoorInspections, summary } = data
 
-  // Group indoor inspections by floor plan
-  const indoorByFloorPlan = new Map<string, { name: string; building: string | null; inspections: any[] }>()
-  for (const insp of indoorInspections) {
-    const fp = insp.station?.floor_plan
-    const fpId = fp?.id || 'unknown'
-    if (!indoorByFloorPlan.has(fpId)) {
-      indoorByFloorPlan.set(fpId, {
-        name: fp?.name || 'Okänd planritning',
-        building: fp?.building_name || null,
-        inspections: []
-      })
-    }
-    indoorByFloorPlan.get(fpId)!.inspections.push(insp)
-  }
+  // Sortera utomhusinspektioner efter placed_at för korrekt numrering (samma som kundportalen)
+  const sortedOutdoor = [...outdoorInspections].sort((a, b) =>
+    new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
+  )
 
-  const outdoorTableRows = outdoorInspections.map(insp => {
+  // Bygg Google Maps Static kartbild
+  const mapUrl = buildStaticMapUrl(sortedOutdoor)
+  const mapImageHtml = mapUrl ? `
+    <div style="margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
+      <img src="${mapUrl}" style="width: 100%; height: auto; display: block;" alt="Stationskarta" />
+    </div>
+  ` : ''
+
+  // Bygg nummermappning för utomhus (1, 2, 3... baserat på placed_at-order)
+  const outdoorTableRows = sortedOutdoor.map((insp: any, index: number) => {
     const statusColor = getStatusColor(insp.status)
+    const stationNumber = index + 1
     return `
       <tr>
-        <td>${insp.station?.serial_number || '-'}</td>
+        <td><strong>${stationNumber}</strong></td>
         <td>${insp.station?.station_type_data?.name || insp.station?.equipment_type || '-'}</td>
         <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status)}</span></td>
         <td>${insp.station?.station_type_data?.measurement_label || '-'}</td>
@@ -99,22 +145,86 @@ function generateInspectionReportHTML(data: {
     `
   }).join('')
 
-  const indoorSections = Array.from(indoorByFloorPlan.entries()).map(([, group]) => {
+  // Group indoor inspections by floor plan
+  const indoorByFloorPlan = new Map<string, { name: string; building: string | null; imagePath: string | null; inspections: any[] }>()
+  for (const insp of indoorInspections) {
+    const fp = insp.station?.floor_plan
+    const fpId = fp?.id || 'unknown'
+    if (!indoorByFloorPlan.has(fpId)) {
+      indoorByFloorPlan.set(fpId, {
+        name: fp?.name || 'Okänd planritning',
+        building: fp?.building_name || null,
+        imagePath: fp?.image_path || null,
+        inspections: []
+      })
+    }
+    indoorByFloorPlan.get(fpId)!.inspections.push(insp)
+  }
+
+  // Bygg inomhussektioner med planritningsbilder och korrekt numrering
+  const indoorSectionsArr: string[] = []
+
+  for (const [, group] of indoorByFloorPlan) {
     const sectionTitle = group.building
       ? `${group.name} (${group.building}) — ${group.inspections.length} st`
       : `${group.name} — ${group.inspections.length} st`
 
-    const rows = group.inspections.map((insp: any) => {
+    // Sortera efter placed_at inom gruppen
+    const sortedInGroup = [...group.inspections].sort((a: any, b: any) =>
+      new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
+    )
+
+    // Hämta planritningsbild
+    let floorPlanHtml = ''
+    if (group.imagePath) {
+      const imageUrl = await getFloorPlanImageUrl(group.imagePath)
+      if (imageUrl) {
+        // Bygg markörer baserade på position_x_percent / position_y_percent
+        const markersHtml = sortedInGroup.map((insp: any, idx: number) => {
+          const station = insp.station
+          if (!station?.position_x_percent || !station?.position_y_percent) return ''
+          const statusColor = getStatusColor(insp.status)
+          return `<div style="
+            position: absolute;
+            left: ${station.position_x_percent}%;
+            top: ${station.position_y_percent}%;
+            transform: translate(-50%, -50%);
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: ${statusColor};
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+            z-index: 10;
+          ">${idx + 1}</div>`
+        }).join('')
+
+        floorPlanHtml = `
+          <div style="position: relative; margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border}; max-height: 300px;">
+            <img src="${imageUrl}" style="width: 100%; height: auto; display: block; max-height: 300px; object-fit: contain;" alt="${group.name}" />
+            ${markersHtml}
+          </div>
+        `
+      }
+    }
+
+    const rows = sortedInGroup.map((insp: any, index: number) => {
       const statusColor = getStatusColor(insp.status)
-      const station = insp.station
+      const stationNumber = index + 1
       return `
         <tr>
-          <td>${station?.station_number || '-'}</td>
-          <td>${station?.station_type_data?.name || station?.station_type || '-'}</td>
+          <td><strong>${stationNumber}</strong></td>
+          <td>${insp.station?.station_type_data?.name || insp.station?.station_type || '-'}</td>
           <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status)}</span></td>
-          <td>${station?.station_type_data?.measurement_label || '-'}</td>
+          <td>${insp.station?.station_type_data?.measurement_label || '-'}</td>
           <td class="text-right">${insp.measurement_value !== null && insp.measurement_value !== undefined ? insp.measurement_value : '-'}</td>
-          <td>${insp.measurement_unit || station?.station_type_data?.measurement_unit || '-'}</td>
+          <td>${insp.measurement_unit || insp.station?.station_type_data?.measurement_unit || '-'}</td>
           <td>${insp.findings || '-'}</td>
           <td>${insp.preparation?.name || '-'}</td>
           <td class="text-small">${formatDateTime(insp.inspected_at)}</td>
@@ -122,12 +232,13 @@ function generateInspectionReportHTML(data: {
       `
     }).join('')
 
-    return `
+    indoorSectionsArr.push(`
       <div class="section">
         <div class="section-header">
           <span class="section-icon">🏠</span>
           Inomhusstationer — ${sectionTitle}
         </div>
+        ${floorPlanHtml}
         <table>
           <thead>
             <tr>
@@ -147,8 +258,10 @@ function generateInspectionReportHTML(data: {
           </tbody>
         </table>
       </div>
-    `
-  }).join('')
+    `)
+  }
+
+  const indoorSections = indoorSectionsArr.join('')
 
   return `
 <!DOCTYPE html>
@@ -459,12 +572,13 @@ function generateInspectionReportHTML(data: {
     </div>
     ` : ''}
 
-    ${outdoorInspections.length > 0 ? `
+    ${sortedOutdoor.length > 0 ? `
     <div class="section">
       <div class="section-header">
         <span class="section-icon">📍</span>
-        Utomhusstationer (${outdoorInspections.length} st)
+        Utomhusstationer (${sortedOutdoor.length} st)
       </div>
+      ${mapImageHtml}
       <table>
         <thead>
           <tr>
@@ -516,7 +630,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing session or summary data' })
     }
 
-    const html = generateInspectionReportHTML({
+    const html = await generateInspectionReportHTML({
       session,
       customer,
       technician,

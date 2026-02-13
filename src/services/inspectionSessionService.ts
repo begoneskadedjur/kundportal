@@ -583,7 +583,10 @@ export async function getOutdoorInspectionsForSession(
         id,
         serial_number,
         station_type_id,
-        equipment_type
+        equipment_type,
+        placed_at,
+        latitude,
+        longitude
       ),
       technician:technicians(id, name),
       preparation:preparations!preparation_id(id, name, registration_number)
@@ -805,7 +808,10 @@ export async function getIndoorInspectionsForSession(
         station_number,
         station_type,
         station_type_id,
-        floor_plan:floor_plans(id, name, building_name)
+        placed_at,
+        position_x_percent,
+        position_y_percent,
+        floor_plan:floor_plans(id, name, building_name, image_path)
       ),
       preparation:preparations!preparation_id(id, name, registration_number)
     `)

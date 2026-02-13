@@ -175,9 +175,16 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
 
   // === FLIK 2: Utomhusstationer ===
   if (outdoorInspections.length > 0) {
+    // Sortera efter placed_at för korrekt numrering (samma ordning som kundportalen)
+    const sortedOutdoor = [...outdoorInspections].sort((a, b) => {
+      const dateA = (a.station as any)?.placed_at || ''
+      const dateB = (b.station as any)?.placed_at || ''
+      return dateA.localeCompare(dateB)
+    })
+
     const outdoorHeaders = ['Nr', 'Typ', 'Status', 'Mätvärde avser', 'Mätvärde', 'Enhet', 'Anteckning', 'Preparat', 'Preparat reg.nr', 'Kontrollerad']
-    const outdoorRows = outdoorInspections.map(insp => [
-      insp.station?.serial_number || '-',
+    const outdoorRows = sortedOutdoor.map((insp, index) => [
+      index + 1,
       insp.station?.station_type_data?.name || insp.station?.equipment_type || '-',
       getStatusLabel(insp.status),
       insp.station?.station_type_data?.measurement_label || '-',
@@ -200,11 +207,43 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
 
   // === FLIK 3: Inomhusstationer ===
   if (indoorInspections.length > 0) {
+    // Gruppera per planritning och sortera efter placed_at för korrekt numrering
+    const floorPlanGroups = new Map<string, typeof indoorInspections>()
+    for (const insp of indoorInspections) {
+      const station = insp.station as any
+      const fpId = station?.floor_plan?.id || 'unknown'
+      if (!floorPlanGroups.has(fpId)) floorPlanGroups.set(fpId, [])
+      floorPlanGroups.get(fpId)!.push(insp)
+    }
+
+    // Sortera varje grupp efter placed_at och tilldela sekventiella nummer
+    const numberMap = new Map<string, number>()
+    for (const [, group] of floorPlanGroups) {
+      group.sort((a, b) => {
+        const dateA = (a.station as any)?.placed_at || ''
+        const dateB = (b.station as any)?.placed_at || ''
+        return dateA.localeCompare(dateB)
+      })
+      group.forEach((insp, index) => {
+        numberMap.set(insp.id, index + 1)
+      })
+    }
+
+    // Sortera alla inomhusinspektioner: först per planritning, sedan placed_at
+    const sortedIndoor = [...indoorInspections].sort((a, b) => {
+      const fpA = (a.station as any)?.floor_plan?.name || ''
+      const fpB = (b.station as any)?.floor_plan?.name || ''
+      if (fpA !== fpB) return fpA.localeCompare(fpB)
+      const dateA = (a.station as any)?.placed_at || ''
+      const dateB = (b.station as any)?.placed_at || ''
+      return dateA.localeCompare(dateB)
+    })
+
     const indoorHeaders = ['Nr', 'Typ', 'Planritning', 'Byggnad', 'Status', 'Mätvärde avser', 'Mätvärde', 'Enhet', 'Anteckning', 'Preparat', 'Preparat reg.nr', 'Kontrollerad']
-    const indoorRows = indoorInspections.map(insp => {
+    const indoorRows = sortedIndoor.map(insp => {
       const station = insp.station as any
       return [
-        station?.station_number || '-',
+        numberMap.get(insp.id) || '-',
         station?.station_type_data?.name || station?.station_type || '-',
         station?.floor_plan?.name || '-',
         station?.floor_plan?.building_name || '',
