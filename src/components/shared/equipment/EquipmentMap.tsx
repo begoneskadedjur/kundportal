@@ -64,7 +64,7 @@ export function EquipmentMap({
   inspectedStationIds,
   highlightedStationId
 }: EquipmentMapProps) {
-  const { isLoaded } = useGoogleMaps({ libraries: ['marker'] })
+  const { isLoaded, error: mapError } = useGoogleMaps({ libraries: ['marker'] })
 
   // Refs
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -432,7 +432,9 @@ export function EquipmentMap({
   if (!isLoaded) {
     return (
       <div style={{ height }} className="flex items-center justify-center bg-slate-800/50 rounded-lg">
-        <div className="text-slate-400 text-sm">Laddar karta...</div>
+        <div className="text-slate-400 text-sm">
+          {mapError || 'Laddar karta...'}
+        </div>
       </div>
     )
   }

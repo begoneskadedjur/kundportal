@@ -157,6 +157,11 @@ export interface OutdoorInspectionWithRelations extends OutdoorStationInspection
     id: string
     name: string
   }
+  preparation?: {
+    id: string
+    name: string
+    registration_number: string | null
+  } | null
   photo_url?: string
 }
 

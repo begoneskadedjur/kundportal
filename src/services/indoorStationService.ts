@@ -497,7 +497,8 @@ export class IndoorStationService {
             station_type_id,
             station_type
           ),
-          technician:technicians!inspected_by(id, name)
+          technician:technicians!inspected_by(id, name),
+          preparation:preparations!preparation_id(id, name, registration_number)
         `)
         .eq('station_id', stationId)
         .order('inspected_at', { ascending: false })

@@ -697,7 +697,8 @@ export async function getOutdoorInspectionsByStation(
         station_type_id,
         equipment_type
       ),
-      technician:technicians(id, name)
+      technician:technicians(id, name),
+      preparation:preparations!preparation_id(id, name, registration_number)
     `)
     .eq('station_id', stationId)
     .order('inspected_at', { ascending: false })

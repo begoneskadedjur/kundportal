@@ -19,7 +19,8 @@ import {
   ClipboardList,
   Crosshair,
   Box,
-  Target
+  Target,
+  Beaker
 } from 'lucide-react'
 import type {
   IndoorStationWithRelations,
@@ -342,6 +343,15 @@ function InspectionCard({
             {inspection.measurement_value !== null && inspection.measurement_value !== undefined && (
               <p className="text-xs text-slate-400 mt-0.5">
                 {inspection.station?.station_type_data?.measurement_label || 'Mätvärde'}: {inspection.measurement_value} {inspection.measurement_unit || 'st'}
+              </p>
+            )}
+            {inspection.preparation && (
+              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                <Beaker className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                <span>{inspection.preparation.name}</span>
+                {inspection.preparation.registration_number && (
+                  <span className="text-slate-500">({inspection.preparation.registration_number})</span>
+                )}
               </p>
             )}
             <p className="text-xs text-slate-500 mt-1">

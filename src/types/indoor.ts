@@ -227,6 +227,11 @@ export interface IndoorStationInspectionWithRelations extends IndoorStationInspe
       measurement_label: string | null;
     };
   };
+  preparation?: {
+    id: string;
+    name: string;
+    registration_number: string | null;
+  } | null;
   photo_url?: string; // Signed URL from storage
   // Utökade fält för visning
   measurement_value?: number | null;
