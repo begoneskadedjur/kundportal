@@ -114,14 +114,8 @@ async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): P
         });
       });
       map.fitBounds(bounds, 30);
-      google.maps.event.addListenerOnce(map, 'idle', function() {
-        var currentZoom = map.getZoom();
-        if (currentZoom < 20) {
-          map.setZoom(currentZoom + 1);
-        }
-        google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
-          setTimeout(function() { window.__MAP_READY = true; }, 500);
-        });
+      google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
+        setTimeout(function() { window.__MAP_READY = true; }, 500);
       });
     }
   </script>
