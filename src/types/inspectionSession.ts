@@ -113,6 +113,7 @@ export interface InspectionSessionWithRelations extends StationInspectionSession
   technician?: {
     id: string
     name: string
+    email?: string
   }
   case?: {
     id: string

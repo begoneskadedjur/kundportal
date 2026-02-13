@@ -188,7 +188,7 @@ export function EquipmentMap({
     const map = new google.maps.Map(mapContainerRef.current, {
       center,
       zoom,
-      mapTypeId: google.maps.MapTypeId.ROADMAP,
+      mapTypeId: google.maps.MapTypeId.SATELLITE,
       mapTypeControl: true,
       mapTypeControlOptions: {
         position: google.maps.ControlPosition.TOP_RIGHT,

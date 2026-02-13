@@ -33,7 +33,7 @@ export async function getInspectionSession(
     .select(`
       *,
       customer:customers(id, company_name, contact_address, contact_person, contact_phone, contact_email),
-      technician:technicians(id, name)
+      technician:technicians(id, name, email)
     `)
     .eq('id', sessionId)
     .single()
@@ -585,7 +585,8 @@ export async function getOutdoorInspectionsForSession(
         station_type_id,
         equipment_type
       ),
-      technician:technicians(id, name)
+      technician:technicians(id, name),
+      preparation:preparations!preparation_id(id, name, registration_number)
     `)
     .eq('session_id', sessionId)
     .order('inspected_at', { ascending: false })
@@ -759,7 +760,8 @@ export async function getIndoorInspectionsForSession(
         station_type,
         station_type_id,
         floor_plan:floor_plans(id, name, building_name)
-      )
+      ),
+      preparation:preparations!preparation_id(id, name, registration_number)
     `)
     .eq('session_id', sessionId)
     .order('inspected_at', { ascending: false })

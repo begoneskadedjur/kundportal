@@ -27,7 +27,10 @@ import {
   Eye,
   History,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService } from '../../services/floorPlanService'
@@ -55,6 +58,7 @@ import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
 import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import { generateInspectionPDF, generateInspectionExcel } from '../../services/inspectionReportService'
 
 interface InspectionSessionsViewProps {
   customerId: string
@@ -129,6 +133,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [isIndoorDetailOpen, setIsIndoorDetailOpen] = useState(false)
 
   // Sammanfattningsstatistik
+  const [latestSessionId, setLatestSessionId] = useState<string | null>(null)
   const [lastInspectionDate, setLastInspectionDate] = useState<string | null>(null)
   const [lastTechnicianName, setLastTechnicianName] = useState<string | null>(null)
   const [totalStations, setTotalStations] = useState(0)
@@ -148,6 +153,34 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [latestComparisonData, setLatestComparisonData] = useState<Map<string, { value: number | null; status: 'ok' | 'warning' | 'critical' }>>(new Map())
   const [latestSessionDate, setLatestSessionDate] = useState<string | null>(null)
 
+  // Rapport-nedladdning
+  const [downloadingReport, setDownloadingReport] = useState<string | null>(null)
+  const [reportDropdownOpen, setReportDropdownOpen] = useState<string | null>(null)
+
+  // Stäng rapport-dropdown vid klick utanför
+  useEffect(() => {
+    if (!reportDropdownOpen) return
+    const close = () => setReportDropdownOpen(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [reportDropdownOpen])
+
+  const handleDownloadReport = async (sessionId: string, format: 'pdf' | 'excel') => {
+    setDownloadingReport(sessionId)
+    setReportDropdownOpen(null)
+    try {
+      if (format === 'pdf') {
+        await generateInspectionPDF(sessionId)
+      } else {
+        await generateInspectionExcel(sessionId)
+      }
+    } catch (error) {
+      console.error('Error generating report:', error)
+    } finally {
+      setDownloadingReport(null)
+    }
+  }
+
   // Ladda all data
   const fetchData = useCallback(async () => {
     try {
@@ -160,6 +193,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
 
       // Sätt senaste session-info
       if (sessionsData.length > 0) {
+        setLatestSessionId(sessionsData[0].id)
         setLastInspectionDate(sessionsData[0].completed_at)
         setLastTechnicianName(sessionsData[0].technician?.name || null)
       }
@@ -752,14 +786,50 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             </div>
           </div>
 
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 rounded-lg text-slate-300 text-sm transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 inline mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Uppdatera
-          </button>
+          <div className="flex items-center gap-2">
+            {latestSessionId && (
+              <div className="relative">
+                <button
+                  onClick={() => setReportDropdownOpen(reportDropdownOpen === 'latest' ? null : 'latest')}
+                  disabled={downloadingReport === latestSessionId}
+                  className="px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-600/50 rounded-lg text-teal-400 text-sm transition-colors disabled:opacity-50"
+                >
+                  {downloadingReport === latestSessionId ? (
+                    <RefreshCw className="w-4 h-4 inline mr-1.5 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 inline mr-1.5" />
+                  )}
+                  Rapport
+                </button>
+                {reportDropdownOpen === 'latest' && (
+                  <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 min-w-[160px]">
+                    <button
+                      onClick={() => handleDownloadReport(latestSessionId, 'pdf')}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-t-lg transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-red-400" />
+                      Ladda ned PDF
+                    </button>
+                    <button
+                      onClick={() => handleDownloadReport(latestSessionId, 'excel')}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-b-lg transition-colors"
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                      Ladda ned Excel
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 rounded-lg text-slate-300 text-sm transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 inline mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Uppdatera
+            </button>
+          </div>
         </div>
 
         {/* Sammanfattning av senaste kontroll */}
@@ -858,13 +928,15 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               ) : (
                 <div className="mt-4 space-y-3">
                   {historySessions.map((session) => (
-                    <button
+                    <div
                       key={session.id}
-                      onClick={() => handleOpenHistorySession(session)}
-                      className="w-full text-left bg-slate-900/50 rounded-lg p-4 hover:bg-slate-900/70 transition-colors cursor-pointer group"
+                      className="bg-slate-900/50 rounded-lg p-4 hover:bg-slate-900/70 transition-colors group"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleOpenHistorySession(session)}
+                          className="flex items-center gap-3 text-left flex-1 cursor-pointer"
+                        >
                           <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-500/30 transition-colors">
                             <Calendar className="w-5 h-5 text-purple-400" />
                           </div>
@@ -877,7 +949,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                               <span>{session.technician?.name || 'Okänd tekniker'}</span>
                             </div>
                           </div>
-                        </div>
+                        </button>
 
                         <div className="flex items-center gap-4 text-sm">
                           {/* Statistik för sessionen */}
@@ -896,10 +968,56 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                           <div className="text-slate-500">
                             {session.inspection_summary?.total || 0} st
                           </div>
-                          <Eye className="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition-colors ml-2" />
+                          <div className="relative ml-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setReportDropdownOpen(reportDropdownOpen === session.id ? null : session.id)
+                              }}
+                              disabled={downloadingReport === session.id}
+                              className="p-1.5 text-slate-500 hover:text-teal-400 transition-colors rounded-lg hover:bg-slate-800/50"
+                              title="Ladda ned rapport"
+                            >
+                              {downloadingReport === session.id ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Download className="w-4 h-4" />
+                              )}
+                            </button>
+                            {reportDropdownOpen === session.id && (
+                              <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 min-w-[160px]">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDownloadReport(session.id, 'pdf')
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-t-lg transition-colors"
+                                >
+                                  <FileText className="w-4 h-4 text-red-400" />
+                                  PDF
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDownloadReport(session.id, 'excel')
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-b-lg transition-colors"
+                                >
+                                  <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                                  Excel
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleOpenHistorySession(session)}
+                            className="p-1.5 text-slate-500 hover:text-purple-400 transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
