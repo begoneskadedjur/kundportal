@@ -787,40 +787,6 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           </div>
 
           <div className="flex items-center gap-2">
-            {latestSessionId && (
-              <div className="relative">
-                <button
-                  onClick={() => setReportDropdownOpen(reportDropdownOpen === 'latest' ? null : 'latest')}
-                  disabled={downloadingReport === latestSessionId}
-                  className="px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-600/50 rounded-lg text-teal-400 text-sm transition-colors disabled:opacity-50"
-                >
-                  {downloadingReport === latestSessionId ? (
-                    <RefreshCw className="w-4 h-4 inline mr-1.5 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4 inline mr-1.5" />
-                  )}
-                  Rapport
-                </button>
-                {reportDropdownOpen === 'latest' && (
-                  <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 min-w-[160px]">
-                    <button
-                      onClick={() => handleDownloadReport(latestSessionId, 'pdf')}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-t-lg transition-colors"
-                    >
-                      <FileText className="w-4 h-4 text-red-400" />
-                      Ladda ned PDF
-                    </button>
-                    <button
-                      onClick={() => handleDownloadReport(latestSessionId, 'excel')}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-b-lg transition-colors"
-                    >
-                      <FileSpreadsheet className="w-4 h-4 text-green-400" />
-                      Ladda ned Excel
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -1051,6 +1017,44 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             <Filter className="w-4 h-4" />
             Endast avvikelser
           </button>
+
+          {latestSessionId && (
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setReportDropdownOpen(reportDropdownOpen === 'latest' ? null : 'latest')
+                }}
+                disabled={downloadingReport === latestSessionId}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all bg-teal-600/20 border-teal-600/50 text-teal-400 hover:bg-teal-600/30 disabled:opacity-50"
+              >
+                {downloadingReport === latestSessionId ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Rapport
+              </button>
+              {reportDropdownOpen === 'latest' && (
+                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 min-w-[160px]">
+                  <button
+                    onClick={() => handleDownloadReport(latestSessionId, 'pdf')}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-t-lg transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-red-400" />
+                    Ladda ned PDF
+                  </button>
+                  <button
+                    onClick={() => handleDownloadReport(latestSessionId, 'excel')}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-b-lg transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                    Ladda ned Excel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Sektioner med tabeller */}
