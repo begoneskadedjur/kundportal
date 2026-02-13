@@ -2,7 +2,7 @@
 // Fullständig kunddetaljmodal med tabbar: Utomhus (karta) och Inomhus (planritningar)
 // Med inline inomhusplacering för att lägga till stationer direkt på planritningar
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -21,12 +21,15 @@ import {
   Mail,
   Navigation,
   FileImage,
-  Upload
+  Upload,
+  MoreVertical,
+  ImagePlus,
+  Trash2
 } from 'lucide-react'
 import { CustomerStationSummary } from '../../services/equipmentService'
 import { StationHealthBadge, StationHealthDetail, calculateHealthStatusWithPercentage } from '../shared/StationHealthBadge'
 import { EquipmentService } from '../../services/equipmentService'
-import { FloorPlanService } from '../../services/floorPlanService'
+import { FloorPlanService, ALLOWED_FLOOR_PLAN_TYPES } from '../../services/floorPlanService'
 import { IndoorStationService } from '../../services/indoorStationService'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
@@ -130,6 +133,10 @@ export function CustomerStationsModal({
   const [showStationForm, setShowStationForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isAddingIndoor, setIsAddingIndoor] = useState(false)
+  const [menuOpenForPlan, setMenuOpenForPlan] = useState<string | null>(null)
+  const [replacingImage, setReplacingImage] = useState(false)
+  const replaceImageInputRef = useRef<HTMLInputElement>(null)
+  const replacePlanIdRef = useRef<string | null>(null)
 
   // Ladda data när modal öppnas
   useEffect(() => {
@@ -194,6 +201,41 @@ export function CustomerStationsModal({
       setFloorPlanStations(stationList)
     } catch (error) {
       console.error('Fel vid hämtning av stationer för planritning:', error)
+    }
+  }
+
+  // Byt ut planritningsbild
+  const handleReplaceFloorPlanImage = async (planId: string, file: File) => {
+    setReplacingImage(true)
+    try {
+      await FloorPlanService.replaceFloorPlanImage(planId, file)
+      toast.success('Bilden har bytts ut!')
+      await loadAllData()
+    } catch (error) {
+      console.error('Fel vid byte av bild:', error)
+      toast.error(error instanceof Error ? error.message : 'Kunde inte byta bild')
+    } finally {
+      setReplacingImage(false)
+      if (replaceImageInputRef.current) replaceImageInputRef.current.value = ''
+      replacePlanIdRef.current = null
+    }
+  }
+
+  // Ta bort planritning
+  const handleDeleteFloorPlan = async (planId: string, planName: string, stationCount: number) => {
+    const msg = stationCount > 0
+      ? `Är du säker? Planritningen "${planName}" och ${stationCount} station${stationCount === 1 ? '' : 'er'} kommer att raderas permanent.`
+      : `Är du säker på att du vill ta bort planritningen "${planName}"?`
+    if (!confirm(msg)) return
+
+    try {
+      await FloorPlanService.deleteFloorPlan(planId)
+      toast.success('Planritning borttagen')
+      setMenuOpenForPlan(null)
+      await loadAllData()
+    } catch (error) {
+      console.error('Fel vid borttagning av planritning:', error)
+      toast.error('Kunde inte ta bort planritning')
     }
   }
 
@@ -690,16 +732,71 @@ export function CustomerStationsModal({
                                             <FileImage className="w-12 h-12 text-slate-600" />
                                           </div>
                                         )}
-                                        <div className="p-3 border-t border-slate-700/50">
-                                          <h4 className="font-medium text-white">{plan.name}</h4>
-                                          <p className="text-xs text-slate-400 mt-1">
-                                            {stationsOnPlan.length} {stationsOnPlan.length === 1 ? 'station' : 'stationer'}
-                                          </p>
+                                        <div className="p-3 border-t border-slate-700/50 flex items-start justify-between">
+                                          <div>
+                                            <h4 className="font-medium text-white">{plan.name}</h4>
+                                            <p className="text-xs text-slate-400 mt-1">
+                                              {stationsOnPlan.length} {stationsOnPlan.length === 1 ? 'station' : 'stationer'}
+                                            </p>
+                                          </div>
+                                          <div className="relative">
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                setMenuOpenForPlan(menuOpenForPlan === plan.id ? null : plan.id)
+                                              }}
+                                              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                                            >
+                                              <MoreVertical className="w-4 h-4" />
+                                            </button>
+                                            {menuOpenForPlan === plan.id && (
+                                              <>
+                                                <div className="fixed inset-0 z-30" onClick={() => setMenuOpenForPlan(null)} />
+                                                <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-600 rounded-xl shadow-xl z-40 overflow-hidden">
+                                                  <button
+                                                    onClick={() => {
+                                                      setMenuOpenForPlan(null)
+                                                      replacePlanIdRef.current = plan.id
+                                                      replaceImageInputRef.current?.click()
+                                                    }}
+                                                    disabled={replacingImage}
+                                                    className="w-full px-4 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2.5 disabled:opacity-50"
+                                                  >
+                                                    <ImagePlus className="w-4 h-4" />
+                                                    {replacingImage ? 'Byter bild...' : 'Byt bild'}
+                                                  </button>
+                                                  <button
+                                                    onClick={() => {
+                                                      setMenuOpenForPlan(null)
+                                                      handleDeleteFloorPlan(plan.id, plan.name, stationsOnPlan.length)
+                                                    }}
+                                                    className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors flex items-center gap-2.5"
+                                                  >
+                                                    <Trash2 className="w-4 h-4" />
+                                                    Ta bort planritning
+                                                  </button>
+                                                </div>
+                                              </>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     )
                                   })}
                                 </div>
+                                {/* Dold filinput för bildutbyte */}
+                                <input
+                                  ref={replaceImageInputRef}
+                                  type="file"
+                                  accept={ALLOWED_FLOOR_PLAN_TYPES.join(',')}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file && replacePlanIdRef.current) {
+                                      handleReplaceFloorPlanImage(replacePlanIdRef.current, file)
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
                               </div>
                             ) : (
                               <div className="text-center py-8">
