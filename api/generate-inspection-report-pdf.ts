@@ -63,8 +63,8 @@ const getStatusLabel = (status: string) => {
   return labels[status] || status || '-'
 }
 
-// Bygg Google Maps Static API URL med numrerade markörer
-function buildStaticMapUrl(inspections: any[]): string | null {
+// Hämta Google Maps Static API kartbild som base64 data-URI
+async function fetchStaticMapBase64(inspections: any[]): Promise<string | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) return null
 
@@ -87,17 +87,33 @@ function buildStaticMapUrl(inspections: any[]): string | null {
     return `markers=color:${color}|label:${label}|${lat},${lng}`
   }).join('&')
 
-  return `https://maps.googleapis.com/maps/api/staticmap?size=900x400&maptype=satellite&${markers}&key=${apiKey}`
+  const url = `https://maps.googleapis.com/maps/api/staticmap?size=900x400&maptype=satellite&${markers}&key=${apiKey}`
+
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const buffer = await response.arrayBuffer()
+    const base64 = Buffer.from(buffer).toString('base64')
+    return `data:image/png;base64,${base64}`
+  } catch {
+    return null
+  }
 }
 
-// Hämta floor plan signed URL
-async function getFloorPlanImageUrl(imagePath: string): Promise<string | null> {
+// Hämta planritningsbild som base64 data-URI
+async function fetchFloorPlanBase64(imagePath: string): Promise<string | null> {
   try {
     const { data, error } = await supabase.storage
       .from('floor-plans')
       .createSignedUrl(imagePath, 3600)
     if (error || !data?.signedUrl) return null
-    return data.signedUrl
+
+    const response = await fetch(data.signedUrl)
+    if (!response.ok) return null
+    const buffer = await response.arrayBuffer()
+    const contentType = response.headers.get('content-type') || 'image/png'
+    const base64 = Buffer.from(buffer).toString('base64')
+    return `data:${contentType};base64,${base64}`
   } catch {
     return null
   }
@@ -118,11 +134,11 @@ async function generateInspectionReportHTML(data: {
     new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
   )
 
-  // Bygg Google Maps Static kartbild
-  const mapUrl = buildStaticMapUrl(sortedOutdoor)
-  const mapImageHtml = mapUrl ? `
+  // Hämta Google Maps Static kartbild som base64
+  const mapBase64 = await fetchStaticMapBase64(sortedOutdoor)
+  const mapImageHtml = mapBase64 ? `
     <div style="margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
-      <img src="${mapUrl}" style="width: 100%; height: auto; display: block;" alt="Stationskarta" />
+      <img src="${mapBase64}" style="width: 100%; height: auto; display: block;" alt="Stationskarta" />
     </div>
   ` : ''
 
@@ -174,11 +190,11 @@ async function generateInspectionReportHTML(data: {
       new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
     )
 
-    // Hämta planritningsbild
+    // Hämta planritningsbild som base64
     let floorPlanHtml = ''
     if (group.imagePath) {
-      const imageUrl = await getFloorPlanImageUrl(group.imagePath)
-      if (imageUrl) {
+      const imageBase64 = await fetchFloorPlanBase64(group.imagePath)
+      if (imageBase64) {
         // Bygg markörer baserade på position_x_percent / position_y_percent
         const markersHtml = sortedInGroup.map((insp: any, idx: number) => {
           const station = insp.station
@@ -206,8 +222,8 @@ async function generateInspectionReportHTML(data: {
         }).join('')
 
         floorPlanHtml = `
-          <div style="position: relative; margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border}; max-height: 300px;">
-            <img src="${imageUrl}" style="width: 100%; height: auto; display: block; max-height: 300px; object-fit: contain;" alt="${group.name}" />
+          <div style="position: relative; margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
+            <img src="${imageBase64}" style="width: 100%; height: auto; display: block;" alt="${group.name}" />
             ${markersHtml}
           </div>
         `
