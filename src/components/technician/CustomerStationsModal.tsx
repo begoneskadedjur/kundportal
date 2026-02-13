@@ -134,6 +134,7 @@ export function CustomerStationsModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isAddingIndoor, setIsAddingIndoor] = useState(false)
   const [menuOpenForPlan, setMenuOpenForPlan] = useState<string | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
   const [replacingImage, setReplacingImage] = useState(false)
   const replaceImageInputRef = useRef<HTMLInputElement>(null)
   const replacePlanIdRef = useRef<string | null>(null)
@@ -743,7 +744,14 @@ export function CustomerStationsModal({
                                             <button
                                               onClick={(e) => {
                                                 e.stopPropagation()
-                                                setMenuOpenForPlan(menuOpenForPlan === plan.id ? null : plan.id)
+                                                if (menuOpenForPlan === plan.id) {
+                                                  setMenuOpenForPlan(null)
+                                                  setMenuPosition(null)
+                                                } else {
+                                                  const rect = e.currentTarget.getBoundingClientRect()
+                                                  setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+                                                  setMenuOpenForPlan(plan.id)
+                                                }
                                               }}
                                               className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
                                             >
@@ -751,8 +759,11 @@ export function CustomerStationsModal({
                                             </button>
                                             {menuOpenForPlan === plan.id && (
                                               <>
-                                                <div className="fixed inset-0 z-30" onClick={() => setMenuOpenForPlan(null)} />
-                                                <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-600 rounded-xl shadow-xl z-40 overflow-hidden">
+                                                <div className="fixed inset-0 z-[9998]" onClick={() => { setMenuOpenForPlan(null); setMenuPosition(null) }} />
+                                                <div
+                                                  className="fixed w-48 bg-slate-800 border border-slate-600 rounded-xl shadow-xl z-[9999] overflow-hidden"
+                                                  style={{ top: menuPosition?.top, right: menuPosition?.right }}
+                                                >
                                                   <button
                                                     onClick={() => {
                                                       setMenuOpenForPlan(null)
