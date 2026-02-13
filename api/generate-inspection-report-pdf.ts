@@ -94,7 +94,8 @@ async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): P
       var bounds = new google.maps.LatLngBounds();
       var map = new google.maps.Map(document.getElementById('map'), {
         mapTypeId: 'satellite',
-        disableDefaultUI: true
+        disableDefaultUI: true,
+        isFractionalZoomEnabled: true
       });
       markers.forEach(function(m) {
         var pos = { lat: m.lat, lng: m.lng };
@@ -113,7 +114,7 @@ async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): P
           }
         });
       });
-      map.fitBounds(bounds, 30);
+      map.fitBounds(bounds, 15);
       google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
         setTimeout(function() { window.__MAP_READY = true; }, 500);
       });
