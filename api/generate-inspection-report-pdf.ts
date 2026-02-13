@@ -102,20 +102,26 @@ async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): P
         new google.maps.Marker({
           position: pos,
           map: map,
-          label: { text: m.label, color: 'white', fontWeight: 'bold', fontSize: '11px' },
+          label: { text: m.label, color: 'white', fontWeight: 'bold', fontSize: '9px' },
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
             fillColor: m.color,
             fillOpacity: 1,
             strokeColor: 'white',
-            strokeWeight: 2,
-            scale: 14
+            strokeWeight: 1.5,
+            scale: 10
           }
         });
       });
-      map.fitBounds(bounds, 50);
-      google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
-        setTimeout(function() { window.__MAP_READY = true; }, 500);
+      map.fitBounds(bounds, 30);
+      google.maps.event.addListenerOnce(map, 'idle', function() {
+        var currentZoom = map.getZoom();
+        if (currentZoom < 20) {
+          map.setZoom(currentZoom + 1);
+        }
+        google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
+          setTimeout(function() { window.__MAP_READY = true; }, 500);
+        });
       });
     }
   </script>
@@ -125,7 +131,7 @@ async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): P
   let page: any = null
   try {
     page = await browser.newPage()
-    await page.setViewport({ width: 900, height: 450 })
+    await page.setViewport({ width: 900, height: 450, deviceScaleFactor: 2 })
     await page.setContent(mapHtml, { waitUntil: 'networkidle0', timeout: 20000 })
     await page.waitForFunction('window.__MAP_READY === true', { timeout: 15000 })
     const screenshot = await page.screenshot({ type: 'png' })
