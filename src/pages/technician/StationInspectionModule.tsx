@@ -321,9 +321,10 @@ export default function StationInspectionModule() {
         setActivityStationIds(activityIds)
 
         // ======================================================
-        // ÅTERUPPTAGANDE: Ladda befintliga inspektioner om sessionen är pågående
+        // Ladda befintliga inspektioner för pågående och avslutade sessioner
+        // (behövs för korrekta flikräknare + formulärdata vid redigering)
         // ======================================================
-        if (sessionData.status === 'in_progress') {
+        if (sessionData.status === 'in_progress' || sessionData.status === 'completed') {
           const [existingOutdoor, existingIndoor] = await Promise.all([
             getOutdoorInspectionsForSession(sessionData.id),
             getIndoorInspectionsForSession(sessionData.id)
