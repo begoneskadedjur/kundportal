@@ -220,6 +220,9 @@ export default function StationInspectionModule() {
   // Bekräftelsedialog för att avsluta inspektion
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
 
+  // Auto-dismiss för återupptagande-banner
+  const [showResumeNotice, setShowResumeNotice] = useState(true)
+
   // Bekräftelsedialog för att låsa upp avslutad inspektion
   const [showReopenConfirm, setShowReopenConfirm] = useState(false)
 
@@ -237,6 +240,14 @@ export default function StationInspectionModule() {
 
   // Expanderad planritning för förhandsvisning på ankomstsidan
   const [expandedFloorPlan, setExpandedFloorPlan] = useState<any | null>(null)
+
+  // Auto-dismiss återupptagande-banner efter 10 sekunder
+  useEffect(() => {
+    if (showResumeNotice) {
+      const timer = setTimeout(() => setShowResumeNotice(false), 10000)
+      return () => clearTimeout(timer)
+    }
+  }, [showResumeNotice])
 
   // Ladda data
   useEffect(() => {
@@ -654,7 +665,7 @@ export default function StationInspectionModule() {
     setWizardMode('outdoor')
 
     // Stationen pulserar nu - teknikern klickar själv på den
-    toast.success(`Guide startad! Klicka på den pulserande stationen.`)
+    toast.success('Kontrollrunda startad! Klicka på den pulserande stationen.')
   }, [session?.status, outdoorStations, inspectedStationIds, outdoorNumberMap])
 
   // Starta indoor wizard för vald planritning
@@ -689,7 +700,7 @@ export default function StationInspectionModule() {
     setWizardMode('indoor')
 
     // Stationen pulserar nu - teknikern klickar själv på den
-    toast.success(`Guide startad! Klicka på den pulserande stationen.`)
+    toast.success('Kontrollrunda startad! Klicka på den pulserande stationen.')
   }, [session?.status, selectedFloorPlanId, filteredIndoorStations, inspectedStationIds, indoorNumberMap])
 
   // Gå till nästa station i wizard
@@ -761,7 +772,7 @@ export default function StationInspectionModule() {
     setCurrentWizardStationId(null)
     setWizardStationQueue([])
     setSelectedStation(null)
-    toast('Guide avslutad')
+    toast('Kontrollrunda avslutad')
   }, [])
 
   // Auto-progress till nästa efter lyckad inspektion (om wizard är aktiv)
@@ -1201,7 +1212,7 @@ export default function StationInspectionModule() {
             {session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
               <Button onClick={() => setShowCompleteConfirm(true)} loading={isSubmitting}>
                 <CheckCircle2 className="w-4 h-4 mr-2" />
-                Markera som färdig
+                Klarmarkera kontroll
               </Button>
             )}
 
@@ -1246,11 +1257,12 @@ export default function StationInspectionModule() {
                 />
               </div>
 
-              {/* Återupptagande-info - visas om det redan finns inspekterade stationer vid sidladdning */}
-              {inspectedStationIds.size > 0 && session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
+              {/* Återupptagande-info - visas om det redan finns inspekterade stationer vid sidladdning, försvinner efter 10s */}
+              {showResumeNotice && inspectedStationIds.size > 0 && session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
                   className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 flex items-center gap-2"
                 >
                   <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
@@ -1433,7 +1445,7 @@ export default function StationInspectionModule() {
               onClick={() => setActiveTab('outdoor')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'outdoor'
-                  ? 'bg-green-500 text-white'
+                  ? 'bg-[#20c58f] text-white'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
@@ -1444,7 +1456,7 @@ export default function StationInspectionModule() {
               onClick={() => setActiveTab('indoor')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'indoor'
-                  ? 'bg-green-500 text-white'
+                  ? 'bg-[#20c58f] text-white'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
@@ -1469,68 +1481,68 @@ export default function StationInspectionModule() {
             >
               {/* Guidat läge - visar vilken station som är näst */}
               {wizardMode === 'outdoor' && (
-                <div className="flex items-center justify-between bg-slate-800/80 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-sm text-slate-300">
-                      <Navigation className="w-4 h-4 text-cyan-400" />
+                    <div className="flex items-center gap-2 text-sm text-white font-medium">
+                      <Navigation className="w-4 h-4 text-[#20c58f]" />
                       <span>Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}</span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={wizardPrevStation}
                         disabled={wizardStationQueue.indexOf(currentWizardStationId || '') === 0}
-                        className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded transition-colors"
-                        title="Föregående"
+                        className="p-2.5 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded-lg bg-slate-800/50 transition-colors"
+                        aria-label="Föregående station"
                       >
-                        <ChevronLeft className="w-4 h-4" />
+                        <ChevronLeft className="w-5 h-5" />
                       </button>
                       <button
                         onClick={wizardSkipStation}
-                        className="p-1.5 text-slate-400 hover:text-white rounded transition-colors"
-                        title="Hoppa över"
+                        className="p-2.5 text-slate-300 hover:text-white rounded-lg bg-slate-800/50 transition-colors"
+                        aria-label="Hoppa över station"
                       >
-                        <SkipForward className="w-4 h-4" />
+                        <SkipForward className="w-5 h-5" />
                       </button>
                       <button
                         onClick={wizardNextStation}
-                        className="p-1.5 text-slate-400 hover:text-white rounded transition-colors"
-                        title="Nästa"
+                        className="p-2.5 text-slate-300 hover:text-white rounded-lg bg-slate-800/50 transition-colors"
+                        aria-label="Nästa station"
                       >
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
                   <button
                     onClick={stopWizard}
-                    className="text-xs text-slate-500 hover:text-slate-300"
+                    className="text-sm text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800/50 transition-colors"
                   >
-                    Avsluta
+                    Avsluta kontrollrunda
                   </button>
                 </div>
               )}
 
-              {/* Knapp för att starta guidat läge */}
+              {/* Knapp för att starta kontrollrunda utomhus */}
               {wizardMode !== 'outdoor' && outdoorStations.length > 0 && (
                 <div className="flex justify-end">
                   <button
                     onClick={startOutdoorWizard}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-white rounded-lg text-sm font-medium transition-colors"
                   >
                     <Navigation className="w-4 h-4" />
-                    Starta guide
+                    Starta kontrollrunda
                   </button>
                 </div>
               )}
 
               {outdoorStations.length === 0 ? (
-                <div className="glass rounded-xl p-8 text-center">
+                <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-8 text-center">
                   <MapPin className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                   <p className="text-slate-400">Inga utomhusstationer</p>
                 </div>
               ) : (
                 <>
                   {/* Karta */}
-                  <div className="glass rounded-xl overflow-hidden">
+                  <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
                     <EquipmentMap
                       equipment={outdoorEquipment}
                       height="min(55vh, 450px)"
@@ -1557,7 +1569,7 @@ export default function StationInspectionModule() {
                         <motion.button
                           key={station.id}
                           onClick={() => handleSelectStation(station)}
-                          className={`w-full glass rounded-xl p-4 text-left transition-all hover:bg-slate-800/50 cursor-pointer ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
+                          className={`w-full bg-slate-800/30 border border-slate-700 rounded-xl p-4 text-left transition-all hover:bg-slate-800/50 cursor-pointer ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
                         >
@@ -1602,10 +1614,11 @@ export default function StationInspectionModule() {
                               {!isInspected && session?.status !== 'completed' && (
                                 <button
                                   onClick={(e) => handleQuickOk(station, e)}
-                                  className="p-2 bg-green-500/20 hover:bg-green-500/40 text-green-400 rounded-lg transition-colors"
-                                  title="Markera som OK"
+                                  className="flex items-center gap-1.5 px-3 py-2.5 bg-green-500/20 hover:bg-green-500/40 text-green-400 rounded-lg transition-colors"
+                                  aria-label="Markera station som OK"
                                 >
                                   <Check className="w-5 h-5" />
+                                  <span className="text-xs font-bold">OK</span>
                                 </button>
                               )}
                               <ChevronRight className="w-5 h-5 text-slate-500" />
@@ -1626,44 +1639,44 @@ export default function StationInspectionModule() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
-              {/* Guidat läge för inomhus */}
+              {/* Kontrollrunda-bar för inomhus */}
               {wizardMode === 'indoor' && (
-                <div className="flex items-center justify-between bg-slate-800/80 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-sm text-slate-300">
-                      <Navigation className="w-4 h-4 text-cyan-400" />
+                    <div className="flex items-center gap-2 text-sm text-white font-medium">
+                      <Navigation className="w-4 h-4 text-[#20c58f]" />
                       <span>Station {wizardStationQueue.indexOf(currentWizardStationId || '') + 1} av {wizardStationQueue.length}</span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={wizardPrevStation}
                         disabled={wizardStationQueue.indexOf(currentWizardStationId || '') === 0}
-                        className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded transition-colors"
-                        title="Föregående"
+                        className="p-2.5 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded-lg bg-slate-800/50 transition-colors"
+                        aria-label="Föregående station"
                       >
-                        <ChevronLeft className="w-4 h-4" />
+                        <ChevronLeft className="w-5 h-5" />
                       </button>
                       <button
                         onClick={wizardSkipStation}
-                        className="p-1.5 text-slate-400 hover:text-white rounded transition-colors"
-                        title="Hoppa över"
+                        className="p-2.5 text-slate-300 hover:text-white rounded-lg bg-slate-800/50 transition-colors"
+                        aria-label="Hoppa över station"
                       >
-                        <SkipForward className="w-4 h-4" />
+                        <SkipForward className="w-5 h-5" />
                       </button>
                       <button
                         onClick={wizardNextStation}
-                        className="p-1.5 text-slate-400 hover:text-white rounded transition-colors"
-                        title="Nästa"
+                        className="p-2.5 text-slate-300 hover:text-white rounded-lg bg-slate-800/50 transition-colors"
+                        aria-label="Nästa station"
                       >
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
                   <button
                     onClick={stopWizard}
-                    className="text-xs text-slate-500 hover:text-slate-300"
+                    className="text-sm text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800/50 transition-colors"
                   >
-                    Avsluta
+                    Avsluta kontrollrunda
                   </button>
                 </div>
               )}
@@ -1673,14 +1686,14 @@ export default function StationInspectionModule() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-400">Planritningar</span>
-                    {/* Knapp för att starta guidat läge för inomhus */}
+                    {/* Knapp för att starta kontrollrunda inomhus */}
                     {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && (
                       <button
                         onClick={startIndoorWizard}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-white rounded-lg text-sm font-medium transition-colors"
                       >
                         <Navigation className="w-4 h-4" />
-                        Starta guide
+                        Starta kontrollrunda
                       </button>
                     )}
                   </div>
@@ -1697,41 +1710,42 @@ export default function StationInspectionModule() {
                         <button
                           key={fp.id}
                           onClick={() => setSelectedFloorPlanId(fp.id)}
-                          className={`flex-shrink-0 w-44 rounded-xl overflow-hidden transition-all ${
+                          className={`flex-shrink-0 w-56 rounded-xl overflow-hidden transition-all border-2 ${
                             isSelected
-                              ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-slate-900'
+                              ? 'border-[#20c58f] bg-[#20c58f]/10'
                               : allDone
-                                ? 'ring-1 ring-green-500/50'
-                                : 'hover:ring-1 hover:ring-slate-600'
+                                ? 'border-green-500/30 bg-slate-800'
+                                : 'border-slate-700 bg-slate-800 hover:border-slate-500'
                           }`}
                         >
-                          {/* Liggande aspect ratio för thumbnail */}
-                          <div className={`aspect-[16/10] relative ${
-                            isSelected ? 'bg-green-500/20' : 'bg-slate-800'
-                          }`}>
-                            <Building2 className="w-10 h-10 text-slate-600 absolute inset-0 m-auto" />
-                            {/* Progress overlay */}
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/90 to-transparent p-2">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className={isSelected ? 'text-green-400' : 'text-slate-300'}>
-                                  {inspectedOnPlan}/{totalOnPlan}
+                          <div className="p-3 flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              isSelected ? 'bg-[#20c58f]/20' : 'bg-slate-700'
+                            }`}>
+                              <Building2 className={`w-5 h-5 ${isSelected ? 'text-[#20c58f]' : 'text-slate-400'}`} />
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <p className={`text-sm font-medium truncate ${
+                                isSelected ? 'text-[#20c58f]' : 'text-slate-200'
+                              }`}>
+                                {fp.building_name || fp.name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className={`text-xs font-medium ${
+                                  allDone ? 'text-green-400' : 'text-slate-400'
+                                }`}>
+                                  {inspectedOnPlan}/{totalOnPlan} stationer
                                 </span>
                                 {allDone && <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />}
                               </div>
                             </div>
                           </div>
-                          {/* Label under thumbnail */}
-                          <div className={`p-2 text-left ${
-                            isSelected ? 'bg-green-500/20' : 'bg-slate-800'
-                          }`}>
-                            <p className={`text-xs font-medium truncate ${
-                              isSelected ? 'text-green-400' : 'text-slate-300'
-                            }`}>
-                              {fp.building_name ? `${fp.building_name}` : fp.name}
-                            </p>
-                            {fp.building_name && fp.name && (
-                              <p className="text-xs text-slate-500 truncate">{fp.name}</p>
-                            )}
+                          {/* Mini progressbar */}
+                          <div className="h-1 bg-slate-700">
+                            <div
+                              className="h-full bg-[#20c58f] transition-all duration-300"
+                              style={{ width: `${totalOnPlan > 0 ? (inspectedOnPlan / totalOnPlan) * 100 : 0}%` }}
+                            />
                           </div>
                         </button>
                       )
@@ -1741,17 +1755,17 @@ export default function StationInspectionModule() {
               )}
 
               {indoorStations.length === 0 ? (
-                <div className="glass rounded-xl p-8 text-center">
+                <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-8 text-center">
                   <Building2 className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                   <p className="text-slate-400">Inga inomhusstationer</p>
                 </div>
               ) : !selectedFloorPlanId || !floorPlanImageUrl ? (
-                <div className="glass rounded-xl p-8 text-center">
+                <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-8 text-center">
                   <p className="text-slate-400">Välj en planritning ovan</p>
                 </div>
               ) : (
                 // Floor plan viewer - ökad höjd för bättre mobil UX
-                <div className="glass rounded-xl overflow-hidden">
+                <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
                   <FloorPlanViewer
                     imageUrl={floorPlanImageUrl}
                     stations={indoorStationsForViewer}
@@ -1782,7 +1796,7 @@ export default function StationInspectionModule() {
                       <motion.button
                         key={station.id}
                         onClick={() => handleSelectStation(station)}
-                        className={`w-full glass rounded-xl p-4 text-left transition-all hover:bg-slate-800/50 cursor-pointer ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
+                        className={`w-full bg-slate-800/30 border border-slate-700 rounded-xl p-4 text-left transition-all hover:bg-slate-800/50 cursor-pointer ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.99 }}
                       >
@@ -1932,7 +1946,7 @@ export default function StationInspectionModule() {
                 <div className="p-2 bg-amber-500/20 rounded-full">
                   <AlertTriangle className="w-6 h-6 text-amber-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-white">Markera som färdig?</h3>
+                <h3 className="text-lg font-semibold text-white">Klarmarkera kontroll?</h3>
               </div>
 
               <p className="text-slate-300 mb-2">
@@ -1970,7 +1984,7 @@ export default function StationInspectionModule() {
                   }}
                   className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
                 >
-                  Ja, markera färdig
+                  Ja, klarmarkera
                 </button>
               </div>
             </motion.div>
@@ -2040,7 +2054,7 @@ export default function StationInspectionModule() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 100, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg glass rounded-2xl max-h-[90vh] flex flex-col overflow-hidden"
+              className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
             >
               {/* Sticky Header med actions */}
               <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-700 p-4 flex items-center justify-between">
