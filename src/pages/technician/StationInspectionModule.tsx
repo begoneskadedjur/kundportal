@@ -259,7 +259,7 @@ export default function StationInspectionModule() {
       }
 
       try {
-        const sessionData = await getInspectionSessionByCaseId(caseId)
+        let sessionData = await getInspectionSessionByCaseId(caseId)
 
         if (!sessionData) {
           setError('Ingen inspektionssession hittades för detta ärende')
@@ -280,6 +280,25 @@ export default function StationInspectionModule() {
         setIndoorStations(indoor)
         setFloorPlans(plans)
         setPreparations(preps)
+
+        // Synka total-counts om stationer lagts till/tagits bort sedan sessionen skapades
+        const actualOutdoor = outdoor.length
+        const actualIndoor = indoor.length
+        if (
+          sessionData.total_outdoor_stations !== actualOutdoor ||
+          sessionData.total_indoor_stations !== actualIndoor
+        ) {
+          await updateInspectionSession(sessionData.id, {
+            total_outdoor_stations: actualOutdoor,
+            total_indoor_stations: actualIndoor
+          })
+          sessionData = {
+            ...sessionData,
+            total_outdoor_stations: actualOutdoor,
+            total_indoor_stations: actualIndoor
+          }
+          setSession(sessionData)
+        }
 
         // Välj första fliken med stationer
         if (outdoor.length === 0 && indoor.length > 0) {
@@ -1212,7 +1231,7 @@ export default function StationInspectionModule() {
             {session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
               <Button onClick={() => setShowCompleteConfirm(true)} loading={isSubmitting}>
                 <CheckCircle2 className="w-4 h-4 mr-2" />
-                Klarmarkera kontroll
+                Klarmarkera ärende
               </Button>
             )}
 
@@ -1946,12 +1965,18 @@ export default function StationInspectionModule() {
                 <div className="p-2 bg-amber-500/20 rounded-full">
                   <AlertTriangle className="w-6 h-6 text-amber-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-white">Klarmarkera kontroll?</h3>
+                <h3 className="text-lg font-semibold text-white">Klarmarkera ärende?</h3>
               </div>
 
-              <p className="text-slate-300 mb-2">
-                Har du inspekterat alla stationer?
-              </p>
+              {progress && progress.inspectedStations < progress.totalStations ? (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg mb-4 text-sm text-amber-400">
+                  Du har inte inspekterat alla stationer ännu.
+                </div>
+              ) : (
+                <p className="text-slate-300 mb-2">
+                  Alla stationer är inspekterade.
+                </p>
+              )}
 
               {progress && (
                 <div className="bg-slate-900/50 rounded-lg p-3 mb-4 text-sm">
@@ -1982,7 +2007,8 @@ export default function StationInspectionModule() {
                     setShowCompleteConfirm(false)
                     handleCompleteInspection()
                   }}
-                  className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
+                  disabled={!progress || progress.inspectedStations < progress.totalStations}
+                  className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Ja, klarmarkera
                 </button>
