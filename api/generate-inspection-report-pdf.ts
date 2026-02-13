@@ -95,7 +95,7 @@ async function fetchStaticMapBase64(inspections: any[]): Promise<string | null> 
     return `markers=color:${color}|label:${label}|${lat},${lng}`
   }).join('&')
 
-  const url = `https://maps.googleapis.com/maps/api/staticmap?size=900x400&maptype=satellite&${markers}&key=${apiKey}`
+  const url = `https://maps.googleapis.com/maps/api/staticmap?size=900x400&maptype=roadmap&${markers}&key=${apiKey}`
   console.log(`[StaticMap] Fetching URL (${url.length} chars), first marker: ${sorted[0]?.station?.latitude},${sorted[0]?.station?.longitude}`)
 
   try {
