@@ -22,30 +22,31 @@ const PestProfitability: React.FC = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     const fetchPestData = async () => {
       try {
         setLoading(true)
         const { start, end } = dateRange
 
-        // Hämta privata ärenden
-        const { data: privateData } = await supabase
-          .from('private_cases')
-          .select('skadedjur, pris')
-          .eq('status', 'Avslutat')
-          .gte('completed_date', start)
-          .lte('completed_date', end)
-          .not('completed_date', 'is', null)
+        const [{ data: privateData }, { data: businessData }] = await Promise.all([
+          supabase
+            .from('private_cases')
+            .select('skadedjur, pris')
+            .eq('status', 'Avslutat')
+            .gte('completed_date', start)
+            .lte('completed_date', end)
+            .not('completed_date', 'is', null),
+          supabase
+            .from('business_cases')
+            .select('skadedjur, pris')
+            .eq('status', 'Avslutat')
+            .gte('completed_date', start)
+            .lte('completed_date', end)
+            .not('completed_date', 'is', null)
+        ])
 
-        // Hämta företagsärenden
-        const { data: businessData } = await supabase
-          .from('business_cases')
-          .select('skadedjur, pris')
-          .eq('status', 'Avslutat')
-          .gte('completed_date', start)
-          .lte('completed_date', end)
-          .not('completed_date', 'is', null)
+        if (cancelled) return
 
-        // Kombinera och gruppera per skadedjur
         const stats: Record<string, PestData> = {}
         const allCases = [...(privateData || []), ...(businessData || [])]
 
@@ -65,12 +66,13 @@ const PestProfitability: React.FC = () => {
 
         setPests(sorted)
       } catch (err) {
-        console.error('Error fetching pest data:', err)
+        if (!cancelled) console.error('Error fetching pest data:', err)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     fetchPestData()
+    return () => { cancelled = true }
   }, [dateRange.start, dateRange.end])
 
   const maxRevenue = pests.length > 0 ? pests[0].total_revenue : 0

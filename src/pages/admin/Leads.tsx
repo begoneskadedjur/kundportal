@@ -105,57 +105,49 @@ const Leads: React.FC = () => {
   useEffect(() => {
     fetchLeads()
     fetchTechnicians()
-    
+
+    // Track timeout IDs so we can clear them on unmount
+    const timeoutIds: ReturnType<typeof setTimeout>[] = []
+
     // Set up optimized real-time subscription for leads
     const subscription = supabase
       .channel('leads_realtime')
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
           table: 'leads'
         },
-        (payload) => {
-          // For new leads, refresh the entire list
-          setTimeout(() => {
-            fetchLeads()
-          }, 500)
+        () => {
+          timeoutIds.push(setTimeout(() => fetchLeads(), 500))
         }
       )
-      .on('postgres_changes', 
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
           table: 'leads'
         },
         (payload) => {
-          // For updates, try optimistic update first, then sync
           if (payload.new && payload.old) {
             const updatedLead = payload.new as Lead
             optimisticUpdateLead(updatedLead.id, updatedLead)
-            
-            // Also sync full data after a short delay for consistency
-            setTimeout(() => {
-              fetchLeads()
-            }, 2000)
+            timeoutIds.push(setTimeout(() => fetchLeads(), 2000))
           }
         }
       )
-      .on('postgres_changes', 
-        { 
-          event: 'DELETE', 
-          schema: 'public', 
+      .on('postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
           table: 'leads'
         },
         (payload) => {
-          // For deletes, remove immediately and refresh
           if (payload.old) {
             const deletedLead = payload.old as Lead
             setLeads(prev => prev.filter(lead => lead.id !== deletedLead.id))
           }
-          setTimeout(() => {
-            fetchLeads()
-          }, 500)
+          timeoutIds.push(setTimeout(() => fetchLeads(), 500))
         }
       )
       .on('postgres_changes',
@@ -164,16 +156,14 @@ const Leads: React.FC = () => {
           schema: 'public',
           table: 'lead_technicians'
         },
-        (payload) => {
-          // Refresh leads when technician assignments change
-          setTimeout(() => {
-            fetchLeads()
-          }, 500)
+        () => {
+          timeoutIds.push(setTimeout(() => fetchLeads(), 500))
         }
       )
       .subscribe()
 
     return () => {
+      timeoutIds.forEach(id => clearTimeout(id))
       subscription.unsubscribe()
     }
   }, [])

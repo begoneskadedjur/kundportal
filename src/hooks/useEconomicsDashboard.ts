@@ -38,8 +38,6 @@ export const useEconomicsDashboard = () => {
     setLoading(true)
     setError(null)
     try {
-      // Här kan vi trigga en re-fetch av alla data
-      // För nu returnerar vi bara success
       await new Promise(resolve => setTimeout(resolve, 1000))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fel vid uppdatering')
@@ -51,308 +49,286 @@ export const useEconomicsDashboard = () => {
   return { loading, error, refetch }
 }
 
-// KPI Data hook - FIXAD
+// KPI Data hook
 export const useKpiData = () => {
   const [data, setData] = useState<KpiData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const result = await getKpiData()
-        setData(result || null) // 🆕 Fallback till null
+        if (!cancelled) setData(result || null)
       } catch (err) {
-        console.error('❌ useKpiData error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av KPI data')
-        setData(null) // 🆕 Explicit null vid fel
+        if (!cancelled) {
+          console.error('useKpiData error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av KPI data')
+          setData(null)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
 }
 
-// Monthly Revenue hook - FIXAD med array safety
+// Monthly Revenue hook
 export const useMonthlyRevenue = () => {
-  const [data, setData] = useState<MonthlyRevenue[]>([]) // 🆕 Tom array som default
+  const [data, setData] = useState<MonthlyRevenue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const result = await getMonthlyRevenue()
-        
-        // 🆕 KRITISK FIX: Säkerställ att result är en array
-        if (Array.isArray(result)) {
-          setData(result)
-        } else {
-          console.warn('⚠️ getMonthlyRevenue returned non-array:', result)
+        if (!cancelled) setData(Array.isArray(result) ? result : [])
+      } catch (err) {
+        if (!cancelled) {
+          console.error('useMonthlyRevenue error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av månadsintäkter')
           setData([])
         }
-      } catch (err) {
-        console.error('❌ useMonthlyRevenue error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av månadsintäkter')
-        setData([]) // 🆕 Tom array vid fel
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
 }
 
-// 🆕 BeGone Monthly Stats hook - FIXAD med array safety
+// BeGone Monthly Stats hook
 export const useBeGoneMonthlyStats = () => {
-  const [data, setData] = useState<BeGoneMonthlyStats[]>([]) // 🆕 Tom array som default
+  const [data, setData] = useState<BeGoneMonthlyStats[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const result = await getBeGoneMonthlyStats()
-        
-        // 🆕 KRITISK FIX: Säkerställ att result är en array
-        if (Array.isArray(result)) {
-          setData(result)
-        } else {
-          console.warn('⚠️ getBeGoneMonthlyStats returned non-array:', result)
+        if (!cancelled) setData(Array.isArray(result) ? result : [])
+      } catch (err) {
+        if (!cancelled) {
+          console.error('useBeGoneMonthlyStats error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av BeGone statistik')
           setData([])
         }
-      } catch (err) {
-        console.error('❌ useBeGoneMonthlyStats error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av BeGone statistik')
-        setData([]) // 🆕 Tom array vid fel
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
 }
 
-// Expiring Contracts hook - FIXAD med array safety
+// Expiring Contracts hook
 export const useExpiringContracts = () => {
-  const [data, setData] = useState<ExpiringContract[]>([]) // 🆕 Tom array som default
+  const [data, setData] = useState<ExpiringContract[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const result = await getExpiringContracts()
-        
-        // 🆕 KRITISK FIX: Säkerställ att result är en array
-        if (Array.isArray(result)) {
-          setData(result)
-        } else {
-          console.warn('⚠️ getExpiringContracts returned non-array:', result)
+        if (!cancelled) setData(Array.isArray(result) ? result : [])
+      } catch (err) {
+        if (!cancelled) {
+          console.error('useExpiringContracts error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av utgående avtal')
           setData([])
         }
-      } catch (err) {
-        console.error('❌ useExpiringContracts error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av utgående avtal')
-        setData([]) // 🆕 Tom array vid fel
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
 }
 
-// Technician Revenue hook - FIXAD med array safety
+// Technician Revenue hook
 export const useTechnicianRevenue = () => {
-  const [data, setData] = useState<TechnicianRevenue[]>([]) // 🆕 Tom array som default
+  const [data, setData] = useState<TechnicianRevenue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const result = await getTechnicianRevenue()
-        
-        // 🆕 KRITISK FIX: Säkerställ att result är en array
-        if (Array.isArray(result)) {
-          setData(result)
-        } else {
-          console.warn('⚠️ getTechnicianRevenue returned non-array:', result)
+        if (!cancelled) setData(Array.isArray(result) ? result : [])
+      } catch (err) {
+        if (!cancelled) {
+          console.error('useTechnicianRevenue error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av teknikerintäkter')
           setData([])
         }
-      } catch (err) {
-        console.error('❌ useTechnicianRevenue error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av teknikerintäkter')
-        setData([]) // 🆕 Tom array vid fel
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
 }
 
-// Account Manager Revenue hook - FIXAD med array safety
+// Account Manager Revenue hook
 export const useAccountManagerRevenue = () => {
-  const [data, setData] = useState<AccountManagerRevenue[]>([]) // 🆕 Tom array som default
+  const [data, setData] = useState<AccountManagerRevenue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const result = await getAccountManagerRevenue()
-        
-        // 🆕 KRITISK FIX: Säkerställ att result är en array
-        if (Array.isArray(result)) {
-          setData(result)
-        } else {
-          console.warn('⚠️ getAccountManagerRevenue returned non-array:', result)
+        if (!cancelled) setData(Array.isArray(result) ? result : [])
+      } catch (err) {
+        if (!cancelled) {
+          console.error('useAccountManagerRevenue error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av account manager intäkter')
           setData([])
         }
-      } catch (err) {
-        console.error('❌ useAccountManagerRevenue error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av account manager intäkter')
-        setData([]) // 🆕 Tom array vid fel
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
 }
 
-// Marketing Spend hook - FIXAD med array safety
+// Marketing Spend hook
 export const useMarketingSpend = () => {
-  const [data, setData] = useState<MarketingSpend[]>([]) // 🆕 Tom array som default
+  const [data, setData] = useState<MarketingSpend[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const result = await getMarketingSpend()
-        
-        // 🆕 KRITISK FIX: Säkerställ att result är en array
-        if (Array.isArray(result)) {
-          setData(result)
-        } else {
-          console.warn('⚠️ getMarketingSpend returned non-array:', result)
+        if (!cancelled) setData(Array.isArray(result) ? result : [])
+      } catch (err) {
+        if (!cancelled) {
+          console.error('useMarketingSpend error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av marknadsföringsdata')
           setData([])
         }
-      } catch (err) {
-        console.error('❌ useMarketingSpend error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av marknadsföringsdata')
-        setData([]) // 🆕 Tom array vid fel
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
 }
 
-// Case Economy hook - FIXAD
+// Case Economy hook
 export const useCaseEconomy = () => {
   const [data, setData] = useState<CaseEconomy | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const result = await getCaseEconomy()
-        setData(result || null) // 🆕 Fallback till null
+        if (!cancelled) setData(result || null)
       } catch (err) {
-        console.error('❌ useCaseEconomy error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av ärendeekonomi')
-        setData(null) // 🆕 Explicit null vid fel
+        if (!cancelled) {
+          console.error('useCaseEconomy error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av ärendeekonomi')
+          setData(null)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
 }
 
-// Customer Contracts hook - FIXAD med array safety
+// Customer Contracts hook
 export const useCustomerContracts = () => {
-  const [data, setData] = useState<CustomerContract[]>([]) // 🆕 Tom array som default
+  const [data, setData] = useState<CustomerContract[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const result = await getCustomerContracts()
-        
-        // 🆕 KRITISK FIX: Säkerställ att result är en array
-        if (Array.isArray(result)) {
-          setData(result)
-        } else {
-          console.warn('⚠️ getCustomerContracts returned non-array:', result)
+        if (!cancelled) setData(Array.isArray(result) ? result : [])
+      } catch (err) {
+        if (!cancelled) {
+          console.error('useCustomerContracts error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av kundavtal')
           setData([])
         }
-      } catch (err) {
-        console.error('❌ useCustomerContracts error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av kundavtal')
-        setData([]) // 🆕 Tom array vid fel
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
 }
 
-// 🆕 Combined BeGone Analytics hook - MASSIVT FIXAD
+// Combined BeGone Analytics hook
 export const useBeGoneAnalytics = () => {
   const [combinedData, setCombinedData] = useState<{
     monthlyStats: BeGoneMonthlyStats[]
@@ -366,58 +342,59 @@ export const useBeGoneAnalytics = () => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const monthlyStats = await getBeGoneMonthlyStats()
-        
-        // 🆕 KRITISK FIX: Kontrollera att monthlyStats är en array
+
         if (!Array.isArray(monthlyStats)) {
-          console.warn('⚠️ useBeGoneAnalytics: monthlyStats is not an array:', monthlyStats)
-          setCombinedData(null)
+          if (!cancelled) setCombinedData(null)
           return
         }
-        
+
         const currentMonth = new Date().toISOString().slice(0, 7)
         const currentYear = new Date().getFullYear().toString()
-        
+
         const currentMonthData = monthlyStats.find(m => m?.month === currentMonth)
         const yearData = monthlyStats.filter(m => m?.month?.startsWith(currentYear))
-        
-        // 🆕 Säker summering med null-hantering
+
         const yearToDateTotal = yearData.reduce((sum, m) => sum + (m?.total_begone_revenue || 0), 0)
         const totalCases = yearData.reduce((sum, m) => sum + (m?.total_begone_cases || 0), 0)
         const totalPrivateCases = yearData.reduce((sum, m) => sum + (m?.private_cases_count || 0), 0)
         const totalBusinessCases = yearData.reduce((sum, m) => sum + (m?.business_cases_count || 0), 0)
-        
-        // 🆕 Säker topMonth beräkning
+
         const validMonths = monthlyStats.filter(m => m && (m.total_begone_revenue || 0) > 0)
-        const topMonth = validMonths.length > 0 
+        const topMonth = validMonths.length > 0
           ? validMonths.sort((a, b) => (b?.total_begone_revenue || 0) - (a?.total_begone_revenue || 0))[0]
           : null
 
-        setCombinedData({
-          monthlyStats,
-          currentMonthTotal: currentMonthData?.total_begone_revenue || 0,
-          yearToDateTotal,
-          averageCaseValue: totalCases > 0 ? yearToDateTotal / totalCases : 0,
-          topMonth: topMonth ? { month: topMonth.month, revenue: topMonth.total_begone_revenue || 0 } : null,
-          privateVsBusinessRatio: {
-            private: totalCases > 0 ? (totalPrivateCases / totalCases) * 100 : 0,
-            business: totalCases > 0 ? (totalBusinessCases / totalCases) * 100 : 0
-          }
-        })
+        if (!cancelled) {
+          setCombinedData({
+            monthlyStats,
+            currentMonthTotal: currentMonthData?.total_begone_revenue || 0,
+            yearToDateTotal,
+            averageCaseValue: totalCases > 0 ? yearToDateTotal / totalCases : 0,
+            topMonth: topMonth ? { month: topMonth.month, revenue: topMonth.total_begone_revenue || 0 } : null,
+            privateVsBusinessRatio: {
+              private: totalCases > 0 ? (totalPrivateCases / totalCases) * 100 : 0,
+              business: totalCases > 0 ? (totalBusinessCases / totalCases) * 100 : 0
+            }
+          })
+        }
       } catch (err) {
-        console.error('❌ useBeGoneAnalytics error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av BeGone analys')
-        setCombinedData(null) // 🆕 Explicit null vid fel
+        if (!cancelled) {
+          console.error('useBeGoneAnalytics error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av BeGone analys')
+          setCombinedData(null)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data: combinedData, loading, error }
@@ -435,6 +412,7 @@ export const useKpiDataWithTrends = (dateRange?: { start: string; end: string },
   )
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
@@ -444,30 +422,35 @@ export const useKpiDataWithTrends = (dateRange?: { start: string; end: string },
             dateRange.start, dateRange.end,
             previousDateRange.start, previousDateRange.end
           )
-          setData(result)
+          if (!cancelled) setData(result)
         } else {
           const kpi = await getKpiData()
-          setData({
-            ...kpi,
-            trends: {
-              arr_change_percent: 0,
-              mrr_change_percent: 0,
-              customers_change: 0,
-              case_revenue_change_percent: 0,
-              begone_revenue_change_percent: 0,
-              churn_change: 0
-            }
-          })
+          if (!cancelled) {
+            setData({
+              ...kpi,
+              trends: {
+                arr_change_percent: 0,
+                mrr_change_percent: 0,
+                customers_change: 0,
+                case_revenue_change_percent: 0,
+                begone_revenue_change_percent: 0,
+                churn_change: 0
+              }
+            })
+          }
         }
       } catch (err) {
-        console.error('useKpiDataWithTrends error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av KPI data')
-        setData(null)
+        if (!cancelled) {
+          console.error('useKpiDataWithTrends error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av KPI data')
+          setData(null)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     fetchData()
+    return () => { cancelled = true }
   }, [rangeKey])
 
   return { data, loading, error }
@@ -485,22 +468,26 @@ export const useArticleRevenue = (dateRange?: { start: string; end: string }) =>
   )
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
-      if (!dateRange) { setLoading(false); return }
+      if (!dateRange) { if (!cancelled) setLoading(false); return }
       try {
         setLoading(true)
         setError(null)
         const result = await getArticleRevenueBreakdown(dateRange.start, dateRange.end)
-        setData(Array.isArray(result) ? result : [])
+        if (!cancelled) setData(Array.isArray(result) ? result : [])
       } catch (err) {
-        console.error('useArticleRevenue error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av artikelintäkter')
-        setData([])
+        if (!cancelled) {
+          console.error('useArticleRevenue error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av artikelintäkter')
+          setData([])
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     fetchData()
+    return () => { cancelled = true }
   }, [rangeKey])
 
   return { data, loading, error }
@@ -513,21 +500,25 @@ export const usePriceListAnalytics = () => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
         setError(null)
         const result = await getPriceListUtilization()
-        setData(result)
+        if (!cancelled) setData(result)
       } catch (err) {
-        console.error('usePriceListAnalytics error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av prislistedata')
-        setData(null)
+        if (!cancelled) {
+          console.error('usePriceListAnalytics error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av prislistedata')
+          setData(null)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }
@@ -545,22 +536,26 @@ export const useRevenueHealth = (dateRange?: { start: string; end: string }) => 
   )
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
-      if (!dateRange) { setLoading(false); return }
+      if (!dateRange) { if (!cancelled) setLoading(false); return }
       try {
         setLoading(true)
         setError(null)
         const result = await getRevenueHealthMix(dateRange.start, dateRange.end)
-        setData(result)
+        if (!cancelled) setData(result)
       } catch (err) {
-        console.error('useRevenueHealth error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av intäktsmix')
-        setData(null)
+        if (!cancelled) {
+          console.error('useRevenueHealth error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av intäktsmix')
+          setData(null)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     fetchData()
+    return () => { cancelled = true }
   }, [rangeKey])
 
   return { data, loading, error }
@@ -581,55 +576,52 @@ export const useRevenueComparison = () => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const fetchData = async () => {
       try {
         setLoading(true)
-        setError(null) // 🆕 Rensa tidigare fel
+        setError(null)
         const [kpiData, monthlyRevenue] = await Promise.all([
           getKpiData(),
           getMonthlyRevenue()
         ])
 
-        // 🆕 KRITISK FIX: Kontrollera att vi fick giltig data
-        if (!kpiData) {
-          console.warn('⚠️ useRevenueComparison: kpiData is null')
-          setData(null)
-          return
-        }
-
-        if (!Array.isArray(monthlyRevenue)) {
-          console.warn('⚠️ useRevenueComparison: monthlyRevenue is not an array:', monthlyRevenue)
-          setData(null)
+        if (!kpiData || !Array.isArray(monthlyRevenue)) {
+          if (!cancelled) setData(null)
           return
         }
 
         const currentYear = new Date().getFullYear()
         const yearlyData = monthlyRevenue.filter(m => m?.month?.startsWith(currentYear.toString()))
-        
+
         const contract_revenue = kpiData.total_arr || 0
         const case_revenue = kpiData.total_case_revenue_ytd || 0
         const begone_revenue = kpiData.total_begone_revenue_ytd || 0
         const total_revenue = contract_revenue + case_revenue + begone_revenue
 
-        setData({
-          contract_revenue,
-          case_revenue,
-          begone_revenue,
-          total_revenue,
-          begone_percentage: total_revenue > 0 ? (begone_revenue / total_revenue) * 100 : 0,
-          contract_percentage: total_revenue > 0 ? (contract_revenue / total_revenue) * 100 : 0,
-          case_percentage: total_revenue > 0 ? (case_revenue / total_revenue) * 100 : 0
-        })
+        if (!cancelled) {
+          setData({
+            contract_revenue,
+            case_revenue,
+            begone_revenue,
+            total_revenue,
+            begone_percentage: total_revenue > 0 ? (begone_revenue / total_revenue) * 100 : 0,
+            contract_percentage: total_revenue > 0 ? (contract_revenue / total_revenue) * 100 : 0,
+            case_percentage: total_revenue > 0 ? (case_revenue / total_revenue) * 100 : 0
+          })
+        }
       } catch (err) {
-        console.error('❌ useRevenueComparison error:', err) // 🆕 Debug logging
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av intäktsjämförelse')
-        setData(null) // 🆕 Explicit null vid fel
+        if (!cancelled) {
+          console.error('useRevenueComparison error:', err)
+          setError(err instanceof Error ? err.message : 'Fel vid hämtning av intäktsjämförelse')
+          setData(null)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
     fetchData()
+    return () => { cancelled = true }
   }, [])
 
   return { data, loading, error }

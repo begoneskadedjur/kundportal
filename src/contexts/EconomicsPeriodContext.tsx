@@ -56,13 +56,13 @@ export function EconomicsPeriodProvider({ children }: { children: ReactNode }) {
 
   const computed = useMemo(() => computeDateRange(periodType), [periodType])
 
-  const value: EconomicsPeriodContextType = {
+  const value = useMemo<EconomicsPeriodContextType>(() => ({
     periodType,
     setPeriodType,
     dateRange: computed.dateRange,
     previousDateRange: computed.previousDateRange,
     monthsInPeriod: computed.monthsInPeriod
-  }
+  }), [periodType, computed])
 
   return (
     <EconomicsPeriodContext.Provider value={value}>
