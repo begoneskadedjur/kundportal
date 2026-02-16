@@ -564,8 +564,8 @@ export const getTechnicianRevenue = async (): Promise<TechnicianRevenue[]> => {
           supabase
             .from('cases')
             .select('price')
-            .eq('assigned_technician_id', tech.id)
-            .in('status', ['Avslutat', 'Genomförd', 'Klar'])
+            .eq('primary_technician_id', tech.id)
+            .eq('status', 'Avslutat')
             .not('price', 'is', null)
         ])
 

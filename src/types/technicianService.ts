@@ -189,7 +189,7 @@ export const technicianService = {
       const { data: assignedCases, error: casesError } = await supabase
         .from('cases')
         .select('id, title')
-        .eq('assigned_technician_id', id)
+        .eq('primary_technician_id', id)
         .in('status', ['open', 'in_progress'])
       
       if (casesError) throw casesError

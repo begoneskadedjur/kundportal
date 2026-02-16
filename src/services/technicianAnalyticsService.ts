@@ -87,8 +87,8 @@ export const getTechnicianKpi = async (): Promise<TechnicianKpi> => {
       // Contract cases
       supabase
         .from('cases')
-        .select('price, assigned_technician_id, created_at')
-        .in('status', ['Avslutat', 'Genomförd', 'Klar'])
+        .select('price, primary_technician_id, created_at')
+        .eq('status', 'Avslutat')
         .not('price', 'is', null)
         .gte('created_at', yearStart)
     ])
@@ -166,8 +166,8 @@ export const getTechnicianPerformance = async (): Promise<TechnicianPerformance[
       const { data: contractCases } = await supabase
         .from('cases')
         .select('price')
-        .eq('assigned_technician_id', tech.id)
-        .in('status', ['Avslutat', 'Genomförd', 'Klar'])
+        .eq('primary_technician_id', tech.id)
+        .eq('status', 'Avslutat')
         .not('price', 'is', null) || { data: [] }
 
       // Beräkna totaler
@@ -262,8 +262,8 @@ export const getTechnicianMonthlyData = async (monthsBack: number = 12): Promise
       const { data: contractMonthly } = await supabase
         .from('cases')
         .select('price, created_at')
-        .eq('assigned_technician_id', tech.id)
-        .in('status', ['Avslutat', 'Genomförd', 'Klar'])
+        .eq('primary_technician_id', tech.id)
+        .eq('status', 'Avslutat')
         .not('price', 'is', null)
         .gte('created_at', startDateStr)
         .lte('created_at', endDateStr) || { data: [] }
@@ -412,8 +412,8 @@ export const getPestSpecialization = async (): Promise<PestSpecialization[]> => 
       const { data: contractCases } = await supabase
         .from('cases')
         .select('pest_type, price')
-        .eq('assigned_technician_id', tech.id)
-        .in('status', ['Avslutat', 'Genomförd', 'Klar'])
+        .eq('primary_technician_id', tech.id)
+        .eq('status', 'Avslutat')
         .not('pest_type', 'is', null)
         .not('price', 'is', null) || { data: [] }
 
