@@ -536,37 +536,60 @@ export const getExpiringContracts = async (): Promise<ExpiringContract[]> => {
 
 export const getTechnicianRevenue = async (): Promise<TechnicianRevenue[]> => {
   try {
-    const { data } = await supabase
-      .from('cases')
-      .select('assigned_technician_name, assigned_technician_email, price, completed_date')
-      .not('assigned_technician_name', 'is', null)
-      .not('completed_date', 'is', null)
+    // Hämta aktiva tekniker från technicians-tabellen
+    const { data: technicians, error: techError } = await supabase
+      .from('technicians')
+      .select('id, name, email, is_active')
+      .eq('is_active', true)
 
-    const technicianStats: { [key: string]: any } = {}
+    if (techError) throw techError
+    if (!technicians?.length) return []
 
-    data?.forEach(case_ => {
-      const name = case_.assigned_technician_name
-      const email = case_.assigned_technician_email || ''
-      
-      if (!technicianStats[name]) {
-        technicianStats[name] = {
-          technician_name: name,
-          technician_email: email,
-          cases_completed: 0,
-          total_revenue: 0,
-          avg_case_value: 0,
+    // Hämta data från alla tre ärendekällor parallellt per tekniker
+    const results = await Promise.all(
+      technicians.map(async (tech) => {
+        const [privateRes, businessRes, contractRes] = await Promise.all([
+          supabase
+            .from('private_cases')
+            .select('pris')
+            .eq('primary_assignee_id', tech.id)
+            .eq('status', 'Avslutat')
+            .not('pris', 'is', null),
+          supabase
+            .from('business_cases')
+            .select('pris')
+            .eq('primary_assignee_id', tech.id)
+            .eq('status', 'Avslutat')
+            .not('pris', 'is', null),
+          supabase
+            .from('cases')
+            .select('price')
+            .eq('assigned_technician_id', tech.id)
+            .in('status', ['Avslutat', 'Genomförd', 'Klar'])
+            .not('price', 'is', null)
+        ])
+
+        const privateRevenue = (privateRes.data || []).reduce((sum, c) => sum + (c.pris || 0), 0)
+        const businessRevenue = (businessRes.data || []).reduce((sum, c) => sum + (c.pris || 0), 0)
+        const contractRevenue = (contractRes.data || []).reduce((sum, c) => sum + (c.price || 0), 0)
+
+        const total_revenue = privateRevenue + businessRevenue + contractRevenue
+        const cases_completed = (privateRes.data?.length || 0) + (businessRes.data?.length || 0) + (contractRes.data?.length || 0)
+
+        return {
+          technician_name: tech.name,
+          technician_email: tech.email || '',
+          cases_completed,
+          total_revenue,
+          avg_case_value: cases_completed > 0 ? total_revenue / cases_completed : 0,
           completion_rate: 100
         }
-      }
-      
-      technicianStats[name].cases_completed++
-      technicianStats[name].total_revenue += case_.price || 0
-    })
+      })
+    )
 
-    return Object.values(technicianStats).map((tech: any) => ({
-      ...tech,
-      avg_case_value: tech.cases_completed > 0 ? tech.total_revenue / tech.cases_completed : 0
-    })).sort((a, b) => b.total_revenue - a.total_revenue)
+    return results
+      .filter(t => t.cases_completed > 0 || t.total_revenue > 0)
+      .sort((a, b) => b.total_revenue - a.total_revenue)
   } catch (error) {
     console.error('Error fetching technician revenue:', error)
     throw error
