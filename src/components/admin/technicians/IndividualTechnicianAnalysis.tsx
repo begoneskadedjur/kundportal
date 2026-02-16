@@ -163,7 +163,8 @@ const IndividualTechnicianAnalysis: React.FC<IndividualTechnicianAnalysisProps> 
     setAiLoading(true);
     setAiError(null);
     setAiAnalysis(null);
-    const request: AIAnalysisRequest = { technician, allTechnicians, monthlyData, pestSpecialization };
+    const technicianMonthlyData = (monthlyData || []).filter(m => m.technician_name === technician.name);
+    const request: AIAnalysisRequest = { technician, allTechnicians, monthlyData: technicianMonthlyData, pestSpecialization };
     try {
       const analysisResult = await aiAnalysisService.generateTechnicianAnalysis(request);
       setAiAnalysis(analysisResult);

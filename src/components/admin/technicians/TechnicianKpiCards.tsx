@@ -1,5 +1,5 @@
 import React from 'react'
-import { Users, DollarSign, TrendingUp, Target, AlertTriangle, Wrench } from 'lucide-react'
+import { Users, Banknote, TrendingUp, Target, AlertTriangle, Wrench } from 'lucide-react'
 import { useTechnicianKpi } from '../../../hooks/useTechnicianDashboard'
 import { formatCurrency, formatNumber } from '../../../utils/formatters'
 
@@ -55,7 +55,7 @@ const TechnicianKpiCards: React.FC = () => {
       title: 'Total Intäkt YTD',
       value: formatCurrency(kpiData.total_revenue_ytd),
       description: 'Alla avslutade ärenden i år',
-      icon: DollarSign,
+      icon: Banknote,
       color: 'green',
       trend: `${formatNumber(kpiData.total_cases_ytd)} ärenden`,
       badge: 'YTD'
