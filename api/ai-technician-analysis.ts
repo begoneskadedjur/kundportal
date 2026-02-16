@@ -1,9 +1,9 @@
 // /api/ai-technician-analysis.ts
 // UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
-// UPPDATERAD: 2026-02-04 - Uppgraderad till Gemini 2.5 Flash (2.0 deprecated)
+// UPPDATERAD: 2026-02-16 - Structured output (responseSchema) för att undvika JSON-trunkering
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
 // =================================================================================
 // SECTION 1: CONFIGURATION & INITIALIZATION
@@ -11,24 +11,161 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
-// Definition av den förväntade JSON-strukturen.
-// Detta är hjärtat av vår nya, djupgående analys.
+// Structured output schema — garanterar giltig JSON från Gemini
+const analysisSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    executiveSummary: {
+      type: SchemaType.OBJECT,
+      properties: {
+        headline: { type: SchemaType.STRING, description: 'Skarp, insiktsfull rubrik som en VD kan läsa på 5 sekunder' },
+        summary: { type: SchemaType.STRING, description: 'Brutal-ärlig sammanfattning av teknikerns prestation och potential' },
+      },
+      required: ['headline', 'summary'],
+    },
+    performanceDashboard: {
+      type: SchemaType.OBJECT,
+      properties: {
+        overall_performance_grade: { type: SchemaType.STRING, format: 'enum', enum: ['A+', 'A', 'B', 'C', 'D'] },
+        key_metrics: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              metric: { type: SchemaType.STRING },
+              value: { type: SchemaType.STRING },
+              comparison_to_team_avg: { type: SchemaType.NUMBER, description: 'Procentuell jämförelse mot teamets snitt' },
+              comparison_to_top_performer: { type: SchemaType.NUMBER, description: 'Procentuell jämförelse mot topprestern' },
+            },
+            required: ['metric', 'value', 'comparison_to_team_avg', 'comparison_to_top_performer'],
+          },
+        },
+      },
+      required: ['overall_performance_grade', 'key_metrics'],
+    },
+    revenueDeepDive: {
+      type: SchemaType.OBJECT,
+      properties: {
+        breakdown: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              source: { type: SchemaType.STRING, format: 'enum', enum: ['Privat', 'Företag', 'Avtal'] },
+              revenue: { type: SchemaType.NUMBER },
+              case_count: { type: SchemaType.INTEGER },
+              avg_value: { type: SchemaType.NUMBER },
+            },
+            required: ['source', 'revenue', 'case_count', 'avg_value'],
+          },
+        },
+        profitability_analysis: { type: SchemaType.STRING },
+      },
+      required: ['breakdown', 'profitability_analysis'],
+    },
+    specializationAnalysis: {
+      type: SchemaType.OBJECT,
+      properties: {
+        primary_specialization: { type: SchemaType.STRING },
+        specialization_revenue: { type: SchemaType.NUMBER },
+        specialization_avg_case_value: { type: SchemaType.NUMBER },
+        comparison_to_team_avg_for_pest: { type: SchemaType.NUMBER },
+        recommendation: { type: SchemaType.STRING },
+      },
+      required: ['primary_specialization', 'specialization_revenue', 'specialization_avg_case_value', 'comparison_to_team_avg_for_pest', 'recommendation'],
+    },
+    historicalTrends: {
+      type: SchemaType.OBJECT,
+      properties: {
+        six_month_revenue_trend: { type: SchemaType.STRING, format: 'enum', enum: ['stark uppgång', 'stabil', 'svag nedgång', 'data saknas'] },
+        consistency_score: { type: SchemaType.STRING, format: 'enum', enum: ['mycket konsekvent', 'varierande', 'oförutsägbar'] },
+        trend_analysis: { type: SchemaType.STRING },
+      },
+      required: ['six_month_revenue_trend', 'consistency_score', 'trend_analysis'],
+    },
+    strengths: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          area: { type: SchemaType.STRING },
+          description: { type: SchemaType.STRING },
+          evidence: { type: SchemaType.STRING },
+        },
+        required: ['area', 'description', 'evidence'],
+      },
+    },
+    developmentAreas: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          area: { type: SchemaType.STRING },
+          description: { type: SchemaType.STRING },
+          potential_impact: { type: SchemaType.STRING },
+        },
+        required: ['area', 'description', 'potential_impact'],
+      },
+    },
+    actionableDevelopmentPlan: {
+      type: SchemaType.OBJECT,
+      properties: {
+        primary_focus_30_days: { type: SchemaType.STRING },
+        actions: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              action: { type: SchemaType.STRING },
+              priority: { type: SchemaType.STRING, format: 'enum', enum: ['Hög', 'Medium', 'Låg'] },
+              expected_outcome: { type: SchemaType.STRING },
+              how_to_measure: { type: SchemaType.STRING },
+            },
+            required: ['action', 'priority', 'expected_outcome', 'how_to_measure'],
+          },
+        },
+      },
+      required: ['primary_focus_30_days', 'actions'],
+    },
+    mentorshipProfile: {
+      type: SchemaType.OBJECT,
+      properties: {
+        profile: { type: SchemaType.STRING, format: 'enum', enum: ['Idealisk Mentor', 'Aktiv Adept', 'Självgående Expert', 'Potential att leda'] },
+        should_mentor: { type: SchemaType.BOOLEAN },
+        mentoring_areas: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+        needs_mentoring: { type: SchemaType.BOOLEAN },
+        learning_focus: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+      },
+      required: ['profile', 'should_mentor', 'mentoring_areas', 'needs_mentoring', 'learning_focus'],
+    },
+    riskAssessment: {
+      type: SchemaType.OBJECT,
+      properties: {
+        key_risks: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              risk: { type: SchemaType.STRING },
+              mitigation_strategy: { type: SchemaType.STRING },
+            },
+            required: ['risk', 'mitigation_strategy'],
+          },
+        },
+        retention_factor: { type: SchemaType.STRING, format: 'enum', enum: ['Hög', 'Medium', 'Låg'] },
+      },
+      required: ['key_risks', 'retention_factor'],
+    },
+  },
+  required: [
+    'executiveSummary', 'performanceDashboard', 'revenueDeepDive',
+    'specializationAnalysis', 'historicalTrends', 'strengths',
+    'developmentAreas', 'actionableDevelopmentPlan', 'mentorshipProfile', 'riskAssessment',
+  ],
+};
+
+// Analysinstruktioner — schemat hanterar JSON-strukturen, prompten styr kvaliteten
 const systemPrompt = `Du är en elit-analytiker och strategisk coach för BeGone, ett ledande skadedjursföretag. Ditt uppdrag är att genomföra en djupgående, datadriven analys av en enskild tekniker. Du måste vara ärlig, direkt och ge konkreta, handlingsbara rekommendationer.
-
-Analysen ska generera ett JSON-objekt och **ENDAST** ett JSON-objekt, som strikt följer denna TypeScript-interface:
-
-interface AIAnalysis {
-  executiveSummary: { headline: string; summary: string; };
-  performanceDashboard: { overall_performance_grade: 'A+' | 'A' | 'B' | 'C' | 'D'; key_metrics: Array<{ metric: string; value: string; comparison_to_team_avg: number; comparison_to_top_performer: number; }>; };
-  revenueDeepDive: { breakdown: Array<{ source: 'Privat' | 'Företag' | 'Avtal'; revenue: number; case_count: number; avg_value: number; }>; profitability_analysis: string; };
-  specializationAnalysis: { primary_specialization: string; specialization_revenue: number; specialization_avg_case_value: number; comparison_to_team_avg_for_pest: number; recommendation: string; };
-  historicalTrends: { six_month_revenue_trend: 'stark uppgång' | 'stabil' | 'svag nedgång' | 'data saknas'; consistency_score: 'mycket konsekvent' | 'varierande' | 'oförutsägbar'; trend_analysis: string; };
-  strengths: Array<{ area: string; description: string; evidence: string; }>;
-  developmentAreas: Array<{ area: string; description: string; potential_impact: string; }>;
-  actionableDevelopmentPlan: { primary_focus_30_days: string; actions: Array<{ action: string; priority: 'Hög' | 'Medium' | 'Låg'; expected_outcome: string; how_to_measure: string; }>; };
-  mentorshipProfile: { profile: 'Idealisk Mentor' | 'Aktiv Adept' | 'Självgående Expert' | 'Potential att leda'; should_mentor: boolean; mentoring_areas: string[]; needs_mentoring: boolean; learning_focus: string[]; };
-  riskAssessment: { key_risks: Array<{ risk: string; mitigation_strategy: string; }>; retention_factor: 'Hög' | 'Medium' | 'Låg'; };
-}
 
 INSTRUKTIONER FÖR DIN ANALYS:
 - **executiveSummary**: Var brutal-ärlig. Ge en skarp, insiktsfull sammanfattning som en VD kan läsa på 10 sekunder.
@@ -40,7 +177,7 @@ INSTRUKTIONER FÖR DIN ANALYS:
 - **mentorshipProfile**: Baserat på all data, definiera teknikerns roll. Är hen redo att leda? Behöver hen en mentor? Var specifik.
 - **riskAssessment**: Tänk som en företagsledare. Vilka är riskerna? Utbrändhet? Beroende av en kund? Stagnation?
 
-Du måste leverera en komplett, felfri JSON utan extra text före eller efter. Analysen ska vara på svenska.`;
+Analysen ska vara på svenska.`;
 
 
 // =================================================================================
@@ -76,12 +213,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const analysisContext = buildAnalysisContext(technician, allTechnicians, monthlyData, pestSpecialization);
     const userPrompt = `Analysera följande teknikerdata och generera en JSON enligt systeminstruktionen:\n\n${JSON.stringify(analysisContext, null, 2)}`;
 
-    // --- Anropa Google Gemini ---
+    // --- Anropa Google Gemini med structured output ---
     const model = genAI.getGenerativeModel({
       model: 'gemini-3-flash-preview',
       generationConfig: {
-        maxOutputTokens: 3000,
+        maxOutputTokens: 8192,
         responseMimeType: 'application/json',
+        responseSchema: analysisSchema,
       },
     });
 
