@@ -1,20 +1,27 @@
-// 📁 src/components/admin/technicians/TechnicianKpiCards.tsx - KPI CARDS MED VERKLIG DATA
 import React from 'react'
 import { Users, DollarSign, TrendingUp, Target, AlertTriangle, Wrench } from 'lucide-react'
-import Card from '../../ui/Card'
 import { useTechnicianKpi } from '../../../hooks/useTechnicianDashboard'
 import { formatCurrency, formatNumber } from '../../../utils/formatters'
+
+const colorMap: Record<string, { icon: string; bg: string }> = {
+  green: { icon: 'text-green-400', bg: 'bg-green-500/20' },
+  yellow: { icon: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+  purple: { icon: 'text-purple-400', bg: 'bg-purple-500/20' },
+  blue: { icon: 'text-blue-400', bg: 'bg-blue-500/20' },
+}
 
 const TechnicianKpiCards: React.FC = () => {
   const { data: kpiData, loading, error } = useTechnicianKpi()
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         {[...Array(6)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <div className="h-24 bg-slate-700 rounded"></div>
-          </Card>
+          <div key={i} className="bg-slate-800/50 border border-slate-700/40 rounded-2xl p-5 animate-pulse">
+            <div className="h-4 bg-slate-700 rounded mb-3 w-1/2"></div>
+            <div className="h-7 bg-slate-700 rounded mb-2"></div>
+            <div className="h-3 bg-slate-700 rounded w-3/4"></div>
+          </div>
         ))}
       </div>
     )
@@ -22,12 +29,12 @@ const TechnicianKpiCards: React.FC = () => {
 
   if (error) {
     return (
-      <Card className="p-6">
+      <div className="bg-slate-800/50 border border-slate-700/40 rounded-2xl p-5">
         <div className="flex items-center text-red-400">
           <AlertTriangle className="w-5 h-5 mr-2" />
           <span>Fel vid laddning av tekniker KPI: {error}</span>
         </div>
-      </Card>
+      </div>
     )
   }
 
@@ -39,26 +46,26 @@ const TechnicianKpiCards: React.FC = () => {
       value: kpiData.active_technicians.toString(),
       description: `${kpiData.total_technicians} totalt registrerade`,
       icon: Users,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/20',
-      trend: kpiData.active_technicians === kpiData.total_technicians ? 'Alla aktiva' : `${kpiData.total_technicians - kpiData.active_technicians} inaktiva`
+      color: 'blue',
+      trend: kpiData.active_technicians === kpiData.total_technicians
+        ? 'Alla aktiva'
+        : `${kpiData.total_technicians - kpiData.active_technicians} inaktiva`
     },
     {
       title: 'Total Intäkt YTD',
       value: formatCurrency(kpiData.total_revenue_ytd),
       description: 'Alla avslutade ärenden i år',
       icon: DollarSign,
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/20',
-      trend: `${formatNumber(kpiData.total_cases_ytd)} ärenden`
+      color: 'green',
+      trend: `${formatNumber(kpiData.total_cases_ytd)} ärenden`,
+      badge: 'YTD'
     },
     {
       title: 'Genomsnitt/Tekniker',
       value: formatCurrency(kpiData.avg_revenue_per_technician),
       description: 'Intäkt per aktiv tekniker YTD',
       icon: TrendingUp,
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/20',
+      color: 'purple',
       trend: `${formatNumber(kpiData.avg_cases_per_technician)} ärenden/tekniker`
     },
     {
@@ -66,8 +73,7 @@ const TechnicianKpiCards: React.FC = () => {
       value: formatCurrency(kpiData.avg_case_value_all),
       description: 'Alla avslutade ärenden YTD',
       icon: Target,
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-500/20',
+      color: 'yellow',
       trend: 'Över alla affärstyper'
     },
     {
@@ -75,57 +81,54 @@ const TechnicianKpiCards: React.FC = () => {
       value: formatNumber(kpiData.total_cases_ytd),
       description: 'Avslutade ärenden i år',
       icon: Wrench,
-      color: 'text-cyan-500',
-      bgColor: 'bg-cyan-500/20',
-      trend: kpiData.active_technicians > 0 
+      color: 'green',
+      trend: kpiData.active_technicians > 0
         ? `${Math.round(kpiData.total_cases_ytd / kpiData.active_technicians)} per tekniker`
-        : 'Ingen data'
+        : 'Ingen data',
+      badge: 'YTD'
     },
     {
       title: 'Produktivitet',
       value: kpiData.active_technicians > 0 && kpiData.total_cases_ytd > 0
-        ? `${Math.round((kpiData.total_cases_ytd / kpiData.active_technicians) * 12 / new Date().getMonth() || 1)}`
+        ? `${Math.round((kpiData.total_cases_ytd / kpiData.active_technicians) * 12 / (new Date().getMonth() || 1))}`
         : '0',
       description: 'Uppskattat ärenden/år/tekniker',
       icon: TrendingUp,
-      color: 'text-pink-500',
-      bgColor: 'bg-pink-500/20',
+      color: 'purple',
       trend: 'Baserat på YTD-trend'
     }
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-      {kpiCards.map((card, index) => (
-        <Card 
-          key={index} 
-          className="relative overflow-hidden hover:scale-105 transition-transform duration-300"
-        >
-          <div className="p-4">
-            {/* Icon - mindre */}
-            <div className={`w-8 h-8 ${card.bgColor} rounded-lg flex items-center justify-center mb-3`}>
-              <card.icon className={`w-4 h-4 ${card.color}`} />
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      {kpiCards.map((card, index) => {
+        const colors = colorMap[card.color] || colorMap.green
+        return (
+          <div
+            key={index}
+            className="bg-slate-800/50 rounded-2xl border border-slate-700/40 p-5 hover:border-slate-600 transition-colors duration-200"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className={`p-2 rounded-lg ${colors.bg}`}>
+                <card.icon className={`w-4 h-4 ${colors.icon}`} />
+              </div>
+              {card.badge && (
+                <span className="px-1.5 py-0.5 bg-slate-700/60 text-slate-400 rounded text-[10px] font-medium uppercase tracking-wide">
+                  {card.badge}
+                </span>
+              )}
             </div>
 
-            {/* Värde - mindre text */}
-            <div className="mb-2">
-              <h3 className="text-lg font-bold text-white leading-tight">{card.value}</h3>
-              <p className="text-xs font-medium text-slate-300 leading-tight">{card.title}</p>
+            <p className="text-xl font-bold text-white mb-1 font-mono">{card.value}</p>
+            <h3 className="text-xs font-medium text-slate-300 mb-0.5">{card.title}</h3>
+            <p className="text-[10px] text-slate-500 mb-3">{card.description}</p>
+
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-500/15 text-slate-400">
+              <span>{card.trend}</span>
             </div>
-
-            {/* Beskrivning - mindre text */}
-            <p className="text-xs text-slate-400 mb-1 line-clamp-2">{card.description}</p>
-
-            {/* Trend - mindre text */}
-            <div className="flex items-center">
-              <span className="text-xs text-slate-500 line-clamp-1">{card.trend}</span>
-            </div>
-
-            {/* Gradient overlay - mindre */}
-            <div className={`absolute top-0 right-0 w-12 h-12 ${card.bgColor} rounded-full blur-xl opacity-20 -translate-y-6 translate-x-6`}></div>
           </div>
-        </Card>
-      ))}
+        )
+      })}
     </div>
   )
 }
