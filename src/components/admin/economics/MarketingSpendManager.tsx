@@ -1,10 +1,9 @@
 // 📁 src/components/admin/economics/MarketingSpendManager.tsx
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit3, Save, X, Banknote, Calendar, TrendingUp, Activity } from 'lucide-react'
+import { Plus, Trash2, Edit3, Save, X, Banknote, Calendar, TrendingUp } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import { supabase } from '../../../lib/supabase'
-import { useMarketingSpendPerformance } from '../../../hooks/usePerformanceMonitoring'
 import toast from 'react-hot-toast'
 
 interface MarketingSpend {
@@ -47,53 +46,33 @@ const MarketingSpendManager: React.FC = () => {
     notes: ''
   })
 
-  // Performance monitoring hook
-  const { 
-    performanceData, 
-    markDataLoaded, 
-    markRenderComplete, 
-    getDetailedReport, 
-    isPerformant 
-  } = useMarketingSpendPerformance()
-
   // Hämta alla marknadsföringskostnader
-  const fetchSpendData = async () => {
+  const fetchSpendData = async (cancelled?: { current: boolean }) => {
     try {
       setLoading(true)
-      const startTime = performance.now()
-      
+
       const { data, error } = await supabase
         .from('monthly_marketing_spend')
         .select('*')
         .order('month', { ascending: false })
 
+      if (cancelled?.current) return
       if (error) throw error
       setSpendData(data || [])
-      
-      // Märk att data har laddats för performance monitoring
-      markDataLoaded()
-      
-      const loadTime = performance.now() - startTime
-      console.log(`🚀 MarketingSpend data loaded in ${Math.round(loadTime)}ms`)
-      
     } catch (error) {
+      if (cancelled?.current) return
       console.error('Error fetching marketing spend:', error)
       toast.error('Kunde inte hämta marknadsföringskostnader')
     } finally {
-      setLoading(false)
+      if (!cancelled?.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchSpendData()
+    const cancelled = { current: false }
+    fetchSpendData(cancelled)
+    return () => { cancelled.current = true }
   }, [])
-
-  // Märk rendering som klar när komponenten är fullt laddad
-  useEffect(() => {
-    if (!loading && spendData.length >= 0) {
-      markRenderComplete()
-    }
-  }, [loading, spendData, markRenderComplete])
 
   // Hantera formulärförändringar
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -122,8 +101,6 @@ const MarketingSpendManager: React.FC = () => {
     if (!validateForm()) return
 
     try {
-      const startTime = performance.now()
-      
       const { error } = await supabase
         .from('monthly_marketing_spend')
         .insert([{
@@ -133,9 +110,6 @@ const MarketingSpendManager: React.FC = () => {
         }])
 
       if (error) throw error
-
-      const createTime = performance.now() - startTime
-      console.log(`✅ CREATE operation completed in ${Math.round(createTime)}ms`)
 
       toast.success('Marknadsföringskostnad sparad!')
       setFormData({ month: '', spend: '', notes: '' })
@@ -156,8 +130,6 @@ const MarketingSpendManager: React.FC = () => {
     if (!validateForm()) return
 
     try {
-      const startTime = performance.now()
-      
       const { error } = await supabase
         .from('monthly_marketing_spend')
         .update({
@@ -169,9 +141,6 @@ const MarketingSpendManager: React.FC = () => {
         .eq('id', id)
 
       if (error) throw error
-
-      const updateTime = performance.now() - startTime
-      console.log(`✅ UPDATE operation completed in ${Math.round(updateTime)}ms`)
 
       toast.success('Marknadsföringskostnad uppdaterad!')
       setEditingId(null)
@@ -194,17 +163,12 @@ const MarketingSpendManager: React.FC = () => {
     }
 
     try {
-      const startTime = performance.now()
-      
       const { error } = await supabase
         .from('monthly_marketing_spend')
         .delete()
         .eq('id', id)
 
       if (error) throw error
-
-      const deleteTime = performance.now() - startTime
-      console.log(`🗑️ DELETE operation completed in ${Math.round(deleteTime)}ms`)
 
       toast.success('Marknadsföringskostnad borttagen!')
       fetchSpendData()
@@ -240,16 +204,6 @@ const MarketingSpendManager: React.FC = () => {
         <div className="flex items-center">
           <Banknote className="w-4 h-4 text-[#20c58f] mr-2" />
           <h2 className="text-sm font-semibold text-white">Marknadsföringskostnader</h2>
-          
-          {/* Performance indicator */}
-          {!loading && (
-            <div className="ml-3 flex items-center text-xs">
-              <Activity className={`w-3 h-3 mr-1 ${isPerformant ? 'text-green-400' : 'text-yellow-400'}`} />
-              <span className={`${isPerformant ? 'text-green-400' : 'text-yellow-400'}`}>
-                {performanceData.loadTime > 0 ? `${performanceData.loadTime}ms` : 'Loading...'}
-              </span>
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
