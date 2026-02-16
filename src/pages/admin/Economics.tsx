@@ -1,117 +1,58 @@
-// 📁 src/pages/admin/Economics.tsx
 import React from 'react'
-import { RefreshCw, Banknote, BarChart3, TrendingUp, Activity } from 'lucide-react'
-import Button from '../../components/ui/Button'
+import { EconomicsPeriodProvider } from '../../contexts/EconomicsPeriodContext'
 
-// Importera komponenter som fungerar
+import EconomicsHeader from '../../components/admin/economics/EconomicsHeader'
 import KpiCards from '../../components/admin/economics/KpiCards'
-import MonthlyRevenueChart from '../../components/admin/economics/MonthlyRevenueChart'
-import BeGoneMonthlyStatsChart from '../../components/admin/economics/BeGoneMonthlyStatsChart'
-import EconomicInsightsChart from '../../components/admin/economics/EconomicInsightsChart'
+import RevenueHealthBar from '../../components/admin/economics/RevenueHealthBar'
+import UnifiedRevenueAnalysis from '../../components/admin/economics/UnifiedRevenueAnalysis'
+import ArticleRevenueBreakdown from '../../components/admin/economics/ArticleRevenueBreakdown'
+import PriceListUtilization from '../../components/admin/economics/PriceListUtilization'
+import PestProfitability from '../../components/admin/economics/PestProfitability'
+import TechnicianRevenueSection from '../../components/admin/economics/TechnicianRevenueSection'
+import ChurnRiskSection from '../../components/admin/economics/ChurnRiskSection'
 import MarketingSpendManager from '../../components/admin/economics/MarketingSpendManager'
-import PerformanceTestReport from '../../components/admin/economics/PerformanceTestReport'
 
 const Economics: React.FC = () => {
-  const handleRefresh = async () => {
-    window.location.reload()
-  }
-
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <EconomicsPeriodProvider>
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-      {/* Inline header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Ekonomisk Översikt</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Komplett analys av intäkter, kostnader och tillväxt
-          </p>
-        </div>
-        <Button
-          onClick={handleRefresh}
-          variant="secondary"
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Uppdatera
-        </Button>
-      </div>
+        {/* 1. Page Header with global period selector */}
+        <EconomicsHeader />
 
-      {/* 1. KPI Panel */}
-      <section>
-        <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-          <Banknote className="w-4 h-4 text-yellow-400" />
-          Nyckeltal
-        </h3>
+        {/* 2. Hero KPI Cards */}
         <KpiCards />
-      </section>
 
-      {/* 2. FULLBREDD: Månadsvis Intäktsflöde */}
-      <section>
-        <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-          <BarChart3 className="w-4 h-4 text-[#20c58f]" />
-          Månadsvis Intäktsflöde
-          <span className="ml-2 text-xs text-slate-400 font-normal">Avtalskunder + Merförsäljning</span>
-        </h3>
-        <MonthlyRevenueChart />
-      </section>
+        {/* 3. Revenue Health Bar - Intäktsmix */}
+        <RevenueHealthBar />
 
-      {/* 3. FULLBREDD: Intäkter Engångsjobb */}
-      <section>
-        <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-          <BarChart3 className="w-4 h-4 text-[#20c58f]" />
-          Intäkter Engångsjobb
-          <span className="ml-2 text-xs text-slate-400 font-normal">Privatpersoner + Företag</span>
-        </h3>
-        <BeGoneMonthlyStatsChart />
-      </section>
+        {/* 4. Unified Revenue Analysis (tabbed) */}
+        <UnifiedRevenueAnalysis />
 
-      {/* 4. EKONOMISKA INSIGHTS */}
-      <section>
-        <div className="mb-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-            <TrendingUp className="w-4 h-4 text-yellow-400" />
-            Ekonomiska Insights
-            <span className="ml-2 text-xs text-slate-400 font-normal">Topp ärenden & skadedjur</span>
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">
-            Identifiera högsta ärenden och mest lönsamma skadedjur
-          </p>
+        {/* 5. Article Revenue (2/3) + Price List Utilization (1/3) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <ArticleRevenueBreakdown />
+          </div>
+          <div className="lg:col-span-1">
+            <PriceListUtilization />
+          </div>
         </div>
-        <EconomicInsightsChart />
-      </section>
 
-      {/* 5. MARKNADSFÖRINGSKOSTNADER */}
-      <section>
-        <div className="mb-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-            <Banknote className="w-4 h-4 text-[#20c58f]" />
-            Marknadsföringskostnader
-            <span className="ml-2 text-xs text-slate-400 font-normal">Monthly Marketing Spend Management</span>
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">
-            Hantera och spåra marknadsföringskostnader per månad
-          </p>
+        {/* 6. Pest Profitability (1/2) + Technician Revenue (1/2) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PestProfitability />
+          <TechnicianRevenueSection />
         </div>
-        <MarketingSpendManager />
-      </section>
 
-      {/* 6. PERFORMANCE TEST RAPPORT */}
-      <section>
-        <div className="mb-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-            <Activity className="w-4 h-4 text-cyan-400" />
-            Performance Test Rapport
-            <span className="ml-2 text-xs text-slate-400 font-normal">RLS-Optimering Validering</span>
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">
-            Testa och validera prestanda-förbättringar efter RLS-optimeringar
-          </p>
+        {/* 7. Churn Risk (1/2) + Marketing ROI (1/2) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChurnRiskSection />
+          <MarketingSpendManager />
         </div>
-        <PerformanceTestReport />
-      </section>
 
-    </div>
+      </div>
+    </EconomicsPeriodProvider>
   )
 }
 

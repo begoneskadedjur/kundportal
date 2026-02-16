@@ -2,7 +2,7 @@
 import React from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { AlertTriangle, Clock, Users } from 'lucide-react'
-import Card from '../../ui/Card'
+// Card removed - using direct styling to avoid glass overlay
 import { useExpiringContracts } from '../../../hooks/useEconomicsDashboard'
 
 const formatCurrency = (amount: number): string => {
@@ -46,7 +46,7 @@ const ExpiringContractsChart: React.FC = () => {
 
   if (loading) {
     return (
-      <Card>
+      <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-4">
         <div className="flex items-center mb-6">
           <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Utgående Avtal</h2>
@@ -54,24 +54,24 @@ const ExpiringContractsChart: React.FC = () => {
         <div className="h-80 flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500"></div>
         </div>
-      </Card>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Card className="bg-red-500/10 border-red-500/20">
+      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
         <div className="flex items-center text-red-400">
           <AlertTriangle className="w-5 h-5 mr-2" />
           <span>Fel vid laddning av avtalsdata: {error}</span>
         </div>
-      </Card>
+      </div>
     )
   }
 
   if (!contracts.length) {
     return (
-      <Card>
+      <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-4">
         <div className="flex items-center mb-6">
           <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Utgående Avtal</h2>
@@ -80,7 +80,7 @@ const ExpiringContractsChart: React.FC = () => {
           <Users className="w-8 h-8 mr-2" />
           <span>Inga utgående avtal</span>
         </div>
-      </Card>
+      </div>
     )
   }
 
@@ -123,7 +123,7 @@ const ExpiringContractsChart: React.FC = () => {
   const mediumRiskCount = contracts.filter(c => c.risk_level === 'medium').length
 
   return (
-    <Card>
+    <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-4">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
@@ -232,7 +232,7 @@ const ExpiringContractsChart: React.FC = () => {
           </div>
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 

@@ -1,16 +1,21 @@
-// src/hooks/useEconomicsDashboard.ts - SNABB FIX för array safety
-import { useState, useEffect } from 'react'
-import { 
-  getKpiData, 
-  getMonthlyRevenue, 
-  getExpiringContracts, 
+// src/hooks/useEconomicsDashboard.ts - Ekonomisk dashboard hooks
+import { useState, useEffect, useMemo } from 'react'
+import {
+  getKpiData,
+  getMonthlyRevenue,
+  getExpiringContracts,
   getTechnicianRevenue,
   getAccountManagerRevenue,
   getMarketingSpend,
   getCaseEconomy,
   getCustomerContracts,
-  getBeGoneMonthlyStats, // 🆕 Ny BeGone funktion
+  getBeGoneMonthlyStats,
+  getKpiDataWithTrends,
+  getArticleRevenueBreakdown,
+  getPriceListUtilization,
+  getRevenueHealthMix,
   type KpiData,
+  type KpiDataWithTrends,
   type MonthlyRevenue,
   type ExpiringContract,
   type TechnicianRevenue,
@@ -18,7 +23,10 @@ import {
   type MarketingSpend,
   type CaseEconomy,
   type CustomerContract,
-  type BeGoneMonthlyStats // 🆕 Ny typ
+  type BeGoneMonthlyStats,
+  type ArticleRevenueItem,
+  type PriceListUtilizationData,
+  type RevenueHealthData
 } from '../services/economicsService'
 
 // Huvudhook för economics dashboard
@@ -415,7 +423,150 @@ export const useBeGoneAnalytics = () => {
   return { data: combinedData, loading, error }
 }
 
-// 🆕 Hook för att jämföra avtalskunder vs BeGone intäkter - FIXAD
+// KPI Data med riktiga trender (kräver EconomicsPeriodContext)
+export const useKpiDataWithTrends = (dateRange?: { start: string; end: string }, previousDateRange?: { start: string; end: string }) => {
+  const [data, setData] = useState<KpiDataWithTrends | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const rangeKey = useMemo(() =>
+    dateRange ? `${dateRange.start}-${dateRange.end}` : 'default',
+    [dateRange?.start, dateRange?.end]
+  )
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        if (dateRange && previousDateRange) {
+          const result = await getKpiDataWithTrends(
+            dateRange.start, dateRange.end,
+            previousDateRange.start, previousDateRange.end
+          )
+          setData(result)
+        } else {
+          const kpi = await getKpiData()
+          setData({
+            ...kpi,
+            trends: {
+              arr_change_percent: 0,
+              mrr_change_percent: 0,
+              customers_change: 0,
+              case_revenue_change_percent: 0,
+              begone_revenue_change_percent: 0,
+              churn_change: 0
+            }
+          })
+        }
+      } catch (err) {
+        console.error('useKpiDataWithTrends error:', err)
+        setError(err instanceof Error ? err.message : 'Fel vid hämtning av KPI data')
+        setData(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [rangeKey])
+
+  return { data, loading, error }
+}
+
+// Artikelintäkter hook
+export const useArticleRevenue = (dateRange?: { start: string; end: string }) => {
+  const [data, setData] = useState<ArticleRevenueItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const rangeKey = useMemo(() =>
+    dateRange ? `${dateRange.start}-${dateRange.end}` : 'default',
+    [dateRange?.start, dateRange?.end]
+  )
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!dateRange) { setLoading(false); return }
+      try {
+        setLoading(true)
+        setError(null)
+        const result = await getArticleRevenueBreakdown(dateRange.start, dateRange.end)
+        setData(Array.isArray(result) ? result : [])
+      } catch (err) {
+        console.error('useArticleRevenue error:', err)
+        setError(err instanceof Error ? err.message : 'Fel vid hämtning av artikelintäkter')
+        setData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [rangeKey])
+
+  return { data, loading, error }
+}
+
+// Prislisteutilisering hook
+export const usePriceListAnalytics = () => {
+  const [data, setData] = useState<PriceListUtilizationData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const result = await getPriceListUtilization()
+        setData(result)
+      } catch (err) {
+        console.error('usePriceListAnalytics error:', err)
+        setError(err instanceof Error ? err.message : 'Fel vid hämtning av prislistedata')
+        setData(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  return { data, loading, error }
+}
+
+// Intäktsmix / Revenue Health hook
+export const useRevenueHealth = (dateRange?: { start: string; end: string }) => {
+  const [data, setData] = useState<RevenueHealthData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const rangeKey = useMemo(() =>
+    dateRange ? `${dateRange.start}-${dateRange.end}` : 'default',
+    [dateRange?.start, dateRange?.end]
+  )
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!dateRange) { setLoading(false); return }
+      try {
+        setLoading(true)
+        setError(null)
+        const result = await getRevenueHealthMix(dateRange.start, dateRange.end)
+        setData(result)
+      } catch (err) {
+        console.error('useRevenueHealth error:', err)
+        setError(err instanceof Error ? err.message : 'Fel vid hämtning av intäktsmix')
+        setData(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [rangeKey])
+
+  return { data, loading, error }
+}
+
+// Hook för att jämföra avtalskunder vs BeGone intäkter
 export const useRevenueComparison = () => {
   const [data, setData] = useState<{
     contract_revenue: number

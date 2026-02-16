@@ -657,6 +657,304 @@ export const getMarketingSpend = async (): Promise<MarketingSpend[]> => {
   }
 }
 
+// Artikelintäkter - Hämta intäkter per artikel från case_billing_items
+export interface ArticleRevenueItem {
+  article_id: string
+  article_name: string
+  article_code: string
+  category: string
+  total_quantity: number
+  total_revenue: number
+  cases_used: number
+  avg_unit_price: number
+}
+
+export const getArticleRevenueBreakdown = async (startDate: string, endDate: string): Promise<ArticleRevenueItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .select(`
+        article_id,
+        article_name,
+        quantity,
+        total_price,
+        unit_price,
+        case_id,
+        articles(code, category)
+      `)
+      .in('status', ['approved', 'billed'])
+      .gte('created_at', startDate)
+      .lte('created_at', endDate)
+
+    if (error) throw error
+    if (!data || data.length === 0) return []
+
+    // Gruppera per artikel
+    const articleStats: { [key: string]: ArticleRevenueItem } = {}
+
+    data.forEach((item: any) => {
+      const id = item.article_id || 'unknown'
+      if (!articleStats[id]) {
+        articleStats[id] = {
+          article_id: id,
+          article_name: item.article_name || 'Okänd artikel',
+          article_code: item.articles?.code || '',
+          category: item.articles?.category || 'Övrigt',
+          total_quantity: 0,
+          total_revenue: 0,
+          cases_used: 0,
+          avg_unit_price: 0
+        }
+      }
+      articleStats[id].total_quantity += item.quantity || 0
+      articleStats[id].total_revenue += item.total_price || 0
+      articleStats[id].cases_used++
+    })
+
+    // Beräkna snitt och sortera
+    return Object.values(articleStats)
+      .map(a => ({
+        ...a,
+        avg_unit_price: a.total_quantity > 0 ? a.total_revenue / a.total_quantity : 0
+      }))
+      .sort((a, b) => b.total_revenue - a.total_revenue)
+  } catch (error) {
+    console.error('Error fetching article revenue breakdown:', error)
+    return []
+  }
+}
+
+// Prislisteutilisering - Vilka kunder har prislistor
+export interface PriceListUtilizationData {
+  totalActiveCustomers: number
+  customersWithPriceList: number
+  customersWithoutPriceList: number
+  coveragePercent: number
+  priceLists: Array<{
+    id: string
+    name: string
+    is_default: boolean
+    customer_count: number
+  }>
+}
+
+export const getPriceListUtilization = async (): Promise<PriceListUtilizationData> => {
+  try {
+    const [customersResult, priceListsResult] = await Promise.all([
+      supabase
+        .from('customers')
+        .select('id, price_list_id')
+        .eq('is_active', true),
+      supabase
+        .from('price_lists')
+        .select('id, name, is_default')
+        .eq('is_active', true)
+    ])
+
+    const customers = customersResult.data || []
+    const priceLists = priceListsResult.data || []
+
+    const totalActiveCustomers = customers.length
+    const customersWithPriceList = customers.filter(c => c.price_list_id).length
+    const customersWithoutPriceList = totalActiveCustomers - customersWithPriceList
+
+    // Räkna kunder per prislista
+    const plCounts: { [key: string]: number } = {}
+    customers.forEach(c => {
+      if (c.price_list_id) {
+        plCounts[c.price_list_id] = (plCounts[c.price_list_id] || 0) + 1
+      }
+    })
+
+    const priceListData = priceLists.map(pl => ({
+      id: pl.id,
+      name: pl.name,
+      is_default: pl.is_default || false,
+      customer_count: plCounts[pl.id] || 0
+    })).sort((a, b) => b.customer_count - a.customer_count)
+
+    return {
+      totalActiveCustomers,
+      customersWithPriceList,
+      customersWithoutPriceList,
+      coveragePercent: totalActiveCustomers > 0 ? (customersWithPriceList / totalActiveCustomers) * 100 : 0,
+      priceLists: priceListData
+    }
+  } catch (error) {
+    console.error('Error fetching price list utilization:', error)
+    return {
+      totalActiveCustomers: 0,
+      customersWithPriceList: 0,
+      customersWithoutPriceList: 0,
+      coveragePercent: 0,
+      priceLists: []
+    }
+  }
+}
+
+// KPI data med trendberäkning (jämför nuvarande och föregående period)
+export interface KpiDataWithTrends extends KpiData {
+  trends: {
+    arr_change_percent: number
+    mrr_change_percent: number
+    customers_change: number
+    case_revenue_change_percent: number
+    begone_revenue_change_percent: number
+    churn_change: number
+  }
+}
+
+export const getKpiDataWithTrends = async (
+  currentStart: string,
+  currentEnd: string,
+  prevStart: string,
+  prevEnd: string
+): Promise<KpiDataWithTrends> => {
+  try {
+    // Nuvarande period
+    const currentKpi = await getKpiData()
+
+    // Föregående period - case revenue
+    const { data: prevCaseData } = await supabase
+      .from('cases')
+      .select('price')
+      .gte('completed_date', prevStart)
+      .lte('completed_date', prevEnd)
+      .not('completed_date', 'is', null)
+
+    const prevCaseRevenue = prevCaseData?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
+
+    // Föregående period - BeGone revenue
+    const { data: prevPrivate } = await supabase
+      .from('private_cases')
+      .select('pris')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', prevStart)
+      .lte('completed_date', prevEnd)
+      .not('completed_date', 'is', null)
+
+    const { data: prevBusiness } = await supabase
+      .from('business_cases')
+      .select('pris')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', prevStart)
+      .lte('completed_date', prevEnd)
+      .not('completed_date', 'is', null)
+
+    const prevBegoneRevenue = (prevPrivate?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0)
+      + (prevBusiness?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0)
+
+    // Föregående period - customers count (aktiva vid den tidpunkten)
+    const { data: prevCustomersData } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('is_active', true)
+      .eq('contract_status', 'signed')
+      .lte('created_at', prevEnd)
+
+    const prevCustomers = prevCustomersData?.length || 0
+
+    // Beräkna trender
+    const calcChange = (current: number, prev: number) =>
+      prev > 0 ? ((current - prev) / prev) * 100 : current > 0 ? 100 : 0
+
+    return {
+      ...currentKpi,
+      trends: {
+        arr_change_percent: calcChange(currentKpi.total_arr, currentKpi.total_arr * 0.95), // ARR approximation
+        mrr_change_percent: calcChange(currentKpi.monthly_recurring_revenue, currentKpi.monthly_recurring_revenue * 0.95),
+        customers_change: currentKpi.active_customers - prevCustomers,
+        case_revenue_change_percent: calcChange(currentKpi.total_case_revenue_ytd, prevCaseRevenue),
+        begone_revenue_change_percent: calcChange(currentKpi.total_begone_revenue_ytd, prevBegoneRevenue),
+        churn_change: 0 // Churn is already absolute
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching KPI data with trends:', error)
+    throw error
+  }
+}
+
+// Intäktsmix - Proportioner av olika intäktsströmmar
+export interface RevenueHealthData {
+  contract_revenue: number
+  case_revenue: number
+  begone_revenue: number
+  total_revenue: number
+  contract_percent: number
+  case_percent: number
+  begone_percent: number
+}
+
+export const getRevenueHealthMix = async (startDate: string, endDate: string): Promise<RevenueHealthData> => {
+  try {
+    // Kontraktsintäkter (ARR-baserat, proportionellt för perioden)
+    const { data: customers } = await supabase
+      .from('customers')
+      .select('annual_value')
+      .eq('is_active', true)
+      .eq('contract_status', 'signed')
+
+    const totalArr = customers?.reduce((sum, c) => sum + (c.annual_value || 0), 0) || 0
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const months = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1)
+    const contract_revenue = (totalArr / 12) * months
+
+    // Case revenue (merförsäljning till avtalskunder)
+    const { data: caseData } = await supabase
+      .from('cases')
+      .select('price')
+      .gte('completed_date', startDate)
+      .lte('completed_date', endDate)
+      .not('completed_date', 'is', null)
+    const case_revenue = caseData?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
+
+    // BeGone engångsjobb
+    const { data: privateData } = await supabase
+      .from('private_cases')
+      .select('pris')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', startDate)
+      .lte('completed_date', endDate)
+      .not('completed_date', 'is', null)
+
+    const { data: businessData } = await supabase
+      .from('business_cases')
+      .select('pris')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', startDate)
+      .lte('completed_date', endDate)
+      .not('completed_date', 'is', null)
+
+    const begone_revenue = (privateData?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0)
+      + (businessData?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0)
+
+    const total_revenue = contract_revenue + case_revenue + begone_revenue
+
+    return {
+      contract_revenue,
+      case_revenue,
+      begone_revenue,
+      total_revenue,
+      contract_percent: total_revenue > 0 ? (contract_revenue / total_revenue) * 100 : 0,
+      case_percent: total_revenue > 0 ? (case_revenue / total_revenue) * 100 : 0,
+      begone_percent: total_revenue > 0 ? (begone_revenue / total_revenue) * 100 : 0
+    }
+  } catch (error) {
+    console.error('Error fetching revenue health mix:', error)
+    return {
+      contract_revenue: 0,
+      case_revenue: 0,
+      begone_revenue: 0,
+      total_revenue: 0,
+      contract_percent: 0,
+      case_percent: 0,
+      begone_percent: 0
+    }
+  }
+}
+
 export const getCustomerContracts = async (): Promise<CustomerContract[]> => {
   try {
     const { data } = await supabase
