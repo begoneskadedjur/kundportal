@@ -13,7 +13,6 @@ type TechnicianCardProps = {
   onDelete: (id: string) => void
   onManageAuth: (technician: Technician) => void
   onManageWorkSchedule: (technician: Technician) => void
-  onToggleAdmin: (technician: Technician) => void
 }
 
 export default function TechnicianCard({
@@ -22,8 +21,7 @@ export default function TechnicianCard({
   onToggleStatus,
   onDelete,
   onManageAuth,
-  onManageWorkSchedule,
-  onToggleAdmin
+  onManageWorkSchedule
 }: TechnicianCardProps) {
   const [showDropdown, setShowDropdown] = useState(false)
 
@@ -145,20 +143,6 @@ export default function TechnicianCard({
                 )}
               </button>
               
-              {technician.has_login && technician.role !== 'Admin' && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onToggleAdmin(technician)
-                    setShowDropdown(false)
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2"
-                >
-                  <Shield className="w-4 h-4" />
-                  {technician.is_admin ? 'Ta bort admin-behörighet' : 'Ge admin-behörighet'}
-                </button>
-              )}
-
               <button
                 onClick={(e) => {
                   e.stopPropagation()
