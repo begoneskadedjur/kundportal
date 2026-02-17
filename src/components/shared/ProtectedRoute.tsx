@@ -66,8 +66,10 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         break;
 
       case 'technician':
-        // Tekniker har tillgång till tekniker-sidor
-        if (requiredRole === 'technician') {
+        // Dual-role: tekniker med is_admin får full åtkomst (som admin)
+        if (profile.is_admin) {
+          hasAccess = true;
+        } else if (requiredRole === 'technician') {
           hasAccess = true;
         }
         break;
@@ -101,7 +103,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         redirectPath = '/koordinator/dashboard';
         break;
       case 'technician':
-        redirectPath = '/technician/dashboard';
+        redirectPath = profile.is_admin ? '/admin/dashboard' : '/technician/dashboard';
         break;
       case 'customer':
         // Check if user has multisite access

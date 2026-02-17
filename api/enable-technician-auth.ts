@@ -31,7 +31,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // 2. Kontrollera om auth redan finns
-    // Admins har technician_id=NULL i profilen (pga check constraint), så vi måste matcha via email också
+    // Dubbelkontroll: sök på både technician_id och email för att fånga alla befintliga profiler
     const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
       .select('user_id')

@@ -14,6 +14,8 @@ type Profile = {
   technicians?: { name: string; role: string; email: string; } | null;
 };
 
+type ActiveView = 'admin' | 'technician';
+
 type AuthContextType = {
   user: User | null; profile: Profile | null; loading: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -22,6 +24,9 @@ type AuthContextType = {
   isCustomer: boolean;
   isTechnician: boolean;
   isKoordinator: boolean;
+  hasDualRole: boolean;
+  activeView: ActiveView;
+  setActiveView: (view: ActiveView) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const [activeView, setActiveViewState] = useState<ActiveView>(() => {
+    return (localStorage.getItem('begone_active_view') as ActiveView) || 'admin';
+  });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -68,7 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             targetPath = '/koordinator/dashboard';
             break;
           case 'technician':
-            targetPath = '/technician/dashboard';
+            if (profileData.is_admin) {
+              // Dual-role: navigera baserat på sparad activeView
+              const savedView = localStorage.getItem('begone_active_view') || 'admin';
+              targetPath = savedView === 'technician' ? '/technician/dashboard' : '/admin/dashboard';
+            } else {
+              targetPath = '/technician/dashboard';
+            }
             break;
           case 'customer':
             // Check if this is a multisite user (customer_id is null but has multisite role)
@@ -180,10 +194,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate('/login', { replace: true });
   };
   
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.is_admin === true;
   const isTechnician = profile?.role === 'technician';
   const isCustomer = profile?.role === 'customer';
   const isKoordinator = profile?.role === 'koordinator';
+  const hasDualRole = profile?.role === 'technician' && profile?.is_admin === true;
+
+  const setActiveView = (view: ActiveView) => {
+    setActiveViewState(view);
+    localStorage.setItem('begone_active_view', view);
+  };
 
   const value = {
     user,
@@ -195,6 +215,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isCustomer,
     isTechnician,
     isKoordinator,
+    hasDualRole,
+    activeView,
+    setActiveView,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

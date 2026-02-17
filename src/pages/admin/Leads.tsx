@@ -45,7 +45,7 @@ interface LeadStats {
 
 const Leads: React.FC = () => {
   const navigate = useNavigate()
-  const { user, profile, isAdmin, isKoordinator, isTechnician } = useAuth()
+  const { user, profile, isAdmin, isKoordinator, isTechnician, activeView } = useAuth()
   
   const [loading, setLoading] = useState(true)
   const [leads, setLeads] = useState<Lead[]>([])
@@ -197,7 +197,7 @@ const Leads: React.FC = () => {
       if (filters.assignedTo === 'me') {
         filtered = filtered.filter(lead => {
           // Bara tekniker-rollen ska matcha "mina leads" via technician_id
-          if (profile?.role !== 'technician' || !profile?.technician_id) return false
+          if (activeView !== 'technician' || !profile?.technician_id) return false
           const directlyAssigned = lead.assigned_to === profile.technician_id
           const technicianAssigned = lead.lead_technicians?.some(
             assignment => assignment.technician_id === profile.technician_id
@@ -389,7 +389,7 @@ const Leads: React.FC = () => {
     
     // My active leads - bara för tekniker-rollen
     const myActiveLeads = leads.filter(lead => {
-      if (profile?.role !== 'technician' || !profile?.technician_id) return false
+      if (activeView !== 'technician' || !profile?.technician_id) return false
       const directlyAssigned = lead.assigned_to === profile.technician_id
       const technicianAssigned = lead.lead_technicians?.some(
         assignment => assignment.technician_id === profile.technician_id
@@ -540,7 +540,7 @@ const Leads: React.FC = () => {
     
     // My active leads - bara för tekniker-rollen
     const myActiveLeads = leadsData.filter(lead => {
-      if (profile?.role !== 'technician' || !profile?.technician_id) return false
+      if (activeView !== 'technician' || !profile?.technician_id) return false
       const directlyAssigned = lead.assigned_to === profile.technician_id
       const technicianAssigned = lead.lead_technicians?.some(
         assignment => assignment.technician_id === profile.technician_id

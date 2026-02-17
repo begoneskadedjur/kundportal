@@ -98,7 +98,7 @@ export default function EditContractCaseModal({
   openCommunicationOnLoad = false
 }: EditContractCaseModalProps) {
   const navigate = useNavigate()
-  const { profile } = useAuth()
+  const { profile, activeView } = useAuth()
   const [loading, setLoading] = useState(false)
   const [showSaveSuccess, setShowSaveSuccess] = useState(false)
   const [localCaseData, setLocalCaseData] = useState<any>(caseData)
@@ -1151,8 +1151,8 @@ export default function EditContractCaseModal({
       const newCaseNumber = await generateBENumber()
 
       // Hämta inloggad användares info — bara tekniker-rollen ska kopplas som skapare
-      const technicianId = (profile?.role === 'technician' ? profile?.technician_id : null) || formData.primary_technician_id
-      const technicianName = (profile?.role === 'technician' ? profile?.display_name : null) || formData.primary_technician_name
+      const technicianId = (activeView === 'technician' ? profile?.technician_id : null) || formData.primary_technician_id
+      const technicianName = (activeView === 'technician' ? profile?.display_name : null) || formData.primary_technician_name
 
       // Skapa följeärendet med data från ursprungsärendet
       const followUpCaseData = {

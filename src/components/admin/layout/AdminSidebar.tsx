@@ -1,5 +1,5 @@
 // src/components/admin/layout/AdminSidebar.tsx
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,9 +8,11 @@ import {
   Plus,
   Star,
   HelpCircle,
+  Wrench,
 } from 'lucide-react'
 import { topLevelItems, navGroups, favoriteItems } from './adminNavConfig'
 import { SidebarNavGroup } from './SidebarNavGroup'
+import { useAuth } from '../../../contexts/AuthContext'
 
 interface AdminSidebarProps {
   collapsed: boolean
@@ -27,6 +29,14 @@ export function AdminSidebar({
   userName,
   onSignOut,
 }: AdminSidebarProps) {
+  const { hasDualRole, setActiveView } = useAuth()
+  const navigate = useNavigate()
+
+  const handleSwitchToTechnician = () => {
+    setActiveView('technician')
+    navigate('/technician/dashboard')
+  }
+
   return (
     <aside
       className={`
@@ -68,6 +78,29 @@ export function AdminSidebar({
           </div>
         )}
       </div>
+
+      {/* Vy-växlare för dual-role användare */}
+      {hasDualRole && (
+        <div className={`px-3 py-2 border-b border-slate-700/50 ${collapsed ? 'flex justify-center' : ''}`}>
+          {collapsed ? (
+            <button
+              onClick={handleSwitchToTechnician}
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-all"
+              title="Byt till Tekniker-vy"
+            >
+              <Wrench className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              onClick={handleSwitchToTechnician}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-all"
+            >
+              <Wrench className="w-4 h-4 flex-shrink-0" />
+              <span className="font-medium">Byt till Tekniker-vy</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* CTA Button */}
       <div className="px-3 pt-3">

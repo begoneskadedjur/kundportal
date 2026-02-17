@@ -1,7 +1,7 @@
 // src/components/admin/layout/AdminTopHeader.tsx
 import { useState, useEffect } from 'react'
-import { useLocation, Link } from 'react-router-dom'
-import { ChevronRight, Search, RefreshCw, Bell } from 'lucide-react'
+import { useLocation, Link, useNavigate } from 'react-router-dom'
+import { ChevronRight, Search, RefreshCw, Bell, Wrench } from 'lucide-react'
 import { breadcrumbMap } from './adminNavConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getTicketStats } from '../../../services/communicationService'
@@ -13,7 +13,8 @@ interface AdminTopHeaderProps {
 
 export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderProps) {
   const location = useLocation()
-  const { profile } = useAuth()
+  const navigate = useNavigate()
+  const { profile, hasDualRole, setActiveView } = useAuth()
   const currentLabel = breadcrumbMap[location.pathname] || 'Översikt'
   const [ticketCount, setTicketCount] = useState(0)
 
@@ -62,6 +63,16 @@ export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderPro
             </span>
           )}
         </Link>
+        {hasDualRole && (
+          <button
+            onClick={() => { setActiveView('technician'); navigate('/technician/dashboard') }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-all"
+            title="Byt till Tekniker-vy"
+          >
+            <Wrench className="w-3.5 h-3.5" />
+            <span className="hidden xl:inline">Tekniker-vy</span>
+          </button>
+        )}
         <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
           <span className="text-white text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
         </div>

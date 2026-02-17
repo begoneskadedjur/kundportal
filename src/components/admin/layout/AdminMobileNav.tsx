@@ -1,9 +1,10 @@
 // src/components/admin/layout/AdminMobileNav.tsx
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Bell, Menu, X, LogOut } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Bell, Menu, X, LogOut, Wrench } from 'lucide-react'
 import { topLevelItems, navGroups, mobileBottomItems } from './adminNavConfig'
 import { MobileNavGroup } from './MobileNavGroup'
+import { useAuth } from '../../../contexts/AuthContext'
 
 interface AdminMobileNavProps {
   currentPath: string
@@ -12,6 +13,8 @@ interface AdminMobileNavProps {
 
 export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { hasDualRole, setActiveView } = useAuth()
+  const navigate = useNavigate()
 
   return (
     <>
@@ -78,6 +81,19 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
             <MobileNavGroup key={group.label} group={group} currentPath={currentPath} onNavigate={() => setMobileMenuOpen(false)} />
           ))}
           <div className="h-px bg-slate-700/50 my-3" />
+          {hasDualRole && (
+            <button
+              onClick={() => {
+                setActiveView('technician')
+                setMobileMenuOpen(false)
+                navigate('/technician/dashboard')
+              }}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-all"
+            >
+              <Wrench className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-medium">Byt till Tekniker-vy</span>
+            </button>
+          )}
           <button
             onClick={onSignOut}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all"

@@ -22,7 +22,8 @@ export default function AdminLayout() {
   }
 
   // Grundlaggande rollkontroll — belt-and-suspenders med ProtectedRoute pa varje child
-  if (!profile || !['admin', 'koordinator'].includes(profile.role || '')) {
+  const hasAdminAccess = profile?.role === 'admin' || profile?.role === 'koordinator' || profile?.is_admin === true
+  if (!profile || !hasAdminAccess) {
     return <Navigate to="/login" replace />
   }
 

@@ -22,8 +22,8 @@ export default function AdminOrKoordinatorRoute({ children }: AdminOrKoordinator
     return <Navigate to="/login" replace />;
   }
 
-  // Tillåt både admin och koordinator
-  if (profile.role === 'admin' || profile.is_koordinator) {
+  // Tillåt admin, koordinator, och dual-role tekniker med is_admin
+  if (profile.role === 'admin' || profile.is_admin === true || profile.is_koordinator) {
     return <>{children}</>;
   }
 
