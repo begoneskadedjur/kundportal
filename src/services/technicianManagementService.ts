@@ -135,9 +135,18 @@ export const technicianManagementService = {
       if (techniciansRes.error) throw techniciansRes.error;
       if (profilesRes.error) throw profilesRes.error;
 
-      const profilesByEmail = new Map(profilesRes.data.map(p => [p.email.toLowerCase(), p]));
+      // Bygg två index: FK-baserat (tekniker/koordinator) + email-baserat (admins, som har technician_id=NULL)
+      const profilesByTechId = new Map(
+        profilesRes.data.filter(p => p.technician_id).map(p => [p.technician_id, p])
+      );
+      const profilesByEmail = new Map(
+        profilesRes.data.map(p => [p.email.toLowerCase(), p])
+      );
+
       const enrichedData = (techniciansRes.data || []).map(tech => {
-        const profile = profilesByEmail.get(tech.email.toLowerCase());
+        // Primärt: matcha via FK (tekniker/koordinator)
+        // Fallback: matcha via email (admins — check constraint tvingar technician_id=NULL för admin-profiler)
+        const profile = profilesByTechId.get(tech.id) || profilesByEmail.get(tech.email.toLowerCase()) || null;
         return {
           ...tech,
           has_login: !!profile,
@@ -200,6 +209,12 @@ export const technicianManagementService = {
       }
       if (oldTechnician && oldTechnician.name !== data.name) {
         await this.updateTechnicianNameInCases(oldTechnician.name, data.name);
+        // Synka display_name i profiles om den fortfarande matchar det gamla namnet
+        await supabase
+          .from('profiles')
+          .update({ display_name: data.name })
+          .eq('technician_id', id)
+          .eq('display_name', oldTechnician.name);
       }
       toast.success('Personal uppdaterad!');
       return data;
@@ -265,8 +280,12 @@ export const technicianManagementService = {
 
   async toggleTechnicianStatus(id: string, isActive: boolean): Promise<void> {
     try {
-      await supabase.from('technicians').update({ is_active: isActive }).eq('id', id);
-      await supabase.from('profiles').update({ is_active: isActive }).eq('technician_id', id);
+      const { data: tech } = await supabase.from('technicians').update({ is_active: isActive }).eq('id', id).select('email').single();
+      // Uppdatera profil — försök via FK först, sedan via email (för admins)
+      const { count } = await supabase.from('profiles').update({ is_active: isActive }).eq('technician_id', id).select('*', { count: 'exact', head: true });
+      if (count === 0 && tech?.email) {
+        await supabase.from('profiles').update({ is_active: isActive }).eq('email', tech.email);
+      }
       toast.success(`Personal ${isActive ? 'aktiverad' : 'inaktiverad'}`);
     } catch (error: any) {
       toast.error('Kunde inte uppdatera status');
@@ -332,41 +351,21 @@ export const technicianManagementService = {
 
   async disableTechnicianAuth(technicianId: string): Promise<void> {
     try {
-      // Använd delete-technician API som har logik för att ta bort auth
-      // Men vi vill bara inaktivera auth, inte ta bort teknikern
-      // Skapa en dedikerad API-route för detta
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('technician_id', technicianId)
-        .single();
+      // API:et hanterar allt server-side: slår upp user_id, raderar profil + auth-user
+      const response = await fetch('/api/disable-technician-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ technician_id: technicianId })
+      });
 
-      if (profile) {
-        // Ta bort profilen först (detta kräver inte admin-key)
-        await supabase.from('profiles').delete().eq('technician_id', technicianId);
-
-        // För att ta bort auth-användaren behövs admin-anrop
-        // Använd delete-technician API men skicka bara user_id
-        const response = await fetch('/api/disable-technician-auth', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            user_id: profile.user_id,
-            technician_id: technicianId
-          })
-        });
-
-        if (!response.ok) {
-          const result = await response.json();
-          console.warn('Auth-användaren kunde inte tas bort:', result.error);
-          // Fortsätt ändå - profilen är borttagen
-        }
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Kunde inte inaktivera inloggning');
       }
+
       toast.success('Inloggning inaktiverat!');
     } catch (error: any) {
-      toast.error('Kunde inte inaktivera inloggning');
+      toast.error(error.message || 'Kunde inte inaktivera inloggning');
       throw error;
     }
   },
@@ -392,11 +391,24 @@ export const technicianManagementService = {
     try {
       const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name)`).eq('id', id).single();
       if (error) throw error;
+
+      // FK-join hittar tekniker/koordinator-profiler
+      // Men admin-profiler har technician_id=NULL (pga check constraint) — fallback till email-matchning
+      let profile = data.profiles;
+      if (!profile?.user_id) {
+        const { data: emailProfile } = await supabase
+          .from('profiles')
+          .select('user_id, is_active, display_name')
+          .eq('email', data.email)
+          .single();
+        if (emailProfile) profile = emailProfile;
+      }
+
       return {
         ...data,
-        has_login: !!data.profiles?.user_id,
-        user_id: data.profiles?.user_id || null,
-        display_name: data.profiles?.display_name || null
+        has_login: !!profile?.user_id,
+        user_id: profile?.user_id || null,
+        display_name: profile?.display_name || data.name
       };
     } catch (error: any) {
       console.error('Error fetching staff member:', error);
