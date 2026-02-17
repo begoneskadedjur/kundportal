@@ -4,7 +4,6 @@ import {
   Trash2, Power, Key, UserCheck, Send, Clock, UserX // ✅ UserX behövs för varning
 } from 'lucide-react'
 import Button from '../../../ui/Button'
-import Card from '../../../ui/Card'
 import { technicianManagementService, type Technician } from '../../../../services/technicianManagementService'
 
 // ✅ PROP-TYPEN ÄR UPPDATERAD
@@ -48,7 +47,7 @@ export default function TechnicianCard({
   }, [showDropdown])
 
   return (
-    <Card className={`transition-all duration-200 ${!technician.is_active ? 'opacity-60' : ''}`}>
+    <div className={`bg-slate-800/50 rounded-2xl border border-slate-700/40 p-5 hover:border-slate-600 transition-colors ${!technician.is_active ? 'opacity-60' : ''}`}>
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -270,6 +269,6 @@ export default function TechnicianCard({
           </div>
         </div>
       )}
-    </Card>
+    </div>
   )
 }

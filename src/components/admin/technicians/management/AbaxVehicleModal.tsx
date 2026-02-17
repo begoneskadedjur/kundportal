@@ -57,7 +57,7 @@ export default function AbaxVehicleModal({ isOpen, onClose }: AbaxVehicleModalPr
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999] p-4">
-      <div className="glass w-full max-w-4xl bg-slate-900/95 backdrop-blur-lg border border-slate-600 rounded-xl shadow-2xl flex flex-col">
+      <div className="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col">
         <div className="p-6 border-b border-slate-700 flex items-center justify-between">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center"><Car className="w-5 h-5 text-slate-300" /></div>
