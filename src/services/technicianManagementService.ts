@@ -39,6 +39,7 @@ export type Technician = {
   has_login?: boolean
   user_id?: string | null
   display_name?: string | null
+  is_admin?: boolean
 }
 
 export type TechnicianFormData = {
@@ -78,6 +79,22 @@ export const technicianManagementService = {
       console.error('Error updating work schedule:', error);
       toast.error('Kunde inte spara det nya arbetsschemat.');
       throw error;
+    }
+  },
+
+  async toggleAdminAccess(technicianId: string, isAdmin: boolean): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_admin: isAdmin })
+        .eq('technician_id', technicianId)
+
+      if (error) throw error
+      toast.success(isAdmin ? 'Admin-behörighet aktiverad!' : 'Admin-behörighet borttagen!')
+    } catch (error: any) {
+      console.error('Error toggling admin access:', error)
+      toast.error('Kunde inte uppdatera admin-behörighet')
+      throw error
     }
   },
 
@@ -130,7 +147,7 @@ export const technicianManagementService = {
     try {
       const [techniciansRes, profilesRes] = await Promise.all([
         supabase.from('technicians').select('*').order('name', { ascending: true }),
-        supabase.from('profiles').select('user_id, email, display_name, technician_id')
+        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin')
       ]);
       if (techniciansRes.error) throw techniciansRes.error;
       if (profilesRes.error) throw profilesRes.error;
@@ -146,7 +163,8 @@ export const technicianManagementService = {
           ...tech,
           has_login: !!profile,
           user_id: profile?.user_id || null,
-          display_name: profile?.display_name || tech.name
+          display_name: profile?.display_name || tech.name,
+          is_admin: profile?.is_admin || false
         };
       });
       return enrichedData;

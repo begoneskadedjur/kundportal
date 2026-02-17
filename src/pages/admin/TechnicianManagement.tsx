@@ -139,6 +139,19 @@ export default function TechnicianManagement() {
     }
   }
 
+  const handleToggleAdmin = async (technician: Technician) => {
+    const newState = !technician.is_admin
+    const action = newState ? 'ge admin-behörighet till' : 'ta bort admin-behörighet från'
+    if (!window.confirm(`Är du säker på att du vill ${action} ${technician.name}?`)) return
+
+    try {
+      await technicianManagementService.toggleAdminAccess(technician.id, newState)
+      await fetchTechnicians()
+    } catch (error) {
+      // Fel hanteras av service
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -344,6 +357,7 @@ export default function TechnicianManagement() {
               onDelete={handleDeleteTechnician}
               onManageAuth={handleManageAuth}
               onManageWorkSchedule={handleManageWorkSchedule}
+              onToggleAdmin={handleToggleAdmin}
             />
           ))}
         </div>

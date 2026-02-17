@@ -1,28 +1,29 @@
 import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
-import { 
-  User, Mail, Phone, MapPin, MoreVertical, Edit, 
-  Trash2, Power, Key, UserCheck, Send, Clock, UserX // ✅ UserX behövs för varning
+import {
+  User, Mail, Phone, MapPin, MoreVertical, Edit,
+  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield
 } from 'lucide-react'
 import Button from '../../../ui/Button'
 import { technicianManagementService, type Technician } from '../../../../services/technicianManagementService'
 
-// ✅ PROP-TYPEN ÄR UPPDATERAD
 type TechnicianCardProps = {
   technician: Technician
   onEdit: (technician: Technician) => void
   onToggleStatus: (id: string, isActive: boolean) => void
   onDelete: (id: string) => void
   onManageAuth: (technician: Technician) => void
-  onManageWorkSchedule: (technician: Technician) => void // ✅ NY PROP FÖR ARBETSSCHEMA
+  onManageWorkSchedule: (technician: Technician) => void
+  onToggleAdmin: (technician: Technician) => void
 }
 
-export default function TechnicianCard({ 
-  technician, 
-  onEdit, 
-  onToggleStatus, 
+export default function TechnicianCard({
+  technician,
+  onEdit,
+  onToggleStatus,
   onDelete,
   onManageAuth,
-  onManageWorkSchedule // ✅ NY PROP TILLAGD
+  onManageWorkSchedule,
+  onToggleAdmin
 }: TechnicianCardProps) {
   const [showDropdown, setShowDropdown] = useState(false)
 
@@ -67,6 +68,12 @@ export default function TechnicianCard({
               <span className={`inline-flex px-2 py-1 rounded-md text-xs font-medium ${getRoleColor(technician.role)}`}>
                 {technician.role}
               </span>
+              {technician.is_admin && technician.role !== 'Admin' && (
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-500/20 text-purple-400">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Admin
+                </span>
+              )}
               {technician.has_login && (
                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-500/20 text-green-400">
                   <Key className="w-3 h-3 mr-1" />
@@ -138,6 +145,20 @@ export default function TechnicianCard({
                 )}
               </button>
               
+              {technician.has_login && technician.role !== 'Admin' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleAdmin(technician)
+                    setShowDropdown(false)
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2"
+                >
+                  <Shield className="w-4 h-4" />
+                  {technician.is_admin ? 'Ta bort admin-behörighet' : 'Ge admin-behörighet'}
+                </button>
+              )}
+
               <button
                 onClick={(e) => {
                   e.stopPropagation()
