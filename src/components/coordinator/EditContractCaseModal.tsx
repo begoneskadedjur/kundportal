@@ -1150,9 +1150,9 @@ export default function EditContractCaseModal({
       // Generera nytt BE-nummer
       const newCaseNumber = await generateBENumber()
 
-      // Hämta inloggad användares info
-      const technicianId = profile?.technician_id || formData.primary_technician_id
-      const technicianName = profile?.display_name || formData.primary_technician_name
+      // Hämta inloggad användares info — bara tekniker-rollen ska kopplas som skapare
+      const technicianId = (profile?.role === 'technician' ? profile?.technician_id : null) || formData.primary_technician_id
+      const technicianName = (profile?.role === 'technician' ? profile?.display_name : null) || formData.primary_technician_name
 
       // Skapa följeärendet med data från ursprungsärendet
       const followUpCaseData = {

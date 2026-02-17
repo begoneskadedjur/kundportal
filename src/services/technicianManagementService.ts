@@ -135,18 +135,13 @@ export const technicianManagementService = {
       if (techniciansRes.error) throw techniciansRes.error;
       if (profilesRes.error) throw profilesRes.error;
 
-      // Bygg två index: FK-baserat (tekniker/koordinator) + email-baserat (admins, som har technician_id=NULL)
+      // Matcha profiler via FK (alla roller har nu technician_id)
       const profilesByTechId = new Map(
         profilesRes.data.filter(p => p.technician_id).map(p => [p.technician_id, p])
       );
-      const profilesByEmail = new Map(
-        profilesRes.data.map(p => [p.email.toLowerCase(), p])
-      );
 
       const enrichedData = (techniciansRes.data || []).map(tech => {
-        // Primärt: matcha via FK (tekniker/koordinator)
-        // Fallback: matcha via email (admins — check constraint tvingar technician_id=NULL för admin-profiler)
-        const profile = profilesByTechId.get(tech.id) || profilesByEmail.get(tech.email.toLowerCase()) || null;
+        const profile = profilesByTechId.get(tech.id) || null;
         return {
           ...tech,
           has_login: !!profile,
@@ -280,12 +275,9 @@ export const technicianManagementService = {
 
   async toggleTechnicianStatus(id: string, isActive: boolean): Promise<void> {
     try {
-      const { data: tech } = await supabase.from('technicians').update({ is_active: isActive }).eq('id', id).select('email').single();
-      // Uppdatera profil — försök via FK först, sedan via email (för admins)
-      const { count } = await supabase.from('profiles').update({ is_active: isActive }).eq('technician_id', id).select('*', { count: 'exact', head: true });
-      if (count === 0 && tech?.email) {
-        await supabase.from('profiles').update({ is_active: isActive }).eq('email', tech.email);
-      }
+      await supabase.from('technicians').update({ is_active: isActive }).eq('id', id);
+      // Uppdatera profil via FK (alla roller har nu technician_id)
+      await supabase.from('profiles').update({ is_active: isActive }).eq('technician_id', id);
       toast.success(`Personal ${isActive ? 'aktiverad' : 'inaktiverad'}`);
     } catch (error: any) {
       toast.error('Kunde inte uppdatera status');
@@ -392,17 +384,8 @@ export const technicianManagementService = {
       const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name)`).eq('id', id).single();
       if (error) throw error;
 
-      // FK-join hittar tekniker/koordinator-profiler
-      // Men admin-profiler har technician_id=NULL (pga check constraint) — fallback till email-matchning
-      let profile = data.profiles;
-      if (!profile?.user_id) {
-        const { data: emailProfile } = await supabase
-          .from('profiles')
-          .select('user_id, is_active, display_name')
-          .eq('email', data.email)
-          .single();
-        if (emailProfile) profile = emailProfile;
-      }
+      // FK-join hittar profiler direkt (alla roller har nu technician_id)
+      const profile = data.profiles;
 
       return {
         ...data,

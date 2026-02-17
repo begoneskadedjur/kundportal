@@ -24,10 +24,9 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'user_id eller technician_id krävs' })
     }
 
-    // Slå upp user_id om det inte skickades
+    // Slå upp user_id via FK om det inte skickades
     let authUserId = user_id
     if (!authUserId && technician_id) {
-      // Försök via technician_id FK (tekniker/koordinator)
       const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('user_id')
@@ -36,25 +35,6 @@ export default async function handler(req: any, res: any) {
 
       if (profile) {
         authUserId = profile.user_id
-      } else {
-        // Fallback: slå upp via email (admin-profiler har technician_id=NULL pga check constraint)
-        const { data: technician } = await supabaseAdmin
-          .from('technicians')
-          .select('email')
-          .eq('id', technician_id)
-          .single()
-
-        if (technician) {
-          const { data: emailProfile } = await supabaseAdmin
-            .from('profiles')
-            .select('user_id')
-            .eq('email', technician.email)
-            .single()
-
-          if (emailProfile) {
-            authUserId = emailProfile.user_id
-          }
-        }
       }
     }
 

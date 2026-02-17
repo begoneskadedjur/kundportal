@@ -196,11 +196,11 @@ const Leads: React.FC = () => {
     if (filters.assignedTo !== 'all') {
       if (filters.assignedTo === 'me') {
         filtered = filtered.filter(lead => {
-          // Check if user is assigned directly via assigned_to field
-          const directlyAssigned = lead.assigned_to === profile?.technician_id
-          // Check if user is in lead_technicians table
+          // Bara tekniker-rollen ska matcha "mina leads" via technician_id
+          if (profile?.role !== 'technician' || !profile?.technician_id) return false
+          const directlyAssigned = lead.assigned_to === profile.technician_id
           const technicianAssigned = lead.lead_technicians?.some(
-            assignment => assignment.technician_id === profile?.technician_id
+            assignment => assignment.technician_id === profile.technician_id
           )
           return directlyAssigned || technicianAssigned
         })
@@ -387,13 +387,12 @@ const Leads: React.FC = () => {
   const statsData = useMemo(() => {
     const totalLeads = leads.length
     
-    // My active leads - check both assigned_to and lead_technicians table
+    // My active leads - bara för tekniker-rollen
     const myActiveLeads = leads.filter(lead => {
-      // Check if user is assigned directly via assigned_to field
-      const directlyAssigned = lead.assigned_to === profile?.technician_id
-      // Check if user is in lead_technicians table
+      if (profile?.role !== 'technician' || !profile?.technician_id) return false
+      const directlyAssigned = lead.assigned_to === profile.technician_id
       const technicianAssigned = lead.lead_technicians?.some(
-        assignment => assignment.technician_id === profile?.technician_id
+        assignment => assignment.technician_id === profile.technician_id
       )
       return (directlyAssigned || technicianAssigned) && lead.status !== 'red_lost'
     }).length
@@ -539,13 +538,12 @@ const Leads: React.FC = () => {
   const calculateStats = useCallback((leadsData: Lead[]) => {
     const totalLeads = leadsData.length
     
-    // My active leads - check both assigned_to and lead_technicians table
+    // My active leads - bara för tekniker-rollen
     const myActiveLeads = leadsData.filter(lead => {
-      // Check if user is assigned directly via assigned_to field
-      const directlyAssigned = lead.assigned_to === profile?.technician_id
-      // Check if user is in lead_technicians table
+      if (profile?.role !== 'technician' || !profile?.technician_id) return false
+      const directlyAssigned = lead.assigned_to === profile.technician_id
       const technicianAssigned = lead.lead_technicians?.some(
-        assignment => assignment.technician_id === profile?.technician_id
+        assignment => assignment.technician_id === profile.technician_id
       )
       return (directlyAssigned || technicianAssigned) && lead.status !== 'red_lost'
     }).length

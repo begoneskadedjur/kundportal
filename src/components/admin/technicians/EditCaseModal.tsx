@@ -485,9 +485,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     setFollowUpLoading(true);
 
     try {
-      // Hämta teknikernamn om det finns
-      let technicianName = profile.full_name || 'Okänd tekniker';
-      if (profile.technician_id) {
+      // Hämta teknikernamn — bara om inloggad användare är tekniker
+      let technicianName = profile.display_name || profile.full_name || 'Okänd';
+      if (profile.role === 'technician' && profile.technician_id) {
         const { data: techData } = await supabase
           .from('technicians')
           .select('name')
@@ -529,7 +529,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
         // Följeärende-referens
         parent_case_id: currentCase.id,
-        created_by_technician_id: profile.technician_id || null,
+        created_by_technician_id: profile.role === 'technician' ? profile.technician_id : null,
         created_by_technician_name: technicianName,
 
         // Nollställda fält för det nya ärendet
