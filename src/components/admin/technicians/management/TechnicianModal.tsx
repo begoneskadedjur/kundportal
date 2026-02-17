@@ -2,7 +2,7 @@
 // FULLSTÄNDIG VERSION MED KOMPETENSKARTA INTEGRERAD
 
 import React, { useState, useEffect } from 'react'
-import { User, Key, Car, Wrench, AlertCircle } from 'lucide-react' // ✅ Lade till Wrench
+import { User, Key, Car, Wrench, AlertCircle, Shield } from 'lucide-react'
 import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
 import LoadingSpinner from '../../../shared/LoadingSpinner'
@@ -27,7 +27,8 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
   const [loading, setLoading] = useState(false)
   const [password, setPassword] = useState('')
   const [formData, setFormData] = useState<Partial<TechnicianFormData>>({})
-  const [selectedCompetencies, setSelectedCompetencies] = useState<Set<PestType>>(new Set()) // ✅ State för kompetenser
+  const [selectedCompetencies, setSelectedCompetencies] = useState<Set<PestType>>(new Set())
+  const [alsoAdmin, setAlsoAdmin] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -39,8 +40,10 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
           direct_phone: technician.direct_phone || '',
           office_phone: technician.office_phone || '',
           address: technician.address || '',
-          abax_vehicle_id: technician.abax_vehicle_id || ''
+          abax_vehicle_id: technician.abax_vehicle_id || '',
+          display_name: technician.display_name || technician.name || ''
         });
+        setAlsoAdmin(technician.is_admin || false);
         // Hämta och sätt befintliga kompetenser
         const currentCompetencies = await technicianManagementService.getCompetencies(technician.id);
         setSelectedCompetencies(new Set(currentCompetencies));
@@ -48,6 +51,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
         // Återställ allt för en ny person
         setFormData({ name: '', role: 'Skadedjurstekniker', email: '', direct_phone: '', office_phone: '', address: '', abax_vehicle_id: '' });
         setSelectedCompetencies(new Set());
+        setAlsoAdmin(false);
       }
       setPassword('');
     };
@@ -83,7 +87,17 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
       if (technician) {
         // Uppdatera befintlig personal
         await technicianManagementService.updateTechnician(technician.id, formData as TechnicianFormData);
-        await technicianManagementService.updateCompetencies(technician.id, competenciesArray); // Spara kompetenser
+        await technicianManagementService.updateCompetencies(technician.id, competenciesArray);
+        if (technician.has_login && formData.display_name && formData.display_name !== technician.display_name) {
+          await technicianManagementService.updateDisplayName(technician.id, formData.display_name);
+        }
+        // Synka admin-behörighet om den ändrats
+        if (technician.has_login) {
+          const shouldBeAdmin = formData.role === 'Admin' || alsoAdmin;
+          if (shouldBeAdmin !== (technician.is_admin || false)) {
+            await technicianManagementService.toggleAdminAccess(technician.id, shouldBeAdmin);
+          }
+        }
         if (password.trim() && technician.user_id) {
           await technicianManagementService.updateUserPassword(technician.user_id, password);
         }
@@ -135,6 +149,24 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
               </select>
             </div>
           </div>
+          {/* Admin-behörighet checkbox - visas om personen har inloggning och primär roll inte redan är Admin */}
+          {technician?.has_login && formData.role !== 'Admin' && (
+            <label className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer hover:border-slate-600 transition-colors">
+              <input
+                type="checkbox"
+                checked={alsoAdmin}
+                onChange={(e) => setAlsoAdmin(e.target.checked)}
+                className="h-4 w-4 rounded bg-slate-700 border-slate-500 text-[#20c58f] focus:ring-[#20c58f]"
+              />
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-purple-400" />
+                <div>
+                  <span className="text-sm font-medium text-slate-300">Även admin-behörighet</span>
+                  <p className="text-xs text-slate-500">Personen får tillgång till admin-panelen utöver sin primära roll</p>
+                </div>
+              </div>
+            </label>
+          )}
           <Input label="E-post *" name="email" type="email" value={formData.email || ''} onChange={handleChange} required placeholder="namn@begone.se" className="bg-slate-800/50 border-slate-600"/>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Direkt telefon" name="direct_phone" value={formData.direct_phone || ''} onChange={handleChange} placeholder="072-123 45 67" className="bg-slate-800/50 border-slate-600"/>
@@ -161,6 +193,9 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
           {/* System & Integrationer */}
           <div className="pt-4 border-t border-slate-700 space-y-4">
             <h3 className="text-md font-medium text-slate-300 flex items-center gap-2"><Key className="w-4 h-4 text-purple-400"/>System & Integrationer</h3>
+            {technician?.has_login && (
+              <Input label="Visningsnamn" name="display_name" value={formData.display_name || ''} onChange={handleChange} icon={<User className="w-4 h-4 text-slate-400"/>} placeholder="Namn som visas i systemet" className="bg-slate-800/50 border-slate-600"/>
+            )}
             <Input label="Abax Vehicle ID" name="abax_vehicle_id" value={formData.abax_vehicle_id || ''} onChange={handleChange} icon={<Car className="w-4 h-4 text-slate-400"/>} placeholder="ID från Abax för ruttplanering" className="bg-slate-800/50 border-slate-600"/>
             {technician?.has_login && (<Input label="Ändra lösenord" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Lämna tomt för att inte ändra" icon={<Key className="w-4 h-4 text-slate-400"/>} className="bg-slate-800/50 border-slate-600"/>)}
           </div>

@@ -50,6 +50,7 @@ export type TechnicianFormData = {
   office_phone: string
   address: string
   abax_vehicle_id: string
+  display_name?: string
 }
 
 export type TechnicianStats = {
@@ -96,6 +97,15 @@ export const technicianManagementService = {
       toast.error('Kunde inte uppdatera admin-behörighet')
       throw error
     }
+  },
+
+  async updateDisplayName(technicianId: string, displayName: string): Promise<void> {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ display_name: displayName })
+      .eq('technician_id', technicianId)
+
+    if (error) throw error
   },
 
   // --- KOMPETENS-FUNKTIONER ---
@@ -203,7 +213,7 @@ export const technicianManagementService = {
 
   async updateTechnician(id: string, technicianData: TechnicianFormData): Promise<Technician> {
     try {
-      const { data: oldTechnician } = await supabase.from('technicians').select('name').eq('id', id).single();
+      const { data: oldTechnician } = await supabase.from('technicians').select('name, role').eq('id', id).single();
       const formatPhone = (phone: string) => phone ? phone.replace(/[\s-]/g, '').replace(/^0/, '+46') : null;
       const updateData = {
         name: technicianData.name.trim(),
@@ -229,6 +239,22 @@ export const technicianManagementService = {
           .eq('technician_id', id)
           .eq('display_name', oldTechnician.name);
       }
+      // Synka profiles.role + is_admin om rollen ändrades
+      if (oldTechnician && oldTechnician.role !== data.role) {
+        const roleMapping: Record<string, string> = {
+          'Admin': 'admin',
+          'Koordinator': 'koordinator',
+          'Skadedjurstekniker': 'technician'
+        }
+        const newProfileRole = roleMapping[data.role] || 'technician'
+        const newIsAdmin = data.role === 'Admin'
+
+        await supabase
+          .from('profiles')
+          .update({ role: newProfileRole, is_admin: newIsAdmin })
+          .eq('technician_id', id)
+      }
+
       toast.success('Personal uppdaterad!');
       return data;
     } catch (error: any) {
