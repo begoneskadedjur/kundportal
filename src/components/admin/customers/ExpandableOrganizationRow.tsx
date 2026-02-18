@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw, XCircle } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw, XCircle, Receipt } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 
@@ -18,6 +18,7 @@ interface ExpandableOrganizationRowProps {
   onViewRevenue?: (org: ConsolidatedCustomer) => void
   onRenewal?: (org: ConsolidatedCustomer) => void
   onTerminate?: (org: ConsolidatedCustomer) => void
+  onBillingSettings?: (org: ConsolidatedCustomer) => void
   visibleColumns?: Set<string>
 }
 
@@ -135,6 +136,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   onViewRevenue,
   onRenewal,
   onTerminate,
+  onBillingSettings,
   visibleColumns
 }) => {
   const isVisible = (col: string) => !visibleColumns || visibleColumns.has(col)
@@ -430,6 +432,17 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               title="Säg upp avtal"
             >
               <XCircle className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Billing Settings Button */}
+          {onBillingSettings && (
+            <button
+              onClick={() => onBillingSettings(organization)}
+              className="text-emerald-400 hover:text-emerald-300 text-sm font-medium transition-colors duration-200"
+              title="Faktureringsinställningar"
+            >
+              <Receipt className="h-4 w-4" />
             </button>
           )}
 

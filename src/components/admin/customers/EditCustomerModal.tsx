@@ -1,16 +1,13 @@
 // src/components/admin/customers/EditCustomerModal.tsx - Kompakt kundredigering
 
 import React, { useState, useEffect } from 'react'
-import { Building2, Save, AlertCircle, Receipt } from 'lucide-react'
+import { Building2, Save, AlertCircle } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
-import { PriceListService } from '../../../services/priceListService'
-import { PriceList } from '../../../types/articles'
-import { BillingFrequency, BILLING_FREQUENCY_CONFIG } from '../../../types/contractBilling'
 
 interface Customer {
   id: string
@@ -38,8 +35,6 @@ interface Customer {
   product_summary?: string | null
   service_details?: string | null
   agreement_text?: string | null
-  price_list_id?: string | null
-  billing_frequency?: BillingFrequency | null
 }
 
 interface EditCustomerModalProps {
@@ -77,7 +72,6 @@ export default function EditCustomerModal({
   const [formData, setFormData] = useState<Partial<Customer>>({})
   const [loading, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [priceLists, setPriceLists] = useState<PriceList[]>([])
 
   // Initialize form data when customer changes
   useEffect(() => {
@@ -89,28 +83,17 @@ export default function EditCustomerModal({
         contact_email: customer.contact_email || '',
         contact_phone: customer.contact_phone || '',
         contact_address: customer.contact_address || '',
-        billing_email: customer.billing_email || '',
-        billing_address: customer.billing_address || '',
         business_type: customer.business_type || '',
         industry_category: customer.industry_category || '',
         customer_size: customer.customer_size || null,
         assigned_account_manager: customer.assigned_account_manager || '',
         account_manager_email: customer.account_manager_email || '',
         sales_person: customer.sales_person || '',
-        sales_person_email: customer.sales_person_email || '',
-        price_list_id: customer.price_list_id || null,
-        billing_frequency: customer.billing_frequency || 'monthly'
+        sales_person_email: customer.sales_person_email || ''
       })
       setErrors({})
     }
   }, [customer])
-
-  // Ladda prislistor
-  useEffect(() => {
-    PriceListService.getActivePriceLists()
-      .then(setPriceLists)
-      .catch(err => console.error('Kunde inte ladda prislistor:', err))
-  }, [])
 
   const handleInputChange = (field: keyof Customer, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -151,10 +134,6 @@ export default function EditCustomerModal({
         contact_email: formData.contact_email,
         contact_phone: formData.contact_phone,
         contact_address: formData.contact_address,
-        billing_email: formData.billing_email,
-        billing_address: formData.billing_address,
-        price_list_id: formData.price_list_id,
-        billing_frequency: formData.billing_frequency,
         assigned_account_manager: formData.assigned_account_manager,
         account_manager_email: formData.account_manager_email,
         sales_person: formData.sales_person,
@@ -321,61 +300,6 @@ export default function EditCustomerModal({
               onChange={(e) => handleInputChange('contact_address', e.target.value)}
               placeholder="Gatuadress, Postnummer Ort"
             />
-            <div>
-              <Input
-                label="Faktura e-post"
-                type="email"
-                value={formData.billing_email || ''}
-                onChange={(e) => handleInputChange('billing_email', e.target.value)}
-                placeholder="faktura@example.com"
-              />
-              {formData.billing_email && formData.billing_email !== formData.contact_email && (
-                <p className="text-xs text-yellow-400 mt-1">Skiljer sig från kontakt-email</p>
-              )}
-            </div>
-            <Input
-              label="Fakturaadress"
-              value={formData.billing_address || ''}
-              onChange={(e) => handleInputChange('billing_address', e.target.value)}
-              placeholder="Om annan än kontaktadress"
-            />
-          </div>
-        </div>
-
-        {/* Fakturering */}
-        <div className="border-t border-slate-700/50 pt-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-            <Receipt className="w-3.5 h-3.5" />
-            Fakturering
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Prislista</label>
-              <select
-                value={formData.price_list_id || ''}
-                onChange={(e) => handleInputChange('price_list_id', e.target.value || null)}
-                className={selectStyles}
-              >
-                <option value="">Välj prislista...</option>
-                {priceLists.map(pl => (
-                  <option key={pl.id} value={pl.id}>
-                    {pl.name} {pl.is_default && '(Standard)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Faktureringsfrekvens</label>
-              <select
-                value={formData.billing_frequency || 'monthly'}
-                onChange={(e) => handleInputChange('billing_frequency', e.target.value as BillingFrequency)}
-                className={selectStyles}
-              >
-                {Object.entries(BILLING_FREQUENCY_CONFIG).map(([key, config]) => (
-                  <option key={key} value={key}>{config.label}</option>
-                ))}
-              </select>
-            </div>
           </div>
         </div>
 

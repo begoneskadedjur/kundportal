@@ -78,7 +78,6 @@ export const navGroups: NavGroup[] = [
     icon: Building2,
     items: [
       { label: 'Trafikljusöversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
-      { label: 'Multisite-fakturering', icon: Receipt, path: '/admin/organisation/billing' },
     ]
   },
   {
@@ -135,7 +134,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/leads/analytics': 'Leadanalys',
   '/admin/customer-access': 'Kundåtkomst',
   '/admin/organisation/traffic-light': 'Trafikljusöversikt',
-  '/admin/organisation/billing': 'Multisite-fakturering',
+
   '/admin/team-chat': 'Team AI Chat',
   '/admin/image-bank': 'Bildbank',
   '/admin/tickets': 'Tickets',

@@ -9,7 +9,7 @@ import GeographicOverview from '../../components/admin/coordinator/GeographicOve
 import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
-import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp, Receipt, Target, Sparkles } from 'lucide-react';
+import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp, Target, Sparkles } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 import EventLogCard from '../../components/shared/EventLogCard';
@@ -329,13 +329,6 @@ export default function CoordinatorDashboard() {
               title="Trafikljusöversikt"
               description="Övervakningssystem för att bedöma organisationers prestanda och status."
               tag="Analys"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/organisation/billing"
-              icon={Receipt}
-              title="Multisite-fakturering"
-              description="Hantera fakturering för multisite-organisationer med konsoliderad eller per-site fakturering."
-              tag="Finans"
             />
             <CoordinatorDashboardCard
               href="/koordinator/sok-arenden"

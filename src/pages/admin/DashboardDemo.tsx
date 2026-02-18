@@ -103,7 +103,6 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Kundåtkomst', icon: Building2, path: '/admin/customer-access' },
       { label: 'Trafikljusoversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
-      { label: 'Multisite-fakturering', icon: Receipt, path: '/admin/organisation/billing' },
     ]
   },
   {

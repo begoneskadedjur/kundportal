@@ -26,6 +26,7 @@ import SiteDetailRow from '../../components/admin/customers/SiteDetailRow'
 import MultisiteExpandedTabs from '../../components/admin/customers/MultisiteExpandedTabs'
 import MultiSiteCustomerDetailModal from '../../components/admin/customers/MultiSiteCustomerDetailModal'
 import SingleCustomerDetailModal from '../../components/admin/customers/SingleCustomerDetailModal'
+import BillingSettingsModal from '../../components/admin/customers/BillingSettingsModal'
 import { 
   formatCurrency, 
   formatContractPeriod,
@@ -212,6 +213,8 @@ export default function Customers() {
   const [terminateModalOpen, setTerminateModalOpen] = useState(false)
   const [terminateOrganization, setTerminateOrganization] = useState<any>(null)
   const [addContractCustomerOpen, setAddContractCustomerOpen] = useState(false)
+  const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
+  const [billingSettingsOrg, setBillingSettingsOrg] = useState<any>(null)
 
   // Filter states — searchInput är UI-state, searchTerm debouncas för prestanda vid 3000+ kunder
   const [searchInput, setSearchInput] = useState('')
@@ -438,6 +441,11 @@ export default function Customers() {
   const handleTerminate = (organization: any) => {
     setTerminateOrganization(organization)
     setTerminateModalOpen(true)
+  }
+
+  const handleBillingSettings = (organization: any) => {
+    setBillingSettingsOrg(organization)
+    setBillingSettingsOpen(true)
   }
 
   // Get unique managers for filter
@@ -839,6 +847,7 @@ export default function Customers() {
                           onViewRevenue={handleViewRevenue}
                           onRenewal={handleStartRenewal}
                           onTerminate={handleTerminate}
+                          onBillingSettings={handleBillingSettings}
                           visibleColumns={visibleColumns}
                         />
 
@@ -998,6 +1007,28 @@ export default function Customers() {
         onClose={() => setAddContractCustomerOpen(false)}
         onCustomerCreated={refresh}
       />
+
+      {/* Billing Settings Modal */}
+      {billingSettingsOrg && (
+        <BillingSettingsModal
+          customerId={billingSettingsOrg.sites[0]?.id || null}
+          customerName={billingSettingsOrg.company_name}
+          contactEmail={billingSettingsOrg.contact_email}
+          isMultisite={billingSettingsOrg.organizationType === 'multisite'}
+          currentBillingFrequency={billingSettingsOrg.sites[0]?.billing_frequency || null}
+          currentPriceListId={billingSettingsOrg.sites[0]?.price_list_id || null}
+          currentBillingEmail={billingSettingsOrg.sites[0]?.billing_email || null}
+          currentBillingAddress={billingSettingsOrg.sites[0]?.billing_address || null}
+          currentBillingType={billingSettingsOrg.sites[0]?.billing_type || null}
+          sites={billingSettingsOrg.sites || []}
+          isOpen={billingSettingsOpen}
+          onClose={() => {
+            setBillingSettingsOpen(false)
+            setBillingSettingsOrg(null)
+          }}
+          onSave={refresh}
+        />
+      )}
     </div>
   )
 }

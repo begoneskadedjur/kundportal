@@ -41,7 +41,7 @@ import AdminOrganizationsPage from './pages/admin/multisite/OrganizationsPage';
 import CoordinatorOrganizationsPage from './pages/coordinator/multisite/OrganizationsPage';
 import OrganizationManagement from './pages/admin/multisite/OrganizationManagement';
 import TrafficLightOverview from './pages/admin/multisite/TrafficLightOverview';
-import MultisiteBillingManagement from './pages/admin/multisite/BillingManagement';
+
 import MultisiteRegistrationPage from './pages/admin/multisite/MultisiteRegistrationPage';
 import CoordinatorMultisiteRegistrationPage from './pages/coordinator/MultisiteRegistrationPage';
 
@@ -156,7 +156,7 @@ function App() {
               <Route path="organisation/register" element={<Navigate to="/admin/customer-access" replace />} />
               {/* Organisation routes */}
               <Route path="organisation/traffic-light" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
-              <Route path="organisation/billing" element={<AdminOrKoordinatorRoute><MultisiteBillingManagement /></AdminOrKoordinatorRoute>} />
+
             </Route>
 
             {/* OneflowContractCreator - TILLGÄNGLIG FÖR KOORDINATOR OCH TEKNIKER (utanfor admin-layout) */}
@@ -204,14 +204,6 @@ function App() {
               element={
                 <AdminOrKoordinatorRoute>
                   <TrafficLightOverview />
-                </AdminOrKoordinatorRoute>
-              } 
-            />
-            <Route 
-              path="/koordinator/organisation/billing" 
-              element={
-                <AdminOrKoordinatorRoute>
-                  <MultisiteBillingManagement />
                 </AdminOrKoordinatorRoute>
               } 
             />
