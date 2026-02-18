@@ -29,6 +29,9 @@ interface BillingSettingsModalProps {
   currentBillingEmail: string | null
   currentBillingAddress: string | null
   currentBillingType: 'consolidated' | 'per_site' | null
+  currentBillingReference: string | null
+  currentCostCenter: string | null
+  currentBillingRecipient: string | null
   sites: Array<{
     id: string
     site_name?: string | null
@@ -51,6 +54,9 @@ export default function BillingSettingsModal({
   currentBillingEmail,
   currentBillingAddress,
   currentBillingType,
+  currentBillingReference,
+  currentCostCenter,
+  currentBillingRecipient,
   sites,
   isOpen,
   onClose,
@@ -65,6 +71,9 @@ export default function BillingSettingsModal({
   const [billingEmail, setBillingEmail] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
   const [billingType, setBillingType] = useState<'consolidated' | 'per_site'>('consolidated')
+  const [billingReference, setBillingReference] = useState('')
+  const [costCenter, setCostCenter] = useState('')
+  const [billingRecipient, setBillingRecipient] = useState('')
   const [siteBilling, setSiteBilling] = useState<SiteBillingData[]>([])
 
   // Init form
@@ -75,6 +84,9 @@ export default function BillingSettingsModal({
       setBillingEmail(currentBillingEmail || '')
       setBillingAddress(currentBillingAddress || '')
       setBillingType(currentBillingType || 'consolidated')
+      setBillingReference(currentBillingReference || '')
+      setCostCenter(currentCostCenter || '')
+      setBillingRecipient(currentBillingRecipient || '')
       setSiteBilling(
         sites
           .filter(s => s.id !== customerId)
@@ -86,7 +98,7 @@ export default function BillingSettingsModal({
           }))
       )
     }
-  }, [isOpen, customerId, currentBillingFrequency, currentPriceListId, currentBillingEmail, currentBillingAddress, currentBillingType, sites])
+  }, [isOpen, customerId, currentBillingFrequency, currentPriceListId, currentBillingEmail, currentBillingAddress, currentBillingType, currentBillingReference, currentCostCenter, currentBillingRecipient, sites])
 
   // Load price lists
   useEffect(() => {
@@ -121,6 +133,9 @@ export default function BillingSettingsModal({
           billing_email: billingEmail || null,
           billing_address: billingAddress || null,
           billing_type: isMultisite ? billingType : null,
+          billing_reference: billingReference || null,
+          cost_center: costCenter || null,
+          billing_recipient: billingRecipient || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', customerId)
@@ -231,6 +246,27 @@ export default function BillingSettingsModal({
                 value={billingAddress}
                 onChange={(e) => setBillingAddress(e.target.value)}
                 placeholder="Gatuadress, Postnr Ort"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <Input
+                label="Er referens"
+                value={billingReference}
+                onChange={(e) => setBillingReference(e.target.value)}
+                placeholder="PO-nummer / referens"
+              />
+              <Input
+                label="Kostnadsställe"
+                value={costCenter}
+                onChange={(e) => setCostCenter(e.target.value)}
+                placeholder="T.ex. 4010"
+              />
+              <Input
+                label="Fakturamottagare"
+                value={billingRecipient}
+                onChange={(e) => setBillingRecipient(e.target.value)}
+                placeholder="Mottagarens namn"
               />
             </div>
           </div>

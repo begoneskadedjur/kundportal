@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw, XCircle, Receipt } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw, XCircle, Receipt, Users } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 
@@ -19,6 +19,7 @@ interface ExpandableOrganizationRowProps {
   onRenewal?: (org: ConsolidatedCustomer) => void
   onTerminate?: (org: ConsolidatedCustomer) => void
   onBillingSettings?: (org: ConsolidatedCustomer) => void
+  onContacts?: (org: ConsolidatedCustomer) => void
   visibleColumns?: Set<string>
 }
 
@@ -137,6 +138,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   onRenewal,
   onTerminate,
   onBillingSettings,
+  onContacts,
   visibleColumns
 }) => {
   const isVisible = (col: string) => !visibleColumns || visibleColumns.has(col)
@@ -443,6 +445,17 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               title="Faktureringsinställningar"
             >
               <Receipt className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Contacts Button */}
+          {onContacts && (
+            <button
+              onClick={() => onContacts(organization)}
+              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors duration-200"
+              title="Kontaktpersoner"
+            >
+              <Users className="h-4 w-4" />
             </button>
           )}
 

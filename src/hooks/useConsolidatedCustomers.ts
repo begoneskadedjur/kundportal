@@ -23,6 +23,12 @@ interface Customer {
   contact_address?: string | null
   billing_email?: string | null
   billing_address?: string | null
+  billing_frequency?: string | null
+  price_list_id?: string | null
+  billing_type?: 'consolidated' | 'per_site' | null
+  billing_reference?: string | null
+  cost_center?: string | null
+  billing_recipient?: string | null
   is_active: boolean | null
   created_at: string | null
   updated_at: string | null
@@ -201,6 +207,7 @@ export function useConsolidatedCustomers() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [contactsSearch, setContactsSearch] = useState<Map<string, string[]>>(new Map())
 
   useEffect(() => {
     fetchConsolidatedCustomers()
@@ -217,13 +224,15 @@ export function useConsolidatedCustomers() {
         profilesResult,
         multisiteRolesResult,
         casesResult,
-        invitationsResult
+        invitationsResult,
+        contactsResult
       ] = await Promise.all([
         supabase.from('customers').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('customer_id, role').eq('role', 'customer'),
         supabase.from('multisite_user_roles').select('organization_id, user_id, is_active, role_type, site_ids').eq('is_active', true),
         supabase.from('cases').select('id, customer_id, title, description, price, billing_status, created_at'),
-        supabase.from('user_invitations').select('customer_id, accepted_at, expires_at')
+        supabase.from('user_invitations').select('customer_id, accepted_at, expires_at'),
+        supabase.from('customer_contacts').select('customer_id, name, responsibility_area, email')
       ])
 
       const { data: customersData, error: customersError } = customersResult
@@ -233,6 +242,17 @@ export function useConsolidatedCustomers() {
       const { data: multisiteRoles, error: multisiteError } = multisiteRolesResult
       const { data: casesData, error: casesError } = casesResult
       const { data: invitationsData, error: invitationsError } = invitationsResult
+      const { data: contactsData } = contactsResult
+
+      // Customer contacts map for search (customer_id -> searchable strings)
+      const contactsSearchMap = new Map<string, string[]>()
+      contactsData?.forEach((c: any) => {
+        const strs = contactsSearchMap.get(c.customer_id) || []
+        if (c.name) strs.push(c.name.toLowerCase())
+        if (c.responsibility_area) strs.push(c.responsibility_area.toLowerCase())
+        if (c.email) strs.push(c.email.toLowerCase())
+        contactsSearchMap.set(c.customer_id, strs)
+      })
 
       // Portal access map
       const portalAccessMap = new Map<string, boolean>()
@@ -394,6 +414,7 @@ export function useConsolidatedCustomers() {
       // Konsolidera kunder
       const consolidated = consolidateCustomers(enrichedCustomers, multisiteAccessMap, multisiteUsersMap)
       setConsolidatedCustomers(consolidated)
+      setContactsSearch(contactsSearchMap)
 
     } catch (err) {
       console.error('Error fetching consolidated customers:', err)
@@ -823,15 +844,21 @@ export function useConsolidatedCustomers() {
           customer.contact_email?.toLowerCase().includes(searchLower) ||
           customer.organization_number?.includes(filters.search)
         
-        const matchesSites = customer.sites.some(site => 
+        const matchesSites = customer.sites.some(site =>
           site.company_name?.toLowerCase().includes(searchLower) ||
           site.contact_person?.toLowerCase().includes(searchLower) ||
           site.contact_email?.toLowerCase().includes(searchLower) ||
           site.site_name?.toLowerCase().includes(searchLower) ||
           site.organization_number?.includes(filters.search)
         )
-        
-        if (!matchesOrg && !matchesSites) return false
+
+        // Search in customer contacts
+        const matchesContacts = customer.sites.some(site => {
+          const strs = contactsSearch.get(site.id)
+          return strs?.some(s => s.includes(searchLower))
+        })
+
+        if (!matchesOrg && !matchesSites && !matchesContacts) return false
       }
       
       // Organization type filter

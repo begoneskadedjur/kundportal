@@ -27,6 +27,7 @@ import MultisiteExpandedTabs from '../../components/admin/customers/MultisiteExp
 import MultiSiteCustomerDetailModal from '../../components/admin/customers/MultiSiteCustomerDetailModal'
 import SingleCustomerDetailModal from '../../components/admin/customers/SingleCustomerDetailModal'
 import BillingSettingsModal from '../../components/admin/customers/BillingSettingsModal'
+import CustomerContactsModal from '../../components/admin/customers/CustomerContactsModal'
 import { 
   formatCurrency, 
   formatContractPeriod,
@@ -215,6 +216,8 @@ export default function Customers() {
   const [addContractCustomerOpen, setAddContractCustomerOpen] = useState(false)
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
   const [billingSettingsOrg, setBillingSettingsOrg] = useState<any>(null)
+  const [contactsModalOpen, setContactsModalOpen] = useState(false)
+  const [contactsOrg, setContactsOrg] = useState<any>(null)
 
   // Filter states — searchInput är UI-state, searchTerm debouncas för prestanda vid 3000+ kunder
   const [searchInput, setSearchInput] = useState('')
@@ -446,6 +449,11 @@ export default function Customers() {
   const handleBillingSettings = (organization: any) => {
     setBillingSettingsOrg(organization)
     setBillingSettingsOpen(true)
+  }
+
+  const handleContacts = (organization: any) => {
+    setContactsOrg(organization)
+    setContactsModalOpen(true)
   }
 
   // Get unique managers for filter
@@ -848,6 +856,7 @@ export default function Customers() {
                           onRenewal={handleStartRenewal}
                           onTerminate={handleTerminate}
                           onBillingSettings={handleBillingSettings}
+                          onContacts={handleContacts}
                           visibleColumns={visibleColumns}
                         />
 
@@ -1020,6 +1029,9 @@ export default function Customers() {
           currentBillingEmail={billingSettingsOrg.sites[0]?.billing_email || null}
           currentBillingAddress={billingSettingsOrg.sites[0]?.billing_address || null}
           currentBillingType={billingSettingsOrg.sites[0]?.billing_type || null}
+          currentBillingReference={billingSettingsOrg.sites[0]?.billing_reference || null}
+          currentCostCenter={billingSettingsOrg.sites[0]?.cost_center || null}
+          currentBillingRecipient={billingSettingsOrg.sites[0]?.billing_recipient || null}
           sites={billingSettingsOrg.sites || []}
           isOpen={billingSettingsOpen}
           onClose={() => {
@@ -1027,6 +1039,21 @@ export default function Customers() {
             setBillingSettingsOrg(null)
           }}
           onSave={refresh}
+        />
+      )}
+
+      {/* Customer Contacts Modal */}
+      {contactsOrg && (
+        <CustomerContactsModal
+          customerId={contactsOrg.sites[0]?.id || contactsOrg.id}
+          customerName={contactsOrg.company_name}
+          isMultisite={contactsOrg.organizationType === 'multisite'}
+          sites={contactsOrg.sites || []}
+          isOpen={contactsModalOpen}
+          onClose={() => {
+            setContactsModalOpen(false)
+            setContactsOrg(null)
+          }}
         />
       )}
     </div>

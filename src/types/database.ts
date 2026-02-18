@@ -85,6 +85,10 @@ export type Database = {
           // 💰 Billing Settings
           price_list_id: string | null  // FK till price_lists
           billing_frequency: 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'on_demand' | null
+          billing_type: 'consolidated' | 'per_site' | null
+          billing_reference: string | null
+          cost_center: string | null
+          billing_recipient: string | null
 
           // 🏢 Multisite Support
           organization_id: string | null  // FK till multisite_organizations
@@ -635,6 +639,25 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['lead_contacts']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['lead_contacts']['Insert']>
       }
+      // 🆕 CUSTOMER CONTACTS TABELL - för kontaktpersoner till kunder
+      customer_contacts: {
+        Row: {
+          id: string
+          customer_id: string
+          name: string
+          title: string | null
+          responsibility_area: string | null
+          phone: string | null
+          email: string | null
+          is_primary: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['customer_contacts']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['customer_contacts']['Insert']>
+      }
       // 🆕 LEAD COMMENTS TABELL - för kommentarer och anteckningar
       lead_comments: {
         Row: {
@@ -1023,6 +1046,11 @@ export type QuoteRecipientUpdate = Database['public']['Tables']['quote_recipient
 export type Lead = Database['public']['Tables']['leads']['Row']
 export type LeadInsert = Database['public']['Tables']['leads']['Insert']
 export type LeadUpdate = Database['public']['Tables']['leads']['Update']
+
+// 🆕 CUSTOMER CONTACTS TYPES
+export type CustomerContact = Database['public']['Tables']['customer_contacts']['Row']
+export type CustomerContactInsert = Database['public']['Tables']['customer_contacts']['Insert']
+export type CustomerContactUpdate = Database['public']['Tables']['customer_contacts']['Update']
 
 // 🆕 LEAD CONTACTS TYPES
 export type LeadContact = Database['public']['Tables']['lead_contacts']['Row']
