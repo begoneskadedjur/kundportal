@@ -213,7 +213,8 @@ export default function TrafficLightOverview() {
       const search = filters.searchTerm.toLowerCase()
       if (!item.customer_name.toLowerCase().includes(search) &&
           !item.case_number.toLowerCase().includes(search) &&
-          !(item.pest_type || '').toLowerCase().includes(search)) {
+          !(item.pest_type || '').toLowerCase().includes(search) &&
+          !(item.technician_name || '').toLowerCase().includes(search)) {
         return false
       }
     }
@@ -412,11 +413,12 @@ export default function TrafficLightOverview() {
           <div className="bg-slate-800/50">
             <div className="grid grid-cols-12 gap-3 px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
               <div className="col-span-1 text-center">Status</div>
-              <div className="col-span-3">Kund</div>
+              <div className="col-span-2">Kund</div>
               <div className="col-span-1">Skadedjur</div>
               <div className="col-span-2 text-center">Nivå</div>
               <div className="col-span-2 text-center">Bedömning</div>
               <div className="col-span-1 text-center">Trend</div>
+              <div className="col-span-1">Tekniker</div>
               <div className="col-span-2">Bedömd</div>
             </div>
           </div>
@@ -449,7 +451,7 @@ export default function TrafficLightOverview() {
                     </div>
 
                     {/* KUND */}
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <div className="flex items-center gap-2">
                         {isExpanded
                           ? <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
@@ -492,6 +494,11 @@ export default function TrafficLightOverview() {
                     {/* TREND */}
                     <div className="col-span-1 flex justify-center">
                       {getTrendIcon(item.pest_level_trend)}
+                    </div>
+
+                    {/* TEKNIKER */}
+                    <div className="col-span-1 text-sm text-slate-300 truncate">
+                      {item.technician_name || <span className="text-slate-500">-</span>}
                     </div>
 
                     {/* BEDÖMD */}
