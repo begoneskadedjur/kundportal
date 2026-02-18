@@ -2,7 +2,7 @@
 // Kontakthanteringsmodal per kund/organisation
 
 import { useState, useEffect } from 'react'
-import { Users, Plus, Edit3, Trash2, Save, X, Search, Building2 } from 'lucide-react'
+import { Users, Plus, Edit3, Trash2, Save, X, Building2 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import LoadingSpinner from '../../shared/LoadingSpinner'
@@ -51,7 +51,6 @@ export default function CustomerContactsModal({
   const [showForm, setShowForm] = useState(false)
   const [editingContact, setEditingContact] = useState<CustomerContact | null>(null)
   const [formData, setFormData] = useState<ContactFormData>(emptyForm(customerId || ''))
-  const [searchTerm, setSearchTerm] = useState('')
 
   // All customer IDs (main + sites for multisite)
   const allCustomerIds = isMultisite
@@ -85,7 +84,6 @@ export default function CustomerContactsModal({
       fetchContacts()
       setShowForm(false)
       setEditingContact(null)
-      setSearchTerm('')
     }
   }, [isOpen, customerId])
 
@@ -170,18 +168,6 @@ export default function CustomerContactsModal({
 
   if (!isOpen || !customerId) return null
 
-  // Filter contacts by search
-  const filtered = contacts.filter(c => {
-    if (!searchTerm) return true
-    const s = searchTerm.toLowerCase()
-    return (
-      c.name.toLowerCase().includes(s) ||
-      (c.responsibility_area || '').toLowerCase().includes(s) ||
-      (c.email || '').toLowerCase().includes(s) ||
-      (c.title || '').toLowerCase().includes(s)
-    )
-  })
-
   // Group by customer_id for multisite
   const getSiteName = (cid: string) => {
     const site = sites.find(s => s.id === cid)
@@ -190,7 +176,7 @@ export default function CustomerContactsModal({
 
   const groupedContacts = isMultisite
     ? allCustomerIds.reduce<Record<string, CustomerContact[]>>((acc, cid) => {
-        acc[cid] = filtered.filter(c => c.customer_id === cid)
+        acc[cid] = contacts.filter(c => c.customer_id === cid)
         return acc
       }, {})
     : null
@@ -213,32 +199,22 @@ export default function CustomerContactsModal({
 
         {/* Body */}
         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
-          {/* Search + Add */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Sök namn, ansvarsområde, email..."
-                className="w-full pl-9 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none placeholder-slate-500"
-              />
-            </div>
-            {!showForm && (
+          {/* Add button */}
+          {!showForm && (
+            <div className="flex justify-end">
               <Button
                 onClick={() => {
                   setFormData(emptyForm(customerId))
                   setEditingContact(null)
                   setShowForm(true)
                 }}
-                className="flex items-center gap-1.5 whitespace-nowrap"
+                className="flex items-center gap-1.5"
               >
                 <Plus className="w-4 h-4" />
-                Lägg till
+                Lägg till kontakt
               </Button>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Inline form */}
           {showForm && (
@@ -325,21 +301,17 @@ export default function CustomerContactsModal({
             <div className="flex justify-center py-8">
               <LoadingSpinner />
             </div>
-          ) : filtered.length === 0 ? (
+          ) : contacts.length === 0 ? (
             <div className="text-center py-4">
               <Users className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-              <p className="text-sm text-slate-400">
-                {contacts.length === 0
-                  ? 'Inga kontakter registrerade ännu.'
-                  : 'Inga kontakter matchar sökningen.'}
-              </p>
+              <p className="text-sm text-slate-400">Inga kontakter registrerade ännu.</p>
             </div>
           ) : isMultisite && groupedContacts ? (
             // Multisite: grouped by site
             <div className="space-y-3">
               {allCustomerIds.map(cid => {
                 const siteContacts = groupedContacts[cid] || []
-                if (siteContacts.length === 0 && searchTerm) return null
+                if (siteContacts.length === 0) return null
                 return (
                   <div key={cid} className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
                     <h4 className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 mb-2">
@@ -368,7 +340,7 @@ export default function CustomerContactsModal({
           ) : (
             // Single customer: flat list
             <div className="space-y-1.5">
-              {filtered.map(contact => (
+              {contacts.map(contact => (
                 <ContactRow
                   key={contact.id}
                   contact={contact}
