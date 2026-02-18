@@ -104,7 +104,7 @@ export default function TrafficLightOverview() {
     try {
       const { data, error } = await supabase
         .from('cases')
-        .select('id, case_number, title, pest_level, problem_rating, assessment_date, assessed_by, pest_level_trend, pest_type, customer_id, customers!inner(company_name, contact_address, region)')
+        .select('id, case_number, title, pest_level, problem_rating, assessment_date, assessed_by, pest_level_trend, pest_type, customer_id, customer:customers(company_name, contact_address, region)')
         .or('pest_level.not.is.null,problem_rating.not.is.null')
         .order('assessment_date', { ascending: false })
 
@@ -120,9 +120,9 @@ export default function TrafficLightOverview() {
         assessed_by: c.assessed_by,
         pest_level_trend: c.pest_level_trend,
         pest_type: c.pest_type,
-        customer_name: c.customers?.company_name || 'Okänd kund',
-        address: c.customers?.contact_address || null,
-        region: c.customers?.region || null,
+        customer_name: c.customer?.company_name || 'Okänd kund',
+        address: c.customer?.contact_address || null,
+        region: c.customer?.region || null,
         traffic_light_color: calculateColor(c.pest_level, c.problem_rating)
       }))
 
