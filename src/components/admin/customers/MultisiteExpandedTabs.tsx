@@ -6,11 +6,12 @@ import {
   Activity, AlertTriangle, Crown, Shield, UserCheck, HelpCircle
 } from 'lucide-react'
 import TooltipWrapper from '../../ui/TooltipWrapper'
-import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
+import { ConsolidatedCustomer, type ContactSummary } from '../../../hooks/useConsolidatedCustomers'
 
 interface MultisiteExpandedTabsProps {
   organization: ConsolidatedCustomer
   colSpan?: number
+  contacts?: ContactSummary[]
 }
 
 type TabKey = 'kontakt' | 'enheter' | 'ekonomi' | 'halsa'
@@ -47,7 +48,7 @@ const getContactName = (contact_person: string | null, contact_email: string, mu
 }
 
 // === TAB: Kontakt ===
-function KontaktTab({ organization }: { organization: ConsolidatedCustomer }) {
+function KontaktTab({ organization, contacts = [] }: { organization: ConsolidatedCustomer; contacts?: ContactSummary[] }) {
   const verksamhetschef = organization.sites.find(site => site.site_type === 'huvudkontor') || organization.sites[0]
   const verksamhetschefFromUsers = organization.multisiteUsers?.find(user => user.role_type === 'verksamhetschef')
   const verksamhetschefName = verksamhetschefFromUsers?.display_name
@@ -169,6 +170,57 @@ function KontaktTab({ organization }: { organization: ConsolidatedCustomer }) {
           </div>
         </div>
       </div>
+
+      {/* Registrerade kontaktpersoner */}
+      {contacts.length > 0 && (
+        <div className="bg-slate-700/30 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 text-slate-400" />
+            <h5 className="text-sm font-medium text-slate-300">Registrerade kontaktpersoner ({contacts.length})</h5>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {contacts.map((contact, i) => (
+              <div key={i} className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-slate-200">{contact.name}</div>
+                    {contact.title && (
+                      <div className="text-xs text-slate-400">{contact.title}</div>
+                    )}
+                    {contact.responsibility_area && (
+                      <span className="inline-block mt-1 text-xs text-[#20c58f] bg-[#20c58f]/10 px-2 py-0.5 rounded-full">
+                        {contact.responsibility_area}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {contact.phone && (
+                      <a href={`tel:${contact.phone}`} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors" title="Ring">
+                        <Phone className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    {contact.email && (
+                      <a href={`mailto:${contact.email}`} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors" title="Maila">
+                        <Mail className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+                {(contact.phone || contact.email) && (
+                  <div className="mt-2 pt-2 border-t border-slate-700/30 space-y-0.5">
+                    {contact.phone && (
+                      <div className="text-xs text-slate-500">{contact.phone}</div>
+                    )}
+                    {contact.email && (
+                      <div className="text-xs text-slate-500">{contact.email}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -422,7 +474,7 @@ function HalsaTab({ organization }: { organization: ConsolidatedCustomer }) {
 }
 
 // === MAIN COMPONENT ===
-export default function MultisiteExpandedTabs({ organization, colSpan = 10 }: MultisiteExpandedTabsProps) {
+export default function MultisiteExpandedTabs({ organization, colSpan = 10, contacts }: MultisiteExpandedTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('kontakt')
 
   return (
@@ -448,7 +500,7 @@ export default function MultisiteExpandedTabs({ organization, colSpan = 10 }: Mu
 
         {/* Tab content */}
         <div className="max-w-4xl">
-          {activeTab === 'kontakt' && <KontaktTab organization={organization} />}
+          {activeTab === 'kontakt' && <KontaktTab organization={organization} contacts={contacts} />}
           {activeTab === 'enheter' && <EnheterTab organization={organization} />}
           {activeTab === 'ekonomi' && <EkonomiTab organization={organization} />}
           {activeTab === 'halsa' && <HalsaTab organization={organization} />}

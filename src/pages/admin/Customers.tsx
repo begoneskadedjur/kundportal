@@ -19,7 +19,7 @@ import TerminateContractModal from '../../components/admin/customers/TerminateCo
 import AddContractCustomerModal from '../../components/admin/customers/AddContractCustomerModal'
 import TooltipWrapper from '../../components/ui/TooltipWrapper'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
-import { useConsolidatedCustomers } from '../../hooks/useConsolidatedCustomers'
+import { useConsolidatedCustomers, type ContactSummary } from '../../hooks/useConsolidatedCustomers'
 import ExpandableOrganizationRow from '../../components/admin/customers/ExpandableOrganizationRow'
 import ColumnSelector, { useColumnVisibility } from '../../components/admin/customers/ColumnSelector'
 import SiteDetailRow from '../../components/admin/customers/SiteDetailRow'
@@ -39,7 +39,7 @@ import { PriceListService } from '../../services/priceListService'
 import type { PriceList, PriceListItemWithArticle } from '../../types/articles'
 
 // Expanded row component för att visa mer detaljer
-const ExpandedCustomerRow = ({ customer, colSpan = 10 }: { customer: any; colSpan?: number }) => {
+const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { customer: any; colSpan?: number; contacts?: ContactSummary[] }) => {
   const [priceListData, setPriceListData] = useState<{
     priceList: PriceList | null
     items: PriceListItemWithArticle[]
@@ -166,6 +166,57 @@ const ExpandedCustomerRow = ({ customer, colSpan = 10 }: { customer: any; colSpa
             </div>
           </div>
         </div>
+
+        {/* Registrerade kontaktpersoner */}
+        {contacts.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-700/50">
+            <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4 text-slate-400" />
+              Registrerade kontaktpersoner ({contacts.length})
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {contacts.map((contact, i) => (
+                <div key={i} className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-slate-200">{contact.name}</div>
+                      {contact.title && (
+                        <div className="text-xs text-slate-400">{contact.title}</div>
+                      )}
+                      {contact.responsibility_area && (
+                        <span className="inline-block mt-1 text-xs text-[#20c58f] bg-[#20c58f]/10 px-2 py-0.5 rounded-full">
+                          {contact.responsibility_area}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {contact.phone && (
+                        <a href={`tel:${contact.phone}`} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors" title="Ring">
+                          <Phone className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      {contact.email && (
+                        <a href={`mailto:${contact.email}`} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors" title="Maila">
+                          <Mail className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  {(contact.phone || contact.email) && (
+                    <div className="mt-2 pt-2 border-t border-slate-700/30 space-y-0.5">
+                      {contact.phone && (
+                        <div className="text-xs text-slate-500">{contact.phone}</div>
+                      )}
+                      {contact.email && (
+                        <div className="text-xs text-slate-500">{contact.email}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Avtalsinformation */}
         {customer.agreement_text && (
@@ -882,12 +933,12 @@ export default function Customers() {
 
                         {/* Contact and units expanded view for multisite organizations */}
                         {isExpanded && organization.organizationType === 'multisite' && (
-                          <MultisiteExpandedTabs organization={organization} colSpan={visibleColumns.size} />
+                          <MultisiteExpandedTabs organization={organization} colSpan={visibleColumns.size} contacts={orgContacts} />
                         )}
 
                         {/* Expanded details for single-site customers */}
                         {isExpanded && organization.organizationType === 'single' && (
-                          <ExpandedCustomerRow customer={organization.sites[0]} colSpan={visibleColumns.size} />
+                          <ExpandedCustomerRow customer={organization.sites[0]} colSpan={visibleColumns.size} contacts={orgContacts} />
                         )}
                       </React.Fragment>
                     )

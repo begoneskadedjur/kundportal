@@ -204,7 +204,10 @@ export interface ConsolidatedAnalytics {
 
 export interface ContactSummary {
   name: string
+  title: string | null
   responsibility_area: string | null
+  phone: string | null
+  email: string | null
 }
 
 export function useConsolidatedCustomers() {
@@ -238,7 +241,7 @@ export function useConsolidatedCustomers() {
         supabase.from('multisite_user_roles').select('organization_id, user_id, is_active, role_type, site_ids').eq('is_active', true),
         supabase.from('cases').select('id, customer_id, title, description, price, billing_status, created_at'),
         supabase.from('user_invitations').select('customer_id, accepted_at, expires_at'),
-        supabase.from('customer_contacts').select('customer_id, name, responsibility_area, email')
+        supabase.from('customer_contacts').select('customer_id, name, title, responsibility_area, phone, email')
       ])
 
       const { data: customersData, error: customersError } = customersResult
@@ -261,7 +264,13 @@ export function useConsolidatedCustomers() {
         contactsSearchMap.set(c.customer_id, strs)
 
         const summaries = contactsSummaryMap.get(c.customer_id) || []
-        summaries.push({ name: c.name, responsibility_area: c.responsibility_area || null })
+        summaries.push({
+          name: c.name,
+          title: c.title || null,
+          responsibility_area: c.responsibility_area || null,
+          phone: c.phone || null,
+          email: c.email || null
+        })
         contactsSummaryMap.set(c.customer_id, summaries)
       })
 

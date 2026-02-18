@@ -180,7 +180,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   return (
     <tr className={`border-b border-slate-700/50 transition-colors duration-200 ${
       isHighlighted
-        ? 'bg-[#20c58f]/5 border-l-[3px] border-l-[#20c58f]/60'
+        ? 'bg-[#20c58f]/10 border-l-[3px] border-l-[#20c58f]'
         : `hover:bg-slate-800/50 ${isExpanded ? 'bg-slate-800/30' : ''} ${urgencyBorder}`
     }`}>
       {/* Company & Contact Column */}
@@ -219,21 +219,12 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                   )}
                   <span className="text-slate-400">{organization.contact_email}</span>
                 </div>
-                {/* Contact persons indicator */}
+                {/* Contact persons indicator — subtle hint, details in expanded row */}
                 {contactCount != null && contactCount > 0 && (
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <Users className="w-3 h-3 text-slate-500" />
-                    <span className="text-xs text-slate-500">
-                      {contactNames && contactNames.length > 0 ? (
-                        <>
-                          {contactNames.slice(0, 2).join(', ')}
-                          {contactCount > 2 && (
-                            <span className="text-slate-600"> +{contactCount - 2}</span>
-                          )}
-                        </>
-                      ) : (
-                        `${contactCount} kontaktperson${contactCount > 1 ? 'er' : ''}`
-                      )}
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Users className="w-3 h-3 text-slate-400" />
+                    <span className="text-xs text-slate-400">
+                      {contactCount} kontaktperson{contactCount > 1 ? 'er' : ''}
                     </span>
                   </div>
                 )}
