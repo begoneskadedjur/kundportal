@@ -12,11 +12,16 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Bug
+  ChevronDown,
+  ChevronRight,
+  Wrench,
+  Lightbulb,
+  User
 } from 'lucide-react'
 import Button from '../../../components/ui/Button'
-import Input from '../../../components/ui/Input'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
+import AssessmentScaleBar from '../../../components/shared/AssessmentScaleBar'
+import CaseJourneyTimeline from '../../../components/customer/CaseJourneyTimeline'
 import toast from 'react-hot-toast'
 
 // --- Lokala typer ---
@@ -35,13 +40,15 @@ interface TrafficLightItem {
   pest_type: string | null
   customer_name: string
   address: string | null
-  region: string | null
   traffic_light_color: TrafficLightColor
+  work_report: string | null
+  recommendations: string | null
+  status: string | null
+  technician_name: string | null
 }
 
 interface FilterState {
   searchTerm: string
-  region: string
   status: TrafficLightColor | 'all'
 }
 
@@ -56,10 +63,10 @@ function calculateColor(pestLevel: number | null, problemRating: number | null):
 
 function getPestLevelLabel(level: number): string {
   switch (level) {
-    case 0: return 'Ingen förekomst'
-    case 1: return 'Låg nivå'
-    case 2: return 'Måttlig nivå'
-    case 3: return 'Hög nivå'
+    case 0: return 'Ingen'
+    case 1: return 'Låg'
+    case 2: return 'Måttlig'
+    case 3: return 'Hög'
     default: return 'Okänd'
   }
 }
@@ -84,14 +91,41 @@ function getColorLabel(color: TrafficLightColor): string {
   }
 }
 
+function getBorderColor(color: TrafficLightColor): string {
+  switch (color) {
+    case 'red': return 'border-l-red-500'
+    case 'yellow': return 'border-l-yellow-500'
+    case 'green': return 'border-l-green-500'
+    case 'gray': return 'border-l-slate-600'
+  }
+}
+
+function getLevelBadgeClass(level: number, type: 'pest' | 'problem'): string {
+  const isHigh = type === 'pest' ? level >= 3 : level >= 4
+  const isMid = type === 'pest' ? level === 2 : level === 3
+  if (isHigh) return 'bg-red-500/20 text-red-400 border border-red-500/30'
+  if (isMid) return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+  return 'bg-green-500/20 text-green-400 border border-green-500/30'
+}
+
+function formatRelativeDate(dateStr: string): string {
+  const then = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - then.getTime()
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (days === 0) return 'Idag'
+  if (days === 1) return 'Igår'
+  return `${days} dagar sedan`
+}
+
 export default function TrafficLightOverview() {
   const [items, setItems] = useState<TrafficLightItem[]>([])
-  const [regions, setRegions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null)
+  const [hoveredCaseId, setHoveredCaseId] = useState<string | null>(null)
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: '',
-    region: 'all',
     status: 'all'
   })
 
@@ -104,7 +138,7 @@ export default function TrafficLightOverview() {
     try {
       const { data, error } = await supabase
         .from('cases')
-        .select('id, case_number, title, pest_level, problem_rating, assessment_date, assessed_by, pest_level_trend, pest_type, customer_id, customer:customers(company_name, contact_address, region)')
+        .select('id, case_number, title, pest_level, problem_rating, assessment_date, assessed_by, pest_level_trend, pest_type, customer_id, work_report, recommendations, status, customer:customers(company_name, contact_address), technician:technicians!cases_primary_technician_id_fkey(name)')
         .or('pest_level.not.is.null,problem_rating.not.is.null')
         .order('assessment_date', { ascending: false })
 
@@ -122,16 +156,14 @@ export default function TrafficLightOverview() {
         pest_type: c.pest_type,
         customer_name: c.customer?.company_name || 'Okänd kund',
         address: c.customer?.contact_address || null,
-        region: c.customer?.region || null,
-        traffic_light_color: calculateColor(c.pest_level, c.problem_rating)
+        traffic_light_color: calculateColor(c.pest_level, c.problem_rating),
+        work_report: c.work_report || null,
+        recommendations: c.recommendations || null,
+        status: c.status || null,
+        technician_name: c.technician?.name || null
       }))
 
       setItems(mapped)
-
-      const uniqueRegions = [...new Set(
-        mapped.map(l => l.region).filter(Boolean) as string[]
-      )].sort()
-      setRegions(uniqueRegions)
     } catch (error) {
       console.error('Error fetching traffic light data:', error)
       toast.error('Kunde inte hämta trafikljusdata')
@@ -149,18 +181,18 @@ export default function TrafficLightOverview() {
 
   const handleExport = () => {
     const csvContent = [
-      ['Kund', 'Adress', 'Region', 'Status', 'Skadedjursnivå', 'Problembedömning', 'Skadedjur', 'Trend', 'Senaste bedömning', 'Bedömd av'],
+      ['Kund', 'Adress', 'Status', 'Skadedjursnivå', 'Problembedömning', 'Skadedjur', 'Trend', 'Senaste bedömning', 'Bedömd av', 'Tekniker'],
       ...filteredItems.map(item => [
         item.customer_name,
         item.address || '-',
-        item.region || '-',
         getColorLabel(item.traffic_light_color),
         item.pest_level !== null ? `${item.pest_level} - ${getPestLevelLabel(item.pest_level)}` : '-',
         item.problem_rating !== null ? `${item.problem_rating} - ${getProblemRatingLabel(item.problem_rating)}` : '-',
         item.pest_type || '-',
         item.pest_level_trend || '-',
         item.assessment_date ? new Date(item.assessment_date).toLocaleDateString('sv-SE') : '-',
-        item.assessed_by || '-'
+        item.assessed_by || '-',
+        item.technician_name || '-'
       ])
     ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
 
@@ -169,6 +201,10 @@ export default function TrafficLightOverview() {
     link.href = URL.createObjectURL(blob)
     link.download = `trafikljus-oversikt-${new Date().toISOString().split('T')[0]}.csv`
     link.click()
+  }
+
+  const toggleExpand = (caseId: string) => {
+    setExpandedCaseId(prev => prev === caseId ? null : caseId)
   }
 
   // Filtrera
@@ -181,7 +217,6 @@ export default function TrafficLightOverview() {
         return false
       }
     }
-    if (filters.region !== 'all' && item.region !== filters.region) return false
     if (filters.status !== 'all' && item.traffic_light_color !== filters.status) return false
     return true
   })
@@ -195,12 +230,13 @@ export default function TrafficLightOverview() {
     gray: items.filter(l => l.traffic_light_color === 'gray').length
   }
 
-  const getStatusIcon = (color: TrafficLightColor) => {
+  const getStatusIcon = (color: TrafficLightColor, size: 'sm' | 'md' = 'md') => {
+    const cls = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'
     switch (color) {
-      case 'red': return <XCircle className="w-5 h-5 text-red-400" />
-      case 'yellow': return <AlertTriangle className="w-5 h-5 text-yellow-400" />
-      case 'green': return <CheckCircle className="w-5 h-5 text-green-400" />
-      default: return <Minus className="w-5 h-5 text-slate-400" />
+      case 'red': return <XCircle className={`${cls} text-red-400`} />
+      case 'yellow': return <AlertTriangle className={`${cls} text-yellow-400`} />
+      case 'green': return <CheckCircle className={`${cls} text-green-400`} />
+      default: return <Minus className={`${cls} text-slate-400`} />
     }
   }
 
@@ -208,7 +244,7 @@ export default function TrafficLightOverview() {
     switch (trend) {
       case 'improving': return <TrendingDown className="w-4 h-4 text-green-400" title="Förbättring" />
       case 'worsening': return <TrendingUp className="w-4 h-4 text-red-400" title="Försämring" />
-      default: return <Minus className="w-4 h-4 text-slate-400" title="Stabil" />
+      default: return <Minus className="w-4 h-4 text-slate-500" title="Stabil" />
     }
   }
 
@@ -225,6 +261,13 @@ export default function TrafficLightOverview() {
     green: { icon: 'text-green-400', bg: 'bg-green-500/20', text: 'text-green-400' },
     slate: { icon: 'text-slate-400', bg: 'bg-slate-500/20', text: 'text-slate-400' },
   }
+
+  const quickFilters = [
+    { key: 'all' as const, label: `Alla (${stats.total})`, icon: null, activeClass: 'bg-[#20c58f]/20 border-[#20c58f]/50 text-[#20c58f]' },
+    { key: 'red' as const, label: `${stats.red} kritiska`, icon: XCircle, activeClass: 'bg-red-500/30 border-red-400 text-red-400', iconClass: 'text-red-400' },
+    { key: 'yellow' as const, label: `${stats.yellow} varningar`, icon: AlertTriangle, activeClass: 'bg-yellow-500/30 border-yellow-400 text-yellow-400', iconClass: 'text-yellow-400' },
+    { key: 'green' as const, label: `${stats.green} ok`, icon: CheckCircle, activeClass: 'bg-green-500/30 border-green-400 text-green-400', iconClass: 'text-green-400' },
+  ]
 
   if (loading) {
     return (
@@ -295,7 +338,7 @@ export default function TrafficLightOverview() {
         })}
       </div>
 
-      {/* Kritisk-alert om det finns röda */}
+      {/* Kritisk-alert */}
       {stats.red > 0 && (
         <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
           <div className="flex items-center gap-3">
@@ -312,178 +355,270 @@ export default function TrafficLightOverview() {
         </div>
       )}
 
-      {/* Filter */}
-      <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              type="text"
-              value={filters.searchTerm}
-              onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
-              placeholder="Sök kund, ärendenummer..."
-              className="pl-10 bg-slate-800 border-slate-700"
-            />
-          </div>
-
-          <select
-            value={filters.region}
-            onChange={(e) => setFilters({ ...filters, region: e.target.value })}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-          >
-            <option value="all">Alla regioner</option>
-            {regions.map(region => (
-              <option key={region} value={region}>{region}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value as TrafficLightColor | 'all' })}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-          >
-            <option value="all">Alla statusar</option>
-            <option value="red">Kritisk</option>
-            <option value="yellow">Varning</option>
-            <option value="green">OK</option>
-          </select>
-
-          <div className="flex items-center text-slate-400 text-xs">
-            {filteredItems.length} av {items.length} bedömningar
-          </div>
+      {/* Filter: Sök + Snabbfilter-chips */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={filters.searchTerm}
+            onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
+            placeholder="Sök kund, ärendenummer, skadedjur..."
+            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+          />
         </div>
 
-        {/* Filter summary */}
-        {(filters.searchTerm || filters.region !== 'all' || filters.status !== 'all') && (
-          <div className="mt-3 pt-3 border-t border-slate-700/50">
-            <div className="flex flex-wrap gap-2">
-              {filters.searchTerm && (
-                <span className="inline-flex items-center px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded">
-                  Söker: "{filters.searchTerm}"
-                </span>
-              )}
-              {filters.region !== 'all' && (
-                <span className="inline-flex items-center px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
-                  Region: {filters.region}
-                </span>
-              )}
-              {filters.status !== 'all' && (
-                <span className="inline-flex items-center px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded">
-                  Status: {getColorLabel(filters.status)}
-                </span>
-              )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {quickFilters.map(({ key, label, icon: Icon, activeClass, iconClass }) => {
+            const isActive = filters.status === key
+            return (
               <button
-                onClick={() => setFilters({ searchTerm: '', region: 'all', status: 'all' })}
-                className="text-slate-400 hover:text-white text-xs underline"
+                key={key}
+                onClick={() => setFilters({ ...filters, status: key })}
+                className={`px-2.5 py-1 text-xs border rounded-lg flex items-center gap-1.5 transition-colors ${
+                  isActive
+                    ? activeClass
+                    : 'border-slate-700 text-slate-400 hover:border-slate-600'
+                }`}
               >
-                Rensa filter
+                {Icon && <Icon className={`w-3 h-3 ${isActive ? '' : iconClass || 'text-slate-400'}`} />}
+                {label}
               </button>
-            </div>
-          </div>
-        )}
+            )
+          })}
+        </div>
+
+        <div className="text-xs text-slate-500">
+          Visar {filteredItems.length} av {items.length}
+        </div>
       </div>
 
-      {/* Grid */}
+      {/* Tabell */}
       {filteredItems.length === 0 ? (
         <div className="bg-slate-800/30 border border-slate-700 rounded-xl py-12">
           <div className="text-center">
             <AlertCircle className="w-10 h-10 text-slate-500 mx-auto mb-3" />
             <h3 className="text-base font-semibold text-white mb-1">Inga bedömningar hittades</h3>
             <p className="text-slate-400 text-sm">
-              {filters.searchTerm || filters.region !== 'all' || filters.status !== 'all'
+              {filters.searchTerm || filters.status !== 'all'
                 ? 'Prova att ändra dina filter eller sökord.'
                 : 'Inga ärenden har bedömts med trafikljussystemet än.'}
             </p>
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems.map(item => (
-            <div
-              key={item.case_id}
-              className="bg-slate-800/50 rounded-2xl border border-slate-700/40 p-5 hover:border-slate-600 transition-colors"
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-3">
-                  {getStatusIcon(item.traffic_light_color)}
-                  <div>
-                    <h4 className="text-lg font-semibold text-white">{item.customer_name}</h4>
-                    <p className="text-sm text-slate-400 mt-0.5">#{item.case_number}</p>
-                    {item.address && (
-                      <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
-                        <MapPin className="w-3 h-3" />
-                        <span>{item.address}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {item.pest_level_trend && (
-                  <div className="flex items-center gap-1">
-                    {getTrendIcon(item.pest_level_trend)}
-                  </div>
-                )}
-              </div>
-
-              {/* Bedömningsdetaljer */}
-              <div className="space-y-2 text-sm">
-                {item.pest_level !== null && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Skadedjursnivå:</span>
-                    <span className="text-white font-medium">
-                      {item.pest_level} - {getPestLevelLabel(item.pest_level)}
-                    </span>
-                  </div>
-                )}
-                {item.problem_rating !== null && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Problembedömning:</span>
-                    <span className="text-white font-medium">
-                      {item.problem_rating} - {getProblemRatingLabel(item.problem_rating)}
-                    </span>
-                  </div>
-                )}
-                {item.pest_type && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Skadedjur:</span>
-                    <span className="text-white flex items-center gap-1.5">
-                      <Bug className="w-3.5 h-3.5 text-slate-400" />
-                      {item.pest_type}
-                    </span>
-                  </div>
-                )}
-                {item.assessment_date && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Bedömd:</span>
-                    <span className="text-white">
-                      {new Date(item.assessment_date).toLocaleDateString('sv-SE')}
-                    </span>
-                  </div>
-                )}
-                {item.assessed_by && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Bedömd av:</span>
-                    <span className="text-white">{item.assessed_by}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Status badge footer */}
-              <div className="mt-4 pt-3 border-t border-slate-700 flex items-center justify-between">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                  item.traffic_light_color === 'red' ? 'bg-red-500/20 text-red-400' :
-                  item.traffic_light_color === 'yellow' ? 'bg-yellow-500/20 text-yellow-400' :
-                  item.traffic_light_color === 'green' ? 'bg-green-500/20 text-green-400' :
-                  'bg-slate-700/50 text-slate-400'
-                }`}>
-                  {getColorLabel(item.traffic_light_color)}
-                </span>
-                {item.region && (
-                  <span className="text-xs text-slate-500">{item.region}</span>
-                )}
-              </div>
+        <div className="border border-slate-700 rounded-lg overflow-hidden">
+          {/* Tabellheader */}
+          <div className="bg-slate-800/50">
+            <div className="grid grid-cols-12 gap-3 px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <div className="col-span-1 text-center">Status</div>
+              <div className="col-span-3">Kund</div>
+              <div className="col-span-1">Skadedjur</div>
+              <div className="col-span-2 text-center">Nivå</div>
+              <div className="col-span-2 text-center">Bedömning</div>
+              <div className="col-span-1 text-center">Trend</div>
+              <div className="col-span-2">Bedömd</div>
             </div>
-          ))}
+          </div>
+
+          {/* Tabellrader */}
+          <div className="bg-slate-900/30">
+            {filteredItems.map((item, index) => {
+              const isExpanded = expandedCaseId === item.case_id
+              const isHovered = hoveredCaseId === item.case_id
+
+              return (
+                <div key={item.case_id}>
+                  {/* Datarad */}
+                  <div
+                    className={`
+                      grid grid-cols-12 gap-3 px-4 py-2.5 items-center
+                      border-l-4 ${getBorderColor(item.traffic_light_color)}
+                      ${index > 0 ? 'border-t border-slate-700/50' : ''}
+                      ${isHovered ? 'bg-slate-800/30' : ''}
+                      ${isExpanded ? 'bg-slate-800/20' : ''}
+                      transition-all duration-200 cursor-pointer
+                    `}
+                    onClick={() => toggleExpand(item.case_id)}
+                    onMouseEnter={() => setHoveredCaseId(item.case_id)}
+                    onMouseLeave={() => setHoveredCaseId(null)}
+                  >
+                    {/* STATUS */}
+                    <div className="col-span-1 flex justify-center">
+                      {getStatusIcon(item.traffic_light_color, 'sm')}
+                    </div>
+
+                    {/* KUND */}
+                    <div className="col-span-3">
+                      <div className="flex items-center gap-2">
+                        {isExpanded
+                          ? <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        }
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-white text-sm truncate">{item.customer_name}</div>
+                          <div className="text-xs text-slate-400">#{item.case_number}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SKADEDJUR */}
+                    <div className="col-span-1 text-sm text-slate-300 truncate">
+                      {item.pest_type || <span className="text-slate-500">-</span>}
+                    </div>
+
+                    {/* NIVÅ (pest_level) */}
+                    <div className="col-span-2 text-center">
+                      {item.pest_level !== null ? (
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${getLevelBadgeClass(item.pest_level, 'pest')}`}>
+                          {item.pest_level} - {getPestLevelLabel(item.pest_level)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-500">-</span>
+                      )}
+                    </div>
+
+                    {/* BEDÖMNING (problem_rating) */}
+                    <div className="col-span-2 text-center">
+                      {item.problem_rating !== null ? (
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${getLevelBadgeClass(item.problem_rating, 'problem')}`}>
+                          {item.problem_rating} - {getProblemRatingLabel(item.problem_rating)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-500">-</span>
+                      )}
+                    </div>
+
+                    {/* TREND */}
+                    <div className="col-span-1 flex justify-center">
+                      {getTrendIcon(item.pest_level_trend)}
+                    </div>
+
+                    {/* BEDÖMD */}
+                    <div className="col-span-2">
+                      {item.assessment_date ? (
+                        <div>
+                          <div className="text-sm text-white">
+                            {new Date(item.assessment_date).toLocaleDateString('sv-SE')}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {formatRelativeDate(item.assessment_date)}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-500">-</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanderad rad */}
+                  {isExpanded && (
+                    <div className="bg-slate-900/50 border-t border-slate-700 px-4 py-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Vänster: Bedömningsskalor + rekommendationer */}
+                        <div className="space-y-3">
+                          {item.pest_level !== null && (
+                            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                              <AssessmentScaleBar
+                                type="pest"
+                                value={item.pest_level}
+                                size="sm"
+                                showLabels={true}
+                                showTitle={true}
+                              />
+                            </div>
+                          )}
+
+                          {item.problem_rating !== null && (
+                            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                              <AssessmentScaleBar
+                                type="problem"
+                                value={item.problem_rating}
+                                size="sm"
+                                showLabels={true}
+                                showTitle={true}
+                              />
+                            </div>
+                          )}
+
+                          {item.recommendations && (
+                            <div className="p-3 bg-amber-500/10 border-l-4 border-amber-500 rounded-r-lg">
+                              <h4 className="text-sm font-semibold text-amber-400 flex items-center gap-1.5 mb-1">
+                                <Lightbulb className="w-4 h-4" />
+                                Rekommendationer
+                              </h4>
+                              <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">
+                                {item.recommendations}
+                              </p>
+                            </div>
+                          )}
+
+                          {item.work_report && (
+                            <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
+                              <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5 mb-1">
+                                <Wrench className="w-4 h-4" />
+                                Arbetsrapport
+                              </h4>
+                              <p className="text-sm text-slate-200 whitespace-pre-wrap">
+                                {item.work_report}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Höger: Tidslinje + metadata */}
+                        <div className="space-y-3">
+                          <CaseJourneyTimeline
+                            caseId={item.case_id}
+                            currentPestLevel={item.pest_level}
+                            currentProblemRating={item.problem_rating}
+                            assessmentDate={item.assessment_date}
+                            assessedBy={item.assessed_by}
+                            defaultExpanded={true}
+                          />
+
+                          <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
+                            <h4 className="text-sm font-semibold text-slate-300 mb-2">Ärendeinformation</h4>
+                            <div className="space-y-1.5 text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className="text-slate-400">Ärende:</span>
+                                <span className="text-white">{item.title}</span>
+                              </div>
+                              {item.address && (
+                                <div className="flex items-center gap-2 text-slate-400">
+                                  <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                                  <span className="text-slate-300">{item.address}</span>
+                                </div>
+                              )}
+                              {item.status && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-400">Status:</span>
+                                  <span className="text-white">{item.status}</span>
+                                </div>
+                              )}
+                              {item.technician_name && (
+                                <div className="flex items-center gap-2">
+                                  <User className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                  <span className="text-slate-400">Tekniker:</span>
+                                  <span className="text-white">{item.technician_name}</span>
+                                </div>
+                              )}
+                              {item.assessed_by && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-400">Bedömd av:</span>
+                                  <span className="text-white">{item.assessed_by}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
