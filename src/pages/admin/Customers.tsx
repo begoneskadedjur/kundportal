@@ -170,48 +170,38 @@ const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { custom
         {/* Registrerade kontaktpersoner */}
         {contacts.length > 0 && (
           <div className="mt-4 pt-4 border-t border-slate-700/50">
-            <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+            <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
               <Users className="w-4 h-4 text-slate-400" />
               Registrerade kontaktpersoner ({contacts.length})
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="max-h-[200px] overflow-y-auto space-y-1">
               {contacts.map((contact, i) => (
-                <div key={i} className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-slate-200">{contact.name}</div>
-                      {contact.title && (
-                        <div className="text-xs text-slate-400">{contact.title}</div>
-                      )}
-                      {contact.responsibility_area && (
-                        <span className="inline-block mt-1 text-xs text-[#20c58f] bg-[#20c58f]/10 px-2 py-0.5 rounded-full">
-                          {contact.responsibility_area}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {contact.phone && (
-                        <a href={`tel:${contact.phone}`} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors" title="Ring">
-                          <Phone className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                      {contact.email && (
-                        <a href={`mailto:${contact.email}`} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors" title="Maila">
-                          <Mail className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                    </div>
+                <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-slate-800/40 transition-colors text-sm">
+                  <div className="min-w-0 flex items-center gap-2 flex-1">
+                    <span className="font-medium text-slate-200 truncate">{contact.name}</span>
+                    {contact.title && (
+                      <span className="text-xs text-slate-500 truncate hidden sm:inline">{contact.title}</span>
+                    )}
+                    {contact.responsibility_area && (
+                      <span className="text-xs text-[#20c58f] bg-[#20c58f]/10 px-1.5 py-0.5 rounded shrink-0">{contact.responsibility_area}</span>
+                    )}
                   </div>
-                  {(contact.phone || contact.email) && (
-                    <div className="mt-2 pt-2 border-t border-slate-700/30 space-y-0.5">
-                      {contact.phone && (
-                        <div className="text-xs text-slate-500">{contact.phone}</div>
-                      )}
-                      {contact.email && (
-                        <div className="text-xs text-slate-500">{contact.email}</div>
-                      )}
-                    </div>
-                  )}
+                  <div className="hidden md:flex items-center gap-3 text-xs text-slate-400 shrink-0">
+                    {contact.phone && <span>{contact.phone}</span>}
+                    {contact.email && <span className="truncate max-w-[180px]">{contact.email}</span>}
+                  </div>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    {contact.phone && (
+                      <a href={`tel:${contact.phone}`} className="p-1 text-slate-500 hover:text-[#20c58f] transition-colors" title={`Ring ${contact.name}: ${contact.phone}`}>
+                        <Phone className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    {contact.email && (
+                      <a href={`mailto:${contact.email}`} className="p-1 text-slate-500 hover:text-[#20c58f] transition-colors" title={`Maila ${contact.name}: ${contact.email}`}>
+                        <Mail className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
