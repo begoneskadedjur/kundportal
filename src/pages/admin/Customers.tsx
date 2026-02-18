@@ -186,11 +186,12 @@ export default function Customers() {
   // Use consolidated customers hook instead of regular customer analytics
   const { 
     consolidatedCustomers, 
-    analytics: consolidatedAnalytics, 
-    loading, 
-    error, 
-    filterCustomers: filterConsolidatedCustomers, 
-    refresh 
+    analytics: consolidatedAnalytics,
+    loading,
+    error,
+    filterCustomers: filterConsolidatedCustomers,
+    refresh,
+    getContactsForOrganization
   } = useConsolidatedCustomers()
 
   // Keep old hook for backwards compatibility with components that need individual customers
@@ -218,6 +219,18 @@ export default function Customers() {
   const [billingSettingsOrg, setBillingSettingsOrg] = useState<any>(null)
   const [contactsModalOpen, setContactsModalOpen] = useState(false)
   const [contactsOrg, setContactsOrg] = useState<any>(null)
+
+  // Active customer highlight — tracks which org has an open modal
+  const activeCustomerId =
+    (revenueModalOpen && revenueCustomer?.id) ||
+    (editModalOpen && editingCustomer?.id) ||
+    (multiSiteDetailOpen && selectedMultiSiteOrg?.id) ||
+    (singleCustomerDetailOpen && selectedSingleCustomer?.id) ||
+    (renewalModalOpen && renewalOrganization?.id) ||
+    (terminateModalOpen && terminateOrganization?.id) ||
+    (billingSettingsOpen && billingSettingsOrg?.id) ||
+    (contactsModalOpen && contactsOrg?.id) ||
+    null
 
   // Filter states — searchInput är UI-state, searchTerm debouncas för prestanda vid 3000+ kunder
   const [searchInput, setSearchInput] = useState('')
@@ -829,8 +842,8 @@ export default function Customers() {
                         </div>
                       </th>
                     )}
-                    <th className="px-6 py-4 text-center text-xs font-medium text-slate-300 uppercase tracking-wider">
-                      <div className="flex items-center justify-center gap-2">
+                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center justify-end gap-2">
                         <Edit3 className="w-4 h-4 text-slate-400" />
                         Åtgärder
                       </div>
@@ -840,6 +853,8 @@ export default function Customers() {
                 <tbody>
                   {paginatedCustomers.map((organization) => {
                     const isExpanded = expandedRows.has(organization.id)
+
+                    const orgContacts = getContactsForOrganization(organization)
 
                     return (
                       <React.Fragment key={organization.id}>
@@ -858,6 +873,9 @@ export default function Customers() {
                           onBillingSettings={handleBillingSettings}
                           onContacts={handleContacts}
                           visibleColumns={visibleColumns}
+                          contactCount={orgContacts.length}
+                          contactNames={orgContacts.map(c => c.name)}
+                          isHighlighted={activeCustomerId === organization.id}
                         />
 
                         {/* Contact and units expanded view for multisite organizations */}

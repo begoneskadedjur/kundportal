@@ -202,12 +202,18 @@ export interface ConsolidatedAnalytics {
   }
 }
 
+export interface ContactSummary {
+  name: string
+  responsibility_area: string | null
+}
+
 export function useConsolidatedCustomers() {
   const [consolidatedCustomers, setConsolidatedCustomers] = useState<ConsolidatedCustomer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [contactsSearch, setContactsSearch] = useState<Map<string, string[]>>(new Map())
+  const [contactsMap, setContactsMap] = useState<Map<string, ContactSummary[]>>(new Map())
 
   useEffect(() => {
     fetchConsolidatedCustomers()
@@ -246,12 +252,17 @@ export function useConsolidatedCustomers() {
 
       // Customer contacts map for search (customer_id -> searchable strings)
       const contactsSearchMap = new Map<string, string[]>()
+      const contactsSummaryMap = new Map<string, ContactSummary[]>()
       contactsData?.forEach((c: any) => {
         const strs = contactsSearchMap.get(c.customer_id) || []
         if (c.name) strs.push(c.name.toLowerCase())
         if (c.responsibility_area) strs.push(c.responsibility_area.toLowerCase())
         if (c.email) strs.push(c.email.toLowerCase())
         contactsSearchMap.set(c.customer_id, strs)
+
+        const summaries = contactsSummaryMap.get(c.customer_id) || []
+        summaries.push({ name: c.name, responsibility_area: c.responsibility_area || null })
+        contactsSummaryMap.set(c.customer_id, summaries)
       })
 
       // Portal access map
@@ -415,6 +426,7 @@ export function useConsolidatedCustomers() {
       const consolidated = consolidateCustomers(enrichedCustomers, multisiteAccessMap, multisiteUsersMap)
       setConsolidatedCustomers(consolidated)
       setContactsSearch(contactsSearchMap)
+      setContactsMap(contactsSummaryMap)
 
     } catch (err) {
       console.error('Error fetching consolidated customers:', err)
@@ -912,6 +924,10 @@ export function useConsolidatedCustomers() {
     setRefreshKey(prev => prev + 1)
   }
 
+  const getContactsForOrganization = (org: ConsolidatedCustomer): ContactSummary[] => {
+    return org.sites.flatMap(site => contactsMap.get(site.id) || [])
+  }
+
   return {
     consolidatedCustomers,
     activeConsolidatedCustomers,
@@ -919,7 +935,8 @@ export function useConsolidatedCustomers() {
     loading,
     error,
     filterCustomers,
-    refresh
+    refresh,
+    getContactsForOrganization
   }
 }
 

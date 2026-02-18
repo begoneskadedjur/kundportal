@@ -1,9 +1,10 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
-import React from 'react'
-import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw, XCircle, Receipt, Users } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw, XCircle, Receipt, Users, MoreVertical, MapPin, Banknote } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
+import TooltipWrapper from '../../ui/TooltipWrapper'
 
 interface ExpandableOrganizationRowProps {
   organization: ConsolidatedCustomer
@@ -21,6 +22,9 @@ interface ExpandableOrganizationRowProps {
   onBillingSettings?: (org: ConsolidatedCustomer) => void
   onContacts?: (org: ConsolidatedCustomer) => void
   visibleColumns?: Set<string>
+  contactCount?: number
+  contactNames?: string[]
+  isHighlighted?: boolean
 }
 
 const HealthScoreBadge: React.FC<{ level: string; score: number }> = ({ level, score }) => {
@@ -74,39 +78,39 @@ const formatContractPeriod = (org: ConsolidatedCustomer): { period: string; rema
   if (!org.nextRenewalDate) {
     return { period: 'Okänt avtal', remaining: '', color: 'text-slate-400' }
   }
-  
+
   const endDate = new Date(org.nextRenewalDate)
   const now = new Date()
   const diffTime = endDate.getTime() - now.getTime()
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  
+
   // Beräkna antal månader kvar mer exakt
   const monthsRemaining = Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24 * 30.44)))
-  
+
   // Formatera start- och slutdatum med exakt dag
   let startText = ''
   if (org.earliestContractStartDate) {
     const startDate = new Date(org.earliestContractStartDate)
-    startText = startDate.toLocaleDateString('sv-SE', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric' 
+    startText = startDate.toLocaleDateString('sv-SE', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
     })
   }
-  
-  const endText = endDate.toLocaleDateString('sv-SE', { 
-    day: 'numeric', 
-    month: 'short', 
-    year: 'numeric' 
+
+  const endText = endDate.toLocaleDateString('sv-SE', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
   })
-  
+
   // Bygg ihop perioden
   const period = startText ? `${startText} - ${endText}` : endText
-  
+
   // Månadsbaserad färgkodning: Röd ≤ 6 mån, Gul 7-12 mån, Grön > 12 mån
   let remaining = ''
   let color = 'text-slate-400'
-  
+
   if (diffDays < 0) {
     remaining = 'Utgånget'
     color = 'text-red-400'
@@ -120,7 +124,7 @@ const formatContractPeriod = (org: ConsolidatedCustomer): { period: string; rema
     remaining = `${monthsRemaining} mån kvar`
     color = 'text-green-400'  // Grön - Stabilt
   }
-  
+
   return { period, remaining, color }
 }
 
@@ -128,10 +132,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   organization,
   isExpanded,
   onToggle,
-  onInviteToPortal,
   onEdit,
-  onEmailContact,
-  onViewDetails,
   onViewMultiSiteDetails,
   onViewSingleCustomerDetails,
   onViewRevenue,
@@ -139,8 +140,26 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   onTerminate,
   onBillingSettings,
   onContacts,
-  visibleColumns
+  visibleColumns,
+  contactCount,
+  contactNames,
+  isHighlighted
 }) => {
+  const [showOverflow, setShowOverflow] = useState(false)
+  const overflowRef = useRef<HTMLDivElement>(null)
+
+  // Close overflow on outside click
+  useEffect(() => {
+    if (!showOverflow) return
+    const handler = (e: MouseEvent) => {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setShowOverflow(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showOverflow])
+
   const isVisible = (col: string) => !visibleColumns || visibleColumns.has(col)
   const isMultisite = organization.organizationType === 'multisite'
   const isTerminated = organization.isTerminated
@@ -159,7 +178,11 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
       : 'border-l-[3px] border-l-transparent'
 
   return (
-    <tr className={`border-b border-slate-700 hover:bg-slate-800/50 transition-colors duration-200 ${isExpanded ? 'bg-slate-800/30' : ''} ${urgencyBorder}`}>
+    <tr className={`border-b border-slate-700/50 transition-colors duration-200 ${
+      isHighlighted
+        ? 'bg-[#20c58f]/5 border-l-[3px] border-l-[#20c58f]/60'
+        : `hover:bg-slate-800/50 ${isExpanded ? 'bg-slate-800/30' : ''} ${urgencyBorder}`
+    }`}>
       {/* Company & Contact Column */}
       <td className="px-6 py-4">
         <div className="flex items-center">
@@ -173,7 +196,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               <ChevronRight className="h-4 w-4 text-slate-400" />
             )}
           </button>
-          
+
           <div className="flex-1">
             <div className="flex items-center">
               {isMultisite ? (
@@ -197,9 +220,30 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                   <span className="text-blue-400">{organization.contact_email}</span>
                 </div>
                 {isMultisite && (
-                  <div className="text-xs text-slate-500 mt-1">
-                    📍 {organization.totalSites} enheter | 
-                    💰 {formatCurrency(organization.totalContractValue)}/år
+                  <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {organization.totalSites} enheter
+                    <span className="text-slate-600 mx-0.5">|</span>
+                    <Banknote className="w-3 h-3" />
+                    {formatCurrency(organization.totalContractValue)}/år
+                  </div>
+                )}
+                {/* Contact persons indicator */}
+                {contactCount != null && contactCount > 0 && (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Users className="w-3 h-3 text-slate-500" />
+                    <span className="text-xs text-slate-500">
+                      {contactNames && contactNames.length > 0 ? (
+                        <>
+                          {contactNames.slice(0, 2).join(', ')}
+                          {contactCount > 2 && (
+                            <span className="text-slate-600"> +{contactCount - 2}</span>
+                          )}
+                        </>
+                      ) : (
+                        `${contactCount} kontaktperson${contactCount > 1 ? 'er' : ''}`
+                      )}
+                    </span>
                   </div>
                 )}
               </div>
@@ -379,96 +423,115 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
         </td>
       )}
 
-      {/* Actions Column */}
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-2">
-          {/* Revenue Overview Button */}
-          {onViewRevenue && (
+      {/* Actions Column — Primary icons + overflow menu */}
+      <td className="px-4 py-4">
+        <div className="flex items-center justify-end gap-0.5">
+          {/* Detail view */}
+          <TooltipWrapper content={isMultisite ? 'Multisite-vy' : 'Detaljvy'}>
             <button
-              onClick={() => onViewRevenue(organization)}
-              className="text-green-400 hover:text-green-300 text-sm font-medium transition-colors duration-200"
-              title="Visa intäktsöversikt"
-            >
-              <Coins className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Renewal Button — visas bara om avtal < 90 dagar */}
-          {showRenewalButton && (
-            <button
-              onClick={() => onRenewal!(organization)}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors duration-200 animate-pulse"
-              title="Starta avtalsförnyelse"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Multisite Detail Button */}
-          {isMultisite && onViewMultiSiteDetails && (
-            <button
-              onClick={() => onViewMultiSiteDetails(organization)}
-              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors duration-200"
-              title="Visa detaljerad multisite-vy"
+              onClick={() => isMultisite
+                ? onViewMultiSiteDetails?.(organization)
+                : onViewSingleCustomerDetails?.(organization)
+              }
+              className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 transition-colors"
             >
               <ExternalLink className="h-4 w-4" />
             </button>
-          )}
+          </TooltipWrapper>
 
-          {/* Single Customer Detail Button */}
-          {!isMultisite && onViewSingleCustomerDetails && (
-            <button
-              onClick={() => onViewSingleCustomerDetails(organization)}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors duration-200"
-              title="Visa detaljerad kundvy"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Terminate Contract Button */}
-          {showTerminateButton && (
-            <button
-              onClick={() => onTerminate!(organization)}
-              className="text-red-400/70 hover:text-red-400 text-sm font-medium transition-colors duration-200"
-              title="Säg upp avtal"
-            >
-              <XCircle className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Billing Settings Button */}
-          {onBillingSettings && (
-            <button
-              onClick={() => onBillingSettings(organization)}
-              className="text-emerald-400 hover:text-emerald-300 text-sm font-medium transition-colors duration-200"
-              title="Faktureringsinställningar"
-            >
-              <Receipt className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Contacts Button */}
-          {onContacts && (
-            <button
-              onClick={() => onContacts(organization)}
-              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors duration-200"
-              title="Kontaktpersoner"
-            >
-              <Users className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Edit Customer Button */}
+          {/* Edit */}
           {onEdit && (
-            <button
-              onClick={() => onEdit(organization)}
-              className="text-slate-400 hover:text-white text-sm font-medium transition-colors duration-200"
-              title="Redigera kund"
-            >
-              <Edit3 className="h-4 w-4" />
-            </button>
+            <TooltipWrapper content="Redigera">
+              <button
+                onClick={() => onEdit(organization)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+              >
+                <Edit3 className="h-4 w-4" />
+              </button>
+            </TooltipWrapper>
           )}
+
+          {/* Renewal — conditional, amber with dot indicator */}
+          {showRenewalButton && (
+            <TooltipWrapper content="Förnya avtal">
+              <button
+                onClick={() => onRenewal!(organization)}
+                className="relative p-1.5 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-amber-400 rounded-full" />
+              </button>
+            </TooltipWrapper>
+          )}
+
+          {/* Overflow menu */}
+          <div className="relative" ref={overflowRef}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowOverflow(!showOverflow)
+              }}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+
+            {showOverflow && (
+              <div className="absolute right-0 top-full mt-1 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-30 py-1">
+                {/* Revenue */}
+                {onViewRevenue && (
+                  <button
+                    onClick={() => { onViewRevenue(organization); setShowOverflow(false) }}
+                    className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 transition-colors"
+                  >
+                    <Coins className="w-4 h-4 text-green-400" />
+                    Intäktsöversikt
+                  </button>
+                )}
+
+                {/* Billing settings */}
+                {onBillingSettings && (
+                  <button
+                    onClick={() => { onBillingSettings(organization); setShowOverflow(false) }}
+                    className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 transition-colors"
+                  >
+                    <Receipt className="w-4 h-4 text-emerald-400" />
+                    Fakturering
+                  </button>
+                )}
+
+                {/* Contacts */}
+                {onContacts && (
+                  <button
+                    onClick={() => { onContacts(organization); setShowOverflow(false) }}
+                    className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 transition-colors"
+                  >
+                    <Users className="w-4 h-4 text-blue-400" />
+                    Kontaktpersoner
+                    {contactCount != null && contactCount > 0 && (
+                      <span className="ml-auto text-xs text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
+                        {contactCount}
+                      </span>
+                    )}
+                  </button>
+                )}
+
+                {/* Terminate — destructive, separated */}
+                {showTerminateButton && (
+                  <>
+                    <div className="border-t border-slate-700 my-1" />
+                    <button
+                      onClick={() => { onTerminate!(organization); setShowOverflow(false) }}
+                      className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2.5 transition-colors"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Säg upp avtal
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </td>
     </tr>
