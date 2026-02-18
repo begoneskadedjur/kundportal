@@ -204,6 +204,7 @@ export default function Customers() {
   const [emailCampaignOpen, setEmailCampaignOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<any>(null)
+  const [editingOrgId, setEditingOrgId] = useState<string | null>(null)
   const [multiSiteDetailOpen, setMultiSiteDetailOpen] = useState(false)
   const [selectedMultiSiteOrg, setSelectedMultiSiteOrg] = useState<any>(null)
   const [singleCustomerDetailOpen, setSingleCustomerDetailOpen] = useState(false)
@@ -223,7 +224,7 @@ export default function Customers() {
   // Active customer highlight — tracks which org has an open modal
   const activeCustomerId =
     (revenueModalOpen && revenueCustomer?.id) ||
-    (editModalOpen && editingCustomer?.id) ||
+    (editModalOpen && editingOrgId) ||
     (multiSiteDetailOpen && selectedMultiSiteOrg?.id) ||
     (singleCustomerDetailOpen && selectedSingleCustomer?.id) ||
     (renewalModalOpen && renewalOrganization?.id) ||
@@ -420,9 +421,10 @@ export default function Customers() {
     }
   }
 
-  // Handle customer edit
-  const handleEditCustomer = (customer: any) => {
-    setEditingCustomer(customer)
+  // Handle customer edit — receives full org, passes site[0] to modal
+  const handleEditCustomer = (org: any) => {
+    setEditingCustomer(org.sites?.[0] || org)
+    setEditingOrgId(org.id)
     setEditModalOpen(true)
   }
 
@@ -864,7 +866,7 @@ export default function Customers() {
                           isExpanded={isExpanded}
                           onToggle={() => toggleExpandedRow(organization.id)}
                           onInviteToPortal={inviteToPortal}
-                          onEdit={(org) => handleEditCustomer(org.sites[0])}
+                          onEdit={(org) => handleEditCustomer(org)}
                           onViewMultiSiteDetails={handleViewMultiSiteDetails}
                           onViewSingleCustomerDetails={handleViewSingleCustomerDetails}
                           onViewRevenue={handleViewRevenue}
@@ -973,6 +975,7 @@ export default function Customers() {
         onClose={() => {
           setEditModalOpen(false)
           setEditingCustomer(null)
+          setEditingOrgId(null)
         }}
         onSave={handleCustomerSaved}
       />

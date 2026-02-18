@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React, { useState, useRef, useEffect } from 'react'
-import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, Coins, RefreshCw, XCircle, Receipt, Users, MoreVertical, MapPin, Banknote } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, TrendingUp, RefreshCw, XCircle, Receipt, Users, MoreVertical, MapPin, Banknote } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 import TooltipWrapper from '../../ui/TooltipWrapper'
@@ -217,17 +217,8 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                   {organization.contact_person && (
                     <span>{organization.contact_person} • </span>
                   )}
-                  <span className="text-blue-400">{organization.contact_email}</span>
+                  <span className="text-slate-400">{organization.contact_email}</span>
                 </div>
-                {isMultisite && (
-                  <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {organization.totalSites} enheter
-                    <span className="text-slate-600 mx-0.5">|</span>
-                    <Banknote className="w-3 h-3" />
-                    {formatCurrency(organization.totalContractValue)}/år
-                  </div>
-                )}
                 {/* Contact persons indicator */}
                 {contactCount != null && contactCount > 0 && (
                   <div className="flex items-center gap-1.5 mt-0.5">
@@ -256,7 +247,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
       {isVisible('annualValue') && (
         <td className="px-4 lg:px-6 py-4">
           <div className="text-right">
-            <div className="font-semibold text-green-400 text-sm lg:text-base">
+            <div className="font-semibold text-slate-200 text-sm lg:text-base">
               {formatCurrency(organization.totalAnnualValue || 0)}
             </div>
             <div className="text-xs text-slate-500 hidden sm:block">
@@ -270,7 +261,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
       {isVisible('casesValue') && (
         <td className="hidden lg:table-cell px-4 lg:px-6 py-4">
           <div className="text-right">
-            <div className="font-semibold text-blue-400 text-sm lg:text-base">
+            <div className="font-semibold text-slate-200 text-sm lg:text-base">
               {formatCurrency(organization.totalCasesValue || 0)}
             </div>
             <div className="text-xs text-slate-500 hidden sm:block">
@@ -484,7 +475,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                     onClick={() => { onViewRevenue(organization); setShowOverflow(false) }}
                     className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 transition-colors"
                   >
-                    <Coins className="w-4 h-4 text-green-400" />
+                    <TrendingUp className="w-4 h-4 text-green-400" />
                     Intäktsöversikt
                   </button>
                 )}
@@ -496,7 +487,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                     className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 transition-colors"
                   >
                     <Receipt className="w-4 h-4 text-emerald-400" />
-                    Fakturering
+                    Inställningar fakturering
                   </button>
                 )}
 
@@ -507,7 +498,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                     className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 transition-colors"
                   >
                     <Users className="w-4 h-4 text-blue-400" />
-                    Kontaktpersoner
+                    Hantera kontaktpersoner
                     {contactCount != null && contactCount > 0 && (
                       <span className="ml-auto text-xs text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
                         {contactCount}
