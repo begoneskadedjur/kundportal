@@ -1,10 +1,11 @@
 // src/components/admin/layout/AdminMobileNav.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bell, Menu, X, LogOut, Wrench } from 'lucide-react'
 import { topLevelItems, navGroups, mobileBottomItems } from './adminNavConfig'
 import { MobileNavGroup } from './MobileNavGroup'
 import { useAuth } from '../../../contexts/AuthContext'
+import { getTicketStats } from '../../../services/communicationService'
 
 interface AdminMobileNavProps {
   currentPath: string
@@ -13,8 +14,16 @@ interface AdminMobileNavProps {
 
 export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { hasDualRole, setActiveView } = useAuth()
+  const { profile, hasDualRole, setActiveView } = useAuth()
   const navigate = useNavigate()
+  const [ticketCount, setTicketCount] = useState(0)
+
+  useEffect(() => {
+    if (!profile?.id) return
+    getTicketStats(profile.id).then(stats => {
+      setTicketCount(stats.open)
+    }).catch(() => {})
+  }, [profile?.id])
 
   return (
     <>
@@ -27,10 +36,14 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
           <p className="text-white font-semibold text-sm">BeGone</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 relative" aria-label="Notifieringar">
+          <Link to="/admin/tickets" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 relative" aria-label="Notifieringar">
             <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">3</span>
-          </button>
+            {ticketCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">
+                {ticketCount > 9 ? '9+' : ticketCount}
+              </span>
+            )}
+          </Link>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"

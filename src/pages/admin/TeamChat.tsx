@@ -676,7 +676,7 @@ export default function TeamChat() {
   };
 
   return (
-    <div className="h-[calc(100vh-3rem)] flex bg-slate-900 overflow-hidden -mb-20 lg:-mb-0">
+    <div className="h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3rem)] flex bg-slate-900 overflow-hidden -mb-20 lg:-mb-0">
       {/* Sidebar - kompaktare */}
       <div className={`${isSidebarOpen ? 'w-56' : 'w-0'} h-full min-h-0 transition-all duration-200 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden`}>
         <div className="p-2 border-b border-slate-700">
@@ -989,7 +989,7 @@ export default function TeamChat() {
               {isGeneratingImage ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                <Sparkles className="w-5 h-5" />
+                <Image className="w-5 h-5" />
               )}
             </button>
             <button
