@@ -18,8 +18,6 @@ import {
   Sparkles,
   Image as ImageIcon,
   MessageSquareText,
-  FileText,
-  GraduationCap,
   Beaker,
   Package,
   Wrench,
@@ -47,21 +45,20 @@ export const navGroups: NavGroup[] = [
     label: 'Kunder & Avtal',
     icon: Users,
     items: [
-      { label: 'Kunder', icon: Users, path: '/admin/customers' },
+      { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder' },
       { label: 'Trafikljusöversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
-      { label: 'Kundanalys', icon: BarChart3, path: '/admin/customers/analytics' },
-      { label: 'Skapa avtal', icon: FileText, path: '/admin/oneflow-contract-creator' },
-      { label: 'Kundåtkomst', icon: KeyRound, path: '/admin/customer-access' },
+      { label: 'Kundprognos', icon: BarChart3, path: '/admin/kundprognos' },
+      { label: 'Användarkonton (Kund)', icon: KeyRound, path: '/admin/anvandarkonton-kund' },
     ]
   },
   {
     label: 'Försäljning',
     icon: TrendingUp,
     items: [
-      { label: 'Avtalsöversikt', icon: Receipt, path: '/admin/contracts-overview' },
+      { label: 'Försäljningspipeline', icon: Receipt, path: '/admin/forsaljningspipeline' },
       { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/admin/sales-opportunities' },
       { label: 'Leads', icon: Target, path: '/admin/leads' },
-      { label: 'Leadanalys', icon: BarChart3, path: '/admin/leads/analytics' },
+      { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
     ]
   },
   {
@@ -78,7 +75,7 @@ export const navGroups: NavGroup[] = [
     icon: Building2,
     items: [
       { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/technicians' },
-      { label: 'Personalkonton', icon: UserCheck, path: '/admin/technician-management' },
+      { label: 'Användarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
     ]
   },
@@ -86,18 +83,17 @@ export const navGroups: NavGroup[] = [
     label: 'Verktyg',
     icon: Sparkles,
     items: [
-      { label: 'Team AI Chat', icon: Sparkles, path: '/admin/team-chat' },
-      { label: 'Bildbank', icon: ImageIcon, path: '/admin/image-bank' },
-      { label: 'Lärocenter', icon: GraduationCap, path: '/admin/larosate' },
+      { label: 'AI Assistent', icon: Sparkles, path: '/admin/ai-assistent' },
+      { label: 'Gemensam bildbank', icon: ImageIcon, path: '/admin/bildbank' },
     ]
   },
   {
     label: 'Produkter & Priser',
     icon: Package,
     items: [
-      { label: 'Stationstyper', icon: Target, path: '/admin/settings/station-types' },
+      { label: 'Stationer & Fällor', icon: Target, path: '/admin/stationer-fallor' },
       { label: 'Preparat', icon: Beaker, path: '/admin/settings/preparations' },
-      { label: 'Prislistor', icon: FileText, path: '/admin/settings/price-lists' },
+      { label: 'Prislistor', icon: Receipt, path: '/admin/settings/price-lists' },
       { label: 'Artiklar', icon: Package, path: '/admin/settings/articles' },
     ]
   },
@@ -114,12 +110,12 @@ export const navGroups: NavGroup[] = [
 export const favoriteItems: NavItem[] = [
   { label: 'Ekonomisk översikt', icon: DollarSign, path: '/admin/economics' },
   { label: 'Fakturering', icon: Receipt, path: '/admin/invoicing' },
-  { label: 'Team AI Chat', icon: Sparkles, path: '/admin/team-chat' },
+  { label: 'AI Assistent', icon: Sparkles, path: '/admin/ai-assistent' },
 ]
 
 export const mobileBottomItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/admin/dashboard' },
-  { label: 'Kunder', icon: Users, path: '/admin/customers' },
+  { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder' },
   { label: 'Leads', icon: Target, path: '/admin/leads' },
   { label: 'Ekonomi', icon: DollarSign, path: '/admin/economics' },
 ]
@@ -127,27 +123,27 @@ export const mobileBottomItems: NavItem[] = [
 // Breadcrumb-mappning: path -> svenskt namn
 export const breadcrumbMap: Record<string, string> = {
   '/admin/dashboard': 'Översikt',
-  '/admin/customers': 'Kunder',
+  '/admin/befintliga-kunder': 'Befintliga kunder',
   '/admin/leads': 'Leads',
   '/admin/economics': 'Ekonomisk översikt',
   '/admin/invoicing': 'Fakturering',
   '/admin/commissions': 'Provisioner',
   '/admin/technicians': 'Teknikerstatistik',
-  '/admin/technician-management': 'Personalkonton',
-  '/admin/contracts-overview': 'Avtalsöversikt',
+  '/admin/anvandarkonton-personal': 'Användarkonton (Personal)',
+  '/admin/forsaljningspipeline': 'Försäljningspipeline',
   '/admin/sales-opportunities': 'Försäljningsmöjligheter',
-  '/admin/customers/analytics': 'Kundanalys',
-  '/admin/leads/analytics': 'Leadanalys',
-  '/admin/customer-access': 'Kundåtkomst',
+  '/admin/kundprognos': 'Kundprognos',
+  '/admin/leadsstatistik': 'Leadsstatistik',
+  '/admin/anvandarkonton-kund': 'Användarkonton (Kund)',
   '/admin/organisation/traffic-light': 'Trafikljusöversikt',
 
-  '/admin/team-chat': 'Team AI Chat',
-  '/admin/image-bank': 'Bildbank',
+  '/admin/ai-assistent': 'AI Assistent',
+  '/admin/bildbank': 'Gemensam bildbank',
   '/admin/tickets': 'Tickets',
   '/admin/oneflow-contract-creator': 'Skapa avtal',
   '/admin/oneflow-diagnostics': 'Avtalsdiagnostik',
   '/admin/webhook-config': 'Webhook-config',
-  '/admin/settings/station-types': 'Stationstyper',
+  '/admin/stationer-fallor': 'Stationer & Fällor',
   '/admin/settings/preparations': 'Preparat',
   '/admin/settings/articles': 'Artiklar',
   '/admin/settings/price-lists': 'Prislistor',

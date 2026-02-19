@@ -782,7 +782,7 @@ export default function TeamChat() {
               {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
             </button>
             <h1 className="text-white text-sm font-medium truncate">
-              {currentConversation?.title || 'Team AI Chat'}
+              {currentConversation?.title || 'AI Assistent'}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -801,7 +801,7 @@ export default function TeamChat() {
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
               <Sparkles className="w-12 h-12 mb-3 text-emerald-500" />
-              <h2 className="text-lg font-medium text-white mb-1">Team AI Chat</h2>
+              <h2 className="text-lg font-medium text-white mb-1">AI Assistent</h2>
               <p className="text-center text-sm max-w-md mb-4">
                 AI-assistent med tillgång till kunddata, ärenden och tekniker.
               </p>

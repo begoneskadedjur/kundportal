@@ -950,7 +950,7 @@ export default function OrganizationsPage() {
             <KeyRound className="w-6 h-6 text-[#20c58f]" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Kundåtkomst</h1>
+            <h1 className="text-2xl font-bold text-white">Användarkonton (Kund)</h1>
             <p className="text-sm text-slate-400 mt-0.5">Hantera portalåtkomst, konton, användare och inloggningar</p>
           </div>
         </div>
@@ -1157,7 +1157,7 @@ export default function OrganizationsPage() {
                 Registrera Multisite-organisation
               </Button>
               <Button
-                onClick={() => navigate('/admin/customers')}
+                onClick={() => navigate('/admin/befintliga-kunder')}
                 variant="outline"
                 className="flex items-center gap-2"
               >

@@ -598,7 +598,7 @@ export default function ContractsOverview() {
     return (
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Avtalsöversikt</h1>
+          <h1 className="text-2xl font-bold text-white">Försäljningspipeline</h1>
           <p className="text-sm text-slate-400 mt-1">Hantera kontrakt och försäljningsprocesser</p>
         </div>
         
@@ -658,7 +658,7 @@ export default function ContractsOverview() {
       {/* Sidtitel + åtgärdsknappar */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Avtalsöversikt</h1>
+          <h1 className="text-2xl font-bold text-white">Försäljningspipeline</h1>
           <p className="text-sm text-slate-400 mt-1">Hantera kontrakt och försäljningsprocesser</p>
         </div>
         <div className="flex items-center gap-2">

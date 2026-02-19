@@ -550,7 +550,7 @@ export default function Customers() {
       {/* Sidtitel + åtgärdsknappar */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Kunder</h1>
+          <h1 className="text-2xl font-bold text-white">Befintliga kunder</h1>
           <p className="text-sm text-slate-400 mt-1">Hantera kundrelationer och maximera kundvärde</p>
         </div>
         <div className="flex items-center gap-2">
@@ -580,7 +580,7 @@ export default function Customers() {
             <span className="hidden md:inline">Uppdatera</span>
           </button>
           <button
-            onClick={() => navigate('/admin/customers/analytics')}
+            onClick={() => navigate('/admin/kundprognos')}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
           >
             <Activity className="w-4 h-4" />

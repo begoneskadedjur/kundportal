@@ -100,7 +100,7 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete, onCas
 
   const handleCardClick = () => {
     if (!globalModalOpen && !showDropdown) {
-      navigate(`/admin/customers/${customer.id}`)
+      navigate(`/admin/befintliga-kunder/${customer.id}`)
     }
   }
 
@@ -180,7 +180,7 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete, onCas
             <Button
               variant="primary"
               size="sm"
-              onClick={(e) => handleActionClick(e, () => navigate(`/admin/customers/${customer.id}`))}
+              onClick={(e) => handleActionClick(e, () => navigate(`/admin/befintliga-kunder/${customer.id}`))}
               className="whitespace-nowrap"
               disabled={globalModalOpen}
             >
@@ -191,7 +191,7 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete, onCas
             <Button
               variant="secondary"
               size="sm"
-              onClick={(e) => handleActionClick(e, () => navigate(`/admin/customers/${customer.id}/edit`))}
+              onClick={(e) => handleActionClick(e, () => navigate(`/admin/befintliga-kunder/${customer.id}/edit`))}
               disabled={globalModalOpen}
             >
               <Edit className="w-4 h-4" />

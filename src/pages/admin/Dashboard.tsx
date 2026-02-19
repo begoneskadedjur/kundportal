@@ -750,7 +750,7 @@ const AdminDashboard: React.FC = () => {
             {[
               { icon: Plus, label: 'Skapa avtal', desc: 'Generera via Oneflow', href: '/admin/oneflow-contract-creator', color: 'teal' },
               { icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', href: '/admin/invoicing', color: 'emerald' },
-              { icon: Users, label: 'Sök kund', desc: 'Sök i kundregistret', href: '/admin/customers', color: 'cyan' },
+              { icon: Users, label: 'Sök kund', desc: 'Sök i kundregistret', href: '/admin/befintliga-kunder', color: 'cyan' },
               { icon: Target, label: 'Ny lead', desc: 'Lägg till prospekt', href: '/admin/leads', color: 'purple' },
             ].map((action, index) => (
               <motion.div
@@ -796,7 +796,7 @@ const AdminDashboard: React.FC = () => {
                 </motion.div>
               ))}
             </div>
-            <Link to="/admin/customers" className="flex items-center gap-1 mt-4 text-sm text-teal-400 hover:text-teal-300 transition-colors">
+            <Link to="/admin/befintliga-kunder" className="flex items-center gap-1 mt-4 text-sm text-teal-400 hover:text-teal-300 transition-colors">
               Visa all aktivitet
               <ArrowRight className="w-4 h-4" />
             </Link>

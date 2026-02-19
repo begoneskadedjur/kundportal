@@ -46,7 +46,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       title: 'Hantera Kunder',
       description: 'Visa och hantera avtalskunder',
       icon: Users,
-      href: '/admin/customers',
+      href: '/admin/befintliga-kunder',
       keywords: ['kunder', 'customers', 'avtal'],
       category: 'navigation'
     },
@@ -91,7 +91,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       title: 'Hantera Tekniker',
       description: 'Lägg till och redigera personal',
       icon: UserCheck,
-      href: '/admin/technician-management',
+      href: '/admin/anvandarkonton-personal',
       keywords: ['tekniker', 'personal', 'hantera', 'redigera'],
       category: 'manage'
     },

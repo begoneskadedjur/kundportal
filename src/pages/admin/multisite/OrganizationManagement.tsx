@@ -509,7 +509,7 @@ export default function OrganizationManagement() {
               navigate('/admin/organisation/details', { state: { organizationId: org.id } })
             }}
             onViewSingleCustomerDetails={(org) => {
-              navigate('/admin/customers', { state: { selectedCustomerId: org.id } })
+              navigate('/admin/befintliga-kunder', { state: { selectedCustomerId: org.id } })
             }}
           />
         )}

@@ -553,7 +553,7 @@ export default function ImageBank() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <PageHeader
-            title="Bildbank"
+            title="Gemensam bildbank"
             subtitle={`${totalCount} ärenden med ${totalImages} bilder`}
             showBackButton={true}
           />

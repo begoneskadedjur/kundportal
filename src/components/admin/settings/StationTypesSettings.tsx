@@ -107,7 +107,7 @@ export function StationTypesSettings() {
               <Target className="w-6 h-6 text-emerald-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Stationstyper</h1>
+              <h1 className="text-2xl font-bold text-white">Stationer & Fällor</h1>
               <p className="text-slate-400 text-sm">
                 Hantera vilka stationstyper tekniker kan placera ut
               </p>
@@ -119,7 +119,7 @@ export function StationTypesSettings() {
         <div className="grid grid-cols-3 gap-4 mt-6">
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
             <p className="text-2xl font-bold text-white">{stationTypes.length}</p>
-            <p className="text-sm text-slate-400">Stationstyper</p>
+            <p className="text-sm text-slate-400">Stationer & Fällor</p>
           </div>
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
             <p className="text-2xl font-bold text-emerald-400">{activeCount}</p>

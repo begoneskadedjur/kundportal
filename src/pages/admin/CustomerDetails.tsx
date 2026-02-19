@@ -193,7 +193,7 @@ export default function CustomerDetails() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate('/admin/customers')}
+                onClick={() => navigate('/admin/befintliga-kunder')}
                 className="mr-4"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -227,7 +227,7 @@ export default function CustomerDetails() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate('/admin/customers')}
+                onClick={() => navigate('/admin/befintliga-kunder')}
                 className="mr-4"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -265,7 +265,7 @@ export default function CustomerDetails() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => navigate(`/admin/customers/${customer.id}/edit`)}
+                onClick={() => navigate(`/admin/befintliga-kunder/${customer.id}/edit`)}
               >
                 <Edit className="w-4 h-4 mr-2" />
                 Redigera
@@ -489,7 +489,7 @@ export default function CustomerDetails() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(`/admin/customers/${customer.id}/cases`)}
+                    onClick={() => navigate(`/admin/befintliga-kunder/${customer.id}/cases`)}
                   >
                     Visa alla
                   </Button>
@@ -737,7 +737,7 @@ export default function CustomerDetails() {
                   variant="secondary"
                   size="sm"
                   className="w-full justify-start"
-                  onClick={() => navigate(`/admin/customers/${customer.id}/new-case`)}
+                  onClick={() => navigate(`/admin/befintliga-kunder/${customer.id}/new-case`)}
                 >
                   <FileText className="w-4 h-4 mr-2" />
                   Skapa nytt ärende
@@ -747,7 +747,7 @@ export default function CustomerDetails() {
                   variant="secondary"
                   size="sm"
                   className="w-full justify-start"
-                  onClick={() => navigate(`/admin/customers/${customer.id}/cases`)}
+                  onClick={() => navigate(`/admin/befintliga-kunder/${customer.id}/cases`)}
                 >
                   <Eye className="w-4 h-4 mr-2" />
                   Visa alla ärenden

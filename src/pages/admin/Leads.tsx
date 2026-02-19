@@ -798,7 +798,7 @@ const Leads: React.FC = () => {
           resultCount={filteredLeads.length}
           showOnlyActive={showOnlyActive}
           onShowOnlyActiveToggle={handleShowOnlyActiveToggle}
-          onNavigateToAnalytics={() => navigate('/admin/leads/analytics')}
+          onNavigateToAnalytics={() => navigate('/admin/leadsstatistik')}
           onCreateLead={() => setShowCreateModal(true)}
           visibleColumns={visibleColumns}
           onToggleColumn={toggleColumn}

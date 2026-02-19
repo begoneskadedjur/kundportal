@@ -65,7 +65,7 @@ interface NavGroup {
 
 const topLevelItems: NavItem[] = [
   { label: 'Oversikt', icon: Home, path: '/admin/dashboard' },
-  { label: 'Kunder', icon: Users, path: '/admin/customers' },
+  { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder' },
   { label: 'Leads', icon: Target, path: '/admin/leads' },
 ]
 
@@ -74,10 +74,10 @@ const navGroups: NavGroup[] = [
     label: 'Forsaljning',
     icon: TrendingUp,
     items: [
-      { label: 'Avtalsoversikt', icon: Receipt, path: '/admin/contracts-overview' },
+      { label: 'Forsaljningspipeline', icon: Receipt, path: '/admin/forsaljningspipeline' },
       { label: 'Forsaljningsmojligheter', icon: TrendingUp, path: '/admin/sales-opportunities' },
-      { label: 'Kundanalys', icon: BarChart3, path: '/admin/customers/analytics' },
-      { label: 'Leadanalys', icon: BarChart3, path: '/admin/leads/analytics' },
+      { label: 'Kundprognos', icon: BarChart3, path: '/admin/kundprognos' },
+      { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
     ]
   },
   {
@@ -94,14 +94,14 @@ const navGroups: NavGroup[] = [
     icon: UserCheck,
     items: [
       { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/technicians' },
-      { label: 'Personalkonton', icon: UserCheck, path: '/admin/technician-management' },
+      { label: 'Anvandarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
     ]
   },
   {
     label: 'Organisation',
     icon: Building2,
     items: [
-      { label: 'Kundåtkomst', icon: Building2, path: '/admin/customer-access' },
+      { label: 'Anvandarkonton (Kund)', icon: Building2, path: '/admin/anvandarkonton-kund' },
       { label: 'Trafikljusoversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
     ]
   },
@@ -109,8 +109,8 @@ const navGroups: NavGroup[] = [
     label: 'Verktyg',
     icon: Sparkles,
     items: [
-      { label: 'Team AI Chat', icon: Sparkles, path: '/admin/team-chat' },
-      { label: 'Bildbank', icon: ImageIcon, path: '/admin/image-bank' },
+      { label: 'AI Assistent', icon: Sparkles, path: '/admin/ai-assistent' },
+      { label: 'Gemensam bildbank', icon: ImageIcon, path: '/admin/bildbank' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
       { label: 'Skapa avtal', icon: FileText, path: '/admin/oneflow-contract-creator' },
       { label: 'Larocenter', icon: GraduationCap, path: '/admin/larosate' },
@@ -120,7 +120,7 @@ const navGroups: NavGroup[] = [
     label: 'Installningar',
     icon: Settings,
     items: [
-      { label: 'Stationstyper', icon: Target, path: '/admin/settings/station-types' },
+      { label: 'Stationer & Fallor', icon: Target, path: '/admin/stationer-fallor' },
       { label: 'Preparat', icon: Beaker, path: '/admin/settings/preparations' },
       { label: 'Artiklar', icon: Package, path: '/admin/settings/articles' },
       { label: 'Prislistor', icon: FileText, path: '/admin/settings/price-lists' },
@@ -133,12 +133,12 @@ const navGroups: NavGroup[] = [
 const favoriteItems: NavItem[] = [
   { label: 'Ekonomisk oversikt', icon: DollarSign, path: '/admin/economics' },
   { label: 'Fakturering', icon: Receipt, path: '/admin/invoicing' },
-  { label: 'Team AI Chat', icon: Sparkles, path: '/admin/team-chat' },
+  { label: 'AI Assistent', icon: Sparkles, path: '/admin/ai-assistent' },
 ]
 
 const mobileBottomItems: NavItem[] = [
   { label: 'Oversikt', icon: Home, path: '/admin/dashboard' },
-  { label: 'Kunder', icon: Users, path: '/admin/customers' },
+  { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder' },
   { label: 'Leads', icon: Target, path: '/admin/leads' },
   { label: 'Ekonomi', icon: DollarSign, path: '/admin/economics' },
 ]
@@ -725,9 +725,9 @@ const DashboardDemo: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { title: 'Avtalskunder', value: '47', icon: Users, trend: '+5%', color: 'teal' as const, href: '/admin/customers', sparkData: [30, 35, 32, 38, 42, 40, 47] },
+                { title: 'Avtalskunder', value: '47', icon: Users, trend: '+5%', color: 'teal' as const, href: '/admin/befintliga-kunder', sparkData: [30, 35, 32, 38, 42, 40, 47] },
                 { title: 'Total intakt', value: '1 245 000 kr', icon: DollarSign, trend: '+12%', color: 'emerald' as const, href: '/admin/economics', sparkData: [800, 920, 880, 1050, 1100, 1180, 1245] },
-                { title: 'Aktiva arenden', value: '128', icon: FileText, trend: '+3', color: 'cyan' as const, href: '/admin/customers', sparkData: [100, 108, 115, 110, 120, 125, 128] },
+                { title: 'Aktiva arenden', value: '128', icon: FileText, trend: '+3', color: 'cyan' as const, href: '/admin/befintliga-kunder', sparkData: [100, 108, 115, 110, 120, 125, 128] },
                 { title: 'Aktiva tekniker', value: '8', icon: UserCheck, trend: '+2', color: 'blue' as const, href: '/admin/technicians', sparkData: [5, 6, 6, 7, 7, 7, 8] },
               ].map((kpi, index) => (
                 <motion.div
@@ -749,7 +749,7 @@ const DashboardDemo: React.FC = () => {
               {[
                 { icon: Plus, label: 'Skapa avtal', desc: 'Generera via Oneflow', href: '/admin/oneflow-contract-creator', color: 'teal' },
                 { icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', href: '/admin/invoicing', color: 'emerald' },
-                { icon: Users, label: 'Sok kund', desc: 'Sok i kundregistret', href: '/admin/customers', color: 'cyan' },
+                { icon: Users, label: 'Sok kund', desc: 'Sok i kundregistret', href: '/admin/befintliga-kunder', color: 'cyan' },
                 { icon: Target, label: 'Ny lead', desc: 'Lagg till prospekt', href: '/admin/leads', color: 'purple' },
               ].map((action, index) => (
                 <motion.div
@@ -795,7 +795,7 @@ const DashboardDemo: React.FC = () => {
                   </motion.div>
                 ))}
               </div>
-              <Link to="/admin/customers" className="flex items-center gap-1 mt-4 text-sm text-teal-400 hover:text-teal-300 transition-colors">
+              <Link to="/admin/befintliga-kunder" className="flex items-center gap-1 mt-4 text-sm text-teal-400 hover:text-teal-300 transition-colors">
                 Visa all aktivitet
                 <ArrowRight className="w-4 h-4" />
               </Link>

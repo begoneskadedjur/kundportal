@@ -175,7 +175,7 @@ export default function TechnicianManagement() {
             <Users className="w-6 h-6 text-[#20c58f]" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Personalhantering</h1>
+            <h1 className="text-2xl font-bold text-white">Användarkonton (Personal)</h1>
             <p className="text-sm text-slate-400">
               {filteredTechnicians.length} av {stats.total} personal visas
             </p>

@@ -122,19 +122,19 @@ function App() {
               <Route index element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
               <Route path="dashboard-demo" element={<ProtectedRoute requiredRole="admin"><DashboardDemo /></ProtectedRoute>} />
-              <Route path="customers" element={<ProtectedRoute requiredRole="admin"><Customers /></ProtectedRoute>} />
-              <Route path="customers/:id" element={<ProtectedRoute requiredRole="admin"><CustomerDetails /></ProtectedRoute>} />
-              <Route path="customers/analytics" element={<ProtectedRoute requiredRole="admin"><CustomerAnalytics /></ProtectedRoute>} />
+              <Route path="befintliga-kunder" element={<ProtectedRoute requiredRole="admin"><Customers /></ProtectedRoute>} />
+              <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="admin"><CustomerDetails /></ProtectedRoute>} />
+              <Route path="kundprognos" element={<ProtectedRoute requiredRole="admin"><CustomerAnalytics /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><Leads /></ProtectedRoute>} />
-              <Route path="leads/analytics" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><LeadAnalytics /></ProtectedRoute>} />
+              <Route path="leadsstatistik" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><LeadAnalytics /></ProtectedRoute>} />
               <Route path="economics" element={<ProtectedRoute requiredRole="admin"><Economics /></ProtectedRoute>} />
               <Route path="technicians" element={<ProtectedRoute requiredRole="admin"><Technicians /></ProtectedRoute>} />
-              <Route path="technician-management" element={<ProtectedRoute requiredRole="admin"><TechnicianManagement /></ProtectedRoute>} />
+              <Route path="anvandarkonton-personal" element={<ProtectedRoute requiredRole="admin"><TechnicianManagement /></ProtectedRoute>} />
               <Route path="commissions" element={<ProtectedRoute requiredRole="admin"><TechnicianCommissions /></ProtectedRoute>} />
               <Route path="sales-opportunities" element={<ProtectedRoute requiredRole="admin"><SalesOpportunities /></ProtectedRoute>} />
-              <Route path="image-bank" element={<ProtectedRoute requiredRole="admin"><ImageBank /></ProtectedRoute>} />
-              <Route path="team-chat" element={<ProtectedRoute requiredRole="admin"><TeamChat /></ProtectedRoute>} />
-              <Route path="settings/station-types" element={<ProtectedRoute requiredRole="admin"><StationTypesPage /></ProtectedRoute>} />
+              <Route path="bildbank" element={<ProtectedRoute requiredRole="admin"><ImageBank /></ProtectedRoute>} />
+              <Route path="ai-assistent" element={<ProtectedRoute requiredRole="admin"><TeamChat /></ProtectedRoute>} />
+              <Route path="stationer-fallor" element={<ProtectedRoute requiredRole="admin"><StationTypesPage /></ProtectedRoute>} />
               <Route path="settings/preparations" element={<ProtectedRoute requiredRole="admin"><PreparationsPage /></ProtectedRoute>} />
               <Route path="settings/articles" element={<ProtectedRoute requiredRole="admin"><ArticlesPage /></ProtectedRoute>} />
               <Route path="settings/price-lists" element={<ProtectedRoute requiredRole="admin"><PriceListsPage /></ProtectedRoute>} />
@@ -142,18 +142,18 @@ function App() {
               <Route path="invoicing/*" element={<ProtectedRoute requiredRole="admin"><InvoicingPage /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="admin"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="oneflow-diagnostics" element={<ProtectedRoute requiredRole="admin"><OneflowDiagnostics /></ProtectedRoute>} />
-              <Route path="contracts-overview" element={<ProtectedRoute requiredRole="admin"><ContractsOverview /></ProtectedRoute>} />
+              <Route path="forsaljningspipeline" element={<ProtectedRoute requiredRole="admin"><ContractsOverview /></ProtectedRoute>} />
               <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
               <Route path="oneflow-test" element={<Navigate to="/admin/oneflow-contract-creator" replace />} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="admin"><InternAdministration /></ProtectedRoute>} />
               <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="admin"><CaseDeletionGuide /></ProtectedRoute>} />
               <Route path="guides/ticket-system" element={<ProtectedRoute requiredRole="admin"><TicketSystemGuide /></ProtectedRoute>} />
-              {/* Kundåtkomst - konsoliderad portalhantering */}
-              <Route path="customer-access" element={<AdminOrKoordinatorRoute><AdminOrganizationsPage /></AdminOrKoordinatorRoute>} />
+              {/* Användarkonton (Kund) - konsoliderad portalhantering */}
+              <Route path="anvandarkonton-kund" element={<AdminOrKoordinatorRoute><AdminOrganizationsPage /></AdminOrKoordinatorRoute>} />
               {/* Behåll gamla routes för bakåtkompatibilitet */}
-              <Route path="organisation/organizations" element={<Navigate to="/admin/customer-access" replace />} />
-              <Route path="organisation/organizations-manage" element={<Navigate to="/admin/customer-access" replace />} />
-              <Route path="organisation/register" element={<Navigate to="/admin/customer-access" replace />} />
+              <Route path="organisation/organizations" element={<Navigate to="/admin/anvandarkonton-kund" replace />} />
+              <Route path="organisation/organizations-manage" element={<Navigate to="/admin/anvandarkonton-kund" replace />} />
+              <Route path="organisation/register" element={<Navigate to="/admin/anvandarkonton-kund" replace />} />
               {/* Organisation routes */}
               <Route path="organisation/traffic-light" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
 
@@ -163,6 +163,17 @@ function App() {
               <Route path="larosate/guides/follow-up-case" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><FollowUpCaseGuide /></ProtectedRoute>} />
               <Route path="larosate/guides/case-deletion" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><CaseDeletionGuide /></ProtectedRoute>} />
               <Route path="larosate/guides/equipment-placement" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><EquipmentPlacementGuide /></ProtectedRoute>} />
+
+              {/* Bakåtkompatibilitet: gamla URL:er redirectar till nya */}
+              <Route path="customers" element={<Navigate to="/admin/befintliga-kunder" replace />} />
+              <Route path="customers/analytics" element={<Navigate to="/admin/kundprognos" replace />} />
+              <Route path="customer-access" element={<Navigate to="/admin/anvandarkonton-kund" replace />} />
+              <Route path="contracts-overview" element={<Navigate to="/admin/forsaljningspipeline" replace />} />
+              <Route path="leads/analytics" element={<Navigate to="/admin/leadsstatistik" replace />} />
+              <Route path="technician-management" element={<Navigate to="/admin/anvandarkonton-personal" replace />} />
+              <Route path="team-chat" element={<Navigate to="/admin/ai-assistent" replace />} />
+              <Route path="image-bank" element={<Navigate to="/admin/bildbank" replace />} />
+              <Route path="settings/station-types" element={<Navigate to="/admin/stationer-fallor" replace />} />
 
             </Route>
 
