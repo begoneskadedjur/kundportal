@@ -1,7 +1,6 @@
 // src/pages/admin/WebhookConfig.tsx - OneFlow Webhook Konfiguration Dashboard
 import React, { useState, useEffect } from 'react'
 import { Settings, Webhook, CheckCircle, XCircle, AlertTriangle, RefreshCw, Play } from 'lucide-react'
-import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import toast from 'react-hot-toast'
 
@@ -36,11 +35,11 @@ export default function WebhookConfig() {
 
       console.log('🔄 Hämtar webhook-konfiguration...')
       const response = await fetch('/api/oneflow/webhook-config')
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-      
+
       const result = await response.json()
       console.log('📦 Webhook config response:', result)
 
@@ -52,7 +51,7 @@ export default function WebhookConfig() {
       if (!result.data) {
         throw new Error('Ingen data returnerad från API')
       }
-      
+
       if (!result.data.webhooks || !Array.isArray(result.data.webhooks)) {
         throw new Error('Webhook data har felaktig struktur')
       }
@@ -236,44 +235,52 @@ export default function WebhookConfig() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Settings className="w-5 h-5 text-blue-400" />
-            OneFlow Webhook Konfiguration
-          </h3>
-        </div>
-        
-        <Card>
-          <div className="h-40 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-gradient-to-br from-[#20c58f] to-teal-600 shadow-lg shadow-[#20c58f]/20">
+            <Settings className="w-8 h-8 text-white" />
           </div>
-        </Card>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Webhook Konfiguration</h1>
+            <p className="text-slate-400 text-sm">OneFlow webhook-inställningar och status</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl">
+          <div className="h-40 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#20c58f]"></div>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Settings className="w-5 h-5 text-blue-400" />
-            OneFlow Webhook Konfiguration
-          </h3>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={loadWebhookConfig}
-            className="text-slate-400"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Försök igen
-          </Button>
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-gradient-to-br from-[#20c58f] to-teal-600 shadow-lg shadow-[#20c58f]/20">
+            <Settings className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Webhook Konfiguration</h1>
+            <p className="text-slate-400 text-sm">OneFlow webhook-inställningar och status</p>
+          </div>
+
+          <div className="ml-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={loadWebhookConfig}
+              className="text-slate-400"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Försök igen
+            </Button>
+          </div>
         </div>
-        
-        <Card className="bg-red-500/10 border-red-500/20">
+
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
           <div className="flex items-center text-red-400">
             <XCircle className="w-5 h-5 mr-2" />
             <div>
@@ -281,7 +288,7 @@ export default function WebhookConfig() {
               <div className="text-sm text-red-300 mt-1">{error}</div>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     )
   }
@@ -290,17 +297,20 @@ export default function WebhookConfig() {
   const hasCorrectEvents = ourWebhook && ourWebhook.missing_events.length === 0
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Settings className="w-5 h-5 text-blue-400" />
-          OneFlow Webhook Konfiguration
-        </h3>
-        
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
+        <div className="p-3 rounded-2xl bg-gradient-to-br from-[#20c58f] to-teal-600 shadow-lg shadow-[#20c58f]/20">
+          <Settings className="w-8 h-8 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Webhook Konfiguration</h1>
+          <p className="text-slate-400 text-sm">OneFlow webhook-inställningar och status</p>
+        </div>
+
+        <div className="ml-auto flex items-center gap-3">
           <Button
-            variant="ghost" 
+            variant="ghost"
             size="sm"
             onClick={testWebhook}
             disabled={updating}
@@ -309,7 +319,7 @@ export default function WebhookConfig() {
             <Play className="w-4 h-4 mr-2" />
             Testa Webhook
           </Button>
-          
+
           <Button
             variant="ghost"
             size="sm"
@@ -319,7 +329,7 @@ export default function WebhookConfig() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Ladda om
           </Button>
-          
+
           <Button
             variant="primary"
             size="sm"
@@ -330,7 +340,7 @@ export default function WebhookConfig() {
             <Settings className="w-4 h-4" />
             Fixa Webhook #18000
           </Button>
-          
+
           {!ourWebhook && (
             <Button
               variant="secondary"
@@ -348,7 +358,7 @@ export default function WebhookConfig() {
 
       {/* Status Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className={`p-4 ${ourWebhook ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+        <div className={`p-4 rounded-xl border ${ourWebhook ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
           <div className="flex items-center gap-3">
             {ourWebhook ? (
               <CheckCircle className="w-8 h-8 text-green-400" />
@@ -362,9 +372,9 @@ export default function WebhookConfig() {
               </div>
             </div>
           </div>
-        </Card>
+        </div>
 
-        <Card className={`p-4 ${ourWebhook?.sign_key_matches ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+        <div className={`p-4 rounded-xl border ${ourWebhook?.sign_key_matches ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
           <div className="flex items-center gap-3">
             {ourWebhook?.sign_key_matches ? (
               <CheckCircle className="w-8 h-8 text-green-400" />
@@ -378,9 +388,9 @@ export default function WebhookConfig() {
               </div>
             </div>
           </div>
-        </Card>
+        </div>
 
-        <Card className={`p-4 ${hasCorrectEvents ? 'bg-green-500/10 border-green-500/20' : 'bg-yellow-500/10 border-yellow-500/20'}`}>
+        <div className={`p-4 rounded-xl border ${hasCorrectEvents ? 'bg-green-500/10 border-green-500/20' : 'bg-yellow-500/10 border-yellow-500/20'}`}>
           <div className="flex items-center gap-3">
             {hasCorrectEvents ? (
               <CheckCircle className="w-8 h-8 text-green-400" />
@@ -394,26 +404,26 @@ export default function WebhookConfig() {
               </div>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Webhook Details */}
       {data?.analysis && data.analysis.length > 0 && (
-        <Card>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl">
           <div className="p-6">
             <h4 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-              <Webhook className="w-5 h-5 text-blue-400" />
+              <Webhook className="w-5 h-5 text-[#20c58f]" />
               Webhook Detaljer
             </h4>
-            
+
             <div className="space-y-4">
-              {data.analysis.map((webhook, index) => (
-                <div key={webhook.id} className={`p-4 rounded-lg border ${webhook.is_our_webhook ? 'bg-blue-500/5 border-blue-500/20' : 'bg-slate-800 border-slate-700'}`}>
+              {data.analysis.map((webhook) => (
+                <div key={webhook.id} className={`p-4 rounded-lg border ${webhook.is_our_webhook ? 'bg-[#20c58f]/5 border-[#20c58f]/20' : 'bg-slate-800 border-slate-700'}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-white">Webhook #{webhook.id}</span>
                       {webhook.is_our_webhook && (
-                        <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded">Vår webhook</span>
+                        <span className="px-2 py-1 bg-[#20c58f]/20 text-[#20c58f] text-xs rounded">Vår webhook</span>
                       )}
                       <span className="px-2 py-1 bg-slate-600 text-slate-300 text-xs rounded font-mono">
                         ID: {webhook.id}
@@ -422,7 +432,7 @@ export default function WebhookConfig() {
                         <span className="px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded">BeGone URL</span>
                       )}
                     </div>
-                    
+
                     {webhook.is_our_webhook && (webhook.missing_events.length > 0 || !webhook.sign_key_matches) && (
                       <div className="flex gap-2">
                         <Button
@@ -435,7 +445,7 @@ export default function WebhookConfig() {
                           <RefreshCw className={`w-4 h-4 ${updating ? 'animate-spin' : ''}`} />
                           Uppdatera Events
                         </Button>
-                        
+
                         <Button
                           variant="secondary"
                           size="sm"
@@ -510,12 +520,12 @@ export default function WebhookConfig() {
               ))}
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Recommended Events */}
       {data?.recommended_events && (
-        <Card>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl">
           <div className="p-6">
             <h4 className="text-lg font-medium text-white mb-4">Rekommenderade Events</h4>
             <div className="text-sm text-slate-400 mb-3">
@@ -523,13 +533,13 @@ export default function WebhookConfig() {
             </div>
             <div className="flex flex-wrap gap-2">
               {data.recommended_events.map((event, i) => (
-                <span key={i} className="px-3 py-1 bg-blue-500/20 text-blue-300 text-sm rounded">
+                <span key={i} className="px-3 py-1 bg-[#20c58f]/20 text-[#20c58f] text-sm rounded">
                   {event}
                 </span>
               ))}
             </div>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   )
