@@ -313,7 +313,7 @@ export default function PriceListArticleSelector({
             )}
 
             <a
-              href="/admin/settings/price-lists"
+              href="/admin/prislistor"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
@@ -537,7 +537,7 @@ export default function PriceListArticleSelector({
                     Inga artiklar finns ännu. Skapa artiklar i inställningarna för att kunna lägga till dem i avtal.
                   </p>
                   <a
-                    href="/admin/settings/articles"
+                    href="/admin/artiklar"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 text-sm"

@@ -13,19 +13,19 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    href: '/admin/settings/articles',
+    href: '/admin/artiklar',
     label: 'Artiklar',
     icon: Package,
     description: 'Produkter & tjänster'
   },
   {
-    href: '/admin/settings/price-lists',
+    href: '/admin/prislistor',
     label: 'Prislistor',
     icon: FileText,
     description: 'Kundpriser'
   },
   {
-    href: '/admin/invoicing',
+    href: '/admin/fakturering',
     label: 'Fakturering',
     icon: Receipt,
     description: 'Nytt faktureringssystem'

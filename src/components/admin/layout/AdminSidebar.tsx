@@ -102,7 +102,7 @@ export function AdminSidebar({
       <div className="px-3 pt-3">
         {collapsed ? (
           <Link
-            to="/admin/oneflow-contract-creator"
+            to="/admin/skapa-avtal"
             className="w-full flex items-center justify-center p-2.5 bg-teal-500 hover:bg-teal-400 rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
             title="Skapa avtal"
           >
@@ -110,7 +110,7 @@ export function AdminSidebar({
           </Link>
         ) : (
           <Link
-            to="/admin/oneflow-contract-creator"
+            to="/admin/skapa-avtal"
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white font-semibold rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
           >
             <Plus className="w-4 h-4" />

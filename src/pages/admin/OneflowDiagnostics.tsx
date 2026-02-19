@@ -555,7 +555,7 @@ export default function OneflowDiagnostics() {
             </h2>
             <div className="grid grid-cols-2 gap-3">
               <Button
-                onClick={() => navigate('/admin/oneflow-contract-creator')}
+                onClick={() => navigate('/admin/skapa-avtal')}
                 className="flex items-center gap-2"
               >
                 <FileText className="w-4 h-4" />

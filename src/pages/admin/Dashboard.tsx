@@ -748,8 +748,8 @@ const AdminDashboard: React.FC = () => {
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Snabbåtgärder</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { icon: Plus, label: 'Skapa avtal', desc: 'Generera via Oneflow', href: '/admin/oneflow-contract-creator', color: 'teal' },
-              { icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', href: '/admin/invoicing', color: 'emerald' },
+              { icon: Plus, label: 'Skapa avtal', desc: 'Generera via Oneflow', href: '/admin/skapa-avtal', color: 'teal' },
+              { icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', href: '/admin/fakturering', color: 'emerald' },
               { icon: Users, label: 'Sök kund', desc: 'Sök i kundregistret', href: '/admin/befintliga-kunder', color: 'cyan' },
               { icon: Target, label: 'Ny lead', desc: 'Lägg till prospekt', href: '/admin/leads', color: 'purple' },
             ].map((action, index) => (

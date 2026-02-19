@@ -414,7 +414,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       case 'technician':
         return '/technician/oneflow-contract-creator';
       default:
-        return '/admin/oneflow-contract-creator';
+        return '/admin/skapa-avtal';
     }
   }, [profile?.role]);
 

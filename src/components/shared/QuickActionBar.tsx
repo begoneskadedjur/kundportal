@@ -55,7 +55,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       title: 'Tekniker Statistik',
       description: 'Prestanda och ranking',
       icon: BarChart3,
-      href: '/admin/technicians',
+      href: '/admin/teknikerstatistik',
       keywords: ['tekniker', 'statistik', 'prestanda'],
       category: 'navigation'
     },
@@ -64,7 +64,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       title: 'Ekonomisk Översikt',
       description: 'Intäktsanalys och KPI',
       icon: DollarSign,
-      href: '/admin/economics',
+      href: '/admin/ekonomi',
       keywords: ['ekonomi', 'intäkt', 'kpi', 'finans'],
       category: 'navigation'
     },
@@ -73,7 +73,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       title: 'Fakturering',
       description: 'Komplett faktureringssystem',
       icon: FileText,
-      href: '/admin/invoicing',
+      href: '/admin/fakturering',
       keywords: ['faktura', 'billing', 'ärenden', 'invoicing'],
       category: 'navigation'
     },
@@ -82,7 +82,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       title: 'Skapa Kontrakt',
       description: 'Oneflow-avtal för signering',
       icon: FileText,
-      href: '/admin/oneflow-contract-creator',
+      href: '/admin/skapa-avtal',
       keywords: ['kontrakt', 'oneflow', 'avtal', 'skapa'],
       category: 'create'
     },
@@ -100,7 +100,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       title: 'Provisioner',
       description: 'Beräkna tekniker-provision',
       icon: Wallet,
-      href: '/admin/commissions',
+      href: '/admin/provisioner',
       keywords: ['provision', 'lön', 'tekniker'],
       category: 'navigation'
     },
@@ -109,7 +109,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
       title: 'Försäljningsmöjligheter',
       description: 'Potentiella avtalskunder',
       icon: Target,
-      href: '/admin/sales-opportunities',
+      href: '/admin/forsaljningsmojligheter',
       keywords: ['försäljning', 'möjligheter', 'potentiella'],
       category: 'navigation'
     }
@@ -150,7 +150,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/admin/oneflow-contract-creator')}
+              onClick={() => navigate('/admin/skapa-avtal')}
               className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
             >
               <FileText className="w-4 h-4" />
@@ -160,7 +160,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/admin/economics')}
+              onClick={() => navigate('/admin/ekonomi')}
               className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
             >
               <DollarSign className="w-4 h-4" />

@@ -60,7 +60,7 @@ export default function EnhancedHeader({ currentCase, reportGeneration }: Enhanc
     }
     
     // Navigera till wizard med startparametrar
-    navigate('/admin/oneflow-contract-creator', {
+    navigate('/admin/skapa-avtal', {
       state: {
         startStep: 1, // Börja på dokumenttyp-steget
         preselectedType: 'contract',
@@ -78,7 +78,7 @@ export default function EnhancedHeader({ currentCase, reportGeneration }: Enhanc
       phone: currentCase.contact_phone || '',
     }
     
-    navigate('/admin/oneflow-contract-creator', {
+    navigate('/admin/skapa-avtal', {
       state: {
         startStep: 1,
         preselectedType: 'offer', // Förvälj offert

@@ -75,7 +75,7 @@ const navGroups: NavGroup[] = [
     icon: TrendingUp,
     items: [
       { label: 'Forsaljningspipeline', icon: Receipt, path: '/admin/forsaljningspipeline' },
-      { label: 'Forsaljningsmojligheter', icon: TrendingUp, path: '/admin/sales-opportunities' },
+      { label: 'Forsaljningsmojligheter', icon: TrendingUp, path: '/admin/forsaljningsmojligheter' },
       { label: 'Kundprognos', icon: BarChart3, path: '/admin/kundprognos' },
       { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
     ]
@@ -84,16 +84,16 @@ const navGroups: NavGroup[] = [
     label: 'Ekonomi & Fakturering',
     icon: DollarSign,
     items: [
-      { label: 'Ekonomisk oversikt', icon: DollarSign, path: '/admin/economics' },
-      { label: 'Fakturering', icon: Receipt, path: '/admin/invoicing' },
-      { label: 'Provisioner', icon: Wallet, path: '/admin/commissions' },
+      { label: 'Ekonomisk oversikt', icon: DollarSign, path: '/admin/ekonomi' },
+      { label: 'Fakturering', icon: Receipt, path: '/admin/fakturering' },
+      { label: 'Provisioner', icon: Wallet, path: '/admin/provisioner' },
     ]
   },
   {
     label: 'Personal',
     icon: UserCheck,
     items: [
-      { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/technicians' },
+      { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/teknikerstatistik' },
       { label: 'Anvandarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
     ]
   },
@@ -102,7 +102,7 @@ const navGroups: NavGroup[] = [
     icon: Building2,
     items: [
       { label: 'Anvandarkonton (Kund)', icon: Building2, path: '/admin/anvandarkonton-kund' },
-      { label: 'Trafikljusoversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
+      { label: 'Trafikljusoversikt', icon: Activity, path: '/admin/trafikljusoversikt' },
     ]
   },
   {
@@ -112,7 +112,7 @@ const navGroups: NavGroup[] = [
       { label: 'AI Assistent', icon: Sparkles, path: '/admin/ai-assistent' },
       { label: 'Gemensam bildbank', icon: ImageIcon, path: '/admin/bildbank' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
-      { label: 'Skapa avtal', icon: FileText, path: '/admin/oneflow-contract-creator' },
+      { label: 'Skapa avtal', icon: FileText, path: '/admin/skapa-avtal' },
       { label: 'Larocenter', icon: GraduationCap, path: '/admin/larosate' },
     ]
   },
@@ -121,18 +121,18 @@ const navGroups: NavGroup[] = [
     icon: Settings,
     items: [
       { label: 'Stationer & Fallor', icon: Target, path: '/admin/stationer-fallor' },
-      { label: 'Preparat', icon: Beaker, path: '/admin/settings/preparations' },
-      { label: 'Artiklar', icon: Package, path: '/admin/settings/articles' },
-      { label: 'Prislistor', icon: FileText, path: '/admin/settings/price-lists' },
+      { label: 'Preparat', icon: Beaker, path: '/admin/preparat' },
+      { label: 'Artiklar', icon: Package, path: '/admin/artiklar' },
+      { label: 'Prislistor', icon: FileText, path: '/admin/prislistor' },
       { label: 'Webhook-config', icon: Wrench, path: '/admin/webhook-config' },
-      { label: 'Avtalsdiagnostik', icon: AlertCircle, path: '/admin/oneflow-diagnostics' },
+      { label: 'Avtalsdiagnostik', icon: AlertCircle, path: '/admin/avtalsdiagnostik' },
     ]
   },
 ]
 
 const favoriteItems: NavItem[] = [
-  { label: 'Ekonomisk oversikt', icon: DollarSign, path: '/admin/economics' },
-  { label: 'Fakturering', icon: Receipt, path: '/admin/invoicing' },
+  { label: 'Ekonomisk oversikt', icon: DollarSign, path: '/admin/ekonomi' },
+  { label: 'Fakturering', icon: Receipt, path: '/admin/fakturering' },
   { label: 'AI Assistent', icon: Sparkles, path: '/admin/ai-assistent' },
 ]
 
@@ -140,7 +140,7 @@ const mobileBottomItems: NavItem[] = [
   { label: 'Oversikt', icon: Home, path: '/admin/dashboard' },
   { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder' },
   { label: 'Leads', icon: Target, path: '/admin/leads' },
-  { label: 'Ekonomi', icon: DollarSign, path: '/admin/economics' },
+  { label: 'Ekonomi', icon: DollarSign, path: '/admin/ekonomi' },
 ]
 
 // ============================================================
@@ -372,7 +372,7 @@ const DashboardDemo: React.FC = () => {
         <div className="px-3 pt-3">
           {sidebarCollapsed ? (
             <Link
-              to="/admin/oneflow-contract-creator"
+              to="/admin/skapa-avtal"
               className="w-full flex items-center justify-center p-2.5 bg-teal-500 hover:bg-teal-400 rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
               title="Skapa avtal"
             >
@@ -380,7 +380,7 @@ const DashboardDemo: React.FC = () => {
             </Link>
           ) : (
             <Link
-              to="/admin/oneflow-contract-creator"
+              to="/admin/skapa-avtal"
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white font-semibold rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
             >
               <Plus className="w-4 h-4" />
@@ -726,9 +726,9 @@ const DashboardDemo: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { title: 'Avtalskunder', value: '47', icon: Users, trend: '+5%', color: 'teal' as const, href: '/admin/befintliga-kunder', sparkData: [30, 35, 32, 38, 42, 40, 47] },
-                { title: 'Total intakt', value: '1 245 000 kr', icon: DollarSign, trend: '+12%', color: 'emerald' as const, href: '/admin/economics', sparkData: [800, 920, 880, 1050, 1100, 1180, 1245] },
+                { title: 'Total intakt', value: '1 245 000 kr', icon: DollarSign, trend: '+12%', color: 'emerald' as const, href: '/admin/ekonomi', sparkData: [800, 920, 880, 1050, 1100, 1180, 1245] },
                 { title: 'Aktiva arenden', value: '128', icon: FileText, trend: '+3', color: 'cyan' as const, href: '/admin/befintliga-kunder', sparkData: [100, 108, 115, 110, 120, 125, 128] },
-                { title: 'Aktiva tekniker', value: '8', icon: UserCheck, trend: '+2', color: 'blue' as const, href: '/admin/technicians', sparkData: [5, 6, 6, 7, 7, 7, 8] },
+                { title: 'Aktiva tekniker', value: '8', icon: UserCheck, trend: '+2', color: 'blue' as const, href: '/admin/teknikerstatistik', sparkData: [5, 6, 6, 7, 7, 7, 8] },
               ].map((kpi, index) => (
                 <motion.div
                   key={kpi.title}
@@ -747,8 +747,8 @@ const DashboardDemo: React.FC = () => {
             <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Snabbatgarder</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { icon: Plus, label: 'Skapa avtal', desc: 'Generera via Oneflow', href: '/admin/oneflow-contract-creator', color: 'teal' },
-                { icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', href: '/admin/invoicing', color: 'emerald' },
+                { icon: Plus, label: 'Skapa avtal', desc: 'Generera via Oneflow', href: '/admin/skapa-avtal', color: 'teal' },
+                { icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', href: '/admin/fakturering', color: 'emerald' },
                 { icon: Users, label: 'Sok kund', desc: 'Sok i kundregistret', href: '/admin/befintliga-kunder', color: 'cyan' },
                 { icon: Target, label: 'Ny lead', desc: 'Lagg till prospekt', href: '/admin/leads', color: 'purple' },
               ].map((action, index) => (

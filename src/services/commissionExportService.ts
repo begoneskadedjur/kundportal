@@ -435,7 +435,7 @@ function createEmailHtml(exportData: CommissionExportData[], month: string, tota
           <div style="margin-top: 30px; padding: 20px; background: #e0f2fe; border-radius: 8px; border-left: 4px solid #0ea5e9;">
             <h4 style="margin: 0 0 10px 0; color: #0369a1;">📋 För fullständig rapport</h4>
             <p style="margin: 0;">En detaljerad CSV-fil för lönesystemet bifogas. För att granska eller skriva ut den fullständiga rapporten, vänligen logga in i portalen.</p>
-            <a href="${portalUrl}/admin/commissions" style="display: inline-block; margin-top: 15px; background: #0ea5e9; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">Öppna provisionshantering</a>
+            <a href="${portalUrl}/admin/provisioner" style="display: inline-block; margin-top: 15px; background: #0ea5e9; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">Öppna provisionshantering</a>
           </div>
         </div>
         <div style="background: #1f2937; color: #a0aec0; padding: 20px; text-align: center; font-size: 12px;">

@@ -227,7 +227,7 @@ export function ArticlesTable({
                           {visibleLists.map(({ priceList }) => (
                             <button
                               key={priceList.id}
-                              onClick={() => navigate('/admin/settings/price-lists')}
+                              onClick={() => navigate('/admin/prislistor')}
                               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer ${
                                 priceList.is_default
                                   ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
