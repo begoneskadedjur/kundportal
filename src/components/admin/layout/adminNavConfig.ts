@@ -40,19 +40,27 @@ export interface NavGroup {
 
 export const topLevelItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/admin/dashboard' },
-  { label: 'Kunder', icon: Users, path: '/admin/customers' },
-  { label: 'Kundåtkomst', icon: KeyRound, path: '/admin/customer-access' },
-  { label: 'Leads', icon: Target, path: '/admin/leads' },
 ]
 
 export const navGroups: NavGroup[] = [
+  {
+    label: 'Kunder & Avtal',
+    icon: Users,
+    items: [
+      { label: 'Kunder', icon: Users, path: '/admin/customers' },
+      { label: 'Trafikljusöversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
+      { label: 'Kundanalys', icon: BarChart3, path: '/admin/customers/analytics' },
+      { label: 'Skapa avtal', icon: FileText, path: '/admin/oneflow-contract-creator' },
+      { label: 'Kundåtkomst', icon: KeyRound, path: '/admin/customer-access' },
+    ]
+  },
   {
     label: 'Försäljning',
     icon: TrendingUp,
     items: [
       { label: 'Avtalsöversikt', icon: Receipt, path: '/admin/contracts-overview' },
       { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/admin/sales-opportunities' },
-      { label: 'Kundanalys', icon: BarChart3, path: '/admin/customers/analytics' },
+      { label: 'Leads', icon: Target, path: '/admin/leads' },
       { label: 'Leadanalys', icon: BarChart3, path: '/admin/leads/analytics' },
     ]
   },
@@ -66,18 +74,12 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
-    label: 'Personal',
-    icon: UserCheck,
-    items: [
-      { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/technicians' },
-      { label: 'Personalkonton', icon: UserCheck, path: '/admin/technician-management' },
-    ]
-  },
-  {
     label: 'Organisation',
     icon: Building2,
     items: [
-      { label: 'Trafikljusöversikt', icon: Activity, path: '/admin/organisation/traffic-light' },
+      { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/technicians' },
+      { label: 'Personalkonton', icon: UserCheck, path: '/admin/technician-management' },
+      { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
     ]
   },
   {
@@ -86,19 +88,23 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Team AI Chat', icon: Sparkles, path: '/admin/team-chat' },
       { label: 'Bildbank', icon: ImageIcon, path: '/admin/image-bank' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
-      { label: 'Skapa avtal', icon: FileText, path: '/admin/oneflow-contract-creator' },
       { label: 'Lärocenter', icon: GraduationCap, path: '/admin/larosate' },
     ]
   },
   {
-    label: 'Inställningar',
-    icon: Settings,
+    label: 'Produkter & Priser',
+    icon: Package,
     items: [
       { label: 'Stationstyper', icon: Target, path: '/admin/settings/station-types' },
       { label: 'Preparat', icon: Beaker, path: '/admin/settings/preparations' },
-      { label: 'Artiklar', icon: Package, path: '/admin/settings/articles' },
       { label: 'Prislistor', icon: FileText, path: '/admin/settings/price-lists' },
+      { label: 'Artiklar', icon: Package, path: '/admin/settings/articles' },
+    ]
+  },
+  {
+    label: 'Systeminställningar',
+    icon: Settings,
+    items: [
       { label: 'Webhook-config', icon: Wrench, path: '/admin/webhook-config' },
       { label: 'Avtalsdiagnostik', icon: AlertCircle, path: '/admin/oneflow-diagnostics' },
     ]

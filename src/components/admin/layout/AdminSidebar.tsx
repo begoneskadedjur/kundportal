@@ -45,36 +45,32 @@ export function AdminSidebar({
         ${collapsed ? 'w-20' : 'w-64'}
       `}
     >
-      {/* Logo */}
-      <div className="p-4 border-b border-slate-700/50">
-        <Link to="/admin/dashboard" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-teal-500/20 group-hover:scale-105 group-hover:shadow-teal-500/30 transition-all duration-300">
-            <span className="text-white font-bold text-sm">BG</span>
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <p className="text-white font-semibold text-sm">BeGone</p>
-              <p className="text-slate-400 text-xs">Admin CRM</p>
-            </div>
-          )}
-        </Link>
-      </div>
-
-      {/* User Profile */}
+      {/* User Profile + Collapse toggle */}
       <div className={`px-3 py-3 border-b border-slate-700/50 ${collapsed ? 'flex justify-center' : ''}`}>
         {collapsed ? (
-          <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center" title={userName}>
+          <button
+            onClick={onToggleCollapse}
+            className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center hover:scale-105 transition-all"
+            title={userName}
+          >
             <span className="text-white text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
-          </div>
+          </button>
         ) : (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
               <span className="text-white text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
             </div>
-            <div className="overflow-hidden">
+            <div className="overflow-hidden flex-1 min-w-0">
               <p className="text-white text-sm font-semibold truncate">{userName}</p>
               <p className="text-slate-500 text-xs">Administrator</p>
             </div>
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/50 transition-colors flex-shrink-0"
+              aria-label="Minimera sidopanelen"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
           </div>
         )}
       </div>
@@ -241,22 +237,6 @@ export function AdminSidebar({
           <HelpCircle className="w-4 h-4 flex-shrink-0" />
           {!collapsed && <span className="text-sm">Hjälpcenter</span>}
         </Link>
-
-        {/* Collapse toggle */}
-        <button
-          onClick={onToggleCollapse}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors focus-visible:ring-2 focus-visible:ring-teal-400 outline-none"
-          aria-label="Minimera sidopanelen"
-        >
-          {collapsed ? (
-            <ChevronRight className="w-5 h-5" />
-          ) : (
-            <>
-              <ChevronLeft className="w-5 h-5" />
-              <span className="text-sm">Minimera</span>
-            </>
-          )}
-        </button>
 
         {/* Sign out */}
         <button
