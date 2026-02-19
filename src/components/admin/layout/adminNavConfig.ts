@@ -88,7 +88,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Bildbank', icon: ImageIcon, path: '/admin/image-bank' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
       { label: 'Skapa avtal', icon: FileText, path: '/admin/oneflow-contract-creator' },
-      { label: 'Lärocenter', icon: GraduationCap, path: '/larosate' },
+      { label: 'Lärocenter', icon: GraduationCap, path: '/admin/larosate' },
     ]
   },
   {

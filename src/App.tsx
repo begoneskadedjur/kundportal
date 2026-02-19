@@ -157,6 +157,13 @@ function App() {
               {/* Organisation routes */}
               <Route path="organisation/traffic-light" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
 
+              {/* Lärosäte - Internt kunskapscenter för alla interna roller */}
+              <Route path="larosate" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><Larosate /></ProtectedRoute>} />
+              <Route path="larosate/guides/ticket-system" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><TicketSystemGuide /></ProtectedRoute>} />
+              <Route path="larosate/guides/follow-up-case" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><FollowUpCaseGuide /></ProtectedRoute>} />
+              <Route path="larosate/guides/case-deletion" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><CaseDeletionGuide /></ProtectedRoute>} />
+              <Route path="larosate/guides/equipment-placement" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><EquipmentPlacementGuide /></ProtectedRoute>} />
+
             </Route>
 
             {/* OneflowContractCreator - TILLGÄNGLIG FÖR KOORDINATOR OCH TEKNIKER (utanfor admin-layout) */}
@@ -390,48 +397,12 @@ function App() {
               }
             />
 
-            {/* Lärosäte - Internt kunskapscenter för alla interna roller */}
-            <Route
-              path="/larosate"
-              element={
-                <ProtectedRoute>
-                  <Larosate />
-                </ProtectedRoute>
-              }
-            />
-            {/* Lärosäte guide routes - alla guider nås via /larosate/guides/... */}
-            <Route
-              path="/larosate/guides/ticket-system"
-              element={
-                <ProtectedRoute>
-                  <TicketSystemGuide />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/larosate/guides/follow-up-case"
-              element={
-                <ProtectedRoute>
-                  <FollowUpCaseGuide />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/larosate/guides/case-deletion"
-              element={
-                <ProtectedRoute>
-                  <CaseDeletionGuide />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/larosate/guides/equipment-placement"
-              element={
-                <ProtectedRoute>
-                  <EquipmentPlacementGuide />
-                </ProtectedRoute>
-              }
-            />
+            {/* Lärosäte redirects — bakåtkompatibilitet */}
+            <Route path="/larosate" element={<Navigate to="/admin/larosate" replace />} />
+            <Route path="/larosate/guides/ticket-system" element={<Navigate to="/admin/larosate/guides/ticket-system" replace />} />
+            <Route path="/larosate/guides/follow-up-case" element={<Navigate to="/admin/larosate/guides/follow-up-case" replace />} />
+            <Route path="/larosate/guides/case-deletion" element={<Navigate to="/admin/larosate/guides/case-deletion" replace />} />
+            <Route path="/larosate/guides/equipment-placement" element={<Navigate to="/admin/larosate/guides/equipment-placement" replace />} />
 
             {/* Customer routes */}
             <Route 

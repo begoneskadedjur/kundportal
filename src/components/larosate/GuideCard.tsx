@@ -34,11 +34,11 @@ export default function GuideCard({ guide, index = 0 }: GuideCardProps) {
         {/* Text */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-medium text-white group-hover:text-emerald-400 transition-colors">
+            <h3 className="font-medium text-white group-hover:text-[#20c58f] transition-colors">
               {guide.title}
             </h3>
             {guide.isNew && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-emerald-500/20 text-emerald-400 rounded-full">
+              <span className="px-2 py-0.5 text-xs font-medium bg-[#20c58f]/20 text-[#20c58f] rounded-full">
                 Ny
               </span>
             )}
@@ -50,7 +50,7 @@ export default function GuideCard({ guide, index = 0 }: GuideCardProps) {
 
         {/* Pil */}
         <ChevronRight
-          className="w-5 h-5 text-slate-500 group-hover:text-emerald-400
+          className="w-5 h-5 text-slate-500 group-hover:text-[#20c58f]
                      group-hover:translate-x-1 transition-all flex-shrink-0"
         />
       </Link>

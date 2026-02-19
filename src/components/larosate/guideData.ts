@@ -49,7 +49,7 @@ export const guides: Guide[] = [
     icon: Ticket,
     iconColor: 'text-cyan-400',
     iconBgColor: 'bg-cyan-500/20',
-    path: '/larosate/guides/ticket-system',
+    path: '/admin/larosate/guides/ticket-system',
     tags: ['tickets', 'flikar', 'notifikationer', 'inkorg', 'svar'],
     isNew: true
   },
@@ -61,7 +61,7 @@ export const guides: Guide[] = [
     icon: Plus,
     iconColor: 'text-amber-400',
     iconBgColor: 'bg-amber-500/20',
-    path: '/larosate/guides/follow-up-case',
+    path: '/admin/larosate/guides/follow-up-case',
     tags: ['följeärende', 'nytt ärende', 'fält', 'skapa', 'problem']
   },
   {
@@ -72,7 +72,7 @@ export const guides: Guide[] = [
     icon: Trash2,
     iconColor: 'text-red-400',
     iconBgColor: 'bg-red-500/20',
-    path: '/larosate/guides/case-deletion',
+    path: '/admin/larosate/guides/case-deletion',
     tags: ['radera', 'slaska', 'avbryt', 'ta bort', 'stänga'],
     isNew: true
   },
@@ -84,7 +84,7 @@ export const guides: Guide[] = [
     icon: MapPin,
     iconColor: 'text-emerald-400',
     iconBgColor: 'bg-emerald-500/20',
-    path: '/larosate/guides/equipment-placement',
+    path: '/admin/larosate/guides/equipment-placement',
     tags: ['fällor', 'stationer', 'gps', 'foto', 'placering', 'utrustning']
   }
 ];

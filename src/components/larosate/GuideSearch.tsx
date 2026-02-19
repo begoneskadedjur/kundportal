@@ -36,7 +36,7 @@ export default function GuideSearch({
         placeholder={placeholder}
         className="w-full pl-12 pr-10 py-3 bg-slate-800/50 border border-slate-700/50
                    rounded-xl text-white placeholder-slate-500
-                   focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                   focus:outline-none focus:ring-2 focus:ring-[#20c58f]/40 focus:border-[#20c58f]/40
                    transition-all"
       />
 
