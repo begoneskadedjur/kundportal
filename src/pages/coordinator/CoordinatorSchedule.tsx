@@ -324,27 +324,18 @@ export default function CoordinatorSchedule() {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner text="Laddar schema..." /></div>;
+    return <div className="flex items-center justify-center py-20"><LoadingSpinner text="Laddar schema..." /></div>;
   }
 
   return (
     <>
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col">
-        <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-20">
+      <div className="text-white flex flex-col h-[calc(100vh-3rem)]">
+        <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 z-10">
           <div className="max-w-screen-3xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/koordinator/dashboard')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Tillbaka
-              </Button>
               <LayoutGrid className="w-6 h-6 text-blue-400" />
               <div>
-                <h1 className="text-xl font-bold text-white">Koordinator - Schemaöversikt</h1>
+                <h1 className="text-xl font-bold text-white">Schemaöversikt</h1>
                 <div className="flex items-center gap-3 text-sm text-slate-400">
                   <span>{filteredScheduledCases.length} schemalagda</span>
                   {actionableCases.length > 0 && (
@@ -361,23 +352,11 @@ export default function CoordinatorSchedule() {
             <div className="flex items-center gap-2">
                 <Button onClick={() => { setSelectedCase(null); setIsCreateModalOpen(true); }} variant="primary"><FileText className="w-4 h-4 mr-2" />+ Nytt ärende</Button>
                 <Button onClick={() => setIsAbsenceModalOpen(true)} variant="secondary"><CalendarOff className="w-4 h-4 mr-2" />+ Frånvaro</Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={async () => {
-                    await signOut();
-                    navigate('/login');
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logga ut
-                </Button>
             </div>
           </div>
         </header>
 
-        <div className="flex-grow max-w-screen-3xl mx-auto w-full flex flex-row h-[calc(100vh-65px)]">
+        <div className="flex-grow max-w-screen-3xl mx-auto w-full flex flex-row h-full overflow-hidden">
           {/* ClickUp Control Panel */}
           <aside className="w-1/4 xl:w-1/5 min-w-[320px] flex flex-col h-full">
             <ScheduleControlPanel

@@ -415,14 +415,11 @@ export default function CaseSearch() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white">
-        <div className="max-w-7xl mx-auto p-6 md:p-8">
-          <PageHeader title="Sök Ärenden" showBackButton={true} />
-          <div className="flex items-center justify-center py-12">
-            <div className="flex items-center gap-3 text-slate-400">
-              <div className="w-6 h-6 border-2 border-slate-600 border-t-emerald-400 rounded-full animate-spin"></div>
-              Laddar ärenden...
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 text-white">
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center gap-3 text-slate-400">
+            <div className="w-6 h-6 border-2 border-slate-600 border-t-emerald-400 rounded-full animate-spin"></div>
+            Laddar ärenden...
           </div>
         </div>
       </div>
@@ -430,9 +427,7 @@ export default function CaseSearch() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <div className="max-w-7xl mx-auto p-6 md:p-8">
-        <PageHeader title="Sök Ärenden" showBackButton={true} />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 text-white">
 
         {error && (
           <Card className="mb-6">
@@ -903,7 +898,6 @@ export default function CaseSearch() {
             caseData={selectedCase as any} // Konvertera till rätt typ
           />
         )}
-      </div>
     </div>
   );
 }

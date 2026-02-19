@@ -917,12 +917,7 @@ export default function ScheduleOptimizer() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <div className="max-w-7xl mx-auto p-6 md:p-8">
-        <PageHeader 
-          title="Schemaoptimerare"
-          backPath="/koordinator/dashboard"
-        />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 text-white">
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Inställningar */}
@@ -1378,7 +1373,6 @@ export default function ScheduleOptimizer() {
             )}
           </Card>
         </div>
-      </div>
     </div>
   );
 }

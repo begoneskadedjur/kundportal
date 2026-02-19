@@ -258,39 +258,24 @@ export default function CoordinatorAnalytics() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white">
-        <div className="max-w-7xl mx-auto p-6 md:p-8">
-          <PageHeader 
-            title="Koordinator Analytics"
-            showBackButton={true}
-            backButtonProps={{ href: '/koordinator' }}
-          />
-          
-          <div className="bg-red-900/20 border border-red-500/30 text-red-300 p-6 rounded-lg flex items-center gap-4">
-            <AlertTriangle className="w-6 h-6" />
-            <div>
-              <p className="font-bold">Fel vid laddning av analytics</p>
-              <p className="text-sm">{error}</p>
-            </div>
-            <Button variant="secondary" onClick={refresh} className="ml-auto">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Försök igen
-            </Button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 text-white">
+        <div className="bg-red-900/20 border border-red-500/30 text-red-300 p-6 rounded-lg flex items-center gap-4">
+          <AlertTriangle className="w-6 h-6" />
+          <div>
+            <p className="font-bold">Fel vid laddning av analytics</p>
+            <p className="text-sm">{error}</p>
           </div>
+          <Button variant="secondary" onClick={refresh} className="ml-auto">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Försök igen
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <div className="max-w-7xl mx-auto p-6 md:p-8">
-        
-        <PageHeader 
-          title="Koordinator Analytics"
-          showBackButton={true}
-          backButtonProps={{ href: '/koordinator' }}
-        />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 text-white">
 
         {/* Controls och Alerts */}
         <div className="mb-8 space-y-6">
@@ -473,8 +458,6 @@ export default function CoordinatorAnalytics() {
           dateRange={dateRange}
         />
 
-      </div>
-      
       {/* EditCaseModal */}
       <EditCaseModal 
         isOpen={isEditModalOpen} 

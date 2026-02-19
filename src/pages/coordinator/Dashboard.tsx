@@ -2,15 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase'; // Säkerställ att sökvägen till din supabase-klient är korrekt
 
 // Importera dina komponenter
-import CoordinatorDashboardCard from '../../components/admin/coordinator/CoordinatorDashboardCard';
 import CoordinatorKpiCard from '../../components/admin/coordinator/CoordinatorKpiCard';
 import KpiCaseListModal from '../../components/admin/coordinator/KpiCaseListModal';
 import GeographicOverview from '../../components/admin/coordinator/GeographicOverview';
 import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
-import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp, Target, Sparkles } from 'lucide-react';
-import { PageHeader } from '../../components/shared';
+import { CalendarDays, Users, PieChart, Wrench, AlertTriangle } from 'lucide-react';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 import EventLogCard from '../../components/shared/EventLogCard';
 // CoordinatorHelpSection borttagen - nu finns gemensamt Lärosäte i huvudmenyn
@@ -226,16 +224,9 @@ export default function CoordinatorDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <div className="max-w-7xl mx-auto p-6 md:p-8">
-        
-        <PageHeader 
-          title="Koordinator Dashboard"
-          showBackButton={false}
-        />
-
-        {/* --- KPI Sektion med laddning/fel-hantering --- */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 text-white">
+      {/* --- KPI Sektion med laddning/fel-hantering --- */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {loading ? (
             // Visa "skelett"-kort medan datan laddas
             Array.from({ length: 4 }).map((_, i) => (
@@ -282,91 +273,15 @@ export default function CoordinatorDashboard() {
         </section>
 
 
-        {/* --- Notifikationer borttagna - nu finns global header --- */}
-
-        {/* --- Verktyg (flyttat ovanför kartan) --- */}
-        <section className="mt-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
-            <CoordinatorDashboardCard
-              href="/koordinator/schema"
-              icon={CalendarDays}
-              title="Schema & Planering"
-              description="Visuell översikt av alla teknikers scheman. Dra och släpp oplanerade ärenden för att boka."
-              tag="Kärnfunktion"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/booking-assistant"
-              icon={Wand2}
-              title="Schemaoptimerare"
-              description="Optimera befintligt schema för att minska körsträckor och maximera tekniker-effektivitet."
-              tag="Uppdaterad"
-            />
-            <CoordinatorDashboardCard
-              href="/coordinator/leads"
-              icon={Target}
-              iconColor="text-amber-400"
-              title="Lead Pipeline"
-              description="Hantera potentiella kunder och säljprocessen."
-              tag="Ny"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/oneflow-contract-creator"
-              icon={FileSignature}
-              title="Avtal & Offerter"
-              description="Skapa professionella serviceavtal och offertförslag direkt från ärendedata med Oneflow-integration."
-              tag="Tillgänglig"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/customer-access"
-              icon={Building2}
-              title="Kundåtkomst"
-              description="Hantera portalåtkomst, konton, användare och organisationer."
-              tag="Hantering"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/organisation/traffic-light"
-              icon={TrendingUp}
-              title="Trafikljusöversikt"
-              description="Övervakningssystem för att bedöma organisationers prestanda och status."
-              tag="Analys"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/sok-arenden"
-              icon={FileSearch}
-              title="Sök Ärenden"
-              description="Avancerad sökning bland alla ärenden med filter för status, tekniker, datum och mer."
-              tag="Komplett"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/analytics"
-              icon={BarChart3}
-              title="Analytics & Insights"
-              description="Djup analys av din koordinatorspåverkan på verksamheten och konkreta förbättringsförslag."
-              tag="Ny"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/team-chat"
-              icon={Sparkles}
-              iconColor="text-emerald-400"
-              title="Team AI Chat"
-              description="Centraliserad AI-assistent för hela teamet med bildanalys och konversationshistorik."
-              tag="AI"
-            />
-          </div>
-        </section>
-
-        {/* --- Geografisk översikt och Händelselogg --- */}
-        <section className="mt-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <GeographicOverview />
-          </div>
-          <div className="lg:col-span-1">
-            <EventLogCard maxEntries={8} />
-          </div>
-        </section>
-
-        {/* Guider och Hjälp finns nu i Lärosäte (huvudmenyn) */}
-      </div>
+      {/* --- Geografisk översikt och Händelselogg --- */}
+      <section className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <GeographicOverview />
+        </div>
+        <div className="lg:col-span-1">
+          <EventLogCard maxEntries={8} />
+        </div>
+      </section>
 
       {/* KPI Case List Modal */}
       <KpiCaseListModal
@@ -378,16 +293,15 @@ export default function CoordinatorDashboard() {
         absences={modalData.absences}
         kpiType={modalData.kpiType}
       />
-      
+
       {/* Global Coordinator Chat */}
-      <GlobalCoordinatorChat 
+      <GlobalCoordinatorChat
         currentPage="dashboard"
         contextData={{
           kpiData,
           recentCases: modalData.cases
         }}
       />
-      
     </div>
   );
 }

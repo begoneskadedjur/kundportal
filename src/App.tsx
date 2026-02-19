@@ -18,6 +18,7 @@ import UserProfile from './pages/shared/UserProfile';
 import AdminDashboard from './pages/admin/Dashboard';
 import DashboardDemo from './pages/admin/DashboardDemo';
 import { AdminLayout } from './components/admin/layout';
+import { CoordinatorLayout } from './components/coordinator/layout';
 import Customers from './pages/admin/Customers';
 import CustomerDetails from './pages/admin/CustomerDetails';
 import Economics from './pages/admin/Economics';
@@ -188,102 +189,41 @@ function App() {
 
             </Route>
 
-            {/* OneflowContractCreator - TILLGÄNGLIG FÖR KOORDINATOR OCH TEKNIKER (utanfor admin-layout) */}
-            <Route 
-              path="/koordinator/oneflow-contract-creator" 
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <OneflowContractCreator />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/technician/oneflow-contract-creator" 
+            {/* OneflowContractCreator - TILLGÄNGLIG FÖR TEKNIKER (utanfor layout) */}
+            <Route
+              path="/technician/oneflow-contract-creator"
               element={
                 <ProtectedRoute requiredRole="technician">
                   <OneflowContractCreator />
                 </ProtectedRoute>
-              } 
+              }
             />
 
-            {/* Koordinator-rutter (skyddas av 'koordinator'-rollen) */}
-            <Route 
-              path="/koordinator/dashboard" 
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <CoordinatorMainDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            {/* Kundåtkomst - Koordinator */}
-            <Route
-              path="/koordinator/customer-access"
-              element={
-                <AdminOrKoordinatorRoute>
-                  <CoordinatorOrganizationsPage />
-                </AdminOrKoordinatorRoute>
-              }
-            />
-            {/* Behåll gamla routes för bakåtkompatibilitet */}
-            <Route path="/koordinator/organisation/register" element={<Navigate to="/koordinator/customer-access" replace />} />
-            <Route path="/koordinator/organisation/organizations" element={<Navigate to="/koordinator/customer-access" replace />} />
-            <Route path="/koordinator/organisation/organizations-manage" element={<Navigate to="/koordinator/customer-access" replace />} />
-            <Route 
-              path="/koordinator/organisation/traffic-light" 
-              element={
-                <AdminOrKoordinatorRoute>
-                  <TrafficLightOverview />
-                </AdminOrKoordinatorRoute>
-              } 
-            />
-            <Route 
-              path="/koordinator/schema" 
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <CoordinatorSchedule />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/koordinator/booking-assistant" 
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <ScheduleOptimizer />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/koordinator/sok-arenden" 
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <CaseSearch />
-                </ProtectedRoute>
-              } 
-            />
-            <Route
-              path="/koordinator/analytics"
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <CoordinatorAnalytics />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/koordinator/team-chat"
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <TeamChat />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/coordinator/leads" 
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <Leads />
-                </ProtectedRoute>
-              } 
-            />
+            {/* Koordinator routes — nested under CoordinatorLayout med persistent sidebar */}
+            <Route path="/koordinator" element={<CoordinatorLayout />}>
+              <Route index element={<Navigate to="/koordinator/dashboard" replace />} />
+              <Route path="dashboard" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorMainDashboard /></ProtectedRoute>} />
+              <Route path="schema" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorSchedule /></ProtectedRoute>} />
+              <Route path="booking-assistant" element={<ProtectedRoute requiredRole="koordinator"><ScheduleOptimizer /></ProtectedRoute>} />
+              <Route path="sok-arenden" element={<ProtectedRoute requiredRole="koordinator"><CaseSearch /></ProtectedRoute>} />
+              <Route path="analytics" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorAnalytics /></ProtectedRoute>} />
+              <Route path="team-chat" element={<ProtectedRoute requiredRole="koordinator"><TeamChat /></ProtectedRoute>} />
+              <Route path="leads" element={<ProtectedRoute requiredRole="koordinator"><Leads /></ProtectedRoute>} />
+              <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="koordinator"><OneflowContractCreator /></ProtectedRoute>} />
+              <Route path="customer-access" element={<AdminOrKoordinatorRoute><CoordinatorOrganizationsPage /></AdminOrKoordinatorRoute>} />
+              <Route path="organisation/traffic-light" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
+              <Route path="tickets" element={<ProtectedRoute requiredRole="koordinator"><InternAdministration /></ProtectedRoute>} />
+              <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="koordinator"><CaseDeletionGuide /></ProtectedRoute>} />
+              <Route path="guides/ticket-system" element={<ProtectedRoute requiredRole="koordinator"><TicketSystemGuide /></ProtectedRoute>} />
+              <Route path="larosate" element={<ProtectedRoute requiredRole="koordinator"><Larosate /></ProtectedRoute>} />
+              {/* Bakåtkompatibilitet */}
+              <Route path="organisation/register" element={<Navigate to="/koordinator/customer-access" replace />} />
+              <Route path="organisation/organizations" element={<Navigate to="/koordinator/customer-access" replace />} />
+              <Route path="organisation/organizations-manage" element={<Navigate to="/koordinator/customer-access" replace />} />
+            </Route>
+
+            {/* Redirect gammal engelsk URL */}
+            <Route path="/coordinator/leads" element={<Navigate to="/koordinator/leads" replace />} />
 
             {/* --- TEKNIKER ROUTES (UPPDATERADE MED STRIKT BEHÖRIGHET) --- */}
             <Route 
@@ -383,27 +323,11 @@ function App() {
               }
             />
 
-            <Route
-              path="/koordinator/guides/case-deletion"
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <CaseDeletionGuide />
-                </ProtectedRoute>
-              }
-            />
-            {/* Ticket System guide for non-admin roles (admin guides are inside AdminLayout) */}
+            {/* Ticket System guide for non-admin roles (admin guides are inside AdminLayout, koordinator inside CoordinatorLayout) */}
             <Route
               path="/technician/guides/ticket-system"
               element={
                 <ProtectedRoute requiredRole="technician">
-                  <TicketSystemGuide />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/koordinator/guides/ticket-system"
-              element={
-                <ProtectedRoute requiredRole="koordinator">
                   <TicketSystemGuide />
                 </ProtectedRoute>
               }
@@ -591,21 +515,12 @@ function App() {
             {/* Default redirects */}
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/technician" element={<Navigate to="/technician/dashboard" replace />} />
-            <Route path="/koordinator" element={<Navigate to="/koordinator/dashboard" replace />} />
             
             {/* Legacy portal redirects */}
             <Route path="/portal" element={<Navigate to="/customer" replace />} />
             <Route path="/customer/portal" element={<Navigate to="/customer" replace />} />
 
-            {/* Tickets Routes (admin tickets are inside AdminLayout) */}
-            <Route
-              path="/koordinator/tickets"
-              element={
-                <ProtectedRoute requiredRole="koordinator">
-                  <InternAdministration />
-                </ProtectedRoute>
-              }
-            />
+            {/* Tickets Routes (admin inside AdminLayout, koordinator inside CoordinatorLayout) */}
             <Route
               path="/technician/tickets"
               element={
