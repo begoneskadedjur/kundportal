@@ -103,42 +103,42 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
       case 'revenue':
         return (
           <div className="space-y-6">
-            <div className="bg-slate-800/50 p-6 rounded-lg">
-              <h3 className="text-2xl font-bold text-white mb-4">Total Intäkt</h3>
-              <p className="text-4xl font-bold text-green-400">{formatCurrency(data?.revenue?.total || 0)}</p>
+            <div className="bg-slate-800/50 p-4 sm:p-6 rounded-lg">
+              <h3 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4">Total Intäkt</h3>
+              <p className="text-2xl sm:text-4xl font-bold text-green-400">{formatCurrency(data?.revenue?.total || 0)}</p>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-800/30 p-4 rounded-lg">
+
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="bg-slate-800/30 p-3 sm:p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <FileText className="w-4 h-4 text-blue-400" />
                   <p className="text-sm text-slate-400">Avtal</p>
                 </div>
-                <p className="text-xl font-semibold text-white">{formatCurrency(data?.revenue?.breakdown?.contracts || 0)}</p>
+                <p className="text-lg sm:text-xl font-semibold text-white">{formatCurrency(data?.revenue?.breakdown?.contracts || 0)}</p>
               </div>
-              
-              <div className="bg-slate-800/30 p-4 rounded-lg">
+
+              <div className="bg-slate-800/30 p-3 sm:p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <User className="w-4 h-4 text-purple-400" />
                   <p className="text-sm text-slate-400">Privatärenden</p>
                 </div>
-                <p className="text-xl font-semibold text-white">{formatCurrency(data?.revenue?.breakdown?.privateCases || 0)}</p>
+                <p className="text-lg sm:text-xl font-semibold text-white">{formatCurrency(data?.revenue?.breakdown?.privateCases || 0)}</p>
               </div>
-              
-              <div className="bg-slate-800/30 p-4 rounded-lg">
+
+              <div className="bg-slate-800/30 p-3 sm:p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <Building2 className="w-4 h-4 text-orange-400" />
                   <p className="text-sm text-slate-400">Företagsärenden</p>
                 </div>
-                <p className="text-xl font-semibold text-white">{formatCurrency(data?.revenue?.breakdown?.businessCases || 0)}</p>
+                <p className="text-lg sm:text-xl font-semibold text-white">{formatCurrency(data?.revenue?.breakdown?.businessCases || 0)}</p>
               </div>
-              
-              <div className="bg-slate-800/30 p-4 rounded-lg">
+
+              <div className="bg-slate-800/30 p-3 sm:p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <FileText className="w-4 h-4 text-yellow-400" />
                   <p className="text-sm text-slate-400">Legacy-ärenden</p>
                 </div>
-                <p className="text-xl font-semibold text-white">{formatCurrency(data?.revenue?.breakdown?.legacyCases || 0)}</p>
+                <p className="text-lg sm:text-xl font-semibold text-white">{formatCurrency(data?.revenue?.breakdown?.legacyCases || 0)}</p>
               </div>
             </div>
           </div>
@@ -186,7 +186,7 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
               <h3 className="text-lg font-semibold text-white">Aktiva Tekniker</h3>
               <span className="text-sm text-slate-400">{data?.technicians?.length || 0} tekniker</span>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {data?.technicians?.map((tech) => (
                 <div key={tech.id} className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
                   <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center">
@@ -210,10 +210,10 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
   return (
     <>
       <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {renderContent()}
         </div>
-        <div className="flex justify-end gap-3 p-6 border-t border-slate-800">
+        <div className="flex justify-end gap-3 p-4 sm:p-6 border-t border-slate-800">
           <Button variant="secondary" onClick={onClose}>Stäng</Button>
         </div>
       </Modal>

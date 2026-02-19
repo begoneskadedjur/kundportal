@@ -596,7 +596,7 @@ export default function ContractsOverview() {
 
   if (loading) {
     return (
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Försäljningspipeline</h1>
           <p className="text-sm text-slate-400 mt-1">Hantera kontrakt och försäljningsprocesser</p>
@@ -654,7 +654,7 @@ export default function ContractsOverview() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* Sidtitel + åtgärdsknappar */}
       <div className="flex items-center justify-between">
         <div>

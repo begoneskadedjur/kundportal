@@ -159,11 +159,11 @@ export function ContractInvoiceModal({
               <span className="ml-2 text-slate-400">Laddar...</span>
             </div>
           ) : invoice ? (
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               {/* Kundinformation */}
               <div className="bg-slate-800/50 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-slate-400 mb-3">Kundinformation</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="flex items-start gap-2">
                     <User className="w-4 h-4 text-slate-400 mt-0.5" />
                     <div>
@@ -191,7 +191,7 @@ export function ContractInvoiceModal({
               </div>
 
               {/* Metadata */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div className="bg-slate-800/50 rounded-lg p-4">
                   <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
                     <Calendar className="w-4 h-4" />

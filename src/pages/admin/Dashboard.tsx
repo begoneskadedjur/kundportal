@@ -642,11 +642,11 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
 
         {/* Welcome */}
         <motion.div
-          className="mb-12"
+          className="mb-6 sm:mb-8 lg:mb-12"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
@@ -661,7 +661,7 @@ const AdminDashboard: React.FC = () => {
         </motion.div>
 
         {/* Time period selector + KPI Cards */}
-        <div className="mb-12">
+        <div className="mb-6 sm:mb-8 lg:mb-12">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Nyckeltal</h2>
             <div className="inline-flex bg-slate-800/50 rounded-lg p-0.5 border border-slate-700/50">
@@ -680,7 +680,7 @@ const AdminDashboard: React.FC = () => {
               ))}
             </div>
           </div>
-          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity duration-300 ${refreshing ? 'opacity-60' : ''}`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 transition-opacity duration-300 ${refreshing ? 'opacity-60' : ''}`}>
             {[
               {
                 title: 'Avtalskunder',
@@ -744,9 +744,9 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="mb-12">
+        <div className="mb-6 sm:mb-8 lg:mb-12">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Snabbåtgärder</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {[
               { icon: Plus, label: 'Skapa avtal', desc: 'Generera via Oneflow', href: '/admin/skapa-avtal', color: 'teal' },
               { icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', href: '/admin/fakturering', color: 'emerald' },
@@ -766,10 +766,10 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Activity & Today panel */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Recent Activity */}
           <motion.div
-            className="lg:col-span-2 bg-slate-800/40 backdrop-blur-sm border border-slate-700/40 rounded-2xl p-6"
+            className="lg:col-span-2 bg-slate-800/40 backdrop-blur-sm border border-slate-700/40 rounded-2xl p-4 sm:p-6"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.5 }}
@@ -804,7 +804,7 @@ const AdminDashboard: React.FC = () => {
 
           {/* Today panel */}
           <motion.div
-            className="bg-slate-800/40 backdrop-blur-sm border border-slate-700/40 rounded-2xl p-6"
+            className="bg-slate-800/40 backdrop-blur-sm border border-slate-700/40 rounded-2xl p-4 sm:p-6"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.55 }}

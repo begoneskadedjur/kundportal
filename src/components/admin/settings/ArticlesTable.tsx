@@ -78,7 +78,102 @@ export function ArticlesTable({
 
   return (
     <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden">
-      <div className="overflow-x-auto">
+
+      {/* === MOBIL: Kortvy === */}
+      <div className="md:hidden divide-y divide-slate-700/50">
+        {articles.map(article => {
+          const categoryConfig = ARTICLE_CATEGORY_CONFIG[article.category]
+          const unitConfig = ARTICLE_UNIT_CONFIG[article.unit]
+          const isToggling = togglingId === article.id
+          const isDeleting = deletingId === article.id
+          const isConfirmingDelete = confirmDeleteId === article.id
+
+          return (
+            <div key={article.id} className={`p-3 ${!article.is_active ? 'opacity-50' : ''}`}>
+              {/* Rad 1: Art nr + Namn + Pris */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <code className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded flex-shrink-0">
+                      {article.code}
+                    </code>
+                    <span className="text-sm font-medium text-white truncate">{article.name}</span>
+                  </div>
+                  {article.description && (
+                    <p className="text-xs text-slate-500 truncate mt-0.5">{article.description}</p>
+                  )}
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <span className="text-sm font-medium text-white">{formatArticlePrice(article.default_price)}</span>
+                  <span className="text-xs text-slate-500 ml-1">+{article.vat_rate}%</span>
+                </div>
+              </div>
+
+              {/* Rad 2: Kategori + Grupp + Enhet */}
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color}`}>
+                  {categoryConfig.label}
+                </span>
+                {article.group && (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
+                    style={{ backgroundColor: `${article.group.color}20`, color: article.group.color }}
+                  >
+                    {article.group.name}
+                  </span>
+                )}
+                <span className="text-xs text-slate-400">{unitConfig.shortLabel}</span>
+              </div>
+
+              {/* Rad 3: Status + Åtgärder */}
+              <div className="flex items-center justify-between mt-2">
+                <button
+                  onClick={() => onToggleActive(article.id, !article.is_active)}
+                  disabled={isToggling}
+                  className={`flex items-center gap-1.5 min-h-[44px] px-2 rounded-lg transition-colors ${
+                    article.is_active
+                      ? 'text-emerald-400 hover:bg-emerald-500/20'
+                      : 'text-slate-500 hover:bg-slate-700'
+                  }`}
+                >
+                  {isToggling ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : article.is_active ? (
+                    <ToggleRight className="w-5 h-5" />
+                  ) : (
+                    <ToggleLeft className="w-5 h-5" />
+                  )}
+                  <span className="text-xs">{article.is_active ? 'Aktiv' : 'Inaktiv'}</span>
+                </button>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={() => onEdit(article)}
+                    className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    title="Redigera"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(article.id)}
+                    disabled={isDeleting}
+                    className={`p-2.5 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${
+                      isConfirmingDelete
+                        ? 'text-red-400 bg-red-500/20'
+                        : 'text-slate-400 hover:text-red-400 hover:bg-slate-700'
+                    }`}
+                    title={isConfirmingDelete ? 'Klicka igen för att bekräfta' : 'Ta bort'}
+                  >
+                    {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* === DESKTOP: Tabell === */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead className="bg-slate-800/70 border-b border-slate-700">
             <tr>

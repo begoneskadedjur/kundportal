@@ -223,8 +223,52 @@ const CustomerContractTable: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabell */}
-      <div className="overflow-x-auto">
+      {/* === MOBIL: Kortvy === */}
+      <div className="md:hidden divide-y divide-slate-700/50">
+        {sortedContracts.map((contract) => (
+          <div key={contract.id} className="p-3">
+            {/* Rad 1: Företag + Årspremie */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h4 className="text-sm font-medium text-white truncate">{contract.company_name}</h4>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-xs">{getBusinessTypeIcon(contract.business_type)}</span>
+                  <span className="text-xs text-slate-400">{contract.business_type}</span>
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-sm font-semibold text-green-400">{formatCurrency(contract.annual_value)}</p>
+                <p className="text-xs text-slate-500">{formatCurrency(contract.annual_value / 12)}/mån</p>
+              </div>
+            </div>
+
+            {/* Rad 2: Tid kvar + Status + Slutdatum */}
+            <div className="flex items-center justify-between mt-2 gap-2">
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(contract.days_remaining)}`}>
+                  {contract.days_remaining <= 0 ? 'Utgånget' :
+                   contract.days_remaining <= 90 ? 'Kritisk' :
+                   contract.days_remaining <= 180 ? 'Varning' : 'Aktiv'}
+                </span>
+                <span className={`text-xs font-medium ${getStatusColor(contract.days_remaining).split(' ')[0]}`}>
+                  {contract.days_remaining > 0 ? `${contract.days_remaining}d kvar` : 'Utgånget'}
+                </span>
+              </div>
+              <span className="text-xs text-slate-400">
+                {formatDate(contract.contract_end_date)}
+              </span>
+            </div>
+
+            {/* Rad 3: Account Manager */}
+            <div className="mt-1.5">
+              <span className="text-xs text-slate-500">{contract.assigned_account_manager}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* === DESKTOP: Tabell === */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-800 border-b border-slate-700">
             <tr className="text-slate-300">

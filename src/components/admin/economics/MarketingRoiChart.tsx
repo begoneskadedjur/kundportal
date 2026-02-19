@@ -52,7 +52,7 @@ const MarketingRoiChart: React.FC = () => {
           <Target className="w-5 h-5 text-purple-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Marknadsföring & ROI</h2>
         </div>
-        <div className="h-80 flex items-center justify-center">
+        <div className="h-48 sm:h-64 lg:h-80 flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
         </div>
       </Card>
@@ -77,7 +77,7 @@ const MarketingRoiChart: React.FC = () => {
           <Target className="w-5 h-5 text-purple-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Marknadsföring & ROI</h2>
         </div>
-        <div className="h-80 flex items-center justify-center text-slate-400">
+        <div className="h-48 sm:h-64 lg:h-80 flex items-center justify-center text-slate-400">
           <DollarSign className="w-8 h-8 mr-2" />
           <span>Ingen marknadsföringsdata tillgänglig</span>
         </div>
@@ -112,7 +112,7 @@ const MarketingRoiChart: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
         <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
           <p className="text-purple-400 font-bold text-lg">{formatCurrency(totalSpend)}</p>
           <p className="text-purple-300 text-sm">Total kostnad</p>
@@ -128,7 +128,7 @@ const MarketingRoiChart: React.FC = () => {
       </div>
 
       {/* Kombinerat diagram */}
-      <div className="h-64 mb-4">
+      <div className="h-48 sm:h-56 md:h-64 mb-4">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={marketingSpend} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />

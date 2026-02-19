@@ -174,7 +174,7 @@ const KpiCard: React.FC<KpiCardData> = ({
   const colors = colorMap[color] || colorMap.green
 
   return (
-    <div className="bg-slate-800/50 rounded-2xl border border-slate-700/40 p-5 hover:border-slate-600 transition-colors duration-200">
+    <div className="bg-slate-800/50 rounded-2xl border border-slate-700/40 p-3 sm:p-5 hover:border-slate-600 transition-colors duration-200">
       <div className="flex items-center justify-between mb-3">
         <div className={`p-2 rounded-lg ${colors.bg}`}>
           <IconComponent className={`w-4 h-4 ${colors.icon}`} />
@@ -191,7 +191,7 @@ const KpiCard: React.FC<KpiCardData> = ({
         </div>
       </div>
 
-      <p className="text-xl font-bold text-white mb-1 font-mono">{value}</p>
+      <p className="text-lg sm:text-xl font-bold text-white mb-1 font-mono">{value}</p>
       <h3 className="text-xs font-medium text-slate-300 mb-0.5">{title}</h3>
       <p className="text-[10px] text-slate-500 mb-3">{description}</p>
 

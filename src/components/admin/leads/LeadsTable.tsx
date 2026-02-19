@@ -1,6 +1,6 @@
 // src/components/admin/leads/LeadsTable.tsx - Lead table component (kompakt 7-kolumn layout)
 
-import React from 'react'
+import React, { useState } from 'react'
 import LeadsExpandedRow from './LeadsExpandedRow'
 import {
   Target,
@@ -102,9 +102,178 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
     return `${days}d`
   }
 
+  // Mobile expanded state (separate from desktop expandedRows)
+  const [mobileExpandedIds, setMobileExpandedIds] = useState<Set<string>>(new Set())
+  const toggleMobileExpand = (id: string) => {
+    setMobileExpandedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   return (
     <Card className="overflow-hidden border-slate-700/50 bg-gradient-to-br from-slate-800/40 to-slate-900/40">
-      <div className="overflow-x-auto">
+
+      {/* === MOBIL: Kortvy === */}
+      <div className="md:hidden">
+        {leads.length === 0 ? (
+          <div className="text-center py-12 bg-slate-800/20">
+            <Target className="w-10 h-10 text-slate-500 mx-auto mb-3" />
+            <h3 className="text-base font-semibold text-slate-300 mb-1">Inga leads matchar filtren</h3>
+            <p className="text-slate-500 text-sm">Prova att justera dina sökkriterier.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-700/30">
+            {leads.map((lead) => {
+              const score = calculateLeadScore(lead)
+              const quality = getLeadQuality(score)
+              const scoreColor = getScoreColor(score)
+              const daysSinceUpdate = Math.floor((new Date().getTime() - new Date(lead.updated_at).getTime()) / (1000 * 60 * 60 * 24))
+              const isMobileExpanded = mobileExpandedIds.has(lead.id)
+
+              return (
+                <div key={lead.id} className="p-3">
+                  {/* Huvudrad: Företag + Status + Åtgärder */}
+                  <div className="flex items-start gap-2">
+                    {/* Priority indicator */}
+                    <div className={`w-1 self-stretch rounded-full flex-shrink-0 mt-0.5 ${
+                      lead.priority === 'urgent' ? 'bg-red-500' :
+                      lead.priority === 'high' ? 'bg-orange-400' :
+                      lead.priority === 'medium' ? 'bg-yellow-400' :
+                      lead.priority === 'low' ? 'bg-green-400' : 'bg-slate-700'
+                    }`} />
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-sm font-semibold text-white truncate">{lead.company_name}</h4>
+                        {/* Åtgärdsknappar */}
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <button
+                            onClick={() => onViewLead(lead)}
+                            className="p-2.5 text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onEditLead(lead)}
+                            className="p-2.5 text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteLead(lead)}
+                            disabled={deletingLead === lead.id}
+                            className="p-2.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50"
+                          >
+                            <Trash2 className={`w-4 h-4 ${deletingLead === lead.id ? 'animate-pulse' : ''}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Kontaktperson */}
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <User className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                        <span className="text-xs text-slate-400 truncate">{lead.contact_person}</span>
+                      </div>
+
+                      {/* Status + Score rad */}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-2 h-2 rounded-full ${LEAD_STATUS_DISPLAY[lead.status].dotClass}`} />
+                          <span className={`text-xs font-medium ${LEAD_STATUS_DISPLAY[lead.status].textClass}`}>
+                            {LEAD_STATUS_DISPLAY[lead.status].label}
+                          </span>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded ${scoreColor.bg} ${scoreColor.text}`}>
+                          <Star className="w-3 h-3" />
+                          {score}
+                        </span>
+                        {lead.estimated_value && (
+                          <span className="text-xs font-semibold text-white font-mono">
+                            {formatCurrency(lead.estimated_value)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Expandera-knapp */}
+                      <button
+                        onClick={() => toggleMobileExpand(lead.id)}
+                        className="flex items-center gap-1 mt-2 text-xs text-slate-400 hover:text-white min-h-[44px] -my-2"
+                      >
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMobileExpanded ? 'rotate-180' : ''}`} />
+                        {isMobileExpanded ? 'Dölj detaljer' : 'Visa detaljer'}
+                      </button>
+
+                      {/* Expanderat innehåll */}
+                      {isMobileExpanded && (
+                        <div className="mt-2 pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-x-4 gap-y-2">
+                          {lead.organization_number && (
+                            <div>
+                              <span className="text-xs text-slate-500">Org.nr</span>
+                              <p className="text-xs text-slate-300 font-mono">{lead.organization_number}</p>
+                            </div>
+                          )}
+                          {lead.lead_technicians && lead.lead_technicians.length > 0 && (
+                            <div>
+                              <span className="text-xs text-slate-500">Tilldelad</span>
+                              <div className="space-y-0.5 mt-0.5">
+                                {lead.lead_technicians.slice(0, 3).map((a) => (
+                                  <div key={a.id} className="flex items-center gap-1">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${a.is_primary ? 'bg-yellow-400' : 'bg-green-400'}`} />
+                                    <span className="text-xs text-white">{a.technicians?.name || 'Okänd'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {lead.follow_up_date && (
+                            <div>
+                              <span className="text-xs text-slate-500">Nästa steg</span>
+                              <p className={`text-xs font-medium ${
+                                new Date(lead.follow_up_date) < new Date() ? 'text-red-400' :
+                                new Date(lead.follow_up_date).toDateString() === new Date().toDateString() ? 'text-yellow-400' :
+                                'text-white'
+                              }`}>
+                                {new Date(lead.follow_up_date).toLocaleDateString('sv-SE')}
+                              </p>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-xs text-slate-500">Aktivitet</span>
+                            <p className={`text-xs font-medium ${getActivityColor(daysSinceUpdate)}`}>
+                              {getActivityLabel(daysSinceUpdate)} sedan
+                            </p>
+                          </div>
+                          {lead.priority && (
+                            <div>
+                              <span className="text-xs text-slate-500">Prioritet</span>
+                              <p className={`text-xs font-medium ${
+                                lead.priority === 'urgent' ? 'text-red-400' :
+                                lead.priority === 'high' ? 'text-orange-400' :
+                                lead.priority === 'medium' ? 'text-yellow-400' : 'text-green-400'
+                              }`}>{getPriorityLabel(lead.priority)}</p>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-xs text-slate-500">Uppdaterad</span>
+                            <p className="text-xs text-white">{new Date(lead.updated_at).toLocaleDateString('sv-SE')}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* === DESKTOP: Tabell === */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead className="bg-slate-800/95 backdrop-blur border-b border-slate-600 sticky top-0 z-10">
             <tr>

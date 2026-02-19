@@ -73,7 +73,128 @@ export function ContractBillingItemsTable({
 
   return (
     <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-      <div className="overflow-x-auto">
+
+      {/* === MOBIL: Kortvy === */}
+      <div className="md:hidden">
+        {/* Select-all header */}
+        <div className="flex items-center justify-between p-3 border-b border-slate-700/50 bg-slate-800/70">
+          <label className="flex items-center gap-2 min-h-[44px]">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => { if (el) el.indeterminate = someSelected }}
+              onChange={(e) => onSelectAll(e.target.checked)}
+              className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-emerald-500 focus:ring-emerald-500"
+            />
+            <span className="text-xs text-slate-400">Välj alla</span>
+          </label>
+          <span className="text-xs text-slate-500">{items.length} rader</span>
+        </div>
+
+        <div className="divide-y divide-slate-700/30">
+          {items.map((item) => {
+            const statusConfig = BILLING_ITEM_STATUS_CONFIG[item.status]
+            const isSelected = selectedIds.includes(item.id)
+            const isUpdating = updatingId === item.id
+
+            return (
+              <div key={item.id} className={`p-3 ${isSelected ? 'bg-emerald-500/5' : ''}`}>
+                {/* Rad 1: Checkbox + Kund + Status */}
+                <div className="flex items-start gap-2">
+                  <label className="flex items-center min-h-[44px] min-w-[44px] justify-center flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => onSelectItem(item.id, e.target.checked)}
+                      className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-emerald-500 focus:ring-emerald-500"
+                    />
+                  </label>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-medium text-white truncate">
+                        {item.customer?.company_name || 'Okänd kund'}
+                      </h4>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${statusConfig.bgColor} ${statusConfig.color}`}>
+                        {statusConfig.label}
+                      </span>
+                    </div>
+                    {item.customer?.organization_number && (
+                      <p className="text-xs text-slate-500">{item.customer.organization_number}</p>
+                    )}
+
+                    {/* Artikel + Belopp */}
+                    <div className="flex items-center justify-between gap-2 mt-1.5">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-slate-300 truncate">{item.article_name}</span>
+                          {item.requires_approval && (
+                            <AlertCircle className="w-3 h-3 text-orange-400 flex-shrink-0" />
+                          )}
+                        </div>
+                        {item.article_code && (
+                          <span className="text-xs text-slate-500 font-mono">{item.article_code}</span>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-medium text-white">{formatBillingAmount(item.total_price)}</p>
+                        <div className="flex items-center justify-end gap-1 text-xs text-slate-500">
+                          {item.discount_percent > 0 && (
+                            <span className="text-orange-400">-{item.discount_percent}%</span>
+                          )}
+                          <span>{item.vat_rate}% moms</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Period + Åtgärder */}
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-slate-400">
+                        {formatBillingPeriod(item.billing_period_start, item.billing_period_end)}
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        {isUpdating ? (
+                          <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                        ) : (
+                          <>
+                            {item.requires_approval && item.status === 'pending' && onApproveDiscount && (
+                              <button onClick={() => onApproveDiscount(item.id)} className="p-2 text-orange-400 hover:bg-orange-500/20 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Godkänn rabatt">
+                                <Percent className="w-4 h-4" />
+                              </button>
+                            )}
+                            {item.status === 'pending' && !item.requires_approval && (
+                              <button onClick={() => handleStatusChange(item.id, 'approved')} className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Godkänn">
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                            {item.status === 'approved' && (
+                              <button onClick={() => handleStatusChange(item.id, 'invoiced')} className="p-2 text-purple-400 hover:bg-purple-500/20 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Markera som fakturerad">
+                                <FileText className="w-4 h-4" />
+                              </button>
+                            )}
+                            {item.status === 'invoiced' && (
+                              <button onClick={() => handleStatusChange(item.id, 'paid')} className="p-2 text-emerald-400 hover:bg-emerald-500/20 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Markera som betald">
+                                <Check className="w-4 h-4" />
+                              </button>
+                            )}
+                            {item.status !== 'cancelled' && item.status !== 'paid' && (
+                              <button onClick={() => handleStatusChange(item.id, 'cancelled')} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Avbryt">
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* === DESKTOP: Tabell === */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-700/50">

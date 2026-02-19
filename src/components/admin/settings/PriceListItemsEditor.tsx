@@ -406,7 +406,93 @@ export function PriceListItemsEditor({
       {/* Tabell */}
       <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="max-h-96 overflow-y-auto">
-          <table className="w-full">
+
+          {/* === MOBIL: Kompakt lista === */}
+          <div className="md:hidden divide-y divide-slate-700/30">
+            {filteredArticles.length === 0 ? (
+              <div className="px-3 py-8 text-center text-slate-500">
+                {searchTerm ? 'Inga artiklar matchar sökningen' : 'Inga artiklar tillgängliga'}
+              </div>
+            ) : (
+              filteredArticles.map(article => {
+                const state = priceStates[article.id]
+                const priceType = state?.priceType || 'standard'
+                const isDirty = state?.isDirty || false
+                const categoryConfig = ARTICLE_CATEGORY_CONFIG[article.category]
+                const isSaving = state?.isSaving
+                const discountPercent = parseFloat(state?.discountPercent || '0')
+                const discountedPrice = article.default_price * (1 - discountPercent / 100)
+                const rowClass = getRowClass(priceType, isDirty)
+
+                return (
+                  <div key={article.id} className={`p-3 ${rowClass}`}>
+                    {/* Rad 1: Art nr + Namn + Standardpris */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <code className="text-xs font-mono text-slate-400 flex-shrink-0">{article.code}</code>
+                        <span className="text-sm text-white truncate">{article.name}</span>
+                      </div>
+                      <span className="text-xs text-slate-500 flex-shrink-0">{formatArticlePrice(article.default_price)}</span>
+                    </div>
+
+                    {/* Rad 2: Pristyp + Input */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <select
+                        value={priceType}
+                        onChange={(e) => handlePriceTypeChange(article.id, article, e.target.value as PriceType)}
+                        className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[44px]"
+                      >
+                        <option value="standard">Standard</option>
+                        <option value="custom">Anpassat</option>
+                        <option value="discount">Rabatt</option>
+                      </select>
+
+                      {priceType === 'custom' && (
+                        <div className="flex items-center gap-1 flex-1">
+                          <input
+                            type="number"
+                            value={state?.customPrice || ''}
+                            onChange={(e) => handlePriceChange(article.id, article, e.target.value)}
+                            min="0" step="1"
+                            className="flex-1 min-w-0 px-2 py-1.5 bg-slate-900 border border-purple-500/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[44px]"
+                          />
+                          <span className="text-xs text-slate-500">kr</span>
+                        </div>
+                      )}
+
+                      {priceType === 'discount' && (
+                        <div className="flex items-center gap-1 flex-1">
+                          <input
+                            type="number"
+                            value={state?.discountPercent || ''}
+                            onChange={(e) => handleDiscountChange(article.id, article, e.target.value)}
+                            min="0" max="100" step="1"
+                            className="w-16 px-2 py-1.5 bg-slate-900 border border-emerald-500/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-emerald-500 min-h-[44px]"
+                          />
+                          <span className="text-xs text-slate-500">%</span>
+                          <span className="text-xs text-emerald-400 ml-1">= {formatArticlePrice(discountedPrice)}</span>
+                        </div>
+                      )}
+
+                      {isDirty && (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => confirmPrice(article.id, article)} disabled={isSaving} className="p-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white min-h-[44px] min-w-[44px] flex items-center justify-center">
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                          </button>
+                          <button onClick={() => resetPrice(article.id)} className="p-2 rounded bg-slate-600 hover:bg-slate-500 text-slate-300 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {/* === DESKTOP: Tabell === */}
+          <table className="w-full hidden md:table">
             <thead className="bg-slate-900/80 sticky top-0 z-10">
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">

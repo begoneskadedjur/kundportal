@@ -52,7 +52,7 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
       {/* Mobile slide-out menu */}
       <div
         className={`
-          lg:hidden fixed top-14 right-0 w-72 h-[calc(100%-3.5rem-4rem)] bg-slate-900/95 backdrop-blur-xl
+          lg:hidden fixed top-14 right-0 w-72 max-w-[85vw] h-[calc(100%-3.5rem-4rem)] bg-slate-900/95 backdrop-blur-xl
           border-l border-slate-700/50 z-30 transition-transform duration-300 overflow-y-auto
           ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}
         `}
@@ -105,7 +105,7 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
       </div>
 
       {/* Mobile Bottom Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 z-40 px-2 flex items-center justify-around safe-area-bottom">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 z-40 px-2 pb-safe flex items-center justify-around">
         {mobileBottomItems.map(item => {
           const Icon = item.icon
           const isActive = currentPath === item.path
@@ -113,16 +113,16 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-lg transition-all ${isActive ? 'text-teal-400' : 'text-slate-500'}`}
+              className={`flex flex-col items-center justify-center gap-0.5 px-2 py-2 min-h-[44px] rounded-lg transition-all ${isActive ? 'text-teal-400' : 'text-slate-500'}`}
             >
               <Icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''} transition-transform`} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="text-[11px] font-medium">{item.label}</span>
             </Link>
           )
         })}
-        <button onClick={() => setMobileMenuOpen(true)} className="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-lg text-slate-500">
+        <button onClick={() => setMobileMenuOpen(true)} className="flex flex-col items-center justify-center gap-0.5 px-2 py-2 min-h-[44px] rounded-lg text-slate-500">
           <Menu className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Mer</span>
+          <span className="text-[11px] font-medium">Mer</span>
         </button>
       </nav>
     </>

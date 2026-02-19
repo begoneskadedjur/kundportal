@@ -50,25 +50,25 @@ const TechnicianCommissions: React.FC = () => {
   // Error handling
   if (error && !loading) {
     return (
-      <div className="min-h-screen bg-slate-900 p-6">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         <div className="max-w-4xl mx-auto">
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-8 text-center">
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 sm:p-8 text-center">
             <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-red-400 mb-2">
               Kunde inte ladda provisionsdata
             </h2>
             <p className="text-red-300 mb-6">{error}</p>
-            <div className="flex justify-center space-x-4">
+            <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
               <button
                 onClick={refreshData}
-                className="flex items-center space-x-2 px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 hover:bg-red-500/30 transition-colors"
+                className="flex items-center justify-center space-x-2 px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 hover:bg-red-500/30 transition-colors min-h-[44px]"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Försök igen</span>
               </button>
               <button
                 onClick={() => navigate('/admin')}
-                className="flex items-center space-x-2 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-600 transition-colors"
+                className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-600 transition-colors min-h-[44px]"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Tillbaka</span>
@@ -81,84 +81,71 @@ const TechnicianCommissions: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
       {/* Header */}
-      <div className="border-b border-slate-700 bg-slate-800/50">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate('/admin')}
-                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-slate-400" />
-              </button>
-              
-              <div className="flex items-center space-x-3">
-                <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl">
-                  <Wallet className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-white">
-                    Provisionshantering
-                  </h1>
-                  <p className="text-slate-400">
-                    {selectedTechnicianDisplay === 'Alla tekniker' 
-                      ? `${availableTechnicians.length - 1} tekniker`
-                      : selectedTechnicianDisplay
-                    } • {selectedMonthDisplay}
-                  </p>
-                </div>
-              </div>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="p-2.5 sm:p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl">
+            <Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">
+              Provisionshantering
+            </h1>
+            <p className="text-sm text-slate-400">
+              {selectedTechnicianDisplay === 'Alla tekniker'
+                ? `${availableTechnicians.length - 1} tekniker`
+                : selectedTechnicianDisplay
+              } • {selectedMonthDisplay}
+            </p>
+          </div>
+        </div>
 
-            {/* Header actions */}
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={refreshData}
-                disabled={loading}
-                className={`
-                  flex items-center space-x-2 px-4 py-2 rounded-lg border transition-all duration-200
-                  ${loading
-                    ? 'border-slate-700 bg-slate-800/20 text-slate-500 cursor-not-allowed'
-                    : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 hover:border-slate-500'
-                  }
-                `}
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span>Uppdatera</span>
-              </button>
+        {/* Header actions */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={refreshData}
+            disabled={loading}
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200 min-h-[44px]
+              ${loading
+                ? 'border-slate-700 bg-slate-800/20 text-slate-500 cursor-not-allowed'
+                : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 hover:border-slate-500'
+              }
+            `}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Uppdatera</span>
+          </button>
 
-              {/* Chart type toggle */}
-              <div className="flex items-center bg-slate-800 border border-slate-600 rounded-lg p-1">
-                <button
-                  onClick={() => setChartType('line')}
-                  className={`px-3 py-1 text-sm rounded transition-all duration-200 ${
-                    chartType === 'line'
-                      ? 'bg-green-500 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Linje
-                </button>
-                <button
-                  onClick={() => setChartType('bar')}
-                  className={`px-3 py-1 text-sm rounded transition-all duration-200 ${
-                    chartType === 'bar'
-                      ? 'bg-green-500 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Stapel
-                </button>
-              </div>
-            </div>
+          {/* Chart type toggle */}
+          <div className="flex items-center bg-slate-800 border border-slate-600 rounded-lg p-1">
+            <button
+              onClick={() => setChartType('line')}
+              className={`px-3 py-1.5 text-sm rounded transition-all duration-200 min-h-[36px] ${
+                chartType === 'line'
+                  ? 'bg-green-500 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Linje
+            </button>
+            <button
+              onClick={() => setChartType('bar')}
+              className={`px-3 py-1.5 text-sm rounded transition-all duration-200 min-h-[36px] ${
+                chartType === 'bar'
+                  ? 'bg-green-500 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Stapel
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div>
         {/* Navigation controls */}
         <CommissionMonthSelector
           selectedMonth={selectedMonth}
@@ -172,7 +159,7 @@ const TechnicianCommissions: React.FC = () => {
 
         {/* Tekniker filter */}
         {hasMultipleTechnicians && (
-          <div className="mb-8">
+          <div className="mb-4 sm:mb-6">
             <CommissionTechnicianFilter
               selectedTechnician={selectedTechnician}
               availableTechnicians={availableTechnicians}
@@ -232,7 +219,7 @@ const TechnicianCommissions: React.FC = () => {
             ) : (
               <>
                 {/* Chart section */}
-                <div className="mb-8">
+                <div className="mb-4 sm:mb-6 lg:mb-8">
                   <CommissionChart
                     data={monthlyData}
                     loading={loading}
@@ -243,7 +230,7 @@ const TechnicianCommissions: React.FC = () => {
                 </div>
 
                 {/* Export section */}
-                <div className="mb-8">
+                <div className="mb-4 sm:mb-6 lg:mb-8">
                   <CommissionExportButtons
                     cases={caseDetails}
                     month={selectedMonth.value}
@@ -263,15 +250,15 @@ const TechnicianCommissions: React.FC = () => {
 
                 {/* Insights section */}
                 {calculations.topPerformer && selectedTechnician.id === 'all' && (
-                  <div className="mt-8 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-6">
+                  <div className="mt-4 sm:mt-6 lg:mt-8 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-4 sm:p-6">
                     <div className="flex items-center space-x-3 mb-4">
-                      <TrendingUp className="w-6 h-6 text-green-400" />
-                      <h3 className="text-lg font-semibold text-white">
+                      <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" />
+                      <h3 className="text-base sm:text-lg font-semibold text-white">
                         Månadens insights
                       </h3>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                       <div>
                         <p className="text-sm text-green-400 font-medium mb-1">🏆 Topprestanda</p>
                         <p className="text-white">

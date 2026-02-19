@@ -67,7 +67,106 @@ export function PriceListsTable({
 
   return (
     <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden">
-      <div className="overflow-x-auto">
+
+      {/* === MOBIL: Kortvy === */}
+      <div className="md:hidden divide-y divide-slate-700/50">
+        {priceLists.map(priceList => {
+          const isExpanded = expandedListId === priceList.id
+          const isSettingDefault = settingDefaultId === priceList.id
+          const isDeleting = deletingId === priceList.id
+          const isConfirmingDelete = confirmDeleteId === priceList.id
+          const count = itemCounts[priceList.id] || 0
+
+          return (
+            <div key={priceList.id} className={!priceList.is_active ? 'opacity-50' : ''}>
+              <div className="p-3">
+                {/* Rad 1: Namn + Status */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <button
+                      onClick={() => onToggleExpand(priceList.id)}
+                      className="p-1 text-slate-400 hover:text-white flex-shrink-0"
+                    >
+                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </button>
+                    <span className="font-medium text-white text-sm truncate">{priceList.name}</span>
+                    {priceList.is_default && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs flex-shrink-0">
+                        <Star className="w-3 h-3" /> Standard
+                      </span>
+                    )}
+                  </div>
+                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${
+                    priceList.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-600/20 text-slate-400'
+                  }`}>
+                    {priceList.is_active ? 'Aktiv' : 'Inaktiv'}
+                  </span>
+                </div>
+
+                {/* Rad 2: Artikelantal + Åtgärder */}
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">
+                      <FileText className="w-3 h-3" /> {count} artiklar
+                    </span>
+                    {priceList.description && (
+                      <span className="text-xs text-slate-500 truncate max-w-[120px]">{priceList.description}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    {!priceList.is_default && (
+                      <button onClick={() => onSetDefault(priceList.id)} disabled={isSettingDefault} className="p-2 text-slate-400 hover:text-purple-400 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Sätt som standard">
+                        {isSettingDefault ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
+                      </button>
+                    )}
+                    <button onClick={() => onEdit(priceList)} className="p-2 text-slate-400 hover:text-white rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Redigera">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => onCopy(priceList)} className="p-2 text-slate-400 hover:text-cyan-400 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Kopiera">
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(priceList.id, priceList.is_default)}
+                      disabled={isDeleting || priceList.is_default}
+                      className={`p-2 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                        priceList.is_default ? 'text-slate-600 cursor-not-allowed' :
+                        isConfirmingDelete ? 'text-red-400 bg-red-500/20' : 'text-slate-400 hover:text-red-400'
+                      }`}
+                      title={priceList.is_default ? 'Kan inte ta bort standard' : 'Ta bort'}
+                    >
+                      {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expanderad artikellista */}
+              <AnimatePresence>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-3 bg-slate-900/50 border-t border-slate-700/50">
+                      <PriceListItemsEditor
+                        priceListId={priceList.id}
+                        articles={articles}
+                        onUpdate={onUpdateItems}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* === DESKTOP: Tabell === */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead className="bg-slate-800/70 border-b border-slate-700">
             <tr>

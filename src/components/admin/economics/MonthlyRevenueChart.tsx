@@ -215,16 +215,16 @@ const MonthlyRevenueChart: React.FC = () => {
   return (
     <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
       {/* Header med månadnavigation */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
         <div className="flex items-center">
           <BarChart3 className="w-4 h-4 text-[#20c58f] mr-2" />
           <h2 className="text-sm font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
-        
-        {/* 🆕 Månadnavigation */}
-        <div className="flex items-center gap-4">
+
+        {/* Månadnavigation */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           {/* Månadväljare */}
-          <div className="flex items-center gap-2 bg-slate-800 rounded-lg p-1">
+          <div className="flex items-center gap-1 sm:gap-2 bg-slate-800 rounded-lg p-1">
             <Button
               variant="secondary"
               size="sm"
@@ -234,11 +234,11 @@ const MonthlyRevenueChart: React.FC = () => {
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            
-            <div className="px-3 py-1 text-white font-medium min-w-[140px] text-center">
+
+            <div className="px-2 sm:px-3 py-1 text-white font-medium text-sm sm:text-base min-w-[120px] sm:min-w-[140px] text-center">
               {formatSelectedMonth(selectedMonth)}
             </div>
-            
+
             <Button
               variant="secondary"
               size="sm"
@@ -262,7 +262,7 @@ const MonthlyRevenueChart: React.FC = () => {
             </Button>
           )}
 
-          {/* 🆕 Period filter med 1m option */}
+          {/* Period filter */}
           <div className="flex bg-slate-800 rounded-lg p-1">
             {(['1m', '3m', '6m', '12m'] as const).map((period) => (
               <Button
@@ -318,12 +318,12 @@ const MonthlyRevenueChart: React.FC = () => {
       </div>
 
       {/* Data typ filter */}
-      <div className="flex items-center gap-4 mb-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-3">
         <span className="text-sm text-slate-400 flex items-center gap-2">
           <Filter className="w-4 h-4" />
           Visa:
         </span>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={showDataTypes.contract ? 'primary' : 'secondary'}
             size="sm"
@@ -352,7 +352,7 @@ const MonthlyRevenueChart: React.FC = () => {
       </div>
 
       {/* Chart med markering av vald månad */}
-      <div className="h-80">
+      <div className="h-48 sm:h-64 lg:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <defs>
@@ -421,7 +421,7 @@ const MonthlyRevenueChart: React.FC = () => {
 
       {/* 🆕 Tillväxt jämfört med föregående månad - visar alltid för vald månad */}
       <div className="mt-4 pt-4 border-t border-slate-700/50">
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm">
           <span className="text-slate-400">
             {formatSelectedMonth(selectedMonth)} jämfört med föregående månad:
           </span>

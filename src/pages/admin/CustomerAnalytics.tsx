@@ -51,7 +51,7 @@ export default function CustomerAnalytics() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* Sidtitel */}
       <div>
         <h1 className="text-2xl font-bold text-white">Kundprognos</h1>
@@ -59,8 +59,8 @@ export default function CustomerAnalytics() {
       </div>
 
       {/* Flyttade KPI-kort: Förnyelsevärde + Genomsnittsvärde + Organisationsöversikt */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 ${consolidatedAnalytics.terminatedCount > 0 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'} gap-4`}>
-        <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${consolidatedAnalytics.terminatedCount > 0 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'} gap-3 sm:gap-4`}>
+        <Card className="p-3 sm:p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
           <div className="flex items-start justify-between mb-2">
             <p className="text-xs text-slate-400">Förnyelsevärde (90 dagar)</p>
             <TrendingUp className="w-6 h-6 text-purple-500 opacity-50" />
@@ -73,7 +73,7 @@ export default function CustomerAnalytics() {
           </p>
         </Card>
 
-        <Card className="p-4 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border-cyan-500/20">
+        <Card className="p-3 sm:p-4 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border-cyan-500/20">
           <div className="flex items-start justify-between mb-2">
             <p className="text-xs text-slate-400">Genomsnittligt Avtalsvärde</p>
             <Target className="w-6 h-6 text-cyan-500 opacity-50" />
@@ -86,7 +86,7 @@ export default function CustomerAnalytics() {
           </p>
         </Card>
 
-        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+        <Card className="p-3 sm:p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
           <div className="flex items-start justify-between mb-2">
             <p className="text-xs text-slate-400">Organisationer</p>
             <Users className="w-6 h-6 text-blue-500 opacity-50" />
@@ -99,7 +99,7 @@ export default function CustomerAnalytics() {
           </p>
         </Card>
 
-        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+        <Card className="p-3 sm:p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <div className="flex items-start justify-between mb-2">
             <p className="text-xs text-slate-400">Totalt Enheter</p>
             <Building2 className="w-6 h-6 text-green-500 opacity-50" />
@@ -113,7 +113,7 @@ export default function CustomerAnalytics() {
         </Card>
 
         {consolidatedAnalytics.terminatedCount > 0 && (
-          <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
+          <Card className="p-3 sm:p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
             <div className="flex items-start justify-between mb-2">
               <p className="text-xs text-slate-400">Uppsagda Kunder</p>
               <XCircle className="w-6 h-6 text-red-500 opacity-50" />
@@ -129,12 +129,12 @@ export default function CustomerAnalytics() {
       </div>
 
       {/* ARR Forecast - Flyttad från sidebar */}
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <ARRForecastChart customers={(legacyCustomers || []).filter(c => c.contract_status !== 'terminated')} />
       </Card>
 
       {/* 2x2 Grid med diagram */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <RevenueBreakdownChart
           customers={activeConsolidatedCustomers}
           onSegmentClick={(type) => navigateWithFilter({ revenueType: type })}

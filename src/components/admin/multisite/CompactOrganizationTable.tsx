@@ -218,6 +218,138 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   return (
     <>
       <div className="w-full">
+
+      {/* === MOBIL: Kortvy === */}
+      <div className="md:hidden border border-slate-700 rounded-lg overflow-hidden divide-y divide-slate-700/50">
+        {organizations.map((org) => {
+          const ackStatus = getAcknowledgmentStatus(org)
+          const portalBadge = getPortalStatusBadge(org)
+          const isExpanded = expandedOrgId === org.id
+
+          return (
+            <div key={org.id} className={!org.is_active ? 'opacity-60' : ''}>
+              <div
+                className={`p-3 border-l-4 ${ackStatus.borderColor} cursor-pointer active:bg-slate-800/30`}
+                onClick={() => onToggleExpand(org)}
+              >
+                {/* Rad 1: Status + Namn + Expand/Actions */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="flex-shrink-0">{ackStatus.icon}</div>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-medium text-white truncate">{org.name}</h4>
+                      <p className="text-xs text-slate-400">{org.organization_number}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded ${portalBadge.className}`}>
+                      {portalBadge.text}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
+
+                {/* Rad 2: Typ + Användarantal */}
+                <div className="flex items-center gap-3 mt-2">
+                  {org.organizationType === 'multisite' ? (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">Multisite</span>
+                  ) : (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">Kund</span>
+                  )}
+                  <span className="text-xs text-slate-400">
+                    {org.activeUsersCount || 0}/{org.users_count || 0} användare
+                  </span>
+                  {ackStatus.text && (
+                    <span className={`text-xs font-medium ${ackStatus.color}`}>
+                      {ackStatus.text} obekr.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Expanderad sektion (delad med desktop) visas via click */}
+              {isExpanded && (
+                <div className="bg-slate-900/50 border-t border-slate-700 px-3 py-3">
+                  {/* Snabbåtgärder */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <button onClick={() => onEdit(org)} className="flex items-center gap-1.5 px-3 py-2 text-xs bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 min-h-[44px]">
+                      <Edit2 className="w-3.5 h-3.5" /> Redigera
+                    </button>
+                    <button onClick={() => onToggleActive(org)} className="flex items-center gap-1.5 px-3 py-2 text-xs bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 min-h-[44px]">
+                      {org.is_active ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      {org.is_active ? 'Inaktivera' : 'Aktivera'}
+                    </button>
+                    <button onClick={() => onDelete(org)} className="flex items-center gap-1.5 px-3 py-2 text-xs bg-slate-800 text-red-400 rounded-lg hover:bg-slate-700 min-h-[44px]">
+                      <Trash2 className="w-3.5 h-3.5" /> Ta bort
+                    </button>
+                  </div>
+
+                  {/* Kontaktinfo */}
+                  <div className="space-y-1.5 text-sm mb-3">
+                    {(org.contact_email || org.primary_contact_email || org.billing_email) && (
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="text-xs truncate">{org.contact_email || org.primary_contact_email || org.billing_email}</span>
+                      </div>
+                    )}
+                    {org.contact_phone && (
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="text-xs">{org.contact_phone}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sites (multisite) */}
+                  {org.organizationType === 'multisite' && organizationSites[org.id]?.length > 0 && (
+                    <div className="mb-3">
+                      <h5 className="text-xs font-medium text-slate-300 mb-1.5">Enheter ({organizationSites[org.id].length})</h5>
+                      <div className="space-y-1">
+                        {organizationSites[org.id].slice(0, 3).map(site => (
+                          <div key={site.id} className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <MapPin className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                              <span className="text-xs text-white truncate">{site.site_name}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => onEditSite(org, site)} className="p-1.5 hover:bg-slate-700 rounded"><Edit2 className="w-3 h-3 text-slate-400" /></button>
+                              <button onClick={() => onDeleteSite(org.id, site.id)} className="p-1.5 hover:bg-red-500/20 rounded"><Trash2 className="w-3 h-3 text-red-400" /></button>
+                            </div>
+                          </div>
+                        ))}
+                        {organizationSites[org.id].length > 3 && (
+                          <p className="text-xs text-slate-500 text-center">+{organizationSites[org.id].length - 3} fler</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Users (multisite) */}
+                  {org.organizationType === 'multisite' && organizationUsers[org.id]?.length > 0 && (
+                    <div>
+                      <h5 className="text-xs font-medium text-slate-300 mb-1.5">Användare ({organizationUsers[org.id].length})</h5>
+                      <div className="space-y-1">
+                        {organizationUsers[org.id].slice(0, 3).map(user => (
+                          <div key={user.id} className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg">
+                            <div className="min-w-0">
+                              <p className="text-xs text-white truncate">{user.name}</p>
+                              <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                            </div>
+                            <span className="text-xs text-blue-400 flex-shrink-0 ml-2">{getRoleName(user.role_type)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* === DESKTOP: Grid-tabell === */}
+      <div className="hidden md:block">
       {/* Tabellhuvud */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-t-lg">
         <div className="grid grid-cols-12 gap-3 px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -709,6 +841,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
           )
         })}
       </div>
+      </div>{/* end hidden md:block */}
     </div>
 
     {/* Modal för obekräftade rekommendationer */}

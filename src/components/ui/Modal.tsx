@@ -85,7 +85,7 @@ export default function Modal({
 
   const modalContent = (
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
       style={{ 
         zIndex: usePortal ? 9999 : zIndex,
         pointerEvents: 'auto' // Återställ pointer events för modalen
@@ -108,9 +108,9 @@ export default function Modal({
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700/50 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-slate-700/50 flex-shrink-0">
           <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold text-white truncate">{title}</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-white truncate">{title}</h2>
             {subtitle && (
               <p className="text-slate-400 mt-1 truncate">{subtitle}</p>
             )}

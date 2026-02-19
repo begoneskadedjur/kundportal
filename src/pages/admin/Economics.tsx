@@ -15,7 +15,7 @@ import MarketingSpendManager from '../../components/admin/economics/MarketingSpe
 const Economics: React.FC = () => {
   return (
     <EconomicsPeriodProvider>
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
         {/* 1. Page Header with global period selector */}
         <EconomicsHeader />
@@ -30,7 +30,7 @@ const Economics: React.FC = () => {
         <UnifiedRevenueAnalysis />
 
         {/* 5. Article Revenue (2/3) + Price List Utilization (1/3) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           <div className="lg:col-span-2">
             <ArticleRevenueBreakdown />
           </div>
@@ -40,13 +40,13 @@ const Economics: React.FC = () => {
         </div>
 
         {/* 6. Pest Profitability (1/2) + Technician Revenue (1/2) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <PestProfitability />
           <TechnicianRevenueSection />
         </div>
 
         {/* 7. Churn Risk (1/2) + Marketing ROI (1/2) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <ChurnRiskSection />
           <MarketingSpendManager />
         </div>

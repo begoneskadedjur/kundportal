@@ -250,19 +250,114 @@ const CommissionDetailsTable: React.FC<CommissionDetailsTableProps> = ({
           <Search className="w-12 h-12 text-slate-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-slate-400 mb-2">Inga ärenden hittades</h3>
           <p className="text-slate-500">
-            {searchTerm || typeFilter !== 'all' 
+            {searchTerm || typeFilter !== 'all'
               ? 'Prova att justera dina filter eller sökkriterier.'
               : 'Det finns inga ärenden för den valda perioden.'
             }
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* === MOBIL: Kortvy === */}
+        <div className="md:hidden">
+          {groupedCases.map(({ technician: techName, cases: groupCases }, groupIndex) => (
+            <div key={techName || 'ungrouped'} className={groupIndex > 0 ? 'mt-4' : ''}>
+              {groupByTechnician && techName && (
+                <div
+                  className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors mb-2"
+                  onClick={() => toggleGroup(techName)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-green-500/20 rounded-lg">
+                      <User className="w-4 h-4 text-green-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-white text-sm">{techName}</h4>
+                      <p className="text-xs text-slate-400">
+                        {groupCases.length} ärenden • {formatCurrency(groupCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0))}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform ${expandedGroups.has(techName) ? 'rotate-90' : ''}`} />
+                </div>
+              )}
+
+              {(!groupByTechnician || !techName || expandedGroups.has(techName)) && (
+                <div className="divide-y divide-slate-700/30">
+                  {groupCases.map((case_) => (
+                    <div
+                      key={case_.id}
+                      className={`p-3 ${onCaseClick ? 'cursor-pointer active:bg-slate-700/20' : ''}`}
+                      onClick={() => onCaseClick?.(case_)}
+                    >
+                      {/* Rad 1: Ärende + Provision */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                            case_.type === 'private' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            {case_.type === 'private' ? <User className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-white truncate">
+                              {case_.case_number || case_.id.slice(0, 8)}
+                            </p>
+                            <p className="text-xs text-slate-400 truncate">{case_.title}</p>
+                          </div>
+                        </div>
+                        <span className="text-green-400 font-bold text-sm flex-shrink-0">
+                          {formatCurrency(case_.commission_amount || 0)}
+                        </span>
+                      </div>
+
+                      {/* Rad 2: Kund + Pris + Datum */}
+                      <div className="grid grid-cols-3 gap-2 mt-2">
+                        <div className="min-w-0">
+                          <span className="text-xs text-slate-500">Kund</span>
+                          <p className="text-xs text-white truncate">{formatCustomerInfo(case_)}</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-slate-500">Pris</span>
+                          <p className="text-xs text-white font-medium">{formatCurrency(case_.case_price)}</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-slate-500">Datum</span>
+                          <p className="text-xs text-white">{formatSwedishDate(case_.completed_date)}</p>
+                        </div>
+                      </div>
+
+                      {/* Tekniker om visas */}
+                      {showTechnicianColumn && !groupByTechnician && case_.primary_assignee_name && (
+                        <div className="mt-1">
+                          <span className="text-xs text-slate-500">{case_.primary_assignee_name}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {groupByTechnician && (
+                    <div className="p-3 bg-slate-700/20">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">{groupCases.length} ärenden</span>
+                        <span className="text-green-400 font-bold">
+                          {formatCurrency(groupCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* === DESKTOP: Tabell === */}
+        <div className="hidden md:block overflow-x-auto">
           {groupedCases.map(({ technician, cases: groupCases }, groupIndex) => (
             <div key={technician || 'ungrouped'} className={groupIndex > 0 ? 'mt-8' : ''}>
               {/* Klickbar gruppheader för tekniker */}
               {groupByTechnician && technician && (
-                <div 
+                <div
                   className="flex items-center justify-between mb-4 p-3 bg-slate-700/30 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors"
                   onClick={() => toggleGroup(technician)}
                 >
@@ -279,16 +374,16 @@ const CommissionDetailsTable: React.FC<CommissionDetailsTableProps> = ({
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Expand/Collapse ikon */}
                   <div className="flex items-center space-x-2">
                     <span className="text-xs text-slate-400">
                       {expandedGroups.has(technician) ? 'Dölj ärenden' : 'Visa ärenden'}
                     </span>
-                    <ChevronRight 
+                    <ChevronRight
                       className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${
                         expandedGroups.has(technician) ? 'rotate-90' : ''
-                      }`} 
+                      }`}
                     />
                   </div>
                 </div>
@@ -489,6 +584,7 @@ const CommissionDetailsTable: React.FC<CommissionDetailsTableProps> = ({
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Footer med totaler */}

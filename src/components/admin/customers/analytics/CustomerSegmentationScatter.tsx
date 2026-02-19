@@ -114,11 +114,11 @@ export default function CustomerSegmentationScatter({ customers, onCustomerClick
       </div>
 
       {data.length === 0 ? (
-        <div className="flex items-center justify-center h-64 text-slate-500 text-sm">
+        <div className="flex items-center justify-center h-48 sm:h-64 text-slate-500 text-sm">
           Ingen data tillgänglig
         </div>
       ) : (
-        <div className="h-80">
+        <div className="h-56 sm:h-64 lg:h-80">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />

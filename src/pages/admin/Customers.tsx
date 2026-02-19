@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Search, Filter, RefreshCw, ChevronDown, ChevronUp,
+  Search, Filter, RefreshCw, ChevronDown, ChevronUp, ChevronRight,
   Mail, Phone, Building2, User, Calendar, Coins,
-  AlertTriangle, Activity, Send, Edit3, Users, FilePlus
+  AlertTriangle, Activity, Send, Edit3, Users, FilePlus,
+  ExternalLink, MoreVertical, TrendingUp, Receipt, XCircle
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -261,6 +262,15 @@ export default function Customers() {
   const [billingSettingsOrg, setBillingSettingsOrg] = useState<any>(null)
   const [contactsModalOpen, setContactsModalOpen] = useState(false)
   const [contactsOrg, setContactsOrg] = useState<any>(null)
+  const [mobileOverflowId, setMobileOverflowId] = useState<string | null>(null)
+
+  // Close mobile overflow on outside click
+  useEffect(() => {
+    if (!mobileOverflowId) return
+    const handler = () => setMobileOverflowId(null)
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  }, [mobileOverflowId])
 
   // Active customer highlight — tracks which org has an open modal
   const activeCustomerId =
@@ -546,7 +556,7 @@ export default function Customers() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* Sidtitel + åtgärdsknappar */}
       <div className="flex items-center justify-between">
         <div>
@@ -810,8 +820,242 @@ export default function Customers() {
             )}
           </div>
 
-          {/* Consolidated Customer table */}
-          <Card className="overflow-hidden border-slate-700/50 bg-gradient-to-br from-slate-800/40 to-slate-900/40">
+          {/* === MOBIL: Kortvy === */}
+          <div className="md:hidden space-y-2">
+            {paginatedCustomers.map((organization) => {
+              const isExpanded = expandedRows.has(organization.id)
+              const orgContacts = getContactsForOrganization(organization)
+              const isMultisite = organization.organizationType === 'multisite'
+              const isTerminated = organization.isTerminated
+              const isHighlighted = activeCustomerId === organization.id
+              const showOverflow = mobileOverflowId === organization.id
+
+              // Urgency border
+              const urgencyBorder =
+                (organization.daysToNextRenewal != null && organization.daysToNextRenewal <= 30)
+                  || organization.highestChurnRisk.risk === 'high'
+                  ? 'border-l-[3px] border-l-red-500'
+                  : 'border-l-[3px] border-l-transparent'
+
+              // Contract period helpers
+              const getRemainingText = () => {
+                if (!organization.nextRenewalDate) return null
+                const endDate = new Date(organization.nextRenewalDate)
+                const diffTime = endDate.getTime() - Date.now()
+                const monthsRemaining = Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24 * 30.44)))
+                if (diffTime < 0) return { text: 'Utgånget', color: 'text-red-400' }
+                if (monthsRemaining <= 6) return { text: `${monthsRemaining} mån kvar`, color: 'text-red-400' }
+                if (monthsRemaining <= 12) return { text: `${monthsRemaining} mån kvar`, color: 'text-amber-400' }
+                return { text: `${monthsRemaining} mån kvar`, color: 'text-green-400' }
+              }
+              const remaining = getRemainingText()
+
+              // Health score helpers
+              const getHealthLabel = (level: string) => {
+                switch (level) {
+                  case 'excellent': return 'Utmärkt'
+                  case 'good': return 'Bra'
+                  case 'fair': return 'Ok'
+                  case 'poor': return 'Risk'
+                  default: return 'Okänd'
+                }
+              }
+              const getHealthColor = (level: string) => {
+                switch (level) {
+                  case 'excellent': return 'bg-green-500/20 text-green-400 border-green-500/30'
+                  case 'good': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                  case 'fair': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                  case 'poor': return 'bg-red-500/20 text-red-400 border-red-500/30'
+                  default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                }
+              }
+
+              // Show renewal button
+              const showRenewalButton = !isTerminated
+                && organization.daysToNextRenewal != null
+                && organization.daysToNextRenewal > 0
+                && organization.daysToNextRenewal <= 90
+
+              return (
+                <div
+                  key={organization.id}
+                  className={`bg-slate-800/40 border border-slate-700/40 rounded-xl overflow-hidden ${urgencyBorder} ${
+                    isHighlighted ? 'bg-[#20c58f]/10 !border-l-[#20c58f]' : ''
+                  }`}
+                >
+                  {/* Huvudrad: Expand + Namn + Actions */}
+                  <div className="p-3">
+                    <div className="flex items-start gap-2">
+                      <button
+                        onClick={() => toggleExpandedRow(organization.id)}
+                        className="p-1 mt-0.5 text-slate-400 hover:text-white flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      >
+                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      </button>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          {isMultisite && <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />}
+                          <span className="font-semibold text-sm text-white truncate">{organization.company_name}</span>
+                          {isMultisite && (
+                            <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full border border-blue-500/30 flex-shrink-0">
+                              {organization.totalSites} enheter
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-0.5 truncate">
+                          {organization.contact_person && <span>{organization.contact_person} • </span>}
+                          {organization.contact_email}
+                        </div>
+                        {orgContacts.length > 0 && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Users className="w-3 h-3 text-slate-500" />
+                            <span className="text-[10px] text-slate-500">{orgContacts.length} kontaktperson{orgContacts.length > 1 ? 'er' : ''}</span>
+                          </div>
+                        )}
+                        {isTerminated && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/20 text-red-400 border border-red-500/30 mt-1">
+                            Uppsagt
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <button
+                          onClick={() => isMultisite
+                            ? handleViewMultiSiteDetails(organization)
+                            : handleViewSingleCustomerDetails(organization)
+                          }
+                          className="p-2 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEditCustomer(organization)}
+                          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        {showRenewalButton && (
+                          <button
+                            onClick={() => handleStartRenewal(organization)}
+                            className="relative p-2 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                            <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                          </button>
+                        )}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setMobileOverflowId(showOverflow ? null : organization.id)
+                            }}
+                            className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          {showOverflow && (
+                            <div className="absolute right-0 top-full mt-1 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-30 py-1">
+                              <button
+                                onClick={() => { handleViewRevenue(organization); setMobileOverflowId(null) }}
+                                className="w-full px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 min-h-[44px]"
+                              >
+                                <TrendingUp className="w-4 h-4 text-green-400" />
+                                Intäktsöversikt
+                              </button>
+                              <button
+                                onClick={() => { handleBillingSettings(organization); setMobileOverflowId(null) }}
+                                className="w-full px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 min-h-[44px]"
+                              >
+                                <Receipt className="w-4 h-4 text-emerald-400" />
+                                Inställningar fakturering
+                              </button>
+                              <button
+                                onClick={() => { handleContacts(organization); setMobileOverflowId(null) }}
+                                className="w-full px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 min-h-[44px]"
+                              >
+                                <Users className="w-4 h-4 text-blue-400" />
+                                Kontaktpersoner
+                                {orgContacts.length > 0 && (
+                                  <span className="ml-auto text-xs text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
+                                    {orgContacts.length}
+                                  </span>
+                                )}
+                              </button>
+                              {!isTerminated && (
+                                <>
+                                  <div className="border-t border-slate-700 my-1" />
+                                  <button
+                                    onClick={() => { handleTerminate(organization); setMobileOverflowId(null) }}
+                                    className="w-full px-3 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2.5 min-h-[44px]"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                    Säg upp avtal
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ekonomisk data */}
+                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-700/30">
+                      {visibleColumns.has('annualValue') && (
+                        <div>
+                          <p className="text-[10px] text-slate-500 uppercase">Årspremie</p>
+                          <p className="text-sm font-semibold text-white">{formatCurrency(organization.totalAnnualValue || 0)}</p>
+                        </div>
+                      )}
+                      {visibleColumns.has('contractValue') && (
+                        <div>
+                          <p className="text-[10px] text-slate-500 uppercase">Avtalsvärde</p>
+                          <p className="text-sm font-semibold text-white">{formatCurrency(organization.totalContractValue)}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Status rad: Kontraktsperiod + Health */}
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/30">
+                      <div>
+                        {remaining && (
+                          <span className={`text-xs font-medium ${remaining.color}`}>{remaining.text}</span>
+                        )}
+                        {isTerminated && organization.effectiveEndDate && (
+                          <span className="text-xs text-red-400">
+                            Slutar {new Date(organization.effectiveEndDate).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+                      {visibleColumns.has('healthScore') && (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${getHealthColor(organization.overallHealthScore.level)}`}>
+                          {getHealthLabel(organization.overallHealthScore.level)} ({organization.overallHealthScore.score})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanderad sektion — [&_tr]:block [&_td]:block overrides table display for non-table context */}
+                  {isExpanded && organization.organizationType === 'multisite' && (
+                    <div className="border-t border-slate-700/50 bg-slate-900/30 p-3 [&_tr]:block [&_td]:block [&_td]:p-0">
+                      <MultisiteExpandedTabs organization={organization} colSpan={1} contacts={orgContacts} />
+                    </div>
+                  )}
+                  {isExpanded && organization.organizationType === 'single' && (
+                    <div className="border-t border-slate-700/50 bg-slate-900/30 p-3 [&_tr]:block [&_td]:block [&_td]:p-0">
+                      <ExpandedCustomerRow customer={organization.sites[0]} colSpan={1} contacts={orgContacts} />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* === DESKTOP: Tabellvy === */}
+          <Card className="hidden md:block overflow-hidden border-slate-700/50 bg-gradient-to-br from-slate-800/40 to-slate-900/40">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-800/95 backdrop-blur border-b border-slate-600 sticky top-0 z-10">
@@ -935,71 +1179,71 @@ export default function Customers() {
                   })}
                 </tbody>
               </table>
-
-              {sortedCustomers.length === 0 && (
-                <div className="text-center py-20 bg-slate-800/20">
-                  <div className="mx-auto w-fit p-4 rounded-full bg-slate-700/30 border border-slate-600/50 mb-6">
-                    <Building2 className="w-16 h-16 text-slate-500" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-slate-300 mb-2">
-                    {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all'
-                      ? 'Inga organisationer matchar dina filter'
-                      : 'Inga organisationer registrerade'}
-                  </h3>
-                  <p className="text-slate-500 text-sm max-w-md mx-auto">
-                    {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all'
-                      ? 'Prova att justera dina filterkriterier för att hitta organisationer.'
-                      : 'Organisationer kommer att visas här när de läggs till i systemet.'}
-                  </p>
-                </div>
-              )}
-
-              {/* Pagineringsfooter */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-6 py-3 bg-slate-800/50 border-t border-slate-700">
-                  <span className="text-sm text-slate-400">
-                    Visar {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, sortedCustomers.length)} av {sortedCustomers.length}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-1.5 rounded text-xs font-medium transition-colors bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Föregående
-                    </button>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
-                      .map((page, idx, arr) => (
-                        <React.Fragment key={page}>
-                          {idx > 0 && arr[idx - 1] !== page - 1 && (
-                            <span className="text-slate-500 text-xs">...</span>
-                          )}
-                          <button
-                            onClick={() => setCurrentPage(page)}
-                            className={`w-8 h-8 rounded text-xs font-medium transition-colors ${
-                              page === currentPage
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        </React.Fragment>
-                      ))
-                    }
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-1.5 rounded text-xs font-medium transition-colors bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Nästa
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </Card>
+
+          {/* Tom-state + Pagination (visas för både mobil och desktop) */}
+          {sortedCustomers.length === 0 && (
+            <div className="text-center py-20 bg-slate-800/20 rounded-xl">
+              <div className="mx-auto w-fit p-4 rounded-full bg-slate-700/30 border border-slate-600/50 mb-6">
+                <Building2 className="w-16 h-16 text-slate-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-300 mb-2">
+                {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all'
+                  ? 'Inga organisationer matchar dina filter'
+                  : 'Inga organisationer registrerade'}
+              </h3>
+              <p className="text-slate-500 text-sm max-w-md mx-auto">
+                {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all'
+                  ? 'Prova att justera dina filterkriterier för att hitta organisationer.'
+                  : 'Organisationer kommer att visas här när de läggs till i systemet.'}
+              </p>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-6 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl mt-2">
+              <span className="text-sm text-slate-400">
+                Visar {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, sortedCustomers.length)} av {sortedCustomers.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 disabled:opacity-40 disabled:cursor-not-allowed min-h-[36px]"
+                >
+                  Föregående
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                  .map((page, idx, arr) => (
+                    <React.Fragment key={page}>
+                      {idx > 0 && arr[idx - 1] !== page - 1 && (
+                        <span className="text-slate-500 text-xs">...</span>
+                      )}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded text-xs font-medium transition-colors ${
+                          page === currentPage
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                            : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </React.Fragment>
+                  ))
+                }
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 disabled:opacity-40 disabled:cursor-not-allowed min-h-[36px]"
+                >
+                  Nästa
+                </button>
+              </div>
+            </div>
+          )}
       </div>
 
       {/* Email Campaign Modal */}
