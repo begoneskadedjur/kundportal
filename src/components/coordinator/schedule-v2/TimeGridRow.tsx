@@ -1,7 +1,8 @@
 // TimeGridRow.tsx — En teknikers tidsrad med events och frånvaro
 import { useMemo } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { HOUR_WIDTH, DAY_START_HOUR, TOTAL_HOURS, DAY_GRID_WIDTH, WEEK_DAY_COL_WIDTH, WEEK_GRID_WIDTH, WEEK_HOUR_WIDTH, ROW_HEIGHT, getGridWidth } from './scheduleConstants'
+import { HOUR_WIDTH, DAY_START_HOUR, TOTAL_HOURS, WEEK_DAY_COL_WIDTH, WEEK_HOUR_WIDTH, ROW_HEIGHT, getGridWidth } from './scheduleConstants'
+import { assignLanes } from './scheduleUtils'
 import { EventBlock } from './EventBlock'
 import { AbsenceBlock, type Absence } from './AbsenceBlock'
 import type { ViewMode } from './ScheduleHeader'
@@ -20,9 +21,12 @@ interface TimeGridRowProps {
 export function TimeGridRow({ technician, cases, absences, currentDate, onCaseClick, onAbsenceClick, viewMode, weekStart }: TimeGridRowProps) {
   const gridWidth = getGridWidth(viewMode)
 
+  // Beräkna lanes för överlappande events
+  const laneMap = useMemo(() => assignLanes(cases), [cases])
+
   // Arbetstidsbakgrund (dagvy)
   const workBg = useMemo(() => {
-    if (viewMode === 'week') return null // Enklare i veckovy
+    if (viewMode === 'week') return null
     const ws = technician.work_schedule as Record<string, { start: string; end: string; active: boolean }> | null
     if (!ws) return null
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -48,7 +52,6 @@ export function TimeGridRow({ technician, cases, absences, currentDate, onCaseCl
             className="absolute top-0 h-full border-l border-slate-700/30"
             style={{ left: dayIdx * WEEK_DAY_COL_WIDTH, width: WEEK_DAY_COL_WIDTH }}
           >
-            {/* Subtila timmarkeringar */}
             {Array.from({ length: TOTAL_HOURS }, (_, h) => (
               <div
                 key={h}
@@ -64,10 +67,13 @@ export function TimeGridRow({ technician, cases, absences, currentDate, onCaseCl
           <AbsenceBlock key={a.id} absence={a} onClick={onAbsenceClick} viewMode={viewMode} weekStart={weekStart} />
         ))}
 
-        {/* Event-block */}
-        {cases.map(c => (
-          <EventBlock key={c.id} caseData={c} onClick={onCaseClick} viewMode={viewMode} weekStart={weekStart} />
-        ))}
+        {/* Event-block med lanes */}
+        {cases.map(c => {
+          const la = laneMap.get(c.id)
+          return (
+            <EventBlock key={c.id} caseData={c} onClick={onCaseClick} viewMode={viewMode} weekStart={weekStart} lane={la?.lane} totalLanes={la?.totalLanes} />
+          )
+        })}
       </div>
     )
   }
@@ -92,7 +98,6 @@ export function TimeGridRow({ technician, cases, absences, currentDate, onCaseCl
           className="absolute top-0 h-full border-l border-slate-800/30"
           style={{ left: i * HOUR_WIDTH }}
         >
-          {/* Halvtimme-markering */}
           <div
             className="absolute top-0 h-full border-l border-slate-800/15"
             style={{ left: HOUR_WIDTH / 2 }}
@@ -100,15 +105,18 @@ export function TimeGridRow({ technician, cases, absences, currentDate, onCaseCl
         </div>
       ))}
 
-      {/* Frånvaro-block (renderas under events) */}
+      {/* Frånvaro-block */}
       {absences.map(a => (
         <AbsenceBlock key={a.id} absence={a} onClick={onAbsenceClick} viewMode={viewMode} weekStart={weekStart} />
       ))}
 
-      {/* Event-block */}
-      {cases.map(c => (
-        <EventBlock key={c.id} caseData={c} onClick={onCaseClick} viewMode={viewMode} weekStart={weekStart} />
-      ))}
+      {/* Event-block med lanes */}
+      {cases.map(c => {
+        const la = laneMap.get(c.id)
+        return (
+          <EventBlock key={c.id} caseData={c} onClick={onCaseClick} viewMode={viewMode} weekStart={weekStart} lane={la?.lane} totalLanes={la?.totalLanes} />
+        )
+      })}
     </div>
   )
 }

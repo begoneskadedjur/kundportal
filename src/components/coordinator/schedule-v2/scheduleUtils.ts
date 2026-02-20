@@ -67,6 +67,85 @@ export function eventWidth(start: Date, end: Date, viewMode: ViewMode): number {
   return viewMode === 'week' ? durationToWidthWeek(start, end) : durationToWidth(start, end)
 }
 
+// ─── Överlappdetektering ───
+
+export interface LaneAssignment {
+  lane: number
+  totalLanes: number
+}
+
+/** Tilldela vertikala lanes till överlappande ärenden */
+export function assignLanes(cases: { id: string; start_date?: string | null; due_date?: string | null }[]): Map<string, LaneAssignment> {
+  const result = new Map<string, LaneAssignment>()
+  if (cases.length === 0) return result
+
+  // Parsea och sortera efter starttid
+  const parsed = cases
+    .map(c => {
+      const startRaw = c.start_date || c.due_date
+      const endRaw = c.due_date || c.start_date
+      if (!startRaw || !endRaw) return null
+      return { id: c.id, start: new Date(startRaw).getTime(), end: new Date(endRaw).getTime() }
+    })
+    .filter((c): c is { id: string; start: number; end: number } => c !== null)
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+
+  // Greedy lane assignment
+  // lanes[i] = sluttiden för det senaste eventet i lane i
+  const lanes: number[] = []
+
+  const assigned = new Map<string, number>() // caseId → lane
+
+  for (const ev of parsed) {
+    // Hitta första lane vars sluttid <= ev.start (ingen överlapp)
+    let placed = false
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i] <= ev.start) {
+        lanes[i] = ev.end
+        assigned.set(ev.id, i)
+        placed = true
+        break
+      }
+    }
+    if (!placed) {
+      assigned.set(ev.id, lanes.length)
+      lanes.push(ev.end)
+    }
+  }
+
+  // Beräkna totalLanes per överlappningsgrupp
+  // Vi behöver veta max lanes som körs samtidigt för varje event
+  for (const ev of parsed) {
+    const lane = assigned.get(ev.id)!
+    // Hitta alla events som överlappar med detta event
+    let maxConcurrent = 1
+    for (const other of parsed) {
+      if (other.id === ev.id) continue
+      if (other.start < ev.end && other.end > ev.start) {
+        maxConcurrent++
+      }
+    }
+    result.set(ev.id, { lane, totalLanes: Math.min(maxConcurrent, lanes.length) })
+  }
+
+  // Normalisera totalLanes: alla events i samma överlappningsgrupp ska ha samma totalLanes
+  // Gör ett andra pass för att säkerställa konsistens
+  for (const ev of parsed) {
+    const la = result.get(ev.id)!
+    for (const other of parsed) {
+      if (other.id === ev.id) continue
+      if (other.start < ev.end && other.end > ev.start) {
+        const otherLa = result.get(other.id)!
+        const maxLanes = Math.max(la.totalLanes, otherLa.totalLanes)
+        la.totalLanes = maxLanes
+        otherLa.totalLanes = maxLanes
+      }
+    }
+  }
+
+  return result
+}
+
 // ─── Datum-helpers ───
 
 /** Jämför om två datum är samma dag */

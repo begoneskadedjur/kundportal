@@ -1,4 +1,4 @@
-// EventBlock.tsx — Enskilt event-block med layered information
+// EventBlock.tsx — Enskilt event-block med layered information + lane-stacking
 import { useState, useRef } from 'react'
 import { BeGoneCaseRow } from '../../../types/database'
 import { eventX, eventWidth, clampToGrid, formatTime, shortAddress } from './scheduleUtils'
@@ -11,9 +11,11 @@ interface EventBlockProps {
   onClick: (caseData: BeGoneCaseRow) => void
   viewMode: ViewMode
   weekStart: Date
+  lane?: number
+  totalLanes?: number
 }
 
-export function EventBlock({ caseData, onClick, viewMode, weekStart }: EventBlockProps) {
+export function EventBlock({ caseData, onClick, viewMode, weekStart, lane = 0, totalLanes = 1 }: EventBlockProps) {
   const [hovered, setHovered] = useState(false)
   const blockRef = useRef<HTMLDivElement>(null)
 
@@ -28,6 +30,12 @@ export function EventBlock({ caseData, onClick, viewMode, weekStart }: EventBloc
   const { x, width } = clampToGrid(rawX, rawW, viewMode)
   if (width <= 0) return null
 
+  // Lane-beräkning
+  const totalHeight = ROW_HEIGHT - 10 // 78px tillgängligt
+  const eventHeight = totalHeight / totalLanes
+  const topOffset = 4 + (lane * eventHeight) // 4px baseline
+  const isCompact = eventHeight < 40
+
   const style = getStatusStyle(caseData.status, caseData.case_type)
   const startStr = formatTime(start)
   const endStr = formatTime(end)
@@ -35,13 +43,13 @@ export function EventBlock({ caseData, onClick, viewMode, weekStart }: EventBloc
   const displayName = caseData.bestallare || caseData.kontaktperson || caseData.title || ''
   const addr = shortAddress(caseData.adress)
   const isWeek = viewMode === 'week'
-  const showSecondLine = !isWeek && width > 150
+  const showSecondLine = !isWeek && !isCompact && width > 150
 
   return (
     <div
       ref={blockRef}
       className={`
-        absolute top-1 cursor-pointer rounded-md border-l-4 transition-all duration-150
+        absolute cursor-pointer rounded-md border-l-4 transition-all duration-150
         hover:brightness-110 hover:shadow-lg hover:z-30
         ${style.bg} ${style.border}
         ${isContract ? 'ring-1 ring-purple-400/20' : ''}
@@ -49,27 +57,28 @@ export function EventBlock({ caseData, onClick, viewMode, weekStart }: EventBloc
       style={{
         left: x,
         width,
-        height: ROW_HEIGHT - 10,
+        top: topOffset,
+        height: eventHeight - 2, // 2px gap mellan lanes
       }}
       onClick={() => onClick(caseData)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="px-1.5 py-1 h-full flex flex-col justify-center overflow-hidden">
+      <div className="px-1.5 py-0.5 h-full flex flex-col justify-center overflow-hidden">
         {/* Rad 1: kundnamn + tidsspan */}
         <div className="flex items-center justify-between gap-0.5 min-w-0">
-          <span className={`${isWeek ? 'text-[9px]' : 'text-xs'} font-semibold truncate ${style.text}`}>
+          <span className={`${isWeek || isCompact ? 'text-[9px]' : 'text-xs'} font-semibold truncate ${style.text}`}>
             {isContract && <span className="text-purple-400 mr-0.5">★</span>}
             {displayName}
           </span>
           {!isWeek && (
-            <span className={`text-[10px] font-mono shrink-0 ${style.text} opacity-80`}>
+            <span className={`${isCompact ? 'text-[8px]' : 'text-[10px]'} font-mono shrink-0 ${style.text} opacity-80`}>
               {startStr}–{endStr}
             </span>
           )}
         </div>
 
-        {/* Rad 2 (om bredd tillåter): skadedjur + adress */}
+        {/* Rad 2 (om bredd och höjd tillåter): skadedjur + adress */}
         {showSecondLine && (caseData.skadedjur || addr) && (
           <p className={`text-[10px] truncate mt-0.5 ${style.text} opacity-60`}>
             {[caseData.skadedjur, addr].filter(Boolean).join(' · ')}
