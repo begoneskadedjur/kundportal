@@ -1,10 +1,12 @@
 // src/pages/coordinator/CasePipeline.tsx — Offerthantering: koordinatorns pipeline
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ClipboardList, Search, Phone, Mail, MessageSquare, Eye,
-  CalendarCheck, ArrowUpDown, ChevronDown, X, Loader2,
-  PhoneCall, MailIcon, MessageCircle, ExternalLink,
+  ClipboardList, Search, Phone, MessageSquare, Eye,
+  CalendarCheck, X, Loader2, Send, FileCheck, Banknote,
+  TrendingUp, AlertTriangle, Clock, ChevronUp, ChevronDown,
+  PhoneCall, MailIcon, MessageCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
@@ -34,6 +36,25 @@ function formatPrice(price: number | null): string {
   return `${price.toLocaleString('sv-SE')} kr`
 }
 
+function formatKr(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} mkr`
+  if (value >= 1_000) return `${Math.round(value / 1_000)} tkr`
+  return `${value} kr`
+}
+
+function getDaysAge(dateStr: string | null): number {
+  if (!dateStr) return 0
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000)
+}
+
+function getAgeBorderColor(dateStr: string | null): string {
+  const days = getDaysAge(dateStr)
+  if (days < 14) return 'border-l-green-500'
+  if (days < 30) return 'border-l-amber-400'
+  if (days < 90) return 'border-l-orange-500'
+  return 'border-l-red-500'
+}
+
 type SortOption = 'oldest' | 'newest' | 'price_desc' | 'contact_attempts'
 
 const SORT_OPTIONS: { key: SortOption; label: string }[] = [
@@ -53,6 +74,7 @@ export default function CasePipeline() {
   const [activeTab, setActiveTab] = useState<PipelineTab>('alla')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('oldest')
+  const [showInsights, setShowInsights] = useState(true)
 
   // Modal-state
   const [selectedCase, setSelectedCase] = useState<PipelineCaseRow | null>(null)
@@ -115,13 +137,39 @@ export default function CasePipeline() {
     return result
   }, [cases, activeTab, searchQuery, sortBy])
 
-  // ─── KPI ───
+  // ─── KPI + insikter ───
 
   const stats = useMemo(() => {
     const offertSkickad = cases.filter(c => c.status === 'Offert skickad').length
     const signerad = cases.filter(c => c.status === 'Offert signerad - boka in').length
     const ejKvitterat = cases.filter(c => !c.action || c.action.coordinator_status === 'new').length
-    return { offertSkickad, signerad, ejKvitterat }
+    const totalValue = cases.reduce((s, c) => s + (c.pris || 0), 0)
+    const totalOffertValue = cases.filter(c => c.status === 'Offert skickad').reduce((s, c) => s + (c.pris || 0), 0)
+    const totalSigneradValue = cases.filter(c => c.status === 'Offert signerad - boka in').reduce((s, c) => s + (c.pris || 0), 0)
+    const conversionRate = cases.length > 0 ? Math.round((signerad / cases.length) * 100) : 0
+    const scheduledCount = cases.filter(c => c.start_date && c.due_date).length
+
+    // Åldersfördelning
+    const ageBuckets = { fresh: 0, week: 0, month: 0, quarter: 0, old: 0 }
+    for (const c of cases) {
+      const days = getDaysAge(c.updated_at)
+      if (days < 7) ageBuckets.fresh++
+      else if (days < 14) ageBuckets.week++
+      else if (days < 30) ageBuckets.month++
+      else if (days < 90) ageBuckets.quarter++
+      else ageBuckets.old++
+    }
+
+    // Kräver åtgärd
+    const utanKontakt30d = cases.filter(c =>
+      (c.action?.contact_attempts || 0) === 0 && getDaysAge(c.updated_at) > 30
+    ).length
+
+    return {
+      offertSkickad, signerad, ejKvitterat, totalValue,
+      totalOffertValue, totalSigneradValue, conversionRate,
+      scheduledCount, ageBuckets, utanKontakt30d,
+    }
   }, [cases])
 
   // ─── Actions ───
@@ -132,7 +180,7 @@ export default function CasePipeline() {
       const updated = await CasePipelineService.acknowledgeCase(c.case_id || c.id, c.case_type, user.id, profile.display_name)
       setCases(prev => prev.map(p => p.id === c.id ? { ...p, action: updated } : p))
       toast.success('Ärende kvitterat')
-    } catch (err) {
+    } catch {
       toast.error('Kunde inte kvittera')
     }
   }, [user, profile])
@@ -144,7 +192,7 @@ export default function CasePipeline() {
       setCases(prev => prev.map(p => p.id === c.id ? { ...p, action: updated } : p))
       setContactPopoverCaseId(null)
       toast.success('Kontaktförsök loggat')
-    } catch (err) {
+    } catch {
       toast.error('Kunde inte logga kontaktförsök')
     }
   }, [user, profile])
@@ -157,7 +205,7 @@ export default function CasePipeline() {
       setEditingNoteId(null)
       setNoteText('')
       toast.success('Anteckning sparad')
-    } catch (err) {
+    } catch {
       toast.error('Kunde inte spara')
     }
   }, [user, profile, noteText])
@@ -166,7 +214,7 @@ export default function CasePipeline() {
     try {
       const updated = await CasePipelineService.updateStatus(c.id, c.case_type, status)
       setCases(prev => prev.map(p => p.id === c.id ? { ...p, action: updated } : p))
-    } catch (err) {
+    } catch {
       toast.error('Kunde inte byta status')
     }
   }, [])
@@ -193,17 +241,140 @@ export default function CasePipeline() {
     <>
       <div className="p-4 lg:p-6 space-y-4">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <ClipboardList className="w-6 h-6 text-[#20c58f]" />
-          <h1 className="text-xl font-bold text-white">Offerthantering</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ClipboardList className="w-6 h-6 text-[#20c58f]" />
+            <h1 className="text-xl font-bold text-white">Offerthantering</h1>
+          </div>
+          <button
+            onClick={() => setShowInsights(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800/50"
+          >
+            {showInsights ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            {showInsights ? 'Dölj insikter' : 'Visa insikter'}
+          </button>
         </div>
 
-        {/* KPI-strip */}
-        <div className="flex flex-wrap gap-3">
-          <KpiChip label="Offert skickad" value={stats.offertSkickad} color="text-emerald-400" bg="bg-emerald-500/10" />
-          <KpiChip label="Signerad" value={stats.signerad} color="text-green-400" bg="bg-green-500/10" />
-          <KpiChip label="Ej kvitterat" value={stats.ejKvitterat} color="text-amber-400" bg="bg-amber-500/10" />
+        {/* ═══ SEKTION 1: KPI-kort ═══ */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCard
+            icon={Send}
+            label="Offert skickad"
+            value={stats.offertSkickad}
+            subtext={formatKr(stats.totalOffertValue)}
+            color="emerald"
+            onClick={() => setActiveTab('offert_skickad')}
+            active={activeTab === 'offert_skickad'}
+          />
+          <KpiCard
+            icon={FileCheck}
+            label="Signerad — att boka"
+            value={stats.signerad}
+            subtext={formatKr(stats.totalSigneradValue)}
+            color="green"
+            pulse={stats.signerad > 0}
+            onClick={() => setActiveTab('signerad')}
+            active={activeTab === 'signerad'}
+          />
+          <KpiCard
+            icon={Banknote}
+            label="Pipelinevärde"
+            value={formatKr(stats.totalValue)}
+            subtext="Totalt offertvärde"
+            color="blue"
+          />
+          <KpiCard
+            icon={TrendingUp}
+            label="Konverteringsgrad"
+            value={`${stats.conversionRate}%`}
+            subtext={`${stats.signerad} av ${cases.length} signerade`}
+            color={stats.conversionRate >= 25 ? 'green' : 'amber'}
+          />
         </div>
+
+        {/* ═══ SEKTION 2: Dashboard-insikter ═══ */}
+        <AnimatePresence>
+          {showInsights && !loading && cases.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                {/* Panel A: Konverteringstratt */}
+                <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    <h3 className="text-xs font-semibold text-white">Konverteringstratt</h3>
+                  </div>
+                  <div className="space-y-2">
+                    <FunnelBar label="Offert skickad" value={stats.offertSkickad} max={stats.offertSkickad} color="bg-emerald-500" />
+                    <FunnelBar label="Signerad" value={stats.signerad} max={stats.offertSkickad} color="bg-green-500" />
+                    <FunnelBar label="Inbokad" value={stats.scheduledCount} max={stats.offertSkickad} color="bg-[#20c58f]" />
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-2">
+                    {stats.conversionRate}% konvertering (offert &rarr; signerad)
+                  </p>
+                </div>
+
+                {/* Panel B: Åldersfördelning */}
+                <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <h3 className="text-xs font-semibold text-white">Åldersfördelning</h3>
+                  </div>
+                  <AgingBar buckets={stats.ageBuckets} total={cases.length} />
+                  {stats.ageBuckets.old > 0 && (
+                    <p className="text-[10px] text-red-400 mt-2 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />
+                      {stats.ageBuckets.old} offerter har legat &ouml;ver 90 dagar
+                    </p>
+                  )}
+                </div>
+
+                {/* Panel C: Kräver åtgärd */}
+                <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                    <h3 className="text-xs font-semibold text-white">Kräver åtgärd</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {stats.signerad > 0 && (
+                      <AlertCard
+                        icon={CalendarCheck}
+                        text={`${stats.signerad} signerade att boka in`}
+                        subtext={formatKr(stats.totalSigneradValue)}
+                        severity="red"
+                        onClick={() => setActiveTab('signerad')}
+                      />
+                    )}
+                    {stats.utanKontakt30d > 0 && (
+                      <AlertCard
+                        icon={Phone}
+                        text={`${stats.utanKontakt30d} utan kontakt (>30d)`}
+                        severity="amber"
+                        onClick={() => { setActiveTab('alla'); setSortBy('oldest') }}
+                      />
+                    )}
+                    {stats.ejKvitterat > 0 && (
+                      <AlertCard
+                        icon={Eye}
+                        text={`${stats.ejKvitterat} ej kvitterade`}
+                        severity="blue"
+                        onClick={() => setActiveTab('alla')}
+                      />
+                    )}
+                    {stats.signerad === 0 && stats.utanKontakt30d === 0 && stats.ejKvitterat === 0 && (
+                      <p className="text-xs text-slate-500 py-2">Allt ser bra ut!</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Flikar + sök + sort */}
         <div className="flex flex-wrap items-center gap-3">
@@ -245,7 +416,7 @@ export default function CasePipeline() {
           </select>
         </div>
 
-        {/* Tabell */}
+        {/* ═══ SEKTION 3: Tabell ═══ */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-6 h-6 text-slate-500 animate-spin" />
@@ -317,14 +488,166 @@ export default function CasePipeline() {
   )
 }
 
-// ─── KPI-chip ───
+// ─── KPI-kort ───
 
-function KpiChip({ label, value, color, bg }: { label: string; value: number; color: string; bg: string }) {
+const COLOR_MAP: Record<string, { bg: string; border: string; text: string; icon: string }> = {
+  emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', icon: 'text-emerald-400' },
+  green:   { bg: 'bg-green-500/10',   border: 'border-green-500/20',   text: 'text-green-400',   icon: 'text-green-400' },
+  blue:    { bg: 'bg-blue-500/10',     border: 'border-blue-500/20',    text: 'text-blue-400',    icon: 'text-blue-400' },
+  amber:   { bg: 'bg-amber-500/10',    border: 'border-amber-500/20',   text: 'text-amber-400',   icon: 'text-amber-400' },
+}
+
+function KpiCard({ icon: Icon, label, value, subtext, color, pulse, onClick, active }: {
+  icon: React.ElementType
+  label: string
+  value: string | number
+  subtext: string
+  color: string
+  pulse?: boolean
+  onClick?: () => void
+  active?: boolean
+}) {
+  const c = COLOR_MAP[color] || COLOR_MAP.emerald
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${bg} border border-slate-700/30`}>
-      <span className="text-xs text-slate-400">{label}</span>
-      <span className={`text-sm font-bold ${color}`}>{value}</span>
+    <div
+      onClick={onClick}
+      className={`relative p-3 rounded-xl border transition-all ${c.bg} ${c.border} ${
+        onClick ? 'cursor-pointer hover:scale-[1.02]' : ''
+      } ${active ? 'ring-1 ring-[#20c58f]' : ''}`}
+    >
+      {pulse && (
+        <span className="absolute top-2.5 right-2.5 flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+        </span>
+      )}
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className={`w-4 h-4 ${c.icon}`} />
+        <span className="text-[10px] text-slate-400 font-medium">{label}</span>
+      </div>
+      <p className={`text-lg font-bold ${c.text}`}>{value}</p>
+      <p className="text-[10px] text-slate-500 mt-0.5">{subtext}</p>
     </div>
+  )
+}
+
+// ─── Konverteringstratt bar ───
+
+function FunnelBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.max((value / max) * 100, 2) : 2
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] text-slate-400 w-24 shrink-0">{label}</span>
+      <div className="flex-1 bg-slate-700/30 rounded-full h-4 overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          className={`h-full rounded-full ${color} flex items-center justify-end pr-1.5`}
+        >
+          {pct > 10 && <span className="text-[9px] text-white font-bold">{value}</span>}
+        </motion.div>
+      </div>
+      {pct <= 10 && <span className="text-[10px] text-slate-500 w-6 text-right">{value}</span>}
+    </div>
+  )
+}
+
+// ─── Åldersfördelning ───
+
+const AGE_SEGMENTS: { key: keyof ReturnType<typeof getAgeBuckets>; label: string; color: string }[] = [
+  { key: 'fresh', label: '<7d', color: 'bg-green-500' },
+  { key: 'week', label: '7-14d', color: 'bg-emerald-500' },
+  { key: 'month', label: '14-30d', color: 'bg-amber-400' },
+  { key: 'quarter', label: '30-90d', color: 'bg-orange-500' },
+  { key: 'old', label: '>90d', color: 'bg-red-500' },
+]
+
+function getAgeBuckets() {
+  return { fresh: 0, week: 0, month: 0, quarter: 0, old: 0 }
+}
+
+function AgingBar({ buckets, total }: { buckets: ReturnType<typeof getAgeBuckets>; total: number }) {
+  if (total === 0) return <p className="text-xs text-slate-500">Inga ärenden</p>
+  return (
+    <div>
+      <div className="flex rounded-full h-5 overflow-hidden bg-slate-700/30">
+        {AGE_SEGMENTS.map(seg => {
+          const count = buckets[seg.key]
+          if (count === 0) return null
+          const pct = (count / total) * 100
+          return (
+            <motion.div
+              key={seg.key}
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className={`${seg.color} flex items-center justify-center`}
+              title={`${seg.label}: ${count} ärenden`}
+            >
+              {pct > 8 && <span className="text-[8px] text-white font-bold">{count}</span>}
+            </motion.div>
+          )
+        })}
+      </div>
+      <div className="flex justify-between mt-1">
+        {AGE_SEGMENTS.map(seg => (
+          <div key={seg.key} className="flex items-center gap-1">
+            <div className={`w-1.5 h-1.5 rounded-full ${seg.color}`} />
+            <span className="text-[9px] text-slate-500">{seg.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Åtgärdskort ───
+
+const SEVERITY_COLORS: Record<string, { bg: string; border: string; icon: string; text: string }> = {
+  red:   { bg: 'bg-red-500/10',   border: 'border-red-500/20',   icon: 'text-red-400',   text: 'text-red-300' },
+  amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: 'text-amber-400', text: 'text-amber-300' },
+  blue:  { bg: 'bg-blue-500/10',  border: 'border-blue-500/20',  icon: 'text-blue-400',  text: 'text-blue-300' },
+}
+
+function AlertCard({ icon: Icon, text, subtext, severity, onClick }: {
+  icon: React.ElementType
+  text: string
+  subtext?: string
+  severity: string
+  onClick?: () => void
+}) {
+  const c = SEVERITY_COLORS[severity] || SEVERITY_COLORS.blue
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all hover:scale-[1.01] ${c.bg} ${c.border}`}
+    >
+      <Icon className={`w-4 h-4 shrink-0 ${c.icon}`} />
+      <div className="text-left flex-1 min-w-0">
+        <p className={`text-[11px] font-medium ${c.text}`}>{text}</p>
+        {subtext && <p className="text-[9px] text-slate-500">{subtext}</p>}
+      </div>
+    </button>
+  )
+}
+
+// ─── Ålder-badge ───
+
+function AgeBadge({ dateStr }: { dateStr: string | null }) {
+  const text = formatRelativeDate(dateStr)
+  const days = getDaysAge(dateStr)
+  const color = days < 14
+    ? 'text-green-400'
+    : days < 30
+      ? 'text-amber-400'
+      : days < 90
+        ? 'text-orange-400'
+        : 'text-red-400'
+  return (
+    <span className={`text-[10px] font-medium ${color}`}>
+      {text}{days >= 90 ? ' !' : ''}
+    </span>
   )
 }
 
@@ -357,10 +680,15 @@ function PipelineRow({
   const status = c.action?.coordinator_status || 'new'
   const cfg = COORDINATOR_STATUS_CONFIG[status]
   const isSignerad = c.status === 'Offert signerad - boka in'
-  const contactNoteRef = useRef<HTMLInputElement>(null)
+
+  const rowBg = isSignerad
+    ? 'bg-green-500/[0.03]'
+    : isNew
+      ? 'bg-amber-500/[0.03]'
+      : ''
 
   return (
-    <tr className={`border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors ${isNew ? 'bg-amber-500/[0.03]' : ''}`}>
+    <tr className={`border-b border-slate-800/40 border-l-2 ${getAgeBorderColor(c.updated_at)} hover:bg-slate-800/30 transition-colors ${rowBg}`}>
       {/* ClickUp-status */}
       <td className="px-3 py-2.5">
         <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
@@ -416,9 +744,9 @@ function PipelineRow({
         <span className="text-white font-medium">{formatPrice(c.pris)}</span>
       </td>
 
-      {/* Skickat */}
+      {/* Skickat — med ålderbadge */}
       <td className="px-3 py-2.5 hidden lg:table-cell">
-        <span className="text-slate-500">{formatRelativeDate(c.updated_at)}</span>
+        <AgeBadge dateStr={c.updated_at} />
       </td>
 
       {/* Koord.status */}
@@ -513,14 +841,13 @@ function PipelineRow({
             <MessageSquare className="w-3.5 h-3.5" />
           </button>
 
-          {/* Boka in (bara signerade) */}
+          {/* Boka in (bara signerade) — prominent knapp */}
           {isSignerad && (
             <button
               onClick={() => onBook(c)}
-              className="p-1 rounded text-[#20c58f] hover:bg-[#20c58f]/20 transition-colors"
-              title="Boka in i schemat"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#20c58f]/15 text-[#20c58f] hover:bg-[#20c58f]/25 transition-colors"
             >
-              <CalendarCheck className="w-3.5 h-3.5" />
+              <CalendarCheck className="w-3 h-3" /> Boka
             </button>
           )}
         </div>
