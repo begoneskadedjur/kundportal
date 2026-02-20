@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { CasePipelineService } from '../../services/casePipelineService'
 import { formatAddress } from '../../components/coordinator/schedule-v2/scheduleUtils'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
+import PipelineColumnSelector, { usePipelineColumnVisibility } from '../../components/coordinator/PipelineColumnSelector'
 import type { PipelineCaseRow, PipelineTab, CoordinatorCaseStatus, ContactMethod } from '../../types/casePipeline'
 import { COORDINATOR_STATUS_CONFIG, PIPELINE_TABS } from '../../types/casePipeline'
 
@@ -87,6 +88,9 @@ export default function CasePipeline() {
   // Inline note editing
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
+
+  // Kolumnväljare
+  const { visibleColumns, toggleColumn, resetToDefaults, isVisible } = usePipelineColumnVisibility()
 
   const fetchCases = useCallback(async () => {
     try {
@@ -220,7 +224,7 @@ export default function CasePipeline() {
   }, [])
 
   const handleBookCase = useCallback((c: PipelineCaseRow) => {
-    navigate(`/koordinator/schema-v2?openCase=${c.id}`)
+    navigate(`/koordinator/schema-v2?scheduleCase=${c.id}`)
   }, [navigate])
 
   const handleOpenHistory = useCallback((c: PipelineCaseRow) => {
@@ -246,13 +250,20 @@ export default function CasePipeline() {
             <ClipboardList className="w-6 h-6 text-[#20c58f]" />
             <h1 className="text-xl font-bold text-white">Offerthantering</h1>
           </div>
-          <button
-            onClick={() => setShowInsights(v => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800/50"
-          >
-            {showInsights ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            {showInsights ? 'Dölj insikter' : 'Visa insikter'}
-          </button>
+          <div className="flex items-center gap-2">
+            <PipelineColumnSelector
+              visibleColumns={visibleColumns}
+              onToggle={toggleColumn}
+              onReset={resetToDefaults}
+            />
+            <button
+              onClick={() => setShowInsights(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800/50"
+            >
+              {showInsights ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showInsights ? 'Dölj insikter' : 'Visa insikter'}
+            </button>
+          </div>
         </div>
 
         {/* ═══ SEKTION 1: KPI-kort ═══ */}
@@ -432,19 +443,19 @@ export default function CasePipeline() {
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="bg-slate-800/60 text-slate-400 border-b border-slate-700/50">
-                  <th className="px-3 py-2.5 font-medium">Status</th>
-                  <th className="px-3 py-2.5 font-medium">Ärende</th>
-                  <th className="px-3 py-2.5 font-medium">Typ</th>
-                  <th className="px-3 py-2.5 font-medium">Kund / Kontakt</th>
-                  <th className="px-3 py-2.5 font-medium hidden xl:table-cell">Adress</th>
-                  <th className="px-3 py-2.5 font-medium hidden lg:table-cell">Skadedjur</th>
-                  <th className="px-3 py-2.5 font-medium">Tekniker</th>
-                  <th className="px-3 py-2.5 font-medium">Pris</th>
-                  <th className="px-3 py-2.5 font-medium hidden lg:table-cell">Skickat</th>
-                  <th className="px-3 py-2.5 font-medium">Koord. status</th>
-                  <th className="px-3 py-2.5 font-medium">Försök</th>
-                  <th className="px-3 py-2.5 font-medium hidden xl:table-cell">Anteckning</th>
-                  <th className="px-3 py-2.5 font-medium">Åtgärder</th>
+                  {isVisible('status') && <th className="px-3 py-2.5 font-medium">Status</th>}
+                  {isVisible('arende') && <th className="px-3 py-2.5 font-medium">Ärende</th>}
+                  {isVisible('typ') && <th className="px-3 py-2.5 font-medium">Typ</th>}
+                  {isVisible('kund') && <th className="px-3 py-2.5 font-medium">Kund / Kontakt</th>}
+                  {isVisible('adress') && <th className="px-3 py-2.5 font-medium">Adress</th>}
+                  {isVisible('skadedjur') && <th className="px-3 py-2.5 font-medium">Skadedjur</th>}
+                  {isVisible('tekniker') && <th className="px-3 py-2.5 font-medium">Tekniker</th>}
+                  {isVisible('pris') && <th className="px-3 py-2.5 font-medium">Pris</th>}
+                  {isVisible('skickat') && <th className="px-3 py-2.5 font-medium">Skickat</th>}
+                  {isVisible('koordStatus') && <th className="px-3 py-2.5 font-medium">Koord. status</th>}
+                  {isVisible('forsok') && <th className="px-3 py-2.5 font-medium">Försök</th>}
+                  {isVisible('anteckning') && <th className="px-3 py-2.5 font-medium">Anteckning</th>}
+                  {isVisible('atgarder') && <th className="px-3 py-2.5 font-medium">Åtgärder</th>}
                 </tr>
               </thead>
               <tbody>
@@ -465,6 +476,7 @@ export default function CasePipeline() {
                     onStatusChange={handleStatusChange}
                     onBook={handleBookCase}
                     onOpenHistory={handleOpenHistory}
+                    isVisible={isVisible}
                   />
                 ))}
               </tbody>
@@ -668,17 +680,17 @@ interface PipelineRowProps {
   onStatusChange: (c: PipelineCaseRow, status: CoordinatorCaseStatus) => void
   onBook: (c: PipelineCaseRow) => void
   onOpenHistory: (c: PipelineCaseRow) => void
+  isVisible: (columnId: string) => boolean
 }
 
 function PipelineRow({
   caseRow: c, onAcknowledge, onOpenContactPopover, contactPopoverOpen,
   onLogContact, onStartEditNote, editingNoteId, noteText, onNoteTextChange,
-  onSaveNote, onCancelNote, onStatusChange, onBook, onOpenHistory,
+  onSaveNote, onCancelNote, onStatusChange, onBook, onOpenHistory, isVisible,
 }: PipelineRowProps) {
   const addr = formatAddress(c.adress)
   const isNew = !c.action || c.action.coordinator_status === 'new'
   const status = c.action?.coordinator_status || 'new'
-  const cfg = COORDINATOR_STATUS_CONFIG[status]
   const isSignerad = c.status === 'Offert signerad - boka in'
 
   const rowBg = isSignerad
@@ -690,169 +702,229 @@ function PipelineRow({
   return (
     <tr className={`border-b border-slate-800/40 border-l-2 ${getAgeBorderColor(c.updated_at)} hover:bg-slate-800/30 transition-colors ${rowBg}`}>
       {/* ClickUp-status */}
-      <td className="px-3 py-2.5">
-        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-          isSignerad ? 'bg-green-500/15 text-green-400' : 'bg-emerald-500/15 text-emerald-400'
-        }`}>
-          {isSignerad ? 'Signerad' : 'Offert'}
-        </span>
-      </td>
+      {isVisible('status') && (
+        <td className="px-3 py-2.5">
+          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+            isSignerad ? 'bg-green-500/15 text-green-400' : 'bg-emerald-500/15 text-emerald-400'
+          }`}>
+            {isSignerad ? 'Signerad' : 'Offert'}
+          </span>
+        </td>
+      )}
 
       {/* Ärende */}
-      <td className="px-3 py-2.5">
-        <span className="text-white font-medium truncate max-w-[180px] block" title={c.title}>
-          {c.title || 'Utan titel'}
-        </span>
-      </td>
+      {isVisible('arende') && (
+        <td className="px-3 py-2.5">
+          <span className="text-white font-medium truncate max-w-[180px] block" title={c.title}>
+            {c.title || 'Utan titel'}
+          </span>
+        </td>
+      )}
 
       {/* Typ */}
-      <td className="px-3 py-2.5">
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-          c.case_type === 'private' ? 'bg-blue-500/15 text-blue-400' : 'bg-purple-500/15 text-purple-400'
-        }`}>
-          {c.case_type === 'private' ? 'Privat' : 'Företag'}
-        </span>
-      </td>
+      {isVisible('typ') && (
+        <td className="px-3 py-2.5">
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+            c.case_type === 'private' ? 'bg-blue-500/15 text-blue-400' : 'bg-purple-500/15 text-purple-400'
+          }`}>
+            {c.case_type === 'private' ? 'Privat' : 'Företag'}
+          </span>
+        </td>
+      )}
 
       {/* Kund/Kontakt */}
-      <td className="px-3 py-2.5">
-        <div className="max-w-[160px]">
-          <p className="text-white truncate text-[11px]">{c.kontaktperson || c.bestallare || '—'}</p>
-          {c.telefon_kontaktperson && (
-            <p className="text-slate-500 truncate text-[10px]">{c.telefon_kontaktperson}</p>
-          )}
-        </div>
-      </td>
-
-      {/* Adress */}
-      <td className="px-3 py-2.5 hidden xl:table-cell">
-        <span className="text-slate-400 truncate block max-w-[140px]" title={addr}>{addr || '—'}</span>
-      </td>
-
-      {/* Skadedjur */}
-      <td className="px-3 py-2.5 hidden lg:table-cell">
-        <span className="text-slate-400">{c.skadedjur || '—'}</span>
-      </td>
-
-      {/* Tekniker */}
-      <td className="px-3 py-2.5">
-        <span className="text-slate-300 font-medium">{c.primary_assignee_name || '—'}</span>
-      </td>
-
-      {/* Pris */}
-      <td className="px-3 py-2.5">
-        <span className="text-white font-medium">{formatPrice(c.pris)}</span>
-      </td>
-
-      {/* Skickat — med ålderbadge */}
-      <td className="px-3 py-2.5 hidden lg:table-cell">
-        <AgeBadge dateStr={c.updated_at} />
-      </td>
-
-      {/* Koord.status */}
-      <td className="px-3 py-2.5">
-        <select
-          value={status}
-          onChange={e => onStatusChange(c, e.target.value as CoordinatorCaseStatus)}
-          className={`px-1.5 py-0.5 rounded text-[10px] font-medium border-0 cursor-pointer focus:ring-1 focus:ring-[#20c58f] ${cfg.bgColor} ${cfg.color}`}
-        >
-          {Object.entries(COORDINATOR_STATUS_CONFIG).map(([key, val]) => (
-            <option key={key} value={key}>{val.label}</option>
-          ))}
-        </select>
-      </td>
-
-      {/* Försök */}
-      <td className="px-3 py-2.5">
-        <span className={`text-[11px] font-medium ${(c.action?.contact_attempts || 0) > 0 ? 'text-purple-400' : 'text-slate-600'}`}>
-          {c.action?.contact_attempts || 0}
-        </span>
-      </td>
-
-      {/* Anteckning (inline edit) */}
-      <td className="px-3 py-2.5 hidden xl:table-cell">
-        {editingNoteId === c.id ? (
-          <div className="flex items-center gap-1">
-            <input
-              type="text"
-              value={noteText}
-              onChange={e => onNoteTextChange(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') onSaveNote(c)
-                if (e.key === 'Escape') onCancelNote()
-              }}
-              autoFocus
-              className="w-full px-1.5 py-0.5 text-[10px] bg-slate-800 border border-slate-600 rounded text-white focus:ring-1 focus:ring-[#20c58f] focus:outline-none"
-              placeholder="Skriv anteckning..."
-            />
-            <button onClick={() => onSaveNote(c)} className="text-[#20c58f] hover:text-white text-[10px] shrink-0">Spara</button>
-            <button onClick={() => onCancelNote()} className="text-slate-500 hover:text-white transition-colors shrink-0 p-0.5" title="Stäng">
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => onStartEditNote(c.id, c.action?.coordinator_notes || null)}
-            className="text-slate-500 hover:text-white text-[10px] text-left truncate max-w-[120px] block transition-colors"
-            title={c.action?.coordinator_notes || 'Klicka för att lägga till'}
-          >
-            {c.action?.coordinator_notes || '+ Anteckning'}
-          </button>
-        )}
-      </td>
-
-      {/* Åtgärder */}
-      <td className="px-3 py-2.5">
-        <div className="flex items-center gap-1 relative">
-          {/* Kvittera */}
-          {isNew && (
-            <button
-              onClick={() => onAcknowledge(c)}
-              className="p-1 rounded text-blue-400 hover:bg-blue-500/20 transition-colors"
-              title="Kvittera"
-            >
-              <Eye className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {/* Logga kontakt */}
-          <div className="relative">
-            <button
-              onClick={() => onOpenContactPopover(contactPopoverOpen ? null : c.id)}
-              className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors"
-              title="Logga kontaktförsök"
-            >
-              <Phone className="w-3.5 h-3.5" />
-            </button>
-            {contactPopoverOpen && (
-              <ContactPopover
-                onSelect={(method, note) => onLogContact(c, method, note)}
-                onClose={() => onOpenContactPopover(null)}
-              />
+      {isVisible('kund') && (
+        <td className="px-3 py-2.5">
+          <div className="max-w-[160px]">
+            <p className="text-white truncate text-[11px]">{c.kontaktperson || c.bestallare || '—'}</p>
+            {c.telefon_kontaktperson && (
+              <p className="text-slate-500 truncate text-[10px]">{c.telefon_kontaktperson}</p>
             )}
           </div>
+        </td>
+      )}
 
-          {/* Historik */}
-          <button
-            onClick={() => onOpenHistory(c)}
-            className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors"
-            title="Visa historik"
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-          </button>
+      {/* Adress */}
+      {isVisible('adress') && (
+        <td className="px-3 py-2.5">
+          <span className="text-slate-400 truncate block max-w-[140px]" title={addr}>{addr || '—'}</span>
+        </td>
+      )}
 
-          {/* Boka in (bara signerade) — prominent knapp */}
-          {isSignerad && (
+      {/* Skadedjur */}
+      {isVisible('skadedjur') && (
+        <td className="px-3 py-2.5">
+          <span className="text-slate-400">{c.skadedjur || '—'}</span>
+        </td>
+      )}
+
+      {/* Tekniker */}
+      {isVisible('tekniker') && (
+        <td className="px-3 py-2.5">
+          <span className="text-slate-300 font-medium">{c.primary_assignee_name || '—'}</span>
+        </td>
+      )}
+
+      {/* Pris */}
+      {isVisible('pris') && (
+        <td className="px-3 py-2.5">
+          <span className="text-white font-medium">{formatPrice(c.pris)}</span>
+        </td>
+      )}
+
+      {/* Skickat — med ålderbadge */}
+      {isVisible('skickat') && (
+        <td className="px-3 py-2.5">
+          <AgeBadge dateStr={c.updated_at} />
+        </td>
+      )}
+
+      {/* Koord.status — custom dropdown */}
+      {isVisible('koordStatus') && (
+        <td className="px-3 py-2.5">
+          <StatusDropdown value={status} onChange={(s) => onStatusChange(c, s)} />
+        </td>
+      )}
+
+      {/* Försök */}
+      {isVisible('forsok') && (
+        <td className="px-3 py-2.5">
+          <span className={`text-[11px] font-medium ${(c.action?.contact_attempts || 0) > 0 ? 'text-purple-400' : 'text-slate-600'}`}>
+            {c.action?.contact_attempts || 0}
+          </span>
+        </td>
+      )}
+
+      {/* Anteckning (inline edit) */}
+      {isVisible('anteckning') && (
+        <td className="px-3 py-2.5">
+          {editingNoteId === c.id ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                value={noteText}
+                onChange={e => onNoteTextChange(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') onSaveNote(c)
+                  if (e.key === 'Escape') onCancelNote()
+                }}
+                autoFocus
+                className="w-full px-1.5 py-0.5 text-[10px] bg-slate-800 border border-slate-600 rounded text-white focus:ring-1 focus:ring-[#20c58f] focus:outline-none"
+                placeholder="Skriv anteckning..."
+              />
+              <button onClick={() => onSaveNote(c)} className="text-[#20c58f] hover:text-white text-[10px] shrink-0">Spara</button>
+              <button onClick={() => onCancelNote()} className="text-slate-500 hover:text-white transition-colors shrink-0 p-0.5" title="Stäng">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={() => onBook(c)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#20c58f]/15 text-[#20c58f] hover:bg-[#20c58f]/25 transition-colors"
+              onClick={() => onStartEditNote(c.id, c.action?.coordinator_notes || null)}
+              className="text-slate-500 hover:text-white text-[10px] text-left truncate max-w-[120px] block transition-colors"
+              title={c.action?.coordinator_notes || 'Klicka för att lägga till'}
             >
-              <CalendarCheck className="w-3 h-3" /> Boka
+              {c.action?.coordinator_notes || '+ Anteckning'}
             </button>
           )}
-        </div>
-      </td>
+        </td>
+      )}
+
+      {/* Åtgärder */}
+      {isVisible('atgarder') && (
+        <td className="px-3 py-2.5">
+          <div className="flex items-center gap-1 relative">
+            {/* Kvittera */}
+            {isNew && (
+              <button
+                onClick={() => onAcknowledge(c)}
+                className="p-1 rounded text-blue-400 hover:bg-blue-500/20 transition-colors"
+                title="Kvittera"
+              >
+                <Eye className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {/* Logga kontakt */}
+            <div className="relative">
+              <button
+                onClick={() => onOpenContactPopover(contactPopoverOpen ? null : c.id)}
+                className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors"
+                title="Logga kontaktförsök"
+              >
+                <Phone className="w-3.5 h-3.5" />
+              </button>
+              {contactPopoverOpen && (
+                <ContactPopover
+                  onSelect={(method, note) => onLogContact(c, method, note)}
+                  onClose={() => onOpenContactPopover(null)}
+                />
+              )}
+            </div>
+
+            {/* Historik */}
+            <button
+              onClick={() => onOpenHistory(c)}
+              className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors"
+              title="Visa historik"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Boka in (bara signerade) — prominent knapp */}
+            {isSignerad && (
+              <button
+                onClick={() => onBook(c)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#20c58f]/15 text-[#20c58f] hover:bg-[#20c58f]/25 transition-colors"
+              >
+                <CalendarCheck className="w-3 h-3" /> Boka
+              </button>
+            )}
+          </div>
+        </td>
+      )}
     </tr>
+  )
+}
+
+// ─── Custom status-dropdown (mörkt tema) ───
+
+function StatusDropdown({ value, onChange }: { value: CoordinatorCaseStatus; onChange: (s: CoordinatorCaseStatus) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const cfg = COORDINATOR_STATUS_CONFIG[value]
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer transition-colors ${cfg.bgColor} ${cfg.color}`}
+      >
+        {cfg.label}
+        <ChevronDown className="w-2.5 h-2.5" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[120px]">
+          {(Object.entries(COORDINATOR_STATUS_CONFIG) as [CoordinatorCaseStatus, typeof cfg][]).map(([key, val]) => (
+            <button
+              key={key}
+              onClick={() => { onChange(key); setOpen(false) }}
+              className={`w-full text-left px-3 py-1.5 text-[11px] font-medium hover:bg-slate-700/50 transition-colors ${val.color} ${key === value ? val.bgColor : ''}`}
+            >
+              {val.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

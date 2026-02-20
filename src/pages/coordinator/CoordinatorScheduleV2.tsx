@@ -223,6 +223,20 @@ export default function CoordinatorScheduleV2() {
 
   useEffect(() => {
     const openCaseId = searchParams.get('openCase')
+    const scheduleCaseId = searchParams.get('scheduleCase')
+
+    // Öppna bokningsmodulen (CreateCaseModal) från Offerthantering "Boka"-knapp
+    if (scheduleCaseId && allCases.length > 0) {
+      const foundCase = allCases.find(c => c.id === scheduleCaseId)
+      if (foundCase) {
+        setSelectedCase(foundCase)
+        setIsCreateModalOpen(true)
+      }
+      setSearchParams({})
+      return
+    }
+
+    // Öppna EditCaseModal med kommunikationspanel (från Historik-knapp)
     if (!openCaseId || allCases.length === 0) return
     const foundCase = allCases.find(c => c.id === openCaseId)
     if (foundCase) {

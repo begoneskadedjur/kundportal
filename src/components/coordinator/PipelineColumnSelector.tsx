@@ -1,0 +1,143 @@
+// src/components/coordinator/PipelineColumnSelector.tsx — Kolumnväljare för offerthantering-tabellen
+
+import { useState, useRef, useEffect } from 'react'
+import { Settings, ChevronDown } from 'lucide-react'
+
+export interface PipelineTableColumn {
+  id: string
+  label: string
+  defaultVisible: boolean
+  required: boolean
+}
+
+export const PIPELINE_COLUMNS: PipelineTableColumn[] = [
+  { id: 'status',      label: 'Status',          defaultVisible: true,  required: true },
+  { id: 'arende',      label: 'Ärende',          defaultVisible: true,  required: true },
+  { id: 'typ',         label: 'Typ',             defaultVisible: true,  required: false },
+  { id: 'kund',        label: 'Kund / Kontakt',  defaultVisible: true,  required: false },
+  { id: 'adress',      label: 'Adress',          defaultVisible: true,  required: false },
+  { id: 'skadedjur',   label: 'Skadedjur',       defaultVisible: true,  required: false },
+  { id: 'tekniker',    label: 'Tekniker',        defaultVisible: true,  required: false },
+  { id: 'pris',        label: 'Pris',            defaultVisible: true,  required: false },
+  { id: 'skickat',     label: 'Skickat',         defaultVisible: true,  required: false },
+  { id: 'koordStatus', label: 'Koord. status',   defaultVisible: true,  required: false },
+  { id: 'forsok',      label: 'Försök',          defaultVisible: false, required: false },
+  { id: 'anteckning',  label: 'Anteckning',      defaultVisible: false, required: false },
+  { id: 'atgarder',    label: 'Åtgärder',        defaultVisible: true,  required: true },
+]
+
+const STORAGE_KEY = 'begone_pipeline_columns'
+
+export function usePipelineColumnVisibility() {
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) return new Set(JSON.parse(stored))
+    } catch {}
+    return new Set(PIPELINE_COLUMNS.filter(c => c.defaultVisible).map(c => c.id))
+  })
+
+  const toggleColumn = (columnId: string) => {
+    const col = PIPELINE_COLUMNS.find(c => c.id === columnId)
+    if (col?.required) return
+
+    setVisibleColumns(prev => {
+      const next = new Set(prev)
+      if (next.has(columnId)) next.delete(columnId)
+      else next.add(columnId)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  const resetToDefaults = () => {
+    const defaults = new Set(PIPELINE_COLUMNS.filter(c => c.defaultVisible).map(c => c.id))
+    setVisibleColumns(defaults)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...defaults]))
+  }
+
+  const isVisible = (columnId: string) => visibleColumns.has(columnId)
+
+  return { visibleColumns, toggleColumn, resetToDefaults, isVisible }
+}
+
+interface PipelineColumnSelectorProps {
+  visibleColumns: Set<string>
+  onToggle: (columnId: string) => void
+  onReset: () => void
+}
+
+export default function PipelineColumnSelector({ visibleColumns, onToggle, onReset }: PipelineColumnSelectorProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const hiddenCount = PIPELINE_COLUMNS.filter(c => !c.required && !visibleColumns.has(c.id)).length
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors text-xs font-medium ${
+          hiddenCount > 0
+            ? 'bg-[#20c58f]/10 border-[#20c58f]/30 text-[#20c58f]'
+            : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white hover:border-slate-500'
+        }`}
+      >
+        <Settings className="w-3.5 h-3.5" />
+        Kolumner
+        {hiddenCount > 0 && (
+          <span className="bg-[#20c58f] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+            {hiddenCount}
+          </span>
+        )}
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
+          <div className="p-2.5 border-b border-slate-700">
+            <h4 className="text-xs font-medium text-white">Visa/dölj kolumner</h4>
+          </div>
+          <div className="p-1.5 max-h-80 overflow-y-auto">
+            {PIPELINE_COLUMNS.map(column => (
+              <label
+                key={column.id}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-700/50 ${
+                  column.required ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleColumns.has(column.id)}
+                  onChange={() => onToggle(column.id)}
+                  disabled={column.required}
+                  className="rounded bg-slate-700 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
+                />
+                <span className="text-xs text-slate-300">{column.label}</span>
+                {column.required && (
+                  <span className="ml-auto text-[10px] text-slate-500">Låst</span>
+                )}
+              </label>
+            ))}
+          </div>
+          <div className="p-2 border-t border-slate-700 flex justify-between">
+            <button onClick={onReset} className="text-[10px] text-slate-400 hover:text-white transition-colors">
+              Återställ
+            </button>
+            <button onClick={() => setOpen(false)} className="text-[10px] text-[#20c58f] hover:text-[#20c58f]/80 transition-colors">
+              Stäng
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
