@@ -1,9 +1,16 @@
 // NowIndicator.tsx — Vertikal röd linje som visar nuvarande tid
 import { useState, useEffect } from 'react'
-import { timeToX } from './scheduleUtils'
+import { timeToX, timeToXWeek, isSameDay, isInWeek } from './scheduleUtils'
 import { DAY_START_HOUR, DAY_END_HOUR } from './scheduleConstants'
+import type { ViewMode } from './ScheduleHeader'
 
-export function NowIndicator() {
+interface NowIndicatorProps {
+  viewMode: ViewMode
+  weekStart: Date
+  currentDate: Date
+}
+
+export function NowIndicator({ viewMode, weekStart, currentDate }: NowIndicatorProps) {
   const [now, setNow] = useState(new Date())
 
   useEffect(() => {
@@ -14,7 +21,12 @@ export function NowIndicator() {
   const hour = now.getHours() + now.getMinutes() / 60
   if (hour < DAY_START_HOUR || hour > DAY_END_HOUR) return null
 
-  const x = timeToX(now)
+  // Dagvy: visa bara om det är dagens datum
+  if (viewMode === 'day' && !isSameDay(now, currentDate)) return null
+  // Veckovy: visa bara om nu faller inom den visade veckan
+  if (viewMode === 'week' && !isInWeek(now, weekStart)) return null
+
+  const x = viewMode === 'week' ? timeToXWeek(now, weekStart) : timeToX(now)
 
   return (
     <div

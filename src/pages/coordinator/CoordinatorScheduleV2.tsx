@@ -247,6 +247,7 @@ export default function CoordinatorScheduleV2() {
           cases={filteredScheduledCases}
           absences={absences}
           currentDate={currentDate}
+          viewMode={viewMode}
           onCaseClick={handleOpenCaseModal}
           onAbsenceClick={a => { setSelectedAbsence(a); setIsAbsenceDetailsModalOpen(true) }}
         />

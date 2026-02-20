@@ -1,7 +1,8 @@
 // AbsenceBlock.tsx — Frånvaro-block med diagonala ränder
 import { useState } from 'react'
-import { timeToX, durationToWidth, clampToGrid, formatTime } from './scheduleUtils'
+import { eventX, eventWidth, clampToGrid, formatTime } from './scheduleUtils'
 import { ROW_HEIGHT } from './scheduleConstants'
+import type { ViewMode } from './ScheduleHeader'
 
 export interface Absence {
   id: string
@@ -15,16 +16,18 @@ export interface Absence {
 interface AbsenceBlockProps {
   absence: Absence
   onClick?: (absence: Absence) => void
+  viewMode: ViewMode
+  weekStart: Date
 }
 
-export function AbsenceBlock({ absence, onClick }: AbsenceBlockProps) {
+export function AbsenceBlock({ absence, onClick, viewMode, weekStart }: AbsenceBlockProps) {
   const [hovered, setHovered] = useState(false)
 
   const start = new Date(absence.start_date)
   const end = new Date(absence.end_date)
-  const rawX = timeToX(start)
-  const rawW = durationToWidth(start, end)
-  const { x, width } = clampToGrid(rawX, rawW)
+  const rawX = eventX(start, viewMode, weekStart)
+  const rawW = eventWidth(start, end, viewMode)
+  const { x, width } = clampToGrid(rawX, rawW, viewMode)
   if (width <= 0) return null
 
   const isAdmin = absence.reason === 'Admin'
@@ -33,6 +36,7 @@ export function AbsenceBlock({ absence, onClick }: AbsenceBlockProps) {
 
   const startStr = formatTime(start)
   const endStr = formatTime(end)
+  const isWeek = viewMode === 'week'
 
   return (
     <div
@@ -51,9 +55,9 @@ export function AbsenceBlock({ absence, onClick }: AbsenceBlockProps) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="px-2 py-1.5 h-full flex flex-col justify-center overflow-hidden">
-        <p className="text-xs font-semibold text-slate-200 truncate">{absence.reason}</p>
-        <p className="text-[10px] text-slate-400 mt-0.5">{startStr} – {endStr}</p>
+      <div className="px-1.5 py-1 h-full flex flex-col justify-center overflow-hidden">
+        <p className={`${isWeek ? 'text-[9px]' : 'text-xs'} font-semibold text-slate-200 truncate`}>{absence.reason}</p>
+        {!isWeek && <p className="text-[10px] text-slate-400 mt-0.5">{startStr} – {endStr}</p>}
       </div>
 
       {/* Hover tooltip */}

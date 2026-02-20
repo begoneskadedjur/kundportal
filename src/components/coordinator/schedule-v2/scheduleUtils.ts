@@ -1,27 +1,88 @@
 // scheduleUtils.ts — Positionsberäkning och formatering för schemagrid
 
-import { HOUR_WIDTH, DAY_START_HOUR, GRID_WIDTH } from './scheduleConstants'
+import { HOUR_WIDTH, DAY_START_HOUR, DAY_GRID_WIDTH, WEEK_DAY_COL_WIDTH, WEEK_HOUR_WIDTH, WEEK_GRID_WIDTH } from './scheduleConstants'
+import type { ViewMode } from './ScheduleHeader'
 
-/** Tid → horisontell pixel-offset relativt gridens vänsterkant */
+// ─── Dagvy-positionering ───
+
+/** Tid → horisontell pixel-offset (dagvy) */
 export function timeToX(date: Date): number {
   const hours = date.getHours() + date.getMinutes() / 60
   return (hours - DAY_START_HOUR) * HOUR_WIDTH
 }
 
-/** Tidsspann → pixel-bredd */
+/** Tidsspann → pixel-bredd (dagvy) */
 export function durationToWidth(start: Date, end: Date): number {
   const ms = end.getTime() - start.getTime()
   return (ms / 3_600_000) * HOUR_WIDTH
 }
 
-/** Clamp event inom synligt gridområde */
-export function clampToGrid(x: number, width: number): { x: number; width: number } {
+/** Clamp event inom dagvy grid */
+export function clampToGrid(x: number, width: number, viewMode: ViewMode = 'day'): { x: number; width: number } {
+  const maxWidth = viewMode === 'week' ? WEEK_GRID_WIDTH : DAY_GRID_WIDTH
   let cx = x
   let cw = width
   if (cx < 0) { cw += cx; cx = 0 }
-  if (cx + cw > GRID_WIDTH) cw = GRID_WIDTH - cx
+  if (cx + cw > maxWidth) cw = maxWidth - cx
   return { x: cx, width: Math.max(cw, 0) }
 }
+
+// ─── Veckovy-positionering ───
+
+/** Beräkna dagindex (0=mån, 6=sön) relativt till veckans start */
+function dayIndex(date: Date, weekStart: Date): number {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  const ws = new Date(weekStart)
+  ws.setHours(0, 0, 0, 0)
+  const diff = Math.round((d.getTime() - ws.getTime()) / 86_400_000)
+  return Math.max(0, Math.min(6, diff))
+}
+
+/** Tid → horisontell pixel-offset (veckovy) */
+export function timeToXWeek(date: Date, weekStart: Date): number {
+  const di = dayIndex(date, weekStart)
+  const hours = date.getHours() + date.getMinutes() / 60
+  const timeOffset = (hours - DAY_START_HOUR) * WEEK_HOUR_WIDTH
+  return di * WEEK_DAY_COL_WIDTH + timeOffset
+}
+
+/** Tidsspann → pixel-bredd (veckovy, clamped inom en dagkolumn) */
+export function durationToWidthWeek(start: Date, end: Date): number {
+  const ms = end.getTime() - start.getTime()
+  const w = (ms / 3_600_000) * WEEK_HOUR_WIDTH
+  // Clamp till max en dagkolumns bredd
+  return Math.min(w, WEEK_DAY_COL_WIDTH)
+}
+
+// ─── Vy-agnostisk positionering ───
+
+/** Beräkna X-position beroende på vy */
+export function eventX(date: Date, viewMode: ViewMode, weekStart: Date): number {
+  return viewMode === 'week' ? timeToXWeek(date, weekStart) : timeToX(date)
+}
+
+/** Beräkna bredd beroende på vy */
+export function eventWidth(start: Date, end: Date, viewMode: ViewMode): number {
+  return viewMode === 'week' ? durationToWidthWeek(start, end) : durationToWidth(start, end)
+}
+
+// ─── Datum-helpers ───
+
+/** Jämför om två datum är samma dag */
+export function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
+/** Kolla om ett datum faller inom en vecka (7 dagar från weekStart) */
+export function isInWeek(date: Date, weekStart: Date): boolean {
+  const d = new Date(date); d.setHours(0, 0, 0, 0)
+  const ws = new Date(weekStart); ws.setHours(0, 0, 0, 0)
+  const we = new Date(ws); we.setDate(we.getDate() + 7)
+  return d >= ws && d < we
+}
+
+// ─── Formatering ───
 
 /** Formatera timme:minut som "HH:mm" */
 export function formatTime(date: Date | null): string {
@@ -47,7 +108,6 @@ export function formatAddress(address: unknown): string {
 export function shortAddress(address: unknown): string {
   const full = formatAddress(address)
   if (!full) return ''
-  // Ta bara gatuadress (före kommat) eller de första 30 tecknen
   const parts = full.split(',')
   return parts[0].trim().slice(0, 30)
 }
@@ -57,7 +117,7 @@ export function getTechWorkHours(
   workSchedule: Record<string, { start: string; end: string; active: boolean }> | null,
   date: Date
 ): number {
-  if (!workSchedule) return 8 // fallback
+  if (!workSchedule) return 8
   const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
   const dayKey = days[date.getDay()]
   const day = workSchedule[dayKey]
@@ -79,7 +139,7 @@ export function getWeekNumber(date: Date): number {
 /** Startdag (måndag) för en vecka som innehåller givet datum */
 export function getWeekStart(date: Date): Date {
   const d = new Date(date)
-  const day = d.getDay() || 7 // söndag = 7
+  const day = d.getDay() || 7
   d.setDate(d.getDate() - day + 1)
   d.setHours(0, 0, 0, 0)
   return d

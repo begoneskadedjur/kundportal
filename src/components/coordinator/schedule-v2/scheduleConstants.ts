@@ -1,13 +1,26 @@
 // scheduleConstants.ts — Konstanter för egenbyggd schemavy
 
-export const HOUR_WIDTH = 120       // px per timme (dagvy)
+import type { ViewMode } from './ScheduleHeader'
+
+// ─── Dagvy ───
+export const HOUR_WIDTH = 120       // px per timme
 export const ROW_HEIGHT = 88        // px per teknikerrad
 export const TECH_COL_WIDTH = 224   // px teknikerkolumn (sticky)
 export const DAY_START_HOUR = 6     // 06:00
 export const DAY_END_HOUR = 20      // 20:00
 export const SNAP_MINUTES = 15
 export const TOTAL_HOURS = DAY_END_HOUR - DAY_START_HOUR // 14h
-export const GRID_WIDTH = TOTAL_HOURS * HOUR_WIDTH        // 1680px
+export const DAY_GRID_WIDTH = TOTAL_HOURS * HOUR_WIDTH    // 1680px
+
+// ─── Veckovy ───
+export const WEEK_DAY_COL_WIDTH = 240  // px per dagkolumn
+export const WEEK_GRID_WIDTH = WEEK_DAY_COL_WIDTH * 7 // 1680px
+export const WEEK_HOUR_WIDTH = WEEK_DAY_COL_WIDTH / TOTAL_HOURS // ~17.14px per timme
+
+/** Returnera grid-bredd baserat på vyläge */
+export function getGridWidth(viewMode: ViewMode): number {
+  return viewMode === 'week' ? WEEK_GRID_WIDTH : DAY_GRID_WIDTH
+}
 
 // Unika färger per tekniker (cykliskt)
 export const TECH_COLORS = [
