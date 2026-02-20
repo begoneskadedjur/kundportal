@@ -203,23 +203,60 @@ function App() {
             <Route path="/koordinator" element={<CoordinatorLayout />}>
               <Route index element={<Navigate to="/koordinator/dashboard" replace />} />
               <Route path="dashboard" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorMainDashboard /></ProtectedRoute>} />
+
+              {/* Kunder & Avtal */}
+              <Route path="befintliga-kunder" element={<ProtectedRoute requiredRole="koordinator"><Customers /></ProtectedRoute>} />
+              <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="koordinator"><CustomerDetails /></ProtectedRoute>} />
+              <Route path="trafikljusoversikt" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
+              <Route path="kundprognos" element={<ProtectedRoute requiredRole="koordinator"><CustomerAnalytics /></ProtectedRoute>} />
+              <Route path="customer-access" element={<AdminOrKoordinatorRoute><CoordinatorOrganizationsPage /></AdminOrKoordinatorRoute>} />
+
+              {/* Försäljning */}
+              <Route path="forsaljningspipeline" element={<ProtectedRoute requiredRole="koordinator"><ContractsOverview /></ProtectedRoute>} />
+              <Route path="forsaljningsmojligheter" element={<ProtectedRoute requiredRole="koordinator"><SalesOpportunities /></ProtectedRoute>} />
+              <Route path="leads" element={<ProtectedRoute requiredRole="koordinator"><Leads /></ProtectedRoute>} />
+              <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="koordinator"><LeadAnalytics /></ProtectedRoute>} />
+
+              {/* Ekonomi & Fakturering */}
+              <Route path="ekonomi" element={<ProtectedRoute requiredRole="koordinator"><Economics /></ProtectedRoute>} />
+              <Route path="fakturering" element={<ProtectedRoute requiredRole="koordinator"><InvoicingPage /></ProtectedRoute>} />
+              <Route path="fakturering/*" element={<ProtectedRoute requiredRole="koordinator"><InvoicingPage /></ProtectedRoute>} />
+              <Route path="provisioner" element={<ProtectedRoute requiredRole="koordinator"><TechnicianCommissions /></ProtectedRoute>} />
+
+              {/* Organisation */}
+              <Route path="teknikerstatistik" element={<ProtectedRoute requiredRole="koordinator"><Technicians /></ProtectedRoute>} />
+              <Route path="anvandarkonton-personal" element={<ProtectedRoute requiredRole="koordinator"><TechnicianManagement /></ProtectedRoute>} />
+              <Route path="tickets" element={<ProtectedRoute requiredRole="koordinator"><InternAdministration /></ProtectedRoute>} />
+
+              {/* Verktyg */}
+              <Route path="team-chat" element={<ProtectedRoute requiredRole="koordinator"><TeamChat /></ProtectedRoute>} />
+              <Route path="bildbank" element={<ProtectedRoute requiredRole="koordinator"><ImageBank /></ProtectedRoute>} />
+
+              {/* Produkter & Priser */}
+              <Route path="stationer-fallor" element={<ProtectedRoute requiredRole="koordinator"><StationTypesPage /></ProtectedRoute>} />
+              <Route path="preparat" element={<ProtectedRoute requiredRole="koordinator"><PreparationsPage /></ProtectedRoute>} />
+              <Route path="prislistor" element={<ProtectedRoute requiredRole="koordinator"><PriceListsPage /></ProtectedRoute>} />
+              <Route path="artiklar" element={<ProtectedRoute requiredRole="koordinator"><ArticlesPage /></ProtectedRoute>} />
+
+              {/* Planering (koordinator-specifik) */}
               <Route path="schema" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorSchedule /></ProtectedRoute>} />
               <Route path="booking-assistant" element={<ProtectedRoute requiredRole="koordinator"><ScheduleOptimizer /></ProtectedRoute>} />
+
+              {/* Ärenden (koordinator-specifik) */}
               <Route path="sok-arenden" element={<ProtectedRoute requiredRole="koordinator"><CaseSearch /></ProtectedRoute>} />
-              <Route path="analytics" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorAnalytics /></ProtectedRoute>} />
-              <Route path="team-chat" element={<ProtectedRoute requiredRole="koordinator"><TeamChat /></ProtectedRoute>} />
-              <Route path="leads" element={<ProtectedRoute requiredRole="koordinator"><Leads /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="koordinator"><OneflowContractCreator /></ProtectedRoute>} />
-              <Route path="customer-access" element={<AdminOrKoordinatorRoute><CoordinatorOrganizationsPage /></AdminOrKoordinatorRoute>} />
-              <Route path="organisation/traffic-light" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
-              <Route path="tickets" element={<ProtectedRoute requiredRole="koordinator"><InternAdministration /></ProtectedRoute>} />
+              <Route path="analytics" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorAnalytics /></ProtectedRoute>} />
+
+              {/* Guides & Lärosäte */}
               <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="koordinator"><CaseDeletionGuide /></ProtectedRoute>} />
               <Route path="guides/ticket-system" element={<ProtectedRoute requiredRole="koordinator"><TicketSystemGuide /></ProtectedRoute>} />
               <Route path="larosate" element={<ProtectedRoute requiredRole="koordinator"><Larosate /></ProtectedRoute>} />
+
               {/* Bakåtkompatibilitet */}
               <Route path="organisation/register" element={<Navigate to="/koordinator/customer-access" replace />} />
               <Route path="organisation/organizations" element={<Navigate to="/koordinator/customer-access" replace />} />
               <Route path="organisation/organizations-manage" element={<Navigate to="/koordinator/customer-access" replace />} />
+              <Route path="organisation/traffic-light" element={<Navigate to="/koordinator/trafikljusoversikt" replace />} />
             </Route>
 
             {/* Redirect gammal engelsk URL */}
