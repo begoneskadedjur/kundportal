@@ -65,6 +65,24 @@ export class CasePipelineService {
     ]
   }
 
+  /** Hämta coordinator actions för en lista med ärende-IDn (för Schema V2 drawern) */
+  static async getActionsForCases(caseIds: string[]): Promise<Record<string, CoordinatorCaseAction>> {
+    if (caseIds.length === 0) return {}
+
+    const { data, error } = await supabase
+      .from('coordinator_case_actions')
+      .select('*')
+      .in('case_id', caseIds)
+
+    if (error) throw error
+
+    const map: Record<string, CoordinatorCaseAction> = {}
+    for (const a of data || []) {
+      map[a.case_id] = a
+    }
+    return map
+  }
+
   /** Kvittera ärende — markera som mottaget av koordinator */
   static async acknowledgeCase(
     caseId: string,

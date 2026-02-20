@@ -10,6 +10,8 @@ import { AnimatePresence } from 'framer-motion'
 import { ScheduleHeader, type ViewMode } from '../../components/coordinator/schedule-v2/ScheduleHeader'
 import { ScheduleGrid } from '../../components/coordinator/schedule-v2/ScheduleGrid'
 import { ActionableCasesDrawer } from '../../components/coordinator/schedule-v2/ActionableCasesDrawer'
+import { CasePipelineService } from '../../services/casePipelineService'
+import type { CoordinatorCaseAction } from '../../types/casePipeline'
 import type { Absence } from '../../components/coordinator/schedule-v2/AbsenceBlock'
 
 // Befintliga modaler (återanvänds rakt av)
@@ -93,6 +95,7 @@ export default function CoordinatorScheduleV2() {
   const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false)
   const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false)
   const [isActionableDrawerOpen, setIsActionableDrawerOpen] = useState(false)
+  const [actionMap, setActionMap] = useState<Record<string, CoordinatorCaseAction>>({})
 
   // ─── Data-fetching (identisk med befintlig CoordinatorSchedule) ───
 
@@ -241,6 +244,19 @@ export default function CoordinatorScheduleV2() {
   const scheduledCases = useMemo(() => allCases.filter(isScheduledCase), [allCases])
   const actionableCases = useMemo(() => allCases.filter(c => c.status === 'Offert signerad - boka in'), [allCases])
 
+  // Hämta coordinator actions för "att boka in"-ärenden
+  useEffect(() => {
+    if (actionableCases.length === 0) return
+    const ids = actionableCases.map(c => c.id)
+    CasePipelineService.getActionsForCases(ids)
+      .then(setActionMap)
+      .catch(err => console.warn('Kunde inte hämta coordinator actions:', err))
+  }, [actionableCases])
+
+  const handleActionUpdate = useCallback((caseId: string, action: CoordinatorCaseAction) => {
+    setActionMap(prev => ({ ...prev, [caseId]: action }))
+  }, [])
+
   const filteredScheduledCases = useMemo(() => {
     return scheduledCases.filter(c => {
       if (!activeStatuses.has(c.status)) return false
@@ -333,7 +349,9 @@ export default function CoordinatorScheduleV2() {
           {isActionableDrawerOpen && (
             <ActionableCasesDrawer
               cases={actionableCases}
+              actionMap={actionMap}
               onScheduleCase={handleScheduleFromDrawer}
+              onActionUpdate={handleActionUpdate}
               onClose={() => setIsActionableDrawerOpen(false)}
             />
           )}
