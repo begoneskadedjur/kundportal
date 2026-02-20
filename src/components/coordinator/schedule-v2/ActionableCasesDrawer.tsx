@@ -1,10 +1,11 @@
 // ActionableCasesDrawer.tsx — Expanderbar panel med actions för ärenden att boka in
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
   CalendarPlus, ChevronUp, ChevronRight, ChevronDown, ExternalLink,
   Eye, Phone, CalendarCheck, PhoneCall, MailIcon, MessageCircle, Loader2,
+  ArrowUpDown, Check,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -22,6 +23,12 @@ interface ActionableCasesDrawerProps {
   onClose: () => void
 }
 
+type DrawerSort = 'default' | 'status' | 'attempts'
+
+const STATUS_ORDER: Record<string, number> = {
+  new: 0, acknowledged: 1, in_progress: 2, contacted: 3, booked: 4, completed: 5,
+}
+
 function formatRelativeDate(dateStr: string | null): string {
   if (!dateStr) return ''
   const date = new Date(dateStr)
@@ -37,16 +44,31 @@ function formatRelativeDate(dateStr: string | null): string {
 
 export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActionUpdate, onClose }: ActionableCasesDrawerProps) {
   const navigate = useNavigate()
+  const [sortBy, setSortBy] = useState<DrawerSort>('default')
 
-  // Sortera: okvitterade först, sedan äldst
+  const toggleSort = (col: DrawerSort) => {
+    setSortBy(prev => prev === col ? 'default' : col)
+  }
+
   const sorted = useMemo(() => {
     return [...cases].sort((a, b) => {
-      const aNew = !actionMap[a.id] || actionMap[a.id].coordinator_status === 'new' ? 0 : 1
-      const bNew = !actionMap[b.id] || actionMap[b.id].coordinator_status === 'new' ? 0 : 1
-      if (aNew !== bNew) return aNew - bNew
-      return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
+      if (sortBy === 'default') {
+        const aNew = !actionMap[a.id] || actionMap[a.id].coordinator_status === 'new' ? 0 : 1
+        const bNew = !actionMap[b.id] || actionMap[b.id].coordinator_status === 'new' ? 0 : 1
+        if (aNew !== bNew) return aNew - bNew
+        return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
+      }
+      if (sortBy === 'status') {
+        const aStatus = actionMap[a.id]?.coordinator_status || 'new'
+        const bStatus = actionMap[b.id]?.coordinator_status || 'new'
+        return (STATUS_ORDER[aStatus] ?? 99) - (STATUS_ORDER[bStatus] ?? 99)
+      }
+      if (sortBy === 'attempts') {
+        return (actionMap[b.id]?.contact_attempts || 0) - (actionMap[a.id]?.contact_attempts || 0)
+      }
+      return 0
     })
-  }, [cases, actionMap])
+  }, [cases, actionMap, sortBy])
 
   return (
     <motion.div
@@ -97,8 +119,19 @@ export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActi
                   <th className="px-2 py-1.5 font-medium">Ärende</th>
                   <th className="px-2 py-1.5 font-medium">Typ</th>
                   <th className="px-2 py-1.5 font-medium">Tekniker</th>
-                  <th className="px-2 py-1.5 font-medium">Status</th>
-                  <th className="px-2 py-1.5 font-medium">Försök</th>
+                  <th
+                    className={`px-2 py-1.5 font-medium cursor-pointer select-none hover:text-slate-300 transition-colors ${sortBy === 'status' ? 'text-[#20c58f]' : ''}`}
+                    onClick={() => toggleSort('status')}
+                  >
+                    <span className="flex items-center gap-1">Status <ArrowUpDown className="w-2.5 h-2.5" /></span>
+                  </th>
+                  <th
+                    className={`px-2 py-1.5 font-medium cursor-pointer select-none hover:text-slate-300 transition-colors ${sortBy === 'attempts' ? 'text-[#20c58f]' : ''}`}
+                    onClick={() => toggleSort('attempts')}
+                  >
+                    <span className="flex items-center gap-1">Försök <ArrowUpDown className="w-2.5 h-2.5" /></span>
+                  </th>
+                  <th className="px-2 py-1.5 font-medium hidden lg:table-cell">Anteckning</th>
                   <th className="px-2 py-1.5 font-medium text-right">Åtgärder</th>
                 </tr>
               </thead>
@@ -142,8 +175,8 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate }: Drawe
   const status = action?.coordinator_status || 'new'
   const cfg = COORDINATOR_STATUS_CONFIG[status]
   const isScheduled = !!(c.start_date && c.due_date)
+  const notePreview = action?.coordinator_notes || ''
 
-  // Synka noteText när action uppdateras utifrån
   useEffect(() => {
     setNoteText(action?.coordinator_notes || '')
   }, [action?.coordinator_notes])
@@ -225,6 +258,14 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate }: Drawe
             {action?.contact_attempts || 0}
           </span>
         </td>
+        <td className="px-2 py-1.5 hidden lg:table-cell">
+          <span
+            className="text-slate-500 text-[10px] truncate block max-w-[120px]"
+            title={notePreview || undefined}
+          >
+            {notePreview ? (notePreview.length > 18 ? notePreview.slice(0, 18) + '...' : notePreview) : '—'}
+          </span>
+        </td>
         <td className="px-2 py-1.5 text-right" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-1">
             {/* Kvittera (bara om ny) */}
@@ -251,7 +292,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate }: Drawe
               </button>
               {contactOpen && (
                 <ContactPopover
-                  onSelect={handleLogContact}
+                  onConfirm={handleLogContact}
                   onClose={() => setContactOpen(false)}
                 />
               )}
@@ -277,7 +318,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate }: Drawe
       {/* Expanderad detalj */}
       {expanded && (
         <tr>
-          <td colSpan={7} className="px-0 py-0">
+          <td colSpan={8} className="px-0 py-0">
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -344,12 +385,13 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate }: Drawe
   )
 }
 
-// ─── Kontaktförsök-popover ───
+// ─── Kontaktförsök-popover (tvåstegs: välj metod → bekräfta) ───
 
-function ContactPopover({ onSelect, onClose }: {
-  onSelect: (method: ContactMethod, note?: string) => void
+function ContactPopover({ onConfirm, onClose }: {
+  onConfirm: (method: ContactMethod, note?: string) => void
   onClose: () => void
 }) {
+  const [selectedMethod, setSelectedMethod] = useState<ContactMethod | null>(null)
   const [note, setNote] = useState('')
   const ref = useRef<HTMLDivElement>(null)
 
@@ -361,37 +403,51 @@ function ContactPopover({ onSelect, onClose }: {
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
 
+  const handleConfirm = () => {
+    if (!selectedMethod) return
+    onConfirm(selectedMethod, note || undefined)
+  }
+
   return (
     <div ref={ref} className="absolute right-0 top-full mt-1 z-50 w-56 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-2.5">
       <p className="text-[10px] text-slate-400 mb-2 font-medium">Logga kontaktförsök</p>
       <div className="flex gap-1.5 mb-2">
+        {([
+          { method: 'phone' as ContactMethod, label: 'Telefon', icon: PhoneCall },
+          { method: 'email' as ContactMethod, label: 'E-post', icon: MailIcon },
+          { method: 'sms' as ContactMethod, label: 'SMS', icon: MessageCircle },
+        ]).map(({ method, label, icon: Icon }) => (
+          <button
+            key={method}
+            onClick={() => setSelectedMethod(method)}
+            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] font-medium transition-colors ${
+              selectedMethod === method
+                ? 'bg-[#20c58f]/20 text-[#20c58f] ring-1 ring-[#20c58f]'
+                : 'bg-slate-700 hover:bg-slate-600 text-white'
+            }`}
+          >
+            <Icon className="w-3 h-3" /> {label}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleConfirm() }}
+          placeholder="Valfri anteckning..."
+          className="flex-1 px-2 py-1 text-[10px] bg-slate-900 border border-slate-700 rounded text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+        />
         <button
-          onClick={() => onSelect('phone', note || undefined)}
-          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] font-medium bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+          onClick={handleConfirm}
+          disabled={!selectedMethod}
+          className="p-1.5 rounded bg-[#20c58f] text-white hover:bg-[#1ab07e] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Bekräfta"
         >
-          <PhoneCall className="w-3 h-3" /> Telefon
-        </button>
-        <button
-          onClick={() => onSelect('email', note || undefined)}
-          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] font-medium bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-        >
-          <MailIcon className="w-3 h-3" /> E-post
-        </button>
-        <button
-          onClick={() => onSelect('sms', note || undefined)}
-          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] font-medium bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-        >
-          <MessageCircle className="w-3 h-3" /> SMS
+          <Check className="w-3.5 h-3.5" />
         </button>
       </div>
-      <input
-        type="text"
-        value={note}
-        onChange={e => setNote(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter' && note) onSelect('phone', note) }}
-        placeholder="Valfri anteckning..."
-        className="w-full px-2 py-1 text-[10px] bg-slate-900 border border-slate-700 rounded text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-      />
     </div>
   )
 }
