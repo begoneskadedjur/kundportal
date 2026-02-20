@@ -57,6 +57,7 @@ export default function CasePipeline() {
   // Modal-state
   const [selectedCase, setSelectedCase] = useState<PipelineCaseRow | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false)
 
   // Kontaktförsök-popover
   const [contactPopoverCaseId, setContactPopoverCaseId] = useState<string | null>(null)
@@ -174,7 +175,8 @@ export default function CasePipeline() {
     navigate(`/koordinator/schema-v2?openCase=${c.id}`)
   }, [navigate])
 
-  const handleOpenCase = useCallback((c: PipelineCaseRow) => {
+  const handleOpenHistory = useCallback((c: PipelineCaseRow) => {
+    setOpenCommunicationOnLoad(true)
     setSelectedCase(c)
     setIsEditModalOpen(true)
   }, [])
@@ -291,7 +293,7 @@ export default function CasePipeline() {
                     onCancelNote={() => { setEditingNoteId(null); setNoteText('') }}
                     onStatusChange={handleStatusChange}
                     onBook={handleBookCase}
-                    onOpenCase={handleOpenCase}
+                    onOpenHistory={handleOpenHistory}
                   />
                 ))}
               </tbody>
@@ -304,10 +306,11 @@ export default function CasePipeline() {
       {selectedCase && (
         <EditCaseModal
           isOpen={isEditModalOpen}
-          onClose={() => { setIsEditModalOpen(false); setSelectedCase(null) }}
+          onClose={() => { setIsEditModalOpen(false); setSelectedCase(null); setOpenCommunicationOnLoad(false) }}
           onSuccess={handleEditSuccess}
           caseData={selectedCase as any}
           technicians={[]}
+          openCommunicationOnLoad={openCommunicationOnLoad}
         />
       )}
     </>
@@ -341,13 +344,13 @@ interface PipelineRowProps {
   onCancelNote: () => void
   onStatusChange: (c: PipelineCaseRow, status: CoordinatorCaseStatus) => void
   onBook: (c: PipelineCaseRow) => void
-  onOpenCase: (c: PipelineCaseRow) => void
+  onOpenHistory: (c: PipelineCaseRow) => void
 }
 
 function PipelineRow({
   caseRow: c, onAcknowledge, onOpenContactPopover, contactPopoverOpen,
   onLogContact, onStartEditNote, editingNoteId, noteText, onNoteTextChange,
-  onSaveNote, onCancelNote, onStatusChange, onBook, onOpenCase,
+  onSaveNote, onCancelNote, onStatusChange, onBook, onOpenHistory,
 }: PipelineRowProps) {
   const addr = formatAddress(c.adress)
   const isNew = !c.action || c.action.coordinator_status === 'new'
@@ -367,15 +370,11 @@ function PipelineRow({
         </span>
       </td>
 
-      {/* Ärende (klickbar) */}
+      {/* Ärende */}
       <td className="px-3 py-2.5">
-        <button
-          onClick={() => onOpenCase(c)}
-          className="text-white font-medium hover:text-[#20c58f] transition-colors text-left truncate max-w-[180px] block"
-          title={c.title}
-        >
+        <span className="text-white font-medium truncate max-w-[180px] block" title={c.title}>
           {c.title || 'Utan titel'}
-        </button>
+        </span>
       </td>
 
       {/* Typ */}
@@ -504,6 +503,15 @@ function PipelineRow({
               />
             )}
           </div>
+
+          {/* Historik */}
+          <button
+            onClick={() => onOpenHistory(c)}
+            className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors"
+            title="Visa historik"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+          </button>
 
           {/* Boka in (bara signerade) */}
           {isSignerad && (

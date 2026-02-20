@@ -291,6 +291,11 @@ export default function CoordinatorScheduleV2() {
     }
   }, [contractCases])
 
+  const handleOpenHistory = useCallback((caseData: BeGoneCaseRow) => {
+    setOpenCommunicationOnLoad(true)
+    handleOpenCaseModal(caseData)
+  }, [handleOpenCaseModal])
+
   const handleSchedulePendingCase = (caseData: Case & { customer?: any }) => {
     const adaptedCase = adaptCaseToBeGoneRow(caseData)
     setSelectedCase(adaptedCase)
@@ -352,7 +357,7 @@ export default function CoordinatorScheduleV2() {
               actionMap={actionMap}
               onScheduleCase={handleScheduleFromDrawer}
               onActionUpdate={handleActionUpdate}
-              onOpenCase={handleOpenCaseModal}
+              onOpenHistory={handleOpenHistory}
               onClose={() => setIsActionableDrawerOpen(false)}
             />
           )}

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
   CalendarPlus, ChevronUp, ChevronRight, ChevronDown, ExternalLink,
-  Eye, Phone, CalendarCheck, PhoneCall, MailIcon, MessageCircle, Loader2,
+  Eye, Phone, CalendarCheck, PhoneCall, MailIcon, MessageCircle, MessageSquare, Loader2,
   ArrowUpDown, Check,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -20,7 +20,7 @@ interface ActionableCasesDrawerProps {
   actionMap: Record<string, CoordinatorCaseAction>
   onScheduleCase: (caseData: BeGoneCaseRow) => void
   onActionUpdate: (caseId: string, action: CoordinatorCaseAction) => void
-  onOpenCase?: (caseData: BeGoneCaseRow) => void
+  onOpenHistory?: (caseData: BeGoneCaseRow) => void
   onClose: () => void
 }
 
@@ -43,7 +43,7 @@ function formatRelativeDate(dateStr: string | null): string {
   return date.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
 }
 
-export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActionUpdate, onOpenCase, onClose }: ActionableCasesDrawerProps) {
+export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActionUpdate, onOpenHistory, onClose }: ActionableCasesDrawerProps) {
   const navigate = useNavigate()
   const [sortBy, setSortBy] = useState<DrawerSort>('default')
 
@@ -145,7 +145,7 @@ export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActi
                     action={actionMap[c.id] || null}
                     onScheduleCase={onScheduleCase}
                     onActionUpdate={onActionUpdate}
-                    onOpenCase={onOpenCase}
+                    onOpenHistory={onOpenHistory}
                   />
                 ))}
               </tbody>
@@ -164,10 +164,10 @@ interface DrawerRowProps {
   action: CoordinatorCaseAction | null
   onScheduleCase: (caseData: BeGoneCaseRow) => void
   onActionUpdate: (caseId: string, action: CoordinatorCaseAction) => void
-  onOpenCase?: (caseData: BeGoneCaseRow) => void
+  onOpenHistory?: (caseData: BeGoneCaseRow) => void
 }
 
-function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenCase }: DrawerRowProps) {
+function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenHistory }: DrawerRowProps) {
   const { user, profile } = useAuth()
   const [expanded, setExpanded] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
@@ -241,18 +241,8 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenC
             : <ChevronRight className="w-3.5 h-3.5" />
           }
         </td>
-        <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
-          {onOpenCase ? (
-            <button
-              onClick={() => onOpenCase(c)}
-              className="text-white font-medium hover:text-[#20c58f] transition-colors truncate block max-w-[160px] text-left"
-              title={c.title || 'Utan titel'}
-            >
-              {c.title || 'Utan titel'}
-            </button>
-          ) : (
-            <span className="text-white font-medium truncate block max-w-[160px]">{c.title || 'Utan titel'}</span>
-          )}
+        <td className="px-2 py-1.5">
+          <span className="text-white font-medium truncate block max-w-[160px]" title={c.title || 'Utan titel'}>{c.title || 'Utan titel'}</span>
         </td>
         <td className="px-2 py-1.5">
           <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
@@ -312,6 +302,17 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenC
                 />
               )}
             </div>
+
+            {/* Historik */}
+            {onOpenHistory && (
+              <button
+                onClick={() => onOpenHistory(c)}
+                className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors"
+                title="Visa historik"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+              </button>
+            )}
 
             {/* Boka in */}
             {!isScheduled && (
