@@ -27,8 +27,18 @@ export const topLevelItems: NavItem[] = [
 
 export const navGroups: NavGroup[] = [
   {
+    label: 'Planering',
+    icon: CalendarDays,
+    pinned: true,
+    items: [
+      { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
+      { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
+    ],
+  },
+  {
     label: 'Kunder & Avtal',
     icon: Users,
+    pinned: true,
     items: [
       { label: 'Befintliga kunder', icon: Users, path: '/koordinator/befintliga-kunder' },
       { label: 'Trafikljusöversikt', icon: Activity, path: '/koordinator/trafikljusoversikt' },
@@ -69,14 +79,6 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Planering',
-    icon: CalendarDays,
-    items: [
-      { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
-      { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
-    ],
-  },
-  {
     label: 'Ärenden',
     icon: FileSearch,
     items: [
@@ -84,12 +86,6 @@ export const navGroups: NavGroup[] = [
       { label: 'Avtal & Offerter', icon: FileSignature, path: '/koordinator/oneflow-contract-creator' },
     ],
   },
-]
-
-export const favoriteItems: NavItem[] = [
-  { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
-  { label: 'Fakturering', icon: Receipt, path: '/koordinator/fakturering' },
-  { label: 'Sök Ärenden', icon: FileSearch, path: '/koordinator/sok-arenden' },
 ]
 
 export const mobileBottomItems: NavItem[] = [

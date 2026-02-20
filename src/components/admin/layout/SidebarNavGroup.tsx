@@ -12,7 +12,7 @@ interface SidebarNavGroupProps {
 
 export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGroupProps) {
   const isAnyActive = group.items.some(item => currentPath.startsWith(item.path))
-  const [expanded, setExpanded] = useState(isAnyActive)
+  const [expanded, setExpanded] = useState(group.pinned || isAnyActive)
   const GroupIcon = group.icon
 
   if (collapsed) {
@@ -69,7 +69,7 @@ export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGro
         onClick={() => setExpanded(!expanded)}
         className={`
           w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200
-          ${isAnyActive ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'}
+          ${group.pinned ? 'bg-teal-500/5 text-teal-400/70 hover:text-teal-400' : isAnyActive ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'}
         `}
       >
         <div className="flex items-center gap-2.5">

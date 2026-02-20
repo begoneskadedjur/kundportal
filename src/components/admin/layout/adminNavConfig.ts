@@ -34,6 +34,7 @@ export interface NavGroup {
   label: string
   icon: React.ElementType
   items: NavItem[]
+  pinned?: boolean
 }
 
 export const topLevelItems: NavItem[] = [

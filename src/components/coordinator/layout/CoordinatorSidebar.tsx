@@ -6,11 +6,11 @@ import {
   LogOut,
   Search,
   CalendarDays,
-  Star,
+
   HelpCircle,
   Shield,
 } from 'lucide-react'
-import { topLevelItems, navGroups, favoriteItems } from './coordinatorNavConfig'
+import { topLevelItems, navGroups } from './coordinatorNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -160,49 +160,6 @@ export function CoordinatorSidebar({
           />
         ))}
 
-        {/* Separator before favorites */}
-        <div className="h-px bg-slate-700/50 my-3" />
-
-        {/* Favorites section */}
-        {!collapsed && (
-          <div>
-            <p className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              <Star className="w-3.5 h-3.5" />
-              Favoriter
-            </p>
-            <div className="space-y-0.5 mt-1">
-              {favoriteItems.map(item => {
-                const Icon = item.icon
-                const isActive = currentPath.startsWith(item.path)
-                return (
-                  <Link
-                    key={`fav-${item.path}`}
-                    to={item.path}
-                    className={`
-                      flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-200 text-sm
-                      focus-visible:ring-2 focus-visible:ring-teal-400 outline-none
-                      ${isActive
-                        ? 'text-teal-400 bg-teal-500/5'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                      }
-                    `}
-                  >
-                    <Icon className="w-4 h-4 flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        )}
-        {collapsed && (
-          <button
-            className="w-full flex items-center justify-center px-3 py-2.5 rounded-xl text-slate-500 hover:text-amber-400 transition-colors"
-            title="Favoriter"
-          >
-            <Star className="w-5 h-5" />
-          </button>
-        )}
       </nav>
 
       {/* Bottom Section */}
