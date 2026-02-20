@@ -58,6 +58,7 @@ import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule';
 import CoordinatorScheduleV2 from './pages/coordinator/CoordinatorScheduleV2';
 import ScheduleOptimizer from './pages/coordinator/ScheduleOptimizer';
 import CaseSearch from './pages/coordinator/CaseSearch';
+import CasePipeline from './pages/coordinator/CasePipeline';
 import CoordinatorAnalytics from './pages/coordinator/CoordinatorAnalytics';
 
 // TEKNIKER PAGES
@@ -145,6 +146,7 @@ function App() {
               <Route path="skapa-avtal" element={<ProtectedRoute requiredRole="admin"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="avtalsdiagnostik" element={<ProtectedRoute requiredRole="admin"><OneflowDiagnostics /></ProtectedRoute>} />
               <Route path="forsaljningspipeline" element={<ProtectedRoute requiredRole="admin"><ContractsOverview /></ProtectedRoute>} />
+              <Route path="offerthantering" element={<ProtectedRoute requiredRole="admin"><CasePipeline /></ProtectedRoute>} />
               <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
               <Route path="oneflow-test" element={<Navigate to="/admin/skapa-avtal" replace />} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="admin"><InternAdministration /></ProtectedRoute>} />
@@ -235,6 +237,7 @@ function App() {
               <Route path="booking-assistant" element={<ProtectedRoute requiredRole="koordinator"><ScheduleOptimizer /></ProtectedRoute>} />
 
               {/* Ärenden (koordinator-specifik) */}
+              <Route path="offerthantering" element={<ProtectedRoute requiredRole="koordinator"><CasePipeline /></ProtectedRoute>} />
               <Route path="sok-arenden" element={<ProtectedRoute requiredRole="koordinator"><CaseSearch /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="koordinator"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="analytics" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorAnalytics /></ProtectedRoute>} />

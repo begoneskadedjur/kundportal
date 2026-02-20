@@ -18,6 +18,7 @@ import {
   Sparkles,
   Image as ImageIcon,
   FileSearch,
+  ClipboardList,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
@@ -83,6 +84,7 @@ export const navGroups: NavGroup[] = [
     label: 'Ärenden',
     icon: FileSearch,
     items: [
+      { label: 'Offerthantering', icon: ClipboardList, path: '/koordinator/offerthantering' },
       { label: 'Sök Ärenden', icon: FileSearch, path: '/koordinator/sok-arenden' },
       { label: 'Avtal & Offerter', icon: FileSignature, path: '/koordinator/oneflow-contract-creator' },
     ],
@@ -129,6 +131,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/schema-v2': 'Schema V2 (Test)',
 
   // Ärenden (koordinator-specifik)
+  '/koordinator/offerthantering': 'Offerthantering',
   '/koordinator/sok-arenden': 'Sök Ärenden',
   '/koordinator/oneflow-contract-creator': 'Avtal & Offerter',
   '/koordinator/analytics': 'Analytics & Insights',

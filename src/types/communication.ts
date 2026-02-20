@@ -12,7 +12,10 @@ export type SystemEventType =
   | 'scheduled'
   | 'rescheduled'
   | 'price_updated'
-  | 'case_created';
+  | 'case_created'
+  | 'coordinator_acknowledged'
+  | 'coordinator_contacted'
+  | 'coordinator_note_added';
 
 export type MentionType = 'user' | 'role' | 'all';
 
@@ -201,6 +204,9 @@ export const SYSTEM_EVENT_MESSAGES: Record<SystemEventType, (data: SystemComment
   rescheduled: (data) => `Ärendet ombokades till ${data.scheduledDate} kl. ${data.scheduledTime}`,
   price_updated: (data) => `Pris ändrat från ${data.oldValue} kr till ${data.newValue} kr`,
   case_created: () => `Ärendet skapades`,
+  coordinator_acknowledged: (data) => `Koordinator ${data.technicianName || ''} har mottagit ärendet`,
+  coordinator_contacted: (data) => `Kontaktförsök via ${data.newValue || 'okänd metod'}`,
+  coordinator_note_added: () => `Koordinatornotering tillagd`,
 };
 
 // Ticket-status konfiguration
