@@ -48,8 +48,9 @@ export function ScheduleGrid({
   // Filtrera ärenden per datum
   const dateCases = useMemo(() => {
     return cases.filter(c => {
-      if (!c.start_date) return false
-      const caseDate = new Date(c.start_date)
+      const dateField = c.start_date || c.due_date
+      if (!dateField) return false
+      const caseDate = new Date(dateField)
       if (viewMode === 'day') return isSameDay(caseDate, currentDate)
       return isInWeek(caseDate, weekStart)
     })

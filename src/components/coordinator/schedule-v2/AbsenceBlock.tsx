@@ -23,8 +23,8 @@ interface AbsenceBlockProps {
 export function AbsenceBlock({ absence, onClick, viewMode, weekStart }: AbsenceBlockProps) {
   const [hovered, setHovered] = useState(false)
 
-  const start = new Date(absence.start_date)
-  const end = new Date(absence.end_date)
+  const start = new Date(absence.start_date || absence.end_date)
+  const end = new Date(absence.end_date || absence.start_date)
   const rawX = eventX(start, viewMode, weekStart)
   const rawW = eventWidth(start, end, viewMode)
   const { x, width } = clampToGrid(rawX, rawW, viewMode)

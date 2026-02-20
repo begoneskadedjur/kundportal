@@ -17,9 +17,11 @@ export function EventBlock({ caseData, onClick, viewMode, weekStart }: EventBloc
   const [hovered, setHovered] = useState(false)
   const blockRef = useRef<HTMLDivElement>(null)
 
-  const start = caseData.start_date ? new Date(caseData.start_date) : null
-  const end = caseData.due_date ? new Date(caseData.due_date) : null
-  if (!start || !end) return null
+  const startRaw = caseData.start_date || caseData.due_date
+  const endRaw = caseData.due_date || caseData.start_date
+  if (!startRaw || !endRaw) return null
+  const start = new Date(startRaw)
+  const end = new Date(endRaw)
 
   const rawX = eventX(start, viewMode, weekStart)
   const rawW = eventWidth(start, end, viewMode)
