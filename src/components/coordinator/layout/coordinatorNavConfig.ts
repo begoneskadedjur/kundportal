@@ -34,7 +34,7 @@ export const navGroups: NavGroup[] = [
     label: 'Försäljning',
     icon: Target,
     items: [
-      { label: 'Lead Pipeline', icon: Target, path: '/koordinator/leads' },
+      { label: 'Leads', icon: Target, path: '/koordinator/leads' },
       { label: 'Avtal & Offerter', icon: FileSignature, path: '/koordinator/oneflow-contract-creator' },
     ],
   },
@@ -57,8 +57,8 @@ export const navGroups: NavGroup[] = [
     label: 'Verktyg',
     icon: Sparkles,
     items: [
-      { label: 'Team AI Chat', icon: Sparkles, path: '/koordinator/team-chat' },
-      { label: 'Kundåtkomst', icon: Building2, path: '/koordinator/customer-access' },
+      { label: 'AI Assistent', icon: Sparkles, path: '/koordinator/team-chat' },
+      { label: 'Användarkonton (Kund)', icon: Building2, path: '/koordinator/customer-access' },
     ],
   },
   {
@@ -73,7 +73,7 @@ export const navGroups: NavGroup[] = [
 
 export const favoriteItems: NavItem[] = [
   { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
-  { label: 'Team AI Chat', icon: Sparkles, path: '/koordinator/team-chat' },
+  { label: 'AI Assistent', icon: Sparkles, path: '/koordinator/team-chat' },
   { label: 'Sök Ärenden', icon: FileSearch, path: '/koordinator/sok-arenden' },
 ]
 
@@ -89,13 +89,13 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/dashboard': 'Översikt',
   '/koordinator/schema': 'Schema & Planering',
   '/koordinator/booking-assistant': 'Schemaoptimerare',
-  '/koordinator/leads': 'Lead Pipeline',
+  '/koordinator/leads': 'Leads',
   '/koordinator/oneflow-contract-creator': 'Avtal & Offerter',
   '/koordinator/sok-arenden': 'Sök Ärenden',
   '/koordinator/analytics': 'Analytics & Insights',
   '/koordinator/organisation/traffic-light': 'Trafikljusöversikt',
-  '/koordinator/team-chat': 'Team AI Chat',
-  '/koordinator/customer-access': 'Kundåtkomst',
+  '/koordinator/team-chat': 'AI Assistent',
+  '/koordinator/customer-access': 'Användarkonton (Kund)',
   '/koordinator/tickets': 'Tickets',
   '/koordinator/larosate': 'Lärosäte',
   '/koordinator/guides/case-deletion': 'Ärendehantering',
