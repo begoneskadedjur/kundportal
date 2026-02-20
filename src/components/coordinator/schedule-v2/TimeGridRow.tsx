@@ -1,5 +1,5 @@
 // TimeGridRow.tsx — En teknikers tidsrad med events och frånvaro
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
 import { HOUR_WIDTH, DAY_START_HOUR, TOTAL_HOURS, WEEK_DAY_COL_WIDTH, WEEK_HOUR_WIDTH, ROW_HEIGHT, getGridWidth } from './scheduleConstants'
 import { assignLanes } from './scheduleUtils'
@@ -18,7 +18,7 @@ interface TimeGridRowProps {
   weekStart: Date
 }
 
-export function TimeGridRow({ technician, cases, absences, currentDate, onCaseClick, onAbsenceClick, viewMode, weekStart }: TimeGridRowProps) {
+export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absences, currentDate, onCaseClick, onAbsenceClick, viewMode, weekStart }: TimeGridRowProps) {
   const gridWidth = getGridWidth(viewMode)
 
   // Beräkna lanes för överlappande events
@@ -119,4 +119,4 @@ export function TimeGridRow({ technician, cases, absences, currentDate, onCaseCl
       })}
     </div>
   )
-}
+})

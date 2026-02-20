@@ -1,5 +1,5 @@
 // TechnicianRowHeader.tsx — Sticky vänsterkolumn per tekniker med kapacitetsbar
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { Technician, BeGoneCaseRow } from '../../../types/database'
 import { TECH_COL_WIDTH, ROW_HEIGHT, TECH_COLORS } from './scheduleConstants'
 import { getTechWorkHours } from './scheduleUtils'
@@ -11,7 +11,7 @@ interface TechnicianRowHeaderProps {
   currentDate: Date
 }
 
-export function TechnicianRowHeader({ technician, cases, index, currentDate }: TechnicianRowHeaderProps) {
+export const TechnicianRowHeader = memo(function TechnicianRowHeader({ technician, cases, index, currentDate }: TechnicianRowHeaderProps) {
   const color = TECH_COLORS[index % TECH_COLORS.length]
 
   const { caseCount, scheduledHours, capacity, ratio } = useMemo(() => {
@@ -57,4 +57,4 @@ export function TechnicianRowHeader({ technician, cases, index, currentDate }: T
       </div>
     </div>
   )
-}
+})

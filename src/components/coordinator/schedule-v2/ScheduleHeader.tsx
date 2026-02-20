@@ -26,6 +26,9 @@ interface ScheduleHeaderProps {
   technicians: Technician[]
   selectedTechnicianIds: Set<string>
   setSelectedTechnicianIds: (ids: Set<string>) => void
+  // Actionable drawer
+  isActionableOpen?: boolean
+  onToggleActionable?: () => void
 }
 
 export function ScheduleHeader({
@@ -42,6 +45,8 @@ export function ScheduleHeader({
   technicians,
   selectedTechnicianIds,
   setSelectedTechnicianIds,
+  isActionableOpen,
+  onToggleActionable,
 }: ScheduleHeaderProps) {
   const weekNum = getWeekNumber(currentDate)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -117,7 +122,16 @@ export function ScheduleHeader({
             {stats.toBook > 0 && (
               <>
                 <span className="w-1 h-1 bg-slate-600 rounded-full" />
-                <span className="text-amber-400">{stats.toBook} att boka in</span>
+                <button
+                  onClick={onToggleActionable}
+                  className={`font-medium transition-colors ${
+                    isActionableOpen
+                      ? 'text-amber-300 underline underline-offset-2'
+                      : 'text-amber-400 hover:text-amber-300 hover:underline underline-offset-2'
+                  }`}
+                >
+                  {stats.toBook} att boka in
+                </button>
               </>
             )}
             <span className="w-1 h-1 bg-slate-600 rounded-full" />

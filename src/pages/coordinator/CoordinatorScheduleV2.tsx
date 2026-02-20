@@ -6,9 +6,12 @@ import { BeGoneCaseRow, Technician, isScheduledCase, ALL_VALID_STATUSES } from '
 import { Case } from '../../types/cases'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 
+import { AnimatePresence } from 'framer-motion'
+
 // V2 komponenter
 import { ScheduleHeader, type ViewMode } from '../../components/coordinator/schedule-v2/ScheduleHeader'
 import { ScheduleGrid } from '../../components/coordinator/schedule-v2/ScheduleGrid'
+import { ActionableCasesDrawer } from '../../components/coordinator/schedule-v2/ActionableCasesDrawer'
 import type { Absence } from '../../components/coordinator/schedule-v2/AbsenceBlock'
 
 // Befintliga modaler (återanvänds rakt av)
@@ -51,6 +54,7 @@ export default function CoordinatorScheduleV2() {
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null)
   const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false)
   const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false)
+  const [isActionableDrawerOpen, setIsActionableDrawerOpen] = useState(false)
 
   // ─── Data-fetching (identisk med befintlig CoordinatorSchedule) ───
 
@@ -187,7 +191,7 @@ export default function CoordinatorScheduleV2() {
 
   // ─── Modal-hantering ───
 
-  const handleOpenCaseModal = (caseData: BeGoneCaseRow) => {
+  const handleOpenCaseModal = useCallback((caseData: BeGoneCaseRow) => {
     if (caseData.case_type === 'contract') {
       const cc = contractCases.find(c => c.id === caseData.id)
       if (cc) {
@@ -200,13 +204,19 @@ export default function CoordinatorScheduleV2() {
     } else {
       setSelectedCase(caseData); setIsEditModalOpen(true)
     }
-  }
+  }, [contractCases])
 
   const handleSchedulePendingCase = (caseData: Case & { customer?: any }) => {
     const adaptedCase = adaptCaseToBeGoneRow(caseData)
     setSelectedCase(adaptedCase)
     setIsCreateModalOpen(true)
   }
+
+  const handleScheduleFromDrawer = useCallback((caseData: BeGoneCaseRow) => {
+    setSelectedCase(caseData)
+    setIsCreateModalOpen(true)
+    setIsActionableDrawerOpen(false)
+  }, [])
 
   const handleUpdateSuccess = () => {
     setIsEditModalOpen(false)
@@ -215,6 +225,10 @@ export default function CoordinatorScheduleV2() {
     setSelectedInspectionCase(null)
     fetchData()
   }
+
+  const handleAbsenceClick = useCallback((a: Absence) => {
+    setSelectedAbsence(a); setIsAbsenceDetailsModalOpen(true)
+  }, [])
 
   const handleCreateSuccess = () => { setIsCreateModalOpen(false); setSelectedCase(null); fetchData() }
   const handleAbsenceCreateSuccess = () => { setIsAbsenceModalOpen(false); fetchData() }
@@ -246,7 +260,19 @@ export default function CoordinatorScheduleV2() {
           technicians={technicians}
           selectedTechnicianIds={selectedTechnicianIds}
           setSelectedTechnicianIds={setSelectedTechnicianIds}
+          isActionableOpen={isActionableDrawerOpen}
+          onToggleActionable={() => setIsActionableDrawerOpen(v => !v)}
         />
+
+        <AnimatePresence>
+          {isActionableDrawerOpen && (
+            <ActionableCasesDrawer
+              cases={actionableCases}
+              onScheduleCase={handleScheduleFromDrawer}
+              onClose={() => setIsActionableDrawerOpen(false)}
+            />
+          )}
+        </AnimatePresence>
 
         <ScheduleGrid
           technicians={filteredTechnicians}
@@ -255,7 +281,7 @@ export default function CoordinatorScheduleV2() {
           currentDate={currentDate}
           viewMode={viewMode}
           onCaseClick={handleOpenCaseModal}
-          onAbsenceClick={a => { setSelectedAbsence(a); setIsAbsenceDetailsModalOpen(true) }}
+          onAbsenceClick={handleAbsenceClick}
         />
       </div>
 

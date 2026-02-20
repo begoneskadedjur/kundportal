@@ -1,5 +1,5 @@
 // EventBlock.tsx — Enskilt event-block med layered information + lane-stacking
-import { useState, useRef } from 'react'
+import { useState, useRef, memo } from 'react'
 import { BeGoneCaseRow } from '../../../types/database'
 import { eventX, eventWidth, clampToGrid, formatTime, shortAddress } from './scheduleUtils'
 import { getStatusStyle, ROW_HEIGHT } from './scheduleConstants'
@@ -15,7 +15,7 @@ interface EventBlockProps {
   totalLanes?: number
 }
 
-export function EventBlock({ caseData, onClick, viewMode, weekStart, lane = 0, totalLanes = 1 }: EventBlockProps) {
+export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode, weekStart, lane = 0, totalLanes = 1 }: EventBlockProps) {
   const [hovered, setHovered] = useState(false)
   const blockRef = useRef<HTMLDivElement>(null)
 
@@ -94,4 +94,4 @@ export function EventBlock({ caseData, onClick, viewMode, weekStart, lane = 0, t
       )}
     </div>
   )
-}
+})
