@@ -32,6 +32,7 @@ export const navGroups: NavGroup[] = [
     pinned: true,
     items: [
       { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
+      { label: 'Schema V2 (Test)', icon: CalendarDays, path: '/koordinator/schema-v2' },
       { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
     ],
   },
@@ -125,6 +126,7 @@ export const breadcrumbMap: Record<string, string> = {
   // Planering (koordinator-specifik)
   '/koordinator/schema': 'Schema & Planering',
   '/koordinator/booking-assistant': 'Schemaoptimerare',
+  '/koordinator/schema-v2': 'Schema V2 (Test)',
 
   // Ärenden (koordinator-specifik)
   '/koordinator/sok-arenden': 'Sök Ärenden',

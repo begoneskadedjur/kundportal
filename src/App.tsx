@@ -55,6 +55,7 @@ import WebhookConfig from './pages/admin/WebhookConfig';
 // KOORDINATOR IMPORTS
 import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
 import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule';
+import CoordinatorScheduleV2 from './pages/coordinator/CoordinatorScheduleV2';
 import ScheduleOptimizer from './pages/coordinator/ScheduleOptimizer';
 import CaseSearch from './pages/coordinator/CaseSearch';
 import CoordinatorAnalytics from './pages/coordinator/CoordinatorAnalytics';
@@ -230,6 +231,7 @@ function App() {
 
               {/* Planering (koordinator-specifik) */}
               <Route path="schema" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorSchedule /></ProtectedRoute>} />
+              <Route path="schema-v2" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorScheduleV2 /></ProtectedRoute>} />
               <Route path="booking-assistant" element={<ProtectedRoute requiredRole="koordinator"><ScheduleOptimizer /></ProtectedRoute>} />
 
               {/* Ärenden (koordinator-specifik) */}
