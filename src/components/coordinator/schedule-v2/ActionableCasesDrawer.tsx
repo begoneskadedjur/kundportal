@@ -20,6 +20,7 @@ interface ActionableCasesDrawerProps {
   actionMap: Record<string, CoordinatorCaseAction>
   onScheduleCase: (caseData: BeGoneCaseRow) => void
   onActionUpdate: (caseId: string, action: CoordinatorCaseAction) => void
+  onOpenCase?: (caseData: BeGoneCaseRow) => void
   onClose: () => void
 }
 
@@ -42,7 +43,7 @@ function formatRelativeDate(dateStr: string | null): string {
   return date.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
 }
 
-export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActionUpdate, onClose }: ActionableCasesDrawerProps) {
+export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActionUpdate, onOpenCase, onClose }: ActionableCasesDrawerProps) {
   const navigate = useNavigate()
   const [sortBy, setSortBy] = useState<DrawerSort>('default')
 
@@ -56,7 +57,7 @@ export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActi
         const aNew = !actionMap[a.id] || actionMap[a.id].coordinator_status === 'new' ? 0 : 1
         const bNew = !actionMap[b.id] || actionMap[b.id].coordinator_status === 'new' ? 0 : 1
         if (aNew !== bNew) return aNew - bNew
-        return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       }
       if (sortBy === 'status') {
         const aStatus = actionMap[a.id]?.coordinator_status || 'new'
@@ -131,6 +132,7 @@ export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActi
                   >
                     <span className="flex items-center gap-1">Försök <ArrowUpDown className="w-2.5 h-2.5" /></span>
                   </th>
+                  <th className="px-2 py-1.5 font-medium hidden md:table-cell">Signerad</th>
                   <th className="px-2 py-1.5 font-medium hidden lg:table-cell">Anteckning</th>
                   <th className="px-2 py-1.5 font-medium text-right">Åtgärder</th>
                 </tr>
@@ -143,6 +145,7 @@ export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActi
                     action={actionMap[c.id] || null}
                     onScheduleCase={onScheduleCase}
                     onActionUpdate={onActionUpdate}
+                    onOpenCase={onOpenCase}
                   />
                 ))}
               </tbody>
@@ -161,9 +164,10 @@ interface DrawerRowProps {
   action: CoordinatorCaseAction | null
   onScheduleCase: (caseData: BeGoneCaseRow) => void
   onActionUpdate: (caseId: string, action: CoordinatorCaseAction) => void
+  onOpenCase?: (caseData: BeGoneCaseRow) => void
 }
 
-function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate }: DrawerRowProps) {
+function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenCase }: DrawerRowProps) {
   const { user, profile } = useAuth()
   const [expanded, setExpanded] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
@@ -237,8 +241,18 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate }: Drawe
             : <ChevronRight className="w-3.5 h-3.5" />
           }
         </td>
-        <td className="px-2 py-1.5">
-          <span className="text-white font-medium truncate block max-w-[160px]">{c.title || 'Utan titel'}</span>
+        <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
+          {onOpenCase ? (
+            <button
+              onClick={() => onOpenCase(c)}
+              className="text-white font-medium hover:text-[#20c58f] transition-colors truncate block max-w-[160px] text-left"
+              title={c.title || 'Utan titel'}
+            >
+              {c.title || 'Utan titel'}
+            </button>
+          ) : (
+            <span className="text-white font-medium truncate block max-w-[160px]">{c.title || 'Utan titel'}</span>
+          )}
         </td>
         <td className="px-2 py-1.5">
           <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
@@ -258,6 +272,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate }: Drawe
             {action?.contact_attempts || 0}
           </span>
         </td>
+        <td className="px-2 py-1.5 text-slate-500 hidden md:table-cell">{formatRelativeDate(c.updated_at)}</td>
         <td className="px-2 py-1.5 hidden lg:table-cell">
           <span
             className="text-slate-500 text-[10px] truncate block max-w-[120px]"
@@ -318,7 +333,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate }: Drawe
       {/* Expanderad detalj */}
       {expanded && (
         <tr>
-          <td colSpan={8} className="px-0 py-0">
+          <td colSpan={9} className="px-0 py-0">
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}

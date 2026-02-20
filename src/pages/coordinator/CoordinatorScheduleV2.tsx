@@ -352,6 +352,7 @@ export default function CoordinatorScheduleV2() {
               actionMap={actionMap}
               onScheduleCase={handleScheduleFromDrawer}
               onActionUpdate={handleActionUpdate}
+              onOpenCase={handleOpenCaseModal}
               onClose={() => setIsActionableDrawerOpen(false)}
             />
           )}

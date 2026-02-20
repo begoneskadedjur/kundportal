@@ -459,6 +459,9 @@ function PipelineRow({
               placeholder="Skriv anteckning..."
             />
             <button onClick={() => onSaveNote(c)} className="text-[#20c58f] hover:text-white text-[10px] shrink-0">Spara</button>
+            <button onClick={() => onCancelNote()} className="text-slate-500 hover:text-white transition-colors shrink-0 p-0.5" title="Stäng">
+              <X className="w-3 h-3" />
+            </button>
           </div>
         ) : (
           <button
