@@ -1,5 +1,5 @@
 // CoordinatorScheduleV2.tsx — Egenbyggd schemavy (ersätter FullCalendar)
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { BeGoneCaseRow, Technician, isScheduledCase, ALL_VALID_STATUSES } from '../../types/database'
@@ -71,6 +71,11 @@ export default function CoordinatorScheduleV2() {
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<Set<string>>(new Set())
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES))
 
+  // Refs för att undvika dubbel fetch-loop
+  const selectedTechRef = useRef(selectedTechnicianIds)
+  selectedTechRef.current = selectedTechnicianIds
+  const isInitialLoad = useRef(true)
+
   // Vy-state
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('day')
@@ -140,7 +145,8 @@ export default function CoordinatorScheduleV2() {
 
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true)
+      if (isInitialLoad.current) setLoading(true)
+
       const [techResult, privateResult, businessResult, contractResult, absenceResult] = await Promise.all([
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
         supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
@@ -167,7 +173,7 @@ export default function CoordinatorScheduleV2() {
       ]
       setAllCases(combinedCases as BeGoneCaseRow[])
 
-      if (selectedTechnicianIds.size === 0 && fetchedTechnicians.length > 0) {
+      if (selectedTechRef.current.size === 0 && fetchedTechnicians.length > 0) {
         const defaultSelected = fetchedTechnicians.filter(t => t.role === 'Skadedjurstekniker').map(t => t.id)
         setSelectedTechnicianIds(new Set(defaultSelected))
       }
@@ -175,8 +181,9 @@ export default function CoordinatorScheduleV2() {
       console.error('Fel vid datahämtning:', err)
     } finally {
       setLoading(false)
+      isInitialLoad.current = false
     }
-  }, [selectedTechnicianIds.size])
+  }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
 
