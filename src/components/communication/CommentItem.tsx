@@ -299,13 +299,21 @@ export default function CommentItem({
 
   // Systemkommentar har egen styling - REDESIGN: Mer subtil och inline
   if (comment.is_system_comment) {
+    const exactTime = new Date(comment.created_at).toLocaleString('sv-SE', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    });
     return (
       <div className="flex items-center gap-2 py-1.5 px-2">
         <div className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
           <Settings className="w-3 h-3 text-slate-500" />
         </div>
-        <span className="text-[13px] text-slate-500 flex-1">{comment.content}</span>
-        <span className="text-[11px] text-slate-600">
+        <span className="text-[13px] flex-1">
+          <span className="text-slate-300 font-medium">{comment.author_name}</span>
+          <span className="text-slate-600 mx-1">&mdash;</span>
+          <span className="text-slate-500">{comment.content}</span>
+        </span>
+        <span className="text-[11px] text-slate-600 shrink-0 cursor-default" title={exactTime}>
           {formatCommentTime(comment.created_at)}
         </span>
       </div>
