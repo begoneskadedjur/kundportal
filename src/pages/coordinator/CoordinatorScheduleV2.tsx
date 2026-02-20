@@ -33,7 +33,7 @@ export default function CoordinatorScheduleV2() {
   const [absences, setAbsences] = useState<Absence[]>([])
   const [technicians, setTechnicians] = useState<Technician[]>([])
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<Set<string>>(new Set())
-  const [activeStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES))
+  const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES))
 
   // Vy-state
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -240,6 +240,12 @@ export default function CoordinatorScheduleV2() {
             toBook: actionableCases.length,
             technicians: filteredTechnicians.length,
           }}
+          activeStatuses={activeStatuses}
+          setActiveStatuses={setActiveStatuses}
+          defaultStatuses={new Set(DEFAULT_ACTIVE_STATUSES)}
+          technicians={technicians}
+          selectedTechnicianIds={selectedTechnicianIds}
+          setSelectedTechnicianIds={setSelectedTechnicianIds}
         />
 
         <ScheduleGrid

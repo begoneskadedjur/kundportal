@@ -1,8 +1,13 @@
-// ScheduleHeader.tsx — Header med datumnavigation, vy-växlare och knappar
-import { CalendarDays, ChevronLeft, ChevronRight, FileText, CalendarOff } from 'lucide-react'
+// ScheduleHeader.tsx — Header med datumnavigation, vy-växlare, filter och knappar
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, CalendarOff, SlidersHorizontal } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
 import Button from '../../ui/Button'
 import { StatusLegend } from './StatusLegend'
 import { getWeekNumber } from './scheduleUtils'
+import { FILTER_STATUSES } from './scheduleConstants'
+import { ScheduleFilterPopover } from './ScheduleFilterPopover'
+import type { Technician } from '../../../types/database'
 
 export type ViewMode = 'day' | 'week'
 
@@ -14,6 +19,13 @@ interface ScheduleHeaderProps {
   onCreateCase: () => void
   onCreateAbsence: () => void
   stats: { scheduled: number; toBook: number; technicians: number }
+  // Filter-props
+  activeStatuses: Set<string>
+  setActiveStatuses: (s: Set<string>) => void
+  defaultStatuses: Set<string>
+  technicians: Technician[]
+  selectedTechnicianIds: Set<string>
+  setSelectedTechnicianIds: (ids: Set<string>) => void
 }
 
 export function ScheduleHeader({
@@ -24,8 +36,50 @@ export function ScheduleHeader({
   onCreateCase,
   onCreateAbsence,
   stats,
+  activeStatuses,
+  setActiveStatuses,
+  defaultStatuses,
+  technicians,
+  selectedTechnicianIds,
+  setSelectedTechnicianIds,
 }: ScheduleHeaderProps) {
   const weekNum = getWeekNumber(currentDate)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  // Stäng popover vid klick utanför
+  useEffect(() => {
+    if (!filterOpen) return
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [filterOpen])
+
+  // Stäng vid Escape
+  useEffect(() => {
+    if (!filterOpen) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFilterOpen(false)
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [filterOpen])
+
+  // Beräkna om filter avviker från default
+  const activeFilterCount = useMemo(() => {
+    const allStatusKeys = FILTER_STATUSES.flatMap(s => s.group || [s.key])
+    const hiddenStatuses = allStatusKeys.filter(k => defaultStatuses.has(k) && !activeStatuses.has(k))
+    const extraStatuses = allStatusKeys.filter(k => !defaultStatuses.has(k) && activeStatuses.has(k))
+    const defaultTechIds = new Set(technicians.filter(t => t.role === 'Skadedjurstekniker').map(t => t.id))
+    const techDiff = technicians.filter(t => defaultTechIds.has(t.id) !== selectedTechnicianIds.has(t.id))
+    return hiddenStatuses.length + extraStatuses.length + techDiff.length
+  }, [activeStatuses, defaultStatuses, technicians, selectedTechnicianIds])
+
+  const hasActiveFilters = activeFilterCount > 0
 
   const navigateDate = (delta: number) => {
     const d = new Date(currentDate)
@@ -118,11 +172,50 @@ export function ScheduleHeader({
         </button>
       </div>
 
-      {/* Höger: legend + knappar */}
+      {/* Höger: legend + filter + knappar */}
       <div className="flex items-center gap-3">
         <div className="hidden xl:block">
           <StatusLegend />
         </div>
+
+        {/* Filter-knapp + popover */}
+        <div ref={filterRef} className="relative">
+          <button
+            onClick={() => setFilterOpen(!filterOpen)}
+            aria-expanded={filterOpen}
+            aria-haspopup="dialog"
+            className={`
+              relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg
+              border transition-colors duration-200
+              ${hasActiveFilters
+                ? 'border-[#20c58f]/40 bg-[#20c58f]/10 text-[#20c58f] hover:bg-[#20c58f]/15'
+                : 'border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }
+            `}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            Filter
+            {activeFilterCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#20c58f] text-white min-w-[18px] text-center leading-none">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          <AnimatePresence>
+            {filterOpen && (
+              <ScheduleFilterPopover
+                activeStatuses={activeStatuses}
+                setActiveStatuses={setActiveStatuses}
+                technicians={technicians}
+                selectedTechnicianIds={selectedTechnicianIds}
+                setSelectedTechnicianIds={setSelectedTechnicianIds}
+                defaultStatuses={defaultStatuses}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+
         <Button onClick={onCreateCase} variant="primary" className="text-sm">
           <FileText className="w-4 h-4 mr-1.5" />
           Nytt ärende

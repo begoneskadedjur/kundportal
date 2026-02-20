@@ -66,3 +66,22 @@ export const STATUS_LEGEND = [
   { label: 'Avtal',      color: 'bg-purple-500' },
   { label: 'Avslutat',   color: 'bg-emerald-600' },
 ] as const
+
+// Filterbar statuslista (grupperar Återbesök 1-5)
+export interface FilterStatus {
+  key: string
+  label: string
+  dot: string
+  group?: string[] // om satt, togglar alla dessa statusar
+}
+
+export const FILTER_STATUSES: FilterStatus[] = [
+  { key: 'Öppen', label: 'Öppen', dot: 'bg-sky-500' },
+  { key: 'Bokad', label: 'Bokad', dot: 'bg-amber-500' },
+  { key: 'Offert skickad', label: 'Offert', dot: 'bg-orange-500' },
+  { key: 'Offert signerad - boka in', label: 'Signerad', dot: 'bg-[#20c58f]' },
+  { key: '_aterbesok', label: 'Återbesök', dot: 'bg-blue-500', group: ['Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'] },
+  { key: 'Privatperson - review', label: 'Review', dot: 'bg-violet-500' },
+  { key: 'Stängt - slasklogg', label: 'Stängt', dot: 'bg-red-500' },
+  { key: 'Avslutat', label: 'Avslutat', dot: 'bg-emerald-600' },
+]
