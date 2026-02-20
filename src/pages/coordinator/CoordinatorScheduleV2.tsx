@@ -149,9 +149,38 @@ export default function CoordinatorScheduleV2() {
 
       const [techResult, privateResult, businessResult, contractResult, absenceResult] = await Promise.all([
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
-        supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
-        supabase.from('business_cases').select('*').order('created_at', { ascending: false }),
-        supabase.from('cases').select('*, customer:customers(*)').in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
+        supabase.from('private_cases').select(`
+          id, title, status, priority, start_date, due_date, created_at, updated_at,
+          adress, kontaktperson, skadedjur, annat_skadedjur,
+          e_post_kontaktperson, telefon_kontaktperson, personnummer, pris,
+          primary_assignee_id, primary_assignee_name, primary_assignee_email,
+          secondary_assignee_id, secondary_assignee_name, secondary_assignee_email,
+          tertiary_assignee_id, tertiary_assignee_name, tertiary_assignee_email,
+          description, rapport, r_rot_rut, r_fastighetsbeteckning,
+          r_arbetskostnad, r_material_utrustning, r_servicebil,
+          reklamation, vaggloss_angade_rum, case_number,
+          material_cost, time_spent_minutes, work_started_at,
+          parent_case_id, created_by_technician_id, created_by_technician_name
+        `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
+        supabase.from('business_cases').select(`
+          id, title, status, priority, start_date, due_date, created_at, updated_at,
+          adress, kontaktperson, skadedjur, annat_skadedjur, bestallare,
+          e_post_kontaktperson, telefon_kontaktperson, org_nr, pris,
+          e_post_faktura, markning_faktura,
+          primary_assignee_id, primary_assignee_name, primary_assignee_email,
+          secondary_assignee_id, secondary_assignee_name, secondary_assignee_email,
+          tertiary_assignee_id, tertiary_assignee_name, tertiary_assignee_email,
+          description, rapport, reklamation, vaggloss_angade_rum, case_number,
+          material_cost, time_spent_minutes, work_started_at,
+          parent_case_id, created_by_technician_id, created_by_technician_name
+        `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
+        supabase.from('cases').select(`
+          *, customer:customers(
+            company_name, contact_address, contact_person, contact_phone,
+            contact_email, billing_email, billing_address,
+            organization_number, parent_customer_id, site_name, is_multisite
+          )
+        `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('technician_absences').select('*'),
       ])
 
