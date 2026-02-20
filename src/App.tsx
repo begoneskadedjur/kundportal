@@ -217,26 +217,16 @@ function App() {
               <Route path="leads" element={<ProtectedRoute requiredRole="koordinator"><Leads /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="koordinator"><LeadAnalytics /></ProtectedRoute>} />
 
-              {/* Ekonomi & Fakturering */}
-              <Route path="ekonomi" element={<ProtectedRoute requiredRole="koordinator"><Economics /></ProtectedRoute>} />
+              {/* Fakturering */}
               <Route path="fakturering" element={<ProtectedRoute requiredRole="koordinator"><InvoicingPage /></ProtectedRoute>} />
               <Route path="fakturering/*" element={<ProtectedRoute requiredRole="koordinator"><InvoicingPage /></ProtectedRoute>} />
-              <Route path="provisioner" element={<ProtectedRoute requiredRole="koordinator"><TechnicianCommissions /></ProtectedRoute>} />
 
               {/* Organisation */}
-              <Route path="teknikerstatistik" element={<ProtectedRoute requiredRole="koordinator"><Technicians /></ProtectedRoute>} />
-              <Route path="anvandarkonton-personal" element={<ProtectedRoute requiredRole="koordinator"><TechnicianManagement /></ProtectedRoute>} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="koordinator"><InternAdministration /></ProtectedRoute>} />
 
               {/* Verktyg */}
               <Route path="team-chat" element={<ProtectedRoute requiredRole="koordinator"><TeamChat /></ProtectedRoute>} />
               <Route path="bildbank" element={<ProtectedRoute requiredRole="koordinator"><ImageBank /></ProtectedRoute>} />
-
-              {/* Produkter & Priser */}
-              <Route path="stationer-fallor" element={<ProtectedRoute requiredRole="koordinator"><StationTypesPage /></ProtectedRoute>} />
-              <Route path="preparat" element={<ProtectedRoute requiredRole="koordinator"><PreparationsPage /></ProtectedRoute>} />
-              <Route path="prislistor" element={<ProtectedRoute requiredRole="koordinator"><PriceListsPage /></ProtectedRoute>} />
-              <Route path="artiklar" element={<ProtectedRoute requiredRole="koordinator"><ArticlesPage /></ProtectedRoute>} />
 
               {/* Planering (koordinator-specifik) */}
               <Route path="schema" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorSchedule /></ProtectedRoute>} />

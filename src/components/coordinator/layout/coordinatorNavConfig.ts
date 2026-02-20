@@ -1,6 +1,6 @@
 // src/components/coordinator/layout/coordinatorNavConfig.ts
 // Navigeringskonfiguration för koordinator-layout
-// Speglar admin-menystrukturen + koordinator-specifika grupper (Planering, Ärenden)
+// Utvalda admin-grupper + koordinator-specifika grupper (Planering, Ärenden)
 
 import {
   Home,
@@ -14,15 +14,9 @@ import {
   KeyRound,
   TrendingUp,
   Receipt,
-  DollarSign,
-  Wallet,
-  Building2,
-  UserCheck,
   MessageSquareText,
   Sparkles,
   Image as ImageIcon,
-  Package,
-  Beaker,
   FileSearch,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
@@ -53,20 +47,16 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Ekonomi & Fakturering',
-    icon: DollarSign,
+    label: 'Fakturering',
+    icon: Receipt,
     items: [
-      { label: 'Ekonomisk översikt', icon: DollarSign, path: '/koordinator/ekonomi' },
       { label: 'Fakturering', icon: Receipt, path: '/koordinator/fakturering' },
-      { label: 'Provisioner', icon: Wallet, path: '/koordinator/provisioner' },
     ],
   },
   {
     label: 'Organisation',
-    icon: Building2,
+    icon: MessageSquareText,
     items: [
-      { label: 'Teknikerstatistik', icon: BarChart3, path: '/koordinator/teknikerstatistik' },
-      { label: 'Användarkonton (Personal)', icon: UserCheck, path: '/koordinator/anvandarkonton-personal' },
       { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets' },
     ],
   },
@@ -76,16 +66,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'AI Assistent', icon: Sparkles, path: '/koordinator/team-chat' },
       { label: 'Gemensam bildbank', icon: ImageIcon, path: '/koordinator/bildbank' },
-    ],
-  },
-  {
-    label: 'Produkter & Priser',
-    icon: Package,
-    items: [
-      { label: 'Stationer & Fällor', icon: Target, path: '/koordinator/stationer-fallor' },
-      { label: 'Preparat', icon: Beaker, path: '/koordinator/preparat' },
-      { label: 'Prislistor', icon: Receipt, path: '/koordinator/prislistor' },
-      { label: 'Artiklar', icon: Package, path: '/koordinator/artiklar' },
     ],
   },
   {
@@ -108,7 +88,7 @@ export const navGroups: NavGroup[] = [
 
 export const favoriteItems: NavItem[] = [
   { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
-  { label: 'Ekonomisk översikt', icon: DollarSign, path: '/koordinator/ekonomi' },
+  { label: 'Fakturering', icon: Receipt, path: '/koordinator/fakturering' },
   { label: 'Sök Ärenden', icon: FileSearch, path: '/koordinator/sok-arenden' },
 ]
 
@@ -116,7 +96,7 @@ export const mobileBottomItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/koordinator/dashboard' },
   { label: 'Kunder', icon: Users, path: '/koordinator/befintliga-kunder' },
   { label: 'Leads', icon: Target, path: '/koordinator/leads' },
-  { label: 'Ekonomi', icon: DollarSign, path: '/koordinator/ekonomi' },
+  { label: 'Ärenden', icon: FileSearch, path: '/koordinator/sok-arenden' },
 ]
 
 // Breadcrumb-mappning: path -> svenskt namn
@@ -136,25 +116,15 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/leads': 'Leads',
   '/koordinator/leadsstatistik': 'Leadsstatistik',
 
-  // Ekonomi & Fakturering
-  '/koordinator/ekonomi': 'Ekonomisk översikt',
+  // Fakturering
   '/koordinator/fakturering': 'Fakturering',
-  '/koordinator/provisioner': 'Provisioner',
 
   // Organisation
-  '/koordinator/teknikerstatistik': 'Teknikerstatistik',
-  '/koordinator/anvandarkonton-personal': 'Användarkonton (Personal)',
   '/koordinator/tickets': 'Tickets',
 
   // Verktyg
   '/koordinator/team-chat': 'AI Assistent',
   '/koordinator/bildbank': 'Gemensam bildbank',
-
-  // Produkter & Priser
-  '/koordinator/stationer-fallor': 'Stationer & Fällor',
-  '/koordinator/preparat': 'Preparat',
-  '/koordinator/prislistor': 'Prislistor',
-  '/koordinator/artiklar': 'Artiklar',
 
   // Planering (koordinator-specifik)
   '/koordinator/schema': 'Schema & Planering',
