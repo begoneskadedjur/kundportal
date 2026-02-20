@@ -4,8 +4,6 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { BeGoneCaseRow, Technician, isScheduledCase, ALL_VALID_STATUSES } from '../../types/database'
 import { Case } from '../../types/cases'
-import LoadingSpinner from '../../components/shared/LoadingSpinner'
-
 import { AnimatePresence } from 'framer-motion'
 
 // V2 komponenter
@@ -27,6 +25,41 @@ import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinato
 const DEFAULT_ACTIVE_STATUSES = ALL_VALID_STATUSES.filter(
   s => !s.includes('Avslutat') && !s.includes('Stängt')
 )
+
+/** Skeleton-loading som matchar ScheduleGrid-layouten */
+function ScheduleSkeleton() {
+  const rows = 6 // Placeholder-tekniker
+  return (
+    <div className="flex flex-1 overflow-hidden animate-pulse">
+      {/* Teknikerkolumn */}
+      <div className="flex-shrink-0 border-r border-slate-700/50" style={{ width: 224 }}>
+        <div className="border-b border-slate-700/50 bg-slate-900/95 h-8" />
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="flex items-center gap-2 px-3 border-b border-slate-800/60" style={{ height: 88 }}>
+            <div className="w-1 self-stretch rounded-full bg-slate-700/50" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-24 bg-slate-800/60 rounded" />
+              <div className="h-2 w-16 bg-slate-800/40 rounded" />
+              <div className="h-1 w-full bg-slate-800/30 rounded-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Grid-area */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-8 bg-slate-900/95 border-b border-slate-700/50" />
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="border-b border-slate-800/60 relative" style={{ height: 88 }}>
+            {/* Subtila vertikala linjer */}
+            {Array.from({ length: 14 }, (_, h) => (
+              <div key={h} className="absolute top-0 h-full border-l border-slate-800/20" style={{ left: h * 120 }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function CoordinatorScheduleV2() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -235,10 +268,6 @@ export default function CoordinatorScheduleV2() {
 
   // ─── Render ───
 
-  if (loading) {
-    return <div className="flex items-center justify-center py-20"><LoadingSpinner text="Laddar schema..." /></div>
-  }
-
   return (
     <>
       <div className="text-white flex flex-col h-[calc(100vh-3rem)]">
@@ -274,15 +303,19 @@ export default function CoordinatorScheduleV2() {
           )}
         </AnimatePresence>
 
-        <ScheduleGrid
-          technicians={filteredTechnicians}
-          cases={filteredScheduledCases}
-          absences={absences}
-          currentDate={currentDate}
-          viewMode={viewMode}
-          onCaseClick={handleOpenCaseModal}
-          onAbsenceClick={handleAbsenceClick}
-        />
+        {loading ? (
+          <ScheduleSkeleton />
+        ) : (
+          <ScheduleGrid
+            technicians={filteredTechnicians}
+            cases={filteredScheduledCases}
+            absences={absences}
+            currentDate={currentDate}
+            viewMode={viewMode}
+            onCaseClick={handleOpenCaseModal}
+            onAbsenceClick={handleAbsenceClick}
+          />
+        )}
       </div>
 
       {/* Modaler — identiska med befintlig sida */}

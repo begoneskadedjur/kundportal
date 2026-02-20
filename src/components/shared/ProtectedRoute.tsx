@@ -14,8 +14,9 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   const { userRole: multisiteRole, loading: multisiteLoading } = useMultisite();
   const location = useLocation();
 
-  // 1. Visa laddningsskärm som tidigare
-  if (loading || multisiteLoading) {
+  // 1. Visa laddningsskärm — skippa multisite-check för roller som inte behöver det
+  const needsMultisite = !requiredRole || requiredRole === 'customer'
+  if (loading || (needsMultisite && multisiteLoading)) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <LoadingSpinner text="Verifierar behörighet..." />

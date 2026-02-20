@@ -13,17 +13,11 @@ export default function CoordinatorLayout() {
   const location = useLocation()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <LoadingSpinner text="Laddar..." />
-      </div>
-    )
-  }
-
   // Rollkontroll — koordinator + admin har tillgång
-  const hasAccess = profile?.role === 'koordinator' || profile?.role === 'admin' || profile?.is_admin === true
-  if (!profile || !hasAccess) {
+  const hasAccess = !loading && (profile?.role === 'koordinator' || profile?.role === 'admin' || profile?.is_admin === true)
+
+  // Redirect om auth klar men ingen tillgång
+  if (!loading && (!profile || !hasAccess)) {
     return <Navigate to="/login" replace />
   }
 
@@ -71,7 +65,13 @@ export default function CoordinatorLayout() {
           lg:pt-12
         `}
       >
-        <Outlet />
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <LoadingSpinner text="Laddar..." />
+          </div>
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   )
