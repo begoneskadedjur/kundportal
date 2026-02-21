@@ -252,6 +252,9 @@ function mapOfferToInsertData(detail: OneFlowContractDetail, listState?: string)
     selected_products: detail.product_groups || null,
     start_date: parseDate(mappedData.start_date),
     customer_id: null,
+    // Använd Oneflow-datum istället för Supabase default now()
+    created_at: detail.created_time || null,
+    updated_at: detail.updated_time || detail.created_time || null,
   }
 }
 
