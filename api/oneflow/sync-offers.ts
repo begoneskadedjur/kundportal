@@ -181,8 +181,10 @@ function parseDate(value: string | undefined | null): string | null {
   return null
 }
 
-/** Mappa Oneflow-detalj till contracts-tabellens format */
-function mapOfferToInsertData(detail: OneFlowContractDetail): Record<string, any> {
+/** Mappa Oneflow-detalj till contracts-tabellens format.
+ *  listState = state från list-API:n (pålitligare: inkluderar expired/cancelled)
+ *  detail.state kan skilja sig — t.ex. visa "pending" istället för "expired" */
+function mapOfferToInsertData(detail: OneFlowContractDetail, listState?: string): Record<string, any> {
   // Extrahera template ID
   const templateId =
     detail.template?.id?.toString() ||
@@ -231,7 +233,7 @@ function mapOfferToInsertData(detail: OneFlowContractDetail): Record<string, any
     source_type: 'manual',
     source_id: null,
     type: 'offer',
-    status: STATUS_MAP[detail.state] || 'pending',
+    status: STATUS_MAP[listState || detail.state] || 'pending',
     template_id: templateId,
     begone_employee_name: mappedData.begone_employee_name || begoneEmployee?.name || null,
     begone_employee_email: mappedData.begone_employee_email || begoneEmployee?.email || null,
@@ -316,7 +318,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         continue
       }
 
-      const insertData = mapOfferToInsertData(detail)
+      const insertData = mapOfferToInsertData(detail, offer.state)
 
       // Upsert
       const { error } = await supabase
