@@ -1082,6 +1082,117 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
   }
 }
 
+// Logga Oneflow-händelse som systemevent i ärendets kommunikationspanel
+const logOfferEventToCase = async (
+  contractId: string,
+  eventMessage: string
+): Promise<void> => {
+  try {
+    // Hämta kontraktet från DB via oneflow_contract_id
+    const { data: contract, error: contractError } = await supabase
+      .from('contracts')
+      .select('id, source_id, source_type, type')
+      .eq('oneflow_contract_id', contractId)
+      .single()
+
+    if (contractError || !contract) {
+      console.log('ℹ️ Ingen kontrakt hittad för systemevent-loggning:', contractId)
+      return
+    }
+
+    // Bara logga om offerten skapades från ett ärende
+    if (!contract.source_id) {
+      console.log('ℹ️ Offert saknar source_id — inget ärende att logga till')
+      return
+    }
+
+    // Bestäm case_type — source_type är 'legacy_case' för cases-tabellen
+    // Prova cases-tabellen först
+    let caseType: string = 'contract'
+    const { data: caseRow } = await supabase
+      .from('cases')
+      .select('id')
+      .eq('id', contract.source_id)
+      .maybeSingle()
+
+    if (!caseRow) {
+      // Prova private_cases
+      const { data: privateRow } = await supabase
+        .from('private_cases')
+        .select('id')
+        .eq('id', contract.source_id)
+        .maybeSingle()
+      if (privateRow) {
+        caseType = 'private'
+      } else {
+        // Prova business_cases
+        const { data: businessRow } = await supabase
+          .from('business_cases')
+          .select('id')
+          .eq('id', contract.source_id)
+          .maybeSingle()
+        if (businessRow) {
+          caseType = 'business'
+        } else {
+          console.log('⚠️ Kunde inte hitta ärende för source_id:', contract.source_id)
+          return
+        }
+      }
+    }
+
+    // Skapa systemevent i case_comments
+    const { error: commentError } = await supabase
+      .from('case_comments')
+      .insert({
+        case_id: contract.source_id,
+        case_type: caseType,
+        content: eventMessage,
+        is_system_comment: true,
+        system_event_type: 'status_change',
+        author_name: 'Oneflow',
+        author_role: 'admin',
+      })
+
+    if (commentError) {
+      console.error('❌ Kunde inte logga systemevent till case_comments:', commentError)
+    } else {
+      console.log('✅ Oneflow-händelse loggad till kommunikationspanelen:', eventMessage)
+    }
+  } catch (error) {
+    console.error('❌ Fel vid logOfferEventToCase:', error)
+    // Inte kritiskt — låt webhook fortsätta
+  }
+}
+
+// Uppdatera ärendestatus baserat på source_id-koppling
+const updateCaseStatusViaSourceId = async (
+  contractId: string,
+  newStatus: string,
+  extraFields?: Record<string, any>
+): Promise<void> => {
+  try {
+    const { data: contract } = await supabase
+      .from('contracts')
+      .select('source_id')
+      .eq('oneflow_contract_id', contractId)
+      .single()
+
+    if (contract?.source_id) {
+      const updateData: Record<string, any> = { status: newStatus, ...extraFields }
+      const { error } = await supabase
+        .from('cases')
+        .update(updateData)
+        .eq('id', contract.source_id)
+
+      if (!error) {
+        console.log(`✅ Ärendestatus uppdaterad till '${newStatus}' via source_id`)
+      }
+    }
+  } catch (error) {
+    console.error('❌ Fel vid updateCaseStatusViaSourceId:', error)
+  }
+}
+
 // Invalidera offer_statistics cache (tvingar nästa GET att hämta nytt)
 const invalidateOfferStatsCache = async () => {
   try {
@@ -1240,14 +1351,15 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               }
             }
             
-            // Koppla offert till ärende om case_id finns i data fields
-            const caseIdField = contractDetails.data_fields?.find(field => 
-              field.custom_id === 'case_id' || 
-              field._private_ownerside?.custom_id === 'case_id'
-            )
-            
-            if (caseIdField?.value) {
-              console.log(`🔗 Kopplar offert/kontrakt till ärende: ${caseIdField.value}`)
+            // Koppla offert till ärende via source_id (satt vid skapande i create-contract API)
+            const { data: contractForLink } = await supabase
+              .from('contracts')
+              .select('source_id')
+              .eq('oneflow_contract_id', contractId)
+              .single()
+
+            if (contractForLink?.source_id) {
+              console.log(`🔗 Kopplar offert/kontrakt till ärende via source_id: ${contractForLink.source_id}`)
               const { error: caseUpdateError } = await supabase
                 .from('cases')
                 .update({
@@ -1256,14 +1368,36 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
                   quote_sent_at: new Date().toISOString(),
                   quote_generated_at: contractDetails.created_time || new Date().toISOString()
                 })
-                .eq('id', caseIdField.value)
-              
+                .eq('id', contractForLink.source_id)
+
               if (caseUpdateError) {
                 console.error('❌ Kunde inte koppla offert till ärende:', caseUpdateError)
               } else {
-                console.log('✅ Offert/kontrakt kopplat till ärende')
+                console.log('✅ Offert/kontrakt kopplat till ärende via source_id')
+              }
+            } else {
+              // Fallback: Försök hitta case_id i Oneflow data fields (legacy)
+              const caseIdField = contractDetails.data_fields?.find(field =>
+                field.custom_id === 'case_id' ||
+                field._private_ownerside?.custom_id === 'case_id'
+              )
+              if (caseIdField?.value) {
+                console.log(`🔗 Kopplar offert till ärende via Oneflow data field: ${caseIdField.value}`)
+                await supabase
+                  .from('cases')
+                  .update({
+                    oneflow_contract_id: contractId,
+                    quote_status: contractData.type === 'offer' ? 'sent' : 'pending',
+                    quote_sent_at: new Date().toISOString(),
+                  })
+                  .eq('id', caseIdField.value)
               }
             }
+
+            // Logga systemevent till ärendets kommunikationspanel
+            const recipientName = contractDetails.parties?.[1]?.participants?.[0]?.name
+              || contractData.contact_person || contractData.company_name || 'mottagare'
+            await logOfferEventToCase(contractId, `📄 Offert skickad till ${recipientName}`)
           } else {
             console.log('⚠️ Kontraktdetaljer saknas för publish event')
           }
@@ -1275,7 +1409,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             const contractData = parseContractDetailsToInsertData(contractDetails)
             contractData.status = 'signed'
             await saveOrUpdateContract(contractData)
-            
+
             // Uppdatera offerstatus i cases om koppling finns
             const { error: caseUpdateError } = await supabase
               .from('cases')
@@ -1284,11 +1418,11 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
                 quote_signed_at: new Date().toISOString()
               })
               .eq('oneflow_contract_id', contractId)
-            
+
             if (!caseUpdateError) {
               console.log('✅ Offerstatus uppdaterad till signerad i ärende')
             }
-            
+
             // Uppdatera contracts-tabellen också (för offerter som blir signerade)
             const { error: contractUpdateError } = await supabase
               .from('contracts')
@@ -1298,16 +1432,26 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               })
               .eq('oneflow_contract_id', contractId)
               .eq('type', 'offer') // Endast för offerter
-            
+
             if (!contractUpdateError) {
               console.log('✅ Offertstatus uppdaterad till signerad i contracts')
             }
-            
+
             // Invalidera offer-statistik cache vid signering
             await invalidateOfferStatsCache()
 
             // Automatisk kundregistrering för signerade avtal
             await createCustomerFromSignedContract(contractId)
+
+            // Uppdatera ärendets huvudstatus till bokningsbar (för offerter)
+            if (contractData.type === 'offer') {
+              await updateCaseStatusViaSourceId(contractId, 'Offert signerad - boka in')
+            }
+
+            // Logga systemevent till kommunikationspanelen
+            const signerName = contractDetails.parties?.[1]?.participants?.find(p => p.signatory)?.name
+              || contractData.contact_person || contractData.company_name || 'mottagare'
+            await logOfferEventToCase(contractId, `✅ Offert signerad av ${signerName}`)
           }
           break
 
@@ -1315,12 +1459,12 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           console.log('❌ Kontrakt avvisat - uppdaterar status')
           await supabase
             .from('contracts')
-            .update({ 
+            .update({
               status: 'declined',
               updated_at: new Date().toISOString()
             })
             .eq('oneflow_contract_id', contractId)
-          
+
           // Uppdatera offerstatus i cases om koppling finns
           await supabase
             .from('cases')
@@ -1332,6 +1476,9 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
           // Invalidera offer-statistik cache vid avvisning
           await invalidateOfferStatsCache()
+
+          // Logga systemevent
+          await logOfferEventToCase(contractId, '❌ Offert nekad av mottagaren')
           break
 
         case 'contract:lifecycle_state:start':
@@ -1381,12 +1528,12 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           console.log('⏰ Signeringsperiod gått ut - uppdaterar status')
           await supabase
             .from('contracts')
-            .update({ 
+            .update({
               status: 'overdue',
               updated_at: new Date().toISOString()
             })
             .eq('oneflow_contract_id', contractId)
-          
+
           // Uppdatera även kund status till expired
           await supabase
             .from('customers')
@@ -1398,6 +1545,9 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
           // Invalidera offer-statistik cache vid utgånget
           await invalidateOfferStatsCache()
+
+          // Logga systemevent
+          await logOfferEventToCase(contractId, '⏰ Offertens giltighetstid har gått ut')
           break
 
         case 'contract:signing_period_revive':

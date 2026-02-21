@@ -143,6 +143,7 @@ export default function CoordinatorScheduleV2() {
       faktura_email: customer?.billing_email || customer?.contact_email || null,
       faktura_adress: customer?.billing_address || customer?.contact_address || null,
       parent_customer_id: customer?.parent_customer_id || null,
+      oneflow_contract_id: contractCase.oneflow_contract_id || null,
     } as BeGoneCaseRow
   }
 

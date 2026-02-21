@@ -80,6 +80,10 @@ export interface Case {
   send_booking_confirmation: boolean
   send_offer: boolean
   notes: string | null
+
+  // Oneflow integration
+  oneflow_contract_id: string | null
+  quote_status: 'pending' | 'sent' | 'signed' | 'rejected' | 'expired' | null
 }
 
 // Create case input type (for customer requests)

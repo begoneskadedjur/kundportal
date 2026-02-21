@@ -5,7 +5,7 @@ import type { CoordinatorCaseAction, PipelineOfferRow, PipelineCaseRow, Coordina
 const OFFER_COLUMNS = `
   id, oneflow_contract_id, status, company_name, contact_person,
   contact_email, contact_phone, contact_address, total_value,
-  template_id, begone_employee_name, created_at, updated_at
+  template_id, begone_employee_name, source_id, created_at, updated_at
 `
 
 export class CasePipelineService {
@@ -193,10 +193,10 @@ export class CasePipelineService {
     return map
   }
 
-  /** Kvittera ärende (legacy ClickUp) */
+  /** Kvittera ärende (legacy ClickUp + contract) */
   static async acknowledgeCase(
     caseId: string,
-    caseType: 'private' | 'business',
+    caseType: 'private' | 'business' | 'contract',
     userId: string,
     userName: string,
   ): Promise<CoordinatorCaseAction> {
@@ -221,10 +221,10 @@ export class CasePipelineService {
     return data
   }
 
-  /** Logga kontaktförsök (legacy ClickUp, används av ActionableCasesDrawer) */
+  /** Logga kontaktförsök (legacy ClickUp + contract, används av ActionableCasesDrawer) */
   static async logContactAttempt(
     caseId: string,
-    caseType: 'private' | 'business',
+    caseType: 'private' | 'business' | 'contract',
     userId: string,
     userName: string,
     method: ContactMethod,
@@ -260,10 +260,10 @@ export class CasePipelineService {
     return data
   }
 
-  /** Uppdatera koordinatornotering (legacy ClickUp, används av ActionableCasesDrawer) */
+  /** Uppdatera koordinatornotering (legacy ClickUp + contract, används av ActionableCasesDrawer) */
   static async updateNotes(
     caseId: string,
-    caseType: 'private' | 'business',
+    caseType: 'private' | 'business' | 'contract',
     notes: string,
     userId: string,
     userName: string,
@@ -285,10 +285,10 @@ export class CasePipelineService {
     return data
   }
 
-  /** Byt coordinator_status (legacy ClickUp) */
+  /** Byt coordinator_status (legacy ClickUp + contract) */
   static async updateStatus(
     caseId: string,
-    caseType: 'private' | 'business',
+    caseType: 'private' | 'business' | 'contract',
     status: CoordinatorCaseStatus,
   ): Promise<CoordinatorCaseAction> {
     const { data, error } = await supabase

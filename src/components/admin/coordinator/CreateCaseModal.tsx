@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import { useClickUpSync } from '../../../hooks/useClickUpSync';
 import SiteSelector from '../../shared/SiteSelector';
@@ -73,6 +73,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
   const [existingImages, setExistingImages] = useState<CaseImageWithUrl[]>([]);
+  const [offerDetails, setOfferDetails] = useState<{
+    agreement_text: string | null;
+    selected_products: any[] | null;
+    total_value: number | null;
+  } | null>(null);
+  const [offerExpanded, setOfferExpanded] = useState(true);
 
   // ClickUp sync hook
   const { syncAfterCreate } = useClickUpSync();
@@ -85,6 +91,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setSelectedContractCustomer(null);
     setSelectedSiteId(null);
     setExistingImages([]);
+    setOfferDetails(null);
+    setOfferExpanded(true);
     // Städa upp bildförhandsvisningar
     setSelectedImages(prev => {
       prev.forEach(img => URL.revokeObjectURL(img.preview));
@@ -264,6 +272,33 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
     fetchExistingImages();
   }, [isOpen, initialCaseData?.id]);
+
+  // Hämta offertinnehåll om ärendet har en Oneflow-koppling
+  useEffect(() => {
+    const fetchOfferDetails = async () => {
+      const oneflowId = (initialCaseData as any)?.oneflow_contract_id;
+      if (!isOpen || !oneflowId) {
+        setOfferDetails(null);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('contracts')
+          .select('agreement_text, selected_products, total_value')
+          .eq('oneflow_contract_id', oneflowId)
+          .single();
+
+        if (!error && data) {
+          setOfferDetails(data);
+        }
+      } catch (err) {
+        console.error('Kunde inte hämta offertinnehåll:', err);
+      }
+    };
+
+    fetchOfferDetails();
+  }, [isOpen, initialCaseData]);
 
   // Identifiera och hantera multisite vs vanliga kunder när data är laddad
   useEffect(() => {
@@ -919,6 +954,62 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 })()
               )}
               
+              {/* Offertinnehåll (visas om ärendet har Oneflow-koppling) */}
+              {offerDetails && (
+                <div className="p-4 bg-[#20c58f]/5 border border-[#20c58f]/20 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setOfferExpanded(v => !v)}
+                    className="flex items-center gap-2 w-full text-left"
+                  >
+                    <FileCheck className="w-4 h-4 text-[#20c58f]" />
+                    <span className="text-sm font-semibold text-white flex-1">Offertinnehåll</span>
+                    {offerDetails.total_value && (
+                      <span className="text-xs font-medium text-[#20c58f] mr-2">
+                        {offerDetails.total_value.toLocaleString('sv-SE')} kr
+                      </span>
+                    )}
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${offerExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                  {offerExpanded && (
+                    <div className="mt-3 space-y-3">
+                      {/* Produkter/tjänster */}
+                      {offerDetails.selected_products && offerDetails.selected_products.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-slate-400 mb-1.5">Produkter / Tjänster</p>
+                          <div className="space-y-1">
+                            {offerDetails.selected_products.map((group: any, gi: number) =>
+                              (group.products || [group]).map((product: any, pi: number) => (
+                                <div key={`${gi}-${pi}`} className="flex items-center justify-between px-3 py-1.5 bg-slate-800/40 rounded text-xs">
+                                  <span className="text-slate-200">
+                                    {product.quantity?.amount > 1 ? `${product.quantity.amount}× ` : ''}
+                                    {product.name || 'Produkt'}
+                                  </span>
+                                  {product.price_1?.amount?.amount && (
+                                    <span className="text-slate-400">
+                                      {parseFloat(product.price_1.amount.amount).toLocaleString('sv-SE')} kr
+                                    </span>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {/* Avtalstext */}
+                      {offerDetails.agreement_text && (
+                        <div>
+                          <p className="text-xs font-medium text-slate-400 mb-1">Avtalstext</p>
+                          <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed bg-slate-800/30 rounded p-2">
+                            {offerDetails.agreement_text}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* STATIONSKONTROLL: Tvåkolumnslayout med bokningsassistent */}
               {caseType === 'inspection' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

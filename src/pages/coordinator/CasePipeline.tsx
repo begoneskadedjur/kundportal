@@ -265,7 +265,11 @@ export default function CasePipeline() {
   }, [])
 
   const handleBookOffer = useCallback((o: PipelineOfferRow) => {
-    navigate(`/koordinator/schema-v2?scheduleCase=${o.id}`)
+    if (o.source_id) {
+      navigate(`/koordinator/schema-v2?scheduleCase=${o.source_id}`)
+    } else {
+      toast.error('Offerten saknar koppling till ett ärende.')
+    }
   }, [navigate])
 
   // Konverteringsgrad: använd Oneflow-statistik om tillgänglig, annars lokala siffror

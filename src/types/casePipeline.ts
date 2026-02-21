@@ -13,7 +13,7 @@ export type ContactMethod = 'phone' | 'email' | 'sms'
 export interface CoordinatorCaseAction {
   id: string
   case_id: string | null
-  case_type: 'private' | 'business' | null
+  case_type: 'private' | 'business' | 'contract' | null
   contract_id: string | null
   coordinator_status: CoordinatorCaseStatus
   acknowledged_at: string | null
@@ -41,6 +41,7 @@ export interface PipelineOfferRow {
   total_value: number | null
   template_id: string | null
   begone_employee_name: string | null
+  source_id: string | null          // FK till ärendet offerten skapades från
   created_at: string
   updated_at: string
   action: CoordinatorCaseAction | null

@@ -990,6 +990,7 @@ export type BusinessCasesUpdate = Database['public']['Tables']['business_cases']
 // Union type för flexibel hantering med extra fält för koordinatorvyn
 export type BeGoneCaseRow = (PrivateCasesRow | BusinessCasesRow) & {
   parent_customer_id?: string | null  // För multisite-enheter
+  oneflow_contract_id?: string | null // Koppling till Oneflow-offert (för contract cases)
 }
 
 // Befintliga hjälptyper

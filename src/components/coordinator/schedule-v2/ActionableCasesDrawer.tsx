@@ -189,7 +189,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
     if (!user?.id || !profile?.display_name) return
     setActionLoading('acknowledge')
     try {
-      const updated = await CasePipelineService.acknowledgeCase(c.id, c.case_type as 'private' | 'business', user.id, profile.display_name)
+      const updated = await CasePipelineService.acknowledgeCase(c.id, c.case_type as 'private' | 'business' | 'contract', user.id, profile.display_name)
       onActionUpdate(c.id, updated)
       toast.success('Kvitterat')
     } catch { toast.error('Kunde inte kvittera') }
@@ -200,7 +200,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
     if (!user?.id || !profile?.display_name) return
     setActionLoading('contact')
     try {
-      const updated = await CasePipelineService.logContactAttempt(c.id, c.case_type as 'private' | 'business', user.id, profile.display_name, method, note)
+      const updated = await CasePipelineService.logContactAttempt(c.id, c.case_type as 'private' | 'business' | 'contract', user.id, profile.display_name, method, note)
       onActionUpdate(c.id, updated)
       setContactOpen(false)
       toast.success('Kontaktförsök loggat')
@@ -212,7 +212,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
     if (!user?.id || !profile?.display_name) return
     setSavingNote(true)
     try {
-      const updated = await CasePipelineService.updateNotes(c.id, c.case_type as 'private' | 'business', noteText, user.id, profile.display_name)
+      const updated = await CasePipelineService.updateNotes(c.id, c.case_type as 'private' | 'business' | 'contract', noteText, user.id, profile.display_name)
       onActionUpdate(c.id, updated)
       toast.success('Anteckning sparad')
     } catch { toast.error('Kunde inte spara') }
@@ -221,7 +221,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
 
   const handleStatusChange = useCallback(async (newStatus: CoordinatorCaseStatus) => {
     try {
-      const updated = await CasePipelineService.updateStatus(c.id, c.case_type as 'private' | 'business', newStatus)
+      const updated = await CasePipelineService.updateStatus(c.id, c.case_type as 'private' | 'business' | 'contract', newStatus)
       onActionUpdate(c.id, updated)
     } catch { toast.error('Kunde inte byta status') }
   }, [c.id, c.case_type, onActionUpdate])
@@ -246,10 +246,15 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
         </td>
         <td className="px-2 py-1.5">
           <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
-            c.case_type === 'private' ? 'bg-blue-500/15 text-blue-400' : 'bg-purple-500/15 text-purple-400'
+            c.case_type === 'private' ? 'bg-blue-500/15 text-blue-400'
+            : c.case_type === 'contract' ? 'bg-[#20c58f]/15 text-[#20c58f]'
+            : 'bg-purple-500/15 text-purple-400'
           }`}>
-            {c.case_type === 'private' ? 'Privat' : 'Företag'}
+            {c.case_type === 'private' ? 'Privat' : c.case_type === 'contract' ? 'Offert' : 'Företag'}
           </span>
+          {(c as any).oneflow_contract_id && c.case_type !== 'contract' && (
+            <span className="ml-1 px-1 py-0.5 rounded text-[8px] font-medium bg-[#20c58f]/10 text-[#20c58f]">Offert</span>
+          )}
         </td>
         <td className="px-2 py-1.5 text-slate-300 font-medium">{c.primary_assignee_name || '—'}</td>
         <td className="px-2 py-1.5">
