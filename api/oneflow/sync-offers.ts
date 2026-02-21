@@ -38,10 +38,14 @@ const OFFER_FIELD_MAPPING: Record<string, string> = {
 }
 
 // Status-mappning: Oneflow state → vår status
+// Oneflow API states: draft, pending, overdue, signed, declined, canceled
 const STATUS_MAP: Record<string, string> = {
   pending: 'pending',
   signed: 'signed',
   declined: 'declined',
+  overdue: 'overdue',
+  canceled: 'declined',
+  // Legacy/fallback:
   published: 'pending',
   completed: 'signed',
   cancelled: 'declined',
