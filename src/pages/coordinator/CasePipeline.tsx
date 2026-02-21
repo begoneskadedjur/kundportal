@@ -152,8 +152,10 @@ export default function CasePipeline() {
   // ─── KPI (lokala beräkningar från offers) ───
 
   const localStats = useMemo(() => {
-    const pendingOffers = offers.filter(o => o.status === 'pending' || o.status === 'overdue')
+    const pendingOffers = offers.filter(o => o.status === 'pending')
     const signedOffers = offers.filter(o => o.status === 'signed')
+    const overdueOffers = offers.filter(o => o.status === 'overdue')
+    const declinedOffers = offers.filter(o => o.status === 'declined')
     const ejKvitterat = offers.filter(o => !o.action || o.action.coordinator_status === 'new').length
     const totalPipelineValue = offers.reduce((s, o) => s + (o.total_value || 0), 0)
     const pendingValue = pendingOffers.reduce((s, o) => s + (o.total_value || 0), 0)
@@ -178,6 +180,8 @@ export default function CasePipeline() {
     return {
       pending: pendingOffers.length,
       signed: signedOffers.length,
+      overdue: overdueOffers.length,
+      declined: declinedOffers.length,
       ejKvitterat,
       totalPipelineValue,
       pendingValue,
@@ -271,8 +275,8 @@ export default function CasePipeline() {
       : 0
   )
   const conversionSubtext = offerStats
-    ? `${offerStats.signed} av ${offerStats.signed + offerStats.declined + offerStats.overdue} (Oneflow)`
-    : `${localStats.signed} av ${offers.length} signerade`
+    ? `${offerStats.signed} av ${offerStats.total_sent} (Oneflow)`
+    : `${localStats.signed} av ${offers.length} totalt`
 
   // ─── Render ───
 
@@ -305,16 +309,16 @@ export default function CasePipeline() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           icon={Send}
-          label="Offert skickad"
+          label="Pågående"
           value={localStats.pending}
           subtext={formatKr(localStats.pendingValue)}
-          color="emerald"
+          color="blue"
           onClick={() => setActiveTab('pending')}
           active={activeTab === 'pending'}
         />
         <KpiCard
           icon={FileCheck}
-          label="Signerad — att boka"
+          label="Signerat — att boka"
           value={localStats.signed}
           subtext={formatKr(localStats.signedValue)}
           color="green"
@@ -327,7 +331,7 @@ export default function CasePipeline() {
           label="Pipelinevärde"
           value={formatKr(localStats.totalPipelineValue)}
           subtext="Totalt offertvärde"
-          color="blue"
+          color="emerald"
         />
         <KpiCard
           icon={TrendingUp}
@@ -349,7 +353,7 @@ export default function CasePipeline() {
             className="overflow-hidden"
           >
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              {/* Panel A: Konverteringstratt */}
+              {/* Panel A: Konverteringstratt (4 statusar som matchar Oneflow-donuten) */}
               <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -357,14 +361,17 @@ export default function CasePipeline() {
                 </div>
                 {offerStats ? (
                   <div className="space-y-2">
-                    <FunnelBar label="Skickade" value={offerStats.total_sent} max={offerStats.total_sent} color="bg-emerald-500" />
-                    <FunnelBar label="Signerade" value={offerStats.signed} max={offerStats.total_sent} color="bg-green-500" />
-                    <FunnelBar label="Avvisade" value={offerStats.declined} max={offerStats.total_sent} color="bg-red-500/70" />
+                    <FunnelBar label="Pågående" value={offerStats.pending} max={offerStats.total_sent} color="bg-blue-500" />
+                    <FunnelBar label="Signerat" value={offerStats.signed} max={offerStats.total_sent} color="bg-green-500" />
+                    <FunnelBar label="Förfallet" value={offerStats.overdue} max={offerStats.total_sent} color="bg-amber-500" />
+                    <FunnelBar label="Avfärdat" value={offerStats.declined} max={offerStats.total_sent} color="bg-red-500/70" />
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <FunnelBar label="Offert skickad" value={localStats.pending} max={offers.length || 1} color="bg-emerald-500" />
-                    <FunnelBar label="Signerad" value={localStats.signed} max={offers.length || 1} color="bg-green-500" />
+                    <FunnelBar label="Pågående" value={localStats.pending} max={offers.length || 1} color="bg-blue-500" />
+                    <FunnelBar label="Signerat" value={localStats.signed} max={offers.length || 1} color="bg-green-500" />
+                    <FunnelBar label="Förfallet" value={localStats.overdue} max={offers.length || 1} color="bg-amber-500" />
+                    <FunnelBar label="Avfärdat" value={localStats.declined} max={offers.length || 1} color="bg-red-500/70" />
                   </div>
                 )}
                 <p className="text-[10px] text-slate-500 mt-2">

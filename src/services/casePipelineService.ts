@@ -17,7 +17,7 @@ export class CasePipelineService {
       .from('contracts')
       .select(OFFER_COLUMNS)
       .eq('type', 'offer')
-      .in('status', ['pending', 'signed', 'overdue'])
+      .in('status', ['pending', 'signed', 'overdue', 'declined'])
       .order('created_at', { ascending: true })
 
     if (error) throw error

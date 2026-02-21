@@ -99,16 +99,18 @@ export const OFFER_STATUS_CONFIG: Record<string, {
   color: string
   bgColor: string
 }> = {
-  pending: { label: 'Skickad', color: 'text-blue-400', bgColor: 'bg-blue-500/15' },
-  signed: { label: 'Signerad', color: 'text-green-400', bgColor: 'bg-green-500/15' },
-  declined: { label: 'Avvisad', color: 'text-red-400', bgColor: 'bg-red-500/15' },
-  overdue: { label: 'Utgången', color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
+  pending: { label: 'Pågående', color: 'text-blue-400', bgColor: 'bg-blue-500/15' },
+  signed: { label: 'Signerat', color: 'text-green-400', bgColor: 'bg-green-500/15' },
+  overdue: { label: 'Förfallet', color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
+  declined: { label: 'Avfärdat', color: 'text-red-400', bgColor: 'bg-red-500/15' },
 }
 
-export type PipelineTab = 'pending' | 'signed' | 'alla'
+export type PipelineTab = 'pending' | 'signed' | 'overdue' | 'declined' | 'alla'
 
 export const PIPELINE_TABS: { key: PipelineTab; label: string; statuses: string[] }[] = [
-  { key: 'pending', label: 'Offert skickad', statuses: ['pending', 'overdue'] },
-  { key: 'signed', label: 'Signerad', statuses: ['signed'] },
-  { key: 'alla', label: 'Alla', statuses: ['pending', 'signed', 'overdue'] },
+  { key: 'alla', label: 'Alla', statuses: ['pending', 'signed', 'overdue', 'declined'] },
+  { key: 'pending', label: 'Pågående', statuses: ['pending'] },
+  { key: 'signed', label: 'Signerat', statuses: ['signed'] },
+  { key: 'overdue', label: 'Förfallet', statuses: ['overdue'] },
+  { key: 'declined', label: 'Avfärdat', statuses: ['declined'] },
 ]
