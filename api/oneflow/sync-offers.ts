@@ -233,6 +233,9 @@ function mapOfferToInsertData(detail: OneFlowContractDetail): Record<string, any
   }
 }
 
+// Vercel maxDuration (sekunder) — Hobby: max 60s, Pro: max 300s
+export const config = { maxDuration: 60 }
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res)
 
@@ -243,8 +246,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'ONEFLOW_API_TOKEN saknas' })
   }
 
+  // Batch-stöd: skicka { batchSize: 50, batchOffset: 0 } för att bearbeta i omgångar
+  const body = typeof req.body === 'object' && req.body ? req.body : {}
+  const batchSize = Number(body.batchSize) || 40   // max antal att bearbeta per anrop
+  const batchOffset = Number(body.batchOffset) || 0  // hoppa över N offerter som behöver synk
+
   try {
-    console.log('🔄 Startar fullsync av Oneflow-offerter...')
+    console.log(`🔄 Startar sync (batch: offset=${batchOffset}, size=${batchSize})...`)
 
     // 1. Lista alla offerter från Oneflow
     const offers = await listAllOfferIds()
@@ -261,22 +269,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       existingMap.set(e.oneflow_contract_id, e.status)
     }
 
-    let imported = 0
-    let updated = 0
-    let skipped = 0
-    let errors = 0
-
-    // 3. Synka varje offert
-    for (const offer of offers) {
+    // 3. Filtrera ut offerter som behöver synkas (ny eller ändrad status)
+    const needsSync = offers.filter(offer => {
       const ofId = offer.id.toString()
       const newStatus = STATUS_MAP[offer.state] || 'pending'
       const existingStatus = existingMap.get(ofId)
+      return existingStatus !== newStatus
+    })
 
-      // Om redan finns med samma status → skippa (undvik onödiga API-anrop)
-      if (existingStatus === newStatus) {
-        skipped++
-        continue
-      }
+    const totalNeedsSync = needsSync.length
+    const skipped = offers.length - totalNeedsSync
+
+    // Välj batch
+    const batch = needsSync.slice(batchOffset, batchOffset + batchSize)
+
+    let imported = 0
+    let updated = 0
+    let errors = 0
+
+    // 4. Synka varje offert i batchen
+    for (const offer of batch) {
+      const ofId = offer.id.toString()
+      const existingStatus = existingMap.get(ofId)
 
       // Hämta detaljer
       const detail = await fetchOfferDetails(offer.id)
@@ -302,20 +316,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         imported++
       }
 
-      // Rate limiting: 100ms mellan API-anrop
-      await new Promise(r => setTimeout(r, 100))
+      // Rate limiting: 50ms mellan API-anrop
+      await new Promise(r => setTimeout(r, 50))
     }
+
+    const nextOffset = batchOffset + batchSize
+    const hasMore = nextOffset < totalNeedsSync
 
     const summary = {
       total_in_oneflow: offers.length,
+      needs_sync: totalNeedsSync,
+      batch_processed: batch.length,
       imported,
       updated,
       skipped,
       errors,
       existing_before: existingMap.size,
+      has_more: hasMore,
+      next_offset: hasMore ? nextOffset : null,
     }
 
-    console.log('✅ Sync klar:', summary)
+    console.log('✅ Batch klar:', summary)
 
     return res.status(200).json({
       success: true,
