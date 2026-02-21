@@ -275,6 +275,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = typeof req.body === 'object' && req.body ? req.body : {}
   const batchSize = Number(body.batchSize) || 15   // max antal att bearbeta per anrop
   const batchOffset = Number(body.batchOffset) || 0  // hoppa över N offerter som behöver synk
+  const forceAll = !!body.force  // tvinga re-sync av alla (ignorera status-jämförelse)
 
   try {
     console.log(`🔄 Startar sync (batch: offset=${batchOffset}, size=${batchSize})...`)
@@ -294,8 +295,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       existingMap.set(e.oneflow_contract_id, e.status)
     }
 
-    // 3. Filtrera ut offerter som behöver synkas (ny eller ändrad status)
-    const needsSync = offers.filter(offer => {
+    // 3. Filtrera ut offerter som behöver synkas (ny, ändrad status, eller force)
+    const needsSync = forceAll ? offers : offers.filter(offer => {
       const ofId = offer.id.toString()
       const newStatus = STATUS_MAP[offer.state] || 'pending'
       const existingStatus = existingMap.get(ofId)
