@@ -1,4 +1,4 @@
-// src/components/coordinator/PipelineColumnSelector.tsx — Kolumnväljare för offerthantering-tabellen
+// src/components/coordinator/PipelineColumnSelector.tsx — Kolumnväljare för offerthantering-tabellen (Oneflow-baserad)
 
 import { useState, useRef, useEffect } from 'react'
 import { Settings, ChevronDown } from 'lucide-react'
@@ -11,22 +11,19 @@ export interface PipelineTableColumn {
 }
 
 export const PIPELINE_COLUMNS: PipelineTableColumn[] = [
-  { id: 'status',      label: 'Status',          defaultVisible: true,  required: true },
-  { id: 'arende',      label: 'Ärende',          defaultVisible: true,  required: true },
-  { id: 'typ',         label: 'Typ',             defaultVisible: true,  required: false },
-  { id: 'kund',        label: 'Kund / Kontakt',  defaultVisible: true,  required: false },
-  { id: 'adress',      label: 'Adress',          defaultVisible: true,  required: false },
-  { id: 'skadedjur',   label: 'Skadedjur',       defaultVisible: true,  required: false },
-  { id: 'tekniker',    label: 'Tekniker',        defaultVisible: true,  required: false },
-  { id: 'pris',        label: 'Pris',            defaultVisible: true,  required: false },
-  { id: 'skickat',     label: 'Skickat',         defaultVisible: true,  required: false },
-  { id: 'koordStatus', label: 'Koord. status',   defaultVisible: true,  required: false },
-  { id: 'forsok',      label: 'Försök',          defaultVisible: false, required: false },
-  { id: 'anteckning',  label: 'Anteckning',      defaultVisible: false, required: false },
-  { id: 'atgarder',    label: 'Åtgärder',        defaultVisible: true,  required: true },
+  { id: 'offerStatus',  label: 'Offertstatus',      defaultVisible: true,  required: true },
+  { id: 'kund',         label: 'Kund / Kontakt',    defaultVisible: true,  required: true },
+  { id: 'adress',       label: 'Adress',            defaultVisible: true,  required: false },
+  { id: 'pris',         label: 'Pris',              defaultVisible: true,  required: false },
+  { id: 'ansvarig',     label: 'Ansvarig',          defaultVisible: true,  required: false },
+  { id: 'skickat',      label: 'Skickat',           defaultVisible: true,  required: false },
+  { id: 'koordStatus',  label: 'Koord. status',     defaultVisible: true,  required: false },
+  { id: 'forsok',       label: 'Försök',            defaultVisible: false, required: false },
+  { id: 'anteckning',   label: 'Anteckning',        defaultVisible: false, required: false },
+  { id: 'atgarder',     label: 'Åtgärder',          defaultVisible: true,  required: true },
 ]
 
-const STORAGE_KEY = 'begone_pipeline_columns'
+const STORAGE_KEY = 'begone_pipeline_columns_v2'
 
 export function usePipelineColumnVisibility() {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {

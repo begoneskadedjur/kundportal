@@ -1029,6 +1029,24 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
   }
 }
 
+// Invalidera offer_statistics cache (tvingar nästa GET att hämta nytt)
+const invalidateOfferStatsCache = async () => {
+  try {
+    const { error } = await supabase
+      .from('offer_statistics')
+      .update({ last_synced_at: '1970-01-01T00:00:00Z' })
+      .eq('period', 'all_time')
+
+    if (error) {
+      console.warn('⚠️ Kunde inte invalidera offer_statistics cache:', error.message)
+    } else {
+      console.log('🔄 offer_statistics cache invaliderad')
+    }
+  } catch (err) {
+    console.warn('⚠️ Fel vid cache-invalidering:', err)
+  }
+}
+
 // Processera specifika webhook events
 const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
   const contractId = payload.contract.id.toString()
@@ -1088,7 +1106,12 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             contractData.status = 'pending' // Kontrakt är skickat men inte signerat
             await saveOrUpdateContract(contractData)
             console.log('✅ Kontrakt sparat med status pending - syns nu i contracts-overview')
-            
+
+            // Invalidera offer-statistik cache vid ny offert
+            if (contractData.type === 'offer') {
+              await invalidateOfferStatsCache()
+            }
+
             // NYTT: Identifiera och koppla kund för offerten
             if (contractData.type === 'offer' && contractData.company_name) {
               let customerId = null
@@ -1227,6 +1250,9 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               console.log('✅ Offertstatus uppdaterad till signerad i contracts')
             }
             
+            // Invalidera offer-statistik cache vid signering
+            await invalidateOfferStatsCache()
+
             // Automatisk kundregistrering för signerade avtal
             await createCustomerFromSignedContract(contractId)
           }
@@ -1250,6 +1276,9 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               quote_rejected_at: new Date().toISOString()
             })
             .eq('oneflow_contract_id', contractId)
+
+          // Invalidera offer-statistik cache vid avvisning
+          await invalidateOfferStatsCache()
           break
 
         case 'contract:lifecycle_state:start':
@@ -1313,6 +1342,9 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               updated_at: new Date().toISOString()
             })
             .eq('oneflow_contract_id', contractId)
+
+          // Invalidera offer-statistik cache vid utgånget
+          await invalidateOfferStatsCache()
           break
 
         case 'contract:signing_period_revive':

@@ -1,4 +1,4 @@
-// src/types/casePipeline.ts — Typer för koordinatorns offerthantering
+// src/types/casePipeline.ts — Typer för koordinatorns offerthantering (Oneflow-baserad)
 
 export type CoordinatorCaseStatus =
   | 'new'
@@ -12,8 +12,9 @@ export type ContactMethod = 'phone' | 'email' | 'sms'
 
 export interface CoordinatorCaseAction {
   id: string
-  case_id: string
-  case_type: 'private' | 'business'
+  case_id: string | null
+  case_type: 'private' | 'business' | null
+  contract_id: string | null
   coordinator_status: CoordinatorCaseStatus
   acknowledged_at: string | null
   acknowledged_by: string | null
@@ -21,11 +22,31 @@ export interface CoordinatorCaseAction {
   last_contact_attempt_at: string | null
   last_contact_method: string | null
   coordinator_notes: string | null
+  dismissed_at: string | null
+  dismissed_by: string | null
   created_at: string
   updated_at: string
 }
 
-/** Sammanslaget ärende + coordinator action för tabellvyn */
+/** Oneflow-baserad offert-rad för tabellvyn */
+export interface PipelineOfferRow {
+  id: string                        // contracts.id (uuid)
+  oneflow_contract_id: string
+  status: string                    // pending / signed / declined / overdue
+  company_name: string | null
+  contact_person: string | null
+  contact_email: string | null
+  contact_phone: string | null
+  contact_address: string | null
+  total_value: number | null
+  template_id: string | null
+  begone_employee_name: string | null
+  created_at: string
+  updated_at: string
+  action: CoordinatorCaseAction | null
+}
+
+/** Legacy: ClickUp-baserad rad (behålls för bakåtkompatibilitet med schema-v2) */
 export interface PipelineCaseRow {
   id: string
   case_type: 'private' | 'business'
@@ -48,6 +69,18 @@ export interface PipelineCaseRow {
   action: CoordinatorCaseAction | null
 }
 
+export interface OfferStats {
+  total_sent: number
+  signed: number
+  declined: number
+  pending: number
+  overdue: number
+  sign_rate: number
+  total_value_sent: number
+  total_value_signed: number
+  last_synced_at: string
+}
+
 export const COORDINATOR_STATUS_CONFIG: Record<CoordinatorCaseStatus, {
   label: string
   color: string
@@ -61,10 +94,21 @@ export const COORDINATOR_STATUS_CONFIG: Record<CoordinatorCaseStatus, {
   completed: { label: 'Klar', color: 'text-emerald-400', bgColor: 'bg-emerald-500/15' },
 }
 
-export type PipelineTab = 'offert_skickad' | 'signerad' | 'alla'
+export const OFFER_STATUS_CONFIG: Record<string, {
+  label: string
+  color: string
+  bgColor: string
+}> = {
+  pending: { label: 'Skickad', color: 'text-blue-400', bgColor: 'bg-blue-500/15' },
+  signed: { label: 'Signerad', color: 'text-green-400', bgColor: 'bg-green-500/15' },
+  declined: { label: 'Avvisad', color: 'text-red-400', bgColor: 'bg-red-500/15' },
+  overdue: { label: 'Utgången', color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
+}
+
+export type PipelineTab = 'pending' | 'signed' | 'alla'
 
 export const PIPELINE_TABS: { key: PipelineTab; label: string; statuses: string[] }[] = [
-  { key: 'offert_skickad', label: 'Offert skickad', statuses: ['Offert skickad'] },
-  { key: 'signerad', label: 'Signerad — att boka', statuses: ['Offert signerad - boka in'] },
-  { key: 'alla', label: 'Alla', statuses: ['Offert skickad', 'Offert signerad - boka in'] },
+  { key: 'pending', label: 'Offert skickad', statuses: ['pending', 'overdue'] },
+  { key: 'signed', label: 'Signerad', statuses: ['signed'] },
+  { key: 'alla', label: 'Alla', statuses: ['pending', 'signed', 'overdue'] },
 ]

@@ -1,9 +1,9 @@
-// src/pages/coordinator/CasePipeline.tsx — Offerthantering: koordinatorns pipeline
+// src/pages/coordinator/CasePipeline.tsx — Offerthantering: koordinatorns pipeline (Oneflow-baserad)
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ClipboardList, Search, Phone, MessageSquare, Eye,
+  ClipboardList, Search, Phone, MessageSquare, Eye, EyeOff,
   CalendarCheck, X, Loader2, Send, FileCheck, Banknote,
   TrendingUp, AlertTriangle, Clock, ChevronUp, ChevronDown,
   PhoneCall, MailIcon, MessageCircle,
@@ -11,11 +11,10 @@ import {
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { CasePipelineService } from '../../services/casePipelineService'
-import { formatAddress } from '../../components/coordinator/schedule-v2/scheduleUtils'
-import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import PipelineColumnSelector, { usePipelineColumnVisibility } from '../../components/coordinator/PipelineColumnSelector'
-import type { PipelineCaseRow, PipelineTab, CoordinatorCaseStatus, ContactMethod } from '../../types/casePipeline'
-import { COORDINATOR_STATUS_CONFIG, PIPELINE_TABS } from '../../types/casePipeline'
+import { useOfferStats } from '../../hooks/useOfferStats'
+import type { PipelineOfferRow, PipelineTab, CoordinatorCaseStatus, ContactMethod } from '../../types/casePipeline'
+import { COORDINATOR_STATUS_CONFIG, OFFER_STATUS_CONFIG, PIPELINE_TABS } from '../../types/casePipeline'
 
 // ─── Hjälpfunktioner ───
 
@@ -68,22 +67,18 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
 // ─── Huvudkomponent ───
 
 export default function CasePipeline() {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
-  const [cases, setCases] = useState<PipelineCaseRow[]>([])
+  const [offers, setOffers] = useState<PipelineOfferRow[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<PipelineTab>('alla')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('oldest')
   const [showInsights, setShowInsights] = useState(true)
-
-  // Modal-state
-  const [selectedCase, setSelectedCase] = useState<PipelineCaseRow | null>(null)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false)
+  const [showDismissed, setShowDismissed] = useState(false)
 
   // Kontaktförsök-popover
-  const [contactPopoverCaseId, setContactPopoverCaseId] = useState<string | null>(null)
+  const [contactPopoverOfferId, setContactPopoverOfferId] = useState<string | null>(null)
 
   // Inline note editing
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
@@ -92,34 +87,42 @@ export default function CasePipeline() {
   // Kolumnväljare
   const { visibleColumns, toggleColumn, resetToDefaults, isVisible } = usePipelineColumnVisibility()
 
-  const fetchCases = useCallback(async () => {
+  // Oneflow-statistik (cachad i Supabase)
+  const { stats: offerStats } = useOfferStats()
+
+  const fetchOffers = useCallback(async () => {
     try {
-      const data = await CasePipelineService.getPipelineCases()
-      setCases(data)
+      const data = await CasePipelineService.getPipelineOffers()
+      setOffers(data)
     } catch (err) {
-      console.error('Fel vid hämtning av pipeline-ärenden:', err)
-      toast.error('Kunde inte ladda ärenden')
+      console.error('Fel vid hämtning av pipeline-offerter:', err)
+      toast.error('Kunde inte ladda offerter')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { fetchCases() }, [fetchCases])
+  useEffect(() => { fetchOffers() }, [fetchOffers])
 
   // ─── Filtrering + sökning + sortering ───
 
   const filtered = useMemo(() => {
     const tab = PIPELINE_TABS.find(t => t.key === activeTab)!
-    let result = cases.filter(c => tab.statuses.includes(c.status))
+    let result = offers.filter(o => tab.statuses.includes(o.status))
+
+    // Dölja avfärdade om inte showDismissed
+    if (!showDismissed) {
+      result = result.filter(o => !o.action?.dismissed_at)
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
-      result = result.filter(c =>
-        (c.title || '').toLowerCase().includes(q) ||
-        (c.kontaktperson || '').toLowerCase().includes(q) ||
-        (c.primary_assignee_name || '').toLowerCase().includes(q) ||
-        (c.bestallare || '').toLowerCase().includes(q) ||
-        (c.skadedjur || '').toLowerCase().includes(q)
+      result = result.filter(o =>
+        (o.company_name || '').toLowerCase().includes(q) ||
+        (o.contact_person || '').toLowerCase().includes(q) ||
+        (o.contact_email || '').toLowerCase().includes(q) ||
+        (o.contact_address || '').toLowerCase().includes(q) ||
+        (o.begone_employee_name || '').toLowerCase().includes(q)
       )
     }
 
@@ -130,33 +133,36 @@ export default function CasePipeline() {
       if (aNew !== bNew) return aNew - bNew
 
       switch (sortBy) {
-        case 'oldest': return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
-        case 'newest': return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-        case 'price_desc': return (b.pris || 0) - (a.pris || 0)
+        case 'oldest': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        case 'newest': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        case 'price_desc': return (b.total_value || 0) - (a.total_value || 0)
         case 'contact_attempts': return (b.action?.contact_attempts || 0) - (a.action?.contact_attempts || 0)
         default: return 0
       }
     })
 
     return result
-  }, [cases, activeTab, searchQuery, sortBy])
+  }, [offers, activeTab, searchQuery, sortBy, showDismissed])
 
-  // ─── KPI + insikter ───
+  // ─── Antal dolda ───
+  const dismissedCount = useMemo(() =>
+    offers.filter(o => !!o.action?.dismissed_at).length
+  , [offers])
 
-  const stats = useMemo(() => {
-    const offertSkickad = cases.filter(c => c.status === 'Offert skickad').length
-    const signerad = cases.filter(c => c.status === 'Offert signerad - boka in').length
-    const ejKvitterat = cases.filter(c => !c.action || c.action.coordinator_status === 'new').length
-    const totalValue = cases.reduce((s, c) => s + (c.pris || 0), 0)
-    const totalOffertValue = cases.filter(c => c.status === 'Offert skickad').reduce((s, c) => s + (c.pris || 0), 0)
-    const totalSigneradValue = cases.filter(c => c.status === 'Offert signerad - boka in').reduce((s, c) => s + (c.pris || 0), 0)
-    const conversionRate = cases.length > 0 ? Math.round((signerad / cases.length) * 100) : 0
-    const scheduledCount = cases.filter(c => c.start_date && c.due_date).length
+  // ─── KPI (lokala beräkningar från offers) ───
+
+  const localStats = useMemo(() => {
+    const pendingOffers = offers.filter(o => o.status === 'pending' || o.status === 'overdue')
+    const signedOffers = offers.filter(o => o.status === 'signed')
+    const ejKvitterat = offers.filter(o => !o.action || o.action.coordinator_status === 'new').length
+    const totalPipelineValue = offers.reduce((s, o) => s + (o.total_value || 0), 0)
+    const pendingValue = pendingOffers.reduce((s, o) => s + (o.total_value || 0), 0)
+    const signedValue = signedOffers.reduce((s, o) => s + (o.total_value || 0), 0)
 
     // Åldersfördelning
     const ageBuckets = { fresh: 0, week: 0, month: 0, quarter: 0, old: 0 }
-    for (const c of cases) {
-      const days = getDaysAge(c.updated_at)
+    for (const o of offers) {
+      const days = getDaysAge(o.created_at)
       if (days < 7) ageBuckets.fresh++
       else if (days < 14) ageBuckets.week++
       else if (days < 30) ageBuckets.month++
@@ -165,338 +171,366 @@ export default function CasePipeline() {
     }
 
     // Kräver åtgärd
-    const utanKontakt30d = cases.filter(c =>
-      (c.action?.contact_attempts || 0) === 0 && getDaysAge(c.updated_at) > 30
+    const utanKontakt30d = offers.filter(o =>
+      (o.action?.contact_attempts || 0) === 0 && getDaysAge(o.created_at) > 30
     ).length
 
     return {
-      offertSkickad, signerad, ejKvitterat, totalValue,
-      totalOffertValue, totalSigneradValue, conversionRate,
-      scheduledCount, ageBuckets, utanKontakt30d,
+      pending: pendingOffers.length,
+      signed: signedOffers.length,
+      ejKvitterat,
+      totalPipelineValue,
+      pendingValue,
+      signedValue,
+      ageBuckets,
+      utanKontakt30d,
     }
-  }, [cases])
+  }, [offers])
 
   // ─── Actions ───
 
-  const handleAcknowledge = useCallback(async (c: PipelineCaseRow) => {
-    if (!user?.id || !profile?.display_name) return
+  const handleAcknowledge = useCallback(async (o: PipelineOfferRow) => {
+    if (!user?.id) return
     try {
-      const updated = await CasePipelineService.acknowledgeCase(c.case_id || c.id, c.case_type, user.id, profile.display_name)
-      setCases(prev => prev.map(p => p.id === c.id ? { ...p, action: updated } : p))
-      toast.success('Ärende kvitterat')
+      const updated = await CasePipelineService.acknowledgeOffer(o.id, user.id)
+      setOffers(prev => prev.map(p => p.id === o.id ? { ...p, action: updated } : p))
+      toast.success('Offert kvitterad')
     } catch {
       toast.error('Kunde inte kvittera')
     }
-  }, [user, profile])
+  }, [user])
 
-  const handleLogContact = useCallback(async (c: PipelineCaseRow, method: ContactMethod, note?: string) => {
-    if (!user?.id || !profile?.display_name) return
+  const handleLogContact = useCallback(async (o: PipelineOfferRow, method: ContactMethod, note?: string) => {
+    if (!user?.id) return
     try {
-      const updated = await CasePipelineService.logContactAttempt(c.id, c.case_type, user.id, profile.display_name, method, note)
-      setCases(prev => prev.map(p => p.id === c.id ? { ...p, action: updated } : p))
-      setContactPopoverCaseId(null)
+      const updated = await CasePipelineService.logOfferContactAttempt(o.id, user.id, method, note)
+      setOffers(prev => prev.map(p => p.id === o.id ? { ...p, action: updated } : p))
+      setContactPopoverOfferId(null)
       toast.success('Kontaktförsök loggat')
     } catch {
       toast.error('Kunde inte logga kontaktförsök')
     }
-  }, [user, profile])
+  }, [user])
 
-  const handleSaveNote = useCallback(async (c: PipelineCaseRow) => {
-    if (!user?.id || !profile?.display_name) return
+  const handleSaveNote = useCallback(async (o: PipelineOfferRow) => {
     try {
-      const updated = await CasePipelineService.updateNotes(c.id, c.case_type, noteText, user.id, profile.display_name)
-      setCases(prev => prev.map(p => p.id === c.id ? { ...p, action: updated } : p))
+      const updated = await CasePipelineService.updateOfferNotes(o.id, noteText)
+      setOffers(prev => prev.map(p => p.id === o.id ? { ...p, action: updated } : p))
       setEditingNoteId(null)
       setNoteText('')
       toast.success('Anteckning sparad')
     } catch {
       toast.error('Kunde inte spara')
     }
-  }, [user, profile, noteText])
+  }, [noteText])
 
-  const handleStatusChange = useCallback(async (c: PipelineCaseRow, status: CoordinatorCaseStatus) => {
+  const handleStatusChange = useCallback(async (o: PipelineOfferRow, status: CoordinatorCaseStatus) => {
     try {
-      const updated = await CasePipelineService.updateStatus(c.id, c.case_type, status)
-      setCases(prev => prev.map(p => p.id === c.id ? { ...p, action: updated } : p))
+      const updated = await CasePipelineService.updateOfferStatus(o.id, status)
+      setOffers(prev => prev.map(p => p.id === o.id ? { ...p, action: updated } : p))
     } catch {
       toast.error('Kunde inte byta status')
     }
   }, [])
 
-  const handleBookCase = useCallback((c: PipelineCaseRow) => {
-    navigate(`/koordinator/schema-v2?scheduleCase=${c.id}`)
-  }, [navigate])
+  const handleDismiss = useCallback(async (o: PipelineOfferRow) => {
+    if (!user?.id) return
+    try {
+      await CasePipelineService.dismissOffer(o.id, user.id)
+      setOffers(prev => prev.map(p => p.id === o.id
+        ? { ...p, action: { ...(p.action || {} as any), dismissed_at: new Date().toISOString(), dismissed_by: user.id } }
+        : p
+      ))
+      toast.success('Offert dold')
+    } catch {
+      toast.error('Kunde inte dölja')
+    }
+  }, [user])
 
-  const handleOpenHistory = useCallback((c: PipelineCaseRow) => {
-    setOpenCommunicationOnLoad(true)
-    setSelectedCase(c)
-    setIsEditModalOpen(true)
+  const handleUndismiss = useCallback(async (o: PipelineOfferRow) => {
+    try {
+      await CasePipelineService.undismissOffer(o.id)
+      setOffers(prev => prev.map(p => p.id === o.id
+        ? { ...p, action: p.action ? { ...p.action, dismissed_at: null, dismissed_by: null } : null }
+        : p
+      ))
+      toast.success('Offert synlig igen')
+    } catch {
+      toast.error('Kunde inte återställa')
+    }
   }, [])
 
-  const handleEditSuccess = useCallback(() => {
-    setIsEditModalOpen(false)
-    setSelectedCase(null)
-    fetchCases()
-  }, [fetchCases])
+  const handleBookOffer = useCallback((o: PipelineOfferRow) => {
+    navigate(`/koordinator/schema-v2?scheduleCase=${o.id}`)
+  }, [navigate])
+
+  // Konverteringsgrad: använd Oneflow-statistik om tillgänglig, annars lokala siffror
+  const conversionRate = offerStats?.sign_rate ?? (
+    (localStats.signed + localStats.pending) > 0
+      ? Math.round((localStats.signed / (localStats.signed + localStats.pending)) * 100)
+      : 0
+  )
+  const conversionSubtext = offerStats
+    ? `${offerStats.signed} av ${offerStats.signed + offerStats.declined + offerStats.overdue} (Oneflow)`
+    : `${localStats.signed} av ${offers.length} signerade`
 
   // ─── Render ───
 
   return (
-    <>
-      <div className="p-4 lg:p-6 space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <ClipboardList className="w-6 h-6 text-[#20c58f]" />
-            <h1 className="text-xl font-bold text-white">Offerthantering</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <PipelineColumnSelector
-              visibleColumns={visibleColumns}
-              onToggle={toggleColumn}
-              onReset={resetToDefaults}
-            />
-            <button
-              onClick={() => setShowInsights(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800/50"
-            >
-              {showInsights ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              {showInsights ? 'Dölj insikter' : 'Visa insikter'}
-            </button>
-          </div>
+    <div className="p-4 lg:p-6 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <ClipboardList className="w-6 h-6 text-[#20c58f]" />
+          <h1 className="text-xl font-bold text-white">Offerthantering</h1>
+          <span className="text-xs text-slate-500 font-medium">Oneflow</span>
         </div>
-
-        {/* ═══ SEKTION 1: KPI-kort ═══ */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard
-            icon={Send}
-            label="Offert skickad"
-            value={stats.offertSkickad}
-            subtext={formatKr(stats.totalOffertValue)}
-            color="emerald"
-            onClick={() => setActiveTab('offert_skickad')}
-            active={activeTab === 'offert_skickad'}
+        <div className="flex items-center gap-2">
+          <PipelineColumnSelector
+            visibleColumns={visibleColumns}
+            onToggle={toggleColumn}
+            onReset={resetToDefaults}
           />
-          <KpiCard
-            icon={FileCheck}
-            label="Signerad — att boka"
-            value={stats.signerad}
-            subtext={formatKr(stats.totalSigneradValue)}
-            color="green"
-            pulse={stats.signerad > 0}
-            onClick={() => setActiveTab('signerad')}
-            active={activeTab === 'signerad'}
-          />
-          <KpiCard
-            icon={Banknote}
-            label="Pipelinevärde"
-            value={formatKr(stats.totalValue)}
-            subtext="Totalt offertvärde"
-            color="blue"
-          />
-          <KpiCard
-            icon={TrendingUp}
-            label="Konverteringsgrad"
-            value={`${stats.conversionRate}%`}
-            subtext={`${stats.signerad} av ${cases.length} signerade`}
-            color={stats.conversionRate >= 25 ? 'green' : 'amber'}
-          />
+          <button
+            onClick={() => setShowInsights(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800/50"
+          >
+            {showInsights ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            {showInsights ? 'Dölj insikter' : 'Visa insikter'}
+          </button>
         </div>
+      </div>
 
-        {/* ═══ SEKTION 2: Dashboard-insikter ═══ */}
-        <AnimatePresence>
-          {showInsights && !loading && cases.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                {/* Panel A: Konverteringstratt */}
-                <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="w-4 h-4 text-emerald-400" />
-                    <h3 className="text-xs font-semibold text-white">Konverteringstratt</h3>
-                  </div>
-                  <div className="space-y-2">
-                    <FunnelBar label="Offert skickad" value={stats.offertSkickad} max={stats.offertSkickad} color="bg-emerald-500" />
-                    <FunnelBar label="Signerad" value={stats.signerad} max={stats.offertSkickad} color="bg-green-500" />
-                    <FunnelBar label="Inbokad" value={stats.scheduledCount} max={stats.offertSkickad} color="bg-[#20c58f]" />
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-2">
-                    {stats.conversionRate}% konvertering (offert &rarr; signerad)
-                  </p>
+      {/* ═══ SEKTION 1: KPI-kort ═══ */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard
+          icon={Send}
+          label="Offert skickad"
+          value={localStats.pending}
+          subtext={formatKr(localStats.pendingValue)}
+          color="emerald"
+          onClick={() => setActiveTab('pending')}
+          active={activeTab === 'pending'}
+        />
+        <KpiCard
+          icon={FileCheck}
+          label="Signerad — att boka"
+          value={localStats.signed}
+          subtext={formatKr(localStats.signedValue)}
+          color="green"
+          pulse={localStats.signed > 0}
+          onClick={() => setActiveTab('signed')}
+          active={activeTab === 'signed'}
+        />
+        <KpiCard
+          icon={Banknote}
+          label="Pipelinevärde"
+          value={formatKr(localStats.totalPipelineValue)}
+          subtext="Totalt offertvärde"
+          color="blue"
+        />
+        <KpiCard
+          icon={TrendingUp}
+          label="Konverteringsgrad"
+          value={`${conversionRate}%`}
+          subtext={conversionSubtext}
+          color={conversionRate >= 25 ? 'green' : 'amber'}
+        />
+      </div>
+
+      {/* ═══ SEKTION 2: Dashboard-insikter ═══ */}
+      <AnimatePresence>
+        {showInsights && !loading && offers.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              {/* Panel A: Konverteringstratt */}
+              <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-xs font-semibold text-white">Konverteringstratt</h3>
                 </div>
-
-                {/* Panel B: Åldersfördelning */}
-                <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Clock className="w-4 h-4 text-amber-400" />
-                    <h3 className="text-xs font-semibold text-white">Åldersfördelning</h3>
+                {offerStats ? (
+                  <div className="space-y-2">
+                    <FunnelBar label="Skickade" value={offerStats.total_sent} max={offerStats.total_sent} color="bg-emerald-500" />
+                    <FunnelBar label="Signerade" value={offerStats.signed} max={offerStats.total_sent} color="bg-green-500" />
+                    <FunnelBar label="Avvisade" value={offerStats.declined} max={offerStats.total_sent} color="bg-red-500/70" />
                   </div>
-                  <AgingBar buckets={stats.ageBuckets} total={cases.length} />
-                  {stats.ageBuckets.old > 0 && (
-                    <p className="text-[10px] text-red-400 mt-2 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3 shrink-0" />
-                      {stats.ageBuckets.old} offerter har legat &ouml;ver 90 dagar
-                    </p>
+                ) : (
+                  <div className="space-y-2">
+                    <FunnelBar label="Offert skickad" value={localStats.pending} max={offers.length || 1} color="bg-emerald-500" />
+                    <FunnelBar label="Signerad" value={localStats.signed} max={offers.length || 1} color="bg-green-500" />
+                  </div>
+                )}
+                <p className="text-[10px] text-slate-500 mt-2">
+                  {conversionRate}% konvertering{offerStats ? ' (Oneflow)' : ''}
+                </p>
+              </div>
+
+              {/* Panel B: Åldersfördelning */}
+              <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-xs font-semibold text-white">Åldersfördelning</h3>
+                </div>
+                <AgingBar buckets={localStats.ageBuckets} total={offers.length} />
+                {localStats.ageBuckets.old > 0 && (
+                  <p className="text-[10px] text-red-400 mt-2 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                    {localStats.ageBuckets.old} offerter har legat &ouml;ver 90 dagar
+                  </p>
+                )}
+              </div>
+
+              {/* Panel C: Kräver åtgärd */}
+              <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <h3 className="text-xs font-semibold text-white">Kräver åtgärd</h3>
+                </div>
+                <div className="space-y-2">
+                  {localStats.signed > 0 && (
+                    <AlertCard
+                      icon={CalendarCheck}
+                      text={`${localStats.signed} signerade att boka in`}
+                      subtext={formatKr(localStats.signedValue)}
+                      severity="red"
+                      onClick={() => setActiveTab('signed')}
+                    />
+                  )}
+                  {localStats.utanKontakt30d > 0 && (
+                    <AlertCard
+                      icon={Phone}
+                      text={`${localStats.utanKontakt30d} utan kontakt (>30d)`}
+                      severity="amber"
+                      onClick={() => { setActiveTab('alla'); setSortBy('oldest') }}
+                    />
+                  )}
+                  {localStats.ejKvitterat > 0 && (
+                    <AlertCard
+                      icon={Eye}
+                      text={`${localStats.ejKvitterat} ej kvitterade`}
+                      severity="blue"
+                      onClick={() => setActiveTab('alla')}
+                    />
+                  )}
+                  {localStats.signed === 0 && localStats.utanKontakt30d === 0 && localStats.ejKvitterat === 0 && (
+                    <p className="text-xs text-slate-500 py-2">Allt ser bra ut!</p>
                   )}
                 </div>
-
-                {/* Panel C: Kräver åtgärd */}
-                <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertTriangle className="w-4 h-4 text-red-400" />
-                    <h3 className="text-xs font-semibold text-white">Kräver åtgärd</h3>
-                  </div>
-                  <div className="space-y-2">
-                    {stats.signerad > 0 && (
-                      <AlertCard
-                        icon={CalendarCheck}
-                        text={`${stats.signerad} signerade att boka in`}
-                        subtext={formatKr(stats.totalSigneradValue)}
-                        severity="red"
-                        onClick={() => setActiveTab('signerad')}
-                      />
-                    )}
-                    {stats.utanKontakt30d > 0 && (
-                      <AlertCard
-                        icon={Phone}
-                        text={`${stats.utanKontakt30d} utan kontakt (>30d)`}
-                        severity="amber"
-                        onClick={() => { setActiveTab('alla'); setSortBy('oldest') }}
-                      />
-                    )}
-                    {stats.ejKvitterat > 0 && (
-                      <AlertCard
-                        icon={Eye}
-                        text={`${stats.ejKvitterat} ej kvitterade`}
-                        severity="blue"
-                        onClick={() => setActiveTab('alla')}
-                      />
-                    )}
-                    {stats.signerad === 0 && stats.utanKontakt30d === 0 && stats.ejKvitterat === 0 && (
-                      <p className="text-xs text-slate-500 py-2">Allt ser bra ut!</p>
-                    )}
-                  </div>
-                </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Flikar + sök + sort */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex bg-slate-800/50 rounded-lg p-0.5">
-            {PIPELINE_TABS.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === tab.key
-                    ? 'bg-[#20c58f] text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Sök ärende, kund, tekniker..."
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-            />
-          </div>
-
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as SortOption)}
-            className="px-3 py-1.5 text-xs bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-          >
-            {SORT_OPTIONS.map(o => (
-              <option key={o.key} value={o.key}>{o.label}</option>
-            ))}
-          </select>
+      {/* Flikar + sök + sort + dismissed toggle */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex bg-slate-800/50 rounded-lg p-0.5">
+          {PIPELINE_TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-[#20c58f] text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* ═══ SEKTION 3: Tabell ═══ */}
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-6 h-6 text-slate-500 animate-spin" />
-            <span className="ml-2 text-sm text-slate-400">Laddar ärenden...</span>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16">
-            <ClipboardList className="mx-auto w-10 h-10 text-slate-600 mb-3" />
-            <p className="text-sm text-slate-400">Inga ärenden matchar filtret</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-700/50">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="bg-slate-800/60 text-slate-400 border-b border-slate-700/50">
-                  {isVisible('status') && <th className="px-3 py-2.5 font-medium">Status</th>}
-                  {isVisible('arende') && <th className="px-3 py-2.5 font-medium">Ärende</th>}
-                  {isVisible('typ') && <th className="px-3 py-2.5 font-medium">Typ</th>}
-                  {isVisible('kund') && <th className="px-3 py-2.5 font-medium">Kund / Kontakt</th>}
-                  {isVisible('adress') && <th className="px-3 py-2.5 font-medium">Adress</th>}
-                  {isVisible('skadedjur') && <th className="px-3 py-2.5 font-medium">Skadedjur</th>}
-                  {isVisible('tekniker') && <th className="px-3 py-2.5 font-medium">Tekniker</th>}
-                  {isVisible('pris') && <th className="px-3 py-2.5 font-medium">Pris</th>}
-                  {isVisible('skickat') && <th className="px-3 py-2.5 font-medium">Skickat</th>}
-                  {isVisible('koordStatus') && <th className="px-3 py-2.5 font-medium">Koord. status</th>}
-                  {isVisible('forsok') && <th className="px-3 py-2.5 font-medium">Försök</th>}
-                  {isVisible('anteckning') && <th className="px-3 py-2.5 font-medium">Anteckning</th>}
-                  {isVisible('atgarder') && <th className="px-3 py-2.5 font-medium">Åtgärder</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(c => (
-                  <PipelineRow
-                    key={c.id}
-                    caseRow={c}
-                    onAcknowledge={handleAcknowledge}
-                    onOpenContactPopover={setContactPopoverCaseId}
-                    contactPopoverOpen={contactPopoverCaseId === c.id}
-                    onLogContact={handleLogContact}
-                    onStartEditNote={(id, currentNote) => { setEditingNoteId(id); setNoteText(currentNote || '') }}
-                    editingNoteId={editingNoteId}
-                    noteText={noteText}
-                    onNoteTextChange={setNoteText}
-                    onSaveNote={handleSaveNote}
-                    onCancelNote={() => { setEditingNoteId(null); setNoteText('') }}
-                    onStatusChange={handleStatusChange}
-                    onBook={handleBookCase}
-                    onOpenHistory={handleOpenHistory}
-                    isVisible={isVisible}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Sök kund, kontakt, e-post..."
+            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+          />
+        </div>
+
+        <SortDropdown value={sortBy} onChange={setSortBy} />
+
+        {/* Visa dolda toggle */}
+        {dismissedCount > 0 && (
+          <button
+            onClick={() => setShowDismissed(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+              showDismissed
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white hover:border-slate-500'
+            }`}
+          >
+            <EyeOff className="w-3.5 h-3.5" />
+            Dolda ({dismissedCount})
+          </button>
         )}
       </div>
 
-      {/* EditCaseModal */}
-      {selectedCase && (
-        <EditCaseModal
-          isOpen={isEditModalOpen}
-          onClose={() => { setIsEditModalOpen(false); setSelectedCase(null); setOpenCommunicationOnLoad(false) }}
-          onSuccess={handleEditSuccess}
-          caseData={selectedCase as any}
-          technicians={[]}
-          openCommunicationOnLoad={openCommunicationOnLoad}
-        />
+      {/* ═══ SEKTION 3: Tabell ═══ */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 text-slate-500 animate-spin" />
+          <span className="ml-2 text-sm text-slate-400">Laddar offerter...</span>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <ClipboardList className="mx-auto w-10 h-10 text-slate-600 mb-3" />
+          <p className="text-sm text-slate-400">Inga offerter matchar filtret</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-700/50">
+          <table className="w-full text-xs text-left">
+            <thead>
+              <tr className="bg-slate-800/60 text-slate-400 border-b border-slate-700/50">
+                {isVisible('offerStatus') && <th className="px-3 py-2.5 font-medium">Offertstatus</th>}
+                {isVisible('kund') && <th className="px-3 py-2.5 font-medium">Kund / Kontakt</th>}
+                {isVisible('adress') && <th className="px-3 py-2.5 font-medium">Adress</th>}
+                {isVisible('pris') && <th className="px-3 py-2.5 font-medium">Pris</th>}
+                {isVisible('ansvarig') && <th className="px-3 py-2.5 font-medium">Ansvarig</th>}
+                {isVisible('skickat') && <th className="px-3 py-2.5 font-medium">Skickat</th>}
+                {isVisible('koordStatus') && <th className="px-3 py-2.5 font-medium">Koord. status</th>}
+                {isVisible('forsok') && <th className="px-3 py-2.5 font-medium">Försök</th>}
+                {isVisible('anteckning') && <th className="px-3 py-2.5 font-medium">Anteckning</th>}
+                {isVisible('atgarder') && <th className="px-3 py-2.5 font-medium">Åtgärder</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(o => (
+                <PipelineRow
+                  key={o.id}
+                  offer={o}
+                  onAcknowledge={handleAcknowledge}
+                  onOpenContactPopover={setContactPopoverOfferId}
+                  contactPopoverOpen={contactPopoverOfferId === o.id}
+                  onLogContact={handleLogContact}
+                  onStartEditNote={(id, currentNote) => { setEditingNoteId(id); setNoteText(currentNote || '') }}
+                  editingNoteId={editingNoteId}
+                  noteText={noteText}
+                  onNoteTextChange={setNoteText}
+                  onSaveNote={handleSaveNote}
+                  onCancelNote={() => { setEditingNoteId(null); setNoteText('') }}
+                  onStatusChange={handleStatusChange}
+                  onBook={handleBookOffer}
+                  onDismiss={handleDismiss}
+                  onUndismiss={handleUndismiss}
+                  isVisible={isVisible}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -580,7 +614,7 @@ function getAgeBuckets() {
 }
 
 function AgingBar({ buckets, total }: { buckets: ReturnType<typeof getAgeBuckets>; total: number }) {
-  if (total === 0) return <p className="text-xs text-slate-500">Inga ärenden</p>
+  if (total === 0) return <p className="text-xs text-slate-500">Inga offerter</p>
   return (
     <div>
       <div className="flex rounded-full h-5 overflow-hidden bg-slate-700/30">
@@ -595,7 +629,7 @@ function AgingBar({ buckets, total }: { buckets: ReturnType<typeof getAgeBuckets
               animate={{ width: `${pct}%` }}
               transition={{ duration: 0.6, ease: 'easeOut' }}
               className={`${seg.color} flex items-center justify-center`}
-              title={`${seg.label}: ${count} ärenden`}
+              title={`${seg.label}: ${count} offerter`}
             >
               {pct > 8 && <span className="text-[8px] text-white font-bold">{count}</span>}
             </motion.div>
@@ -663,83 +697,124 @@ function AgeBadge({ dateStr }: { dateStr: string | null }) {
   )
 }
 
+// ─── Custom sort-dropdown (mörkt tema) ───
+
+function SortDropdown({ value, onChange }: { value: SortOption; onChange: (v: SortOption) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const current = SORT_OPTIONS.find(o => o.key === value)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-300 hover:text-white hover:border-slate-500 transition-colors"
+      >
+        {current?.label}
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[160px]">
+          {SORT_OPTIONS.map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => { onChange(opt.key); setOpen(false) }}
+              className={`w-full text-left px-3 py-1.5 text-[11px] font-medium hover:bg-slate-700/50 transition-colors ${
+                opt.key === value ? 'text-[#20c58f]' : 'text-slate-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Tabellrad ───
 
 interface PipelineRowProps {
-  caseRow: PipelineCaseRow
-  onAcknowledge: (c: PipelineCaseRow) => void
+  offer: PipelineOfferRow
+  onAcknowledge: (o: PipelineOfferRow) => void
   onOpenContactPopover: (id: string | null) => void
   contactPopoverOpen: boolean
-  onLogContact: (c: PipelineCaseRow, method: ContactMethod, note?: string) => void
+  onLogContact: (o: PipelineOfferRow, method: ContactMethod, note?: string) => void
   onStartEditNote: (id: string, currentNote: string | null) => void
   editingNoteId: string | null
   noteText: string
   onNoteTextChange: (text: string) => void
-  onSaveNote: (c: PipelineCaseRow) => void
+  onSaveNote: (o: PipelineOfferRow) => void
   onCancelNote: () => void
-  onStatusChange: (c: PipelineCaseRow, status: CoordinatorCaseStatus) => void
-  onBook: (c: PipelineCaseRow) => void
-  onOpenHistory: (c: PipelineCaseRow) => void
+  onStatusChange: (o: PipelineOfferRow, status: CoordinatorCaseStatus) => void
+  onBook: (o: PipelineOfferRow) => void
+  onDismiss: (o: PipelineOfferRow) => void
+  onUndismiss: (o: PipelineOfferRow) => void
   isVisible: (columnId: string) => boolean
 }
 
 function PipelineRow({
-  caseRow: c, onAcknowledge, onOpenContactPopover, contactPopoverOpen,
+  offer: o, onAcknowledge, onOpenContactPopover, contactPopoverOpen,
   onLogContact, onStartEditNote, editingNoteId, noteText, onNoteTextChange,
-  onSaveNote, onCancelNote, onStatusChange, onBook, onOpenHistory, isVisible,
+  onSaveNote, onCancelNote, onStatusChange, onBook, onDismiss, onUndismiss, isVisible,
 }: PipelineRowProps) {
-  const addr = formatAddress(c.adress)
-  const isNew = !c.action || c.action.coordinator_status === 'new'
-  const status = c.action?.coordinator_status || 'new'
-  const isSignerad = c.status === 'Offert signerad - boka in'
+  const isNew = !o.action || o.action.coordinator_status === 'new'
+  const status = o.action?.coordinator_status || 'new'
+  const isSigned = o.status === 'signed'
+  const isDismissed = !!o.action?.dismissed_at
+  const offerStatusCfg = OFFER_STATUS_CONFIG[o.status] || OFFER_STATUS_CONFIG.pending
 
-  const rowBg = isSignerad
-    ? 'bg-green-500/[0.03]'
-    : isNew
-      ? 'bg-amber-500/[0.03]'
-      : ''
+  const rowBg = isDismissed
+    ? 'opacity-50'
+    : isSigned
+      ? 'bg-green-500/[0.03]'
+      : isNew
+        ? 'bg-amber-500/[0.03]'
+        : ''
 
   return (
-    <tr className={`border-b border-slate-800/40 border-l-2 ${getAgeBorderColor(c.updated_at)} hover:bg-slate-800/30 transition-colors ${rowBg}`}>
-      {/* ClickUp-status */}
-      {isVisible('status') && (
+    <tr className={`border-b border-slate-800/40 border-l-2 ${getAgeBorderColor(o.created_at)} hover:bg-slate-800/30 transition-colors ${rowBg}`}>
+      {/* Offertstatus (Oneflow) */}
+      {isVisible('offerStatus') && (
         <td className="px-3 py-2.5">
-          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-            isSignerad ? 'bg-green-500/15 text-green-400' : 'bg-emerald-500/15 text-emerald-400'
-          }`}>
-            {isSignerad ? 'Signerad' : 'Offert'}
+          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${offerStatusCfg.bgColor} ${offerStatusCfg.color}`}>
+            {offerStatusCfg.label}
           </span>
         </td>
       )}
 
-      {/* Ärende */}
-      {isVisible('arende') && (
-        <td className="px-3 py-2.5">
-          <span className="text-white font-medium truncate max-w-[180px] block" title={c.title}>
-            {c.title || 'Utan titel'}
-          </span>
-        </td>
-      )}
-
-      {/* Typ */}
-      {isVisible('typ') && (
-        <td className="px-3 py-2.5">
-          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-            c.case_type === 'private' ? 'bg-blue-500/15 text-blue-400' : 'bg-purple-500/15 text-purple-400'
-          }`}>
-            {c.case_type === 'private' ? 'Privat' : 'Företag'}
-          </span>
-        </td>
-      )}
-
-      {/* Kund/Kontakt */}
+      {/* Kund / Kontakt + mailto */}
       {isVisible('kund') && (
         <td className="px-3 py-2.5">
-          <div className="max-w-[160px]">
-            <p className="text-white truncate text-[11px]">{c.kontaktperson || c.bestallare || '—'}</p>
-            {c.telefon_kontaktperson && (
-              <p className="text-slate-500 truncate text-[10px]">{c.telefon_kontaktperson}</p>
+          <div className="max-w-[180px]">
+            <p className="text-white truncate text-[11px] font-medium">{o.company_name || o.contact_person || '—'}</p>
+            {o.contact_person && o.company_name && (
+              <p className="text-slate-500 truncate text-[10px]">{o.contact_person}</p>
             )}
+            <div className="flex items-center gap-2 mt-0.5">
+              {o.contact_phone && (
+                <span className="text-slate-500 truncate text-[10px]">{o.contact_phone}</span>
+              )}
+              {o.contact_email && (
+                <a
+                  href={`mailto:${o.contact_email}`}
+                  className="text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+                  title={o.contact_email}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <MailIcon className="w-3 h-3" />
+                </a>
+              )}
+            </div>
           </div>
         </td>
       )}
@@ -747,50 +822,45 @@ function PipelineRow({
       {/* Adress */}
       {isVisible('adress') && (
         <td className="px-3 py-2.5">
-          <span className="text-slate-400 truncate block max-w-[140px]" title={addr}>{addr || '—'}</span>
-        </td>
-      )}
-
-      {/* Skadedjur */}
-      {isVisible('skadedjur') && (
-        <td className="px-3 py-2.5">
-          <span className="text-slate-400">{c.skadedjur || '—'}</span>
-        </td>
-      )}
-
-      {/* Tekniker */}
-      {isVisible('tekniker') && (
-        <td className="px-3 py-2.5">
-          <span className="text-slate-300 font-medium">{c.primary_assignee_name || '—'}</span>
+          <span className="text-slate-400 truncate block max-w-[140px]" title={o.contact_address || ''}>
+            {o.contact_address || '—'}
+          </span>
         </td>
       )}
 
       {/* Pris */}
       {isVisible('pris') && (
         <td className="px-3 py-2.5">
-          <span className="text-white font-medium">{formatPrice(c.pris)}</span>
+          <span className="text-white font-medium">{formatPrice(o.total_value)}</span>
+        </td>
+      )}
+
+      {/* Ansvarig (BeGone-medarbetare) */}
+      {isVisible('ansvarig') && (
+        <td className="px-3 py-2.5">
+          <span className="text-slate-300 font-medium">{o.begone_employee_name || '—'}</span>
         </td>
       )}
 
       {/* Skickat — med ålderbadge */}
       {isVisible('skickat') && (
         <td className="px-3 py-2.5">
-          <AgeBadge dateStr={c.updated_at} />
+          <AgeBadge dateStr={o.created_at} />
         </td>
       )}
 
       {/* Koord.status — custom dropdown */}
       {isVisible('koordStatus') && (
         <td className="px-3 py-2.5">
-          <StatusDropdown value={status} onChange={(s) => onStatusChange(c, s)} />
+          <StatusDropdown value={status} onChange={(s) => onStatusChange(o, s)} />
         </td>
       )}
 
       {/* Försök */}
       {isVisible('forsok') && (
         <td className="px-3 py-2.5">
-          <span className={`text-[11px] font-medium ${(c.action?.contact_attempts || 0) > 0 ? 'text-purple-400' : 'text-slate-600'}`}>
-            {c.action?.contact_attempts || 0}
+          <span className={`text-[11px] font-medium ${(o.action?.contact_attempts || 0) > 0 ? 'text-purple-400' : 'text-slate-600'}`}>
+            {o.action?.contact_attempts || 0}
           </span>
         </td>
       )}
@@ -798,32 +868,32 @@ function PipelineRow({
       {/* Anteckning (inline edit) */}
       {isVisible('anteckning') && (
         <td className="px-3 py-2.5">
-          {editingNoteId === c.id ? (
+          {editingNoteId === o.id ? (
             <div className="flex items-center gap-1">
               <input
                 type="text"
                 value={noteText}
                 onChange={e => onNoteTextChange(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter') onSaveNote(c)
+                  if (e.key === 'Enter') onSaveNote(o)
                   if (e.key === 'Escape') onCancelNote()
                 }}
                 autoFocus
                 className="w-full px-1.5 py-0.5 text-[10px] bg-slate-800 border border-slate-600 rounded text-white focus:ring-1 focus:ring-[#20c58f] focus:outline-none"
                 placeholder="Skriv anteckning..."
               />
-              <button onClick={() => onSaveNote(c)} className="text-[#20c58f] hover:text-white text-[10px] shrink-0">Spara</button>
+              <button onClick={() => onSaveNote(o)} className="text-[#20c58f] hover:text-white text-[10px] shrink-0">Spara</button>
               <button onClick={() => onCancelNote()} className="text-slate-500 hover:text-white transition-colors shrink-0 p-0.5" title="Stäng">
                 <X className="w-3 h-3" />
               </button>
             </div>
           ) : (
             <button
-              onClick={() => onStartEditNote(c.id, c.action?.coordinator_notes || null)}
+              onClick={() => onStartEditNote(o.id, o.action?.coordinator_notes || null)}
               className="text-slate-500 hover:text-white text-[10px] text-left truncate max-w-[120px] block transition-colors"
-              title={c.action?.coordinator_notes || 'Klicka för att lägga till'}
+              title={o.action?.coordinator_notes || 'Klicka för att lägga till'}
             >
-              {c.action?.coordinator_notes || '+ Anteckning'}
+              {o.action?.coordinator_notes || '+ Anteckning'}
             </button>
           )}
         </td>
@@ -834,9 +904,9 @@ function PipelineRow({
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-1 relative">
             {/* Kvittera */}
-            {isNew && (
+            {isNew && !isDismissed && (
               <button
-                onClick={() => onAcknowledge(c)}
+                onClick={() => onAcknowledge(o)}
                 className="p-1 rounded text-blue-400 hover:bg-blue-500/20 transition-colors"
                 title="Kvittera"
               >
@@ -845,38 +915,50 @@ function PipelineRow({
             )}
 
             {/* Logga kontakt */}
-            <div className="relative">
-              <button
-                onClick={() => onOpenContactPopover(contactPopoverOpen ? null : c.id)}
-                className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors"
-                title="Logga kontaktförsök"
-              >
-                <Phone className="w-3.5 h-3.5" />
-              </button>
-              {contactPopoverOpen && (
-                <ContactPopover
-                  onSelect={(method, note) => onLogContact(c, method, note)}
-                  onClose={() => onOpenContactPopover(null)}
-                />
-              )}
-            </div>
+            {!isDismissed && (
+              <div className="relative">
+                <button
+                  onClick={() => onOpenContactPopover(contactPopoverOpen ? null : o.id)}
+                  className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors"
+                  title="Logga kontaktförsök"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                </button>
+                {contactPopoverOpen && (
+                  <ContactPopover
+                    onSelect={(method, note) => onLogContact(o, method, note)}
+                    onClose={() => onOpenContactPopover(null)}
+                  />
+                )}
+              </div>
+            )}
 
-            {/* Historik */}
-            <button
-              onClick={() => onOpenHistory(c)}
-              className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors"
-              title="Visa historik"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Boka in (bara signerade) — prominent knapp */}
-            {isSignerad && (
+            {/* Boka in (bara signerade) */}
+            {isSigned && !isDismissed && (
               <button
-                onClick={() => onBook(c)}
+                onClick={() => onBook(o)}
                 className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#20c58f]/15 text-[#20c58f] hover:bg-[#20c58f]/25 transition-colors"
               >
                 <CalendarCheck className="w-3 h-3" /> Boka
+              </button>
+            )}
+
+            {/* Dölja / Återställ */}
+            {isDismissed ? (
+              <button
+                onClick={() => onUndismiss(o)}
+                className="p-1 rounded text-amber-400 hover:bg-amber-500/20 transition-colors"
+                title="Visa igen"
+              >
+                <Eye className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => onDismiss(o)}
+                className="p-1 rounded text-slate-500 hover:bg-slate-700/50 hover:text-slate-300 transition-colors"
+                title="Dölj offert"
+              >
+                <EyeOff className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
