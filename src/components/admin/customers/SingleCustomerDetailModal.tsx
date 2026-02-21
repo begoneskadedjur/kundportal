@@ -26,6 +26,7 @@ import AdminCasesList from './AdminCasesList'
 import CustomerEquipmentDualView from './CustomerEquipmentDualView'
 import { formatCurrency, getContractProgress } from '../../../utils/customerMetrics'
 import { supabase } from '../../../lib/supabase'
+import { CustomerGroupService } from '../../../services/customerGroupService'
 
 interface SingleCustomerDetailModalProps {
   customer: ConsolidatedCustomer | null
@@ -89,6 +90,18 @@ export default function SingleCustomerDetailModal({
     fetchBilling()
   }, [site.id])
 
+  const [customerGroupName, setCustomerGroupName] = useState<string | null>(null)
+  useEffect(() => {
+    if (customer.customer_group_id) {
+      CustomerGroupService.getActiveGroups().then(groups => {
+        const match = groups.find(g => g.id === customer.customer_group_id)
+        setCustomerGroupName(match?.name ?? null)
+      }).catch(() => setCustomerGroupName(null))
+    } else {
+      setCustomerGroupName(null)
+    }
+  }, [customer.customer_group_id])
+
   const billingStats = useMemo(() => {
     const byStatus: Record<string, { amount: number; count: number }> = {
       paid: { amount: 0, count: 0 },
@@ -130,6 +143,11 @@ export default function SingleCustomerDetailModal({
                       <h2 className="text-xl font-bold text-white">
                         {customer.company_name}
                       </h2>
+                      {customer.customer_number && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-[#20c58f]/20 text-[#20c58f] border border-[#20c58f]/30">
+                          #{customer.customer_number}
+                        </span>
+                      )}
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
                         Enskild kund
                       </span>
@@ -492,9 +510,16 @@ export default function SingleCustomerDetailModal({
                     </div>
 
                     {/* Additional customer info */}
-                    {(customer.industry_category || customer.business_type || customer.customer_size) && (
+                    {(customer.industry_category || customer.business_type || customer.customer_size || customerGroupName) && (
                       <div className="pt-3 border-t border-slate-700/50">
                         <div className="grid grid-cols-1 gap-3">
+                          {customerGroupName && (
+                            <div>
+                              <div className="text-sm text-slate-400">Kundgrupp</div>
+                              <div className="text-white">{customerGroupName}</div>
+                            </div>
+                          )}
+
                           {customer.industry_category && (
                             <div>
                               <div className="text-sm text-slate-400">Bransch</div>

@@ -4,7 +4,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Confetti from 'react-confetti'
-import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck, ShoppingCart } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck, ShoppingCart, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
 import Button from '../../components/ui/Button'
@@ -17,6 +17,8 @@ import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
 import { SelectedProduct, CustomerType, SelectedArticleItem } from '../../types/products'
 import { convertArticlesToOneflowProducts, generateArticleContractDescription } from '../../utils/articlePricingCalculator'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
+import { CustomerGroupService } from '../../services/customerGroupService'
+import { CustomerGroup } from '../../types/customerGroups'
 import toast from 'react-hot-toast'
 
 interface WizardData {
@@ -56,17 +58,32 @@ interface WizardData {
   
   // Case linking
   case_id?: string
+
+  // Kundgrupp (bara vid avtal)
+  customer_group_id: string | null
 }
 
-const STEPS = [
+const OFFER_STEPS = [
   { id: 1, title: 'Dokumenttyp', icon: FileCheck },
   { id: 2, title: 'Välj Mall', icon: FileText },
   { id: 3, title: 'Avtalspart', icon: User },
   { id: 4, title: 'BeGone Info', icon: Building2 },
   { id: 5, title: 'Motpart', icon: Mail },
-  { id: 6, title: 'Produkter', icon: ShoppingCart }, // 🆕 NYTT STEG
+  { id: 6, title: 'Produkter', icon: ShoppingCart },
   { id: 7, title: 'Avtalsobjekt', icon: FileText },
   { id: 8, title: 'Granska & Skicka', icon: Send }
+]
+
+const CONTRACT_STEPS = [
+  { id: 1, title: 'Dokumenttyp', icon: FileCheck },
+  { id: 2, title: 'Välj Mall', icon: FileText },
+  { id: 3, title: 'Avtalspart', icon: User },
+  { id: 4, title: 'Kundgrupp', icon: Users },
+  { id: 5, title: 'BeGone Info', icon: Building2 },
+  { id: 6, title: 'Motpart', icon: Mail },
+  { id: 7, title: 'Produkter', icon: ShoppingCart },
+  { id: 8, title: 'Avtalsobjekt', icon: FileText },
+  { id: 9, title: 'Granska & Skicka', icon: Send }
 ]
 
 export default function OneflowContractCreator() {
@@ -93,6 +110,7 @@ export default function OneflowContractCreator() {
   const [showZeroArticlesWarning, setShowZeroArticlesWarning] = useState(false)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
 
   // 🆕 DYNAMISK BEGONE INFO BASERAT PÅ INLOGGAD ANVÄNDARE
   const [wizardData, setWizardData] = useState<WizardData>({
@@ -115,8 +133,22 @@ export default function OneflowContractCreator() {
     selectedArticles: [],
     selectedProducts: [],
     agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
-    sendForSigning: true
+    sendForSigning: true,
+    customer_group_id: null
   })
+
+  // Dynamiska steg baserat på dokumenttyp
+  const STEPS = wizardData.documentType === 'contract' ? CONTRACT_STEPS : OFFER_STEPS
+
+  // Steg-offset: vid avtal skiftas steg 4+ med 1 (kundgrupp injicerat)
+  const isContract = wizardData.documentType === 'contract'
+  // Mappa logiska steg-ID:n till offer-steg (för renderStepContent)
+  const stepOffset = (step: number) => isContract && step >= 5 ? step - 1 : step
+
+  // Hämta kundgrupper
+  useEffect(() => {
+    CustomerGroupService.getActiveGroups().then(setCustomerGroups).catch(console.error)
+  }, [])
 
   // Hantera förifyllda data från EditCaseModal
   useEffect(() => {
@@ -163,13 +195,15 @@ export default function OneflowContractCreator() {
           // Använd setTimeout för att säkerställa att state har uppdaterats innan steg-hoppning
           setTimeout(() => {
             // Om vi har autoSelectTemplate flagga och all nödvändig data, hoppa direkt till steg 6
-            if (customerData.autoSelectTemplate && 
-                customerData.selectedTemplate && 
-                customerData.Kontaktperson && 
+            if (customerData.autoSelectTemplate &&
+                customerData.selectedTemplate &&
+                customerData.Kontaktperson &&
                 customerData['e-post-kontaktperson']) {
-              console.log('Auto-selecting template and jumping to step 6:', customerData.selectedTemplate)
-              // Vi har all data - hoppa till steg 6 (produktval)
-              setCurrentStep(6)
+              // Vi har all data - hoppa till produktval (steg 6 för offert, 7 för avtal)
+              const docType = customerData.documentType || prefillType
+              const targetProductStep = docType === 'contract' ? 7 : 6
+              console.log('Auto-selecting template and jumping to product step:', targetProductStep)
+              setCurrentStep(targetProductStep)
             } else if (customerData.autoSelectTemplate && customerData.selectedTemplate) {
               // Om vi har template men inte all kontaktdata, gå till steg 2 med förvald mall
               console.log('Auto-selecting template at step 2:', customerData.selectedTemplate)
@@ -265,28 +299,38 @@ export default function OneflowContractCreator() {
     })
   }
 
+  // Steg-nummer för produkter-steget (6 för offerter, 7 för avtal)
+  const productsStep = isContract ? 7 : 6
+  // Steg-nummer för avtalsobjekt
+  const agreementStep = isContract ? 8 : 7
+  // Steg-nummer för granskning
+  const reviewStep = isContract ? 9 : 8
+  // BeGone Info-steget
+  const begoneStep = isContract ? 5 : 4
+  // Motpart-steget
+  const counterpartyStep = isContract ? 6 : 5
+
   const nextStep = () => {
     if (currentStep < STEPS.length) {
-      // Varning vid 0 artiklar i steg 6
-      if (currentStep === 6 && wizardData.selectedArticles.length === 0 && !showZeroArticlesWarning) {
+      // Varning vid 0 artiklar i produktsteget
+      if (currentStep === productsStep && wizardData.selectedArticles.length === 0 && !showZeroArticlesWarning) {
         setShowZeroArticlesWarning(true)
         return
       }
       setShowZeroArticlesWarning(false)
 
       let nextStepNumber = currentStep + 1
-      
+
       // Om vi är på steg 2 (mallval) och har valt en offertmall,
       // hoppa över steg 3 (avtalspart) eftersom den väljs automatiskt
       if (currentStep === 2 && wizardData.documentType === 'offer' && wizardData.selectedTemplate) {
-        // Sätt partyType automatiskt baserat på vald offertmall
         const template = OFFER_TEMPLATES.find(t => t.id === wizardData.selectedTemplate)
         if (template && template.category) {
           setWizardData(prev => ({ ...prev, partyType: template.category as 'company' | 'individual' }))
         }
-        nextStepNumber = 4 // Hoppa över steg 3 (avtalspart)
+        nextStepNumber = 4 // Hoppa över steg 3 (avtalspart) → direkt till BeGone Info
       }
-      
+
       setCurrentStep(nextStepNumber)
     }
   }
@@ -294,13 +338,13 @@ export default function OneflowContractCreator() {
   const prevStep = () => {
     if (currentStep > 1) {
       let prevStepNumber = currentStep - 1
-      
-      // Om vi kommer tillbaka från steg 4 och har en offertmall vald,
-      // hoppa över steg 3 (avtalspart) tillbaka till steg 2 (mallval)
+
+      // Om vi kommer tillbaka från BeGone Info (steg 4 för offert) och har en offertmall vald,
+      // hoppa tillbaka till steg 2 (mallval)
       if (currentStep === 4 && wizardData.documentType === 'offer' && wizardData.selectedTemplate) {
         prevStepNumber = 2
       }
-      
+
       setCurrentStep(prevStepNumber)
     }
   }
@@ -309,48 +353,62 @@ export default function OneflowContractCreator() {
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 
   const canProceed = () => {
-    switch (currentStep) {
-      case 1: return wizardData.documentType !== ''
-      case 2: return wizardData.selectedTemplate !== ''
-      case 3: return true // Partytype har default
-      case 4: return wizardData.anstalld && wizardData['e-post-anstlld'] && (wizardData.documentType === 'offer' || wizardData.avtalslngd)
-      case 5: {
-        if (!wizardData.Kontaktperson.trim()) return false
-        if (!wizardData['e-post-kontaktperson'].trim()) return false
-        if (!isValidEmail(wizardData['e-post-kontaktperson'])) return false
-        if (wizardData.partyType === 'company') {
-          if (!wizardData.foretag.trim()) return false
-          if (!wizardData['org-nr'].trim()) return false
-        }
-        return true
+    // Steg 1-3 är samma för alla
+    if (currentStep === 1) return wizardData.documentType !== ''
+    if (currentStep === 2) return wizardData.selectedTemplate !== ''
+    if (currentStep === 3) return true // Partytype har default
+
+    // Steg 4 är Kundgrupp (bara för avtal) eller BeGone Info (för offerter)
+    if (isContract && currentStep === 4) return wizardData.customer_group_id !== null
+
+    // BeGone Info
+    if (currentStep === begoneStep) return !!(wizardData.anstalld && wizardData['e-post-anstlld'] && (wizardData.documentType === 'offer' || wizardData.avtalslngd))
+
+    // Motpart
+    if (currentStep === counterpartyStep) {
+      if (!wizardData.Kontaktperson.trim()) return false
+      if (!wizardData['e-post-kontaktperson'].trim()) return false
+      if (!isValidEmail(wizardData['e-post-kontaktperson'])) return false
+      if (wizardData.partyType === 'company') {
+        if (!wizardData.foretag.trim()) return false
+        if (!wizardData['org-nr'].trim()) return false
       }
-      case 6: return wizardData.selectedPriceListId !== null
-      case 7: return wizardData.agreementText.length > 0
-      case 8: return true
-      default: return false
+      return true
     }
+
+    // Produkter
+    if (currentStep === productsStep) return wizardData.selectedPriceListId !== null
+    // Avtalsobjekt
+    if (currentStep === agreementStep) return wizardData.agreementText.length > 0
+    // Granskning
+    if (currentStep === reviewStep) return true
+
+    return false
   }
 
   const getValidationHint = (): string => {
-    switch (currentStep) {
-      case 5: {
-        if (wizardData.partyType === 'company' && !wizardData.foretag.trim())
-          return 'Fyll i företagsnamn'
-        if (wizardData.partyType === 'company' && !wizardData['org-nr'].trim())
-          return 'Fyll i organisationsnummer'
-        if (!wizardData.Kontaktperson.trim())
-          return 'Fyll i kontaktperson'
-        if (!wizardData['e-post-kontaktperson'].trim())
-          return 'Fyll i e-postadress'
-        if (!isValidEmail(wizardData['e-post-kontaktperson']))
-          return 'Ange en giltig e-postadress'
-        return ''
-      }
-      case 6:
-        if (!wizardData.selectedPriceListId) return 'Välj en prislista'
-        return ''
-      default: return ''
+    if (isContract && currentStep === 4) {
+      if (!wizardData.customer_group_id) return 'Välj en kundgrupp'
+      return ''
     }
+    if (currentStep === counterpartyStep) {
+      if (wizardData.partyType === 'company' && !wizardData.foretag.trim())
+        return 'Fyll i företagsnamn'
+      if (wizardData.partyType === 'company' && !wizardData['org-nr'].trim())
+        return 'Fyll i organisationsnummer'
+      if (!wizardData.Kontaktperson.trim())
+        return 'Fyll i kontaktperson'
+      if (!wizardData['e-post-kontaktperson'].trim())
+        return 'Fyll i e-postadress'
+      if (!isValidEmail(wizardData['e-post-kontaktperson']))
+        return 'Ange en giltig e-postadress'
+      return ''
+    }
+    if (currentStep === productsStep) {
+      if (!wizardData.selectedPriceListId) return 'Välj en prislista'
+      return ''
+    }
+    return ''
   }
 
   // Hitta rätt mall baserat på dokumenttyp
@@ -410,7 +468,8 @@ export default function OneflowContractCreator() {
           senderEmail: user?.email,
           senderName: wizardData.anstalld,
           selectedProducts: convertedProducts,
-          priceListId: wizardData.selectedPriceListId
+          priceListId: wizardData.selectedPriceListId,
+          customerGroupId: wizardData.customer_group_id
         })
       })
       
@@ -483,8 +542,88 @@ export default function OneflowContractCreator() {
     toast.success('📝 Testdata ifylld!')
   }
 
+  // Rendera kundgruppsteget (bara för avtal, steg 4)
+  const renderCustomerGroupStep = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-white mb-2">Välj Kundgrupp</h2>
+        <p className="text-slate-400">Vilken kundgrupp tillhör kunden? Kundnumret tilldelas vid signering.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+        {customerGroups.map((group, index) => {
+          const capacity = group.series_end - group.series_start + 1
+          const used = Math.max(0, group.current_counter - group.series_start + 1)
+          const remaining = capacity - used
+          const isSelected = wizardData.customer_group_id === group.id
+
+          return (
+            <motion.div
+              key={group.id}
+              onClick={() => updateWizardData('customer_group_id', group.id)}
+              className={`relative p-5 rounded-xl border-2 cursor-pointer overflow-hidden ${
+                isSelected
+                  ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/30'
+                  : 'border-slate-700 bg-slate-800/50'
+              }`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              whileHover={{
+                scale: 1.02,
+                boxShadow: isSelected
+                  ? '0 25px 50px -12px rgba(34, 197, 94, 0.4)'
+                  : '0 25px 50px -12px rgba(148, 163, 184, 0.2)',
+                borderColor: isSelected ? '#22c55e' : '#64748b'
+              }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div>
+                <h3 className="text-sm font-semibold text-white mb-1">{group.name}</h3>
+                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                  <span className="font-mono">Serie {group.series_start}–{group.series_end}</span>
+                  <span>|</span>
+                  <span>{remaining} lediga</span>
+                </div>
+                {/* Kapacitetsbar */}
+                <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${remaining < 20 ? 'bg-amber-500' : 'bg-[#20c58f]'}`}
+                    style={{ width: `${Math.min(100, (used / capacity) * 100)}%` }}
+                  />
+                </div>
+              </div>
+              {isSelected && (
+                <motion.div
+                  className="absolute top-2 right-2"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: 0.3, type: 'spring', bounce: 0.5 }}
+                >
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                </motion.div>
+              )}
+            </motion.div>
+          )
+        })}
+      </div>
+    </div>
+  )
+
   const renderStepContent = () => {
-    switch (currentStep) {
+    // Steg 1-3 är samma för alla
+    // Steg 4 för avtal = Kundgrupp, steg 4 för offert = BeGone Info (case 4 nedan)
+    // Steg 5+ hanteras med variablerna begoneStep, counterpartyStep etc.
+
+    // Kundgruppsteg (bara vid avtal, steg 4)
+    if (isContract && currentStep === 4) return renderCustomerGroupStep()
+
+    // Mappa till logiskt steg-nummer (för offer-baserade case-satser)
+    // Offer: 1,2,3,4(begone),5(motpart),6(prod),7(avtal),8(review)
+    // Contract: 1,2,3,4(kundgrupp->hanterat ovan),5(begone),6(motpart),7(prod),8(avtal),9(review)
+    const logicalStep = isContract && currentStep >= 5 ? currentStep - 1 : currentStep
+
+    switch (logicalStep) {
       case 1:
         return (
           <div className="space-y-6">
@@ -1239,7 +1378,8 @@ export default function OneflowContractCreator() {
                         selectedArticles: [],
                         selectedProducts: [],
                         agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
-                        sendForSigning: true
+                        sendForSigning: true,
+                        customer_group_id: null
                       })
                     }}
                     className="px-6"
@@ -1328,7 +1468,7 @@ export default function OneflowContractCreator() {
         </div>
 
         {/* Varning vid 0 artiklar */}
-        {showZeroArticlesWarning && currentStep === 6 && (
+        {showZeroArticlesWarning && currentStep === productsStep && (
           <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center justify-between">
             <p className="text-amber-400 text-sm">
               Du har inte valt några artiklar. Vill du fortsätta utan?
@@ -1337,7 +1477,7 @@ export default function OneflowContractCreator() {
               <Button variant="outline" size="sm" onClick={() => setShowZeroArticlesWarning(false)}>
                 Tillbaka
               </Button>
-              <Button size="sm" onClick={() => { setShowZeroArticlesWarning(false); setCurrentStep(7) }}>
+              <Button size="sm" onClick={() => { setShowZeroArticlesWarning(false); setCurrentStep(agreementStep) }}>
                 Fortsätt ändå
               </Button>
             </div>

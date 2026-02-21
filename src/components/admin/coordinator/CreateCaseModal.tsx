@@ -12,6 +12,7 @@ import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
 import { CaseImageService, CaseImageWithUrl } from '../../../services/caseImageService';
 import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard';
+import { CaseNumberService } from '../../../services/caseNumberService';
 
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
@@ -539,10 +540,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       return toast.error('Du måste välja en anläggning för denna multisite-kund');
     }
     
-    setLoading(true); 
+    setLoading(true);
     setError(null);
-    
+
     try {
+      // Generera universellt ärendenummer
+      const caseNumber = await CaseNumberService.generateCaseNumber();
+
       if (caseType === 'inspection') {
         // Hantera stationskontroll-ärenden
         // Om multisite, använd sitens customer_id istället för huvudkundens
@@ -581,7 +585,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
           address: formData.adress ? { formatted_address: formData.adress } : null,
           price: null,
-          case_number: `INS-${Date.now().toString().slice(-6)}`,
+          case_number: caseNumber,
           send_booking_confirmation: formData.skicka_bokningsbekraftelse === 'Ja'
         };
 
@@ -676,7 +680,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
           address: formData.adress ? { formatted_address: formData.adress } : null,
           price: formData.pris || null,
-          case_number: `AVT-${Date.now().toString().slice(-6)}`
+          case_number: caseNumber
         };
 
         let createdCaseId: string | null = null;
@@ -718,7 +722,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           const { data, error } = await supabase.from(tableName).insert([{
             ...formData,
             title: formData.title.trim(),
-            clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            case_number: caseNumber
           }]).select('id');
           if (error) throw error;
           createdClickUpCaseId = data?.[0]?.id || null;

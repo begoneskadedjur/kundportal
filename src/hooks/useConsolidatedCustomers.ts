@@ -115,7 +115,9 @@ export interface ConsolidatedCustomer {
   industry_category?: string | null
   customer_size?: 'small' | 'medium' | 'large' | null
   business_type?: string | null
-  
+  customer_number?: number | null
+  customer_group_id?: string | null
+
   // Aggregated data
   sites: CustomerSite[]
   totalSites: number
@@ -495,7 +497,9 @@ export function useConsolidatedCustomers() {
             industry_category: huvudkontor.industry_category,
             customer_size: huvudkontor.customer_size,
             business_type: huvudkontor.business_type,
-            
+            customer_number: huvudkontor.customer_number,
+            customer_group_id: huvudkontor.customer_group_id,
+
             sites: [],
             totalSites: 0,
             totalContractValue: 0,
@@ -566,7 +570,9 @@ export function useConsolidatedCustomers() {
           industry_category: customer.industry_category,
           customer_size: customer.customer_size,
           business_type: customer.business_type,
-          
+          customer_number: customer.customer_number,
+          customer_group_id: customer.customer_group_id,
+
           sites: [customer],
           totalSites: 1,
           totalContractValue: customer.total_contract_value || 0,
@@ -859,11 +865,12 @@ export function useConsolidatedCustomers() {
       // Sökfilter - sök i organisation och alla sites
       if (filters.search) {
         const searchLower = filters.search.toLowerCase()
-        const matchesOrg = 
+        const matchesOrg =
           customer.company_name?.toLowerCase().includes(searchLower) ||
           customer.contact_person?.toLowerCase().includes(searchLower) ||
           customer.contact_email?.toLowerCase().includes(searchLower) ||
-          customer.organization_number?.includes(filters.search)
+          customer.organization_number?.includes(filters.search) ||
+          customer.customer_number?.toString().includes(filters.search)
         
         const matchesSites = customer.sites.some(site =>
           site.company_name?.toLowerCase().includes(searchLower) ||

@@ -56,38 +56,7 @@ interface EditContractCaseModalProps {
   openCommunicationOnLoad?: boolean // Öppna kommunikationspanelen direkt vid öppning
 }
 
-// Generate BE-number for contract cases
-const generateBENumber = async (): Promise<string> => {
-  try {
-    // Get the latest BE number
-    const { data, error } = await supabase
-      .from('cases')
-      .select('case_number')
-      .like('case_number', 'BE-%')
-      .order('case_number', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      throw error
-    }
-
-    let nextNumber = 1001 // Start from BE-1001
-    
-    if (data?.case_number) {
-      const currentNumber = parseInt(data.case_number.replace('BE-', ''), 10)
-      if (!isNaN(currentNumber)) {
-        nextNumber = currentNumber + 1
-      }
-    }
-
-    return `BE-${nextNumber}`
-  } catch (error) {
-    console.error('Error generating BE number:', error)
-    // Fallback to timestamp-based number
-    return `BE-${Date.now().toString().slice(-6)}`
-  }
-}
+import { CaseNumberService } from '../../services/caseNumberService'
 
 export default function EditContractCaseModal({
   isOpen,
@@ -363,7 +332,7 @@ export default function EditContractCaseModal({
     
     // Generate BE number if not present
     if (isOpen && caseData && !caseData.case_number) {
-      generateBENumber().then(number => {
+      CaseNumberService.generateCaseNumber().then(number => {
         setFormData(prev => ({ ...prev, case_number: number }))
       })
     }
@@ -1148,7 +1117,7 @@ export default function EditContractCaseModal({
     setFollowUpLoading(true)
     try {
       // Generera nytt BE-nummer
-      const newCaseNumber = await generateBENumber()
+      const newCaseNumber = await CaseNumberService.generateCaseNumber()
 
       // Hämta inloggad användares info — bara tekniker-rollen ska kopplas som skapare
       const technicianId = (activeView === 'technician' ? profile?.technician_id : null) || formData.primary_technician_id

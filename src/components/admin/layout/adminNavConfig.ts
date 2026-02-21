@@ -104,6 +104,7 @@ export const navGroups: NavGroup[] = [
     label: 'Systeminställningar',
     icon: Settings,
     items: [
+      { label: 'Kundgrupper', icon: Users, path: '/admin/kundgrupper' },
       { label: 'Webhook-config', icon: Wrench, path: '/admin/webhook-config' },
       { label: 'Avtalsdiagnostik', icon: AlertCircle, path: '/admin/avtalsdiagnostik' },
     ]
@@ -151,4 +152,5 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/preparat': 'Preparat',
   '/admin/artiklar': 'Artiklar',
   '/admin/prislistor': 'Prislistor',
+  '/admin/kundgrupper': 'Kundgrupper',
 }

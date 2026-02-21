@@ -30,6 +30,7 @@ import StationTypesPage from './pages/admin/settings/StationTypesPage';
 import PreparationsPage from './pages/admin/settings/PreparationsPage';
 import ArticlesPage from './pages/admin/settings/ArticlesPage';
 import PriceListsPage from './pages/admin/settings/PriceListsPage';
+import CustomerGroupsPage from './pages/admin/settings/CustomerGroupsPage';
 import InvoicingPage from './pages/admin/invoicing';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
@@ -148,6 +149,7 @@ function App() {
               <Route path="forsaljningspipeline" element={<ProtectedRoute requiredRole="admin"><ContractsOverview /></ProtectedRoute>} />
               <Route path="offerthantering" element={<ProtectedRoute requiredRole="admin"><CasePipeline /></ProtectedRoute>} />
               <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
+              <Route path="kundgrupper" element={<ProtectedRoute requiredRole="admin"><CustomerGroupsPage /></ProtectedRoute>} />
               <Route path="oneflow-test" element={<Navigate to="/admin/skapa-avtal" replace />} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="admin"><InternAdministration /></ProtectedRoute>} />
               <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="admin"><CaseDeletionGuide /></ProtectedRoute>} />

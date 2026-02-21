@@ -893,8 +893,38 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
         .from('contracts')
         .update({ customer_id: existingCustomerId })
         .eq('id', contract.id)
-      
+
       console.log('✅ Kontrakt länkat till befintlig kund:', existingCustomerId)
+
+      // Tilldela kundnummer om kunden saknar ett och kontraktet har customer_group_id
+      if (contract.customer_group_id) {
+        try {
+          const { data: existingCust } = await supabase
+            .from('customers')
+            .select('customer_number')
+            .eq('id', existingCustomerId)
+            .single()
+
+          if (existingCust && !existingCust.customer_number) {
+            const { data: customerNumber, error: allocError } = await supabase
+              .rpc('allocate_customer_number', { p_group_id: contract.customer_group_id })
+
+            if (!allocError && customerNumber) {
+              await supabase
+                .from('customers')
+                .update({
+                  customer_group_id: contract.customer_group_id,
+                  customer_number: customerNumber
+                })
+                .eq('id', existingCustomerId)
+              console.log(`✅ Kundnummer ${customerNumber} tilldelat befintlig kund ${existingCustomerId}`)
+            }
+          }
+        } catch (numError) {
+          console.error('⚠️ Kunde inte tilldela kundnummer till befintlig kund:', numError)
+        }
+      }
+
       return
     }
 
@@ -1022,6 +1052,29 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       company: customerData.company_name,
       value: customerData.total_contract_value
     })
+
+    // Tilldela kundnummer från kundgrupp om det finns
+    if (contract.customer_group_id) {
+      try {
+        const { data: customerNumber, error: allocError } = await supabase
+          .rpc('allocate_customer_number', { p_group_id: contract.customer_group_id })
+
+        if (!allocError && customerNumber) {
+          await supabase
+            .from('customers')
+            .update({
+              customer_group_id: contract.customer_group_id,
+              customer_number: customerNumber
+            })
+            .eq('id', newCustomer.id)
+          console.log(`✅ Kundnummer ${customerNumber} tilldelat ny kund ${newCustomer.id}`)
+        } else if (allocError) {
+          console.error('⚠️ Kunde inte tilldela kundnummer:', allocError.message)
+        }
+      } catch (numError) {
+        console.error('⚠️ Fel vid kundnummerallokering:', numError)
+      }
+    }
 
   } catch (error) {
     console.error('💥 Fel vid kundregistrering för kontrakt', contractId, ':', error)

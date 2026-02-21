@@ -1,12 +1,14 @@
 // src/components/admin/customers/EditCustomerModal.tsx - Kompakt kundredigering
 
 import React, { useState, useEffect } from 'react'
-import { Building2, Save, AlertCircle } from 'lucide-react'
+import { Building2, Save, AlertCircle, Hash } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
+import { CustomerGroupService } from '../../../services/customerGroupService'
+import { CustomerGroup } from '../../../types/customerGroups'
 import toast from 'react-hot-toast'
 
 interface Customer {
@@ -31,6 +33,8 @@ interface Customer {
   account_manager_email?: string | null
   sales_person?: string | null
   sales_person_email?: string | null
+  customer_group_id?: string | null
+  customer_number?: number | null
   service_frequency?: string | null
   product_summary?: string | null
   service_details?: string | null
@@ -72,6 +76,11 @@ export default function EditCustomerModal({
   const [formData, setFormData] = useState<Partial<Customer>>({})
   const [loading, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+
+  useEffect(() => {
+    CustomerGroupService.getActiveGroups().then(setCustomerGroups).catch(console.error)
+  }, [])
 
   // Initialize form data when customer changes
   useEffect(() => {
@@ -89,7 +98,9 @@ export default function EditCustomerModal({
         assigned_account_manager: customer.assigned_account_manager || '',
         account_manager_email: customer.account_manager_email || '',
         sales_person: customer.sales_person || '',
-        sales_person_email: customer.sales_person_email || ''
+        sales_person_email: customer.sales_person_email || '',
+        customer_group_id: customer.customer_group_id || '',
+        customer_number: customer.customer_number ?? ''
       })
       setErrors({})
     }
@@ -138,6 +149,8 @@ export default function EditCustomerModal({
         account_manager_email: formData.account_manager_email,
         sales_person: formData.sales_person,
         sales_person_email: formData.sales_person_email,
+        customer_group_id: formData.customer_group_id || null,
+        customer_number: formData.customer_number ? Number(formData.customer_number) : null,
         updated_at: new Date().toISOString()
       }
 
@@ -265,6 +278,36 @@ export default function EditCustomerModal({
                 <option value="large">Stor</option>
               </select>
             </div>
+          </div>
+        </div>
+
+        {/* Kundnummer & Grupp */}
+        <div className="border-t border-slate-700/50 pt-5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+            <Hash className="w-3.5 h-3.5" />
+            Kundnummer & Grupp
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Kundgrupp</label>
+              <select
+                value={formData.customer_group_id as string || ''}
+                onChange={(e) => handleInputChange('customer_group_id', e.target.value || null)}
+                className={selectStyles}
+              >
+                <option value="">Välj kundgrupp</option>
+                {customerGroups.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+            <Input
+              label="Kundnummer"
+              type="number"
+              value={formData.customer_number?.toString() || ''}
+              onChange={(e) => handleInputChange('customer_number', e.target.value ? parseInt(e.target.value) : null)}
+              placeholder="T.ex. 527"
+            />
           </div>
         </div>
 

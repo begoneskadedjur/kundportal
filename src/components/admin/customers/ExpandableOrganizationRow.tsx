@@ -207,6 +207,9 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               <div>
                 <div className="font-semibold text-slate-200">
                   {organization.company_name}
+                  {organization.customer_number && (
+                    <span className="ml-2 text-xs font-mono text-[#20c58f]/70">#{organization.customer_number}</span>
+                  )}
                   {isMultisite && (
                     <span className="ml-2 text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full border border-blue-500/30">
                       {organization.totalSites} enheter

@@ -100,6 +100,10 @@ export type Database = {
           parent_customer_id: string | null  // FK till huvudorganisationens customer
           region: string | null  // Region för enheten
           site_type: 'huvudkontor' | 'enhet' | null  // Typ av multisite-enhet
+
+          // Kundgrupp & kundnummer
+          customer_group_id: string | null
+          customer_number: number | null
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
@@ -445,7 +449,10 @@ export type Database = {
           billing_address: string | null
           
           customer_id: string | null
-          
+
+          // Kundgrupp (vald i wizard vid avtal)
+          customer_group_id: string | null
+
           created_at: string
           updated_at: string
         }

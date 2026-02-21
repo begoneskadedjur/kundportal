@@ -47,6 +47,8 @@ interface ContractRequestBody {
     }
     notes?: string
   }>
+  // Kundgrupp-ID (vid avtal)
+  customerGroupId?: string | null
 }
 
 // FÄLTMAPPNING FÖR OLIKA DOKUMENTTYPER
@@ -245,7 +247,8 @@ export default async function handler(
     senderName,
     selectedProducts,
     caseId,
-    priceListId
+    priceListId,
+    customerGroupId
   } = req.body as ContractRequestBody
 
   // Validera användaren
@@ -398,9 +401,10 @@ export default async function handler(
       created_by_email: creatorEmail,
       created_by_name: creatorName,
       created_by_role: creatorRole,
-      price_list_id: priceListId || null
+      price_list_id: priceListId || null,
+      customer_group_id: customerGroupId || null
     }
-    
+
     // Lägg till source_id och source_type om caseId finns
     if (caseId) {
       updateData.source_id = caseId
