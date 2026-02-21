@@ -165,6 +165,22 @@ async function fetchOfferDetails(contractId: number): Promise<OneFlowContractDet
   }
 }
 
+/** Validera om en sträng är ett giltigt datum (inte fritext som "Enligt överenskommelse") */
+function parseDate(value: string | undefined | null): string | null {
+  if (!value) return null
+  // Matcha ISO-datum (2025-01-15) eller vanligt datumformat
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const d = new Date(value)
+    if (!isNaN(d.getTime())) return value
+  }
+  // Matcha svenskt format (15/1-2025, 15/01/2025, etc)
+  if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/.test(value)) {
+    return null // Osäkert format, hoppa över
+  }
+  // Allt annat (fritext) → null
+  return null
+}
+
 /** Mappa Oneflow-detalj till contracts-tabellens format */
 function mapOfferToInsertData(detail: OneFlowContractDetail): Record<string, any> {
   // Extrahera template ID
@@ -228,7 +244,7 @@ function mapOfferToInsertData(detail: OneFlowContractDetail): Record<string, any
     agreement_text: mappedData.agreement_text || null,
     total_value: totalValue > 0 ? totalValue : null,
     selected_products: detail.product_groups || null,
-    start_date: mappedData.start_date || null,
+    start_date: parseDate(mappedData.start_date),
     customer_id: null,
   }
 }
@@ -248,7 +264,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Batch-stöd: skicka { batchSize: 50, batchOffset: 0 } för att bearbeta i omgångar
   const body = typeof req.body === 'object' && req.body ? req.body : {}
-  const batchSize = Number(body.batchSize) || 40   // max antal att bearbeta per anrop
+  const batchSize = Number(body.batchSize) || 15   // max antal att bearbeta per anrop
   const batchOffset = Number(body.batchOffset) || 0  // hoppa över N offerter som behöver synk
 
   try {
