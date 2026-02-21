@@ -60,6 +60,8 @@ interface OneFlowContract {
   _private_ownerside?: { template_id?: number }
   created_time?: string
   updated_time?: string
+  published_time?: string
+  state_updated_time?: string
 }
 
 interface OneFlowContractDetail {
@@ -186,9 +188,8 @@ function parseDate(value: string | undefined | null): string | null {
 }
 
 /** Mappa Oneflow-detalj till contracts-tabellens format.
- *  listState = state från list-API:n (pålitligare: inkluderar expired/cancelled)
- *  detail.state kan skilja sig — t.ex. visa "pending" istället för "expired" */
-function mapOfferToInsertData(detail: OneFlowContractDetail, listState?: string): Record<string, any> {
+ *  listItem = objekt från list-API:n (har pålitligare state + created_time/updated_time) */
+function mapOfferToInsertData(detail: OneFlowContractDetail, listItem?: OneFlowContract): Record<string, any> {
   // Extrahera template ID
   const templateId =
     detail.template?.id?.toString() ||
@@ -237,7 +238,7 @@ function mapOfferToInsertData(detail: OneFlowContractDetail, listState?: string)
     source_type: 'manual',
     source_id: null,
     type: 'offer',
-    status: STATUS_MAP[listState || detail.state] || 'pending',
+    status: STATUS_MAP[listItem?.state || detail.state] || 'pending',
     template_id: templateId,
     begone_employee_name: mappedData.begone_employee_name || begoneEmployee?.name || null,
     begone_employee_email: mappedData.begone_employee_email || begoneEmployee?.email || null,
@@ -252,9 +253,9 @@ function mapOfferToInsertData(detail: OneFlowContractDetail, listState?: string)
     selected_products: detail.product_groups || null,
     start_date: parseDate(mappedData.start_date),
     customer_id: null,
-    // Använd Oneflow-datum istället för Supabase default now()
-    created_at: detail.created_time || null,
-    updated_at: detail.updated_time || detail.created_time || null,
+    // Använd Oneflow-datum: published_time = när offerten skickades (bästa datumet)
+    created_at: listItem?.published_time || detail.created_time || listItem?.created_time || null,
+    updated_at: listItem?.state_updated_time || detail.updated_time || listItem?.updated_time || null,
   }
 }
 
@@ -326,7 +327,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         continue
       }
 
-      const insertData = mapOfferToInsertData(detail, offer.state)
+      const insertData = mapOfferToInsertData(detail, offer)
 
       // Upsert
       const { error } = await supabase
