@@ -224,6 +224,9 @@ export default function TechnicianCases() {
                         <tr key={case_.id} className="border-b border-slate-800 hover:bg-slate-800/50">
                             <td className="px-4 py-4">
                                 <div className="font-medium text-white">{case_.title}</div>
+                                {case_.case_number && (
+                                  <span className="text-xs text-slate-500 font-mono">{case_.case_number}</span>
+                                )}
                                 <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-1"><MapPin className="w-3 h-3" /> {formatAddress(case_.adress)}</div>
                             </td>
                             <td className="px-4 py-4">

@@ -117,7 +117,10 @@ const CaseSearchCard: React.FC<CaseSearchCardProps> = ({ className = '' }) => {
       
       // Sök i ClickUp task ID
       if (caseData.clickup_task_id?.toLowerCase().includes(query)) return true;
-      
+
+      // Sök i ärendenummer
+      if (caseData.case_number?.toLowerCase().includes(query)) return true;
+
       return false;
     });
 

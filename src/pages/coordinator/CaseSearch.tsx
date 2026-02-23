@@ -269,7 +269,8 @@ export default function CaseSearch() {
           caseItem.primary_assignee_name,
           typeof caseItem.adress === 'string' ? caseItem.adress : JSON.stringify(caseItem.adress),
           caseItem.beskrivning,
-          caseItem.skadedjur
+          caseItem.skadedjur,
+          caseItem.case_number,
         ].filter(Boolean);
 
         const matchesTextSearch = searchFields.some(field => field?.toLowerCase().includes(query));
@@ -680,6 +681,9 @@ export default function CaseSearch() {
                           <h3 className="font-medium text-white text-sm truncate flex-1" title={caseItem.title}>
                             {caseItem.title}
                           </h3>
+                          {caseItem.case_number && (
+                            <span className="text-xs text-slate-500 font-mono shrink-0">{caseItem.case_number}</span>
+                          )}
                           {hasCommentMatch && (
                             <span className="flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded" title={`${caseCommentMatches.length} kommentar${caseCommentMatches.length > 1 ? 'er' : ''} matchar sökningen`}>
                               <MessageSquare className="w-3 h-3" />

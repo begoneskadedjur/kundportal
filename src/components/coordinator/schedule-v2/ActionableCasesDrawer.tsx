@@ -243,6 +243,9 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
         </td>
         <td className="px-2 py-1.5">
           <span className="text-white font-medium truncate block max-w-[160px]" title={c.title || 'Utan titel'}>{c.title || 'Utan titel'}</span>
+          {c.case_number && (
+            <span className="text-[10px] text-slate-500 font-mono block">{c.case_number}</span>
+          )}
         </td>
         <td className="px-2 py-1.5">
           <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${

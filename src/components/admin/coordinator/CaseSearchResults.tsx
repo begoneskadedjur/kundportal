@@ -55,7 +55,8 @@ const CaseSearchResultItem: React.FC<{ caseData: BeGoneCaseRow; onClick: () => v
     pris,
     primary_assignee_name,
     secondary_assignee_name,
-    tertiary_assignee_name
+    tertiary_assignee_name,
+    case_number
   } = caseData;
 
   const fullAddress = formatAddress(adress);
@@ -79,6 +80,9 @@ const CaseSearchResultItem: React.FC<{ caseData: BeGoneCaseRow; onClick: () => v
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {getCaseTypeIcon(case_type)}
           <h4 className="font-semibold text-white text-sm truncate">{title}</h4>
+          {case_number && (
+            <span className="text-xs text-slate-500 font-mono shrink-0">{case_number}</span>
+          )}
         </div>
         <span className={`px-2 py-1 rounded-full text-xs font-medium border ${statusColorClass} ml-2 whitespace-nowrap`}>
           {status}
