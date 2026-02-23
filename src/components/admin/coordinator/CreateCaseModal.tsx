@@ -453,7 +453,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       toast.error('Inga avtalskunder hittades');
       return;
     }
-    setFormData({ status: 'Bokat' });
+    setFormData({ status: 'Bokad' });
     setStep('form');
   };
   
@@ -799,7 +799,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           const { data, error } = await supabase.from(tableName).insert([{
             ...formData,
             title: caseNumber,
-            case_number: caseNumber
+            case_number: caseNumber,
+            status: 'Bokad'
           }]).select('id');
           if (error) throw error;
           createdClickUpCaseId = data?.[0]?.id || null;

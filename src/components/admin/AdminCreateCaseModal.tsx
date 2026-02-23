@@ -171,7 +171,7 @@ export default function AdminCreateCaseModal({
         type="submit"
         form="create-case-form"
         loading={loading}
-        disabled={loading || !formData.title || !formData.description}
+        disabled={loading || !formData.description}
         className="flex-1"
       >
         {loading ? 'Skapar ärende...' : 'Skapa ärende'}
@@ -231,16 +231,6 @@ export default function AdminCreateCaseModal({
               Ärendeinformation
             </h3>
             
-            <Input
-              label="Titel *"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              required
-              placeholder="Kort beskrivning av problemet"
-              className="text-white"
-            />
-
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Beskrivning *

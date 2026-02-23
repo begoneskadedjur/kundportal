@@ -10,7 +10,7 @@ import {
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save,
   FileText, Users, ClipboardCheck, Play,
   FileSignature, ChevronDown, ChevronRight, DollarSign,
-  Building, Building2, Plus, Trash2
+  Building, Building2, Plus, Trash2, Pencil
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -85,6 +85,9 @@ export default function InspectionCaseModal({
   const [regionchefContactInfo, setRegionchefContactInfo] = useState<any>(null)
   const [verksamhetschefContactInfo, setVerksamhetschefContactInfo] = useState<any>(null)
   const [loadingRecipients, setLoadingRecipients] = useState(false)
+
+  // Inline title edit state
+  const [editingTitle, setEditingTitle] = useState(false)
 
   // Radering state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -402,12 +405,14 @@ export default function InspectionCaseModal({
       </div>
       <div>
         <div className="flex items-center gap-3">
-          <span className="text-2xl font-bold text-white">Stationskontroll</span>
-          <span className="px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-full text-sm font-medium">
-            {formData.case_number || 'INS-...'}
-          </span>
+          <span className="text-2xl font-bold text-white">Ärende: {formData.case_number || 'INS-...'}</span>
+          {!editingTitle && (
+            <button onClick={() => setEditingTitle(true)} className="p-1 text-slate-400 hover:text-white rounded transition-colors" title="Redigera ärendenamn">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
-        <p className="text-sm text-cyan-300">Kontroll av fällor & stationer</p>
+        <p className="text-sm text-cyan-300">Stationskontroll</p>
       </div>
     </div>
   )
@@ -727,18 +732,18 @@ export default function InspectionCaseModal({
                 <FileText className="w-5 h-5 text-cyan-400" />
                 Grundläggande information
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Titel</label>
-                  <input
-                    type="text"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleChange}
-                    disabled={isCustomerView}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white disabled:opacity-60"
+              {editingTitle && !isCustomerView && (
+                <div className="flex items-center gap-2 mb-4">
+                  <input name="title" value={formData.title} onChange={handleChange}
+                    className="flex-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                    placeholder="Ärendenamn..."
+                    autoFocus
+                    onBlur={() => setEditingTitle(false)}
+                    onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
                   />
                 </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
                   <select

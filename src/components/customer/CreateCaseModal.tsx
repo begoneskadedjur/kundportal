@@ -151,15 +151,6 @@ export default function CreateCaseModal({
               Ärendeinformation
             </h3>
             
-            <Input
-              label="Titel på ärendet"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              required
-              placeholder="T.ex. 'Akut myrorproblem i köket'"
-            />
-
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Beskrivning
@@ -261,7 +252,7 @@ export default function CreateCaseModal({
             <Button
               type="submit"
               loading={loading}
-              disabled={loading || !formData.title || !formData.description}
+              disabled={loading || !formData.description}
               className="flex-1"
             >
               {loading ? 'Skapar ärende...' : 'Skapa ärende'}

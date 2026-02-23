@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2 } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -60,6 +60,7 @@ interface TechnicianCase {
   id: string;
   case_type: 'private' | 'business' | 'contract';
   title: string;
+  case_number?: string;
   description?: string;
   status: string;
   case_price?: number;
@@ -366,6 +367,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // Återbesök / Nytt ärende val-dialog
   const [showActionDialog, setShowActionDialog] = useState(false)
   const [showRevisitModal, setShowRevisitModal] = useState(false)
+
+  // Inline title edit state
+  const [editingTitle, setEditingTitle] = useState(false)
 
   // Kommunikations-panel state
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
@@ -930,8 +934,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // Kontrollera om kommunikation kan visas
   const showCommunication = currentCase && (currentCase.case_type === 'private' || currentCase.case_type === 'business');
 
+  const modalTitle = (
+    <div className="flex items-center gap-2">
+      <span>Ärende: {currentCase.case_number || currentCase.title}</span>
+      {!editingTitle && (
+        <button onClick={() => setEditingTitle(true)} className="p-1 text-slate-400 hover:text-white rounded transition-colors" title="Redigera ärendenamn">
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  )
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true} className="scroll-smooth"
+    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true} className="scroll-smooth"
       headerActions={showCommunication ? (
         <button
           type="button"
@@ -1211,7 +1226,17 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-white flex items-center gap-2"><FileText className="w-5 h-5 text-teal-400" />Ärendeinformation</h3>
-            <Input label="Titel *" name="title" value={formData.title || ''} onChange={handleChange} required />
+            {editingTitle && (
+              <div className="flex items-center gap-2">
+                <input name="title" value={formData.title || ''} onChange={handleChange}
+                  className="flex-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                  placeholder="Ärendenamn..."
+                  autoFocus
+                  onBlur={() => setEditingTitle(false)}
+                  onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning</label>
               <textarea 
