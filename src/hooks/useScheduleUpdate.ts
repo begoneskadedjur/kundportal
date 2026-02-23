@@ -3,7 +3,6 @@
 
 import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { useClickUpSync } from './useClickUpSync'
 import { BeGoneCaseRow } from '../types/database'
 import toast from 'react-hot-toast'
 
@@ -15,7 +14,6 @@ interface UpdateResult {
 
 export function useScheduleUpdate() {
   const [updating, setUpdating] = useState(false)
-  const { syncAfterUpdate } = useClickUpSync()
 
   /**
    * Uppdatera tekniker för ett ärende
@@ -28,10 +26,10 @@ export function useScheduleUpdate() {
     role: 'primary' | 'secondary' | 'tertiary' = 'primary'
   ): Promise<UpdateResult> => {
     setUpdating(true)
-    
+
     try {
       const tableName = caseType === 'private' ? 'private_cases' : 'business_cases'
-      
+
       const updateData: any = {}
       if (role === 'primary') {
         updateData.primary_assignee_id = technicianId
@@ -53,9 +51,6 @@ export function useScheduleUpdate() {
 
       if (error) throw error
 
-      // Synka till ClickUp i bakgrunden
-      syncAfterUpdate(caseId, caseType, false) // false = ingen toast
-
       return {
         success: true,
         updatedCase: data as BeGoneCaseRow
@@ -70,7 +65,7 @@ export function useScheduleUpdate() {
     } finally {
       setUpdating(false)
     }
-  }, [syncAfterUpdate])
+  }, [])
 
   /**
    * Uppdatera tid för ett ärende
@@ -82,10 +77,10 @@ export function useScheduleUpdate() {
     endDate: string
   ): Promise<UpdateResult> => {
     setUpdating(true)
-    
+
     try {
       const tableName = caseType === 'private' ? 'private_cases' : 'business_cases'
-      
+
       const updateData = {
         start_date: startDate,
         due_date: endDate
@@ -99,9 +94,6 @@ export function useScheduleUpdate() {
         .single()
 
       if (error) throw error
-
-      // Synka till ClickUp i bakgrunden
-      syncAfterUpdate(caseId, caseType, false)
 
       return {
         success: true,
@@ -117,7 +109,7 @@ export function useScheduleUpdate() {
     } finally {
       setUpdating(false)
     }
-  }, [syncAfterUpdate])
+  }, [])
 
   /**
    * Validera om en tid är inom vanlig arbetstid (bara varning, inte blockering)
@@ -125,7 +117,7 @@ export function useScheduleUpdate() {
   const validateWorkingHours = useCallback((startDate: Date, endDate: Date): boolean => {
     const startHour = startDate.getHours()
     const endHour = endDate.getHours()
-    
+
     // Varna om tiden är utanför normal arbetstid (08:00-17:00)
     if (startHour < 8 || endHour > 17) {
       toast('⚠️ OBS: Detta är utanför normal arbetstid (08:00-17:00)', {
@@ -136,7 +128,7 @@ export function useScheduleUpdate() {
         }
       })
     }
-    
+
     // Kontrollera om det är helg
     const dayOfWeek = startDate.getDay()
     if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -148,7 +140,7 @@ export function useScheduleUpdate() {
         }
       })
     }
-    
+
     return true // Alltid tillåt, bara varna
   }, [])
 
@@ -175,7 +167,7 @@ export function useScheduleUpdate() {
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
           .gte('start_date', startOfDay.toISOString())
           .lte('start_date', endOfDay.toISOString()),
-        
+
         supabase
           .from('business_cases')
           .select('id, start_date, due_date, title')
@@ -185,7 +177,7 @@ export function useScheduleUpdate() {
       ]
 
       const [privateResult, businessResult] = await Promise.all(promises)
-      
+
       const allCases = [
         ...(privateResult.data || []),
         ...(businessResult.data || [])
@@ -197,7 +189,7 @@ export function useScheduleUpdate() {
 
       for (const existingCase of allCases) {
         if (!existingCase.start_date || !existingCase.due_date) continue
-        
+
         const existingStart = new Date(existingCase.start_date).getTime()
         const existingEnd = new Date(existingCase.due_date).getTime()
 

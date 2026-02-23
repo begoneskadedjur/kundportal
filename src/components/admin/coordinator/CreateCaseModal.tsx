@@ -7,7 +7,6 @@ import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } fr
 import { Case } from '../../../types/cases';
 import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
-import { useClickUpSync } from '../../../hooks/useClickUpSync';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
 import { CaseImageService, CaseImageWithUrl } from '../../../services/caseImageService';
@@ -84,9 +83,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
-
-  // ClickUp sync hook
-  const { syncAfterCreate } = useClickUpSync();
 
   const handleReset = useCallback(() => {
     setStep('selectType'); setCaseType(null); setFormData({});
@@ -803,17 +799,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           const { data, error } = await supabase.from(tableName).insert([{
             ...formData,
             title: caseNumber,
-            clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             case_number: caseNumber
           }]).select('id');
           if (error) throw error;
           createdClickUpCaseId = data?.[0]?.id || null;
           toast.success('Ärendet har skapats!');
-
-          // Synka till ClickUp i bakgrunden om case skapades
-          if (createdClickUpCaseId && caseType !== 'contract') {
-            syncAfterCreate(createdClickUpCaseId, caseType);
-          }
         }
 
         // Ladda upp valda bilder om det finns några
