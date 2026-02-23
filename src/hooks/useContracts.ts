@@ -64,8 +64,6 @@ export function useContracts(): UseContractsReturn {
   // Contract list caching — använd ref för att undvika oändlig loop
   const [contractsLoadedAt, setContractsLoadedAt] = useState<number | null>(null)
   const contractsCacheRef = useRef<{ [filterKey: string]: { data: ContractWithSourceData[], timestamp: number } }>({})
-  const statsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Ladda kontrakt med filter (med caching via ref)
   const loadContracts = useCallback(async (filters: ContractFilters = {}) => {
@@ -487,59 +485,6 @@ export function useContracts(): UseContractsReturn {
       loadContractStats()
     }
   }, [loadContracts, loadContractStats])
-
-  // Real-time subscription för nya/uppdaterade kontrakt
-  useEffect(() => {
-    const subscription = supabase
-      .channel('contracts_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'contracts'
-        },
-        async (payload) => {
-          switch (payload.eventType) {
-            case 'INSERT':
-              if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current)
-              realtimeDebounceRef.current = setTimeout(() => refreshContracts(), 2000)
-              break
-
-            case 'UPDATE':
-              const updatedContract = payload.new as Contract
-              let contractExists = false
-
-              setContracts(prev => {
-                contractExists = prev.some(c => c.id === updatedContract.id)
-                return prev.map(contract =>
-                  contract.id === updatedContract.id
-                    ? { ...contract, ...updatedContract }
-                    : contract
-                )
-              })
-
-              if (contractExists) {
-                if (statsDebounceRef.current) clearTimeout(statsDebounceRef.current)
-                statsDebounceRef.current = setTimeout(() => loadContractStats(), 2000)
-              }
-              break
-
-            case 'DELETE':
-              const deletedId = payload.old.id
-              setContracts(prev => prev.filter(contract => contract.id !== deletedId))
-              if (statsDebounceRef.current) clearTimeout(statsDebounceRef.current)
-              statsDebounceRef.current = setTimeout(() => loadContractStats(), 2000)
-              break
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [refreshContracts])
 
   // Real-time subscription för contract_files
   useEffect(() => {
