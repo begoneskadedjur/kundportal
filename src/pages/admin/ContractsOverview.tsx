@@ -520,7 +520,7 @@ export default function ContractsOverview() {
     }
 
     fetchPriceLists()
-  }, [contracts])
+  }, [contracts.length])
 
 
   // Filtrera kontrakt
@@ -1056,7 +1056,6 @@ export default function ContractsOverview() {
                   rank={index + 1}
                   onClick={() => {
                     setSearchTerm(seller.name)
-                    setSidePanelOpen(false)
                   }}
                 />
               ))}

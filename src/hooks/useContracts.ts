@@ -64,6 +64,7 @@ export function useContracts(): UseContractsReturn {
   // Contract list caching — använd ref för att undvika oändlig loop
   const [contractsLoadedAt, setContractsLoadedAt] = useState<number | null>(null)
   const contractsCacheRef = useRef<{ [filterKey: string]: { data: ContractWithSourceData[], timestamp: number } }>({})
+  const statsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Ladda kontrakt med filter (med caching via ref)
   const loadContracts = useCallback(async (filters: ContractFilters = {}) => {
@@ -518,14 +519,16 @@ export function useContracts(): UseContractsReturn {
               })
 
               if (contractExists) {
-                loadContractStats()
+                if (statsDebounceRef.current) clearTimeout(statsDebounceRef.current)
+                statsDebounceRef.current = setTimeout(() => loadContractStats(), 2000)
               }
               break
 
             case 'DELETE':
               const deletedId = payload.old.id
               setContracts(prev => prev.filter(contract => contract.id !== deletedId))
-              loadContractStats()
+              if (statsDebounceRef.current) clearTimeout(statsDebounceRef.current)
+              statsDebounceRef.current = setTimeout(() => loadContractStats(), 2000)
               break
           }
         }
