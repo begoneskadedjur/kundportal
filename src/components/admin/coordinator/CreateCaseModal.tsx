@@ -1,11 +1,11 @@
 // 📁 src/components/admin/coordinator/CreateCaseModal.tsx
 // ⭐ VERSION 4.0 - STÖD FÖR AVTALSKUNDER OCH TRE KUNDTYPER ⭐
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import { useClickUpSync } from '../../../hooks/useClickUpSync';
 import SiteSelector from '../../shared/SiteSelector';
@@ -81,6 +81,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   } | null>(null);
   const [offerExpanded, setOfferExpanded] = useState(true);
   const [generatedCaseNumber, setGeneratedCaseNumber] = useState<string | null>(null);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const customerDropdownRef = useRef<HTMLDivElement>(null);
 
   // ClickUp sync hook
   const { syncAfterCreate } = useClickUpSync();
@@ -96,6 +99,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setOfferDetails(null);
     setOfferExpanded(true);
     setGeneratedCaseNumber(null);
+    setCustomerSearchTerm('');
+    setCustomerDropdownOpen(false);
     // Städa upp bildförhandsvisningar
     setSelectedImages(prev => {
       prev.forEach(img => URL.revokeObjectURL(img.preview));
@@ -245,15 +250,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
   // Generera ärendenummer direkt vid formuläröppning (nya ärenden)
   useEffect(() => {
-    if (step !== 'form' || initialCaseData || generatedCaseNumber) return;
+    if (step !== 'form' || !caseType || initialCaseData || generatedCaseNumber) return;
     let cancelled = false;
     CaseNumberService.generateCaseNumber().then(num => {
       if (cancelled) return;
       setGeneratedCaseNumber(num);
-      setFormData(prev => ({ ...prev, title: prev.title || num }));
+      setFormData(prev => ({ ...prev, title: num }));
     }).catch(err => console.error('Kunde inte generera ärendenummer:', err));
     return () => { cancelled = true };
-  }, [step, initialCaseData, generatedCaseNumber]);
+  }, [step, caseType, initialCaseData, generatedCaseNumber]);
 
   // Separat useEffect för tekniker-förval - hanterar timing-problem med asynkron laddning
   useEffect(() => {
@@ -421,6 +426,44 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   }, [selectedContractCustomer, selectedSiteId, contractCustomers, multisiteRoles]);
 
+  // Click-outside och Escape för kundselektor-dropdown
+  useEffect(() => {
+    if (!customerDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
+        setCustomerDropdownOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCustomerDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [customerDropdownOpen]);
+
+  // Filtrerad kundlista för sökbar dropdown
+  const filteredContractCustomers = useMemo(() => {
+    const search = customerSearchTerm.toLowerCase().trim();
+    return contractCustomers
+      .filter(c => {
+        if (caseType === 'inspection') return customersWithStations.has(c.id);
+        if (c.parent_customer_id) return false;
+        return true;
+      })
+      .filter(c => {
+        if (!search) return true;
+        return (
+          c.company_name?.toLowerCase().includes(search) ||
+          c.customer_number?.toLowerCase().includes(search) ||
+          c.organization_number?.toLowerCase().includes(search)
+        );
+      });
+  }, [contractCustomers, customerSearchTerm, caseType, customersWithStations]);
+
   const selectCaseType = (type: 'private' | 'business' | 'contract' | 'inspection') => {
     setCaseType(type);
     if ((type === 'contract' || type === 'inspection') && contractCustomers.length === 0) {
@@ -433,7 +476,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value, ...(name === 'kontaktperson' && !initialCaseData && { title: value }) }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleTechnicianSelectionChange = (technicianId: string) => {
@@ -824,10 +867,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   }
 
   const footer = step === 'form' ? (
-    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 p-4 border-t border-slate-800">
+    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 px-4 py-2.5 border-t border-slate-700/50">
       <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="w-full sm:w-auto">Avbryt</Button>
-      <Button type="submit" form="create-case-form" loading={loading} disabled={loading} size="lg" className="w-full sm:w-auto">
-        <CheckCircle className="w-5 h-5 mr-2"/>
+      <Button type="submit" form="create-case-form" loading={loading} disabled={loading} className="w-full sm:w-auto">
+        <CheckCircle className="w-4 h-4 mr-1.5"/>
         {initialCaseData ? 'Boka In Ärende' : 'Skapa & Boka Ärende'}
       </Button>
     </div>
@@ -857,39 +900,39 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
   return (
       <Modal isOpen={isOpen} onClose={onClose} title={getModalTitle()} size={`w-full sm:w-11/12 ${getModalSize()}`} preventClose={loading} footer={footer} usePortal={true}>
-        <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
+        <div className="p-4 max-h-[85vh] overflow-y-auto">
           {step === 'selectType' && !initialCaseData && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Rad 1: Engångsärenden */}
-                <div className="flex flex-col md:flex-row gap-4">
-                  <button type="button" onClick={() => selectCaseType('private')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
-                    <User className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-blue-400" />
-                    <h3 className="text-xl font-bold">Privatperson</h3>
-                    <p className="text-sm text-slate-400 mt-2">Engångsjobb via ClickUp</p>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <button type="button" onClick={() => selectCaseType('private')} className="flex-1 p-4 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
+                    <User className="w-8 h-8 mx-auto mb-2 text-blue-400" />
+                    <h3 className="text-base font-semibold">Privatperson</h3>
+                    <p className="text-xs text-slate-400 mt-1">Engångsjobb via ClickUp</p>
                   </button>
-                  <button type="button" onClick={() => selectCaseType('business')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
-                    <Building className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-green-400" />
-                    <h3 className="text-xl font-bold">Företag</h3>
-                    <p className="text-sm text-slate-400 mt-2">Engångsjobb via ClickUp</p>
+                  <button type="button" onClick={() => selectCaseType('business')} className="flex-1 p-4 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
+                    <Building className="w-8 h-8 mx-auto mb-2 text-green-400" />
+                    <h3 className="text-base font-semibold">Företag</h3>
+                    <p className="text-xs text-slate-400 mt-1">Engångsjobb via ClickUp</p>
                   </button>
                 </div>
 
                 {/* Rad 2: Avtalskundrelaterade ärenden */}
                 <div className="pt-2 border-t border-slate-700">
-                  <p className="text-xs text-slate-500 mb-3 uppercase tracking-wider">Avtalskunder</p>
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
-                      <FileCheck className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-emerald-400" />
-                      <h3 className="text-xl font-bold">Servicebesök</h3>
-                      <p className="text-sm text-slate-400 mt-2">Återkommande tjänster</p>
+                  <p className="text-xs text-slate-500 mb-2 uppercase tracking-wider">Avtalskunder</p>
+                  <div className="flex flex-col md:flex-row gap-3">
+                    <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-4 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
+                      <FileCheck className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
+                      <h3 className="text-base font-semibold">Servicebesök</h3>
+                      <p className="text-xs text-slate-400 mt-1">Återkommande tjänster</p>
                       {contractCustomers.length > 0 && (
                         <p className="text-xs text-emerald-400 mt-1">{contractCustomers.length} kunder</p>
                       )}
                     </button>
-                    <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
-                      <ClipboardCheck className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-cyan-400" />
-                      <h3 className="text-xl font-bold">Stationskontroll</h3>
-                      <p className="text-sm text-slate-400 mt-2">Kontroll av fällor & stationer</p>
+                    <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-4 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
+                      <ClipboardCheck className="w-8 h-8 mx-auto mb-2 text-cyan-400" />
+                      <h3 className="text-base font-semibold">Stationskontroll</h3>
+                      <p className="text-xs text-slate-400 mt-1">Kontroll av fällor & stationer</p>
                       {contractCustomers.length > 0 && (
                         <p className="text-xs text-cyan-400 mt-1">{contractCustomers.length} kunder</p>
                       )}
@@ -899,47 +942,95 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               </div>
           )}
           {step === 'form' && (
-            <form id="create-case-form" onSubmit={handleSubmit} className="space-y-6">
+            <form id="create-case-form" onSubmit={handleSubmit} className="space-y-3">
               {!initialCaseData && !initialCaseType && (
                 <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><ChevronLeft className="w-4 h-4" /> Byt kundtyp</Button>
               )}
-              {error && (<div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3"><AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" /><p className="text-red-400">{error}</p></div>)}
+              {error && (<div className="bg-red-500/20 border border-red-500/40 p-3 rounded-xl flex items-center gap-3"><AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" /><p className="text-sm text-red-400">{error}</p></div>)}
               
-              {/* Avtalskund-väljare (för contract och inspection) */}
+              {/* Avtalskund-väljare (för contract och inspection) — sökbar dropdown */}
               {(caseType === 'contract' || caseType === 'inspection') && (
-                <div className={`p-4 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-lg`}>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                <div className={`p-3 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-xl`}>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">
                     {caseType === 'inspection' ? 'Välj kund med stationer *' : 'Välj avtalskund *'}
                   </label>
-                  <select
-                    value={selectedContractCustomer || ''}
-                    onChange={(e) => {
-                      setSelectedContractCustomer(e.target.value);
-                      setSelectedSiteId(null); // Reset site when customer changes
-                      // Data fylls nu i via useEffect när selectedContractCustomer ändras
-                    }}
-                    className={`w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none ${caseType === 'inspection' ? 'focus:border-cyan-500' : 'focus:border-emerald-500'}`}
-                    required
-                  >
-                    <option value="">{caseType === 'inspection' ? 'Välj kund med stationer...' : 'Välj kund...'}</option>
-                    {contractCustomers
-                      .filter(c => {
-                        // För stationskontroll: Visa ALLA kunder med stationer (inkl. multisite-enheter)
-                        if (caseType === 'inspection') {
-                          return customersWithStations.has(c.id);
-                        }
-                        // För andra ärendetyper: Visa bara huvudkunder, inte multisite-enheter
-                        if (c.parent_customer_id) return false;
-                        return true;
-                      })
-                      .map(customer => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.company_name} {customer.organization_number ? `(${customer.organization_number})` : ''}
-                        </option>
-                      ))}
-                  </select>
+                  <div ref={customerDropdownRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCustomerDropdownOpen(!customerDropdownOpen)}
+                      className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-left flex items-center justify-between transition-colors hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    >
+                      {selectedContractCustomer ? (
+                        <span className="text-white text-sm truncate">
+                          {(() => {
+                            const c = contractCustomers.find(c => c.id === selectedContractCustomer);
+                            if (!c) return 'Laddar...';
+                            return `${c.company_name}${c.customer_number ? ` (${c.customer_number})` : c.organization_number ? ` (${c.organization_number})` : ''}`;
+                          })()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-sm">
+                          {caseType === 'inspection' ? 'Sök och välj kund med stationer...' : 'Sök och välj kund...'}
+                        </span>
+                      )}
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${customerDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {customerDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden">
+                        <div className="p-2 border-b border-slate-700">
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            <input
+                              type="text"
+                              value={customerSearchTerm}
+                              onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                              placeholder="Sök företagsnamn, kundnummer, org.nr..."
+                              className="w-full pl-8 pr-3 py-1.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto">
+                          {filteredContractCustomers.length === 0 ? (
+                            <div className="px-3 py-4 text-center text-sm text-slate-500">
+                              Inga kunder matchar sökningen
+                            </div>
+                          ) : (
+                            filteredContractCustomers.map(customer => (
+                              <button
+                                key={customer.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedContractCustomer(customer.id);
+                                  setSelectedSiteId(null);
+                                  setCustomerDropdownOpen(false);
+                                  setCustomerSearchTerm('');
+                                }}
+                                className={`w-full px-3 py-2 text-left hover:bg-slate-700/50 transition-colors flex items-center justify-between ${
+                                  selectedContractCustomer === customer.id ? 'bg-[#20c58f]/10' : ''
+                                }`}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className={`text-sm font-medium truncate ${selectedContractCustomer === customer.id ? 'text-[#20c58f]' : 'text-white'}`}>{customer.company_name}</div>
+                                  <div className="text-xs text-slate-400 truncate">
+                                    {customer.customer_number && <span className="mr-2">#{customer.customer_number}</span>}
+                                    {customer.organization_number && <span>Org: {customer.organization_number}</span>}
+                                  </div>
+                                </div>
+                                {selectedContractCustomer === customer.id && (
+                                  <CheckCircle className="w-4 h-4 text-[#20c58f] flex-shrink-0 ml-2" />
+                                )}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {caseType === 'inspection' && customersWithStations.size === 0 && (
-                    <p className="text-xs text-amber-400 mt-2">
+                    <p className="text-xs text-amber-400 mt-1">
                       Inga kunder med etablerade stationer hittades.
                     </p>
                   )}
@@ -952,8 +1043,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   const selectedCustomer = contractCustomers.find(c => c.id === selectedContractCustomer);
                   if (selectedCustomer?.is_multisite && selectedCustomer?.organization_id) {
                     return (
-                      <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-                        <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                      <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+                        <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
                           <Building2 className="w-4 h-4 text-purple-400" />
                           Välj anläggning/site *
                         </label>
@@ -965,7 +1056,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           placeholder="Välj anläggning..."
                           className="w-full"
                         />
-                        <p className="text-xs text-slate-500 mt-2">
+                        <p className="text-xs text-slate-500 mt-1">
                           Välj vilken anläggning {caseType === 'inspection' ? 'stationskontrollen' : 'ärendet'} gäller
                         </p>
                       </div>
@@ -977,7 +1068,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               
               {/* Offertinnehåll (visas om ärendet har Oneflow-koppling) */}
               {offerDetails && (
-                <div className="p-4 bg-[#20c58f]/5 border border-[#20c58f]/20 rounded-lg">
+                <div className="p-3 bg-[#20c58f]/5 border border-[#20c58f]/20 rounded-xl">
                   <button
                     type="button"
                     onClick={() => setOfferExpanded(v => !v)}
@@ -1033,11 +1124,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
               {/* STATIONSKONTROLL: Tvåkolumnslayout med bokningsassistent */}
               {caseType === 'inspection' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {/* Vänster kolumn: Intelligent bokning */}
-                  <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4">
-                    <h3 className="font-semibold text-white text-lg flex items-center gap-2">
-                      <Zap className="text-cyan-400"/>Intelligent Bokning
+                  <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+                      <Zap className="w-4 h-4 text-cyan-400"/>Intelligent Bokning
                     </h3>
 
                     {/* Adress (hämtas från kund) */}
@@ -1050,9 +1141,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     />
 
                     {/* Sökparametrar för bokningsassistent */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Hitta tider från:</label>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Hitta tider från:</label>
                         <DatePicker
                           selected={searchStartDate}
                           onChange={(date) => handleDateChange(date, 'searchStartDate')}
@@ -1064,11 +1155,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Tidsåtgång</label>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Tidsåtgång</label>
                         <select
                           value={timeSlotDuration}
                           onChange={e => setTimeSlotDuration(Number(e.target.value))}
-                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
                         >
                           <option value={60}>1 timme</option>
                           <option value={90}>1.5 timmar</option>
@@ -1081,15 +1172,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
                     {/* Teknikerval för sökning */}
                     <div>
-                      <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                        <Users size={16} /> Sök bland valda tekniker
+                      <h4 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
+                        <Users size={14} /> Sök bland valda tekniker
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {technicians.map(tech => (
                           <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
                             <input
                               type="checkbox"
-                              className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-cyan-500 focus:ring-cyan-500"
+                              className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                               checked={selectedTechnicianIds.includes(tech.id)}
                               onChange={() => handleTechnicianSelectionChange(tech.id)}
                             />
@@ -1106,10 +1197,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       loading={suggestionLoading}
                       className="w-full"
                       variant="primary"
-                      size="lg"
                       disabled={!selectedContractCustomer}
                     >
-                      <Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker
+                      <Zap className="w-4 h-4 mr-1.5"/> Hitta bästa tid & tekniker
                     </Button>
 
                     {!selectedContractCustomer && (
@@ -1141,23 +1231,23 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   </div>
 
                   {/* Höger kolumn: Bokning & Detaljer */}
-                  <div className="p-4 sm:p-6 bg-cyan-500/5 border border-cyan-500/20 rounded-lg space-y-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
-                        <ClipboardCheck className="w-5 h-5 text-cyan-400" />
+                  <div className="p-3 bg-cyan-500/5 border border-cyan-500/20 rounded-xl space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                        <ClipboardCheck className="w-4 h-4 text-cyan-400" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-white text-lg">Bokning & Detaljer</h3>
-                        <p className="text-sm text-slate-400">Verifiera kundinfo och välj tid för stationskontroll</p>
+                        <h3 className="text-sm font-semibold text-white">Bokning & Detaljer</h3>
+                        <p className="text-xs text-slate-400">Verifiera kundinfo och välj tid för stationskontroll</p>
                       </div>
                     </div>
 
                     {/* Kund & Kontakt */}
-                    <div className="space-y-4">
-                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
-                        <User size={16}/> Kund & Kontakt
+                    <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+                        <User size={14}/> Kund & Kontakt
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <Input
                           label="Kontaktperson"
                           name="kontaktperson"
@@ -1178,7 +1268,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         value={formData.e_post_kontaktperson || ''}
                         onChange={handleChange}
                       />
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <Input
                           label="Organisationsnummer"
                           name="org_nr"
@@ -1195,13 +1285,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     </div>
 
                     {/* Bokning & Team */}
-                    <div className="space-y-4">
-                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
-                        <Users size={16}/> Bokning & Team
+                    <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+                        <Users size={14}/> Bokning & Team
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Starttid *</label>
                           <DatePicker
                             selected={formData.start_date ? new Date(formData.start_date) : null}
                             onChange={(date) => handleDateChange(date, 'start_date')}
@@ -1218,7 +1308,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Sluttid *</label>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Sluttid *</label>
                           <DatePicker
                             selected={formData.due_date ? new Date(formData.due_date) : null}
                             onChange={(date) => handleDateChange(date, 'due_date')}
@@ -1237,13 +1327,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Ansvarig tekniker *</label>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Ansvarig tekniker *</label>
                         <select
                           name="primary_assignee_id"
                           value={formData.primary_assignee_id || ''}
                           onChange={handleChange}
                           required
-                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
                         >
                           <option value="" disabled>Välj tekniker...</option>
                           {technicians.map(t => (
@@ -1252,12 +1342,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Extra tekniker (valfri)</label>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Extra tekniker (valfri)</label>
                         <select
                           name="secondary_assignee_id"
                           value={formData.secondary_assignee_id || ''}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
                         >
                           <option value="">Ingen vald</option>
                           {technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.tertiary_assignee_id).map(t => (
@@ -1266,12 +1356,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Extra tekniker 2 (valfri)</label>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Extra tekniker 2 (valfri)</label>
                         <select
                           name="tertiary_assignee_id"
                           value={formData.tertiary_assignee_id || ''}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
                         >
                           <option value="">Ingen vald</option>
                           {technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.secondary_assignee_id).map(t => (
@@ -1282,45 +1372,44 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     </div>
 
                     {/* Ärendeinformation */}
-                    <div className="space-y-4">
-                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
-                        <Briefcase size={16}/> Ärendeinformation
+                    <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+                        <Briefcase size={14}/> Ärendeinformation
                       </h4>
                       <Input
-                        label="Ärendetitel (valfritt - auto-genereras annars)"
+                        label="Ärendetitel"
                         name="title"
                         value={formData.title || ''}
                         onChange={handleChange}
-                        placeholder="Stationskontroll - [Kundnamn]"
                       />
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          <FileText size={14} className="inline mr-1" />
+                        <label className="block text-xs font-medium text-slate-400 mb-1">
+                          <FileText size={12} className="inline mr-1" />
                           Anteckningar till tekniker (valfritt)
                         </label>
                         <textarea
                           name="description"
                           value={formData.description || ''}
                           onChange={handleChange}
-                          rows={3}
-                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-base"
+                          rows={2}
+                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
                           placeholder="T.ex. portkod, speciella instruktioner..."
                         />
                       </div>
                     </div>
 
                     {/* Utskick */}
-                    <div className="space-y-4">
-                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
-                        <MapPin size={16}/> Utskick
+                    <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+                        <MapPin size={14}/> Utskick
                       </h4>
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Skicka bokningsbekräftelse?</label>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Skicka bokningsbekräftelse?</label>
                         <select
                           name="skicka_bokningsbekraftelse"
                           value={formData.skicka_bokningsbekraftelse || 'Nej'}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
                         >
                           <option value="Nej">Nej</option>
                           <option value="JA - Första Klockslaget">JA - Första Klockslaget</option>
@@ -1330,8 +1419,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     </div>
 
                     {/* Info-ruta */}
-                    <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                      <p className="text-sm text-slate-400">
+                    <div className="p-3 bg-slate-800/30 rounded-xl border border-slate-700">
+                      <p className="text-xs text-slate-400">
                         <span className="font-medium text-cyan-400">Tips:</span> Stationskontrollen kommer automatiskt visa alla stationer (utomhus och inomhus) för den valda kunden.
                         Teknikern kan sedan gå igenom och kontrollera varje station i valfri ordning.
                       </p>
@@ -1342,55 +1431,54 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
               {/* ÖVRIGA ÄRENDETYPER: Fullt formulär */}
               {caseType !== 'inspection' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4 flex flex-col">
-                  <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3 flex flex-col">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Zap className="w-4 h-4 text-blue-400"/>Intelligent Bokning</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={typeof formData.adress === 'string' ? formData.adress : ''} onChange={handleChange} required />
                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Hitta tider från:</label>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Hitta tider från:</label>
                         <DatePicker selected={searchStartDate} onChange={(date) => handleDateChange(date, 'searchStartDate')} locale="sv" dateFormat="yyyy-MM-dd" placeholderText="Välj startdatum..." isClearable className="w-full" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Skadedjur *</label>
-                      <select name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Skadedjur *</label>
+                      <select name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} required className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
                           <option value="" disabled>Välj typ...</option>
                           {PEST_TYPES.map(pest => <option key={pest} value={pest}>{pest}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Tidsåtgång</label>
-                      <select value={timeSlotDuration} onChange={e => setTimeSlotDuration(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Tidsåtgång</label>
+                      <select value={timeSlotDuration} onChange={e => setTimeSlotDuration(Number(e.target.value))} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
                           <option value={60}>1 timme</option><option value={90}>1.5 timmar</option><option value={120}>2 timmar</option><option value={180}>3 timmar</option>
                       </select>
                     </div>
                   </div>
 
-                  {/* ✅ FÖRBÄTTRING: Knapp och dropdown är nu grupperade och flyttade högre upp. */}
-                  <div className="pt-4 border-t border-slate-700 space-y-4">
+                  <div className="pt-3 border-t border-slate-700 space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Antal tekniker som krävs</label>
-                      <select value={numberOfTechnicians} onChange={e => setNumberOfTechnicians(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Antal tekniker som krävs</label>
+                      <select value={numberOfTechnicians} onChange={e => setNumberOfTechnicians(Number(e.target.value))} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
                           <option value={1}>1 tekniker (Hitta bästa individ)</option>
                           <option value={2}>2 tekniker (Hitta bästa team)</option>
                           <option value={3}>3 tekniker (Hitta bästa team)</option>
                       </select>
                     </div>
-                    
+
                     {/* Checkbox för att välja tekniker (endast för single booking) */}
                     {numberOfTechnicians === 1 && (
                       <div>
-                        <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2"><Users size={16} /> Sök bland valda tekniker</h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <h4 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5"><Users size={14} /> Sök bland valda tekniker</h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                           {technicians.map(tech => (
                             <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
-                              <input 
-                                type="checkbox" 
-                                className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500" 
-                                checked={selectedTechnicianIds.includes(tech.id)} 
-                                onChange={() => handleTechnicianSelectionChange(tech.id)} 
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
+                                checked={selectedTechnicianIds.includes(tech.id)}
+                                onChange={() => handleTechnicianSelectionChange(tech.id)}
                               />
                               <span className="text-sm text-white truncate">{tech.name}</span>
                             </label>
@@ -1398,20 +1486,20 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         </div>
                       </div>
                     )}
-                    
-                    <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
+
+                    <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary"><Zap className="w-4 h-4 mr-1.5"/> Hitta bästa tid & tekniker</Button>
                   </div>
 
                   {/* Resultat-sektion - under Intelligent Bokning i vänstra kolumnen */}
                   {suggestionLoading && (
-                    <div className="text-center py-6">
+                    <div className="text-center py-4">
                       <LoadingSpinner text="Analyserar rutter och hittar optimala tider..." />
                     </div>
                   )}
 
                   {/* Single technician suggestions */}
                   {suggestions.length > 0 && (
-                    <div className="pt-4 border-t border-slate-700">
+                    <div className="pt-3 border-t border-slate-700">
                       <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                         <CalendarSearch className="w-4 h-4 text-purple-400" />
                         Bokningsförslag ({suggestions.length} st)
@@ -1486,11 +1574,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 </div>
 
                 {/* Höger kolumn: Bokning & Detaljer */}
-                <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-6">
-                  <h3 className="font-semibold text-white text-lg flex items-center gap-2"><FileText className="text-green-400"/>Bokning & Detaljer</h3>
-                  <div className="space-y-4">
-                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2"><User size={16}/> Kund & Kontakt</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><FileText className="w-4 h-4 text-green-400"/>Bokning & Detaljer</h3>
+                  <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><User size={14}/> Kund & Kontakt</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <Input label="Kontaktperson *" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} required />
                           <Input label="Telefonnummer *" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} required />
                       </div>
@@ -1500,48 +1588,47 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       ) : (
                           <>
                             <Input label="Företagsnamn *" name="company_name" value={(formData as any).company_name || ''} onChange={handleChange} required />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />
                               <Input label="Beställare" name="bestallare" value={formData.bestallare || ''} onChange={handleChange} />
                             </div>
                           </>
                       )}
                   </div>
-                  <div className="space-y-4">
-                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2"><Users size={16}/> Bokning & Team</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label><DatePicker selected={formData.start_date ? new Date(formData.start_date) : null} onChange={(date) => handleDateChange(date, 'start_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" timeCaption="Tid" timeInputLabel="Tid:" placeholderText="Välj starttid..." isClearable required className="w-full" /></div>
-                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Sluttid *</label><DatePicker selected={formData.due_date ? new Date(formData.due_date) : null} onChange={(date) => handleDateChange(date, 'due_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" timeCaption="Tid" timeInputLabel="Tid:" placeholderText="Välj sluttid..." isClearable required className="w-full" /></div>
+                  <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Users size={14}/> Bokning & Team</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div><label className="block text-xs font-medium text-slate-400 mb-1">Starttid *</label><DatePicker selected={formData.start_date ? new Date(formData.start_date) : null} onChange={(date) => handleDateChange(date, 'start_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" timeCaption="Tid" timeInputLabel="Tid:" placeholderText="Välj starttid..." isClearable required className="w-full" /></div>
+                          <div><label className="block text-xs font-medium text-slate-400 mb-1">Sluttid *</label><DatePicker selected={formData.due_date ? new Date(formData.due_date) : null} onChange={(date) => handleDateChange(date, 'due_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" timeCaption="Tid" timeInputLabel="Tid:" placeholderText="Välj sluttid..." isClearable required className="w-full" /></div>
                       </div>
-                      <div className="space-y-4">
-                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Ansvarig tekniker *</label><select name="primary_assignee_id" value={formData.primary_assignee_id || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"><option value="" disabled>Välj tekniker...</option>{technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Extra tekniker (valfri)</label><select name="secondary_assignee_id" value={formData.secondary_assignee_id || ''} onChange={handleChange} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"><option value="">Ingen vald</option>{technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.tertiary_assignee_id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Extra tekniker 2 (valfri)</label><select name="tertiary_assignee_id" value={formData.tertiary_assignee_id || ''} onChange={handleChange} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"><option value="">Ingen vald</option>{technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.secondary_assignee_id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                      <div className="space-y-3">
+                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Ansvarig tekniker *</label><select name="primary_assignee_id" value={formData.primary_assignee_id || ''} onChange={handleChange} required className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"><option value="" disabled>Välj tekniker...</option>{technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Extra tekniker (valfri)</label><select name="secondary_assignee_id" value={formData.secondary_assignee_id || ''} onChange={handleChange} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"><option value="">Ingen vald</option>{technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.tertiary_assignee_id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Extra tekniker 2 (valfri)</label><select name="tertiary_assignee_id" value={formData.tertiary_assignee_id || ''} onChange={handleChange} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"><option value="">Ingen vald</option>{technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.secondary_assignee_id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
                       </div>
                   </div>
-                  <div className="space-y-4">
-                       <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2"><Briefcase size={16}/> Ärendeinformation</h4>
+                  <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Briefcase size={14}/> Ärendeinformation</h4>
                        <Input label="Ärendetitel" name="title" value={formData.title || ''} onChange={handleChange} />
-                       <div><label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={3} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" placeholder="Kort om ärendet, portkod, etc."/></div>
+                       <div><label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={2} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" placeholder="Kort om ärendet, portkod, etc."/></div>
                        {caseType === 'business' && (<Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />)}
                   </div>
-                  <div className="space-y-4">
-                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2"><Euro size={16}/> Ekonomi & Utskick</h4>
-                      {/* ✅ FÖRBÄTTRING: Etiketten för pris ändras nu baserat på kundtyp. */}
+                  <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Euro size={14}/> Ekonomi & Utskick</h4>
                       <Input type="number" label={caseType === 'private' ? 'Pris (inkl. moms)' : 'Pris (exkl. moms)'} name="pris" value={formData.pris ?? ''} onChange={handleChange} />
                       {caseType === 'private' && (
                           <div>
-                              <label className="block text-sm font-medium text-slate-300 mb-2">ROT/RUT</label>
-                              <select name="r_rot_rut" value={formData.r_rot_rut || 'Nej'} onChange={handleChange} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                              <label className="block text-xs font-medium text-slate-400 mb-1">ROT/RUT</label>
+                              <select name="r_rot_rut" value={formData.r_rot_rut || 'Nej'} onChange={handleChange} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
                                   <option value="Nej">Ej avdragsgillt</option><option value="ROT">ROT</option><option value="RUT">RUT</option><option value="INKL moms">Pris inkl. moms</option>
                               </select>
                           </div>
                       )}
                       {showRotRutDetails && (
-                          <div className="p-4 bg-slate-900/70 border border-slate-700 rounded-lg space-y-4">
-                               <h5 className="text-sm font-semibold text-white flex items-center gap-2"><Percent size={14}/> Detaljer för ROT/RUT-avdrag</h5>
+                          <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                               <h5 className="text-sm font-semibold text-white flex items-center gap-1.5"><Percent size={14}/> Detaljer för ROT/RUT-avdrag</h5>
                                <Input label="Fastighetsbeteckning" name="r_fastighetsbeteckning" value={formData.r_fastighetsbeteckning || ''} onChange={handleChange} />
-                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                   <Input type="number" label="Arbetskostnad" name="r_arbetskostnad" value={formData.r_arbetskostnad ?? ''} onChange={handleChange} />
                                   <Input type="number" label="Material & Utrustning" name="r_material_utrustning" value={formData.r_material_utrustning ?? ''} onChange={handleChange} />
                                   <Input type="number" label="Servicebil" name="r_servicebil" value={formData.r_servicebil ?? ''} onChange={handleChange} />
@@ -1550,24 +1637,24 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       )}
                       {caseType === 'business' && (<Input type="email" label="E-post Faktura" name="e_post_faktura" value={formData.e_post_faktura || ''} onChange={handleChange} />)}
                       <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Skicka bokningsbekräftelse?</label>
-                          <select name="skicka_bokningsbekraftelse" value={formData.skicka_bokningsbekraftelse || 'Nej'} onChange={handleChange} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Skicka bokningsbekräftelse?</label>
+                          <select name="skicka_bokningsbekraftelse" value={formData.skicka_bokningsbekraftelse || 'Nej'} onChange={handleChange} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
                               <option value="Nej">Nej</option><option value="JA - Första Klockslaget">JA - Första Klockslaget</option><option value="JA - Tidsspann">JA - Tidsspann</option>
                           </select>
                       </div>
                   </div>
                   {/* Bilder sektion */}
-                  <div className="space-y-4">
-                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
-                        <ImageIcon size={16} className="text-cyan-400" /> Bilder (valfritt)
+                  <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
+                        <ImageIcon size={14} className="text-cyan-400" /> Bilder (valfritt)
                       </h4>
 
                       {/* Visa befintliga bilder från kund */}
                       {existingImages.length > 0 && (
-                        <div className="mb-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                          <div className="flex items-center gap-2 mb-3">
-                            <ImageIcon size={14} className="text-emerald-400" />
-                            <span className="text-sm text-emerald-400 font-medium">
+                        <div className="mb-2 p-3 bg-slate-800/30 rounded-xl border border-slate-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <ImageIcon size={12} className="text-emerald-400" />
+                            <span className="text-xs text-emerald-400 font-medium">
                               {existingImages.length} bild{existingImages.length > 1 ? 'er' : ''} från kund
                             </span>
                           </div>
