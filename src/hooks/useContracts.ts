@@ -65,6 +65,7 @@ export function useContracts(): UseContractsReturn {
   const [contractsLoadedAt, setContractsLoadedAt] = useState<number | null>(null)
   const contractsCacheRef = useRef<{ [filterKey: string]: { data: ContractWithSourceData[], timestamp: number } }>({})
   const statsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Ladda kontrakt med filter (med caching via ref)
   const loadContracts = useCallback(async (filters: ContractFilters = {}) => {
@@ -501,8 +502,8 @@ export function useContracts(): UseContractsReturn {
         async (payload) => {
           switch (payload.eventType) {
             case 'INSERT':
-              await refreshContracts()
-              toast.success('Nytt kontrakt skapat')
+              if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current)
+              realtimeDebounceRef.current = setTimeout(() => refreshContracts(), 2000)
               break
 
             case 'UPDATE':
