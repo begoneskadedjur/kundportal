@@ -344,12 +344,14 @@ const TEMPLATE_FIELD_ORDER: { [templateId: string]: string[] } = {
 const parseContractDetailsToInsertData = (details: OneflowContractDetails): ContractInsertData => {
   // Mappa OneFlow state till våra statusar (draft är borttaget)
   const statusMapping: { [key: string]: ContractInsertData['status'] } = {
-    'pending': 'pending', 
+    'pending': 'pending',
     'signed': 'signed',
     'declined': 'declined',
+    'overdue': 'overdue',
     'published': 'pending',
     'completed': 'active',
     'cancelled': 'declined',
+    'canceled': 'declined',
     'expired': 'overdue'
   }
 
@@ -532,7 +534,7 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
 }
 
 // Spara eller uppdatera kontrakt i databasen
-const saveOrUpdateContract = async (contractData: ContractInsertData): Promise<void> => {
+const saveOrUpdateContract = async (contractData: ContractInsertData, options?: { preserveStatus?: boolean }): Promise<void> => {
   try {
     console.log('💾 Sparar/uppdaterar kontrakt i databas:', contractData.oneflow_contract_id)
 
@@ -550,6 +552,14 @@ const saveOrUpdateContract = async (contractData: ContractInsertData): Promise<v
     if (existingContract) {
       // Uppdatera befintligt kontrakt - bevara fält som sätts via create-contract API
       const { price_list_id, created_by_email, created_by_name, created_by_role, ...webhookData } = contractData as any
+
+      // Skydda livscykel-status från att nedgraderas av content-events
+      const LIFECYCLE_STATUSES = ['overdue', 'signed', 'declined', 'ended', 'active', 'trashed']
+      if (options?.preserveStatus && LIFECYCLE_STATUSES.includes(existingContract.status)) {
+        console.log(`🔒 Bevarar status '${existingContract.status}' — ignorerar inkommande '${webhookData.status}'`)
+        delete webhookData.status
+      }
+
       const { error: updateError } = await supabase
         .from('contracts')
         .update({
@@ -1574,18 +1584,18 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           if (contractDetails) {
             console.log('✅ Processar kontrakt med fullständig data')
             const contractData = parseContractDetailsToInsertData(contractDetails)
-            await saveOrUpdateContract(contractData)
+            await saveOrUpdateContract(contractData, { preserveStatus: true })
           } else {
             console.error('❌ Kunde inte hämta kontrakt-detaljer för content_update')
           }
           break
 
         case 'contract:delete':
-          console.log('🗑️ Kontrakt borttaget')
+          console.log('🗑️ Kontrakt borttaget/papperskorgen')
           await supabase
             .from('contracts')
-            .update({ 
-              status: 'declined',
+            .update({
+              status: 'trashed',
               updated_at: new Date().toISOString()
             })
             .eq('oneflow_contract_id', contractId)
@@ -1619,7 +1629,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           console.log('📊 Datafält uppdaterat - synkar data')
           if (contractDetails) {
             const contractData = parseContractDetailsToInsertData(contractDetails)
-            await saveOrUpdateContract(contractData)
+            await saveOrUpdateContract(contractData, { preserveStatus: true })
           }
           break
 
@@ -1630,7 +1640,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           console.log(`🛍️ Produkt ${event.type.split(':')[1]} - uppdaterar produktdata`)
           if (contractDetails) {
             const contractData = parseContractDetailsToInsertData(contractDetails)
-            await saveOrUpdateContract(contractData)
+            await saveOrUpdateContract(contractData, { preserveStatus: true })
           }
           break
 
@@ -1646,7 +1656,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           console.log(`🏢 Part ${event.type.split(':')[1]} - uppdaterar partdata`)
           if (contractDetails) {
             const contractData = parseContractDetailsToInsertData(contractDetails)
-            await saveOrUpdateContract(contractData)
+            await saveOrUpdateContract(contractData, { preserveStatus: true })
           }
           break
 
@@ -1689,7 +1699,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           // Spara ändå kontraktdata om vi har den
           if (contractDetails && event.type.startsWith('contract:')) {
             const contractData = parseContractDetailsToInsertData(contractDetails)
-            await saveOrUpdateContract(contractData)
+            await saveOrUpdateContract(contractData, { preserveStatus: true })
           }
       }
 
