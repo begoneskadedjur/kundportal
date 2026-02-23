@@ -217,7 +217,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       // Låt nästa useEffect hantera kund-identifiering
       if (type === 'contract' && initialCaseData.customer_id) {
         setFormData({
-          title: initialCaseData.title,
           status: 'Bokat',
           skadedjur: initialCaseData.pest_type || initialCaseData.skadedjur,
           priority: initialCaseData.priority,
@@ -247,18 +246,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       handleReset();
     }
   }, [isOpen, initialCaseData, initialCaseType, handleReset]);
-
-  // Generera ärendenummer direkt vid formuläröppning (nya ärenden)
-  useEffect(() => {
-    if (step !== 'form' || !caseType || initialCaseData || generatedCaseNumber) return;
-    let cancelled = false;
-    CaseNumberService.generateCaseNumber().then(num => {
-      if (cancelled) return;
-      setGeneratedCaseNumber(num);
-      setFormData(prev => ({ ...prev, title: num }));
-    }).catch(err => console.error('Kunde inte generera ärendenummer:', err));
-    return () => { cancelled = true };
-  }, [step, caseType, initialCaseData, generatedCaseNumber]);
 
   // Separat useEffect för tekniker-förval - hanterar timing-problem med asynkron laddning
   useEffect(() => {
@@ -643,8 +630,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setError(null);
 
     try {
-      // Använd det förgenererade ärendenumret, eller generera nytt om det saknas
-      const caseNumber = generatedCaseNumber || await CaseNumberService.generateCaseNumber();
+      // Generera ärendenummer vid submit (inte vid modal-öppning) med kollisionsskydd
+      const caseNumber = generatedCaseNumber || await CaseNumberService.generateUniqueCaseNumber();
+      if (!generatedCaseNumber) setGeneratedCaseNumber(caseNumber);
 
       if (caseType === 'inspection') {
         // Hantera stationskontroll-ärenden
@@ -660,14 +648,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : customer;
         const customerName = customerForTitle?.company_name || 'Okänd kund';
 
-        // Använd ärendenumret som titel (auto-genererat)
-        const inspectionTitle = formData.title?.trim() || caseNumber;
-
         // Skapa case-ärende först
         const caseData = {
           customer_id: actualCustomerId!,
           site_id: customer?.is_multisite ? selectedSiteId : null,
-          title: inspectionTitle,
+          title: caseNumber,
           description: formData.description || 'Schemalagd stationskontroll',
           status: 'Bokad',
           priority: formData.priority || 'normal',
@@ -758,13 +743,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : customer;
         const customerName = customerForTitle?.company_name || 'Okänd kund';
 
-        // Använd ärendenumret som titel (auto-genererat)
-        const contractTitle = formData.title?.trim() || caseNumber;
-
         const caseData = {
           customer_id: actualCustomerId, // Använd rätt customer_id (site eller huvudkund)
           site_id: customer?.is_multisite ? selectedSiteId : null,
-          title: contractTitle,
+          title: caseNumber,
           description: formData.description || '',
           status: 'Bokad', // Korrekt svensk status som används i systemet
           priority: formData.priority || 'normal',
@@ -806,21 +788,21 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           }
         }
 
-        toast.success(`Avtalskundärendet "${formData.title}" har bokats in!`);
+        toast.success(`Ärende ${caseNumber} har bokats in!`);
       } else {
         // Hantera ClickUp-ärenden (private/business)
         const tableName = caseType === 'private' ? 'private_cases' : 'business_cases';
         let createdClickUpCaseId: string | null = null;
 
         if (initialCaseData && initialCaseData.case_type !== 'contract') {
-          const { error } = await supabase.from(tableName).update(formData).eq('id', initialCaseData.id);
+          const { error } = await supabase.from(tableName).update({ ...formData, title: caseNumber }).eq('id', initialCaseData.id);
           if (error) throw error;
           createdClickUpCaseId = initialCaseData.id;
-          toast.success(`Ärendet "${formData.title}" har bokats in!`);
+          toast.success(`Ärende ${caseNumber} har bokats in!`);
         } else {
           const { data, error } = await supabase.from(tableName).insert([{
             ...formData,
-            title: formData.title?.trim() || caseNumber,
+            title: caseNumber,
             clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             case_number: caseNumber
           }]).select('id');
@@ -1376,12 +1358,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
                         <Briefcase size={14}/> Ärendeinformation
                       </h4>
-                      <Input
-                        label="Ärendetitel"
-                        name="title"
-                        value={formData.title || ''}
-                        onChange={handleChange}
-                      />
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">
                           <FileText size={12} className="inline mr-1" />
@@ -1609,7 +1585,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   </div>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                        <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Briefcase size={14}/> Ärendeinformation</h4>
-                       <Input label="Ärendetitel" name="title" value={formData.title || ''} onChange={handleChange} />
                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={2} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" placeholder="Kort om ärendet, portkod, etc."/></div>
                        {caseType === 'business' && (<Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />)}
                   </div>
