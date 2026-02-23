@@ -23,6 +23,7 @@ export function TechnicianCards({ stats, selectedTechnician, onSelect }: Technic
       {stats.map(t => {
         const isSelected = selectedTechnician === t.technician_email
         const hasOverdue = t.overdue > 0
+        const hasAtRisk = t.at_risk > 0
 
         return (
           <button
@@ -33,7 +34,9 @@ export function TechnicianCards({ stats, selectedTechnician, onSelect }: Technic
                 ? 'bg-[#20c58f]/10 border-[#20c58f]/50 ring-1 ring-[#20c58f]/30'
                 : hasOverdue
                   ? 'bg-slate-800/30 border-red-500/30 hover:border-red-500/50'
-                  : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
+                  : hasAtRisk
+                    ? 'bg-slate-800/30 border-amber-500/30 hover:border-amber-500/50'
+                    : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
             }`}
           >
             {/* Namn */}
@@ -64,12 +67,21 @@ export function TechnicianCards({ stats, selectedTechnician, onSelect }: Technic
                   {t.sign_rate}%
                 </span>
               </div>
-              <div className="flex items-center gap-1">
-                <Banknote className="w-3 h-3 text-amber-400" />
-                <span className="text-xs text-slate-400">
-                  {formatKr(t.total_pipeline_value)}
-                </span>
-              </div>
+              {t.at_risk > 0 ? (
+                <div className="flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-amber-400" />
+                  <span className="text-xs text-amber-400">
+                    {t.at_risk} <span className="text-amber-400/60">risk</span>
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Banknote className="w-3 h-3 text-amber-400" />
+                  <span className="text-xs text-slate-400">
+                    {formatKr(t.total_pipeline_value)}
+                  </span>
+                </div>
+              )}
             </div>
           </button>
         )

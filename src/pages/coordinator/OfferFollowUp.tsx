@@ -31,9 +31,10 @@ export default function OfferFollowUp() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  const [sortBy, setSortBy] = useState<FollowUpSortBy>('oldest')
+  const [sortBy, setSortBy] = useState<FollowUpSortBy>('priority')
   const [statusFilter, setStatusFilter] = useState<FollowUpStatusFilter>('all')
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const fetchData = async (isRefresh = false) => {
     try {
@@ -109,7 +110,12 @@ export default function OfferFollowUp() {
               <span className="text-xs text-slate-400">Pågående</span>
             </div>
             <div className="text-lg font-bold text-white">{kpis.total_pending}</div>
-            <div className="text-[10px] text-slate-500">{formatKr(kpis.total_pending_value)} i pipeline</div>
+            <div className="text-[10px] text-slate-500">
+              {kpis.at_risk_pending > 0
+                ? <span className="text-amber-400 font-medium">{kpis.at_risk_pending} snart förfallna</span>
+                : `${formatKr(kpis.total_pending_value)} i pipeline`
+              }
+            </div>
           </div>
 
           <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
@@ -120,7 +126,12 @@ export default function OfferFollowUp() {
             <div className={`text-lg font-bold ${kpis.total_overdue > 0 ? 'text-red-400' : 'text-white'}`}>
               {kpis.total_overdue}
             </div>
-            <div className="text-[10px] text-slate-500">{formatKr(kpis.total_overdue_value)} i risk</div>
+            <div className="text-[10px] text-slate-500">
+              {kpis.recently_overdue > 0
+                ? <span className="text-red-400 font-medium">{kpis.recently_overdue} nya denna vecka</span>
+                : `${formatKr(kpis.total_overdue_value)} i risk`
+              }
+            </div>
           </div>
 
           <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
@@ -139,6 +150,40 @@ export default function OfferFollowUp() {
             </div>
             <div className="text-lg font-bold text-white">{kpis.avg_days_to_sign}</div>
             <div className="text-[10px] text-slate-500">till signering</div>
+          </div>
+        </div>
+      )}
+
+      {/* Action-banner */}
+      {kpis && (kpis.recently_overdue > 0 || kpis.at_risk_pending > 0) && (
+        <div className="p-3 bg-gradient-to-r from-red-500/10 to-amber-500/10 border border-red-500/20 rounded-xl">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">Offerter som kräver åtgärd</p>
+              <div className="flex items-center gap-4 mt-1">
+                {kpis.recently_overdue > 0 && (
+                  <span className="text-xs text-red-400">
+                    {kpis.recently_overdue} nyligen förfallna
+                  </span>
+                )}
+                {kpis.at_risk_pending > 0 && (
+                  <span className="text-xs text-amber-400">
+                    {kpis.at_risk_pending} närmar sig deadline
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setSortBy('priority')
+                setStatusFilter('all')
+                setSelectedTechnician(null)
+              }}
+              className="px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] text-white text-xs font-medium rounded-lg transition-colors flex-shrink-0"
+            >
+              Visa prioriterade
+            </button>
           </div>
         </div>
       )}
@@ -175,6 +220,8 @@ export default function OfferFollowUp() {
         onStatusFilterChange={setStatusFilter}
         isCoordinator={isCoordinator}
         senderEmail={senderEmail}
+        showArchived={showArchived}
+        onToggleArchived={() => setShowArchived(!showArchived)}
       />
     </div>
   )

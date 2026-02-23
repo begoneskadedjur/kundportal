@@ -1,6 +1,29 @@
 // src/services/offerFollowUpService.ts — Service för offertuppföljning med tekniker-koppling
 import { supabase } from '../lib/supabase'
 
+// === Prioritetskonstanter ===
+export const THRESHOLDS = {
+  RECENTLY_OVERDUE_DAYS: 7,
+  APPROACHING_DEADLINE_DAYS: 10,
+  ARCHIVE_CUTOFF_DAYS: 90,
+} as const
+
+export type OfferPriority = 'critical' | 'warning' | 'normal' | 'archived'
+
+function classifyPriority(
+  status: string,
+  age_days: number,
+  days_since_overdue: number | null
+): OfferPriority {
+  // Arkiverade: alla statusar, 90+ dagar gamla
+  if (age_days >= THRESHOLDS.ARCHIVE_CUTOFF_DAYS) return 'archived'
+  // Kritiska: alla överförfallna (inte arkiverade)
+  if (status === 'overdue') return 'critical'
+  // Varning: pågående > 10 dagar
+  if (status === 'pending' && age_days >= THRESHOLDS.APPROACHING_DEADLINE_DAYS) return 'warning'
+  return 'normal'
+}
+
 export interface FollowUpOffer {
   id: string
   oneflow_contract_id: string
@@ -21,6 +44,10 @@ export interface FollowUpOffer {
   // Beräknade fält
   age_days: number
   has_comments: boolean
+  // Prioritetsfält
+  priority: OfferPriority
+  is_recently_overdue: boolean
+  days_since_overdue: number | null
 }
 
 export interface TechnicianOfferStats {
@@ -33,6 +60,7 @@ export interface TechnicianOfferStats {
   declined: number
   total_pipeline_value: number
   sign_rate: number
+  at_risk: number
 }
 
 export interface FollowUpKPIs {
@@ -42,6 +70,8 @@ export interface FollowUpKPIs {
   total_overdue_value: number
   sign_rate: number
   avg_days_to_sign: number
+  recently_overdue: number
+  at_risk_pending: number
 }
 
 export interface DashboardData {
@@ -51,7 +81,7 @@ export interface DashboardData {
 }
 
 export type FollowUpStatusFilter = 'all' | 'pending' | 'overdue' | 'signed' | 'declined'
-export type FollowUpSortBy = 'oldest' | 'newest' | 'value_desc' | 'technician'
+export type FollowUpSortBy = 'priority' | 'oldest' | 'newest' | 'value_desc' | 'technician'
 
 const OFFER_COLUMNS = `
   id, oneflow_contract_id, type, status, company_name, contact_person,
@@ -63,6 +93,7 @@ const EMPTY_KPIS: FollowUpKPIs = {
   total_pending: 0, total_pending_value: 0,
   total_overdue: 0, total_overdue_value: 0,
   sign_rate: 0, avg_days_to_sign: 0,
+  recently_overdue: 0, at_risk_pending: 0,
 }
 
 export class OfferFollowUpService {
@@ -111,12 +142,20 @@ export class OfferFollowUpService {
     const allOffers: FollowUpOffer[] = allContracts.map(o => {
       const email = o.begone_employee_email?.toLowerCase() || ''
       const tech = techByEmail.get(email) || null
+      const age_days = Math.floor((now - new Date(o.created_at).getTime()) / (1000 * 60 * 60 * 24))
+      const days_since_overdue = o.status === 'overdue'
+        ? Math.floor((now - new Date(o.updated_at).getTime()) / (1000 * 60 * 60 * 24))
+        : null
+
       return {
         ...o,
         technician_id: tech?.id || null,
         technician_name: tech?.name || o.begone_employee_name,
-        age_days: Math.floor((now - new Date(o.created_at).getTime()) / (1000 * 60 * 60 * 24)),
+        age_days,
         has_comments: hasCommentsSet.has(o.oneflow_contract_id),
+        days_since_overdue,
+        priority: classifyPriority(o.status, age_days, days_since_overdue),
+        is_recently_overdue: o.status === 'overdue' && days_since_overdue !== null && days_since_overdue <= THRESHOLDS.RECENTLY_OVERDUE_DAYS,
       }
     })
 
@@ -147,6 +186,8 @@ export class OfferFollowUpService {
       total_overdue_value: overdueContracts.reduce((sum, c) => sum + (Number(c.total_value) || 0), 0),
       sign_rate: totalCount > 0 ? Math.round((signedContracts.length / totalCount) * 100) : 0,
       avg_days_to_sign: avgDays,
+      recently_overdue: allOffers.filter(o => o.is_recently_overdue).length,
+      at_risk_pending: allOffers.filter(o => o.status === 'pending' && o.age_days >= THRESHOLDS.APPROACHING_DEADLINE_DAYS).length,
     }
 
     // === Beräkna techStats (alla anställda med kontrakt) ===
@@ -166,6 +207,13 @@ export class OfferFollowUpService {
           .filter(c => c.status === 'pending' || c.status === 'overdue')
           .reduce((sum, c) => sum + (Number(c.total_value) || 0), 0)
 
+        // At-risk: pending offerter äldre än 10 dagar
+        const at_risk = myContracts.filter(c => {
+          if (c.status !== 'pending') return false
+          const age = Math.floor((now - new Date(c.created_at).getTime()) / (1000 * 60 * 60 * 24))
+          return age >= THRESHOLDS.APPROACHING_DEADLINE_DAYS
+        }).length
+
         return {
           technician_id: t.id,
           technician_name: t.name,
@@ -176,6 +224,7 @@ export class OfferFollowUpService {
           declined,
           total_pipeline_value: pipelineValue,
           sign_rate: total > 0 ? Math.round((signed / total) * 100) : 0,
+          at_risk,
         }
       })
       .filter(t => t.pending + t.overdue + t.signed + t.declined > 0)

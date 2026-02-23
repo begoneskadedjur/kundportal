@@ -1,11 +1,11 @@
 // src/components/coordinator/follow-up/FollowUpTable.tsx
-// Expanderbar tabell för offertuppföljning med åldersindikator och kommentarer
+// Expanderbar tabell för offertuppföljning med prioritetsgrupper och åldersindikator
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown, ChevronUp, MessageSquare, ExternalLink,
   Clock, AlertTriangle, User, Building2, Mail, Phone,
-  FileSignature,
+  FileSignature, Archive,
 } from 'lucide-react'
 import { OFFER_STATUS_CONFIG } from '../../../types/casePipeline'
 import { CommentThread } from './CommentThread'
@@ -19,6 +19,8 @@ interface FollowUpTableProps {
   onStatusFilterChange: (filter: FollowUpStatusFilter) => void
   isCoordinator: boolean
   senderEmail?: string
+  showArchived: boolean
+  onToggleArchived: () => void
 }
 
 const STATUS_FILTERS: { key: FollowUpStatusFilter; label: string }[] = [
@@ -30,11 +32,14 @@ const STATUS_FILTERS: { key: FollowUpStatusFilter; label: string }[] = [
 ]
 
 const SORT_OPTIONS: { key: FollowUpSortBy; label: string }[] = [
+  { key: 'priority', label: 'Prioritet' },
   { key: 'oldest', label: 'Äldst först' },
   { key: 'newest', label: 'Nyast först' },
   { key: 'value_desc', label: 'Värde (högst)' },
   { key: 'technician', label: 'Tekniker' },
 ]
+
+const PRIORITY_ORDER = { critical: 0, warning: 1, normal: 2, archived: 3 } as const
 
 function getAgeBadge(days: number): { label: string; className: string } {
   if (days < 7) return { label: `${days}d`, className: 'bg-green-500/15 text-green-400' }
@@ -55,6 +60,183 @@ function formatPrice(price: number | null): string {
   return `${price.toLocaleString('sv-SE')} kr`
 }
 
+// === Rad-komponent ===
+function OfferRow({
+  offer,
+  isExpanded,
+  onToggle,
+  isCoordinator,
+  senderEmail,
+}: {
+  offer: FollowUpOffer
+  isExpanded: boolean
+  onToggle: () => void
+  isCoordinator: boolean
+  senderEmail?: string
+}) {
+  const ageBadge = getAgeBadge(offer.age_days)
+  const borderColor = getAgeBorderColor(offer.age_days)
+  const statusConfig = OFFER_STATUS_CONFIG[offer.status] || { label: offer.status, color: 'text-slate-400', bgColor: 'bg-slate-500/15' }
+  const isArchived = offer.priority === 'archived'
+
+  return (
+    <div className={`rounded-xl overflow-hidden ${isArchived ? 'opacity-60' : ''}`}>
+      {/* Rad */}
+      <button
+        onClick={onToggle}
+        className={`w-full text-left p-3 border-l-4 ${borderColor} bg-slate-800/30 border border-slate-700/50 border-l-4 rounded-xl hover:bg-slate-800/50 transition-colors`}
+      >
+        <div className="flex items-center gap-3">
+          {/* Pulserande prick för nyligen förfallna */}
+          {offer.is_recently_overdue && (
+            <span className="relative flex h-2 w-2 flex-shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+            </span>
+          )}
+
+          {/* Åldersbadge + prioritetstaggar */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${ageBadge.className}`}>
+              {ageBadge.label}
+            </span>
+            {offer.is_recently_overdue && (
+              <span className="px-1 py-0.5 rounded text-[10px] font-semibold bg-red-500/20 text-red-400">
+                Ny!
+              </span>
+            )}
+            {offer.priority === 'warning' && (
+              <span className="px-1 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-400">
+                Snart förfallen
+              </span>
+            )}
+          </div>
+
+          {/* Kund + kontakt */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-white truncate">
+                {offer.company_name || offer.contact_person || 'Okänd kund'}
+              </span>
+              {offer.has_comments && (
+                <MessageSquare className="w-3 h-3 text-blue-400 flex-shrink-0" />
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              {offer.contact_person && offer.company_name && (
+                <span className="text-[10px] text-slate-500 truncate">{offer.contact_person}</span>
+              )}
+              {isCoordinator && offer.technician_name && (
+                <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                  <User className="w-2.5 h-2.5" /> {offer.technician_name}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Värde */}
+          <span className="text-sm font-medium text-white whitespace-nowrap">
+            {formatPrice(offer.total_value)}
+          </span>
+
+          {/* Status */}
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusConfig.bgColor} ${statusConfig.color}`}>
+            {statusConfig.label}
+          </span>
+
+          {/* Expand */}
+          {isExpanded
+            ? <ChevronUp className="w-4 h-4 text-slate-400" />
+            : <ChevronDown className="w-4 h-4 text-slate-400" />}
+        </div>
+      </button>
+
+      {/* Expanderad vy */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="p-3 bg-slate-800/20 border border-slate-700/30 border-t-0 rounded-b-xl space-y-3">
+              {/* Detaljer */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {offer.contact_email && (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <Mail className="w-3 h-3" />
+                    <a href={`mailto:${offer.contact_email}`} className="hover:text-white transition-colors truncate">
+                      {offer.contact_email}
+                    </a>
+                  </div>
+                )}
+                {offer.contact_phone && (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <Phone className="w-3 h-3" />
+                    <a href={`tel:${offer.contact_phone}`} className="hover:text-white transition-colors">
+                      {offer.contact_phone}
+                    </a>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <Clock className="w-3 h-3" />
+                  <span>Skickad {new Date(offer.created_at).toLocaleDateString('sv-SE')}</span>
+                </div>
+                {offer.oneflow_contract_id && (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <ExternalLink className="w-3 h-3 text-slate-400" />
+                    <a
+                      href={`https://app.oneflow.com/contracts/${offer.oneflow_contract_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#20c58f] hover:underline"
+                    >
+                      Öppna i Oneflow
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Kommentarer */}
+              {offer.oneflow_contract_id && (
+                <div className="pt-2 border-t border-slate-700/50">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-medium text-slate-300">Kommentarer</span>
+                  </div>
+                  <CommentThread
+                    contractId={offer.oneflow_contract_id}
+                    senderEmail={senderEmail}
+                  />
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// === Sektionsheader ===
+function SectionHeader({ icon: Icon, label, count, className }: {
+  icon: React.ElementType
+  label: string
+  count: number
+  className: string
+}) {
+  return (
+    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${className}`}>
+      <Icon className="w-3.5 h-3.5" />
+      <span className="text-xs font-semibold">{label}</span>
+      <span className="text-[10px] opacity-60">{count} st</span>
+    </div>
+  )
+}
+
+// === Huvudkomponent ===
 export function FollowUpTable({
   offers,
   sortBy,
@@ -63,18 +245,30 @@ export function FollowUpTable({
   onStatusFilterChange,
   isCoordinator,
   senderEmail,
+  showArchived,
+  onToggleArchived,
 }: FollowUpTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  // Räkna arkiverade (innan filtrering)
+  const archivedCount = offers.filter(o => o.priority === 'archived').length
+
   // Filter
   const filtered = offers.filter(o => {
-    if (statusFilter === 'all') return true
-    return o.status === statusFilter
+    if (statusFilter !== 'all' && o.status !== statusFilter) return false
+    if (!showArchived && o.priority === 'archived') return false
+    return true
   })
 
   // Sort
   const sorted = [...filtered].sort((a, b) => {
     switch (sortBy) {
+      case 'priority':
+        // Prioritetsordning, sedan äldst först inom varje grupp
+        const pa = PRIORITY_ORDER[a.priority] ?? 2
+        const pb = PRIORITY_ORDER[b.priority] ?? 2
+        if (pa !== pb) return pa - pb
+        return a.age_days - b.age_days
       case 'oldest': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       case 'newest': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       case 'value_desc': return (b.total_value || 0) - (a.total_value || 0)
@@ -82,6 +276,24 @@ export function FollowUpTable({
       default: return 0
     }
   })
+
+  // Prioritetsgrupper (bara vid prioritetssort)
+  const usePriorityGroups = sortBy === 'priority'
+  const critical = usePriorityGroups ? sorted.filter(o => o.priority === 'critical') : []
+  const warning = usePriorityGroups ? sorted.filter(o => o.priority === 'warning') : []
+  const normal = usePriorityGroups ? sorted.filter(o => o.priority === 'normal') : []
+  const archived = usePriorityGroups ? sorted.filter(o => o.priority === 'archived') : []
+
+  const renderRow = (offer: FollowUpOffer) => (
+    <OfferRow
+      key={offer.id}
+      offer={offer}
+      isExpanded={expandedId === offer.id}
+      onToggle={() => setExpandedId(expandedId === offer.id ? null : offer.id)}
+      isCoordinator={isCoordinator}
+      senderEmail={senderEmail}
+    />
+  )
 
   return (
     <div className="space-y-3">
@@ -118,6 +330,21 @@ export function FollowUpTable({
         </select>
 
         <span className="text-xs text-slate-500">{sorted.length} st</span>
+
+        {/* Arkiv-toggle */}
+        {archivedCount > 0 && (
+          <button
+            onClick={onToggleArchived}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+              showArchived
+                ? 'bg-slate-700/50 text-slate-300'
+                : 'bg-slate-800/30 text-slate-500 hover:text-slate-400'
+            }`}
+          >
+            <Archive className="w-3 h-3" />
+            {showArchived ? 'Dölj gamla' : `+${archivedCount} gamla (90d+)`}
+          </button>
+        )}
       </div>
 
       {/* Tabell */}
@@ -126,134 +353,60 @@ export function FollowUpTable({
           <FileSignature className="w-8 h-8 text-slate-600 mx-auto mb-2" />
           <p className="text-sm text-slate-500">Inga offerter matchar filtret</p>
         </div>
+      ) : usePriorityGroups ? (
+        /* Grupperad vy */
+        <div className="space-y-4">
+          {critical.length > 0 && (
+            <div className="space-y-1.5">
+              <SectionHeader
+                icon={AlertTriangle}
+                label="Kräver omedelbar åtgärd"
+                count={critical.length}
+                className="bg-red-500/10 border border-red-500/20 text-red-400"
+              />
+              {critical.map(renderRow)}
+            </div>
+          )}
+
+          {warning.length > 0 && (
+            <div className="space-y-1.5">
+              <SectionHeader
+                icon={Clock}
+                label="Närmar sig deadline"
+                count={warning.length}
+                className="bg-amber-500/10 border border-amber-500/20 text-amber-400"
+              />
+              {warning.map(renderRow)}
+            </div>
+          )}
+
+          {normal.length > 0 && (
+            <div className="space-y-1.5">
+              {(critical.length > 0 || warning.length > 0) && (
+                <div className="px-2 py-1">
+                  <span className="text-xs text-slate-500">Övriga offerter</span>
+                </div>
+              )}
+              {normal.map(renderRow)}
+            </div>
+          )}
+
+          {archived.length > 0 && (
+            <div className="space-y-1.5">
+              <SectionHeader
+                icon={Archive}
+                label="Gamla offerter (90+ dagar)"
+                count={archived.length}
+                className="bg-slate-800/30 border border-slate-700/30 text-slate-500"
+              />
+              {archived.map(renderRow)}
+            </div>
+          )}
+        </div>
       ) : (
+        /* Platt vy (andra sorteringar) */
         <div className="space-y-1.5">
-          {sorted.map(offer => {
-            const isExpanded = expandedId === offer.id
-            const ageBadge = getAgeBadge(offer.age_days)
-            const borderColor = getAgeBorderColor(offer.age_days)
-            const statusConfig = OFFER_STATUS_CONFIG[offer.status] || { label: offer.status, color: 'text-slate-400', bgColor: 'bg-slate-500/15' }
-
-            return (
-              <div key={offer.id} className="rounded-xl overflow-hidden">
-                {/* Rad */}
-                <button
-                  onClick={() => setExpandedId(isExpanded ? null : offer.id)}
-                  className={`w-full text-left p-3 border-l-4 ${borderColor} bg-slate-800/30 border border-slate-700/50 border-l-4 rounded-xl hover:bg-slate-800/50 transition-colors`}
-                >
-                  <div className="flex items-center gap-3">
-                    {/* Åldersbadge */}
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${ageBadge.className}`}>
-                      {ageBadge.label}
-                    </span>
-
-                    {/* Kund + kontakt */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white truncate">
-                          {offer.company_name || offer.contact_person || 'Okänd kund'}
-                        </span>
-                        {offer.has_comments && (
-                          <MessageSquare className="w-3 h-3 text-blue-400 flex-shrink-0" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {offer.contact_person && offer.company_name && (
-                          <span className="text-[10px] text-slate-500 truncate">{offer.contact_person}</span>
-                        )}
-                        {isCoordinator && offer.technician_name && (
-                          <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
-                            <User className="w-2.5 h-2.5" /> {offer.technician_name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Värde */}
-                    <span className="text-sm font-medium text-white whitespace-nowrap">
-                      {formatPrice(offer.total_value)}
-                    </span>
-
-                    {/* Status */}
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusConfig.bgColor} ${statusConfig.color}`}>
-                      {statusConfig.label}
-                    </span>
-
-                    {/* Expand */}
-                    {isExpanded
-                      ? <ChevronUp className="w-4 h-4 text-slate-400" />
-                      : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                  </div>
-                </button>
-
-                {/* Expanderad vy */}
-                <AnimatePresence>
-                  {isExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="p-3 bg-slate-800/20 border border-slate-700/30 border-t-0 rounded-b-xl space-y-3">
-                        {/* Detaljer */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                          {offer.contact_email && (
-                            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                              <Mail className="w-3 h-3" />
-                              <a href={`mailto:${offer.contact_email}`} className="hover:text-white transition-colors truncate">
-                                {offer.contact_email}
-                              </a>
-                            </div>
-                          )}
-                          {offer.contact_phone && (
-                            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                              <Phone className="w-3 h-3" />
-                              <a href={`tel:${offer.contact_phone}`} className="hover:text-white transition-colors">
-                                {offer.contact_phone}
-                              </a>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                            <Clock className="w-3 h-3" />
-                            <span>Skickad {new Date(offer.created_at).toLocaleDateString('sv-SE')}</span>
-                          </div>
-                          {offer.oneflow_contract_id && (
-                            <div className="flex items-center gap-1.5 text-xs">
-                              <ExternalLink className="w-3 h-3 text-slate-400" />
-                              <a
-                                href={`https://app.oneflow.com/contracts/${offer.oneflow_contract_id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[#20c58f] hover:underline"
-                              >
-                                Öppna i Oneflow
-                              </a>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Kommentarer */}
-                        {offer.oneflow_contract_id && (
-                          <div className="pt-2 border-t border-slate-700/50">
-                            <div className="flex items-center gap-1.5 mb-2">
-                              <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-                              <span className="text-xs font-medium text-slate-300">Kommentarer</span>
-                            </div>
-                            <CommentThread
-                              contractId={offer.oneflow_contract_id}
-                              senderEmail={senderEmail}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )
-          })}
+          {sorted.map(renderRow)}
         </div>
       )}
     </div>
