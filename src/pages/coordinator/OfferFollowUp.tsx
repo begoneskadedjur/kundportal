@@ -1,5 +1,5 @@
 // src/pages/coordinator/OfferFollowUp.tsx — Offertuppföljning: systematisk uppföljning av osignerade offerter
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   FileSignature, Loader2, RefreshCw,
   Clock, AlertTriangle, TrendingUp, Banknote,
@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { OfferFollowUpService } from '../../services/offerFollowUpService'
 import { FollowUpTable } from '../../components/coordinator/follow-up/FollowUpTable'
 import { TechnicianCards } from '../../components/coordinator/follow-up/TechnicianCards'
+import toast from 'react-hot-toast'
 import type {
   FollowUpOffer, FollowUpKPIs, TechnicianOfferStats,
   FollowUpSortBy, FollowUpStatusFilter,
@@ -21,7 +22,8 @@ function formatKr(value: number): string {
 }
 
 export default function OfferFollowUp() {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
+  const userId = user?.id
   const isCoordinator = profile?.role === 'koordinator' || profile?.role === 'admin'
   const technicianEmail = isCoordinator ? undefined : profile?.technicians?.email
 
@@ -35,6 +37,7 @@ export default function OfferFollowUp() {
   const [statusFilter, setStatusFilter] = useState<FollowUpStatusFilter>('all')
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
 
   const fetchData = async (isRefresh = false) => {
     try {
@@ -56,15 +59,61 @@ export default function OfferFollowUp() {
 
   useEffect(() => { fetchData() }, [technicianEmail])
 
-  // Filtrera på vald tekniker
+  // Filtrera på vald tekniker + dolda
   const filteredOffers = useMemo(() => {
-    if (!selectedTechnician) return offers
-    return offers.filter(o =>
-      o.technician_name && techStats.find(t =>
-        t.technician_email === selectedTechnician && t.technician_name === o.technician_name
+    let result = offers
+
+    // Filtrera på tekniker
+    if (selectedTechnician) {
+      result = result.filter(o =>
+        o.technician_name && techStats.find(t =>
+          t.technician_email === selectedTechnician && t.technician_name === o.technician_name
+        )
       )
-    )
-  }, [offers, selectedTechnician, techStats])
+    }
+
+    // Filtrera bort dolda (om inte showHidden)
+    if (!showHidden && userId) {
+      result = result.filter(o => !(o.hidden_by || []).includes(userId))
+    }
+
+    return result
+  }, [offers, selectedTechnician, techStats, showHidden, userId])
+
+  // Räkna dolda offerter
+  const hiddenCount = useMemo(() => {
+    if (!userId) return 0
+    return offers.filter(o => (o.hidden_by || []).includes(userId)).length
+  }, [offers, userId])
+
+  // Dölj/visa handlers
+  const handleHide = useCallback(async (contractId: string) => {
+    if (!userId) return
+    try {
+      await OfferFollowUpService.hideOffer(contractId, userId)
+      setOffers(prev => prev.map(o =>
+        o.id === contractId ? { ...o, hidden_by: [...(o.hidden_by || []), userId] } : o
+      ))
+      toast.success('Offert dold')
+    } catch (err) {
+      console.error('Kunde inte dölja offert:', err)
+      toast.error('Kunde inte dölja offert')
+    }
+  }, [userId])
+
+  const handleUnhide = useCallback(async (contractId: string) => {
+    if (!userId) return
+    try {
+      await OfferFollowUpService.unhideOffer(contractId, userId)
+      setOffers(prev => prev.map(o =>
+        o.id === contractId ? { ...o, hidden_by: (o.hidden_by || []).filter(id => id !== userId) } : o
+      ))
+      toast.success('Offert synlig igen')
+    } catch (err) {
+      console.error('Kunde inte visa offert:', err)
+      toast.error('Kunde inte visa offert')
+    }
+  }, [userId])
 
   // Sender-email för kommentarer
   const senderEmail = profile?.technicians?.email || undefined
@@ -176,9 +225,10 @@ export default function OfferFollowUp() {
             </div>
             <button
               onClick={() => {
+                setStatusFilter('overdue')
                 setSortBy('priority')
-                setStatusFilter('all')
                 setSelectedTechnician(null)
+                document.getElementById('follow-up-table')?.scrollIntoView({ behavior: 'smooth' })
               }}
               className="px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] text-white text-xs font-medium rounded-lg transition-colors flex-shrink-0"
             >
@@ -222,6 +272,12 @@ export default function OfferFollowUp() {
         senderEmail={senderEmail}
         showArchived={showArchived}
         onToggleArchived={() => setShowArchived(!showArchived)}
+        onHide={handleHide}
+        onUnhide={handleUnhide}
+        userId={userId}
+        showHidden={showHidden}
+        onToggleHidden={() => setShowHidden(!showHidden)}
+        hiddenCount={hiddenCount}
       />
     </div>
   )

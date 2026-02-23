@@ -48,6 +48,8 @@ export interface FollowUpOffer {
   priority: OfferPriority
   is_recently_overdue: boolean
   days_since_overdue: number | null
+  // Dölj-funktion
+  hidden_by: string[]
 }
 
 export interface TechnicianOfferStats {
@@ -86,7 +88,7 @@ export type FollowUpSortBy = 'priority' | 'oldest' | 'newest' | 'value_desc' | '
 const OFFER_COLUMNS = `
   id, oneflow_contract_id, type, status, company_name, contact_person,
   contact_email, contact_phone, total_value, begone_employee_name,
-  begone_employee_email, created_at, updated_at
+  begone_employee_email, created_at, updated_at, hidden_by
 `
 
 const EMPTY_KPIS: FollowUpKPIs = {
@@ -156,6 +158,7 @@ export class OfferFollowUpService {
         days_since_overdue,
         priority: classifyPriority(o.status, age_days, days_since_overdue),
         is_recently_overdue: o.status === 'overdue' && days_since_overdue !== null && days_since_overdue <= THRESHOLDS.RECENTLY_OVERDUE_DAYS,
+        hidden_by: o.hidden_by || [],
       }
     })
 
@@ -231,6 +234,46 @@ export class OfferFollowUpService {
       .sort((a, b) => (b.pending + b.overdue) - (a.pending + a.overdue))
 
     return { offers, kpis, techStats }
+  }
+
+  /** Dölj en offert för en specifik användare */
+  static async hideOffer(contractId: string, userId: string): Promise<void> {
+    const { data, error: fetchError } = await supabase
+      .from('contracts')
+      .select('hidden_by')
+      .eq('id', contractId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    const currentHidden: string[] = data?.hidden_by || []
+    if (currentHidden.includes(userId)) return
+
+    const { error } = await supabase
+      .from('contracts')
+      .update({ hidden_by: [...currentHidden, userId] })
+      .eq('id', contractId)
+
+    if (error) throw error
+  }
+
+  /** Visa en offert igen för en specifik användare */
+  static async unhideOffer(contractId: string, userId: string): Promise<void> {
+    const { data, error: fetchError } = await supabase
+      .from('contracts')
+      .select('hidden_by')
+      .eq('id', contractId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    const currentHidden: string[] = data?.hidden_by || []
+    const { error } = await supabase
+      .from('contracts')
+      .update({ hidden_by: currentHidden.filter(id => id !== userId) })
+      .eq('id', contractId)
+
+    if (error) throw error
   }
 
   /** Hämta kommentarer för ett kontrakt (via API-proxy) */

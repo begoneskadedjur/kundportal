@@ -1,14 +1,15 @@
 // src/components/coordinator/follow-up/FollowUpTable.tsx
-// Expanderbar tabell för offertuppföljning med prioritetsgrupper och åldersindikator
+// Expanderbar tabell för offertuppföljning med prioritetsgrupper, dölj-funktion och intern kommunikation
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown, ChevronUp, MessageSquare, ExternalLink,
-  Clock, AlertTriangle, User, Building2, Mail, Phone,
-  FileSignature, Archive,
+  Clock, AlertTriangle, User, Mail, Phone,
+  FileSignature, Archive, EyeOff, Eye,
 } from 'lucide-react'
 import { OFFER_STATUS_CONFIG } from '../../../types/casePipeline'
 import { CommentThread } from './CommentThread'
+import CommentSection from '../../communication/CommentSection'
 import type { FollowUpOffer, FollowUpSortBy, FollowUpStatusFilter } from '../../../services/offerFollowUpService'
 
 interface FollowUpTableProps {
@@ -21,6 +22,13 @@ interface FollowUpTableProps {
   senderEmail?: string
   showArchived: boolean
   onToggleArchived: () => void
+  // Dölj-funktion
+  onHide?: (contractId: string) => void
+  onUnhide?: (contractId: string) => void
+  userId?: string
+  showHidden?: boolean
+  onToggleHidden?: () => void
+  hiddenCount?: number
 }
 
 const STATUS_FILTERS: { key: FollowUpStatusFilter; label: string }[] = [
@@ -67,20 +75,27 @@ function OfferRow({
   onToggle,
   isCoordinator,
   senderEmail,
+  onHide,
+  onUnhide,
+  isHiddenByMe,
 }: {
   offer: FollowUpOffer
   isExpanded: boolean
   onToggle: () => void
   isCoordinator: boolean
   senderEmail?: string
+  onHide?: (contractId: string) => void
+  onUnhide?: (contractId: string) => void
+  isHiddenByMe: boolean
 }) {
+  const [activeTab, setActiveTab] = useState<'internal' | 'external'>('internal')
   const ageBadge = getAgeBadge(offer.age_days)
   const borderColor = getAgeBorderColor(offer.age_days)
   const statusConfig = OFFER_STATUS_CONFIG[offer.status] || { label: offer.status, color: 'text-slate-400', bgColor: 'bg-slate-500/15' }
   const isArchived = offer.priority === 'archived'
 
   return (
-    <div className={`rounded-xl overflow-hidden ${isArchived ? 'opacity-60' : ''}`}>
+    <div className={`rounded-xl overflow-hidden ${isArchived ? 'opacity-60' : ''} ${isHiddenByMe ? 'opacity-40' : ''}`}>
       {/* Rad */}
       <button
         onClick={onToggle}
@@ -144,6 +159,28 @@ function OfferRow({
             {statusConfig.label}
           </span>
 
+          {/* Dölj-knapp */}
+          {(onHide || onUnhide) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                if (isHiddenByMe) {
+                  onUnhide?.(offer.id)
+                } else {
+                  onHide?.(offer.id)
+                }
+              }}
+              className={`p-1 rounded transition-colors flex-shrink-0 ${
+                isHiddenByMe
+                  ? 'text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10'
+                  : 'text-slate-600 hover:text-slate-400 hover:bg-slate-700/30'
+              }`}
+              title={isHiddenByMe ? 'Visa igen' : 'Dölj offert'}
+            >
+              {isHiddenByMe ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            </button>
+          )}
+
           {/* Expand */}
           {isExpanded
             ? <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -199,19 +236,49 @@ function OfferRow({
                 )}
               </div>
 
-              {/* Kommentarer */}
-              {offer.oneflow_contract_id && (
-                <div className="pt-2 border-t border-slate-700/50">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="text-xs font-medium text-slate-300">Kommentarer</span>
-                  </div>
+              {/* Kommunikation — intern/extern flikar */}
+              <div className="pt-2 border-t border-slate-700/50">
+                <div className="flex items-center gap-1 mb-2">
+                  <button
+                    onClick={() => setActiveTab('internal')}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      activeTab === 'internal'
+                        ? 'bg-[#20c58f] text-white'
+                        : 'bg-slate-800/50 text-slate-400 hover:text-slate-300 border border-slate-700/50'
+                    }`}
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    Intern
+                  </button>
+                  {offer.oneflow_contract_id && (
+                    <button
+                      onClick={() => setActiveTab('external')}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                        activeTab === 'external'
+                          ? 'bg-[#20c58f] text-white'
+                          : 'bg-slate-800/50 text-slate-400 hover:text-slate-300 border border-slate-700/50'
+                      }`}
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Oneflow
+                    </button>
+                  )}
+                </div>
+
+                {activeTab === 'internal' ? (
+                  <CommentSection
+                    caseId={offer.id}
+                    caseType="contract"
+                    caseTitle={offer.company_name || offer.contact_person || ''}
+                    compact={true}
+                  />
+                ) : offer.oneflow_contract_id ? (
                   <CommentThread
                     contractId={offer.oneflow_contract_id}
                     senderEmail={senderEmail}
                   />
-                </div>
-              )}
+                ) : null}
+              </div>
             </div>
           </motion.div>
         )}
@@ -247,6 +314,12 @@ export function FollowUpTable({
   senderEmail,
   showArchived,
   onToggleArchived,
+  onHide,
+  onUnhide,
+  userId,
+  showHidden,
+  onToggleHidden,
+  hiddenCount = 0,
 }: FollowUpTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -264,7 +337,6 @@ export function FollowUpTable({
   const sorted = [...filtered].sort((a, b) => {
     switch (sortBy) {
       case 'priority':
-        // Prioritetsordning, sedan äldst först inom varje grupp
         const pa = PRIORITY_ORDER[a.priority] ?? 2
         const pb = PRIORITY_ORDER[b.priority] ?? 2
         if (pa !== pb) return pa - pb
@@ -292,11 +364,14 @@ export function FollowUpTable({
       onToggle={() => setExpandedId(expandedId === offer.id ? null : offer.id)}
       isCoordinator={isCoordinator}
       senderEmail={senderEmail}
+      onHide={onHide}
+      onUnhide={onUnhide}
+      isHiddenByMe={userId ? (offer.hidden_by || []).includes(userId) : false}
     />
   )
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" id="follow-up-table">
       {/* Filter + sortering */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Status-filter */}
@@ -330,6 +405,21 @@ export function FollowUpTable({
         </select>
 
         <span className="text-xs text-slate-500">{sorted.length} st</span>
+
+        {/* Dolda-toggle */}
+        {hiddenCount > 0 && onToggleHidden && (
+          <button
+            onClick={onToggleHidden}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+              showHidden
+                ? 'bg-slate-700/50 text-slate-300'
+                : 'bg-slate-800/30 text-slate-500 hover:text-slate-400'
+            }`}
+          >
+            <EyeOff className="w-3 h-3" />
+            {showHidden ? 'Dölj gömda' : `${hiddenCount} dolda`}
+          </button>
+        )}
 
         {/* Arkiv-toggle */}
         {archivedCount > 0 && (
