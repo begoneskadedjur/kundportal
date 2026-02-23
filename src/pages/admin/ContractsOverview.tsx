@@ -470,7 +470,12 @@ const PipelineFilters: React.FC<{
 }
 
 export default function ContractsOverview() {
-  const { contracts, loading, error, stats, currentFilters, setFilters, clearFilters, refreshContracts } = useContracts()
+  const {
+    contracts, loading, error, stats, currentFilters, setFilters, clearFilters, refreshContracts,
+    // Fil-state — skickas som props till FilesColumn, FileDownloadButton, ContractFilesModal
+    contractFiles, filesLoading, downloadingFiles, viewingFiles,
+    loadContractFiles, hasContractFiles, viewContractFile, downloadContractFile
+  } = useContracts()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -975,10 +980,18 @@ export default function ContractsOverview() {
                         
                         <td className="px-4 py-4">
                           <div className="flex justify-center gap-2">
-                            <FilesColumn 
+                            <FilesColumn
                               contractId={contract.id}
                               onFilesModalOpen={() => handleOpenFilesModal(contract)}
                               showButton={false}
+                              contractFiles={contractFiles}
+                              filesLoading={filesLoading}
+                              downloadingFiles={downloadingFiles}
+                              viewingFiles={viewingFiles}
+                              loadContractFiles={loadContractFiles}
+                              hasContractFiles={hasContractFiles}
+                              viewContractFile={viewContractFile}
+                              downloadContractFile={downloadContractFile}
                             />
                             {contract.oneflow_contract_id && (
                               <Button
@@ -1174,6 +1187,11 @@ export default function ContractsOverview() {
           }}
           contractId={selectedContractId}
           contractName={selectedContractName}
+          contractFiles={contractFiles}
+          filesLoading={filesLoading}
+          downloadingFiles={downloadingFiles}
+          loadContractFiles={loadContractFiles}
+          downloadContractFile={downloadContractFile}
         />
       </div>
     </div>

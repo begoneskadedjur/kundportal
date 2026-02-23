@@ -2,7 +2,7 @@
 import React from 'react'
 import { FileText, Loader, Download } from 'lucide-react'
 import Button from '../../ui/Button'
-import { useContracts } from '../../../hooks/useContracts'
+import { ContractFile } from '../../../types/database'
 
 interface FileDownloadButtonProps {
   contractId: string
@@ -11,29 +11,33 @@ interface FileDownloadButtonProps {
   size?: 'sm' | 'md' | 'lg'
   onFilesModalOpen?: () => void
   className?: string
+  // Fil-state från förälder (ContractsOverview via FilesColumn)
+  contractFiles: { [contractId: string]: ContractFile[] }
+  filesLoading: { [contractId: string]: boolean }
+  downloadingFiles: { [fileId: string]: boolean }
+  loadContractFiles: (contractId: string, forceRefresh?: boolean) => Promise<ContractFile[]>
+  downloadContractFile: (contractId: string, fileId: string) => Promise<void>
+  hasContractFiles: (contractId: string) => boolean
 }
 
-export default function FileDownloadButton({ 
-  contractId, 
+export default function FileDownloadButton({
+  contractId,
   showLabel = false,
   variant = 'ghost',
   size = 'sm',
   onFilesModalOpen,
-  className = ''
+  className = '',
+  contractFiles,
+  filesLoading,
+  downloadingFiles,
+  loadContractFiles,
+  downloadContractFile,
+  hasContractFiles
 }: FileDownloadButtonProps) {
-  const { 
-    contractFiles, 
-    filesLoading, 
-    downloadingFiles,
-    loadContractFiles,
-    downloadContractFile,
-    hasContractFiles
-  } = useContracts()
-  
   const currentFiles = contractFiles[contractId] || []
   const isLoading = filesLoading[contractId] || false
   const hasCachedFiles = hasContractFiles(contractId)
-  const hasDownloading = Object.keys(downloadingFiles).some(fileId => 
+  const hasDownloading = Object.keys(downloadingFiles).some(fileId =>
     downloadingFiles[fileId] && currentFiles.some(f => f.id === fileId)
   )
 
@@ -43,12 +47,12 @@ export default function FileDownloadButton({
       // Om filer inte är laddade, ladda dem först
       if (!hasCachedFiles) {
         const files = await loadContractFiles(contractId)
-        
+
         // Efter laddning, kolla resultatet
         if (files.length === 0) {
           return // Inga filer att ladda ner
         }
-        
+
         if (files.length === 1) {
           // Ladda ner direkt om endast en fil
           await downloadContractFile(contractId, files[0].id)
@@ -58,12 +62,12 @@ export default function FileDownloadButton({
         }
         return
       }
-      
+
       // Filer redan laddade - hantera baserat på antal
       if (currentFiles.length === 0) {
         return // Inga filer att ladda ner
       }
-      
+
       if (currentFiles.length === 1) {
         // Ladda ner direkt om endast en fil
         const file = currentFiles[0]
@@ -87,7 +91,7 @@ export default function FileDownloadButton({
         spin: true
       }
     }
-    
+
     if (hasDownloading) {
       return {
         icon: Loader,
@@ -96,7 +100,7 @@ export default function FileDownloadButton({
         spin: true
       }
     }
-    
+
     // Om filer inte laddade än
     if (!hasCachedFiles) {
       return {
@@ -106,7 +110,7 @@ export default function FileDownloadButton({
         spin: false
       }
     }
-    
+
     // Inga filer efter laddning
     if (currentFiles.length === 0) {
       return {
@@ -116,12 +120,12 @@ export default function FileDownloadButton({
         spin: false
       }
     }
-    
+
     const completedCount = currentFiles.filter(f => f.download_status === 'completed').length
-    
+
     return {
       icon: currentFiles.length === 1 ? Download : FileText,
-      text: currentFiles.length === 1 
+      text: currentFiles.length === 1
         ? (completedCount > 0 ? 'Ladda ner igen' : 'Ladda ner')
         : `${currentFiles.length} filer`,
       disabled: false,
@@ -142,15 +146,15 @@ export default function FileDownloadButton({
       title={
         !hasCachedFiles
           ? 'Klicka för att ladda kontraktsfiler'
-          : currentFiles.length === 0 
+          : currentFiles.length === 0
             ? 'Inga filer tillgängliga'
             : currentFiles.length === 1
               ? `Ladda ner: ${currentFiles[0].file_name}`
               : `Visa ${currentFiles.length} filer`
       }
     >
-      <IconComponent 
-        className={`w-4 h-4 ${showLabel ? 'mr-2' : ''} ${buttonState.spin ? 'animate-spin' : ''}`} 
+      <IconComponent
+        className={`w-4 h-4 ${showLabel ? 'mr-2' : ''} ${buttonState.spin ? 'animate-spin' : ''}`}
       />
       {showLabel && (
         <span className="text-xs">{buttonState.text}</span>

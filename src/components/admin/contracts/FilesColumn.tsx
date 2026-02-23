@@ -2,22 +2,36 @@
 import React from 'react'
 import { FileText, Download, CheckCircle, Clock, XCircle, Eye } from 'lucide-react'
 import FileDownloadButton from './FileDownloadButton'
-import { useContracts } from '../../../hooks/useContracts'
 import { ContractFile } from '../../../types/database'
 
 interface FilesColumnProps {
   contractId: string
   onFilesModalOpen?: () => void
   showButton?: boolean
+  // Fil-state från förälder (ContractsOverview)
+  contractFiles: { [contractId: string]: ContractFile[] }
+  filesLoading: { [contractId: string]: boolean }
+  downloadingFiles: { [fileId: string]: boolean }
+  viewingFiles: { [fileId: string]: boolean }
+  loadContractFiles: (contractId: string, forceRefresh?: boolean) => Promise<ContractFile[]>
+  hasContractFiles: (contractId: string) => boolean
+  viewContractFile: (contractId: string, fileId: string) => Promise<void>
+  downloadContractFile: (contractId: string, fileId: string) => Promise<void>
 }
 
-export default function FilesColumn({ 
-  contractId, 
+export default function FilesColumn({
+  contractId,
   onFilesModalOpen,
-  showButton = true 
+  showButton = true,
+  contractFiles,
+  filesLoading,
+  downloadingFiles,
+  viewingFiles,
+  loadContractFiles,
+  hasContractFiles,
+  viewContractFile,
+  downloadContractFile
 }: FilesColumnProps) {
-  const { contractFiles, filesLoading, downloadingFiles, viewingFiles, loadContractFiles, hasContractFiles, viewContractFile, downloadContractFile } = useContracts()
-  
   const currentFiles = contractFiles[contractId] || []
   const isLoading = filesLoading[contractId] || false
   const hasCachedFiles = hasContractFiles(contractId)
@@ -40,26 +54,26 @@ export default function FilesColumn({
       }
     }
 
-    // 🔧 FIX: Deduplikation för att förhindra "1/2 nedladdade" för enstaka filer
-    const deduplicatedFiles = currentFiles.filter((file, index, arr) => 
+    // Deduplikation för att förhindra "1/2 nedladdade" för enstaka filer
+    const deduplicatedFiles = currentFiles.filter((file, index, arr) =>
       arr.findIndex(f => f.oneflow_file_id === file.oneflow_file_id) === index
     )
 
-    const stats = deduplicatedFiles.reduce((stats, file) => {
-      stats.total++
+    const stats = deduplicatedFiles.reduce((acc, file) => {
+      acc.total++
       switch (file.download_status) {
         case 'completed':
-          stats.completed++
+          acc.completed++
           break
         case 'pending':
         case 'downloading':
-          stats.pending++
+          acc.pending++
           break
         case 'failed':
-          stats.failed++
+          acc.failed++
           break
       }
-      return stats
+      return acc
     }, { total: 0, completed: 0, pending: 0, failed: 0 })
 
     return stats
@@ -121,14 +135,14 @@ export default function FilesColumn({
   }
 
   const getStatusText = () => {
-    // 🔧 FIX: För enstaka filer - visa alltid ikoner (returnera null)
+    // För enstaka filer - visa alltid ikoner (returnera null)
     if (stats.total === 1) {
-      return null // Alltid visa ikoner för enstaka filer
+      return null
     }
 
     // Flera filer - visa korrekt sammanfattning
     if (stats.total === 0) return 'Inga filer'
-    
+
     if (stats.completed === stats.total) {
       return `${stats.total} nedladdade`
     }
@@ -148,7 +162,6 @@ export default function FilesColumn({
       await viewContractFile(contractId, fileId)
     } catch (error) {
       console.error('Fel vid visning av fil:', error)
-      // Förbättrad felhantering - visa inte toast här eftersom hook redan gör det
     }
   }
 
@@ -162,14 +175,14 @@ export default function FilesColumn({
   }
 
   const statusText = getStatusText()
-  const isSingleFile = stats.total === 1 // 🔧 FIX: Visa ikoner för ALLA enstaka filer, inte bara pending
+  const isSingleFile = stats.total === 1
 
   return (
     <div className="flex items-center justify-between gap-2">
       {/* Status indikator */}
       <div className="flex items-center gap-2 min-w-0">
         {isSingleFile ? (
-          // 🔧 FIX: Visa ikoner för ALLA enstaka filer med separerade loading states
+          // Visa ikoner för ALLA enstaka filer med separerade loading states
           <div className="flex items-center gap-1">
             <button
               onClick={() => handleViewFile(currentFiles[0].id, currentFiles[0].file_name)}
@@ -200,7 +213,7 @@ export default function FilesColumn({
           // Standard status för andra fall
           <>
             {getStatusIcon()}
-            <span 
+            <span
               className="text-xs text-slate-400 truncate cursor-pointer"
               onClick={onFilesModalOpen}
               title="Klicka för att se alla filer"
@@ -218,6 +231,12 @@ export default function FilesColumn({
           onFilesModalOpen={onFilesModalOpen}
           variant="ghost"
           size="sm"
+          contractFiles={contractFiles}
+          filesLoading={filesLoading}
+          downloadingFiles={downloadingFiles}
+          loadContractFiles={loadContractFiles}
+          downloadContractFile={downloadContractFile}
+          hasContractFiles={hasContractFiles}
         />
       )}
     </div>

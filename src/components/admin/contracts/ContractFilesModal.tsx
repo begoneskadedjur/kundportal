@@ -10,7 +10,6 @@ import {
   getDownloadStatusLabel,
   formatFileSize
 } from '../../../services/contractFilesService'
-import { useContracts } from '../../../hooks/useContracts'
 import toast from 'react-hot-toast'
 
 interface ContractFilesModalProps {
@@ -18,6 +17,12 @@ interface ContractFilesModalProps {
   onClose: () => void
   contractId: string | null
   contractName?: string
+  // Fil-state från förälder (ContractsOverview)
+  contractFiles: { [contractId: string]: ContractFile[] }
+  filesLoading: { [contractId: string]: boolean }
+  downloadingFiles: { [fileId: string]: boolean }
+  loadContractFiles: (contractId: string, forceRefresh?: boolean) => Promise<ContractFile[]>
+  downloadContractFile: (contractId: string, fileId: string) => Promise<void>
 }
 
 // Enstaka fil-komponent
@@ -79,15 +84,17 @@ const FileRow: React.FC<{
   )
 }
 
-export default function ContractFilesModal({ isOpen, onClose, contractId, contractName }: ContractFilesModalProps) {
-  const {
-    contractFiles,
-    filesLoading,
-    downloadingFiles,
-    loadContractFiles,
-    downloadContractFile
-  } = useContracts()
-
+export default function ContractFilesModal({
+  isOpen,
+  onClose,
+  contractId,
+  contractName,
+  contractFiles,
+  filesLoading,
+  downloadingFiles,
+  loadContractFiles,
+  downloadContractFile
+}: ContractFilesModalProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const currentContractFiles = contractId ? contractFiles[contractId] || [] : []
