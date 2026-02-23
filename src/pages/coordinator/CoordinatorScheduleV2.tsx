@@ -257,7 +257,10 @@ export default function CoordinatorScheduleV2() {
   // ─── Filtrerade ärenden ───
 
   const scheduledCases = useMemo(() => allCases.filter(isScheduledCase), [allCases])
-  const actionableCases = useMemo(() => allCases.filter(c => c.status === 'Offert signerad - boka in'), [allCases])
+  const actionableCases = useMemo(() =>
+    allCases.filter(c => c.status === 'Offert signerad - boka in' && c.oneflow_contract_id),
+    [allCases]
+  )
 
   // Hämta coordinator actions för "att boka in"-ärenden
   useEffect(() => {
