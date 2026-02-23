@@ -61,19 +61,19 @@ export function useContracts(): UseContractsReturn {
   const [viewingFiles, setViewingFiles] = useState<{ [fileId: string]: boolean }>({}) // 🆕 SEPARERAD STATE FÖR VIEW
   const [filesLoadedAt, setFilesLoadedAt] = useState<{ [contractId: string]: number }>({}) // Cache timestamp
   
-  // Contract list caching
+  // Contract list caching — använd ref för att undvika oändlig loop
   const [contractsLoadedAt, setContractsLoadedAt] = useState<number | null>(null)
-  const [contractsCache, setContractsCache] = useState<{ [filterKey: string]: { data: ContractWithSourceData[], timestamp: number } }>({})
+  const contractsCacheRef = useRef<{ [filterKey: string]: { data: ContractWithSourceData[], timestamp: number } }>({})
 
-  // Ladda kontrakt med filter (med caching)
+  // Ladda kontrakt med filter (med caching via ref)
   const loadContracts = useCallback(async (filters: ContractFilters = {}) => {
     const filterKey = JSON.stringify(filters)
-    
+
     try {
       // Skapa cache-nyckel baserat på filter
-      const cached = contractsCache[filterKey]
+      const cached = contractsCacheRef.current[filterKey]
       const isCached = cached && (Date.now() - cached.timestamp < 2 * 60 * 1000) // 2 minuter cache
-      
+
       // Använd cache om tillgängligt
       if (isCached && cached.data) {
         setContracts(cached.data)
@@ -81,31 +81,31 @@ export function useContracts(): UseContractsReturn {
         setLoading(false)
         return
       }
-      
+
       // Förhindra multipla samtidiga requests för samma filter
       if (loadingRef.current.has(filterKey)) {
         return
       }
-      
+
       setLoading(true)
       setError(null)
       loadingRef.current.add(filterKey) // Mark as loading
-      
+
       const contractList = await ContractService.getContracts(filters)
       setContracts(contractList)
       setCurrentFilters(filters)
       currentFiltersRef.current = filters
-      
-      // Uppdatera cache
-      setContractsCache(prev => ({
-        ...prev,
+
+      // Uppdatera cache via ref (ingen state-uppdatering → ingen re-render-loop)
+      contractsCacheRef.current = {
+        ...contractsCacheRef.current,
         [filterKey]: {
           data: contractList,
           timestamp: Date.now()
         }
-      }))
+      }
       setContractsLoadedAt(Date.now())
-      
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Okänt fel vid hämtning av kontrakt'
       setError(errorMessage)
@@ -116,7 +116,7 @@ export function useContracts(): UseContractsReturn {
         loadingRef.current.delete(filterKey) // Remove from loading set
       }
     }
-  }, [contractsCache]) // Lägg till contractsCache som dependency
+  }, []) // Stabil referens — cache läses via ref
 
   // Ladda kontraktstatistik
   const loadContractStats = useCallback(async (filters: Pick<ContractFilters, 'date_from' | 'date_to'> = {}) => {
@@ -435,7 +435,7 @@ export function useContracts(): UseContractsReturn {
   // Refresh kontrakt (rensa cache och ladda om)
   const refreshContracts = useCallback(async () => {
     // Rensa cache för att tvinga ny hämtning
-    setContractsCache({})
+    contractsCacheRef.current = {}
     setFilesLoadedAt({}) // Rensa även filcache
     setContractFiles({})
     

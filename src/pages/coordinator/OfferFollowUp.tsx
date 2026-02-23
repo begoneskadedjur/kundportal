@@ -40,15 +40,11 @@ export default function OfferFollowUp() {
       if (isRefresh) setRefreshing(true)
       else setLoading(true)
 
-      const [offersData, kpisData, statsData] = await Promise.all([
-        OfferFollowUpService.getFollowUpOffers(technicianEmail),
-        OfferFollowUpService.getKPIs(),
-        isCoordinator ? OfferFollowUpService.getTechnicianStats() : Promise.resolve([]),
-      ])
+      const data = await OfferFollowUpService.getDashboardData(technicianEmail)
 
-      setOffers(offersData)
-      setKpis(kpisData)
-      setTechStats(statsData)
+      setOffers(data.offers)
+      setKpis(data.kpis)
+      setTechStats(data.techStats)
     } catch (err) {
       console.error('OfferFollowUp fetch error:', err)
     } finally {

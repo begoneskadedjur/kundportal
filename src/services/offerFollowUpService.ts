@@ -44,6 +44,12 @@ export interface FollowUpKPIs {
   avg_days_to_sign: number
 }
 
+export interface DashboardData {
+  offers: FollowUpOffer[]
+  kpis: FollowUpKPIs
+  techStats: TechnicianOfferStats[]
+}
+
 export type FollowUpStatusFilter = 'all' | 'pending' | 'overdue' | 'signed' | 'declined'
 export type FollowUpSortBy = 'oldest' | 'newest' | 'value_desc' | 'technician'
 
@@ -53,49 +59,58 @@ const OFFER_COLUMNS = `
   begone_employee_email, created_at, updated_at
 `
 
+const EMPTY_KPIS: FollowUpKPIs = {
+  total_pending: 0, total_pending_value: 0,
+  total_overdue: 0, total_overdue_value: 0,
+  sign_rate: 0, avg_days_to_sign: 0,
+}
+
 export class OfferFollowUpService {
-  /** Hämta alla offerter/avtal för uppföljning, med tekniker-koppling */
-  static async getFollowUpOffers(technicianEmail?: string): Promise<FollowUpOffer[]> {
-    let query = supabase
+  /**
+   * Hämta all dashboard-data i EN runda (1 contracts-query, 1 tekniker-query, 1 kommentar-query).
+   * Beräknar offers, KPIs och techStats lokalt.
+   */
+  static async getDashboardData(technicianEmail?: string): Promise<DashboardData> {
+    // 1) Hämta alla relevanta kontrakt
+    const { data: allContracts, error: contractsError } = await supabase
       .from('contracts')
       .select(OFFER_COLUMNS)
       .in('status', ['pending', 'overdue', 'signed', 'declined'])
       .order('created_at', { ascending: true })
 
-    if (technicianEmail) {
-      query = query.ilike('begone_employee_email', technicianEmail)
+    if (contractsError) throw contractsError
+    if (!allContracts || allContracts.length === 0) {
+      return { offers: [], kpis: EMPTY_KPIS, techStats: [] }
     }
 
-    const { data: offers, error } = await query
-    if (error) throw error
-    if (!offers || offers.length === 0) return []
-
-    // Hämta alla tekniker för att mappa email → tekniker
+    // 2) Hämta tekniker (en query)
     const { data: technicians } = await supabase
       .from('technicians')
-      .select('id, name, email')
+      .select('id, name, email, role')
       .eq('is_active', true)
 
-    const techByEmail = new Map<string, { id: string; name: string }>()
+    const techByEmail = new Map<string, { id: string; name: string; role: string }>()
     for (const t of technicians || []) {
-      if (t.email) techByEmail.set(t.email.toLowerCase(), { id: t.id, name: t.name })
+      if (t.email) techByEmail.set(t.email.toLowerCase(), { id: t.id, name: t.name, role: t.role || '' })
     }
 
-    // Kolla vilka kontrakt som har kommentarer (via oneflow_sync_log)
-    const contractIds = offers.map(o => o.oneflow_contract_id).filter(Boolean)
-    const { data: commentEvents } = await supabase
-      .from('oneflow_sync_log')
-      .select('contract_id')
-      .in('contract_id', contractIds)
-      .ilike('event_type', '%comment%')
+    // 3) Kolla vilka kontrakt som har kommentarer
+    const contractIds = allContracts.map(o => o.oneflow_contract_id).filter(Boolean)
+    const { data: commentEvents } = contractIds.length > 0
+      ? await supabase
+          .from('oneflow_sync_log')
+          .select('oneflow_contract_id')
+          .in('oneflow_contract_id', contractIds)
+          .like('event_type', '%comment%')
+      : { data: [] }
 
-    const hasCommentsSet = new Set((commentEvents || []).map(e => e.contract_id))
+    const hasCommentsSet = new Set((commentEvents || []).map(e => e.oneflow_contract_id))
 
+    // === Beräkna offers ===
     const now = Date.now()
-    return offers.map(o => {
+    const allOffers: FollowUpOffer[] = allContracts.map(o => {
       const email = o.begone_employee_email?.toLowerCase() || ''
       const tech = techByEmail.get(email) || null
-
       return {
         ...o,
         technician_id: tech?.id || null,
@@ -104,71 +119,19 @@ export class OfferFollowUpService {
         has_comments: hasCommentsSet.has(o.oneflow_contract_id),
       }
     })
-  }
 
-  /** Hämta statistik per tekniker */
-  static async getTechnicianStats(): Promise<TechnicianOfferStats[]> {
-    const { data: technicians } = await supabase
-      .from('technicians')
-      .select('id, name, email')
-      .eq('is_active', true)
-      .eq('role', 'Skadedjurstekniker')
+    // Filtrera per tekniker om det behövs
+    const offers = technicianEmail
+      ? allOffers.filter(o => o.begone_employee_email?.toLowerCase() === technicianEmail.toLowerCase())
+      : allOffers
 
-    if (!technicians || technicians.length === 0) return []
+    // === Beräkna KPIs (alltid på alla kontrakt, inte filtrerade) ===
+    const pendingContracts = allContracts.filter(c => c.status === 'pending')
+    const overdueContracts = allContracts.filter(c => c.status === 'overdue')
+    const signedContracts = allContracts.filter(c => c.status === 'signed')
+    const totalCount = allContracts.length
 
-    const { data: contracts } = await supabase
-      .from('contracts')
-      .select('begone_employee_email, status, total_value')
-      .in('status', ['pending', 'overdue', 'signed', 'declined'])
-
-    if (!contracts) return []
-
-    return technicians.map(t => {
-      const email = t.email?.toLowerCase() || ''
-      const myContracts = contracts.filter(c =>
-        c.begone_employee_email?.toLowerCase() === email
-      )
-
-      const pending = myContracts.filter(c => c.status === 'pending').length
-      const overdue = myContracts.filter(c => c.status === 'overdue').length
-      const signed = myContracts.filter(c => c.status === 'signed').length
-      const declined = myContracts.filter(c => c.status === 'declined').length
-      const total = pending + overdue + signed + declined
-      const pipelineValue = myContracts
-        .filter(c => c.status === 'pending' || c.status === 'overdue')
-        .reduce((sum, c) => sum + (Number(c.total_value) || 0), 0)
-
-      return {
-        technician_id: t.id,
-        technician_name: t.name,
-        technician_email: email,
-        pending,
-        overdue,
-        signed,
-        declined,
-        total_pipeline_value: pipelineValue,
-        sign_rate: total > 0 ? Math.round((signed / total) * 100) : 0,
-      }
-    }).filter(t => t.pending + t.overdue + t.signed + t.declined > 0)
-      .sort((a, b) => (b.pending + b.overdue) - (a.pending + a.overdue))
-  }
-
-  /** Beräkna övergripande KPI:er */
-  static async getKPIs(): Promise<FollowUpKPIs> {
-    const { data: contracts } = await supabase
-      .from('contracts')
-      .select('status, total_value, created_at, updated_at')
-      .in('status', ['pending', 'overdue', 'signed', 'declined'])
-
-    if (!contracts) return { total_pending: 0, total_pending_value: 0, total_overdue: 0, total_overdue_value: 0, sign_rate: 0, avg_days_to_sign: 0 }
-
-    const pending = contracts.filter(c => c.status === 'pending')
-    const overdue = contracts.filter(c => c.status === 'overdue')
-    const signed = contracts.filter(c => c.status === 'signed')
-    const total = contracts.length
-
-    // Snitt dagar till signering (för signerade kontrakt)
-    const signedDays = signed.map(c => {
+    const signedDays = signedContracts.map(c => {
       const created = new Date(c.created_at).getTime()
       const updated = new Date(c.updated_at).getTime()
       return Math.floor((updated - created) / (1000 * 60 * 60 * 24))
@@ -177,14 +140,49 @@ export class OfferFollowUpService {
       ? Math.round(signedDays.reduce((a, b) => a + b, 0) / signedDays.length)
       : 0
 
-    return {
-      total_pending: pending.length,
-      total_pending_value: pending.reduce((sum, c) => sum + (Number(c.total_value) || 0), 0),
-      total_overdue: overdue.length,
-      total_overdue_value: overdue.reduce((sum, c) => sum + (Number(c.total_value) || 0), 0),
-      sign_rate: total > 0 ? Math.round((signed.length / total) * 100) : 0,
+    const kpis: FollowUpKPIs = {
+      total_pending: pendingContracts.length,
+      total_pending_value: pendingContracts.reduce((sum, c) => sum + (Number(c.total_value) || 0), 0),
+      total_overdue: overdueContracts.length,
+      total_overdue_value: overdueContracts.reduce((sum, c) => sum + (Number(c.total_value) || 0), 0),
+      sign_rate: totalCount > 0 ? Math.round((signedContracts.length / totalCount) * 100) : 0,
       avg_days_to_sign: avgDays,
     }
+
+    // === Beräkna techStats (bara Skadedjurstekniker) ===
+    const techStats: TechnicianOfferStats[] = (technicians || [])
+      .filter(t => t.role === 'Skadedjurstekniker')
+      .map(t => {
+        const email = t.email?.toLowerCase() || ''
+        const myContracts = allContracts.filter(c =>
+          c.begone_employee_email?.toLowerCase() === email
+        )
+
+        const pending = myContracts.filter(c => c.status === 'pending').length
+        const overdue = myContracts.filter(c => c.status === 'overdue').length
+        const signed = myContracts.filter(c => c.status === 'signed').length
+        const declined = myContracts.filter(c => c.status === 'declined').length
+        const total = pending + overdue + signed + declined
+        const pipelineValue = myContracts
+          .filter(c => c.status === 'pending' || c.status === 'overdue')
+          .reduce((sum, c) => sum + (Number(c.total_value) || 0), 0)
+
+        return {
+          technician_id: t.id,
+          technician_name: t.name,
+          technician_email: email,
+          pending,
+          overdue,
+          signed,
+          declined,
+          total_pipeline_value: pipelineValue,
+          sign_rate: total > 0 ? Math.round((signed / total) * 100) : 0,
+        }
+      })
+      .filter(t => t.pending + t.overdue + t.signed + t.declined > 0)
+      .sort((a, b) => (b.pending + b.overdue) - (a.pending + a.overdue))
+
+    return { offers, kpis, techStats }
   }
 
   /** Hämta kommentarer för ett kontrakt (via API-proxy) */
