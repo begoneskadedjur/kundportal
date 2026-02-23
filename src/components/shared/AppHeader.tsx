@@ -18,6 +18,7 @@ import {
   Shield,
   Wrench,
   Check,
+  FileSignature,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
@@ -47,6 +48,7 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Dashboard', path: '/technician/dashboard', icon: LayoutDashboard },
     { label: 'Schema', path: '/technician/schedule', icon: Calendar },
     { label: 'Mina ärenden', path: '/technician/cases', icon: Search },
+    { label: 'Mina offerter', path: '/technician/offer-follow-up', icon: FileSignature },
     { label: 'Tickets', path: '/technician/tickets', icon: MessageSquareText },
     { label: 'Lär dig systemet', path: '/admin/larosate', icon: GraduationCap },
   ],

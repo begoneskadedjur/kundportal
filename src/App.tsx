@@ -60,6 +60,7 @@ import CoordinatorScheduleV2 from './pages/coordinator/CoordinatorScheduleV2';
 import ScheduleOptimizer from './pages/coordinator/ScheduleOptimizer';
 import CaseSearch from './pages/coordinator/CaseSearch';
 import CasePipeline from './pages/coordinator/CasePipeline';
+import OfferFollowUp from './pages/coordinator/OfferFollowUp';
 import CoordinatorAnalytics from './pages/coordinator/CoordinatorAnalytics';
 
 // TEKNIKER PAGES
@@ -221,6 +222,7 @@ function App() {
               <Route path="forsaljningsmojligheter" element={<ProtectedRoute requiredRole="koordinator"><SalesOpportunities /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole="koordinator"><Leads /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="koordinator"><LeadAnalytics /></ProtectedRoute>} />
+              <Route path="offertuppfoljning" element={<ProtectedRoute requiredRole="koordinator"><OfferFollowUp /></ProtectedRoute>} />
 
               {/* Fakturering */}
               <Route path="fakturering" element={<ProtectedRoute requiredRole="koordinator"><InvoicingPage /></ProtectedRoute>} />
@@ -313,6 +315,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="technician">
                   <OneflowContractCreator />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/technician/offer-follow-up"
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <OfferFollowUp />
                 </ProtectedRoute>
               }
             />
