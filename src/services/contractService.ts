@@ -162,36 +162,12 @@ export class ContractService {
 
 
 
-      // Hämta källdata för kontrakt som har source_id
-      const contractsWithSourceData = await Promise.all(
-        (data || []).map(async (contract) => {
-          let source_case_data = undefined
-          
-          if (contract.source_id && contract.source_type !== 'manual') {
-            try {
-              // Hämta källärendet baserat på source_type
-              const tableName = contract.source_type === 'private_case' ? 'private_cases' : 'business_cases'
-              const { data: sourceData } = await supabase
-                .from(tableName)
-                .select('title, case_number, clickup_task_id')
-                .eq('id', contract.source_id)
-                .single()
-              
-              if (sourceData) {
-                source_case_data = sourceData
-              }
-            } catch (sourceError) {
-              console.warn(`⚠️ Kunde inte hämta källdata för ${contract.id}:`, sourceError)
-            }
-          }
-
-          return {
-            ...contract,
-            source_case_data,
-            customer_data: contract.customers || undefined
-          } as ContractWithSourceData
-        })
-      )
+      // Mappa kontrakt till ContractWithSourceData (source_case_data ej använd i UI)
+      const contractsWithSourceData = (data || []).map(contract => ({
+        ...contract,
+        source_case_data: undefined,
+        customer_data: contract.customers || undefined,
+      } as ContractWithSourceData))
 
       // Deduplicate contracts baserat på oneflow_contract_id
       const uniqueContracts = contractsWithSourceData.reduce((acc: ContractWithSourceData[], current) => {
