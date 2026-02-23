@@ -19,7 +19,7 @@ export function TechnicianCards({ stats, selectedTechnician, onSelect }: Technic
   if (stats.length === 0) return null
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
       {stats.map(t => {
         const isSelected = selectedTechnician === t.technician_email
         const hasOverdue = t.overdue > 0
@@ -28,7 +28,7 @@ export function TechnicianCards({ stats, selectedTechnician, onSelect }: Technic
           <button
             key={t.technician_id}
             onClick={() => onSelect(isSelected ? null : t.technician_email)}
-            className={`p-3 rounded-xl border text-left transition-all ${
+            className={`p-3 rounded-xl border text-left transition-all min-w-[180px] max-w-[220px] flex-shrink-0 ${
               isSelected
                 ? 'bg-[#20c58f]/10 border-[#20c58f]/50 ring-1 ring-[#20c58f]/30'
                 : hasOverdue

@@ -149,9 +149,8 @@ export class OfferFollowUpService {
       avg_days_to_sign: avgDays,
     }
 
-    // === Beräkna techStats (bara Skadedjurstekniker) ===
+    // === Beräkna techStats (alla anställda med kontrakt) ===
     const techStats: TechnicianOfferStats[] = (technicians || [])
-      .filter(t => t.role === 'Skadedjurstekniker')
       .map(t => {
         const email = t.email?.toLowerCase() || ''
         const myContracts = allContracts.filter(c =>
