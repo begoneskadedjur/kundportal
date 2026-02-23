@@ -373,6 +373,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
   // Kommunikations-panel state
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
+  const [oneflowContractId, setOneflowContractId] = useState<string | null>(null)
 
   // Radering state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -629,6 +630,26 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       }
     }
   }, [caseData]);
+
+  // Slå upp kopplat Oneflow-kontrakt för kommunikationspanelen
+  useEffect(() => {
+    if (!caseData?.id || !caseData?.case_type) {
+      setOneflowContractId(null)
+      return
+    }
+    const sourceType = caseData.case_type === 'private' ? 'private_case' : caseData.case_type === 'business' ? 'business_case' : null
+    if (!sourceType) { setOneflowContractId(null); return }
+
+    supabase
+      .from('contracts')
+      .select('oneflow_contract_id')
+      .eq('source_id', caseData.id)
+      .eq('source_type', sourceType)
+      .not('oneflow_contract_id', 'is', null)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setOneflowContractId(data?.oneflow_contract_id || null))
+  }, [caseData?.id, caseData?.case_type])
 
   const getTableName = () => {
     if (!currentCase) return null;
@@ -1633,6 +1654,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           caseId={currentCase.id}
           caseType={currentCase.case_type as CaseType}
           caseTitle={currentCase.title}
+          oneflowContractId={oneflowContractId || undefined}
+          senderEmail={profile?.technicians?.email || undefined}
         />
       )}
 

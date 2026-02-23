@@ -2438,6 +2438,8 @@ export default function EditContractCaseModal({
           caseId={caseData?.id || ''}
           caseType={'contract' as CaseType}
           caseTitle={formData.title || caseData?.title || 'Avtalsärende'}
+          oneflowContractId={caseData?.oneflow_contract_id || undefined}
+          senderEmail={profile?.technicians?.email || undefined}
         />
       )}
 

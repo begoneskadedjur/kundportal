@@ -1,9 +1,10 @@
 // src/components/communication/CommunicationSlidePanel.tsx
 // Slide-in panel för kommunikation i ärenden
 
-import React, { useEffect, useRef } from 'react';
-import { X, MessageSquare } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, MessageSquare, FileSignature } from 'lucide-react';
 import CommentSection from './CommentSection';
+import { CommentThread } from '../coordinator/follow-up/CommentThread';
 import { CaseType } from '../../types/communication';
 
 interface CommunicationSlidePanelProps {
@@ -12,6 +13,8 @@ interface CommunicationSlidePanelProps {
   caseId: string;
   caseType: CaseType;
   caseTitle: string;
+  oneflowContractId?: string;
+  senderEmail?: string;
 }
 
 export default function CommunicationSlidePanel({
@@ -20,8 +23,11 @@ export default function CommunicationSlidePanel({
   caseId,
   caseType,
   caseTitle,
+  oneflowContractId,
+  senderEmail,
 }: CommunicationSlidePanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<'internal' | 'oneflow'>('internal');
 
   // Stäng panel vid klick utanför
   useEffect(() => {
@@ -112,14 +118,49 @@ export default function CommunicationSlidePanel({
           </button>
         </div>
 
-        {/* Content - REDESIGN: Tightare padding */}
+        {/* Flikar — visas bara om ärendet har kopplat Oneflow-kontrakt */}
+        {oneflowContractId && (
+          <div className="flex-shrink-0 flex gap-1 px-3 py-2 border-b border-slate-800">
+            <button
+              onClick={() => setActiveTab('internal')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === 'internal'
+                  ? 'bg-[#20c58f] text-white'
+                  : 'bg-slate-800/50 text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <MessageSquare className="w-3 h-3" />
+              Intern
+            </button>
+            <button
+              onClick={() => setActiveTab('oneflow')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === 'oneflow'
+                  ? 'bg-[#20c58f] text-white'
+                  : 'bg-slate-800/50 text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <FileSignature className="w-3 h-3" />
+              Oneflow
+            </button>
+          </div>
+        )}
+
+        {/* Content */}
         <div className="flex-1 min-h-0 flex flex-col px-3 pt-3 pb-3">
-          <CommentSection
-            caseId={caseId}
-            caseType={caseType}
-            caseTitle={caseTitle}
-            compact={true}
-          />
+          {activeTab === 'internal' || !oneflowContractId ? (
+            <CommentSection
+              caseId={caseId}
+              caseType={caseType}
+              caseTitle={caseTitle}
+              compact={true}
+            />
+          ) : (
+            <CommentThread
+              contractId={oneflowContractId}
+              senderEmail={senderEmail}
+            />
+          )}
         </div>
       </div>
     </>
