@@ -10,42 +10,7 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 import { ClickUpStatus } from '../../types/database'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
-
-// Generate case number for organization cases
-const generateCaseNumber = async (): Promise<string> => {
-  try {
-    const today = new Date()
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
-    
-    // Get the latest case number for today
-    const { data, error } = await supabase
-      .from('cases')
-      .select('case_number')
-      .like('case_number', `CASE-${dateStr}-%`)
-      .order('case_number', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      throw error
-    }
-
-    let nextNumber = 1
-    
-    if (data?.case_number) {
-      const match = data.case_number.match(/CASE-\d{8}-(\d+)/)
-      if (match) {
-        nextNumber = parseInt(match[1], 10) + 1
-      }
-    }
-
-    return `CASE-${dateStr}-${String(nextNumber).padStart(3, '0')}`
-  } catch (error) {
-    console.error('Error generating case number:', error)
-    // Fallback to timestamp-based number
-    return `CASE-${Date.now()}`
-  }
-}
+import { CaseNumberService } from '../../services/caseNumberService'
 
 interface OrganizationServiceRequestProps {
   isOpen: boolean
@@ -137,7 +102,7 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
       const chosenSite = sites.find(s => s.id === chosenSiteId)
       
       // Generate case number
-      const caseNumber = await generateCaseNumber()
+      const caseNumber = await CaseNumberService.generateCaseNumber()
       
       // Skapa ärendet i 'cases' tabellen för organisationskunder
       const { data, error } = await supabase

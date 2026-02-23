@@ -99,12 +99,11 @@ interface BookingResponse {
   error?: string
 }
 
-// Generate unique case number
-function generateCaseNumber(caseType: 'private' | 'business'): string {
-  const prefix = caseType === 'private' ? 'PR' : 'BU'
-  const timestamp = Date.now().toString(36).toUpperCase()
-  const random = Math.random().toString(36).substr(2, 4).toUpperCase()
-  return `${prefix}-${timestamp}-${random}`
+// Generate universal case number (BE-XXXXXXX) via Supabase RPC
+async function generateCaseNumber(): Promise<string> {
+  const { data, error } = await supabase.rpc('generate_universal_case_number')
+  if (error || !data) throw new Error(`Kunde inte generera ärendenummer: ${error?.message}`)
+  return data
 }
 
 // Validate required fields
@@ -232,7 +231,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Generate case number and prepare data
     console.log('[AI Booking] Generating case number...')
-    const caseNumber = generateCaseNumber(bookingData.case_type)
+    const caseNumber = await generateCaseNumber()
     const timestamp = new Date().toISOString()
     console.log('[AI Booking] Generated case number:', caseNumber)
     

@@ -103,8 +103,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       assigned_technician: assignedTechnician?.name || 'Ingen tilldelad'
     })
 
-    // 3. Generera case number
-    const caseNumber = `${customer.company_name.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`
+    // 3. Generera universellt ärendenummer (BE-XXXXXXX)
+    const { data: caseNumber, error: rpcError } = await supabase.rpc('generate_universal_case_number')
+    if (rpcError || !caseNumber) {
+      console.error('Failed to generate case number:', rpcError)
+      return res.status(500).json({ error: 'Kunde inte generera ärendenummer' })
+    }
 
     // 4. Förbered beskrivning med extra info
     let fullDescription = description

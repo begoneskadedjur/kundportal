@@ -184,11 +184,12 @@ async function importListTasks(
           const caseData = mapTaskToDatabase(task, tableName)
           
           if (existing && forceReimport) {
-            // Uppdatera befintligt ärende med ny status-mappning
+            // Uppdatera befintligt ärende — bevara befintligt case_number
+            const { case_number, ...updateData } = caseData
             const { error: updateError } = await supabase
               .from(tableName)
               .update({
-                ...caseData,
+                ...updateData,
                 updated_at: new Date().toISOString()
               })
               .eq('clickup_task_id', task.id)
@@ -201,7 +202,12 @@ async function importListTasks(
               stats.imported++
             }
           } else {
-            // Insertera nytt ärende
+            // Insertera nytt ärende — generera universellt BE-nummer
+            const { data: beNumber, error: rpcError } = await supabase.rpc('generate_universal_case_number')
+            if (!rpcError && beNumber) {
+              caseData.case_number = beNumber
+              console.log(`🆕 Generated BE-number ${beNumber} for import task ${task.id}`)
+            }
             const { error: insertError } = await supabase
               .from(tableName)
               .insert(caseData)

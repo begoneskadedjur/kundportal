@@ -2,6 +2,7 @@
 // ENKEL SYNC SERVICE SOM ANVÄNDER BEFINTLIGA KOMPONENTER
 
 import { supabase } from '../lib/supabase'
+import { CaseNumberService } from './caseNumberService'
 import { ClickUpClient } from './clickup/client'
 import { 
   convertSupabaseToClickUp,
@@ -222,11 +223,12 @@ class ClickUpSyncService {
         .single()
 
       if (existingCase) {
-        // Uppdatera befintligt case
+        // Uppdatera befintligt case — bevara befintligt case_number
+        const { case_number, ...updateFields } = supabaseData
         const { error: updateError } = await supabase
           .from(tableName)
           .update({
-            ...supabaseData,
+            ...updateFields,
             updated_at: new Date().toISOString()
           })
           .eq('clickup_task_id', taskId)
@@ -235,7 +237,15 @@ class ClickUpSyncService {
           return { success: false, error: `Failed to update case: ${updateError.message}` }
         }
       } else {
-        // Skapa nytt case
+        // Skapa nytt case — generera universellt BE-nummer
+        try {
+          const beNumber = await CaseNumberService.generateCaseNumber()
+          supabaseData.case_number = beNumber
+          console.log(`[ClickUpSync] Generated BE-number ${beNumber} for new task ${taskId}`)
+        } catch (numError) {
+          console.error('[ClickUpSync] Failed to generate case number:', numError)
+        }
+
         const { error: insertError } = await supabase
           .from(tableName)
           .insert(supabaseData)

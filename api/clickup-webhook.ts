@@ -251,7 +251,24 @@ async function syncCustomerTaskFromClickUp(taskId: string, customerId: string) {
     }
 
     const caseData = mapClickUpTaskToCustomerCaseData(taskData, customerId)
-    
+
+    // Kolla om ärendet redan finns — bevara befintligt case_number vid uppdatering
+    const { data: existingCase } = await supabase
+      .from('cases')
+      .select('id, case_number')
+      .eq('clickup_task_id', taskId)
+      .single()
+
+    if (existingCase) {
+      delete caseData.case_number
+    } else {
+      const { data: beNumber, error: rpcError } = await supabase.rpc('generate_universal_case_number')
+      if (!rpcError && beNumber) {
+        caseData.case_number = beNumber
+        console.log(`🆕 Generated BE-number ${beNumber} for new customer task ${taskId}`)
+      }
+    }
+
     const { error } = await supabase
       .from('cases')
       .upsert(caseData, {
@@ -283,7 +300,7 @@ async function syncBeGoneTaskFromClickUp(taskId: string, tableName: 'private_cas
     }
 
     const caseData = mapClickUpTaskToBeGoneCaseData(taskData, tableName)
-    
+
     // 🆕 EXTRA LOGGING FÖR COMMISSION
     if (caseData.commission_amount) {
       console.log(`🏆 NEW COMMISSION RECORDED:`, {
@@ -294,7 +311,24 @@ async function syncBeGoneTaskFromClickUp(taskId: string, tableName: 'private_cas
         price: taskData.custom_fields?.find((f: any) => f.name.toLowerCase() === 'pris')?.value
       })
     }
-    
+
+    // Kolla om ärendet redan finns — bevara befintligt case_number vid uppdatering
+    const { data: existingCase } = await supabase
+      .from(tableName)
+      .select('id, case_number')
+      .eq('clickup_task_id', taskId)
+      .single()
+
+    if (existingCase) {
+      delete caseData.case_number
+    } else {
+      const { data: beNumber, error: rpcError } = await supabase.rpc('generate_universal_case_number')
+      if (!rpcError && beNumber) {
+        caseData.case_number = beNumber
+        console.log(`🆕 Generated BE-number ${beNumber} for new BeGone task ${taskId}`)
+      }
+    }
+
     const { error } = await supabase
       .from(tableName)
       .upsert(caseData, {
