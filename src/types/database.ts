@@ -309,6 +309,7 @@ export type Database = {
           skicka_erbjudande: string | null
           vaggloss_angade_rum: string | null
           bestallare: string | null
+          company_name: string | null
           pris: number | null
           filer: any | null // JSONB
           annat_skadedjur: string | null
@@ -991,6 +992,7 @@ export type BusinessCasesUpdate = Database['public']['Tables']['business_cases']
 export type BeGoneCaseRow = (PrivateCasesRow | BusinessCasesRow) & {
   parent_customer_id?: string | null  // För multisite-enheter
   oneflow_contract_id?: string | null // Koppling till Oneflow-offert (för contract cases)
+  company_name?: string | null // Företagsnamn (business_cases + contract via adaptCaseToBeGoneRow)
 }
 
 // Befintliga hjälptyper

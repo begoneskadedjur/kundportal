@@ -50,9 +50,10 @@ const getTeamEfficiencyInfo = (score: number): { label: string; color: string } 
 interface CreateCaseModalProps {
   isOpen: boolean; onClose: () => void; onSuccess: () => void;
   technicians: Technician[]; initialCaseData?: BeGoneCaseRow | null;
+  initialCaseType?: 'private' | 'business' | 'contract' | 'inspection' | null;
 }
 
-export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData }: CreateCaseModalProps) {
+export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
   const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
@@ -79,6 +80,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     total_value: number | null;
   } | null>(null);
   const [offerExpanded, setOfferExpanded] = useState(true);
+  const [generatedCaseNumber, setGeneratedCaseNumber] = useState<string | null>(null);
 
   // ClickUp sync hook
   const { syncAfterCreate } = useClickUpSync();
@@ -93,6 +95,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setExistingImages([]);
     setOfferDetails(null);
     setOfferExpanded(true);
+    setGeneratedCaseNumber(null);
     // Städa upp bildförhandsvisningar
     setSelectedImages(prev => {
       prev.forEach(img => URL.revokeObjectURL(img.preview));
@@ -230,10 +233,27 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       setStep('form');
       const assignedCount = [initialCaseData.primary_assignee_id, initialCaseData.secondary_assignee_id, initialCaseData.tertiary_assignee_id].filter(Boolean).length;
       setNumberOfTechnicians(assignedCount > 0 ? assignedCount : 1);
+    } else if (isOpen && initialCaseType) {
+      // Dropdown-val: hoppa direkt till formuläret med vald typ
+      handleReset();
+      setCaseType(initialCaseType);
+      setStep('form');
     } else if (isOpen) {
       handleReset();
     }
-  }, [isOpen, initialCaseData, handleReset]);
+  }, [isOpen, initialCaseData, initialCaseType, handleReset]);
+
+  // Generera ärendenummer direkt vid formuläröppning (nya ärenden)
+  useEffect(() => {
+    if (step !== 'form' || initialCaseData || generatedCaseNumber) return;
+    let cancelled = false;
+    CaseNumberService.generateCaseNumber().then(num => {
+      if (cancelled) return;
+      setGeneratedCaseNumber(num);
+      setFormData(prev => ({ ...prev, title: prev.title || num }));
+    }).catch(err => console.error('Kunde inte generera ärendenummer:', err));
+    return () => { cancelled = true };
+  }, [step, initialCaseData, generatedCaseNumber]);
 
   // Separat useEffect för tekniker-förval - hanterar timing-problem med asynkron laddning
   useEffect(() => {
@@ -557,8 +577,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       return toast.error("Du måste välja en ärendetyp.");
     }
 
-    if (caseType !== 'inspection' && !formData.title) {
-      return toast.error("Ärendetitel måste vara ifylld.");
+    // Företagsnamn krävs för business-ärenden
+    if (caseType === 'business' && !formData.company_name?.trim()) {
+      return toast.error("Företagsnamn måste vara ifyllt.");
     }
 
     if (!formData.start_date || !formData.due_date || !formData.primary_assignee_id) {
@@ -579,8 +600,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setError(null);
 
     try {
-      // Generera universellt ärendenummer
-      const caseNumber = await CaseNumberService.generateCaseNumber();
+      // Använd det förgenererade ärendenumret, eller generera nytt om det saknas
+      const caseNumber = generatedCaseNumber || await CaseNumberService.generateCaseNumber();
 
       if (caseType === 'inspection') {
         // Hantera stationskontroll-ärenden
@@ -596,8 +617,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : customer;
         const customerName = customerForTitle?.company_name || 'Okänd kund';
 
-        // Använd manuellt inmatad titel eller auto-generera
-        const inspectionTitle = formData.title?.trim() || `Stationskontroll - ${customerName}`;
+        // Använd ärendenumret som titel (auto-genererat)
+        const inspectionTitle = formData.title?.trim() || caseNumber;
 
         // Skapa case-ärende först
         const caseData = {
@@ -694,8 +715,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : customer;
         const customerName = customerForTitle?.company_name || 'Okänd kund';
 
-        // Använd manuellt inmatad titel eller auto-generera från kundnamn
-        const contractTitle = formData.title?.trim() || customerName;
+        // Använd ärendenumret som titel (auto-genererat)
+        const contractTitle = formData.title?.trim() || caseNumber;
 
         const caseData = {
           customer_id: actualCustomerId, // Använd rätt customer_id (site eller huvudkund)
@@ -756,7 +777,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         } else {
           const { data, error } = await supabase.from(tableName).insert([{
             ...formData,
-            title: formData.title.trim(),
+            title: formData.title?.trim() || caseNumber,
             clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             case_number: caseNumber
           }]).select('id');
@@ -879,7 +900,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           )}
           {step === 'form' && (
             <form id="create-case-form" onSubmit={handleSubmit} className="space-y-6">
-              {!initialCaseData && (
+              {!initialCaseData && !initialCaseType && (
                 <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><ChevronLeft className="w-4 h-4" /> Byt kundtyp</Button>
               )}
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3"><AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" /><p className="text-red-400">{error}</p></div>)}
@@ -1477,10 +1498,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       {caseType === 'private' ? (
                           <Input label="Personnummer *" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} required />
                       ) : (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />
-                            <Input label="Beställare" name="bestallare" value={formData.bestallare || ''} onChange={handleChange} />
-                          </div>
+                          <>
+                            <Input label="Företagsnamn *" name="company_name" value={(formData as any).company_name || ''} onChange={handleChange} required />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />
+                              <Input label="Beställare" name="bestallare" value={formData.bestallare || ''} onChange={handleChange} />
+                            </div>
+                          </>
                       )}
                   </div>
                   <div className="space-y-4">
@@ -1497,7 +1521,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   </div>
                   <div className="space-y-4">
                        <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2"><Briefcase size={16}/> Ärendeinformation</h4>
-                       <Input label="Ärendetitel (auto-ifylls från namn)" name="title" value={formData.title || ''} onChange={handleChange} required />
+                       <Input label="Ärendetitel" name="title" value={formData.title || ''} onChange={handleChange} />
                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={3} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" placeholder="Kort om ärendet, portkod, etc."/></div>
                        {caseType === 'business' && (<Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />)}
                   </div>

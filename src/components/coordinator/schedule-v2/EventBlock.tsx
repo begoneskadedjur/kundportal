@@ -40,7 +40,8 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
   const startStr = formatTime(start)
   const endStr = formatTime(end)
   const isContract = caseData.case_type === 'contract'
-  const displayName = caseData.bestallare || caseData.kontaktperson || caseData.title || ''
+  const displayName = caseData.company_name || caseData.bestallare || caseData.kontaktperson || caseData.title || ''
+  const caseNum = caseData.case_number
   const addr = shortAddress(caseData.adress)
   const isWeek = viewMode === 'week'
   const showSecondLine = !isWeek && !isCompact && width > 150
@@ -78,10 +79,10 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
           )}
         </div>
 
-        {/* Rad 2 (om bredd och höjd tillåter): skadedjur + adress */}
-        {showSecondLine && (caseData.skadedjur || addr) && (
+        {/* Rad 2 (om bredd och höjd tillåter): ärendenummer · skadedjur · adress */}
+        {showSecondLine && (caseNum || caseData.skadedjur || addr) && (
           <p className={`text-[10px] truncate mt-0.5 ${style.text} opacity-60`}>
-            {[caseData.skadedjur, addr].filter(Boolean).join(' · ')}
+            {[caseNum, caseData.skadedjur, addr].filter(Boolean).join(' · ')}
           </p>
         )}
       </div>

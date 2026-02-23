@@ -1,6 +1,6 @@
 // ScheduleHeader.tsx — Header med datumnavigation, vy-växlare, filter och knappar
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, FileText, CalendarOff, SlidersHorizontal } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, FileText, CalendarOff, SlidersHorizontal, User, Building, FileCheck, ClipboardCheck } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import Button from '../../ui/Button'
 import { StatusLegend } from './StatusLegend'
@@ -10,13 +10,14 @@ import { ScheduleFilterPopover } from './ScheduleFilterPopover'
 import type { Technician } from '../../../types/database'
 
 export type ViewMode = 'day' | 'week'
+export type CaseType = 'private' | 'business' | 'contract' | 'inspection'
 
 interface ScheduleHeaderProps {
   currentDate: Date
   viewMode: ViewMode
   onChangeDate: (date: Date) => void
   onChangeView: (mode: ViewMode) => void
-  onCreateCase: () => void
+  onCreateCase: (type: CaseType) => void
   onCreateAbsence: () => void
   stats: { scheduled: number; toBook: number; technicians: number }
   // Filter-props
@@ -50,7 +51,9 @@ export function ScheduleHeader({
 }: ScheduleHeaderProps) {
   const weekNum = getWeekNumber(currentDate)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
+  const createRef = useRef<HTMLDivElement>(null)
 
   // Stäng popover vid klick utanför
   useEffect(() => {
@@ -66,13 +69,25 @@ export function ScheduleHeader({
 
   // Stäng vid Escape
   useEffect(() => {
-    if (!filterOpen) return
+    if (!filterOpen && !createMenuOpen) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setFilterOpen(false)
+      if (e.key === 'Escape') { setFilterOpen(false); setCreateMenuOpen(false) }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [filterOpen])
+  }, [filterOpen, createMenuOpen])
+
+  // Stäng create-meny vid klick utanför
+  useEffect(() => {
+    if (!createMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (createRef.current && !createRef.current.contains(e.target as Node)) {
+        setCreateMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [createMenuOpen])
 
   // Beräkna om filter avviker från default
   const activeFilterCount = useMemo(() => {
@@ -230,10 +245,50 @@ export function ScheduleHeader({
           </AnimatePresence>
         </div>
 
-        <Button onClick={onCreateCase} variant="primary" className="text-sm">
-          <FileText className="w-4 h-4 mr-1.5" />
-          Nytt ärende
-        </Button>
+        {/* Nytt ärende dropdown */}
+        <div ref={createRef} className="relative">
+          <Button onClick={() => setCreateMenuOpen(!createMenuOpen)} variant="primary" className="text-sm">
+            <FileText className="w-4 h-4 mr-1.5" />
+            Nytt ärende
+            <ChevronDown className={`w-3.5 h-3.5 ml-1.5 transition-transform ${createMenuOpen ? 'rotate-180' : ''}`} />
+          </Button>
+
+          {createMenuOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50">
+              <p className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider">Engångsärenden</p>
+              <button
+                onClick={() => { onCreateCase('private'); setCreateMenuOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
+              >
+                <User className="w-4 h-4 text-blue-400" />
+                Privatperson
+              </button>
+              <button
+                onClick={() => { onCreateCase('business'); setCreateMenuOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
+              >
+                <Building className="w-4 h-4 text-green-400" />
+                Företag
+              </button>
+              <div className="my-1.5 border-t border-slate-700" />
+              <p className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider">Avtalskunder</p>
+              <button
+                onClick={() => { onCreateCase('contract'); setCreateMenuOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
+              >
+                <FileCheck className="w-4 h-4 text-emerald-400" />
+                Servicebesök
+              </button>
+              <button
+                onClick={() => { onCreateCase('inspection'); setCreateMenuOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
+              >
+                <ClipboardCheck className="w-4 h-4 text-cyan-400" />
+                Stationskontroll
+              </button>
+            </div>
+          )}
+        </div>
         <Button onClick={onCreateAbsence} variant="secondary" className="text-sm">
           <CalendarOff className="w-4 h-4 mr-1.5" />
           Frånvaro

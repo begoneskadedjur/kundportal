@@ -23,12 +23,17 @@ export function EventHoverCard({ caseData }: EventHoverCardProps) {
 
   return (
     <div className="w-72 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl p-3 text-sm z-50">
-      {/* Kundnamn + status */}
+      {/* Kundnamn + ärendenummer + status */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="font-semibold text-white leading-tight">
-          {isContract && <span className="text-purple-400 mr-1">★</span>}
-          {caseData.bestallare || caseData.kontaktperson || caseData.title}
-        </p>
+        <div>
+          <p className="font-semibold text-white leading-tight">
+            {isContract && <span className="text-purple-400 mr-1">★</span>}
+            {caseData.company_name || caseData.bestallare || caseData.kontaktperson || caseData.title}
+          </p>
+          {caseData.case_number && (
+            <p className="text-[10px] text-slate-500 font-mono mt-0.5">{caseData.case_number}</p>
+          )}
+        </div>
         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${style.bg} ${style.text}`}>
           {caseData.status?.split(' - ')[0] || 'Okänd'}
         </span>

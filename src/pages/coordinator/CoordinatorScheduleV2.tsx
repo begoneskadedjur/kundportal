@@ -7,7 +7,7 @@ import { Case } from '../../types/cases'
 import { AnimatePresence } from 'framer-motion'
 
 // V2 komponenter
-import { ScheduleHeader, type ViewMode } from '../../components/coordinator/schedule-v2/ScheduleHeader'
+import { ScheduleHeader, type ViewMode, type CaseType } from '../../components/coordinator/schedule-v2/ScheduleHeader'
 import { ScheduleGrid } from '../../components/coordinator/schedule-v2/ScheduleGrid'
 import { ActionableCasesDrawer } from '../../components/coordinator/schedule-v2/ActionableCasesDrawer'
 import { CasePipelineService } from '../../services/casePipelineService'
@@ -90,6 +90,7 @@ export default function CoordinatorScheduleV2() {
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false)
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [caseTypeForCreate, setCaseTypeForCreate] = useState<CaseType | null>(null)
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false)
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null)
   const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false)
@@ -168,7 +169,7 @@ export default function CoordinatorScheduleV2() {
         `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('business_cases').select(`
           id, title, status, priority, start_date, due_date, created_at, updated_at,
-          adress, kontaktperson, skadedjur, annat_skadedjur, bestallare,
+          adress, kontaktperson, skadedjur, annat_skadedjur, bestallare, company_name,
           e_post_kontaktperson, telefon_kontaktperson, org_nr, pris,
           e_post_faktura, markning_faktura,
           primary_assignee_id, primary_assignee_name, primary_assignee_email,
@@ -351,7 +352,7 @@ export default function CoordinatorScheduleV2() {
           viewMode={viewMode}
           onChangeDate={setCurrentDate}
           onChangeView={setViewMode}
-          onCreateCase={() => { setSelectedCase(null); setIsCreateModalOpen(true) }}
+          onCreateCase={(type) => { setSelectedCase(null); setCaseTypeForCreate(type); setIsCreateModalOpen(true) }}
           onCreateAbsence={() => setIsAbsenceModalOpen(true)}
           stats={{
             scheduled: filteredScheduledCases.length,
@@ -419,10 +420,11 @@ export default function CoordinatorScheduleV2() {
       />
       <CreateCaseModal
         isOpen={isCreateModalOpen}
-        onClose={() => { setIsCreateModalOpen(false); setSelectedCase(null) }}
+        onClose={() => { setIsCreateModalOpen(false); setSelectedCase(null); setCaseTypeForCreate(null) }}
         onSuccess={handleCreateSuccess}
         technicians={technicians}
         initialCaseData={selectedCase}
+        initialCaseType={caseTypeForCreate}
       />
       <CreateAbsenceModal
         isOpen={isAbsenceModalOpen}
