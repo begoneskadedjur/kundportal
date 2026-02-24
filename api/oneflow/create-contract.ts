@@ -405,8 +405,14 @@ export default async function handler(
       process.env.SUPABASE_SERVICE_KEY!
     )
     
-    // Uppdatera kontraktet med creator info, case-koppling och prislista
-    const updateData: any = {
+    // Upsert kontrakt-metadata direkt (skapar raden om webhook inte hunnit)
+    const upsertData: any = {
+      oneflow_contract_id: createdContract.id.toString(),
+      source_type: caseId ? 'legacy_case' : 'manual',
+      source_id: caseId || null,
+      type: documentType === 'offer' ? 'offer' : 'contract',
+      status: sendForSigning ? 'pending' : 'draft',
+      template_id: templateId,
       created_by_email: creatorEmail,
       created_by_name: creatorName,
       created_by_role: creatorRole,
@@ -419,19 +425,17 @@ export default async function handler(
       customer_group_id: customerGroupId || null
     }
 
-    // Lägg till source_id och source_type om caseId finns
-    if (caseId) {
-      updateData.source_id = caseId
-      updateData.source_type = 'legacy_case'
-    }
-    
-    const { error: updateError } = await supabase
+    const { error: upsertError } = await supabase
       .from('contracts')
-      .update(updateData)
-      .eq('oneflow_contract_id', createdContract.id.toString())
+      .upsert(upsertData, {
+        onConflict: 'oneflow_contract_id',
+        ignoreDuplicates: false
+      })
 
-    if (updateError) {
-      console.error('Kunde inte uppdatera creator info:', updateError)
+    if (upsertError) {
+      console.error('Kunde inte spara kontrakt-metadata:', upsertError)
+    } else {
+      console.log(`✅ Kontrakt-metadata sparad för ${createdContract.id} (source_id: ${caseId || 'ingen'})`)
     }
 
     // Identifiera och koppla kund för offerten
