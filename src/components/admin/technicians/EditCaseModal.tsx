@@ -424,6 +424,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     if (!currentCase) return null;
     
     return {
+      case_id: currentCase.id,
       partyType: currentCase.case_type === 'business' ? 'company' : 'individual',
       Kontaktperson: formData.kontaktperson || currentCase.kontaktperson || '',
       'e-post-kontaktperson': formData.e_post_kontaktperson || currentCase.e_post_kontaktperson || '',
