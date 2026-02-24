@@ -1105,7 +1105,7 @@ const logOfferEventToCase = async (
     // Hämta kontraktet från DB via oneflow_contract_id
     const { data: contract, error: contractError } = await supabase
       .from('contracts')
-      .select('id, source_id, source_type, type')
+      .select('id, source_id, source_type, type, begone_employee_email')
       .eq('oneflow_contract_id', contractId)
       .single()
 
@@ -1154,12 +1154,38 @@ const logOfferEventToCase = async (
       }
     }
 
+    // Slå upp author_id från teknikerns profil
+    let authorId: string | null = null
+    if (contract.begone_employee_email) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('email', contract.begone_employee_email)
+        .single()
+      if (profile) authorId = profile.user_id
+    }
+    // Fallback till admin om teknikerprofil inte hittas
+    if (!authorId) {
+      const { data: adminProfile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('role', 'admin')
+        .limit(1)
+        .single()
+      if (adminProfile) authorId = adminProfile.user_id
+    }
+    if (!authorId) {
+      console.error('❌ Ingen author_id hittad för systemkommentar')
+      return
+    }
+
     // Skapa systemevent i case_comments
     const { error: commentError } = await supabase
       .from('case_comments')
       .insert({
         case_id: contract.source_id,
         case_type: caseType,
+        author_id: authorId,
         content: eventMessage,
         is_system_comment: true,
         system_event_type: 'status_change',
