@@ -84,7 +84,7 @@ export default async function handler(
     const { error: updateError } = await supabase
       .from('contracts')
       .update({
-        status: 'deleted',
+        status: 'trashed',
         updated_at: new Date().toISOString()
       })
       .eq('id', contractId)
