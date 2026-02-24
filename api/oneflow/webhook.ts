@@ -469,9 +469,13 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     return undefined
   }
 
-  // Hämta kontaktinformation från första party
+  // Hämta kontaktinformation — prioritera motparten (inte BeGone)
   const firstParty = details.parties?.[0]
   const firstParticipant = firstParty?.participants?.[0]
+  const counterParty = details.parties?.find((p: any) =>
+    p.type !== 'owner' && !p.name?.toLowerCase().includes('begone')
+  )
+  const counterParticipant = counterParty?.participants?.[0]
 
   // Beräkna totalt värde från produkter
   let totalValue = 0
@@ -512,12 +516,12 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     start_date: findField('begynnelsedag', 'startdatum', 'start-date', 'utfrande-datum', 'utförande-datum') || null,
     
     // Kontakt-information (använd party/participant som fallback)
-    contact_person: findField('Kontaktperson', 'kontaktperson', 'kontakt-person', 'contact-person') || firstParticipant?.name || null,
-    contact_email: findField('e-post-kontaktperson', 'kontaktperson-e-post', 'contact-email', 'e-post') || firstParticipant?.email || null,
-    contact_phone: findField('telefonnummer-kontaktperson', 'tel-nr', 'telefon', 'phone', 'telefonnummer') || firstParticipant?.phone_number || null,
+    contact_person: findField('Kontaktperson', 'kontaktperson', 'kontakt-person', 'contact-person') || counterParticipant?.name || firstParticipant?.name || null,
+    contact_email: findField('e-post-kontaktperson', 'kontaktperson-e-post', 'contact-email', 'e-post') || counterParticipant?.email || firstParticipant?.email || null,
+    contact_phone: findField('telefonnummer-kontaktperson', 'tel-nr', 'telefon', 'phone', 'telefonnummer') || counterParticipant?.phone_number || firstParticipant?.phone_number || null,
     contact_address: findField('utforande-adress', 'utförande-adress', 'adress', 'address', 'leveransadress') || null,
-    company_name: findField('foretag', 'företag', 'kund', 'company', 'bolag') || firstParty?.name || null,
-    organization_number: findField('org-nr', 'orgnr', 'per-org-nr', 'organisationsnummer') || firstParty?.identification_number || null,
+    company_name: findField('foretag', 'företag', 'kund', 'company', 'bolag') || counterParty?.name || counterParticipant?.name || null,
+    organization_number: findField('org-nr', 'orgnr', 'per-org-nr', 'organisationsnummer') || counterParty?.identification_number || firstParty?.identification_number || null,
     
     // Avtal/Offert-detaljer  
     agreement_text: agreementParts.join('\n\n'),
@@ -1174,6 +1178,44 @@ const logOfferEventToCase = async (
   }
 }
 
+// Logga Oneflow-händelse till event_log (system-wide audit för aktivitetsflöde)
+const logOfferEventToEventLog = async (
+  contractId: string,
+  eventType: 'offer_sent' | 'offer_signed' | 'offer_declined' | 'offer_expired' | 'offer_deleted',
+  description: string,
+  metadata?: Record<string, any>
+): Promise<void> => {
+  try {
+    const { data: contract } = await supabase
+      .from('contracts')
+      .select('id, company_name, contact_person, begone_employee_name, begone_employee_email, source_id')
+      .eq('oneflow_contract_id', contractId)
+      .single()
+
+    if (!contract) return
+
+    await supabase.from('event_log').insert({
+      event_type: eventType,
+      description,
+      case_id: contract.id,
+      case_type: 'contract',
+      case_title: contract.company_name || contract.contact_person || 'Okänd',
+      metadata: {
+        ...metadata,
+        oneflow_contract_id: contractId,
+        source_id: contract.source_id,
+        technician_email: contract.begone_employee_email,
+        technician_name: contract.begone_employee_name,
+      },
+      performed_by_id: contract.begone_employee_email || 'system',
+      performed_by_name: contract.begone_employee_name || 'Oneflow',
+      created_at: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.error('logOfferEventToEventLog error:', err)
+  }
+}
+
 // Uppdatera ärendestatus baserat på source_id-koppling
 const updateCaseStatusViaSourceId = async (
   contractId: string,
@@ -1408,6 +1450,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             const recipientName = contractDetails.parties?.[1]?.participants?.[0]?.name
               || contractData.contact_person || contractData.company_name || 'mottagare'
             await logOfferEventToCase(contractId, `📄 Offert skickad till ${recipientName}`)
+            await logOfferEventToEventLog(contractId, 'offer_sent', `Offert skickad till ${recipientName}`)
           } else {
             console.log('⚠️ Kontraktdetaljer saknas för publish event')
           }
@@ -1462,6 +1505,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             const signerName = contractDetails.parties?.[1]?.participants?.find(p => p.signatory)?.name
               || contractData.contact_person || contractData.company_name || 'mottagare'
             await logOfferEventToCase(contractId, `✅ Offert signerad av ${signerName}`)
+            await logOfferEventToEventLog(contractId, 'offer_signed', `Offert signerad av ${signerName}`)
           }
           break
 
@@ -1489,6 +1533,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
           // Logga systemevent
           await logOfferEventToCase(contractId, '❌ Offert nekad av mottagaren')
+          await logOfferEventToEventLog(contractId, 'offer_declined', 'Offert nekad av mottagaren')
           break
 
         case 'contract:lifecycle_state:start':
@@ -1558,6 +1603,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
           // Logga systemevent
           await logOfferEventToCase(contractId, '⏰ Offertens giltighetstid har gått ut')
+          await logOfferEventToEventLog(contractId, 'offer_expired', 'Offertens giltighetstid har gått ut')
           break
 
         case 'contract:signing_period_revive':

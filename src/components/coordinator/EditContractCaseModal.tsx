@@ -818,7 +818,7 @@ export default function EditContractCaseModal({
     })
     
     // För multisite, hantera företagsnamn och organisationsnummer korrekt
-    let companyName = customerData?.company_name || formData.contact_person || ''
+    let companyName = customerData?.company_name || formData.contact_person || customerData?.contact_person || ''
     let orgNumber = customerData?.organization_number || ''
     
     if (customerData?.is_multisite) {
@@ -886,6 +886,8 @@ export default function EditContractCaseModal({
       pestType: formData.pest_type,
       // Add case_id for webhook linking
       case_id: caseData?.id,
+      // Add customer price list for article pricing
+      selectedPriceListId: customerData?.price_list_id || null,
       // Add multisite recipient information
       multisite_recipient: selectedRecipient ? {
         role: selectedRecipient.role,

@@ -2,7 +2,7 @@
 // Kort för att visa händelselogg på dashboards
 
 import { useState, useEffect } from 'react';
-import { History, Trash2, FileText, AlertCircle, RefreshCw, ChevronRight } from 'lucide-react';
+import { History, Trash2, FileText, AlertCircle, RefreshCw, ChevronRight, FileSignature, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { getEventLog } from '../../services/caseDeleteService';
 import { formatDistanceToNow } from '../../utils/dateUtils';
 
@@ -54,6 +54,41 @@ const getEventTypeInfo = (eventType: string) => {
         color: 'text-amber-400',
         bgColor: 'bg-amber-500/20',
         label: 'Statusändring'
+      };
+    case 'offer_sent':
+      return {
+        icon: FileSignature,
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/20',
+        label: 'Offert skickad'
+      };
+    case 'offer_signed':
+      return {
+        icon: CheckCircle,
+        color: 'text-green-400',
+        bgColor: 'bg-green-500/20',
+        label: 'Offert signerad'
+      };
+    case 'offer_declined':
+      return {
+        icon: XCircle,
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/20',
+        label: 'Offert nekad'
+      };
+    case 'offer_expired':
+      return {
+        icon: Clock,
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/20',
+        label: 'Offert förfallen'
+      };
+    case 'offer_deleted':
+      return {
+        icon: Trash2,
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/20',
+        label: 'Offert raderad'
       };
     default:
       return {

@@ -24,7 +24,8 @@ export interface CaseDeleteInfo {
 }
 
 export interface EventLogEntry {
-  event_type: 'case_deleted' | 'case_created' | 'case_updated' | 'status_changed';
+  event_type: 'case_deleted' | 'case_created' | 'case_updated' | 'status_changed'
+    | 'offer_sent' | 'offer_signed' | 'offer_declined' | 'offer_expired' | 'offer_deleted';
   description: string;
   case_id?: string;
   case_type?: string;
@@ -479,6 +480,40 @@ export async function getEventLog(options: {
 
   if (error) {
     console.error('Error fetching event log:', error);
+    throw error;
+  }
+
+  return {
+    entries: data || [],
+    totalCount: count || 0
+  };
+}
+
+/**
+ * Hämta offert-specifika händelser med valfri tekniker-filtrering
+ */
+export async function getOfferEventLog(options: {
+  limit?: number;
+  offset?: number;
+  technicianEmail?: string;
+}): Promise<{ entries: any[]; totalCount: number }> {
+  const { limit = 20, offset = 0, technicianEmail } = options;
+
+  let query = supabase
+    .from('event_log')
+    .select('*', { count: 'exact' })
+    .in('event_type', ['offer_sent', 'offer_signed', 'offer_declined', 'offer_expired', 'offer_deleted'])
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (technicianEmail) {
+    query = query.eq('metadata->>technician_email', technicianEmail);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    console.error('Error fetching offer event log:', error);
     throw error;
   }
 

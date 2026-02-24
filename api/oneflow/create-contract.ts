@@ -121,6 +121,7 @@ function convertProductsToOneflow(
   description: string
   price_1: {
     base_amount: { amount: string }
+    amount: { amount: string }
     discount_amount: { amount: string }
   }
   quantity: {
@@ -152,14 +153,14 @@ function convertProductsToOneflow(
       let basePrice = customPrice || pricing?.basePrice || 0
       let discountAmount = 0
       
-      let originalPrice = basePrice
-      
+      const originalPrice = basePrice
+
       // Beräkna rabatt om tillgänglig
       if (pricing?.discountPercent && !customPrice) {
         discountAmount = basePrice * (pricing.discountPercent / 100)
         basePrice = basePrice - discountAmount
       }
-      
+
       // Konvertera kvantitetstyp
       let oneflowQuantityType = 'quantity'
       if (product.quantityType === 'single_choice') {
@@ -167,7 +168,8 @@ function convertProductsToOneflow(
       } else if (product.quantityType === 'multiple_choice') {
         oneflowQuantityType = 'multiple_choice'
       }
-      
+
+      const basePriceString = Math.round(originalPrice).toString()
       const finalPriceString = Math.round(basePrice).toString()
       const discountAmountString = discountAmount > 0 ? Math.round(discountAmount).toString() : "0"
 
@@ -175,7 +177,8 @@ function convertProductsToOneflow(
         name: product.name,
         description: product.description,
         price_1: {
-          base_amount: { amount: finalPriceString },
+          base_amount: { amount: basePriceString },
+          amount: { amount: finalPriceString },
           discount_amount: { amount: discountAmountString }
         },
         quantity: {
@@ -303,7 +306,7 @@ export default async function handler(
     : [{
         type: 'company',
         country_code: 'SE',
-        name: recipient.company_name,
+        name: recipient.company_name || recipient.name,
         identification_number: recipient.organization_number,
         participants: [participantData]
       }]
@@ -401,6 +404,11 @@ export default async function handler(
       created_by_email: creatorEmail,
       created_by_name: creatorName,
       created_by_role: creatorRole,
+      begone_employee_email: creatorEmail,
+      begone_employee_name: creatorName,
+      company_name: recipient.company_name || recipient.name || null,
+      contact_person: recipient.name || null,
+      contact_email: recipient.email || null,
       price_list_id: priceListId || null,
       customer_group_id: customerGroupId || null
     }

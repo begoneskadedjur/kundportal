@@ -9,6 +9,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { OfferFollowUpService } from '../../services/offerFollowUpService'
 import { FollowUpTable } from '../../components/coordinator/follow-up/FollowUpTable'
 import { TechnicianCards } from '../../components/coordinator/follow-up/TechnicianCards'
+import DeleteOfferConfirmDialog from '../../components/coordinator/follow-up/DeleteOfferConfirmDialog'
+import OfferActivityFeed from '../../components/coordinator/follow-up/OfferActivityFeed'
 import toast from 'react-hot-toast'
 import type {
   FollowUpOffer, FollowUpKPIs, TechnicianOfferStats,
@@ -38,6 +40,8 @@ export default function OfferFollowUp() {
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<FollowUpOffer | null>(null)
 
   const fetchData = async (isRefresh = false) => {
     try {
@@ -114,6 +118,20 @@ export default function OfferFollowUp() {
       toast.error('Kunde inte visa offert')
     }
   }, [userId])
+
+  // Radera-handler: öppna bekräftelsedialog
+  const handleDelete = useCallback((contractId: string) => {
+    const offer = offers.find(o => o.id === contractId)
+    if (offer) setDeleteTarget(offer)
+  }, [offers])
+
+  // Efter lyckad radering: ta bort från lista
+  const handleDeleted = useCallback(() => {
+    if (deleteTarget) {
+      setOffers(prev => prev.filter(o => o.id !== deleteTarget.id))
+      setDeleteTarget(null)
+    }
+  }, [deleteTarget])
 
   // Sender-email för kommentarer
   const senderEmail = profile?.technicians?.email || undefined
@@ -238,6 +256,12 @@ export default function OfferFollowUp() {
         </div>
       )}
 
+      {/* Senaste offerthändelser */}
+      <OfferActivityFeed
+        technicianEmail={technicianEmail}
+        maxEntries={8}
+      />
+
       {/* Tekniker-kort (bara koordinator) */}
       {isCoordinator && techStats.length > 0 && (
         <div className="space-y-2">
@@ -272,12 +296,23 @@ export default function OfferFollowUp() {
         senderEmail={senderEmail}
         showArchived={showArchived}
         onToggleArchived={() => setShowArchived(!showArchived)}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
         onHide={handleHide}
         onUnhide={handleUnhide}
         userId={userId}
         showHidden={showHidden}
         onToggleHidden={() => setShowHidden(!showHidden)}
         hiddenCount={hiddenCount}
+        onDelete={handleDelete}
+      />
+
+      {/* Radera-bekräftelsedialog */}
+      <DeleteOfferConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={handleDeleted}
+        offer={deleteTarget}
       />
     </div>
   )

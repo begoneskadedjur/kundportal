@@ -181,6 +181,8 @@ export default function OneflowContractCreator() {
             begynnelsedag: customerData.begynnelsedag || prev.begynnelsedag,
             // Lägg till case_id för webhook-koppling
             case_id: customerData.case_id || undefined,
+            // Lägg till prislista från kunden
+            selectedPriceListId: customerData.selectedPriceListId || prev.selectedPriceListId,
           }))
           
           // Debug-logging för att spåra prefill-processen

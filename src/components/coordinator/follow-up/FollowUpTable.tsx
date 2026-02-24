@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown, ChevronUp, MessageSquare, ExternalLink,
   Clock, AlertTriangle, User, Mail, Phone,
-  FileSignature, Archive, EyeOff, Eye,
+  FileSignature, Archive, EyeOff, Eye, Search, X, Trash2,
 } from 'lucide-react'
 import { OFFER_STATUS_CONFIG } from '../../../types/casePipeline'
 import { CommentThread } from './CommentThread'
@@ -22,6 +22,9 @@ interface FollowUpTableProps {
   senderEmail?: string
   showArchived: boolean
   onToggleArchived: () => void
+  // Sökfunktion
+  searchQuery?: string
+  onSearchChange?: (query: string) => void
   // Dölj-funktion
   onHide?: (contractId: string) => void
   onUnhide?: (contractId: string) => void
@@ -29,6 +32,8 @@ interface FollowUpTableProps {
   showHidden?: boolean
   onToggleHidden?: () => void
   hiddenCount?: number
+  // Radera-funktion
+  onDelete?: (contractId: string) => void
 }
 
 const STATUS_FILTERS: { key: FollowUpStatusFilter; label: string }[] = [
@@ -78,6 +83,7 @@ function OfferRow({
   onHide,
   onUnhide,
   isHiddenByMe,
+  onDelete,
 }: {
   offer: FollowUpOffer
   isExpanded: boolean
@@ -87,6 +93,7 @@ function OfferRow({
   onHide?: (contractId: string) => void
   onUnhide?: (contractId: string) => void
   isHiddenByMe: boolean
+  onDelete?: (contractId: string) => void
 }) {
   const [activeTab, setActiveTab] = useState<'internal' | 'external'>('internal')
   const ageBadge = getAgeBadge(offer.age_days)
@@ -178,6 +185,20 @@ function OfferRow({
               title={isHiddenByMe ? 'Visa igen' : 'Dölj offert'}
             >
               {isHiddenByMe ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            </button>
+          )}
+
+          {/* Radera-knapp */}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(offer.id)
+              }}
+              className="p-1 rounded transition-colors flex-shrink-0 text-slate-600 hover:text-red-400 hover:bg-red-500/10"
+              title="Radera offert"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
 
@@ -314,20 +335,36 @@ export function FollowUpTable({
   senderEmail,
   showArchived,
   onToggleArchived,
+  searchQuery = '',
+  onSearchChange,
   onHide,
   onUnhide,
   userId,
   showHidden,
   onToggleHidden,
   hiddenCount = 0,
+  onDelete,
 }: FollowUpTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  // Sök-filtrering
+  const searchFiltered = searchQuery.trim()
+    ? offers.filter(o => {
+        const q = searchQuery.toLowerCase()
+        return (
+          o.company_name?.toLowerCase().includes(q) ||
+          o.contact_person?.toLowerCase().includes(q) ||
+          o.contact_email?.toLowerCase().includes(q) ||
+          o.technician_name?.toLowerCase().includes(q)
+        )
+      })
+    : offers
+
   // Räkna arkiverade (innan filtrering)
-  const archivedCount = offers.filter(o => o.priority === 'archived').length
+  const archivedCount = searchFiltered.filter(o => o.priority === 'archived').length
 
   // Filter
-  const filtered = offers.filter(o => {
+  const filtered = searchFiltered.filter(o => {
     if (statusFilter !== 'all' && o.status !== statusFilter) return false
     if (!showArchived && o.priority === 'archived') return false
     return true
@@ -367,11 +404,34 @@ export function FollowUpTable({
       onHide={onHide}
       onUnhide={onUnhide}
       isHiddenByMe={userId ? (offer.hidden_by || []).includes(userId) : false}
+      onDelete={onDelete}
     />
   )
 
   return (
     <div className="space-y-3" id="follow-up-table">
+      {/* Sökfält */}
+      {onSearchChange && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
+            placeholder="Sök kund, kontaktperson, tekniker..."
+            className="w-full pl-8 pr-8 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-xs text-slate-300 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Filter + sortering */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Status-filter */}

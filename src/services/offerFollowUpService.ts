@@ -50,6 +50,8 @@ export interface FollowUpOffer {
   days_since_overdue: number | null
   // Dölj-funktion
   hidden_by: string[]
+  // Koppling till ursprungligt ärende
+  source_id: string | null
 }
 
 export interface TechnicianOfferStats {
@@ -88,7 +90,7 @@ export type FollowUpSortBy = 'priority' | 'oldest' | 'newest' | 'value_desc' | '
 const OFFER_COLUMNS = `
   id, oneflow_contract_id, type, status, company_name, contact_person,
   contact_email, contact_phone, total_value, begone_employee_name,
-  begone_employee_email, created_at, updated_at, hidden_by
+  begone_employee_email, created_at, updated_at, hidden_by, source_id
 `
 
 const EMPTY_KPIS: FollowUpKPIs = {
@@ -159,6 +161,7 @@ export class OfferFollowUpService {
         priority: classifyPriority(o.status, age_days, days_since_overdue),
         is_recently_overdue: o.status === 'overdue' && days_since_overdue !== null && days_since_overdue <= THRESHOLDS.RECENTLY_OVERDUE_DAYS,
         hidden_by: o.hidden_by || [],
+        source_id: o.source_id || null,
       }
     })
 
@@ -280,6 +283,20 @@ export class OfferFollowUpService {
   static async getComments(contractId: string): Promise<any> {
     const response = await fetch(`/api/oneflow/comments?contractId=${contractId}`)
     if (!response.ok) throw new Error('Kunde inte hämta kommentarer')
+    return response.json()
+  }
+
+  /** Radera en offert/avtal från Oneflow + markera som deleted i DB */
+  static async deleteOffer(contractId: string): Promise<{ source_id: string | null; source_type: string | null; company_name: string | null }> {
+    const response = await fetch('/api/oneflow/delete-offer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contractId }),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ message: 'Okänt fel' }))
+      throw new Error(err.message || 'Kunde inte radera offert')
+    }
     return response.json()
   }
 
