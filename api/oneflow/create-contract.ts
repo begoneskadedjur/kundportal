@@ -408,7 +408,7 @@ export default async function handler(
     // Upsert kontrakt-metadata direkt (skapar raden om webhook inte hunnit)
     const upsertData: any = {
       oneflow_contract_id: createdContract.id.toString(),
-      source_type: caseId ? 'legacy_case' : 'manual',
+      source_type: caseId ? (partyType === 'company' ? 'business_case' : 'private_case') : 'manual',
       source_id: caseId || null,
       type: documentType === 'offer' ? 'offer' : 'contract',
       status: sendForSigning ? 'pending' : 'draft',
