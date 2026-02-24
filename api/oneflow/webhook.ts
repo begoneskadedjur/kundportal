@@ -1194,6 +1194,17 @@ const logOfferEventToEventLog = async (
 
     if (!contract) return
 
+    // Slå upp teknikerns user_id (UUID) för performed_by_id
+    let performedById: string | null = null
+    if (contract.begone_employee_email) {
+      const { data: techProfile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('email', contract.begone_employee_email)
+        .single()
+      if (techProfile) performedById = techProfile.user_id
+    }
+
     await supabase.from('event_log').insert({
       event_type: eventType,
       description,
@@ -1207,7 +1218,7 @@ const logOfferEventToEventLog = async (
         technician_email: contract.begone_employee_email,
         technician_name: contract.begone_employee_name,
       },
-      performed_by_id: contract.begone_employee_email || 'system',
+      performed_by_id: performedById,
       performed_by_name: contract.begone_employee_name || 'Oneflow',
       created_at: new Date().toISOString(),
     })
