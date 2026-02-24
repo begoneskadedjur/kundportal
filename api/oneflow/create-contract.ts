@@ -428,8 +428,8 @@ export default async function handler(
     const { error: updateError } = await supabase
       .from('contracts')
       .update(updateData)
-      .eq('oneflow_contract_id', createdContract.id)
-    
+      .eq('oneflow_contract_id', createdContract.id.toString())
+
     if (updateError) {
       console.error('Kunde inte uppdatera creator info:', updateError)
     }
@@ -470,7 +470,7 @@ export default async function handler(
         const { error: customerLinkError } = await supabase
           .from('contracts')
           .update({ customer_id: customerId, updated_at: new Date().toISOString() })
-          .eq('oneflow_contract_id', createdContract.id)
+          .eq('oneflow_contract_id', createdContract.id.toString())
 
         if (customerLinkError) {
           console.error('Kunde inte koppla kund:', customerLinkError)
