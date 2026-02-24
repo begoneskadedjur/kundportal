@@ -178,7 +178,6 @@ function convertProductsToOneflow(
         description: product.description,
         price_1: {
           base_amount: { amount: basePriceString },
-          amount: { amount: finalPriceString },
           discount_amount: { amount: discountAmountString }
         },
         quantity: {
