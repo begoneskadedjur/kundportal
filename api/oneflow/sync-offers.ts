@@ -235,8 +235,6 @@ function mapOfferToInsertData(detail: OneFlowContractDetail, listItem?: OneFlowC
 
   return {
     oneflow_contract_id: detail.id.toString(),
-    source_type: 'manual',
-    source_id: null,
     type: 'offer',
     status: STATUS_MAP[listItem?.state || detail.state] || 'pending',
     template_id: templateId,
