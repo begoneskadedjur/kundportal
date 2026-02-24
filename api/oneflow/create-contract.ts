@@ -121,7 +121,10 @@ function convertProductsToOneflow(
   description: string
   price_1: {
     base_amount: { amount: string }
-    amount: { amount: string }
+    discount_amount: { amount: string }
+  }
+  price_2: {
+    base_amount: { amount: string }
     discount_amount: { amount: string }
   }
   quantity: {
@@ -177,6 +180,10 @@ function convertProductsToOneflow(
         name: product.name,
         description: product.description,
         price_1: {
+          base_amount: { amount: basePriceString },
+          discount_amount: { amount: discountAmountString }
+        },
+        price_2: {
           base_amount: { amount: basePriceString },
           discount_amount: { amount: discountAmountString }
         },
