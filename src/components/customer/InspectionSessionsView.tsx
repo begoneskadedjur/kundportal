@@ -28,6 +28,8 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Download,
   FileSpreadsheet,
   FileText
@@ -139,7 +141,13 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [totalStations, setTotalStations] = useState(0)
   const [statusCounts, setStatusCounts] = useState({ ok: 0, warning: 0, critical: 0, noInspection: 0 })
 
-  // Historik-sektion
+  // Sessionsväljare — alla sessioner + vald session
+  const [allSessions, setAllSessions] = useState<InspectionSessionWithRelations[]>([])
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [loadingSessions, setLoadingSessions] = useState(false)
+  const [loadingSessionData, setLoadingSessionData] = useState(false)
+
+  // Historik-sektion (behålls för bakåtkompatibilitet men dold i UI)
   const [showHistory, setShowHistory] = useState(false)
   const [historySessions, setHistorySessions] = useState<InspectionSessionWithRelations[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -181,103 +189,119 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     }
   }
 
-  // Ladda all data
+  // Ladda sessionslista + data för vald session
   const fetchData = useCallback(async () => {
     try {
-      // Hämta utomhusstationer och planritningar parallellt
-      const [outdoorStations, floorPlanData, sessionsData] = await Promise.all([
+      // Hämta alla sessioner med sammanfattning
+      const [sessionsData, outdoorStations, floorPlanData] = await Promise.all([
+        getCompletedSessionsWithSummary(customerId, 50),
         EquipmentService.getEquipmentByCustomer(customerId),
-        FloorPlanService.getFloorPlansByCustomer(customerId),
-        getCompletedSessionsForCustomer(customerId, 1) // Senaste session för sammanfattning
+        FloorPlanService.getFloorPlansByCustomer(customerId)
       ])
 
-      // Sätt senaste session-info (inkl. in_progress sessioner)
-      if (sessionsData.length > 0) {
-        setLatestSessionId(sessionsData[0].id)
-        setLastInspectionDate(sessionsData[0].completed_at || sessionsData[0].created_at || null)
-        setLastTechnicianName(sessionsData[0].technician?.name || null)
-      }
+      setAllSessions(sessionsData)
 
-      // Skapa nummermappning för outdoor-stationer baserat på placed_at (samma som kartan)
+      if (sessionsData.length > 0) {
+        const latestSession = sessionsData[0]
+        setLatestSessionId(latestSession.id)
+        setSelectedSessionId(latestSession.id)
+        setLastInspectionDate(latestSession.completed_at || latestSession.created_at || null)
+        setLastTechnicianName(latestSession.technician?.name || null)
+
+        // Ladda stationsdata för senaste sessionen
+        await loadSessionStationData(latestSession.id, outdoorStations, floorPlanData)
+      }
+    } catch (error) {
+      console.error('Error fetching inspection data:', error)
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [customerId])
+
+  // Ladda stationsdata för en specifik session
+  const loadSessionStationData = async (
+    sessionId: string,
+    outdoorStations?: EquipmentPlacementWithRelations[],
+    floorPlanData?: FloorPlanWithRelations[]
+  ) => {
+    setLoadingSessionData(true)
+    try {
+      // Hämta stationslistor om de inte skickats in
+      const [outdoor, plans] = await Promise.all([
+        outdoorStations || EquipmentService.getEquipmentByCustomer(customerId),
+        floorPlanData || FloorPlanService.getFloorPlansByCustomer(customerId)
+      ])
+
+      // Hämta inspektioner för denna session
+      const [sessionOutdoor, sessionIndoor] = await Promise.all([
+        getOutdoorInspectionsForSession(sessionId),
+        getIndoorInspectionsForSession(sessionId)
+      ])
+
+      // Skapa nummermappning baserat på placed_at
       const outdoorNumberMap = new Map<string, number>()
-      const sortedOutdoor = [...outdoorStations].sort((a, b) =>
+      const sortedOutdoor = [...outdoor].sort((a, b) =>
         new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
       )
       sortedOutdoor.forEach((station, index) => {
         outdoorNumberMap.set(station.id, index + 1)
       })
 
-      // Hämta senaste inspektion för varje utomhusstation
-      const outdoorWithInspections = await Promise.all(
-        outdoorStations.map(async (station) => {
-          const inspections = await getOutdoorInspectionsByStation(station.id)
-          const latest = inspections.length > 0 ? inspections[0] : null
-          const previous = inspections.length > 1 ? inspections[1] : null
+      // Mappa inspektioner till stationer
+      const inspByStation = new Map(sessionOutdoor.map(i => [(i.station as any)?.id || i.id, i]))
 
-          // Beräkna status baserat på tröskelvärden
-          const stationType = station.station_type_data
-          const measurementValue = latest?.measurement_value ?? null
-          const previousValue = previous?.measurement_value ?? null
-          let calculatedStatus: CalculatedStatus = 'ok'
+      const outdoorWithInspections = outdoor.map(station => {
+        const insp = inspByStation.get(station.id)
+        const stationType = station.station_type_data
+        const measurementValue = insp?.measurement_value ?? null
 
-          if (stationType && measurementValue !== null) {
-            calculatedStatus = calculateStationStatus(
-              {
-                ...stationType,
-                description: null,
-                requires_serial_number: false,
-                is_active: true,
-                sort_order: 0,
-                created_at: '',
-                updated_at: ''
-              } as any,
-              measurementValue
-            )
-          }
+        let calculatedStatus: CalculatedStatus = 'ok'
+        if (stationType && measurementValue !== null) {
+          calculatedStatus = calculateStationStatus(
+            { ...stationType, description: null, requires_serial_number: false, is_active: true, sort_order: 0, created_at: '', updated_at: '' } as any,
+            measurementValue
+          )
+        }
 
-          // Beräkna trend
-          let trend: number | null = null
-          let trendDirection: 'up' | 'down' | 'stable' = 'stable'
-          if (measurementValue !== null && previousValue !== null) {
-            trend = measurementValue - previousValue
-            if (trend > 0) trendDirection = 'up'
-            else if (trend < 0) trendDirection = 'down'
-          }
+        return {
+          id: station.id,
+          stationNumber: outdoorNumberMap.get(station.id)?.toString() || null,
+          stationType: stationType?.name || station.equipment_type || 'Okänd',
+          typeColor: stationType?.color || '#6b7280',
+          measurementLabel: stationType?.measurement_label || null,
+          measurementUnit: stationType?.measurement_unit || 'st',
+          thresholdWarning: stationType?.threshold_warning ?? null,
+          thresholdCritical: stationType?.threshold_critical ?? null,
+          thresholdDirection: (stationType?.threshold_direction || 'above') as 'above' | 'below',
+          latestInspection: insp ? {
+            id: insp.id,
+            inspectedAt: insp.inspected_at,
+            status: insp.status as InspectionStatus,
+            findings: insp.findings,
+            photoUrl: insp.photo_url,
+            measurementValue: insp.measurement_value,
+            technicianName: insp.technician?.name || null
+          } : null,
+          calculatedStatus,
+          originalOutdoorStation: station,
+          trend: null,
+          trendDirection: 'stable' as const
+        } as StationWithLatestInspection
+      })
 
-          return {
-            id: station.id,
-            stationNumber: outdoorNumberMap.get(station.id)?.toString() || null,
-            stationType: stationType?.name || station.equipment_type || 'Okänd',
-            typeColor: stationType?.color || '#6b7280',
-            measurementLabel: stationType?.measurement_label || null,
-            measurementUnit: stationType?.measurement_unit || 'st',
-            thresholdWarning: stationType?.threshold_warning ?? null,
-            thresholdCritical: stationType?.threshold_critical ?? null,
-            thresholdDirection: (stationType?.threshold_direction || 'above') as 'above' | 'below',
-            latestInspection: latest ? {
-              id: latest.id,
-              inspectedAt: latest.inspected_at,
-              status: latest.status as InspectionStatus,
-              findings: latest.findings,
-              photoUrl: latest.photo_url,
-              measurementValue: latest.measurement_value,
-              technicianName: latest.technician?.name || null
-            } : null,
-            calculatedStatus,
-            originalOutdoorStation: station,
-            previousValue,
-            trend,
-            trendDirection
-          } as StationWithLatestInspection
-        })
-      )
-
-      // Hämta inomhusstationer för varje planritning
+      // Inomhusstationer
       const indoorSections: StationSection[] = []
-      for (const plan of floorPlanData) {
-        const stations = await IndoorStationService.getStationsByFloorPlan(plan.id)
+      const indoorByFloorPlan = new Map<string, typeof sessionIndoor>()
+      sessionIndoor.forEach(insp => {
+        const station = insp.station as any
+        const planId = station?.floor_plan?.id || 'unknown'
+        if (!indoorByFloorPlan.has(planId)) indoorByFloorPlan.set(planId, [])
+        indoorByFloorPlan.get(planId)!.push(insp)
+      })
 
-        // Skapa nummermappning för denna planritnings stationer baserat på placed_at (samma som planritningen)
+      for (const plan of plans) {
+        const stations = await IndoorStationService.getStationsByFloorPlan(plan.id)
         const indoorNumberMap = new Map<string, number>()
         const sortedIndoor = [...stations].sort((a, b) =>
           new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
@@ -286,72 +310,49 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           indoorNumberMap.set(station.id, index + 1)
         })
 
-        // Hämta senaste inspektion för varje inomhusstation
-        const stationsWithInspections = await Promise.all(
-          stations.map(async (station) => {
-            const inspections = await IndoorStationService.getInspectionsByStation(station.id, 2)
-            const latest = inspections.length > 0 ? inspections[0] : null
-            const previous = inspections.length > 1 ? inspections[1] : null
+        const planInspections = indoorByFloorPlan.get(plan.id) || []
+        const inspByIndoorStation = new Map(planInspections.map(i => [(i.station as any)?.id || i.id, i]))
 
-            // Beräkna status baserat på tröskelvärden
-            const stationType = station.station_type_data
-            const measurementValue = latest?.measurement_value ?? null
-            const previousValue = previous?.measurement_value ?? null
-            let calculatedStatus: CalculatedStatus = 'ok'
+        const stationsWithInspections = stations.map(station => {
+          const insp = inspByIndoorStation.get(station.id)
+          const stationType = station.station_type_data
+          const measurementValue = insp?.measurement_value ?? null
 
-            if (stationType && measurementValue !== null) {
-              calculatedStatus = calculateStationStatus(
-                {
-                  ...stationType,
-                  description: null,
-                  requires_serial_number: false,
-                  is_active: true,
-                  sort_order: 0,
-                  created_at: '',
-                  updated_at: ''
-                } as any,
-                measurementValue
-              )
-            }
+          let calculatedStatus: CalculatedStatus = 'ok'
+          if (stationType && measurementValue !== null) {
+            calculatedStatus = calculateStationStatus(
+              { ...stationType, description: null, requires_serial_number: false, is_active: true, sort_order: 0, created_at: '', updated_at: '' } as any,
+              measurementValue
+            )
+          }
 
-            // Beräkna trend
-            let trend: number | null = null
-            let trendDirection: 'up' | 'down' | 'stable' = 'stable'
-            if (measurementValue !== null && previousValue !== null) {
-              trend = measurementValue - previousValue
-              if (trend > 0) trendDirection = 'up'
-              else if (trend < 0) trendDirection = 'down'
-            }
-
-            return {
-              id: station.id,
-              stationNumber: indoorNumberMap.get(station.id)?.toString() || null,
-              stationType: stationType?.name || station.station_type || 'Okänd',
-              typeColor: stationType?.color || '#6b7280',
-              measurementLabel: stationType?.measurement_label || null,
-              measurementUnit: stationType?.measurement_unit || 'st',
-              thresholdWarning: stationType?.threshold_warning ?? null,
-              thresholdCritical: stationType?.threshold_critical ?? null,
-              thresholdDirection: (stationType?.threshold_direction || 'above') as 'above' | 'below',
-              latestInspection: latest ? {
-                id: latest.id,
-                inspectedAt: latest.inspected_at,
-                status: latest.status as InspectionStatus,
-                findings: latest.findings,
-                photoUrl: latest.photo_url,
-                measurementValue: latest.measurement_value ?? null,
-                technicianName: latest.technician?.name || null
-              } : null,
-              calculatedStatus,
-              originalIndoorStation: station,
-              floorPlanId: plan.id,
-              floorPlanName: plan.name,
-              previousValue,
-              trend,
-              trendDirection
-            } as StationWithLatestInspection
-          })
-        )
+          return {
+            id: station.id,
+            stationNumber: indoorNumberMap.get(station.id)?.toString() || null,
+            stationType: stationType?.name || station.station_type || 'Okänd',
+            typeColor: stationType?.color || '#6b7280',
+            measurementLabel: stationType?.measurement_label || null,
+            measurementUnit: stationType?.measurement_unit || 'st',
+            thresholdWarning: stationType?.threshold_warning ?? null,
+            thresholdCritical: stationType?.threshold_critical ?? null,
+            thresholdDirection: (stationType?.threshold_direction || 'above') as 'above' | 'below',
+            latestInspection: insp ? {
+              id: insp.id,
+              inspectedAt: insp.inspected_at,
+              status: insp.status as InspectionStatus,
+              findings: insp.findings,
+              photoUrl: insp.photo_url,
+              measurementValue: insp.measurement_value ?? null,
+              technicianName: insp.technician?.name || null
+            } : null,
+            calculatedStatus,
+            originalIndoorStation: station,
+            floorPlanId: plan.id,
+            floorPlanName: plan.name,
+            trend: null,
+            trendDirection: 'stable' as const
+          } as StationWithLatestInspection
+        })
 
         if (stationsWithInspections.length > 0) {
           indoorSections.push({
@@ -365,45 +366,38 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
       }
 
       // Bygg sektioner
-      const allSections: StationSection[] = []
-
+      const builtSections: StationSection[] = []
       if (outdoorWithInspections.length > 0) {
-        allSections.push({
-          id: 'outdoor',
-          name: 'Utomhus',
-          icon: 'outdoor',
-          stations: outdoorWithInspections
-        })
+        builtSections.push({ id: 'outdoor', name: 'Utomhus', icon: 'outdoor', stations: outdoorWithInspections })
       }
-
-      allSections.push(...indoorSections)
-      setSections(allSections)
+      builtSections.push(...indoorSections)
+      setSections(builtSections)
 
       // Räkna statistik
-      const allStations = allSections.flatMap(s => s.stations)
-      setTotalStations(allStations.length)
+      const allStationsList = builtSections.flatMap(s => s.stations)
+      setTotalStations(allStationsList.length)
 
       const counts = { ok: 0, warning: 0, critical: 0, noInspection: 0 }
-      allStations.forEach(station => {
-        if (!station.latestInspection) {
-          counts.noInspection++
-        } else if (station.calculatedStatus === 'critical') {
-          counts.critical++
-        } else if (station.calculatedStatus === 'warning') {
-          counts.warning++
-        } else {
-          counts.ok++
-        }
+      allStationsList.forEach(station => {
+        if (!station.latestInspection) counts.noInspection++
+        else if (station.calculatedStatus === 'critical') counts.critical++
+        else if (station.calculatedStatus === 'warning') counts.warning++
+        else counts.ok++
       })
       setStatusCounts(counts)
 
+      // Uppdatera session-info
+      const session = allSessions.find(s => s.id === sessionId)
+      if (session) {
+        setLastInspectionDate(session.completed_at || session.created_at || null)
+        setLastTechnicianName(session.technician?.name || null)
+      }
     } catch (error) {
-      console.error('Error fetching inspection data:', error)
+      console.error('Error loading session station data:', error)
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      setLoadingSessionData(false)
     }
-  }, [customerId])
+  }
 
   useEffect(() => {
     fetchData()
@@ -414,15 +408,55 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     await fetchData()
   }
 
-  // Ladda historiska sessioner (on-demand)
+  // Byt vald session
+  const handleSelectSession = async (sessionId: string) => {
+    if (sessionId === selectedSessionId) return
+    setSelectedSessionId(sessionId)
+    setLatestSessionId(sessionId) // Uppdatera för rapport-nedladdning
+    await loadSessionStationData(sessionId)
+  }
+
+  // Navigera mellan sessioner
+  const selectedSessionIndex = allSessions.findIndex(s => s.id === selectedSessionId)
+  const hasPreviousSession = selectedSessionIndex < allSessions.length - 1
+  const hasNextSession = selectedSessionIndex > 0
+
+  const handlePreviousSession = () => {
+    if (hasPreviousSession) {
+      handleSelectSession(allSessions[selectedSessionIndex + 1].id)
+    }
+  }
+  const handleNextSession = () => {
+    if (hasNextSession) {
+      handleSelectSession(allSessions[selectedSessionIndex - 1].id)
+    }
+  }
+
+  // Gruppera sessioner per månad
+  const sessionsByMonth = useMemo(() => {
+    const groups: { label: string; sessions: InspectionSessionWithRelations[] }[] = []
+    const map = new Map<string, InspectionSessionWithRelations[]>()
+
+    allSessions.forEach(session => {
+      const date = new Date(session.completed_at || session.created_at || '')
+      const key = format(date, 'yyyy-MM')
+      const label = format(date, 'MMMM yyyy', { locale: sv })
+      if (!map.has(key)) {
+        map.set(key, [])
+        groups.push({ label, sessions: map.get(key)! })
+      }
+      map.get(key)!.push(session)
+    })
+
+    return groups
+  }, [allSessions])
+
+  // Ladda historiska sessioner (behålls för historikmodal)
   const loadHistorySessions = async () => {
     if (historyLoaded || loadingHistory) return
-
     setLoadingHistory(true)
     try {
-      // Hämta de senaste 10 sessionerna med sammanfattning (exkludera den senaste som redan visas)
       const sessions = await getCompletedSessionsWithSummary(customerId, 11)
-      // Skippa första (den visas redan i sammanfattningen)
       setHistorySessions(sessions.slice(1))
       setHistoryLoaded(true)
     } catch (error) {
@@ -432,7 +466,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     }
   }
 
-  // Toggle historik-sektion
+  // Toggle historik-sektion (behålls)
   const handleToggleHistory = () => {
     const newShowHistory = !showHistory
     setShowHistory(newShowHistory)
@@ -798,195 +832,114 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           </div>
         </div>
 
-        {/* Sammanfattning av senaste kontroll */}
+        {/* Sessionsväljare + sammanfattning */}
         <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-5 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-teal-400" />
-            <h2 className="text-lg font-semibold text-white">Senaste servicebesök</h2>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="bg-slate-900/50 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-xs text-slate-500 uppercase">Datum</span>
-              </div>
-              <p className="text-white font-medium text-sm">
-                {lastInspectionDate ? formatDate(lastInspectionDate) : 'Ingen kontroll'}
-              </p>
-            </div>
-
-            <div className="bg-slate-900/50 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-xs text-slate-500 uppercase">Tekniker</span>
-              </div>
-              <p className="text-white font-medium text-sm">
-                {lastTechnicianName || 'Okänd'}
-              </p>
-            </div>
-
-            <div className="bg-slate-900/50 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-xs text-slate-500 uppercase">OK</span>
-              </div>
-              <p className="text-emerald-400 font-bold text-lg">{statusCounts.ok}</p>
-            </div>
-
-            <div className="bg-slate-900/50 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-xs text-slate-500 uppercase">Varning</span>
-              </div>
-              <p className="text-amber-400 font-bold text-lg">{statusCounts.warning}</p>
-            </div>
-
-            <div className="bg-slate-900/50 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                <span className="text-xs text-slate-500 uppercase">Kritisk</span>
-              </div>
-              <p className="text-red-400 font-bold text-lg">{statusCounts.critical}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Kontrollhistorik - expanderbar sektion */}
-        <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 mb-6">
-          <button
-            onClick={handleToggleHistory}
-            className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-700/30 transition-colors rounded-xl"
-          >
+          {/* Navigering mellan sessioner */}
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <History className="w-5 h-5 text-purple-400" />
-              <span className="text-white font-medium">Kontrollhistorik</span>
-              {historySessions.length > 0 && (
-                <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full">
-                  {historySessions.length} tidigare besök
+              <Calendar className="w-5 h-5 text-teal-400" />
+              <h2 className="text-lg font-semibold text-white">
+                {lastInspectionDate ? formatDate(lastInspectionDate) : 'Ingen kontroll'}
+              </h2>
+              {lastTechnicianName && (
+                <span className="text-sm text-slate-400 hidden sm:inline">
+                  — {lastTechnicianName}
                 </span>
               )}
-            </div>
-            <div className="flex items-center gap-2">
-              {loadingHistory && (
-                <RefreshCw className="w-4 h-4 text-slate-400 animate-spin" />
-              )}
-              {showHistory ? (
-                <ChevronUp className="w-5 h-5 text-slate-400" />
-              ) : (
-                <ChevronDown className="w-5 h-5 text-slate-400" />
+              {selectedSessionIndex === 0 && allSessions.length > 0 && (
+                <span className="text-xs bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded-full">Senaste</span>
               )}
             </div>
-          </button>
 
-          {showHistory && (
-            <div className="px-4 pb-4 border-t border-slate-700/50">
-              {loadingHistory ? (
-                <div className="py-8 text-center">
-                  <RefreshCw className="w-6 h-6 text-slate-400 animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-slate-400">Laddar historik...</p>
-                </div>
-              ) : historySessions.length === 0 ? (
-                <div className="py-8 text-center">
-                  <History className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                  <p className="text-sm text-slate-400">Ingen tidigare historik tillgänglig</p>
-                </div>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  {historySessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className="bg-slate-900/50 rounded-lg p-4 hover:bg-slate-900/70 transition-colors group"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <button
-                          onClick={() => handleOpenHistorySession(session)}
-                          className="flex items-center gap-3 text-left flex-1 cursor-pointer"
-                        >
-                          <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-500/30 transition-colors">
-                            <Calendar className="w-5 h-5 text-purple-400" />
-                          </div>
-                          <div>
-                            <p className="text-white font-medium group-hover:text-purple-300 transition-colors">
-                              {session.completed_at ? formatDate(session.completed_at) : 'Okänt datum'}
-                            </p>
-                            <div className="flex items-center gap-2 text-sm text-slate-400">
-                              <User className="w-3.5 h-3.5" />
-                              <span>{session.technician?.name || 'Okänd tekniker'}</span>
-                            </div>
-                          </div>
-                        </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handlePreviousSession}
+                disabled={!hasPreviousSession || loadingSessionData}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Äldre kontroll"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
 
-                        <div className="flex items-center gap-4 text-sm">
-                          {/* Statistik för sessionen */}
-                          <div className="flex items-center gap-1">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                            <span className="text-slate-300">{session.inspection_summary?.ok || 0}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <AlertTriangle className="w-4 h-4 text-amber-400" />
-                            <span className="text-slate-300">{session.inspection_summary?.warning || 0}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <AlertTriangle className="w-4 h-4 text-red-400" />
-                            <span className="text-slate-300">{session.inspection_summary?.critical || 0}</span>
-                          </div>
-                          <div className="text-slate-500">
-                            {session.inspection_summary?.total || 0} st
-                          </div>
-                          <div className="relative ml-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setReportDropdownOpen(reportDropdownOpen === session.id ? null : session.id)
-                              }}
-                              disabled={downloadingReport === session.id}
-                              className="p-1.5 text-slate-500 hover:text-teal-400 transition-colors rounded-lg hover:bg-slate-800/50"
-                              title="Ladda ned rapport"
-                            >
-                              {downloadingReport === session.id ? (
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Download className="w-4 h-4" />
-                              )}
-                            </button>
-                            {reportDropdownOpen === session.id && (
-                              <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 min-w-[160px]">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDownloadReport(session.id, 'pdf')
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-t-lg transition-colors"
-                                >
-                                  <FileText className="w-4 h-4 text-red-400" />
-                                  PDF
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDownloadReport(session.id, 'excel')
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-b-lg transition-colors"
-                                >
-                                  <FileSpreadsheet className="w-4 h-4 text-green-400" />
-                                  Excel
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => handleOpenHistorySession(session)}
-                            className="p-1.5 text-slate-500 hover:text-purple-400 transition-colors"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+              {/* Dropdown med alla sessioner grupperade per månad */}
+              <div className="relative">
+                <select
+                  value={selectedSessionId || ''}
+                  onChange={(e) => handleSelectSession(e.target.value)}
+                  disabled={loadingSessionData}
+                  className="appearance-none bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white cursor-pointer hover:border-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-500/50 pr-8 disabled:opacity-50"
+                >
+                  {sessionsByMonth.map(group => (
+                    <optgroup key={group.label} label={group.label.charAt(0).toUpperCase() + group.label.slice(1)}>
+                      {group.sessions.map((session, idx) => (
+                        <option key={session.id} value={session.id}>
+                          {session.completed_at
+                            ? format(new Date(session.completed_at), "d MMM yyyy", { locale: sv })
+                            : 'Okänt datum'}
+                          {session.technician?.name ? ` — ${session.technician.name}` : ''}
+                          {group.sessions.length > 1 ? ` (${idx + 1}/${group.sessions.length})` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+
+              <button
+                onClick={handleNextSession}
+                disabled={!hasNextSession || loadingSessionData}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Nyare kontroll"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              <span className="text-xs text-slate-500 ml-2 hidden sm:inline">
+                {allSessions.length} kontroller
+              </span>
+            </div>
+          </div>
+
+          {/* Statistik-kort */}
+          {loadingSessionData ? (
+            <div className="flex items-center justify-center py-4">
+              <RefreshCw className="w-5 h-5 text-teal-400 animate-spin mr-2" />
+              <span className="text-sm text-slate-400">Laddar kontrolldata...</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-slate-900/50 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-xs text-slate-500 uppercase">OK</span>
                 </div>
-              )}
+                <p className="text-emerald-400 font-bold text-lg">{statusCounts.ok}</p>
+              </div>
+
+              <div className="bg-slate-900/50 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs text-slate-500 uppercase">Varning</span>
+                </div>
+                <p className="text-amber-400 font-bold text-lg">{statusCounts.warning}</p>
+              </div>
+
+              <div className="bg-slate-900/50 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                  <span className="text-xs text-slate-500 uppercase">Kritisk</span>
+                </div>
+                <p className="text-red-400 font-bold text-lg">{statusCounts.critical}</p>
+              </div>
+
+              <div className="bg-slate-900/50 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <ClipboardCheck className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-xs text-slate-500 uppercase">Totalt</span>
+                </div>
+                <p className="text-white font-bold text-lg">{totalStations}</p>
+              </div>
             </div>
           )}
         </div>

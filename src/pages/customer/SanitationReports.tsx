@@ -1,11 +1,21 @@
 import React, { useEffect, useState } from 'react'
-import { FileText, Download, Calendar, Search, Filter, History, X, TrendingUp, BarChart3 } from 'lucide-react'
+import { FileText, Download, Calendar, Search, Filter, History, X, TrendingUp, BarChart3, ClipboardCheck, CheckCircle2, AlertTriangle, FileSpreadsheet } from 'lucide-react'
 import { sanitationReportService, SanitationReport } from '../../services/sanitationReportService'
+import { getCompletedSessionsWithSummary } from '../../services/inspectionSessionService'
+import { generateInspectionPDF, generateInspectionExcel } from '../../services/inspectionReportService'
+import type { InspectionSessionWithRelations } from '../../types/inspectionSession'
 import { useAuth } from '../../contexts/AuthContext'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import toast from 'react-hot-toast'
+import { format } from 'date-fns'
+import { sv } from 'date-fns/locale'
+
+type ReportTab = 'inspections' | 'sanitation'
 
 const SanitationReports: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<ReportTab>('inspections')
+
+  // Sanitation reports state
   const [reports, setReports] = useState<SanitationReport[]>([])
   const [filteredReports, setFilteredReports] = useState<SanitationReport[]>([])
   const [loading, setLoading] = useState(true)
@@ -19,11 +29,18 @@ const SanitationReports: React.FC = () => {
     total_versions: number
   } | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
+
+  // Inspection reports state
+  const [inspectionSessions, setInspectionSessions] = useState<InspectionSessionWithRelations[]>([])
+  const [loadingInspections, setLoadingInspections] = useState(true)
+  const [downloadingInspection, setDownloadingInspection] = useState<string | null>(null)
+
   const { profile } = useAuth()
 
   useEffect(() => {
     if (profile?.customer_id) {
       loadReports()
+      loadInspectionSessions()
     }
   }, [profile])
 
@@ -33,13 +50,13 @@ const SanitationReports: React.FC = () => {
 
   const loadReports = async () => {
     if (!profile?.customer_id) return
-    
+
     try {
       setLoading(true)
       const { data, error } = await sanitationReportService.getReports({
         customer_id: profile.customer_id
       })
-      
+
       if (error) {
         console.error('Error loading reports:', error)
         toast.error('Kunde inte ladda rapporter')
@@ -55,12 +72,27 @@ const SanitationReports: React.FC = () => {
     }
   }
 
+  const loadInspectionSessions = async () => {
+    if (!profile?.customer_id) return
+
+    try {
+      setLoadingInspections(true)
+      const sessions = await getCompletedSessionsWithSummary(profile.customer_id, 100)
+      setInspectionSessions(sessions)
+    } catch (error) {
+      console.error('Error loading inspection sessions:', error)
+      toast.error('Kunde inte ladda kontrollrapporter')
+    } finally {
+      setLoadingInspections(false)
+    }
+  }
+
   const filterReports = () => {
     let filtered = [...reports]
 
     // Sökfilter
     if (searchTerm) {
-      filtered = filtered.filter(report => 
+      filtered = filtered.filter(report =>
         report.file_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         report.pest_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         report.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -72,7 +104,7 @@ const SanitationReports: React.FC = () => {
     if (dateFilter !== 'all') {
       const now = new Date()
       let filterDate = new Date()
-      
+
       switch (dateFilter) {
         case '30d':
           filterDate.setDate(now.getDate() - 30)
@@ -99,11 +131,11 @@ const SanitationReports: React.FC = () => {
 
   const handleDownload = async (report: SanitationReport) => {
     if (!report.id) return
-    
+
     try {
       setDownloading(report.id)
       const { data: blob, error } = await sanitationReportService.downloadReport(report.id)
-      
+
       if (error || !blob) {
         toast.error('Kunde inte ladda ner rapport')
         return
@@ -118,7 +150,7 @@ const SanitationReports: React.FC = () => {
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
-      
+
       toast.success('Rapport nedladdad!')
     } catch (error) {
       console.error('Error downloading report:', error)
@@ -128,13 +160,30 @@ const SanitationReports: React.FC = () => {
     }
   }
 
+  const handleDownloadInspection = async (sessionId: string, type: 'pdf' | 'excel') => {
+    try {
+      setDownloadingInspection(`${sessionId}-${type}`)
+      if (type === 'pdf') {
+        await generateInspectionPDF(sessionId)
+      } else {
+        await generateInspectionExcel(sessionId)
+      }
+      toast.success(`${type === 'pdf' ? 'PDF' : 'Excel'}-rapport nedladdad!`)
+    } catch (error) {
+      console.error('Error generating inspection report:', error)
+      toast.error('Kunde inte generera rapport')
+    } finally {
+      setDownloadingInspection(null)
+    }
+  }
+
   const handleShowHistory = async (caseId: string) => {
     try {
       setLoadingHistory(true)
       setShowHistory(caseId)
-      
+
       const { data, error } = await sanitationReportService.getReportHistory(caseId)
-      
+
       if (error) {
         console.error('Error loading report history:', error)
         toast.error('Kunde inte ladda rapporthistorik')
@@ -157,7 +206,7 @@ const SanitationReports: React.FC = () => {
     setHistoryData(null)
   }
 
-  const formatDate = (dateString: string | undefined) => {
+  const formatDate = (dateString: string | undefined | null) => {
     if (!dateString) return '-'
     return new Date(dateString).toLocaleDateString('sv-SE', {
       year: 'numeric',
@@ -176,45 +225,198 @@ const SanitationReports: React.FC = () => {
     return `${kb.toFixed(0)} KB`
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Header */}
-      <div className="bg-slate-800/50 backdrop-blur border-b border-slate-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <FileText className="w-7 h-7 text-blue-400" />
-                Saneringsrapporter
-              </h1>
-              <p className="text-slate-400 mt-1">
-                Alla era saneringsrapporter från genomförda behandlingar
-              </p>
-            </div>
+  // --- Inspection Reports Tab ---
+  const renderInspectionReports = () => {
+    if (loadingInspections) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <LoadingSpinner />
+            <p className="text-slate-400 mt-4">Laddar kontrollrapporter...</p>
+          </div>
+        </div>
+      )
+    }
 
-            <div className="flex items-center gap-4">
-              {/* Filter Selector */}
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-slate-400" />
-                <select
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value as any)}
-                  className="bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
-                >
-                  <option value="all">Alla rapporter</option>
-                  <option value="30d">Senaste 30 dagarna</option>
-                  <option value="3m">Senaste 3 månaderna</option>
-                  <option value="6m">Senaste 6 månaderna</option>
-                  <option value="1y">Senaste året</option>
-                </select>
+    if (inspectionSessions.length === 0) {
+      return (
+        <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-12 text-center">
+          <ClipboardCheck className="mx-auto h-16 w-16 text-slate-500 mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">
+            Inga kontrollrapporter ännu
+          </h3>
+          <p className="text-slate-400">
+            Era kontrollrapporter visas här efter genomförda kontroller
+          </p>
+        </div>
+      )
+    }
+
+    // Stats
+    const totalSessions = inspectionSessions.length
+    const totalStations = inspectionSessions.reduce((sum, s) => sum + (s.inspection_summary?.total || 0), 0)
+    const latestDate = inspectionSessions[0]?.completed_at || inspectionSessions[0]?.created_at
+
+    return (
+      <>
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute inset-0 bg-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-400">
+                    Genomförda kontroller
+                  </p>
+                  <p className="text-2xl font-bold text-white mt-1 font-mono">
+                    {totalSessions}
+                  </p>
+                </div>
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <ClipboardCheck className="h-6 w-6 text-emerald-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-blue-500/30 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute inset-0 bg-blue-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-400">
+                    Senaste kontroll
+                  </p>
+                  <p className="text-lg font-semibold text-white mt-1">
+                    {formatDate(latestDate)}
+                  </p>
+                </div>
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <Calendar className="h-6 w-6 text-blue-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute inset-0 bg-purple-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-400">
+                    Totalt kontrollerade stationer
+                  </p>
+                  <p className="text-2xl font-bold text-white mt-1 font-mono">
+                    {totalStations}
+                  </p>
+                </div>
+                <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                  <BarChart3 className="h-6 w-6 text-purple-400" />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Inspection Sessions List */}
+        <div className="grid gap-4">
+          {inspectionSessions.map((session) => {
+            const summary = session.inspection_summary
+            const sessionDate = session.completed_at || session.created_at
+            const isDownloadingPDF = downloadingInspection === `${session.id}-pdf`
+            const isDownloadingExcel = downloadingInspection === `${session.id}-excel`
+
+            return (
+              <div
+                key={session.id}
+                className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className="absolute inset-0 bg-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="relative">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                          <ClipboardCheck className="h-6 w-6 text-emerald-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-white text-lg">
+                            Kontrollrapport — {sessionDate ? format(new Date(sessionDate), 'd MMMM yyyy', { locale: sv }) : 'Okänt datum'}
+                          </h3>
+                          <p className="text-sm text-slate-400">
+                            {session.technician?.name || 'Okänd tekniker'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Station counts */}
+                      <div className="flex items-center gap-4 text-sm">
+                        {summary && (
+                          <>
+                            <span className="flex items-center gap-1.5 text-emerald-400">
+                              <CheckCircle2 className="w-4 h-4" />
+                              {summary.ok} OK
+                            </span>
+                            <span className="flex items-center gap-1.5 text-amber-400">
+                              <AlertTriangle className="w-4 h-4" />
+                              {summary.warning} Varning
+                            </span>
+                            <span className="flex items-center gap-1.5 text-red-400">
+                              <AlertTriangle className="w-4 h-4" />
+                              {summary.critical} Kritisk
+                            </span>
+                            <span className="text-slate-400 ml-2">
+                              Totalt: {summary.total} stationer
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Download buttons */}
+                    <div className="flex items-center gap-2 ml-6">
+                      <button
+                        onClick={() => handleDownloadInspection(session.id, 'pdf')}
+                        disabled={isDownloadingPDF}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Ladda ner PDF"
+                      >
+                        {isDownloadingPDF ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <FileText className="h-4 w-4" />
+                        )}
+                        <span className="hidden sm:inline">PDF</span>
+                      </button>
+                      <button
+                        onClick={() => handleDownloadInspection(session.id, 'excel')}
+                        disabled={isDownloadingExcel}
+                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Ladda ner Excel"
+                      >
+                        {isDownloadingExcel ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <FileSpreadsheet className="h-4 w-4" />
+                        )}
+                        <span className="hidden sm:inline">Excel</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </>
+    )
+  }
+
+  // --- Sanitation Reports Tab ---
+  const renderSanitationReports = () => {
+    return (
+      <>
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
@@ -245,7 +447,7 @@ const SanitationReports: React.FC = () => {
                     Senaste rapporten
                   </p>
                   <p className="text-lg font-semibold text-white mt-1">
-                    {reports.length > 0 
+                    {reports.length > 0
                       ? formatDate(reports[0].created_at)
                       : 'Ingen rapport'
                     }
@@ -308,7 +510,7 @@ const SanitationReports: React.FC = () => {
           <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-12 text-center">
             <FileText className="mx-auto h-16 w-16 text-slate-500 mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">
-              {searchTerm || dateFilter !== 'all' 
+              {searchTerm || dateFilter !== 'all'
                 ? 'Inga rapporter hittades'
                 : 'Inga rapporter ännu'
               }
@@ -344,7 +546,7 @@ const SanitationReports: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                         {report.technician_name && (
                           <div>
@@ -356,7 +558,7 @@ const SanitationReports: React.FC = () => {
                             </span>
                           </div>
                         )}
-                        
+
                         {report.pest_type && (
                           <div>
                             <span className="font-medium text-slate-300">
@@ -367,7 +569,7 @@ const SanitationReports: React.FC = () => {
                             </span>
                           </div>
                         )}
-                        
+
                         {report.address && (
                           <div className="sm:col-span-2">
                             <span className="font-medium text-slate-300">
@@ -378,7 +580,7 @@ const SanitationReports: React.FC = () => {
                             </span>
                           </div>
                         )}
-                        
+
                         <div>
                           <span className="font-medium text-slate-300">
                             Storlek:
@@ -387,7 +589,7 @@ const SanitationReports: React.FC = () => {
                             {formatFileSize(report.file_size)}
                           </span>
                         </div>
-                        
+
                         {report.version && report.version > 1 && (
                           <div>
                             <span className="font-medium text-slate-300">
@@ -413,7 +615,7 @@ const SanitationReports: React.FC = () => {
                           <span className="hidden sm:inline">Historik</span>
                         </button>
                       )}
-                      
+
                       <button
                         onClick={() => handleDownload(report)}
                         disabled={downloading === report.id}
@@ -438,8 +640,94 @@ const SanitationReports: React.FC = () => {
             ))}
           </div>
         )}
+      </>
+    )
+  }
 
-        {/* History Modal */}
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {/* Header */}
+      <div className="bg-slate-800/50 backdrop-blur border-b border-slate-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                <FileText className="w-7 h-7 text-blue-400" />
+                Rapporter
+              </h1>
+              <p className="text-slate-400 mt-1">
+                Kontrollrapporter och saneringsrapporter
+              </p>
+            </div>
+
+            {activeTab === 'sanitation' && (
+              <div className="flex items-center gap-4">
+                {/* Filter Selector */}
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-slate-400" />
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value as any)}
+                    className="bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+                  >
+                    <option value="all">Alla rapporter</option>
+                    <option value="30d">Senaste 30 dagarna</option>
+                    <option value="3m">Senaste 3 månaderna</option>
+                    <option value="6m">Senaste 6 månaderna</option>
+                    <option value="1y">Senaste året</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tabs */}
+          <div className="flex items-center gap-1 mt-6">
+            <button
+              onClick={() => setActiveTab('inspections')}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                activeTab === 'inspections'
+                  ? 'bg-[#20c58f] text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+              }`}
+            >
+              <ClipboardCheck className="w-4 h-4" />
+              Kontrollrapporter
+              {inspectionSessions.length > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs font-mono ${
+                  activeTab === 'inspections' ? 'bg-white/20' : 'bg-slate-700'
+                }`}>
+                  {inspectionSessions.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('sanitation')}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                activeTab === 'sanitation'
+                  ? 'bg-[#20c58f] text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Saneringsrapporter
+              {reports.length > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs font-mono ${
+                  activeTab === 'sanitation' ? 'bg-white/20' : 'bg-slate-700'
+                }`}>
+                  {reports.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'inspections' ? renderInspectionReports() : renderSanitationReports()}
+
+        {/* History Modal (sanitation only) */}
         {showHistory && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
@@ -486,8 +774,8 @@ const SanitationReports: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-3">
                               <div className={`p-2 rounded-lg ${
-                                historyReport.is_current 
-                                  ? 'bg-emerald-500/20 border border-emerald-500/30' 
+                                historyReport.is_current
+                                  ? 'bg-emerald-500/20 border border-emerald-500/30'
                                   : 'bg-slate-700 border border-slate-600'
                               }`}>
                                 <FileText className={`h-5 w-5 ${
@@ -506,7 +794,7 @@ const SanitationReports: React.FC = () => {
                                 )}
                               </div>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <span className="font-medium text-slate-300">Version:</span>{' '}
