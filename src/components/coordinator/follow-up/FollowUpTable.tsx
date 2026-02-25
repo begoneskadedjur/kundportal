@@ -8,6 +8,7 @@ import {
   FileSignature, Archive, EyeOff, Eye, Search, X, Trash2,
   MoreVertical, FileText,
 } from 'lucide-react'
+import ReactDOM from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { OFFER_STATUS_CONFIG } from '../../../types/casePipeline'
 import { CommentThread } from './CommentThread'
@@ -99,7 +100,9 @@ function OfferRow({
 }) {
   const [activeTab, setActiveTab] = useState<'internal' | 'external'>('internal')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -221,10 +224,15 @@ function OfferRow({
 
           {/* Snabbåtgärder-meny */}
           {(offer.source_id || offer.contact_email || offer.contact_phone) && (
-            <div className="relative flex-shrink-0" ref={menuRef}>
+            <div className="flex-shrink-0">
               <button
+                ref={triggerRef}
                 onClick={(e) => {
                   e.stopPropagation()
+                  if (!menuOpen && triggerRef.current) {
+                    const rect = triggerRef.current.getBoundingClientRect()
+                    setMenuPos({ top: rect.bottom + 4, left: rect.right - 192 })
+                  }
                   setMenuOpen(!menuOpen)
                 }}
                 className="p-1 rounded transition-colors text-slate-600 hover:text-slate-300 hover:bg-slate-700/30"
@@ -232,50 +240,53 @@ function OfferRow({
               >
                 <MoreVertical className="w-3.5 h-3.5" />
               </button>
-              {menuOpen && (
-                <div
-                  className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-30 py-1 overflow-hidden"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {offer.source_id && (
-                    <button
-                      onClick={() => {
-                        const caseType = offer.source_type === 'business_case' ? 'business' : 'private'
-                        const path = isCoordinator
-                          ? `/coordinator/case-search?openCase=${offer.source_id}&caseType=${caseType}`
-                          : `/technician/schedule?openCase=${offer.source_id}&caseType=${caseType}`
-                        navigate(path)
-                        setMenuOpen(false)
-                      }}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-[#20c58f]" />
-                      Gå till ärende
-                    </button>
-                  )}
-                  {offer.contact_email && (
-                    <a
-                      href={`mailto:${offer.contact_email}`}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      <Mail className="w-3.5 h-3.5 text-blue-400" />
-                      Skicka e-post
-                    </a>
-                  )}
-                  {offer.contact_phone && (
-                    <a
-                      href={`tel:${offer.contact_phone}`}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      <Phone className="w-3.5 h-3.5 text-purple-400" />
-                      Ring kund
-                    </a>
-                  )}
-                </div>
-              )}
             </div>
+          )}
+          {menuOpen && ReactDOM.createPortal(
+            <div
+              ref={menuRef}
+              style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
+              className="w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {offer.source_id && (
+                <button
+                  onClick={() => {
+                    const caseType = offer.source_type === 'business_case' ? 'business' : 'private'
+                    const path = isCoordinator
+                      ? `/coordinator/case-search?openCase=${offer.source_id}&caseType=${caseType}`
+                      : `/technician/schedule?openCase=${offer.source_id}&caseType=${caseType}`
+                    navigate(path)
+                    setMenuOpen(false)
+                  }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#20c58f]" />
+                  Gå till ärende
+                </button>
+              )}
+              {offer.contact_email && (
+                <a
+                  href={`mailto:${offer.contact_email}`}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <Mail className="w-3.5 h-3.5 text-blue-400" />
+                  Skicka e-post
+                </a>
+              )}
+              {offer.contact_phone && (
+                <a
+                  href={`tel:${offer.contact_phone}`}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <Phone className="w-3.5 h-3.5 text-purple-400" />
+                  Ring kund
+                </a>
+              )}
+            </div>,
+            document.body
           )}
 
           {/* Expand */}
