@@ -7,24 +7,24 @@ import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import QuoteDetailModal from './QuoteDetailModal'
 
+// Matches the actual columns of quotes_secure_view
 interface Quote {
   id: string
+  customer_id: string
+  case_number: string | null
+  title: string | null
+  price: number | null
+  quote_status: string | null
+  quote_generated_at: string | null
+  quote_sent_at: string | null
+  quote_signed_at: string | null
+  quote_rejected_at: string | null
   oneflow_contract_id: string | null
-  type: 'quote' | 'contract'
-  status: string
-  company_name: string
-  contact_person: string
-  contact_email: string
-  total_value: number | null
-  selected_products: any[]
-  agreement_text: string | null
-  start_date: string | null
-  contract_length: string | null
-  validity_period: string | null
-  document_url: string | null
-  signing_deadline: string | null
-  created_at: string
-  updated_at: string
+  contact_person: string | null
+  contact_email: string | null
+  contact_phone: string | null
+  address: string | null
+  scheduled_start: string | null
 }
 
 interface QuoteListViewProps {
@@ -50,7 +50,7 @@ const QuoteListView: React.FC<QuoteListViewProps> = ({ customerId }) => {
         .from('quotes_secure_view')
         .select('*')
         .eq('customer_id', customerId)
-        .order('created_at', { ascending: false })
+        .order('quote_generated_at', { ascending: false })
 
       if (error) throw error
 
@@ -63,12 +63,13 @@ const QuoteListView: React.FC<QuoteListViewProps> = ({ customerId }) => {
     }
   }
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string | null) => {
     switch (status) {
       case 'signed':
         return <CheckCircle className="w-5 h-5 text-emerald-500" />
       case 'pending':
         return <Clock className="w-5 h-5 text-amber-500" />
+      case 'declined':
       case 'rejected':
         return <AlertCircle className="w-5 h-5 text-red-500" />
       default:
@@ -76,18 +77,20 @@ const QuoteListView: React.FC<QuoteListViewProps> = ({ customerId }) => {
     }
   }
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string | null) => {
     switch (status) {
       case 'signed':
         return 'Signerad'
       case 'pending':
         return 'Väntar på svar'
+      case 'declined':
       case 'rejected':
         return 'Avvisad'
+      case 'overdue':
       case 'expired':
         return 'Utgången'
       default:
-        return status
+        return status || 'Okänd'
     }
   }
 
@@ -102,21 +105,6 @@ const QuoteListView: React.FC<QuoteListViewProps> = ({ customerId }) => {
       style: 'currency',
       currency: 'SEK'
     }).format(amount)
-  }
-
-  const getProductSummary = (products: any[]) => {
-    if (!products || products.length === 0) return 'Inga produkter'
-    
-    const productNames = products
-      .flatMap(p => p.products || [])
-      .map(p => p.name)
-      .filter(Boolean)
-    
-    if (productNames.length === 0) return 'Inga produkter'
-    if (productNames.length === 1) return productNames[0]
-    if (productNames.length <= 3) return productNames.join(', ')
-    
-    return `${productNames.slice(0, 2).join(', ')} och ${productNames.length - 2} andra`
   }
 
   const openInOneflow = (oneflowContractId: string) => {
@@ -179,17 +167,18 @@ const QuoteListView: React.FC<QuoteListViewProps> = ({ customerId }) => {
           <Card key={quote.id} className="p-6 hover:bg-slate-800/60 transition-colors">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                {getStatusIcon(quote.status)}
+                {getStatusIcon(quote.quote_status)}
                 <div>
                   <h3 className="text-lg font-semibold text-white">
-                    {quote.type === 'contract' ? 'Kontrakt' : 'Offert'} - {quote.company_name}
+                    Offert — {quote.title || 'Utan titel'}
                   </h3>
                   <p className="text-sm text-slate-400">
-                    {getStatusText(quote.status)} • {formatDate(quote.created_at)}
+                    {getStatusText(quote.quote_status)} • {formatDate(quote.quote_generated_at)}
+                    {quote.case_number && <span> • {quote.case_number}</span>}
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 {quote.oneflow_contract_id && (
                   <Button
@@ -209,47 +198,28 @@ const QuoteListView: React.FC<QuoteListViewProps> = ({ customerId }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wide">Kontaktperson</p>
-                <p className="text-white">{quote.contact_person}</p>
-                <p className="text-sm text-slate-400">{quote.contact_email}</p>
+                <p className="text-white">{quote.contact_person || '-'}</p>
+                {quote.contact_email && (
+                  <p className="text-sm text-slate-400">{quote.contact_email}</p>
+                )}
               </div>
-              
+
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Produkter</p>
-                <p className="text-white">{getProductSummary(quote.selected_products)}</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Värde</p>
+                <p className="text-white font-semibold">{formatCurrency(quote.price)}</p>
               </div>
-              
+
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wide">Startdatum</p>
-                <p className="text-white">{formatDate(quote.start_date)}</p>
+                <p className="text-white">{formatDate(quote.scheduled_start)}</p>
               </div>
             </div>
 
-            {/* Contract Details (if applicable) */}
-            {quote.type === 'contract' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 pt-4 border-t border-slate-700">
-                {quote.contract_length && (
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Kontraktslängd</p>
-                    <p className="text-white">{quote.contract_length}</p>
-                  </div>
-                )}
-                
-                {quote.total_value && (
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Värde</p>
-                    <p className="text-white font-semibold">{formatCurrency(quote.total_value)}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Agreement Text Preview */}
-            {quote.agreement_text && (
+            {/* Address if available */}
+            {quote.address && (
               <div className="mb-4 pt-4 border-t border-slate-700">
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Avtalstext</p>
-                <p className="text-slate-300 text-sm line-clamp-3">
-                  {quote.agreement_text}
-                </p>
+                <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Adress</p>
+                <p className="text-slate-300 text-sm">{quote.address}</p>
               </div>
             )}
 
@@ -263,21 +233,10 @@ const QuoteListView: React.FC<QuoteListViewProps> = ({ customerId }) => {
                 <Eye className="w-4 h-4 mr-2" />
                 Visa detaljer
               </Button>
-              
-              {quote.document_url && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => window.open(quote.document_url!, '_blank')}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Ladda ner PDF
-                </Button>
-              )}
-              
+
               <div className="ml-auto text-xs text-slate-500">
                 <Calendar className="w-3 h-3 inline mr-1" />
-                Uppdaterad {formatDate(quote.updated_at)}
+                Skapad {formatDate(quote.quote_generated_at)}
               </div>
             </div>
           </Card>
