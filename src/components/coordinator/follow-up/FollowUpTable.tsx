@@ -1,12 +1,14 @@
 // src/components/coordinator/follow-up/FollowUpTable.tsx
 // Expanderbar tabell för offertuppföljning med prioritetsgrupper, dölj-funktion och intern kommunikation
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown, ChevronUp, MessageSquare, ExternalLink,
   Clock, AlertTriangle, User, Mail, Phone,
   FileSignature, Archive, EyeOff, Eye, Search, X, Trash2,
+  MoreVertical, FileText,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { OFFER_STATUS_CONFIG } from '../../../types/casePipeline'
 import { CommentThread } from './CommentThread'
 import CommentSection from '../../communication/CommentSection'
@@ -96,6 +98,21 @@ function OfferRow({
   onDelete?: (contractId: string) => void
 }) {
   const [activeTab, setActiveTab] = useState<'internal' | 'external'>('internal')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [menuOpen])
+
   const ageBadge = getAgeBadge(offer.age_days)
   const borderColor = getAgeBorderColor(offer.age_days)
   const statusConfig = OFFER_STATUS_CONFIG[offer.status] || { label: offer.status, color: 'text-slate-400', bgColor: 'bg-slate-500/15' }
@@ -200,6 +217,65 @@ function OfferRow({
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
+          )}
+
+          {/* Snabbåtgärder-meny */}
+          {(offer.source_id || offer.contact_email || offer.contact_phone) && (
+            <div className="relative flex-shrink-0" ref={menuRef}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setMenuOpen(!menuOpen)
+                }}
+                className="p-1 rounded transition-colors text-slate-600 hover:text-slate-300 hover:bg-slate-700/30"
+                title="Snabbåtgärder"
+              >
+                <MoreVertical className="w-3.5 h-3.5" />
+              </button>
+              {menuOpen && (
+                <div
+                  className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-30 py-1 overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {offer.source_id && (
+                    <button
+                      onClick={() => {
+                        const caseType = offer.source_type === 'business_case' ? 'business' : 'private'
+                        const path = isCoordinator
+                          ? `/coordinator/case-search?openCase=${offer.source_id}&caseType=${caseType}`
+                          : `/technician/schedule?openCase=${offer.source_id}&caseType=${caseType}`
+                        navigate(path)
+                        setMenuOpen(false)
+                      }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-[#20c58f]" />
+                      Gå till ärende
+                    </button>
+                  )}
+                  {offer.contact_email && (
+                    <a
+                      href={`mailto:${offer.contact_email}`}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <Mail className="w-3.5 h-3.5 text-blue-400" />
+                      Skicka e-post
+                    </a>
+                  )}
+                  {offer.contact_phone && (
+                    <a
+                      href={`tel:${offer.contact_phone}`}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <Phone className="w-3.5 h-3.5 text-purple-400" />
+                      Ring kund
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Expand */}

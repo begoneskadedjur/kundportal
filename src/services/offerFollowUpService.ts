@@ -52,6 +52,7 @@ export interface FollowUpOffer {
   hidden_by: string[]
   // Koppling till ursprungligt ärende
   source_id: string | null
+  source_type: string | null
 }
 
 export interface TechnicianOfferStats {
@@ -90,7 +91,7 @@ export type FollowUpSortBy = 'priority' | 'oldest' | 'newest' | 'value_desc' | '
 const OFFER_COLUMNS = `
   id, oneflow_contract_id, type, status, company_name, contact_person,
   contact_email, contact_phone, total_value, begone_employee_name,
-  begone_employee_email, created_at, updated_at, hidden_by, source_id
+  begone_employee_email, created_at, updated_at, hidden_by, source_id, source_type
 `
 
 const EMPTY_KPIS: FollowUpKPIs = {
@@ -162,6 +163,7 @@ export class OfferFollowUpService {
         is_recently_overdue: o.status === 'overdue' && days_since_overdue !== null && days_since_overdue <= THRESHOLDS.RECENTLY_OVERDUE_DAYS,
         hidden_by: o.hidden_by || [],
         source_id: o.source_id || null,
+        source_type: o.source_type || null,
       }
     })
 
