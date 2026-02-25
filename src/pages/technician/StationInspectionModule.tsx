@@ -583,6 +583,9 @@ export default function StationInspectionModule() {
   // Välj station (från karta, planritning eller lista)
   // Tillåter klick även under 'scheduled' - auto-start vid första sparning
   const handleSelectStation = useCallback(async (station: StationData) => {
+    // Blockera redigering om sessionen är avslutad (kräver upplåsning först)
+    if (session?.status === 'completed') return
+
     // Om session inte är startad, markera för auto-start vid första sparning
     if (session?.status === 'scheduled') {
       setShouldAutoStartOnSave(true)
@@ -914,6 +917,7 @@ export default function StationInspectionModule() {
   // Spara stationsinspektion
   const handleSaveInspection = async () => {
     if (!session || !selectedStation) return
+    if (session.status === 'completed') return
 
     try {
       setIsSubmitting(true)
@@ -960,7 +964,7 @@ export default function StationInspectionModule() {
         status: selectedStatus,
         findings: inspectionNotes || undefined,
         photo_path: photoPath || undefined,
-        measurement_value: measurementValue ? parseFloat(measurementValue) : undefined,
+        measurement_value: measurementValue !== '' ? parseFloat(measurementValue) : undefined,
         measurement_unit: measurementUnit || undefined,
         preparation_id: selectedPreparationId || undefined
       }
@@ -1002,7 +1006,7 @@ export default function StationInspectionModule() {
         [selectedStation.id]: {
           status: selectedStatus,
           findings: inspectionNotes || null,
-          measurementValue: measurementValue ? parseFloat(measurementValue) : null,
+          measurementValue: measurementValue !== '' ? parseFloat(measurementValue) : null,
           measurementUnit: measurementUnit || null,
           preparationId: selectedPreparationId,
           preparationName: selectedPrep?.name || null,
