@@ -650,7 +650,7 @@ export default function StationInspectionModule() {
     } finally {
       setHistoryLoading(false)
     }
-  }, [session?.status, outdoorStations])
+  }, [session?.status, outdoorStations, inspectionResults])
 
   // Hantera klick på outdoor station (från kartan)
   const handleOutdoorStationClick = useCallback((equipment: EquipmentPlacementWithRelations) => {
