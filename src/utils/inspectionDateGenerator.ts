@@ -11,7 +11,8 @@ import type {
   DateGenerationParams,
   GeneratedInspectionDate,
   RecurringFrequency,
-  RecurringDayPattern
+  RecurringDayPattern,
+  CustomFrequencyConfig
 } from '../types/recurringSchedule'
 import { isSwedishWorkday, getNextWorkday, getPreviousWorkday, getSwedishHolidayName } from './swedishHolidays'
 
@@ -34,32 +35,57 @@ export function generateInspectionDates(params: DateGenerationParams): Generated
     endDate,
     technicianWorkSchedule,
     technicianAbsences = [],
-    existingBookings = []
+    existingBookings = [],
+    customFrequencyConfig
   } = params
 
   const results: GeneratedInspectionDate[] = []
 
   // Calculate all period boundaries
-  const periods = calculatePeriods(frequency, startDate, endDate)
+  const periods = calculatePeriods(frequency, startDate, endDate, customFrequencyConfig)
+
+  // Determine how many visits per period
+  const visitsPerPeriod = frequency === 'twice_monthly' ? 2
+    : (frequency === 'custom' && customFrequencyConfig?.visits_per_period)
+      ? customFrequencyConfig.visits_per_period
+      : 1
 
   for (const period of periods) {
-    // For twice_monthly: generate 2 dates per period
-    if (frequency === 'twice_monthly') {
-      const midDate = addDays(period.start, Math.floor(
-        (period.end.getTime() - period.start.getTime()) / (2 * 86400000)
+    // Season filter: skip periods outside active months (custom frequency only)
+    if (frequency === 'custom' && customFrequencyConfig?.active_months_start != null && customFrequencyConfig?.active_months_end != null) {
+      const periodMonth = period.start.getMonth() + 1 // 1-12
+      const mStart = customFrequencyConfig.active_months_start
+      const mEnd = customFrequencyConfig.active_months_end
+
+      let inSeason: boolean
+      if (mStart <= mEnd) {
+        // Normal range, e.g. mars(3)–november(11)
+        inSeason = periodMonth >= mStart && periodMonth <= mEnd
+      } else {
+        // Wrap-around range, e.g. november(11)–februari(2)
+        inSeason = periodMonth >= mStart || periodMonth <= mEnd
+      }
+      if (!inSeason) continue
+    }
+
+    if (visitsPerPeriod > 1) {
+      // Multi-visit: split the period into equal segments
+      const totalDays = Math.max(1, Math.round(
+        (period.end.getTime() - period.start.getTime()) / 86400000
       ))
-      const firstHalf = { start: period.start, end: subDays(midDate, 1) }
-      const secondHalf = { start: midDate, end: period.end }
+      const segmentDays = Math.floor(totalDays / visitsPerPeriod)
 
-      const date1 = findBestDate(dayPattern, preferredDayOfMonth, preferredTime,
-        estimatedDurationMinutes, firstHalf, period, technicianWorkSchedule,
-        technicianAbsences, [...existingBookings, ...results.map(r => ({ start: r.date, end: r.endDate }))])
-      if (date1) results.push(date1)
+      for (let v = 0; v < visitsPerPeriod; v++) {
+        const segStart = addDays(period.start, v * segmentDays)
+        const segEnd = v < visitsPerPeriod - 1
+          ? subDays(addDays(period.start, (v + 1) * segmentDays), 1)
+          : period.end
 
-      const date2 = findBestDate(dayPattern, preferredDayOfMonth, preferredTime,
-        estimatedDurationMinutes, secondHalf, period, technicianWorkSchedule,
-        technicianAbsences, [...existingBookings, ...results.map(r => ({ start: r.date, end: r.endDate }))])
-      if (date2) results.push(date2)
+        const date = findBestDate(dayPattern, preferredDayOfMonth, preferredTime,
+          estimatedDurationMinutes, { start: segStart, end: segEnd }, period, technicianWorkSchedule,
+          technicianAbsences, [...existingBookings, ...results.map(r => ({ start: r.date, end: r.endDate }))])
+        if (date) results.push(date)
+      }
     } else {
       const date = findBestDate(dayPattern, preferredDayOfMonth, preferredTime,
         estimatedDurationMinutes, period, period, technicianWorkSchedule,
@@ -80,7 +106,12 @@ interface Period {
   end: Date
 }
 
-function calculatePeriods(frequency: RecurringFrequency, startDate: Date, endDate: Date): Period[] {
+function calculatePeriods(
+  frequency: RecurringFrequency,
+  startDate: Date,
+  endDate: Date,
+  customFrequencyConfig?: CustomFrequencyConfig
+): Period[] {
   const periods: Period[] = []
   let current = new Date(startDate)
 
@@ -107,6 +138,17 @@ function calculatePeriods(frequency: RecurringFrequency, startDate: Date, endDat
       case 'annual':
         periodEnd = addMonths(current, 12)
         break
+      case 'custom': {
+        const periodType = customFrequencyConfig?.period_type || 'month'
+        switch (periodType) {
+          case 'week':    periodEnd = addWeeks(current, 1); break
+          case 'month':   periodEnd = addMonths(current, 1); break
+          case 'quarter': periodEnd = addMonths(current, 3); break
+          case 'year':    periodEnd = addMonths(current, 12); break
+          default:        periodEnd = addMonths(current, 1)
+        }
+        break
+      }
       default:
         periodEnd = addMonths(current, 1)
     }

@@ -5,11 +5,12 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ChevronLeft, ChevronRight, Calendar, Clock, Check,
-  AlertTriangle, Loader2, CalendarDays, Repeat
+  AlertTriangle, Loader2, CalendarDays, Repeat, Settings
 } from 'lucide-react'
 import { format, addMonths } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import DatePicker from 'react-datepicker'
+import '../../styles/DatePickerDarkTheme.css'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -21,12 +22,15 @@ import type {
   RecurringFrequency,
   RecurringDayPattern,
   GeneratedInspectionDate,
-  CreateRecurringScheduleInput
+  CreateRecurringScheduleInput,
+  CustomFrequencyConfig
 } from '../../types/recurringSchedule'
 import {
   FREQUENCY_CONFIG,
   DAY_PATTERN_CONFIG,
-  DURATION_OPTIONS
+  DURATION_OPTIONS,
+  STANDARD_FREQUENCIES,
+  SWEDISH_MONTH_NAMES
 } from '../../types/recurringSchedule'
 import type { WorkSchedule } from '../../types/database'
 
@@ -98,6 +102,11 @@ export function RecurringScheduleWizard({
   )
   const [dayPattern, setDayPattern] = useState<RecurringDayPattern | null>(null)
   const [preferredDayOfMonth, setPreferredDayOfMonth] = useState(1)
+  const [customConfig, setCustomConfig] = useState<CustomFrequencyConfig>({
+    visits_per_period: 1,
+    period_type: 'week'
+  })
+  const [showActivePeriod, setShowActivePeriod] = useState(false)
 
   // Step 4: Time
   const [preferredHour, setPreferredHour] = useState(9)
@@ -138,6 +147,8 @@ export function RecurringScheduleWizard({
       setDurationMinutes(60)
       setFrequency(parseServiceFrequency(serviceFrequency) || null)
       setDayPattern(null)
+      setCustomConfig({ visits_per_period: 1, period_type: 'week' })
+      setShowActivePeriod(false)
       setPreferredHour(9)
       setPreferredMinute(0)
       setPreviewDates([])
@@ -167,7 +178,11 @@ export function RecurringScheduleWizard({
         estimatedDurationMinutes: durationMinutes,
         startDate,
         endDate: previewEnd,
-        technicianWorkSchedule: workSchedule
+        technicianWorkSchedule: workSchedule,
+        customFrequencyConfig: frequency === 'custom' ? {
+          ...customConfig,
+          ...(showActivePeriod ? {} : { active_months_start: undefined, active_months_end: undefined })
+        } : undefined
       })
 
       setPreviewDates(dates)
@@ -198,7 +213,11 @@ export function RecurringScheduleWizard({
         schedule_start_date: format(startDate, 'yyyy-MM-dd'),
         contract_end_date: contractEndDate || undefined,
         is_auto_renewing: true,
-        created_by: profile?.id
+        created_by: profile?.id,
+        custom_frequency_config: frequency === 'custom' ? {
+          ...customConfig,
+          ...(showActivePeriod ? {} : { active_months_start: undefined, active_months_end: undefined })
+        } : undefined
       }
 
       const result = await createScheduleWithSessions(input, includedDates)
@@ -313,7 +332,6 @@ export function RecurringScheduleWizard({
                         locale={sv}
                         inline
                         minDate={new Date()}
-                        calendarClassName="!bg-slate-800 !border-slate-700"
                       />
                     </div>
                     <p className="text-xs text-slate-500 text-center">
@@ -365,22 +383,149 @@ export function RecurringScheduleWizard({
                       Hur ofta ska kontroller genomföras?
                     </p>
                     <div className="space-y-2">
-                      {(Object.entries(FREQUENCY_CONFIG) as [RecurringFrequency, typeof FREQUENCY_CONFIG[RecurringFrequency]][]).map(([key, config]) => (
-                        <button
-                          key={key}
-                          onClick={() => setFrequency(key)}
-                          className={`w-full p-3 rounded-lg border text-left transition-all ${
-                            frequency === key
-                              ? 'border-[#20c58f] bg-[#20c58f]/20'
-                              : 'border-slate-700 bg-slate-800 hover:border-slate-600'
-                          }`}
-                        >
-                          <span className={`text-sm font-medium ${frequency === key ? 'text-[#20c58f]' : 'text-slate-300'}`}>
-                            {config.label}
-                          </span>
-                          <span className="text-xs text-slate-500 ml-2">{config.description}</span>
-                        </button>
-                      ))}
+                      {STANDARD_FREQUENCIES.map(key => {
+                        const config = FREQUENCY_CONFIG[key]
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setFrequency(key)}
+                            className={`w-full p-3 rounded-lg border text-left transition-all ${
+                              frequency === key
+                                ? 'border-[#20c58f] bg-[#20c58f]/20'
+                                : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                            }`}
+                          >
+                            <span className={`text-sm font-medium ${frequency === key ? 'text-[#20c58f]' : 'text-slate-300'}`}>
+                              {config.label}
+                            </span>
+                            <span className="text-xs text-slate-500 ml-2">{config.description}</span>
+                          </button>
+                        )
+                      })}
+
+                      {/* Separator + Custom frequency */}
+                      <div className="flex items-center gap-3 pt-1">
+                        <div className="flex-1 h-px bg-slate-700" />
+                        <span className="text-xs text-slate-500">eller</span>
+                        <div className="flex-1 h-px bg-slate-700" />
+                      </div>
+
+                      <button
+                        onClick={() => setFrequency('custom')}
+                        className={`w-full p-3 rounded-lg border text-left transition-all flex items-center gap-2 ${
+                          frequency === 'custom'
+                            ? 'border-[#20c58f] bg-[#20c58f]/20'
+                            : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                        }`}
+                      >
+                        <Settings className={`w-4 h-4 ${frequency === 'custom' ? 'text-[#20c58f]' : 'text-slate-400'}`} />
+                        <span className={`text-sm font-medium ${frequency === 'custom' ? 'text-[#20c58f]' : 'text-slate-300'}`}>
+                          Anpassat intervall
+                        </span>
+                        <span className="text-xs text-slate-500 ml-1">Ange eget schema</span>
+                      </button>
+
+                      {/* Custom frequency config */}
+                      <AnimatePresence>
+                        {frequency === 'custom' && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="p-3 bg-slate-800/50 border border-slate-700 rounded-xl space-y-3">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={10}
+                                  value={customConfig.visits_per_period}
+                                  onChange={(e) => setCustomConfig(prev => ({
+                                    ...prev,
+                                    visits_per_period: Math.min(10, Math.max(1, Number(e.target.value)))
+                                  }))}
+                                  className="w-16 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm text-center focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                                />
+                                <span className="text-sm text-slate-300">besök per</span>
+                                <select
+                                  value={customConfig.period_type}
+                                  onChange={(e) => setCustomConfig(prev => ({
+                                    ...prev,
+                                    period_type: e.target.value as CustomFrequencyConfig['period_type']
+                                  }))}
+                                  className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                                >
+                                  <option value="week">vecka</option>
+                                  <option value="month">månad</option>
+                                  <option value="quarter">kvartal</option>
+                                  <option value="year">år</option>
+                                </select>
+                              </div>
+
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={showActivePeriod}
+                                  onChange={(e) => {
+                                    setShowActivePeriod(e.target.checked)
+                                    if (e.target.checked && !customConfig.active_months_start) {
+                                      setCustomConfig(prev => ({
+                                        ...prev,
+                                        active_months_start: 3,
+                                        active_months_end: 11
+                                      }))
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded border-slate-600 text-[#20c58f] focus:ring-[#20c58f] bg-slate-700"
+                                />
+                                <span className="text-sm text-slate-300">Begränsa till säsong</span>
+                              </label>
+
+                              <AnimatePresence>
+                                {showActivePeriod && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="overflow-hidden"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <select
+                                        value={customConfig.active_months_start || 3}
+                                        onChange={(e) => setCustomConfig(prev => ({
+                                          ...prev,
+                                          active_months_start: Number(e.target.value)
+                                        }))}
+                                        className="flex-1 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                                      >
+                                        {SWEDISH_MONTH_NAMES.map((name, i) => (
+                                          <option key={i} value={i + 1}>{name}</option>
+                                        ))}
+                                      </select>
+                                      <span className="text-sm text-slate-500">–</span>
+                                      <select
+                                        value={customConfig.active_months_end || 11}
+                                        onChange={(e) => setCustomConfig(prev => ({
+                                          ...prev,
+                                          active_months_end: Number(e.target.value)
+                                        }))}
+                                        className="flex-1 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                                      >
+                                        {SWEDISH_MONTH_NAMES.map((name, i) => (
+                                          <option key={i} value={i + 1}>{name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     {/* Day pattern section — appears when frequency is selected */}

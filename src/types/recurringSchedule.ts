@@ -15,6 +15,7 @@ export type RecurringFrequency =
   | 'quarterly'
   | 'semi_annual'
   | 'annual'
+  | 'custom'
 
 export type RecurringDayPattern =
   | 'first_weekday'
@@ -34,6 +35,17 @@ export type RecurringDayPattern =
 export type RecurringScheduleStatus = 'active' | 'paused' | 'cancelled'
 
 // ============================================
+// CUSTOM FREQUENCY
+// ============================================
+
+export interface CustomFrequencyConfig {
+  visits_per_period: number
+  period_type: 'week' | 'month' | 'quarter' | 'year'
+  active_months_start?: number  // 1-12
+  active_months_end?: number    // 1-12
+}
+
+// ============================================
 // CONFIG MAPS
 // ============================================
 
@@ -42,14 +54,19 @@ export const FREQUENCY_CONFIG: Record<RecurringFrequency, {
   monthInterval: number
   description: string
 }> = {
-  weekly:      { label: 'Varje vecka',              monthInterval: 0.25, description: '4 besök per månad' },
-  bi_weekly:   { label: 'Varannan vecka',           monthInterval: 0.5,  description: '2 besök per månad' },
-  monthly:     { label: 'Månadsvis',                monthInterval: 1,    description: '1 besök per månad' },
-  twice_monthly: { label: '2 gånger/månad',         monthInterval: 1,    description: '2 besök per månad, fördelat' },
-  quarterly:   { label: 'Kvartalsvis',              monthInterval: 3,    description: 'Var 3:e månad' },
-  semi_annual: { label: 'Halvårsvis',               monthInterval: 6,    description: 'Var 6:e månad' },
-  annual:      { label: 'Årsvis',                   monthInterval: 12,   description: '1 besök per år' },
+  weekly:        { label: 'Varje vecka',        monthInterval: 0.25, description: '4 besök per månad' },
+  bi_weekly:     { label: 'Varannan vecka',     monthInterval: 0.5,  description: '2 besök per månad' },
+  monthly:       { label: 'Månadsvis',          monthInterval: 1,    description: '1 besök per månad' },
+  twice_monthly: { label: '2 gånger/månad',     monthInterval: 1,    description: '2 besök per månad, fördelat' },
+  quarterly:     { label: 'Kvartalsvis',        monthInterval: 3,    description: 'Var 3:e månad' },
+  semi_annual:   { label: 'Halvårsvis',         monthInterval: 6,    description: 'Var 6:e månad' },
+  annual:        { label: 'Årsvis',             monthInterval: 12,   description: '1 besök per år' },
+  custom:        { label: 'Anpassat intervall', monthInterval: 1,    description: 'Ange eget schema' },
 }
+
+export const STANDARD_FREQUENCIES: RecurringFrequency[] = [
+  'weekly', 'bi_weekly', 'monthly', 'twice_monthly', 'quarterly', 'semi_annual', 'annual'
+]
 
 export const DAY_PATTERN_CONFIG: Record<RecurringDayPattern, {
   label: string
@@ -81,6 +98,11 @@ export const DURATION_OPTIONS = [
   { value: 240, label: '4 timmar' },
 ]
 
+export const SWEDISH_MONTH_NAMES = [
+  'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
+  'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
+]
+
 // ============================================
 // DATABASE TYPES
 // ============================================
@@ -101,6 +123,7 @@ export interface RecurringSchedule {
   last_generated_at: string | null
   status: RecurringScheduleStatus
   notes: string | null
+  custom_frequency_config: CustomFrequencyConfig | null
   created_at: string
   updated_at: string
   created_by: string | null
@@ -141,6 +164,7 @@ export interface CreateRecurringScheduleInput {
   is_auto_renewing?: boolean
   notes?: string
   created_by?: string
+  custom_frequency_config?: CustomFrequencyConfig
 }
 
 export interface UpdateRecurringScheduleInput {
@@ -152,6 +176,7 @@ export interface UpdateRecurringScheduleInput {
   is_auto_renewing?: boolean
   status?: RecurringScheduleStatus
   notes?: string | null
+  custom_frequency_config?: CustomFrequencyConfig | null
 }
 
 // ============================================
@@ -169,6 +194,7 @@ export interface DateGenerationParams {
   technicianWorkSchedule?: WorkSchedule | null
   technicianAbsences?: { start_date: string; end_date: string }[]
   existingBookings?: { start: Date; end: Date; title?: string }[]
+  customFrequencyConfig?: CustomFrequencyConfig
 }
 
 export interface GeneratedInspectionDate {

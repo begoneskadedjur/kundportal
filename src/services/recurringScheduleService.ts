@@ -43,7 +43,8 @@ export async function createRecurringSchedule(
       generated_until: format(generatedUntil, 'yyyy-MM-dd'),
       status: 'active',
       notes: input.notes || null,
-      created_by: input.created_by || null
+      created_by: input.created_by || null,
+      custom_frequency_config: input.custom_frequency_config || null
     }])
     .select()
     .single()
@@ -445,6 +446,13 @@ export async function createScheduleWithSessions(
     .single()
   const technicianName = techData?.name || null
 
+  // Fetch customer contact data for case records
+  const { data: customerData } = await supabase
+    .from('customers')
+    .select('contact_person, contact_email, contact_phone, contact_address')
+    .eq('id', schedule.customer_id)
+    .single()
+
   // Count stations for the customer (outdoor + indoor)
   const [outdoorResult, indoorResult] = await Promise.all([
     supabase
@@ -491,7 +499,13 @@ export async function createScheduleWithSessions(
           primary_technician_id: schedule.technician_id,
           primary_technician_name: technicianName,
           case_number: caseNumber,
-          price: null
+          price: null,
+          contact_person: customerData?.contact_person || null,
+          contact_email: customerData?.contact_email || null,
+          contact_phone: customerData?.contact_phone || null,
+          address: customerData?.contact_address
+            ? { formatted_address: customerData.contact_address }
+            : null
         }])
         .select('id')
         .single()
