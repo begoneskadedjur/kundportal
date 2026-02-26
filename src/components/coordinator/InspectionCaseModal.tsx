@@ -19,7 +19,7 @@ import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
-import { DROPDOWN_STATUSES, ACCOUNT_MANAGERS } from '../../types/database'
+import { DROPDOWN_STATUSES } from '../../types/database'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import { toSwedishISOString } from '../../utils/dateHelpers'
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
@@ -563,10 +563,9 @@ export default function InspectionCaseModal({
                   </div>
                 )}
                 {(() => {
-                  const amEmail = customerData.assigned_account_manager
+                  const amName = customerData.assigned_account_manager
                     || (customerData.is_multisite && organizationSites?.find((s: any) => s.site_type === 'huvudkontor')?.assigned_account_manager);
-                  if (!amEmail) return null;
-                  const amName = ACCOUNT_MANAGERS.find(m => m.value === amEmail)?.label || amEmail;
+                  if (!amName) return null;
                   return (
                     <div className="mt-3 pt-3 border-t border-cyan-500/20">
                       <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20 w-fit">

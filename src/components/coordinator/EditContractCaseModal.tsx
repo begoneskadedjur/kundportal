@@ -20,7 +20,7 @@ import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
-import { DROPDOWN_STATUSES, ACCOUNT_MANAGERS } from '../../types/database'
+import { DROPDOWN_STATUSES } from '../../types/database'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
@@ -1443,7 +1443,7 @@ export default function EditContractCaseModal({
                         <Star size={12} className="text-amber-400 fill-amber-400" />
                         <span className="text-xs text-slate-400">Account Manager:</span>
                         <span className="text-xs text-amber-300 font-medium">
-                          {ACCOUNT_MANAGERS.find(m => m.value === customerData.assigned_account_manager)?.label || customerData.assigned_account_manager}
+                          {customerData.assigned_account_manager}
                         </span>
                       </div>
                     </div>

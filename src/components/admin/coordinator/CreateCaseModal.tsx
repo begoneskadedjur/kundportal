@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow, ACCOUNT_MANAGERS } from '../../../types/database';
+import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
 import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
@@ -453,16 +453,19 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     if (caseType !== 'contract' && caseType !== 'inspection') return null;
     const siteCustomer = selectedSiteId ? contractCustomers.find(c => c.id === selectedSiteId) : null;
     const parentCustomer = selectedContractCustomer ? contractCustomers.find(c => c.id === selectedContractCustomer) : null;
-    const amEmail = siteCustomer?.assigned_account_manager || parentCustomer?.assigned_account_manager;
+    // account_manager_email lagrar @begone.se-email, kan vara slash-separerad
+    const amEmail = siteCustomer?.account_manager_email || parentCustomer?.account_manager_email;
     if (!amEmail) return null;
-    const amTech = technicians.find(t => t.email === amEmail);
+    const amTech = technicians.find(t => amEmail.toLowerCase().includes(t.email.toLowerCase()));
     return amTech?.id || null;
   }, [caseType, selectedContractCustomer, selectedSiteId, contractCustomers, technicians]);
 
+  // AM-namn: assigned_account_manager lagrar redan namn direkt
   const accountManagerName = useMemo(() => {
-    if (!accountManagerTechId) return null;
-    return technicians.find(t => t.id === accountManagerTechId)?.name || null;
-  }, [accountManagerTechId, technicians]);
+    const siteCustomer = selectedSiteId ? contractCustomers.find(c => c.id === selectedSiteId) : null;
+    const parentCustomer = selectedContractCustomer ? contractCustomers.find(c => c.id === selectedContractCustomer) : null;
+    return siteCustomer?.assigned_account_manager || parentCustomer?.assigned_account_manager || null;
+  }, [selectedContractCustomer, selectedSiteId, contractCustomers]);
 
   const selectCaseType = (type: 'private' | 'business' | 'contract' | 'inspection') => {
     setCaseType(type);

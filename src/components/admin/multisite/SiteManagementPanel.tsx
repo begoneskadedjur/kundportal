@@ -201,12 +201,14 @@ export default function SiteManagementPanel({
 
   const startEdit = (site: OrganizationSite) => {
     setEditingSite(site)
+    // select('*') returnerar contact_address (DB-kolumn), inte address (TS-typ)
+    const rawSite = site as any
     setFormData({
       site_name: site.site_name,
       site_code: site.site_code || '',
-      address: site.address || '',
+      address: rawSite.contact_address || site.address || '',
       region: site.region || '',
-      is_primary: false // Removed is_primary as it's not used in new structure
+      is_primary: false
     })
   }
 
@@ -316,11 +318,11 @@ export default function SiteManagementPanel({
             </div>
 
             {/* Address Info */}
-            {site.address && (
+            {((site as any).contact_address || site.address) && (
               <div className="mt-2">
                 <div className="flex items-center gap-2 text-sm text-slate-400">
                   <Building className="w-3 h-3" />
-                  <span className="truncate">{site.address}</span>
+                  <span className="truncate">{(site as any).contact_address || site.address}</span>
                 </div>
               </div>
             )}
