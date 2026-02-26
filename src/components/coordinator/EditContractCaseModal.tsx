@@ -20,7 +20,7 @@ import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
-import { DROPDOWN_STATUSES } from '../../types/database'
+import { DROPDOWN_STATUSES, ACCOUNT_MANAGERS } from '../../types/database'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
@@ -451,15 +451,16 @@ export default function EditContractCaseModal({
         // Hämta huvudkundens data för organisationsnummer
         const { data: parentData, error: parentError } = await supabase
           .from('customers')
-          .select('organization_number, company_name')
+          .select('organization_number, company_name, assigned_account_manager')
           .eq('id', data.parent_customer_id)
           .single()
-        
+
         if (!parentError && parentData) {
           // Använd huvudkundens org.nr om enheten inte har eget
           finalCustomerData = {
             ...data,
             organization_number: data.organization_number || parentData.organization_number,
+            assigned_account_manager: data.assigned_account_manager || parentData.assigned_account_manager,
             parent_organization_number: parentData.organization_number,
             parent_company_name: parentData.company_name
           }
@@ -1434,6 +1435,17 @@ export default function EditContractCaseModal({
                         <Building2 className="w-3 h-3" />
                         Multisite-organisation
                       </span>
+                    </div>
+                  )}
+                  {customerData.assigned_account_manager && (
+                    <div className="mt-3 pt-3 border-t border-purple-500/20">
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20 w-fit">
+                        <Star size={12} className="text-amber-400 fill-amber-400" />
+                        <span className="text-xs text-slate-400">Account Manager:</span>
+                        <span className="text-xs text-amber-300 font-medium">
+                          {ACCOUNT_MANAGERS.find(m => m.value === customerData.assigned_account_manager)?.label || customerData.assigned_account_manager}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>

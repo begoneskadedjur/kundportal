@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
+import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow, ACCOUNT_MANAGERS } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
@@ -216,7 +216,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           status: 'Bokat',
           skadedjur: initialCaseData.pest_type || initialCaseData.skadedjur,
           priority: initialCaseData.priority,
-          description: initialCaseData.description
+          description: initialCaseData.description,
+          adress: formattedAddress || '',
         });
         // Vänta med att sätta customer tills vi vet om det är multisite
       } else {
@@ -397,7 +398,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           e_post_kontaktperson: dataSource.contact_email || '',
           org_nr: dataSource.organization_number || '',
           bestallare: dataSource.company_name || '',
-          adress: dataSource.contact_address || dataSource.service_address || prev.adress,
+          adress: prev.adress || dataSource.contact_address || dataSource.service_address || '',
           // Lägg även till faktura-fält om de finns
           e_post_faktura: dataSource.billing_email || dataSource.contact_email || '',
           faktura_adress: dataSource.billing_address || dataSource.contact_address || '',
@@ -446,6 +447,22 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         );
       });
   }, [contractCustomers, customerSearchTerm, caseType, customersWithStations]);
+
+  // Account Manager: hitta vilken tekniker som är kundens AM
+  const accountManagerTechId = useMemo(() => {
+    if (caseType !== 'contract' && caseType !== 'inspection') return null;
+    const siteCustomer = selectedSiteId ? contractCustomers.find(c => c.id === selectedSiteId) : null;
+    const parentCustomer = selectedContractCustomer ? contractCustomers.find(c => c.id === selectedContractCustomer) : null;
+    const amEmail = siteCustomer?.assigned_account_manager || parentCustomer?.assigned_account_manager;
+    if (!amEmail) return null;
+    const amTech = technicians.find(t => t.email === amEmail);
+    return amTech?.id || null;
+  }, [caseType, selectedContractCustomer, selectedSiteId, contractCustomers, technicians]);
+
+  const accountManagerName = useMemo(() => {
+    if (!accountManagerTechId) return null;
+    return technicians.find(t => t.id === accountManagerTechId)?.name || null;
+  }, [accountManagerTechId, technicians]);
 
   const selectCaseType = (type: 'private' | 'business' | 'contract' | 'inspection') => {
     setCaseType(type);
@@ -1113,6 +1130,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       onChange={handleChange}
                     />
 
+                    {/* Account Manager-info */}
+                    {accountManagerName && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                        <Star size={12} className="text-amber-400 fill-amber-400" />
+                        <span className="text-xs text-slate-400">Account Manager:</span>
+                        <span className="text-xs text-amber-300 font-medium">{accountManagerName}</span>
+                      </div>
+                    )}
+
                     {/* Sökparametrar för bokningsassistent */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
@@ -1158,6 +1184,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               onChange={() => handleTechnicianSelectionChange(tech.id)}
                             />
                             <span className="text-sm text-white truncate">{tech.name}</span>
+                              {tech.id === accountManagerTechId && (
+                                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-full shrink-0">
+                                  <Star size={10} className="fill-amber-400" />AM
+                                </span>
+                              )}
                           </label>
                         ))}
                       </div>
@@ -1197,6 +1228,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           <BookingSuggestionList
                             suggestions={suggestions}
                             onSelect={applySuggestion}
+                            accountManagerTechId={accountManagerTechId}
                           />
                         </div>
                       </div>
@@ -1408,6 +1440,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <DatePicker selected={searchStartDate} onChange={(date) => handleDateChange(date, 'searchStartDate')} locale="sv" dateFormat="yyyy-MM-dd" placeholderText="Välj startdatum..." isClearable className="w-full" />
                     </div>
                   </div>
+                  {/* Account Manager-info */}
+                  {accountManagerName && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                      <Star size={12} className="text-amber-400 fill-amber-400" />
+                      <span className="text-xs text-slate-400">Account Manager:</span>
+                      <span className="text-xs text-amber-300 font-medium">{accountManagerName}</span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-slate-400 mb-1">Skadedjur *</label>
@@ -1448,6 +1488,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                                 onChange={() => handleTechnicianSelectionChange(tech.id)}
                               />
                               <span className="text-sm text-white truncate">{tech.name}</span>
+                              {tech.id === accountManagerTechId && (
+                                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-full shrink-0">
+                                  <Star size={10} className="fill-amber-400" />AM
+                                </span>
+                              )}
                             </label>
                           ))}
                         </div>
@@ -1475,6 +1520,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <BookingSuggestionList
                           suggestions={suggestions}
                           onSelect={applySuggestion}
+                          accountManagerTechId={accountManagerTechId}
                         />
                       </div>
                     </div>
@@ -1527,7 +1573,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               <div className="pt-2 border-t border-slate-600/50 space-y-1">
                                 {sugg.technicians.map(tech => (
                                   <div key={tech.id} className="flex items-center justify-between text-xs">
-                                    <span className="text-slate-300">{tech.name}</span>
+                                    <span className="text-slate-300 flex items-center gap-1">
+                                      {tech.name}
+                                      {tech.id === accountManagerTechId && (
+                                        <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded-full">AM</span>
+                                      )}
+                                    </span>
                                     <span className="text-slate-500">{tech.travel_time_minutes} min</span>
                                   </div>
                                 ))}

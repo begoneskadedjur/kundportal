@@ -82,13 +82,15 @@ interface BookingSuggestionCardProps {
   onClick: () => void;
   isTopPick?: boolean;
   rank?: number;
+  isAccountManager?: boolean;
 }
 
 export default function BookingSuggestionCard({
   suggestion,
   onClick,
   isTopPick = false,
-  rank
+  rank,
+  isAccountManager = false
 }: BookingSuggestionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -136,6 +138,11 @@ export default function BookingSuggestionCard({
             <h4 className="font-semibold text-white text-sm truncate flex items-center gap-1.5">
               <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               {suggestion.technician_name}
+              {isAccountManager && (
+                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-full shrink-0">
+                  <Star size={10} className="fill-amber-400" />AM
+                </span>
+              )}
             </h4>
           </div>
         </div>
@@ -270,9 +277,10 @@ interface GroupedSuggestion {
 interface BookingSuggestionListProps {
   suggestions: SingleSuggestion[];
   onSelect: (suggestion: SingleSuggestion) => void;
+  accountManagerTechId?: string | null;
 }
 
-export function BookingSuggestionList({ suggestions, onSelect }: BookingSuggestionListProps) {
+export function BookingSuggestionList({ suggestions, onSelect, accountManagerTechId }: BookingSuggestionListProps) {
   // Sortera alla förslag efter effektivitet (bäst först)
   const sortedByEfficiency = React.useMemo(() =>
     [...suggestions].sort((a, b) => b.efficiency_score - a.efficiency_score),
@@ -356,6 +364,7 @@ export function BookingSuggestionList({ suggestions, onSelect }: BookingSuggesti
               onClick={() => onSelect(sugg)}
               isTopPick={index === 0}
               rank={index + 1}
+              isAccountManager={!!accountManagerTechId && sugg.technician_id === accountManagerTechId}
             />
           ))}
         </div>
@@ -390,6 +399,7 @@ export function BookingSuggestionList({ suggestions, onSelect }: BookingSuggesti
                     key={`${sugg.technician_id}-${sugg.start_time}`}
                     suggestion={sugg}
                     onClick={() => onSelect(sugg)}
+                    isAccountManager={!!accountManagerTechId && sugg.technician_id === accountManagerTechId}
                   />
                 ))}
               </div>

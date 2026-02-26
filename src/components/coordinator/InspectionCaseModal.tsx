@@ -10,7 +10,7 @@ import {
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save,
   FileText, Users, ClipboardCheck, Play,
   FileSignature, ChevronDown, ChevronRight, DollarSign,
-  Building, Building2, Plus, Trash2, Pencil
+  Building, Building2, Plus, Trash2, Pencil, Star
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -19,7 +19,7 @@ import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
-import { DROPDOWN_STATUSES } from '../../types/database'
+import { DROPDOWN_STATUSES, ACCOUNT_MANAGERS } from '../../types/database'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import { toSwedishISOString } from '../../utils/dateHelpers'
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
@@ -562,6 +562,21 @@ export default function InspectionCaseModal({
                     </span>
                   </div>
                 )}
+                {(() => {
+                  const amEmail = customerData.assigned_account_manager
+                    || (customerData.is_multisite && organizationSites?.find((s: any) => s.site_type === 'huvudkontor')?.assigned_account_manager);
+                  if (!amEmail) return null;
+                  const amName = ACCOUNT_MANAGERS.find(m => m.value === amEmail)?.label || amEmail;
+                  return (
+                    <div className="mt-3 pt-3 border-t border-cyan-500/20">
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20 w-fit">
+                        <Star size={12} className="text-amber-400 fill-amber-400" />
+                        <span className="text-xs text-slate-400">Account Manager:</span>
+                        <span className="text-xs text-amber-300 font-medium">{amName}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
