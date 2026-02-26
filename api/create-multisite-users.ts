@@ -226,11 +226,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Add site_ids for regionchef and platsansvarig
-        // Regionchef uses 'sites' field, platsansvarig uses 'siteIds'
-        if (roleAssignment.role === 'regionchef' && roleAssignment.sites) {
-          roleData.site_ids = roleAssignment.sites
-        } else if (roleAssignment.role === 'platsansvarig' && roleAssignment.siteIds) {
-          roleData.site_ids = roleAssignment.siteIds
+        // Acceptera både 'siteIds' (UserModal) och 'sites' (wizard) för bakåtkompatibilitet
+        if (roleAssignment.role === 'regionchef' || roleAssignment.role === 'platsansvarig') {
+          const siteIds = roleAssignment.siteIds || roleAssignment.sites
+          if (siteIds && siteIds.length > 0) {
+            roleData.site_ids = siteIds
+          }
         }
 
         if (existingRole) {
