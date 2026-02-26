@@ -103,24 +103,15 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
 
       // Ladda upp bilder om det finns några
       if (data && files.length > 0) {
-        let uploadedCount = 0
-        for (const file of files) {
-          try {
-            await CaseImageService.uploadCaseImage(
-              data.id,
-              'contract', // cases-tabellen är för avtalskunder
-              file,
-              ['general'],
-              undefined,
-              profile?.id
-            )
-            uploadedCount++
-          } catch (uploadError) {
-            console.error('Fel vid bilduppladdning:', uploadError)
-          }
-        }
-        if (uploadedCount > 0) {
-          console.log(`${uploadedCount}/${files.length} bilder uppladdade`)
+        const result = await CaseImageService.uploadMultipleCaseImages(
+          data.id,
+          'contract',
+          files,
+          ['general'],
+          profile?.id
+        )
+        if (result.failed.length > 0) {
+          toast.error(`${result.failed.length} av ${files.length} bilder kunde inte laddas upp`)
         }
       }
 
