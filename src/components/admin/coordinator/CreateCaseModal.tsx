@@ -348,7 +348,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   useEffect(() => {
     if (selectedContractCustomer && contractCustomers.length > 0) {
       const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
-      
+
+      // Om "customer" är en enhet (t.ex. inspection valde enhet direkt), hitta HK för fallback
+      const parentCustomer = customer?.parent_customer_id
+        ? contractCustomers.find(c => c.id === customer.parent_customer_id)
+        : null;
+
       // Om en site är vald för multisite-kund, använd sitens data där det finns
       let dataSource = customer;
       if (selectedSiteId) {
@@ -376,7 +381,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           billing_address: site.billing_address || customer?.billing_address,
           // Sitens egna uppgifter, fallback till huvudkund (HK)
           company_name: site.company_name,
-          organization_number: site.organization_number || customer?.organization_number,
+          organization_number: site.organization_number || customer?.organization_number || parentCustomer?.organization_number,
           contact_address: site.contact_address
         };
         
@@ -396,9 +401,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           kontaktperson: dataSource.contact_person || '',
           telefon_kontaktperson: dataSource.contact_phone || '',
           e_post_kontaktperson: dataSource.contact_email || '',
-          org_nr: dataSource.organization_number || '',
+          org_nr: dataSource.organization_number || parentCustomer?.organization_number || '',
           bestallare: dataSource.company_name || '',
-          company_name: dataSource.company_name || customer?.company_name || '',
+          company_name: dataSource.company_name || customer?.company_name || parentCustomer?.company_name || '',
           adress: prev.adress || dataSource.contact_address || dataSource.service_address || '',
           // Lägg även till faktura-fält om de finns
           e_post_faktura: dataSource.billing_email || dataSource.contact_email || '',
