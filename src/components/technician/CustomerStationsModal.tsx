@@ -25,7 +25,8 @@ import {
   Upload,
   MoreVertical,
   ImagePlus,
-  Trash2
+  Trash2,
+  Repeat
 } from 'lucide-react'
 import { CustomerStationSummary } from '../../services/equipmentService'
 import { StationHealthBadge, StationHealthDetail, calculateHealthStatusWithPercentage } from '../shared/StationHealthBadge'
@@ -50,6 +51,8 @@ import type { StationType } from '../../types/stationTypes'
 import { openInMapsApp } from '../../utils/equipmentMapUtils'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { RecurringScheduleManagement } from './RecurringScheduleManagement'
+import { RecurringScheduleWizard } from './RecurringScheduleWizard'
 import toast from 'react-hot-toast'
 
 interface CustomerStationsModalProps {
@@ -60,7 +63,7 @@ interface CustomerStationsModalProps {
   onStationClick?: (station: any, type: 'outdoor' | 'indoor') => void
 }
 
-type ViewType = 'outdoor' | 'indoor'
+type ViewType = 'outdoor' | 'indoor' | 'schedule'
 
 // Ikonmappning för stationstyper (legacy + dynamiska)
 const INDOOR_TYPE_ICONS: Record<string, React.ElementType> = {
@@ -121,6 +124,7 @@ export function CustomerStationsModal({
   const [indoorStations, setIndoorStations] = useState<IndoorStationWithRelations[]>([])
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails | null>(null)
   const [floorPlans, setFloorPlans] = useState<FloorPlanWithRelations[]>([])
+  const [showScheduleWizard, setShowScheduleWizard] = useState(false)
 
   // Inomhusplacering state
   const [selectedFloorPlan, setSelectedFloorPlan] = useState<FloorPlanWithRelations | null>(null)
@@ -501,6 +505,17 @@ export function CustomerStationsModal({
                       {indoorStations.length}
                     </span>
                   </button>
+                  <button
+                    onClick={() => setActiveView('schedule')}
+                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      activeView === 'schedule'
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <Repeat className="w-4 h-4" />
+                    Schema
+                  </button>
                 </div>
               </div>
 
@@ -852,12 +867,23 @@ export function CustomerStationsModal({
                         )}
                       </>
                     )}
+
+                    {/* Kontrollschema tab */}
+                    {activeView === 'schedule' && customer && (
+                      <div className="p-4">
+                        <RecurringScheduleManagement
+                          customerId={customer.customer_id}
+                          technicianId={profile?.technician_id || ''}
+                          onCreateNew={() => setShowScheduleWizard(true)}
+                        />
+                      </div>
+                    )}
                   </>
                 )}
               </div>
 
-              {/* Footer med lägg till-knapp - döljs i inomhusplaceringsläge */}
-              {!isAddingIndoor && (
+              {/* Footer med lägg till-knapp - döljs i inomhusplaceringsläge och schema-vy */}
+              {!isAddingIndoor && activeView !== 'schedule' && (
                 <div className="px-5 py-4 border-t border-slate-700 bg-slate-800/50">
                   <button
                     onClick={handleAddStationClick}
@@ -943,6 +969,24 @@ export function CustomerStationsModal({
                 </div>
               </div>
             </div>
+          )}
+          {/* Recurring Schedule Wizard */}
+          {showScheduleWizard && customer && (
+            <RecurringScheduleWizard
+              isOpen={showScheduleWizard}
+              onClose={() => setShowScheduleWizard(false)}
+              onComplete={() => {
+                setShowScheduleWizard(false)
+                // Refresh schedule view if on schedule tab
+                if (activeView === 'schedule') {
+                  setActiveView('outdoor')
+                  setTimeout(() => setActiveView('schedule'), 100)
+                }
+              }}
+              customerId={customer.customer_id}
+              customerName={customer.customer_name}
+              technicianId={profile?.technician_id || ''}
+            />
           )}
         </>
       )}

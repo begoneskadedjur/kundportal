@@ -32,6 +32,8 @@ import { AllCustomersList } from '../../components/technician/AllCustomersList'
 import { CustomerStationsModal } from '../../components/technician/CustomerStationsModal'
 import { CollapsibleMapSection } from '../../components/technician/CollapsibleMapSection'
 import { AddStationWizard } from '../../components/technician/AddStationWizard'
+import { RecurringScheduleWizard } from '../../components/technician/RecurringScheduleWizard'
+import { getRecurringSchedulesByCustomer } from '../../services/recurringScheduleService'
 
 interface Customer {
   id: string
@@ -68,6 +70,12 @@ export default function TechnicianEquipment() {
   const [formResetKey, setFormResetKey] = useState(0)
   const [lastEquipmentType, setLastEquipmentType] = useState<EquipmentType | null>(null)
   const [lastUsedMap, setLastUsedMap] = useState(false)
+
+  // Recurring schedule prompt
+  const [showSchedulePrompt, setShowSchedulePrompt] = useState(false)
+  const [schedulePromptCustomerId, setSchedulePromptCustomerId] = useState<string | null>(null)
+  const [schedulePromptCustomerName, setSchedulePromptCustomerName] = useState('')
+  const [showScheduleWizard, setShowScheduleWizard] = useState(false)
 
   // Borttagningsdialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -397,7 +405,10 @@ export default function TechnicianEquipment() {
   }
 
   // Batch-placering: klar, stäng allt
-  const handleFinishBatch = () => {
+  const handleFinishBatch = async () => {
+    const finishedCustomerId = wizardCustomerId
+    const finishedCustomerName = batchCustomerName
+
     setShowSuccessState(false)
     setIsFormOpen(false)
     setEditingEquipment(null)
@@ -407,6 +418,21 @@ export default function TechnicianEquipment() {
     setBatchCustomerName('')
     setLastEquipmentType(null)
     setLastUsedMap(false)
+
+    // Check if this customer already has a recurring schedule
+    if (finishedCustomerId) {
+      try {
+        const schedules = await getRecurringSchedulesByCustomer(finishedCustomerId)
+        const hasActive = schedules.some(s => s.status === 'active')
+        if (!hasActive) {
+          setSchedulePromptCustomerId(finishedCustomerId)
+          setSchedulePromptCustomerName(finishedCustomerName)
+          setShowSchedulePrompt(true)
+        }
+      } catch (e) {
+        // Silently fail - don't block the user
+      }
+    }
   }
 
   // Hantera klick på karta för att öppna utrustning
@@ -802,6 +828,68 @@ export default function TechnicianEquipment() {
       >
         <Plus className="w-8 h-8 text-white" />
       </motion.button>
+
+      {/* Prompt: schedule recurring inspections after station placement */}
+      <AnimatePresence>
+        {showSchedulePrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => setShowSchedulePrompt(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-900 rounded-2xl border border-slate-700 p-6 max-w-sm w-full"
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-white font-semibold text-lg mb-2">Aterkommande kontroller</h3>
+              <p className="text-slate-400 text-sm mb-5">
+                Vill du schemalägga aterkommande kontroller for {schedulePromptCustomerName}?
+                Du kan aven gora detta senare under kundens schema-flik.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSchedulePrompt(false)}
+                  className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg transition"
+                >
+                  Senare
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSchedulePrompt(false)
+                    setShowScheduleWizard(true)
+                  }}
+                  className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition"
+                >
+                  Ja, schemalgg
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Recurring Schedule Wizard */}
+      {showScheduleWizard && schedulePromptCustomerId && (
+        <RecurringScheduleWizard
+          isOpen={showScheduleWizard}
+          onClose={() => {
+            setShowScheduleWizard(false)
+            setSchedulePromptCustomerId(null)
+          }}
+          onComplete={() => {
+            setShowScheduleWizard(false)
+            setSchedulePromptCustomerId(null)
+          }}
+          customerId={schedulePromptCustomerId}
+          customerName={schedulePromptCustomerName}
+          technicianId={technicianId}
+        />
+      )}
     </div>
   )
 }

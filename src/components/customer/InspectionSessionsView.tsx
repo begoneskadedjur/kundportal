@@ -34,6 +34,7 @@ import {
   FileSpreadsheet,
   FileText
 } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService } from '../../services/floorPlanService'
 import { IndoorStationService } from '../../services/indoorStationService'
@@ -160,6 +161,9 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [latestComparisonData, setLatestComparisonData] = useState<Map<string, { value: number | null; status: 'ok' | 'warning' | 'critical' }>>(new Map())
   const [latestSessionDate, setLatestSessionDate] = useState<string | null>(null)
+
+  // Kommande schemalagda kontroller
+  const [upcomingSessions, setUpcomingSessions] = useState<{ id: string; scheduled_at: string; scheduled_end: string | null; technician_name: string | null }[]>([])
 
   // Rapport-nedladdning
   const [downloadingReport, setDownloadingReport] = useState<string | null>(null)
@@ -402,6 +406,34 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Hämta kommande schemalagda kontroller
+  useEffect(() => {
+    async function fetchUpcoming() {
+      try {
+        const { data } = await supabase
+          .from('station_inspection_sessions')
+          .select('id, scheduled_at, scheduled_end, technician:technicians(name)')
+          .eq('customer_id', customerId)
+          .eq('status', 'scheduled')
+          .gte('scheduled_at', new Date().toISOString())
+          .order('scheduled_at', { ascending: true })
+          .limit(5)
+
+        if (data) {
+          setUpcomingSessions(data.map((s: any) => ({
+            id: s.id,
+            scheduled_at: s.scheduled_at,
+            scheduled_end: s.scheduled_end,
+            technician_name: s.technician?.name || null
+          })))
+        }
+      } catch (err) {
+        console.error('Error fetching upcoming sessions:', err)
+      }
+    }
+    fetchUpcoming()
+  }, [customerId])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -831,6 +863,39 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             </button>
           </div>
         </div>
+
+        {/* Kommande schemalagda kontroller */}
+        {upcomingSessions.length > 0 && (
+          <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-medium text-purple-300">
+                Kommande kontroller ({upcomingSessions.length})
+              </h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {upcomingSessions.map(s => (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-2 bg-slate-800/50 rounded-lg px-3 py-1.5 text-sm"
+                >
+                  <span className="text-white font-medium">
+                    {format(new Date(s.scheduled_at), 'd MMM yyyy', { locale: sv })}
+                  </span>
+                  <span className="text-slate-400">
+                    {format(new Date(s.scheduled_at), 'HH:mm')}
+                    {s.scheduled_end && `–${format(new Date(s.scheduled_end), 'HH:mm')}`}
+                  </span>
+                  {s.technician_name && (
+                    <span className="text-slate-500 text-xs">
+                      {s.technician_name}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Sessionsväljare + sammanfattning */}
         <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-5 mb-6">

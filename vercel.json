@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/sync-oneflow",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/extend-recurring-schedules",
+      "schedule": "0 4 * * *"
     }
   ],
   "rewrites": [

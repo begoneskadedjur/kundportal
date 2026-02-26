@@ -60,6 +60,7 @@ export interface StationInspectionSession {
   customer_id: string
   technician_id: string | null
   scheduled_at: string | null
+  scheduled_end: string | null
   started_at: string | null
   completed_at: string | null
   total_outdoor_stations: number
@@ -68,6 +69,7 @@ export interface StationInspectionSession {
   inspected_indoor_stations: number
   status: InspectionSessionStatus
   notes: string | null
+  recurring_schedule_id: string | null
   created_at: string
   updated_at: string
   created_by: string | null
@@ -178,7 +180,9 @@ export interface CreateInspectionSessionInput {
   customer_id: string
   technician_id?: string
   scheduled_at?: string
+  scheduled_end?: string
   notes?: string
+  recurring_schedule_id?: string
 }
 
 /**

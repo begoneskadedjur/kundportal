@@ -1,6 +1,6 @@
 // src/components/customer/UpcomingVisits.tsx
 import React, { useState, useEffect } from 'react'
-import { Calendar, Clock, User, MapPin, Phone, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, User, MapPin, Phone, AlertCircle, ClipboardCheck } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -18,6 +18,7 @@ interface Visit {
   status: string
   estimated_duration?: string
   location?: string
+  source?: 'clickup' | 'inspection'
 }
 
 interface UpcomingVisitsProps {
@@ -42,66 +43,103 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
       setLoading(true)
       setError(null)
 
-      // Först: Hämta kundens clickup_list_id från databasen
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .select('clickup_list_id')
-        .eq('id', customer.id)
-        .single()
+      const allVisits: Visit[] = []
 
-      if (customerError || !customerData?.clickup_list_id) {
-        console.error('Customer not found or no ClickUp list:', customerError)
-        setError('Kunde inte hämta kundinformation')
-        setVisits([])
-        return
+      // 1. Hämta schemalagda inspektionssessioner från Supabase
+      try {
+        const { data: inspectionSessions } = await supabase
+          .from('station_inspection_sessions')
+          .select(`
+            id, scheduled_at, scheduled_end, status, notes,
+            technician:technicians(name, phone)
+          `)
+          .eq('customer_id', customer.id)
+          .in('status', ['scheduled', 'in_progress'])
+          .gte('scheduled_at', new Date().toISOString())
+          .order('scheduled_at', { ascending: true })
+          .limit(10)
+
+        if (inspectionSessions) {
+          for (const session of inspectionSessions) {
+            const tech = session.technician as any
+            const durationMs = session.scheduled_end && session.scheduled_at
+              ? new Date(session.scheduled_end).getTime() - new Date(session.scheduled_at).getTime()
+              : 0
+            const durationMin = Math.round(durationMs / 60000)
+
+            allVisits.push({
+              id: `inspection-${session.id}`,
+              case_id: session.id,
+              case_number: 'Kontroll',
+              case_title: 'Stationskontroll',
+              visit_date: session.scheduled_at,
+              technician_name: tech?.name || 'Ej tilldelad',
+              technician_phone: tech?.phone || undefined,
+              work_description: session.notes || undefined,
+              status: session.status === 'in_progress' ? 'Pågår' : 'Schemalagd',
+              estimated_duration: durationMin > 0 ? `${durationMin} min` : undefined,
+              location: customer.company_name,
+              source: 'inspection'
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching inspection sessions:', err)
       }
 
-      // Sedan: Hämta ärenden från ClickUp som har schemalagda datum
-      const response = await fetch(`/api/clickup-tasks?list_id=${customerData.clickup_list_id}`)
-      
-      if (response.ok) {
-        const data = await response.json()
-        const tasks = data.tasks || []
-        
-        console.log('Fetched tasks for upcoming visits:', tasks.length)
-        
-        // Filtrera tasks som har due_date i framtiden och är aktiva
-        const upcomingTasks = tasks.filter((task: any) => {
-          if (!task.due_date) return false
-          
-          const dueDate = new Date(parseInt(task.due_date))
-          const now = new Date()
-          const status = task.status?.status?.toLowerCase() || ''
-          
-          return dueDate >= now && 
-                 !['genomfört', 'genomförd', 'avslutad', 'klar', 'complete', 'closed'].includes(status)
-        })
+      // 2. Hämta ärenden från ClickUp
+      try {
+        const { data: customerData } = await supabase
+          .from('customers')
+          .select('clickup_list_id')
+          .eq('id', customer.id)
+          .single()
 
-        console.log('Upcoming visits after filtering:', upcomingTasks.length)
+        if (customerData?.clickup_list_id) {
+          const response = await fetch(`/api/clickup-tasks?list_id=${customerData.clickup_list_id}`)
 
-        // Mappa till Visit interface
-        const mappedVisits: Visit[] = upcomingTasks.map((task: any) => ({
-          id: `visit-${task.id}`,
-          case_id: task.id,
-          case_number: task.custom_id || `#${task.id.slice(-6)}`,
-          case_title: task.name,
-          visit_date: new Date(parseInt(task.due_date)).toISOString(),
-          technician_name: task.assignees?.[0]?.username || 'Ej tilldelad',
-          technician_phone: undefined, // Inte tillgängligt från ClickUp
-          work_description: task.description,
-          status: task.status?.status || 'Schemalagd',
-          estimated_duration: '2-4 timmar', // Default estimation
-          location: task.custom_fields?.find((f: any) => f.name?.toLowerCase().includes('adress'))?.value || customer.company_name
-        }))
+          if (response.ok) {
+            const data = await response.json()
+            const tasks = data.tasks || []
 
-        // Sortera efter datum (närmast först)
-        mappedVisits.sort((a, b) => new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime())
-        
-        setVisits(mappedVisits.slice(0, 3)) // Visa max 3 kommande besök
-      } else {
-        console.error('API error:', response.status, response.statusText)
-        setError('Kunde inte hämta besök från ClickUp')
+            const upcomingTasks = tasks.filter((task: any) => {
+              if (!task.due_date) return false
+              const dueDate = new Date(parseInt(task.due_date))
+              const now = new Date()
+              const status = task.status?.status?.toLowerCase() || ''
+              return dueDate >= now &&
+                     !['genomfört', 'genomförd', 'avslutad', 'klar', 'complete', 'closed'].includes(status)
+            })
+
+            for (const task of upcomingTasks) {
+              allVisits.push({
+                id: `visit-${task.id}`,
+                case_id: task.id,
+                case_number: task.custom_id || `#${task.id.slice(-6)}`,
+                case_title: task.name,
+                visit_date: new Date(parseInt(task.due_date)).toISOString(),
+                technician_name: task.assignees?.[0]?.username || 'Ej tilldelad',
+                technician_phone: undefined,
+                work_description: task.description,
+                status: task.status?.status || 'Schemalagd',
+                estimated_duration: '2-4 timmar',
+                location: task.custom_fields?.find((f: any) => f.name?.toLowerCase().includes('adress'))?.value || customer.company_name,
+                source: 'clickup'
+              })
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching ClickUp visits:', err)
+      }
+
+      // Sortera efter datum (närmast först) och begränsa
+      allVisits.sort((a, b) => new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime())
+
+      if (allVisits.length === 0 && !error) {
         setVisits([])
+      } else {
+        setVisits(allVisits.slice(0, 5))
       }
     } catch (error) {
       console.error('Error fetching visits:', error)
@@ -258,6 +296,9 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
+                      {visit.source === 'inspection' && (
+                        <ClipboardCheck className="w-3.5 h-3.5 text-teal-400" />
+                      )}
                       <span className="text-slate-400 text-sm font-mono">
                         {visit.case_number}
                       </span>

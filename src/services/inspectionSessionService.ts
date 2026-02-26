@@ -481,6 +481,8 @@ export async function createInspectionSession(
       customer_id: input.customer_id,
       technician_id: input.technician_id || null,
       scheduled_at: input.scheduled_at || null,
+      scheduled_end: input.scheduled_end || null,
+      recurring_schedule_id: input.recurring_schedule_id || null,
       status: 'scheduled',
       notes: input.notes || null
     }])

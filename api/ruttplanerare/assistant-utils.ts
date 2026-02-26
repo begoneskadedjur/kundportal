@@ -214,6 +214,37 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
     });
   }
 
+  // 4. Hämta från station_inspection_sessions (schemalagda kontroller)
+  const { data: inspectionSessions, error: inspectionError } = await supabase
+    .from('station_inspection_sessions')
+    .select('scheduled_at, scheduled_end, technician_id, customer:customers(company_name), status')
+    .in('technician_id', staffIds)
+    .gte('scheduled_at', from.toISOString())
+    .lte('scheduled_at', to.toISOString())
+    .in('status', ['scheduled', 'in_progress']);
+
+  if (inspectionError) {
+    console.error('Error fetching inspection sessions:', inspectionError);
+  } else {
+    console.log(`[getSchedules] Hämtade ${inspectionSessions?.length || 0} inspection sessions`);
+    inspectionSessions?.forEach(s => {
+      if (s.scheduled_at && s.scheduled_end) {
+        const start = new Date(s.scheduled_at);
+        const end = new Date(s.scheduled_end);
+        const durationMinutes = (end.getTime() - start.getTime()) / 60000;
+        if (durationMinutes <= 0) return;
+        const customerName = (s.customer as any)?.company_name || '';
+        const eventSlot: EventSlot = {
+          start,
+          end,
+          title: `Stationskontroll - ${customerName}`,
+          type: 'case'
+        };
+        addToSchedule(s.technician_id, eventSlot);
+      }
+    });
+  }
+
   // Logga för debugging
   let totalCases = 0;
   schedules.forEach((cases, techId) => {
