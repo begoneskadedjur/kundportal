@@ -77,6 +77,10 @@ export default function TechnicianEquipment() {
   const [schedulePromptCustomerName, setSchedulePromptCustomerName] = useState('')
   const [showScheduleWizard, setShowScheduleWizard] = useState(false)
 
+  // Batch-schemaläggning (från kundlistan)
+  const [batchScheduleTargets, setBatchScheduleTargets] = useState<Array<{ customerId: string; customerName: string }>>([])
+  const [batchScheduleIndex, setBatchScheduleIndex] = useState(0)
+
   // Borttagningsdialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
     id: string
@@ -404,6 +408,21 @@ export default function TechnicianEquipment() {
     setFormResetKey(prev => prev + 1) // Tvinga ommontering av formuläret
   }
 
+  // Check om en kund saknar schema och visa prompt
+  const checkAndPromptSchedule = async (customerId: string, customerName: string) => {
+    try {
+      const schedules = await getRecurringSchedulesByCustomer(customerId)
+      const hasActive = schedules.some(s => s.status === 'active')
+      if (!hasActive) {
+        setSchedulePromptCustomerId(customerId)
+        setSchedulePromptCustomerName(customerName)
+        setShowSchedulePrompt(true)
+      }
+    } catch (e) {
+      // Silently fail - don't block the user
+    }
+  }
+
   // Batch-placering: klar, stäng allt
   const handleFinishBatch = async () => {
     const finishedCustomerId = wizardCustomerId
@@ -419,19 +438,54 @@ export default function TechnicianEquipment() {
     setLastEquipmentType(null)
     setLastUsedMap(false)
 
-    // Check if this customer already has a recurring schedule
     if (finishedCustomerId) {
-      try {
-        const schedules = await getRecurringSchedulesByCustomer(finishedCustomerId)
-        const hasActive = schedules.some(s => s.status === 'active')
-        if (!hasActive) {
-          setSchedulePromptCustomerId(finishedCustomerId)
-          setSchedulePromptCustomerName(finishedCustomerName)
-          setShowSchedulePrompt(true)
-        }
-      } catch (e) {
-        // Silently fail - don't block the user
+      await checkAndPromptSchedule(finishedCustomerId, finishedCustomerName)
+    }
+  }
+
+  // Hantera batch-schemaläggning från kundlistan
+  const handleScheduleFromList = (targets: Array<{ customer_id: string; customer_name: string }>) => {
+    if (targets.length === 0) return
+
+    if (targets.length === 1) {
+      // Enkel kund — öppna wizard direkt
+      setSchedulePromptCustomerId(targets[0].customer_id)
+      setSchedulePromptCustomerName(targets[0].customer_name)
+      setShowScheduleWizard(true)
+    } else {
+      // Batch — öppna wizard för första enheten, spara resten
+      setBatchScheduleTargets(targets.map(t => ({ customerId: t.customer_id, customerName: t.customer_name })))
+      setBatchScheduleIndex(0)
+      setSchedulePromptCustomerId(targets[0].customer_id)
+      setSchedulePromptCustomerName(targets[0].customer_name)
+      setShowScheduleWizard(true)
+    }
+  }
+
+  // Hantera wizard completion — gå vidare till nästa enhet i batch eller avsluta
+  const handleScheduleWizardComplete = () => {
+    if (batchScheduleTargets.length > 0) {
+      const nextIndex = batchScheduleIndex + 1
+      if (nextIndex < batchScheduleTargets.length) {
+        // Öppna wizard för nästa enhet
+        setBatchScheduleIndex(nextIndex)
+        const next = batchScheduleTargets[nextIndex]
+        setSchedulePromptCustomerId(next.customerId)
+        setSchedulePromptCustomerName(next.customerName)
+        // Wizard stängs och öppnas igen via state-change
+        setShowScheduleWizard(false)
+        setTimeout(() => setShowScheduleWizard(true), 100)
+      } else {
+        // Alla klara
+        toast.success(`${batchScheduleTargets.length} scheman skapade`)
+        setBatchScheduleTargets([])
+        setBatchScheduleIndex(0)
+        setShowScheduleWizard(false)
+        setSchedulePromptCustomerId(null)
       }
+    } else {
+      setShowScheduleWizard(false)
+      setSchedulePromptCustomerId(null)
     }
   }
 
@@ -492,6 +546,9 @@ export default function TechnicianEquipment() {
                 customers={allCustomers}
                 loading={loading}
                 onOpenCustomerDetails={handleOpenCustomerDetails}
+                onSchedule={(targets) => handleScheduleFromList(
+                  targets.map(t => ({ customer_id: t.customer_id, customer_name: t.customer_name }))
+                )}
               />
             </div>
           </div>
@@ -512,6 +569,13 @@ export default function TechnicianEquipment() {
           onClose={() => setIsWizardOpen(false)}
           onComplete={handleWizardComplete}
           technicianId={technicianId}
+          onIndoorFinished={(customerId) => {
+            const name = allCustomers.find(c => c.customer_id === customerId)?.customer_name
+              || customers.find(c => c.id === customerId)?.company_name
+              || ''
+            refreshData()
+            checkAndPromptSchedule(customerId, name)
+          }}
         />
 
         {/* Formulär-modal */}
@@ -881,10 +945,7 @@ export default function TechnicianEquipment() {
             setShowScheduleWizard(false)
             setSchedulePromptCustomerId(null)
           }}
-          onComplete={() => {
-            setShowScheduleWizard(false)
-            setSchedulePromptCustomerId(null)
-          }}
+          onComplete={handleScheduleWizardComplete}
           customerId={schedulePromptCustomerId}
           customerName={schedulePromptCustomerName}
           technicianId={technicianId}

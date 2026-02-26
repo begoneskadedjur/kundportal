@@ -15,7 +15,8 @@ import {
   Target,
   Crosshair,
   ExternalLink,
-  Loader2
+  Loader2,
+  CalendarClock
 } from 'lucide-react'
 import { StationHealthBadge, HealthStatus } from '../shared/StationHealthBadge'
 import { EquipmentService, CustomerStationSummary } from '../../services/equipmentService'
@@ -27,6 +28,7 @@ interface ExpandableCustomerRowProps {
   onOpenFullDetails: (customer: CustomerStationSummary) => void
   isExpanded: boolean
   onToggleExpand: () => void
+  onSchedule?: () => void
 }
 
 // Legacy ikonmappning för stationstyper (fallback)
@@ -91,7 +93,8 @@ export function ExpandableCustomerRow({
   customer,
   onOpenFullDetails,
   isExpanded,
-  onToggleExpand
+  onToggleExpand,
+  onSchedule
 }: ExpandableCustomerRowProps) {
   const [loading, setLoading] = useState(false)
   const [outdoorStations, setOutdoorStations] = useState<EquipmentPlacementWithRelations[]>([])
@@ -189,6 +192,20 @@ export function ExpandableCustomerRow({
             {/* Hälsostatus */}
             {hasStations && (
               <StationHealthBadge status={customer.health_status} size="sm" />
+            )}
+
+            {/* Kalender-ikon för schemaläggning */}
+            {onSchedule && hasStations && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSchedule()
+                }}
+                className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                title="Schemalägg kontroller"
+              >
+                <CalendarClock className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>

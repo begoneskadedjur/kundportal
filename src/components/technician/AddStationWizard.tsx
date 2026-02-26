@@ -2,6 +2,7 @@
 // 3-stegs wizard för att lägga till station: Kund → Typ → Placera (Inomhus)
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X,
@@ -49,6 +50,7 @@ interface AddStationWizardProps {
   onComplete: (customerId: string, type: 'outdoor' | 'indoor') => void
   preselectedCustomerId?: string | null
   technicianId?: string
+  onIndoorFinished?: (customerId: string) => void
 }
 
 interface CustomerOption {
@@ -62,7 +64,8 @@ export function AddStationWizard({
   onClose,
   onComplete,
   preselectedCustomerId,
-  technicianId
+  technicianId,
+  onIndoorFinished
 }: AddStationWizardProps) {
   const { profile } = useAuth()
   const [currentStep, setCurrentStep] = useState<WizardStep>(1)
@@ -90,6 +93,7 @@ export function AddStationWizard({
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showFloorPlanMenu, setShowFloorPlanMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
   const [replacingImage, setReplacingImage] = useState(false)
   const replaceImageInputRef = useRef<HTMLInputElement>(null)
 
@@ -368,6 +372,15 @@ export function AddStationWizard({
     }
   }
 
+  // Avsluta inomhusplacering och trigga schemaläggningsprompt
+  const handleFinishIndoor = () => {
+    const cid = selectedCustomerId
+    handleClose()
+    if (cid && onIndoorFinished) {
+      onIndoorFinished(cid)
+    }
+  }
+
   const handleClose = () => {
     setCurrentStep(1)
     setSelectedCustomerId(null)
@@ -382,6 +395,7 @@ export function AddStationWizard({
     setShowTypeSelector(false)
     setShowStationForm(false)
     setShowFloorPlanMenu(false)
+    setMenuPosition(null)
     resetPlacementMode()
     onClose()
   }
@@ -680,20 +694,28 @@ export function AddStationWizard({
 
                           {/* Meny för aktiv planritning */}
                           {selectedFloorPlan && (
-                            <div className="relative flex-shrink-0 ml-auto">
+                            <div className="flex-shrink-0 ml-auto">
                               <button
-                                onClick={() => setShowFloorPlanMenu(!showFloorPlanMenu)}
+                                onClick={(e) => {
+                                  const rect = e.currentTarget.getBoundingClientRect()
+                                  setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+                                  setShowFloorPlanMenu(!showFloorPlanMenu)
+                                }}
                                 className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
                               >
                                 <MoreVertical className="w-4 h-4" />
                               </button>
-                              {showFloorPlanMenu && (
+                              {showFloorPlanMenu && menuPosition && createPortal(
                                 <>
-                                  <div className="fixed inset-0 z-30" onClick={() => setShowFloorPlanMenu(false)} />
-                                  <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-600 rounded-xl shadow-xl z-40 overflow-hidden">
+                                  <div className="fixed inset-0 z-[9998]" onClick={() => { setShowFloorPlanMenu(false); setMenuPosition(null) }} />
+                                  <div
+                                    className="fixed w-48 bg-slate-800 border border-slate-600 rounded-xl shadow-xl z-[9999] overflow-hidden"
+                                    style={{ top: menuPosition.top, right: menuPosition.right }}
+                                  >
                                     <button
                                       onClick={() => {
                                         setShowFloorPlanMenu(false)
+                                        setMenuPosition(null)
                                         replaceImageInputRef.current?.click()
                                       }}
                                       disabled={replacingImage}
@@ -705,6 +727,7 @@ export function AddStationWizard({
                                     <button
                                       onClick={() => {
                                         setShowFloorPlanMenu(false)
+                                        setMenuPosition(null)
                                         handleDeleteFloorPlan()
                                       }}
                                       className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors flex items-center gap-2.5"
@@ -713,7 +736,8 @@ export function AddStationWizard({
                                       Ta bort planritning
                                     </button>
                                   </div>
-                                </>
+                                </>,
+                                document.body
                               )}
                             </div>
                           )}
@@ -768,6 +792,31 @@ export function AddStationWizard({
                       {placementMode === 'view' && stations.length > 0 && (
                         <div className="px-4 py-2 border-t border-slate-700/50 bg-slate-900/50 flex-shrink-0">
                           <StationLegend />
+                        </div>
+                      )}
+
+                      {/* Klar / Placera fler footer */}
+                      {placementMode === 'view' && stations.length > 0 && (
+                        <div className="px-4 py-3 border-t border-slate-700/50 bg-slate-900/50 flex-shrink-0 flex items-center justify-between gap-3">
+                          <span className="text-xs text-slate-500">
+                            {stations.length} {stations.length === 1 ? 'station' : 'stationer'} placerade
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setShowTypeSelector(true)}
+                              className="px-3 py-1.5 text-sm border border-slate-600 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1.5"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              Placera fler
+                            </button>
+                            <button
+                              onClick={handleFinishIndoor}
+                              className="px-3 py-1.5 text-sm bg-[#20c58f] hover:bg-[#1ab07f] text-white rounded-lg transition-colors flex items-center gap-1.5"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              Klar
+                            </button>
+                          </div>
                         </div>
                       )}
 

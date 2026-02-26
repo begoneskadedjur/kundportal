@@ -1,5 +1,6 @@
 // EventBlock.tsx — Enskilt event-block med layered information + lane-stacking
 import { useState, useRef, memo } from 'react'
+import { createPortal } from 'react-dom'
 import { BeGoneCaseRow } from '../../../types/database'
 import { eventX, eventWidth, clampToGrid, formatTime, shortAddress } from './scheduleUtils'
 import { getStatusStyle, ROW_HEIGHT } from './scheduleConstants'
@@ -87,11 +88,21 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
         )}
       </div>
 
-      {/* Hover card */}
-      {hovered && (
-        <div className="absolute left-0 bottom-full mb-2 z-50 pointer-events-none">
+      {/* Hover card via portal — undviker stacking-context-problem med sticky header */}
+      {hovered && blockRef.current && createPortal(
+        <div
+          className="fixed z-[9999] pointer-events-none"
+          style={(() => {
+            const rect = blockRef.current!.getBoundingClientRect()
+            const showBelow = rect.top < 200
+            return showBelow
+              ? { left: rect.left, top: rect.bottom + 8 }
+              : { left: rect.left, top: rect.top - 8, transform: 'translateY(-100%)' }
+          })()}
+        >
           <EventHoverCard caseData={caseData} />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

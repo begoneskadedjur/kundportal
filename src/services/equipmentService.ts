@@ -565,7 +565,7 @@ export class EquipmentService {
           customer_id,
           status,
           placed_at,
-          customer:customers!customer_id(id, company_name, contact_address)
+          customer:customers!customer_id(id, company_name, contact_address, organization_id, parent_customer_id, is_multisite, site_type, site_name)
         `)
         .eq('placed_by_technician_id', technicianId)
 
@@ -583,7 +583,7 @@ export class EquipmentService {
           placed_at,
           floor_plan:floor_plans!floor_plan_id(
             customer_id,
-            customer:customers!customer_id(id, company_name, contact_address)
+            customer:customers!customer_id(id, company_name, contact_address, organization_id, parent_customer_id, is_multisite, site_type, site_name)
           )
         `)
         .eq('placed_by_technician_id', technicianId)
@@ -598,6 +598,11 @@ export class EquipmentService {
         customer_id: string
         customer_name: string
         customer_address: string | null
+        organization_id: string | null
+        parent_customer_id: string | null
+        is_multisite: boolean
+        site_type: 'huvudkontor' | 'enhet' | null
+        site_name: string | null
         outdoor_stations: Array<{ status: string; placed_at: string }>
         indoor_stations: Array<{ status: string; placed_at: string }>
       }>()
@@ -612,6 +617,11 @@ export class EquipmentService {
             customer_id: customerId,
             customer_name: item.customer.company_name,
             customer_address: item.customer.contact_address,
+            organization_id: item.customer.organization_id || null,
+            parent_customer_id: item.customer.parent_customer_id || null,
+            is_multisite: item.customer.is_multisite || false,
+            site_type: item.customer.site_type || null,
+            site_name: item.customer.site_name || null,
             outdoor_stations: [],
             indoor_stations: []
           })
@@ -627,12 +637,18 @@ export class EquipmentService {
       indoorData?.forEach((item: any) => {
         if (!item.floor_plan?.customer) return
         const customerId = item.floor_plan.customer_id
+        const cust = item.floor_plan.customer
 
         if (!customerMap.has(customerId)) {
           customerMap.set(customerId, {
             customer_id: customerId,
-            customer_name: item.floor_plan.customer.company_name,
-            customer_address: item.floor_plan.customer.contact_address,
+            customer_name: cust.company_name,
+            customer_address: cust.contact_address,
+            organization_id: cust.organization_id || null,
+            parent_customer_id: cust.parent_customer_id || null,
+            is_multisite: cust.is_multisite || false,
+            site_type: cust.site_type || null,
+            site_name: cust.site_name || null,
             outdoor_stations: [],
             indoor_stations: []
           })
@@ -676,7 +692,12 @@ export class EquipmentService {
           indoor_count: customer.indoor_stations.length,
           health_status,
           latest_inspection_date: latestDate?.toISOString() || null,
-          latest_inspector_name: null // Kräver separat query om vi vill ha detta
+          latest_inspector_name: null, // Kräver separat query om vi vill ha detta
+          organization_id: customer.organization_id,
+          parent_customer_id: customer.parent_customer_id,
+          is_multisite: customer.is_multisite,
+          site_type: customer.site_type,
+          site_name: customer.site_name
         }
       })
 
@@ -983,6 +1004,12 @@ export interface CustomerStationSummary {
   health_status: 'excellent' | 'good' | 'fair' | 'poor'
   latest_inspection_date: string | null
   latest_inspector_name: string | null
+  // Multisite-fält
+  organization_id: string | null
+  parent_customer_id: string | null
+  is_multisite: boolean
+  site_type: 'huvudkontor' | 'enhet' | null
+  site_name: string | null
 }
 
 export interface IndoorStationWithRelations {

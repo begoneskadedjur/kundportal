@@ -22,7 +22,7 @@ export function EventHoverCard({ caseData }: EventHoverCardProps) {
   ].filter(Boolean)
 
   return (
-    <div className="w-72 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl p-3 text-sm z-50">
+    <div className="w-72 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl p-3 text-sm">
       {/* Kundnamn + ärendenummer + status */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div>
