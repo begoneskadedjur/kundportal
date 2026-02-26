@@ -38,7 +38,7 @@ const ROLES = [
     colorBorderDefault: 'border-purple-500/20',
     colorIcon: 'text-purple-400',
     colorLabel: 'text-purple-300',
-    desc: 'Full oversikt over hela organisationen. Ser alla enheter, kan hantera anvandare och installningar.',
+    desc: 'Full översikt över hela organisationen. Ser alla enheter, kan hantera användare och inställningar.',
     portalDesc: 'Ser alla enheter och all data i organisationsportalen.',
     needsSites: false
   },
@@ -52,7 +52,7 @@ const ROLES = [
     colorBorderDefault: 'border-blue-500/20',
     colorIcon: 'text-blue-400',
     colorLabel: 'text-blue-300',
-    desc: 'Ansvarar for utvalda enheter inom sin region. Kan bjuda in platsansvariga.',
+    desc: 'Ansvarar för utvalda enheter inom sin region. Kan bjuda in platsansvariga.',
     portalDesc: 'Ser enbart sina tilldelade enheter i portalen.',
     needsSites: true
   },
@@ -66,7 +66,7 @@ const ROLES = [
     colorBorderDefault: 'border-green-500/20',
     colorIcon: 'text-green-400',
     colorLabel: 'text-green-300',
-    desc: 'Ansvarar for specifika enheter. Kan begara service och se rapporter.',
+    desc: 'Ansvarar för specifika enheter. Kan begära service och se rapporter.',
     portalDesc: 'Ser enbart sin tilldelade enhet i portalen.',
     needsSites: true
   }
@@ -117,7 +117,7 @@ export default function UserModal({
         .single()
 
       if (orgError || !orgData) {
-        throw new Error('Kunde inte hamta organisation')
+        throw new Error('Kunde inte hämta organisation')
       }
 
       const { data: sitesData, error: sitesError } = await supabase
@@ -133,11 +133,11 @@ export default function UserModal({
       setSites((sitesData || []).map(site => ({
         id: site.id,
         site_name: site.site_name || site.company_name,
-        region: site.region || 'Okand region'
+        region: site.region || 'Okänd region'
       })))
     } catch (error) {
       console.error('Error fetching sites:', error)
-      toast.error('Kunde inte hamta enheter')
+      toast.error('Kunde inte hämta enheter')
     } finally {
       setLoadingSites(false)
     }
@@ -147,19 +147,19 @@ export default function UserModal({
     e.preventDefault()
 
     if (!email || !fullName || !roleType) {
-      toast.error('Vanligen fyll i alla obligatoriska falt')
+      toast.error('Vänligen fyll i alla obligatoriska fält')
       return
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      toast.error('Vanligen ange en giltig e-postadress')
+      toast.error('Vänligen ange en giltig e-postadress')
       return
     }
 
     const currentRole = ROLES.find(r => r.value === roleType)
     if (currentRole?.needsSites && selectedSites.length === 0) {
-      toast.error(`Vanligen valj minst en enhet for ${currentRole.label.toLowerCase()}`)
+      toast.error(`Vänligen välj minst en enhet för ${currentRole.label.toLowerCase()}`)
       return
     }
 
@@ -172,7 +172,7 @@ export default function UserModal({
         .single()
 
       if (orgError || !orgData) {
-        throw new Error('Kunde inte hamta organisation')
+        throw new Error('Kunde inte hämta organisation')
       }
 
       if (existingUser) {
@@ -195,12 +195,12 @@ export default function UserModal({
 
           if (profileError) {
             console.error('Error updating profile:', profileError)
-            toast.error(`Kunde inte uppdatera anvandarnamn: ${profileError.message}`)
+            toast.error(`Kunde inte uppdatera användarnamn: ${profileError.message}`)
             return
           }
         }
 
-        toast.success('Anvandare uppdaterad')
+        toast.success('Användare uppdaterad')
       } else {
         const userId = crypto.randomUUID()
         const response = await fetch('/api/create-multisite-users', {
@@ -226,23 +226,23 @@ export default function UserModal({
         const result = await response.json()
 
         if (!response.ok) {
-          throw new Error(result.error || 'Kunde inte skapa anvandare')
+          throw new Error(result.error || 'Kunde inte skapa användare')
         }
 
         // Kolla om det finns enskilda fel i resultatet
         const failedUsers = result.results?.filter((r: any) => !r.success) || []
         if (failedUsers.length > 0) {
-          throw new Error(failedUsers[0].error || 'Kunde inte skapa anvandare')
+          throw new Error(failedUsers[0].error || 'Kunde inte skapa användare')
         }
 
-        toast.success(sendInviteEmail ? 'Anvandare skapad och inbjudan skickad' : 'Anvandare skapad (ingen inbjudan skickad)')
+        toast.success(sendInviteEmail ? 'Användare skapad och inbjudan skickad' : 'Användare skapad (ingen inbjudan skickad)')
       }
 
       onSuccess()
       onClose()
     } catch (error: any) {
       console.error('Error saving user:', error)
-      toast.error(error.message || 'Kunde inte spara anvandare')
+      toast.error(error.message || 'Kunde inte spara användare')
     } finally {
       setLoading(false)
     }
@@ -260,7 +260,7 @@ export default function UserModal({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-white">
-                {existingUser ? 'Redigera anvandare' : 'Lagg till anvandare'}
+                {existingUser ? 'Redigera användare' : 'Lägg till användare'}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
                 Organisation: {organizationName}
@@ -293,20 +293,20 @@ export default function UserModal({
               />
               {existingUser && (
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Kan inte andras for befintliga anvandare
+                  Kan inte ändras för befintliga användare
                 </p>
               )}
             </div>
             <div>
               <label className="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" />
-                Fullstandigt namn *
+                Fullständigt namn *
               </label>
               <Input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="For- och efternamn"
+                placeholder="För- och efternamn"
                 required
               />
             </div>
@@ -349,12 +349,12 @@ export default function UserModal({
             </div>
           </div>
 
-          {/* Enheter (for platsansvarig och regionchef) */}
+          {/* Enheter (för platsansvarig och regionchef) */}
           {selectedRole?.needsSites && (
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <label className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5" />
-                Valj enheter *
+                Välj enheter *
               </label>
               {loadingSites ? (
                 <div className="flex items-center justify-center py-4">
@@ -389,7 +389,7 @@ export default function UserModal({
                 </div>
               ) : (
                 <p className="text-slate-400 text-sm py-4 text-center border border-slate-700/50 rounded-lg">
-                  Inga enheter tillgangliga
+                  Inga enheter tillgängliga
                 </p>
               )}
               {selectedSites.length > 0 && (
@@ -400,16 +400,16 @@ export default function UserModal({
             </div>
           )}
 
-          {/* Preview: Vad anvandaren kommer se i portalen */}
+          {/* Preview: Vad användaren kommer se i portalen */}
           {(roleType === 'verksamhetschef' || selectedSites.length > 0) && (
             <div className="p-3 bg-[#20c58f]/10 border border-[#20c58f]/20 rounded-xl">
               <h4 className="text-xs font-medium text-[#20c58f] mb-1.5 flex items-center gap-1.5">
                 <Eye className="w-3.5 h-3.5" />
-                Denna anvandare kommer se i portalen:
+                Denna användare kommer se i portalen:
               </h4>
               <div className="text-xs text-slate-300">
                 {roleType === 'verksamhetschef' ? (
-                  <p>Alla {sites.length} enheter i {organizationName} — full oversikt med alla rapporter, arenden och statistik.</p>
+                  <p>Alla {sites.length} enheter i {organizationName} — full översikt med alla rapporter, ärenden och statistik.</p>
                 ) : (
                   <div>
                     <p className="mb-1">{selectedRole?.portalDesc}</p>
@@ -430,7 +430,7 @@ export default function UserModal({
             </div>
           )}
 
-          {/* E-post-inbjudan toggle (bara for nya anvandare) */}
+          {/* E-post-inbjudan toggle (bara för nya användare) */}
           {!existingUser && (
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <label className="flex items-center gap-3 cursor-pointer">
@@ -446,7 +446,7 @@ export default function UserModal({
                     <p className="text-sm font-medium text-white">Skicka inbjudan via e-post</p>
                     <p className="text-xs text-slate-400">
                       {sendInviteEmail
-                        ? 'Anvandaren far ett mail med inloggningsuppgifter'
+                        ? 'Användaren får ett mail med inloggningsuppgifter'
                         : 'Konto skapas utan att skicka e-post (du kan bjuda in senare)'}
                     </p>
                   </div>
@@ -474,7 +474,7 @@ export default function UserModal({
             className="flex items-center gap-2"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {existingUser ? 'Uppdatera' : (sendInviteEmail ? 'Lagg till och bjud in' : 'Lagg till anvandare')}
+            {existingUser ? 'Uppdatera' : (sendInviteEmail ? 'Lägg till och bjud in' : 'Lägg till användare')}
           </Button>
         </div>
       </div>
