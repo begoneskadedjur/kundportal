@@ -374,9 +374,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           // Behåll vissa fält från huvudkund om de saknas på site
           billing_email: site.billing_email || customer?.billing_email,
           billing_address: site.billing_address || customer?.billing_address,
-          // Säkerställ att vi använder sitens egna uppgifter
+          // Sitens egna uppgifter, fallback till huvudkund (HK)
           company_name: site.company_name,
-          organization_number: site.organization_number,
+          organization_number: site.organization_number || customer?.organization_number,
           contact_address: site.contact_address
         };
         
@@ -398,6 +398,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           e_post_kontaktperson: dataSource.contact_email || '',
           org_nr: dataSource.organization_number || '',
           bestallare: dataSource.company_name || '',
+          company_name: dataSource.company_name || customer?.company_name || '',
           adress: prev.adress || dataSource.contact_address || dataSource.service_address || '',
           // Lägg även till faktura-fält om de finns
           e_post_faktura: dataSource.billing_email || dataSource.contact_email || '',
