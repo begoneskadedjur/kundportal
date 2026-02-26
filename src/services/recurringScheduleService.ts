@@ -20,23 +20,11 @@ import { generateInspectionDates } from '../utils/inspectionDateGenerator'
 export async function createRecurringSchedule(
   input: CreateRecurringScheduleInput
 ): Promise<RecurringSchedule | null> {
-  // Calculate initial generated_until: contract_end_date or start + 2 months
+  // Always generate 14 months ahead from start.
+  // contract_end_date is the binding period end, NOT when service stops.
+  // The cron job checks customer.contract_status to determine the real stop point.
   const startDate = new Date(input.schedule_start_date)
-  let generatedUntil: Date
-
-  if (input.contract_end_date) {
-    const contractEnd = new Date(input.contract_end_date)
-    // Generate for contract period + 2 months (for auto-renewing)
-    generatedUntil = input.is_auto_renewing !== false
-      ? addMonths(contractEnd, 2)
-      : contractEnd
-    // But cap at 14 months from start for initial generation
-    const maxInitial = addMonths(startDate, 14)
-    if (generatedUntil > maxInitial) generatedUntil = maxInitial
-  } else {
-    // No end date: generate 14 months ahead
-    generatedUntil = addMonths(startDate, 14)
-  }
+  const generatedUntil = addMonths(startDate, 14)
 
   const { data, error } = await supabase
     .from('recurring_schedules')
@@ -74,7 +62,7 @@ export async function getRecurringSchedule(
     .from('recurring_schedules')
     .select(`
       *,
-      customer:customers(id, company_name, contact_address, service_frequency, contract_start_date, contract_end_date),
+      customer:customers(id, company_name, contact_address, service_frequency, contract_start_date, contract_end_date, contract_status, effective_end_date),
       technician:technicians(id, name, work_schedule)
     `)
     .eq('id', id)
@@ -95,7 +83,7 @@ export async function getRecurringSchedulesByCustomer(
     .from('recurring_schedules')
     .select(`
       *,
-      customer:customers(id, company_name, contact_address, service_frequency, contract_start_date, contract_end_date),
+      customer:customers(id, company_name, contact_address, service_frequency, contract_start_date, contract_end_date, contract_status, effective_end_date),
       technician:technicians(id, name, work_schedule)
     `)
     .eq('customer_id', customerId)
@@ -117,7 +105,7 @@ export async function getRecurringSchedulesByTechnician(
     .from('recurring_schedules')
     .select(`
       *,
-      customer:customers(id, company_name, contact_address, service_frequency, contract_start_date, contract_end_date),
+      customer:customers(id, company_name, contact_address, service_frequency, contract_start_date, contract_end_date, contract_status, effective_end_date),
       technician:technicians(id, name, work_schedule)
     `)
     .eq('technician_id', technicianId)
@@ -495,13 +483,18 @@ export async function extendScheduleIfNeeded(
   }
 
   // Extend by 2 months
-  const newEndDate = addMonths(generatedUntil, 2)
+  let newEndDate = addMonths(generatedUntil, 2)
 
-  // If not auto-renewing and past contract end, don't extend
-  if (!schedule.is_auto_renewing && schedule.contract_end_date) {
-    const contractEnd = new Date(schedule.contract_end_date)
-    if (generatedUntil >= contractEnd) {
+  // Check if customer has been terminated — stop generating past effective_end_date
+  if (schedule.customer?.contract_status === 'terminated') {
+    const effectiveEnd = schedule.customer.effective_end_date
+      ? new Date(schedule.customer.effective_end_date)
+      : null
+    if (!effectiveEnd || generatedUntil >= effectiveEnd) {
       return { extended: false, created: 0 }
+    }
+    if (newEndDate > effectiveEnd) {
+      newEndDate = effectiveEnd
     }
   }
 

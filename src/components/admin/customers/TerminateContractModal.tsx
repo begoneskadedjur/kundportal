@@ -79,6 +79,29 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
 
       if (error) throw error
 
+      // Cancel future inspection sessions past the effective end date
+      const { error: sessionsError } = await supabase
+        .from('station_inspection_sessions')
+        .update({ status: 'cancelled' })
+        .in('customer_id', siteIds)
+        .eq('status', 'scheduled')
+        .gt('scheduled_at', effectiveDateStr)
+
+      if (sessionsError) {
+        console.error('Error cancelling future inspection sessions:', sessionsError)
+      }
+
+      // Cancel all active/paused recurring schedules for this customer
+      const { error: schedulesError } = await supabase
+        .from('recurring_schedules')
+        .update({ status: 'cancelled' })
+        .in('customer_id', siteIds)
+        .in('status', ['active', 'paused'])
+
+      if (schedulesError) {
+        console.error('Error cancelling recurring schedules:', schedulesError)
+      }
+
       toast.success(`Avtal uppsagt for ${organization.company_name} — slutdatum: ${formatDate(effectiveEndDate)}`)
       onTerminated()
       onClose()

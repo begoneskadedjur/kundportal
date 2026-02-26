@@ -114,6 +114,8 @@ export interface RecurringScheduleWithRelations extends RecurringSchedule {
     service_frequency: string | null
     contract_start_date: string | null
     contract_end_date: string | null
+    contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
+    effective_end_date?: string | null
   }
   technician?: {
     id: string

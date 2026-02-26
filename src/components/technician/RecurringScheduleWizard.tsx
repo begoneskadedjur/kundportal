@@ -141,13 +141,9 @@ export function RecurringScheduleWizard({
     if (!frequency || !dayPattern) return
     setLoadingPreview(true)
     try {
-      const endDate = contractEndDate
-        ? addMonths(new Date(contractEndDate), 2)
-        : addMonths(startDate, 14)
-
-      // Cap preview to 14 months
-      const maxPreview = addMonths(startDate, 14)
-      const previewEnd = endDate > maxPreview ? maxPreview : endDate
+      // Always preview 14 months ahead — contract_end_date is just the binding period,
+      // contracts continue until explicitly terminated
+      const previewEnd = addMonths(startDate, 14)
 
       const dates = await previewScheduleDates({
         technicianId,

@@ -29,7 +29,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('recurring_schedules')
       .select(`
         *,
-        technician:technicians(id, name, work_schedule)
+        technician:technicians(id, name, work_schedule),
+        customer:customers(id, contract_status, effective_end_date)
       `)
       .eq('status', 'active')
       .lt('generated_until', format(thresholdDate, 'yyyy-MM-dd'))
@@ -54,14 +55,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const currentEnd = new Date(schedule.generated_until)
         let newEnd = addMonths(currentEnd, EXTENSION_MONTHS)
 
-        // If not auto-renewing, don't go past contract end
-        if (!schedule.is_auto_renewing && schedule.contract_end_date) {
-          const contractEnd = new Date(schedule.contract_end_date)
-          if (currentEnd >= contractEnd) {
-            console.log(`[extend-schedules] Schedule ${schedule.id} past contract end, skipping`)
+        // Check if customer has been terminated — respect effective_end_date, not binding period
+        const customer = schedule.customer as any
+        if (customer?.contract_status === 'terminated') {
+          const effectiveEnd = customer.effective_end_date
+            ? new Date(customer.effective_end_date)
+            : null
+          if (!effectiveEnd || currentEnd >= effectiveEnd) {
+            console.log(`[extend-schedules] Schedule ${schedule.id} customer terminated, skipping`)
             continue
           }
-          if (newEnd > contractEnd) newEnd = contractEnd
+          if (newEnd > effectiveEnd) newEnd = effectiveEnd
+        }
+        if (customer?.contract_status === 'expired') {
+          console.log(`[extend-schedules] Schedule ${schedule.id} customer expired, skipping`)
+          continue
         }
 
         const technicianId = schedule.technician_id
