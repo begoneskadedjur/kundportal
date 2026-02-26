@@ -650,20 +650,35 @@ export function CustomerStationsModal({
                               )}
                             </div>
 
-                            {/* Legend och avbryt-knapp */}
+                            {/* Legend och klar/avbryt-knapp */}
                             <div className="px-4 py-3 border-t border-slate-700/50 bg-slate-900/50 flex-shrink-0">
                               <div className="flex items-center justify-between">
                                 {floorPlanStations.length > 0 ? (
                                   <StationLegend />
                                 ) : (
-                                  <p className="text-sm text-slate-400">Klicka på planritningen för att placera stationer</p>
+                                  <p className="text-sm text-slate-400">Klicka + för att välja stationstyp och placera</p>
                                 )}
-                                <button
-                                  onClick={cancelIndoorPlacement}
-                                  className="px-4 py-2 text-sm text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
-                                >
-                                  Avbryt
-                                </button>
+                                <div className="flex items-center gap-2">
+                                  {floorPlanStations.length > 0 && placementMode === 'view' && (
+                                    <button
+                                      onClick={() => setShowTypeSelector(true)}
+                                      className="px-4 py-2 text-sm text-cyan-300 hover:text-white bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 rounded-lg transition-colors flex items-center gap-1.5"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      Placera fler
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={cancelIndoorPlacement}
+                                    className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                                      floorPlanStations.length > 0
+                                        ? 'text-white bg-[#20c58f] hover:bg-[#1ab07f] font-medium'
+                                        : 'text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600'
+                                    }`}
+                                  >
+                                    {floorPlanStations.length > 0 ? 'Klar' : 'Avbryt'}
+                                  </button>
+                                </div>
                               </div>
                             </div>
 
@@ -672,7 +687,7 @@ export function CustomerStationsModal({
                               <div className="px-4 py-3 bg-cyan-600/20 border-t border-cyan-500/30 flex-shrink-0">
                                 <div className="flex items-center justify-between">
                                   <p className="text-cyan-300 text-sm">
-                                    Klicka pa planritningen for att placera stationen
+                                    Klicka på planritningen för att placera stationen
                                   </p>
                                   <button
                                     onClick={resetPlacementMode}
