@@ -1,6 +1,5 @@
 // src/pages/organisation/Portal.tsx - Unified multisite portal (kundportal-stil)
 import React, { useState, useEffect } from 'react'
-import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 
@@ -16,15 +15,13 @@ import MultisiteReportsView from '../../components/organisation/MultisiteReports
 import MultisiteQuotesView from '../../components/organisation/MultisiteQuotesView'
 
 const OrganisationPortal: React.FC = () => {
-  const { profile } = useAuth()
   const {
     organization,
     userRole,
     sites,
     accessibleSites,
     loading,
-    error,
-    refreshData
+    error
   } = useMultisite()
 
   const [currentView, setCurrentView] = useState<MultisitePortalView>('dashboard')
@@ -35,10 +32,7 @@ const OrganisationPortal: React.FC = () => {
   const [highlightedStationType, setHighlightedStationType] = useState<'outdoor' | 'indoor' | null>(null)
   const [highlightedFloorPlanId, setHighlightedFloorPlanId] = useState<string | null>(null)
 
-  // Refresh vid mount
-  useEffect(() => {
-    refreshData()
-  }, [])
+  // MultisiteContext fetchar data automatiskt — ingen extra refresh behövs
 
   // Bestäm tillgängliga enheter baserat på roll
   const availableSites = userRole?.role_type === 'verksamhetschef'
