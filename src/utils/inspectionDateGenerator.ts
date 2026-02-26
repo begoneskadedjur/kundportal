@@ -285,9 +285,9 @@ function tryPlaceInspection(
       if (dayOffset > 0) {
         const holidayName = getSwedishHolidayName(idealDate)
         if (holidayName) {
-          adjustmentReason = `Rod dag: ${holidayName} (${format(idealDate, 'yyyy-MM-dd')})`
+          adjustmentReason = `Röd dag: ${holidayName} (${format(idealDate, 'yyyy-MM-dd')})`
         } else {
-          adjustmentReason = `Flyttad fran ${format(idealDate, 'yyyy-MM-dd')} (${slot.conflictReason || 'upptagen dag'})`
+          adjustmentReason = `Flyttad från ${format(idealDate, 'yyyy-MM-dd')} (${slot.conflictReason || 'upptagen dag'})`
         }
       } else if (slot.timeAdjusted) {
         adjustmentReason = slot.conflictReason
@@ -313,7 +313,7 @@ function tryPlaceInspection(
     periodStart: fullPeriod.start,
     periodEnd: fullPeriod.end,
     isAdjusted: true,
-    adjustmentReason: 'Ingen ledig tid hittades i perioden - manuell justering kravs',
+    adjustmentReason: 'Ingen ledig tid hittades i perioden — manuell justering krävs',
     hasConflictWarning: true
   }
 }
@@ -425,8 +425,8 @@ function findFreeSlotOnDay(
             end: slotEnd,
             timeAdjusted: true,
             conflictReason: conflictingTitle
-              ? `Flyttad fran ${preferredTime} pga krock med '${conflictingTitle}' kl ${format(conflictBooking!.start, 'HH:mm')}-${format(conflictBooking!.end, 'HH:mm')}`
-              : `Flyttad fran ${preferredTime} pga schemakonflikt`
+              ? `Flyttad från ${preferredTime} pga krock med '${conflictingTitle}' kl ${format(conflictBooking!.start, 'HH:mm')}-${format(conflictBooking!.end, 'HH:mm')}`
+              : `Flyttad från ${preferredTime} pga schemakonflikt`
           }
         }
       }
@@ -453,8 +453,8 @@ function findFreeSlotOnDay(
         end: slotEnd,
         timeAdjusted: true,
         conflictReason: conflictBooking?.title
-          ? `Flyttad fran ${preferredTime} pga krock med '${conflictBooking.title}' kl ${format(conflictBooking.start, 'HH:mm')}-${format(conflictBooking.end, 'HH:mm')}`
-          : `Flyttad fran ${preferredTime} pga schemakonflikt`
+          ? `Flyttad från ${preferredTime} pga krock med '${conflictBooking.title}' kl ${format(conflictBooking.start, 'HH:mm')}-${format(conflictBooking.end, 'HH:mm')}`
+          : `Flyttad från ${preferredTime} pga schemakonflikt`
       }
     }
   }

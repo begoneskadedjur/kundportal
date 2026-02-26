@@ -42,13 +42,13 @@ export const FREQUENCY_CONFIG: Record<RecurringFrequency, {
   monthInterval: number
   description: string
 }> = {
-  weekly:      { label: 'Varje vecka',              monthInterval: 0.25, description: '4 besok per manad' },
-  bi_weekly:   { label: 'Varannan vecka',           monthInterval: 0.5,  description: '2 besok per manad' },
-  monthly:     { label: 'Manadsvis',                monthInterval: 1,    description: '1 besok per manad' },
-  twice_monthly: { label: '2 ganger/manad',         monthInterval: 1,    description: '2 besok per manad, fordelat' },
-  quarterly:   { label: 'Kvartalsvis',              monthInterval: 3,    description: 'Var 3:e manad' },
-  semi_annual: { label: 'Halvarsvis',               monthInterval: 6,    description: 'Var 6:e manad' },
-  annual:      { label: 'Arsvis',                   monthInterval: 12,   description: '1 besok per ar' },
+  weekly:      { label: 'Varje vecka',              monthInterval: 0.25, description: '4 besök per månad' },
+  bi_weekly:   { label: 'Varannan vecka',           monthInterval: 0.5,  description: '2 besök per månad' },
+  monthly:     { label: 'Månadsvis',                monthInterval: 1,    description: '1 besök per månad' },
+  twice_monthly: { label: '2 gånger/månad',         monthInterval: 1,    description: '2 besök per månad, fördelat' },
+  quarterly:   { label: 'Kvartalsvis',              monthInterval: 3,    description: 'Var 3:e månad' },
+  semi_annual: { label: 'Halvårsvis',               monthInterval: 6,    description: 'Var 6:e månad' },
+  annual:      { label: 'Årsvis',                   monthInterval: 12,   description: '1 besök per år' },
 }
 
 export const DAY_PATTERN_CONFIG: Record<RecurringDayPattern, {
@@ -56,19 +56,19 @@ export const DAY_PATTERN_CONFIG: Record<RecurringDayPattern, {
   description: string
   group: 'recommended' | 'first_week' | 'second_week' | 'other'
 }> = {
-  first_weekday:         { label: 'Forsta helgfria vardagen',  description: 'Forsta vardagen efter periodstart som inte ar rod dag', group: 'recommended' },
-  first_monday:          { label: 'Forsta mandagen',           description: 'Forsta mandagen i varje period', group: 'recommended' },
-  first_tuesday:         { label: 'Forsta tisdagen',           description: 'Forsta tisdagen i varje period', group: 'first_week' },
-  first_wednesday:       { label: 'Forsta onsdagen',           description: 'Forsta onsdagen i varje period', group: 'first_week' },
-  first_thursday:        { label: 'Forsta torsdagen',          description: 'Forsta torsdagen i varje period', group: 'first_week' },
-  first_friday:          { label: 'Forsta fredagen',           description: 'Forsta fredagen i varje period', group: 'first_week' },
-  second_week_monday:    { label: 'Andra veckans mandag',      description: 'Mandagen i periodens andra vecka', group: 'second_week' },
+  first_weekday:         { label: 'Första helgfria vardagen',  description: 'Första vardagen efter periodstart som inte är röd dag', group: 'recommended' },
+  first_monday:          { label: 'Första måndagen',           description: 'Första måndagen i varje period', group: 'recommended' },
+  first_tuesday:         { label: 'Första tisdagen',           description: 'Första tisdagen i varje period', group: 'first_week' },
+  first_wednesday:       { label: 'Första onsdagen',           description: 'Första onsdagen i varje period', group: 'first_week' },
+  first_thursday:        { label: 'Första torsdagen',          description: 'Första torsdagen i varje period', group: 'first_week' },
+  first_friday:          { label: 'Första fredagen',           description: 'Första fredagen i varje period', group: 'first_week' },
+  second_week_monday:    { label: 'Andra veckans måndag',      description: 'Måndagen i periodens andra vecka', group: 'second_week' },
   second_week_tuesday:   { label: 'Andra veckans tisdag',      description: 'Tisdagen i periodens andra vecka', group: 'second_week' },
   second_week_wednesday: { label: 'Andra veckans onsdag',      description: 'Onsdagen i periodens andra vecka', group: 'second_week' },
   second_week_thursday:  { label: 'Andra veckans torsdag',     description: 'Torsdagen i periodens andra vecka', group: 'second_week' },
   second_week_friday:    { label: 'Andra veckans fredag',      description: 'Fredagen i periodens andra vecka', group: 'second_week' },
-  last_weekday:          { label: 'Sista helgfria vardagen',   description: 'Sista vardagen i varje period som inte ar rod dag', group: 'other' },
-  specific_day:          { label: 'Specifik dag i manaden',    description: 'Valj vilken dag (1-28) i manaden', group: 'other' },
+  last_weekday:          { label: 'Sista helgfria vardagen',   description: 'Sista vardagen i varje period som inte är röd dag', group: 'other' },
+  specific_day:          { label: 'Specifik dag i månaden',    description: 'Välj vilken dag (1-28) i månaden', group: 'other' },
 }
 
 export const DURATION_OPTIONS = [

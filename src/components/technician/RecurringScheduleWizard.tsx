@@ -30,7 +30,7 @@ import {
 } from '../../types/recurringSchedule'
 import type { WorkSchedule } from '../../types/database'
 
-type WizardStep = 1 | 2 | 3 | 4 | 5 | 6
+type WizardStep = 1 | 2 | 3 | 4 | 5
 
 interface RecurringScheduleWizardProps {
   isOpen: boolean
@@ -42,6 +42,18 @@ interface RecurringScheduleWizardProps {
   contractStartDate?: string | null
   contractEndDate?: string | null
   serviceFrequency?: string | null
+  batchInfo?: { current: number; total: number; unitName: string }
+}
+
+// Swedish day name map for work schedule display
+const SWEDISH_DAY_NAMES: Record<string, string> = {
+  monday: 'mån',
+  tuesday: 'tis',
+  wednesday: 'ons',
+  thursday: 'tor',
+  friday: 'fre',
+  saturday: 'lör',
+  sunday: 'sön'
 }
 
 // Map existing service_frequency strings to our enum
@@ -66,7 +78,8 @@ export function RecurringScheduleWizard({
   technicianId,
   contractStartDate,
   contractEndDate,
-  serviceFrequency
+  serviceFrequency,
+  batchInfo
 }: RecurringScheduleWizardProps) {
   const { profile } = useAuth()
   const [step, setStep] = useState<WizardStep>(1)
@@ -79,20 +92,21 @@ export function RecurringScheduleWizard({
   // Step 2: Duration
   const [durationMinutes, setDurationMinutes] = useState(60)
 
-  // Step 3: Frequency
+  // Step 3: Frequency + Day pattern (merged)
   const [frequency, setFrequency] = useState<RecurringFrequency | null>(
     parseServiceFrequency(serviceFrequency) || null
   )
-
-  // Step 4: Day pattern
   const [dayPattern, setDayPattern] = useState<RecurringDayPattern | null>(null)
   const [preferredDayOfMonth, setPreferredDayOfMonth] = useState(1)
 
-  // Step 5: Time
-  const [preferredTime, setPreferredTime] = useState('09:00')
+  // Step 4: Time
+  const [preferredHour, setPreferredHour] = useState(9)
+  const [preferredMinute, setPreferredMinute] = useState(0)
   const [workSchedule, setWorkSchedule] = useState<WorkSchedule | null>(null)
 
-  // Step 6: Preview
+  const preferredTime = `${String(preferredHour).padStart(2, '0')}:${String(preferredMinute).padStart(2, '0')}`
+
+  // Step 5: Preview
   const [previewDates, setPreviewDates] = useState<GeneratedInspectionDate[]>([])
   const [excludedIndices, setExcludedIndices] = useState<Set<number>>(new Set())
   const [loadingPreview, setLoadingPreview] = useState(false)
@@ -124,15 +138,16 @@ export function RecurringScheduleWizard({
       setDurationMinutes(60)
       setFrequency(parseServiceFrequency(serviceFrequency) || null)
       setDayPattern(null)
-      setPreferredTime('09:00')
+      setPreferredHour(9)
+      setPreferredMinute(0)
       setPreviewDates([])
       setExcludedIndices(new Set())
     }
   }, [isOpen])
 
-  // Generate preview when entering step 6
+  // Generate preview when entering step 5
   useEffect(() => {
-    if (step === 6 && frequency && dayPattern) {
+    if (step === 5 && frequency && dayPattern) {
       generatePreview()
     }
   }, [step])
@@ -141,8 +156,6 @@ export function RecurringScheduleWizard({
     if (!frequency || !dayPattern) return
     setLoadingPreview(true)
     try {
-      // Always preview 14 months ahead — contract_end_date is just the binding period,
-      // contracts continue until explicitly terminated
       const previewEnd = addMonths(startDate, 14)
 
       const dates = await previewScheduleDates({
@@ -161,7 +174,7 @@ export function RecurringScheduleWizard({
       setExcludedIndices(new Set())
     } catch (error) {
       console.error('Error generating preview:', error)
-      toast.error('Kunde inte generera forhandsvisning')
+      toast.error('Kunde inte generera förhandsvisning')
     } finally {
       setLoadingPreview(false)
     }
@@ -191,7 +204,7 @@ export function RecurringScheduleWizard({
       const result = await createScheduleWithSessions(input, includedDates)
 
       if (result.schedule) {
-        toast.success(`${result.sessionsCreated} kontrolltillfallen skapade`)
+        toast.success(`${result.sessionsCreated} kontrolltillfällen skapade`)
         onComplete(result.schedule.id, result.sessionsCreated)
         onClose()
       } else {
@@ -220,15 +233,14 @@ export function RecurringScheduleWizard({
     switch (step) {
       case 1: return !!startDate
       case 2: return durationMinutes > 0
-      case 3: return !!frequency
-      case 4: return !!dayPattern
-      case 5: return !!preferredTime
-      case 6: return includedCount > 0
+      case 3: return !!frequency && !!dayPattern
+      case 4: return !!preferredTime
+      case 5: return includedCount > 0
       default: return false
     }
   }
 
-  const stepLabels = ['Startdatum', 'Tid per besok', 'Frekvens', 'Dagval', 'Klockslag', 'Forhandsvisning']
+  const stepLabels = ['Startdatum', 'Tid per besök', 'Frekvens & dag', 'Klockslag', 'Förhandsvisning']
 
   if (!isOpen) return null
 
@@ -250,11 +262,11 @@ export function RecurringScheduleWizard({
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <Repeat className="w-5 h-5 text-blue-400" />
+              <div className="p-2 rounded-lg bg-[#20c58f]/20">
+                <Repeat className="w-5 h-5 text-[#20c58f]" />
               </div>
               <div>
-                <h2 className="text-white font-semibold text-base">Aterkommande kontroller</h2>
+                <h2 className="text-white font-semibold text-base">Återkommande kontroller</h2>
                 <p className="text-slate-400 text-xs">{customerName}</p>
               </div>
             </div>
@@ -269,13 +281,13 @@ export function RecurringScheduleWizard({
               {stepLabels.map((label, i) => (
                 <div key={i} className="flex items-center gap-1 flex-1">
                   <div className={`h-1.5 rounded-full flex-1 ${
-                    i + 1 <= step ? 'bg-blue-500' : 'bg-slate-700'
+                    i + 1 <= step ? 'bg-[#20c58f]' : 'bg-slate-700'
                   }`} />
                 </div>
               ))}
             </div>
             <p className="text-xs text-slate-500 mt-1.5">
-              Steg {step} av 6: {stepLabels[step - 1]}
+              Steg {step} av 5: {stepLabels[step - 1]}
             </p>
           </div>
 
@@ -292,7 +304,7 @@ export function RecurringScheduleWizard({
                 {step === 1 && (
                   <div className="space-y-4">
                     <p className="text-slate-300 text-sm">
-                      Nar ska kontrollerna borja? Valj startdatum for det aterkommande schemat.
+                      När ska kontrollerna börja? Välj startdatum för det återkommande schemat.
                     </p>
                     <div className="flex justify-center">
                       <DatePicker
@@ -305,17 +317,29 @@ export function RecurringScheduleWizard({
                       />
                     </div>
                     <p className="text-xs text-slate-500 text-center">
-                      Forsta kontroll: {format(startDate, 'EEEE d MMMM yyyy', { locale: sv })}
+                      Första kontroll: {format(startDate, 'EEEE d MMMM yyyy', { locale: sv })}
                     </p>
                   </div>
                 )}
 
                 {step === 2 && (
                   <div className="space-y-4">
-                    <p className="text-slate-300 text-sm">
-                      Hur lang tid tar en kontrollrunda hos denna kund?
-                      Detta anvands for att undvika krockar med andra arenden.
-                    </p>
+                    {batchInfo ? (
+                      <>
+                        <p className="text-slate-300 text-sm font-medium">
+                          Tid per besök — {batchInfo.unitName} ({batchInfo.current} av {batchInfo.total})
+                        </p>
+                        <p className="text-slate-400 text-sm">
+                          Hur lång tid tar en kontrollrunda hos <strong className="text-slate-200">denna enhet</strong>?
+                          Detta används för att undvika krockar med andra ärenden.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-slate-300 text-sm">
+                        Hur lång tid tar en kontrollrunda hos denna kund?
+                        Detta används för att undvika krockar med andra ärenden.
+                      </p>
+                    )}
                     <div className="grid grid-cols-2 gap-2">
                       {DURATION_OPTIONS.map(opt => (
                         <button
@@ -323,7 +347,7 @@ export function RecurringScheduleWizard({
                           onClick={() => setDurationMinutes(opt.value)}
                           className={`p-3 rounded-lg border text-sm font-medium transition-all ${
                             durationMinutes === opt.value
-                              ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                              ? 'border-[#20c58f] bg-[#20c58f]/20 text-[#20c58f]'
                               : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600'
                           }`}
                         >
@@ -338,7 +362,7 @@ export function RecurringScheduleWizard({
                 {step === 3 && (
                   <div className="space-y-4">
                     <p className="text-slate-300 text-sm">
-                      Hur ofta ska kontroller genomforas?
+                      Hur ofta ska kontroller genomföras?
                     </p>
                     <div className="space-y-2">
                       {(Object.entries(FREQUENCY_CONFIG) as [RecurringFrequency, typeof FREQUENCY_CONFIG[RecurringFrequency]][]).map(([key, config]) => (
@@ -347,92 +371,117 @@ export function RecurringScheduleWizard({
                           onClick={() => setFrequency(key)}
                           className={`w-full p-3 rounded-lg border text-left transition-all ${
                             frequency === key
-                              ? 'border-blue-500 bg-blue-500/20'
+                              ? 'border-[#20c58f] bg-[#20c58f]/20'
                               : 'border-slate-700 bg-slate-800 hover:border-slate-600'
                           }`}
                         >
-                          <span className={`text-sm font-medium ${frequency === key ? 'text-blue-300' : 'text-slate-300'}`}>
+                          <span className={`text-sm font-medium ${frequency === key ? 'text-[#20c58f]' : 'text-slate-300'}`}>
                             {config.label}
                           </span>
                           <span className="text-xs text-slate-500 ml-2">{config.description}</span>
                         </button>
                       ))}
                     </div>
+
+                    {/* Day pattern section — appears when frequency is selected */}
+                    <AnimatePresence>
+                      {frequency && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pt-3 border-t border-slate-800 space-y-4">
+                            <p className="text-slate-300 text-sm">
+                              Vilken dag i varje period ska kontrollen läggas?
+                            </p>
+
+                            {(['recommended', 'first_week', 'second_week', 'other'] as const).map(group => {
+                              const groupLabel = {
+                                recommended: 'Rekommenderat',
+                                first_week: 'Första veckan',
+                                second_week: 'Andra veckan',
+                                other: 'Övrigt'
+                              }[group]
+
+                              const patterns = (Object.entries(DAY_PATTERN_CONFIG) as [RecurringDayPattern, typeof DAY_PATTERN_CONFIG[RecurringDayPattern]][])
+                                .filter(([, v]) => v.group === group)
+
+                              if (patterns.length === 0) return null
+
+                              return (
+                                <div key={group}>
+                                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">{groupLabel}</p>
+                                  <div className="space-y-1.5">
+                                    {patterns.map(([key, config]) => (
+                                      <button
+                                        key={key}
+                                        onClick={() => setDayPattern(key)}
+                                        className={`w-full p-2.5 rounded-lg border text-left transition-all ${
+                                          dayPattern === key
+                                            ? 'border-[#20c58f] bg-[#20c58f]/20'
+                                            : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                                        }`}
+                                      >
+                                        <span className={`text-sm ${dayPattern === key ? 'text-[#20c58f]' : 'text-slate-300'}`}>
+                                          {config.label}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            })}
+
+                            {dayPattern === 'specific_day' && (
+                              <div className="flex items-center gap-3 mt-3 p-3 bg-slate-800 rounded-lg border border-slate-700">
+                                <label className="text-sm text-slate-300">Dag i månaden:</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={28}
+                                  value={preferredDayOfMonth}
+                                  onChange={(e) => setPreferredDayOfMonth(Math.min(28, Math.max(1, Number(e.target.value))))}
+                                  className="w-16 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm text-center"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 )}
 
                 {step === 4 && (
                   <div className="space-y-4">
                     <p className="text-slate-300 text-sm">
-                      Vilken dag i varje period ska kontrollen laggas?
-                    </p>
-
-                    {/* Grouped patterns */}
-                    {(['recommended', 'first_week', 'second_week', 'other'] as const).map(group => {
-                      const groupLabel = {
-                        recommended: 'Rekommenderat',
-                        first_week: 'Forsta veckan',
-                        second_week: 'Andra veckan',
-                        other: 'Ovrigt'
-                      }[group]
-
-                      const patterns = (Object.entries(DAY_PATTERN_CONFIG) as [RecurringDayPattern, typeof DAY_PATTERN_CONFIG[RecurringDayPattern]][])
-                        .filter(([, v]) => v.group === group)
-
-                      if (patterns.length === 0) return null
-
-                      return (
-                        <div key={group}>
-                          <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">{groupLabel}</p>
-                          <div className="space-y-1.5">
-                            {patterns.map(([key, config]) => (
-                              <button
-                                key={key}
-                                onClick={() => setDayPattern(key)}
-                                className={`w-full p-2.5 rounded-lg border text-left transition-all ${
-                                  dayPattern === key
-                                    ? 'border-blue-500 bg-blue-500/20'
-                                    : 'border-slate-700 bg-slate-800 hover:border-slate-600'
-                                }`}
-                              >
-                                <span className={`text-sm ${dayPattern === key ? 'text-blue-300' : 'text-slate-300'}`}>
-                                  {config.label}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
-
-                    {dayPattern === 'specific_day' && (
-                      <div className="flex items-center gap-3 mt-3 p-3 bg-slate-800 rounded-lg border border-slate-700">
-                        <label className="text-sm text-slate-300">Dag i manaden:</label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={28}
-                          value={preferredDayOfMonth}
-                          onChange={(e) => setPreferredDayOfMonth(Math.min(28, Math.max(1, Number(e.target.value))))}
-                          className="w-16 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm text-center"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {step === 5 && (
-                  <div className="space-y-4">
-                    <p className="text-slate-300 text-sm">
-                      Vilken tid pa dagen ska kontrollen borja?
+                      Vilken tid på dagen ska kontrollen börja?
                     </p>
                     <div className="flex justify-center">
-                      <input
-                        type="time"
-                        value={preferredTime}
-                        onChange={(e) => setPreferredTime(e.target.value)}
-                        className="px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={preferredHour}
+                          onChange={(e) => setPreferredHour(Number(e.target.value))}
+                          className="px-3 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-lg text-center appearance-none cursor-pointer focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                        >
+                          {[6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map(h => (
+                            <option key={h} value={h}>{String(h).padStart(2, '0')}</option>
+                          ))}
+                        </select>
+                        <span className="text-xl text-slate-400 font-bold">:</span>
+                        <select
+                          value={preferredMinute}
+                          onChange={(e) => setPreferredMinute(Number(e.target.value))}
+                          className="px-3 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-lg text-center appearance-none cursor-pointer focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                        >
+                          {[0, 15, 30, 45].map(m => (
+                            <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     {workSchedule && (
                       <div className="text-xs text-slate-500 text-center space-y-0.5">
@@ -442,7 +491,7 @@ export function RecurringScheduleWizard({
                           .slice(0, 5)
                           .map(([day, v]) => (
                             <span key={day} className="inline-block mx-1">
-                              {day.slice(0, 3)}: {(v as any).start}-{(v as any).end}
+                              {SWEDISH_DAY_NAMES[day] || day}: {(v as any).start}-{(v as any).end}
                             </span>
                           ))
                         }
@@ -451,22 +500,22 @@ export function RecurringScheduleWizard({
                   </div>
                 )}
 
-                {step === 6 && (
+                {step === 5 && (
                   <div className="space-y-4">
                     {loadingPreview ? (
                       <div className="flex flex-col items-center justify-center py-8 gap-3">
-                        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-                        <p className="text-slate-400 text-sm">Kontrollerar tillganglighet...</p>
+                        <Loader2 className="w-8 h-8 text-[#20c58f] animate-spin" />
+                        <p className="text-slate-400 text-sm">Kontrollerar tillgänglighet...</p>
                       </div>
                     ) : (
                       <>
                         <div className="flex items-center justify-between">
                           <p className="text-slate-300 text-sm">
-                            {includedCount} kontrolltillfallen
+                            {includedCount} kontrolltillfällen
                           </p>
                           {previewDates.length > 0 && (
                             <p className="text-xs text-slate-500">
-                              {format(previewDates[0].date, 'MMM yyyy', { locale: sv })} - {format(previewDates[previewDates.length - 1].date, 'MMM yyyy', { locale: sv })}
+                              {format(previewDates[0].date, 'MMM yyyy', { locale: sv })} – {format(previewDates[previewDates.length - 1].date, 'MMM yyyy', { locale: sv })}
                             </p>
                           )}
                         </div>
@@ -489,7 +538,7 @@ export function RecurringScheduleWizard({
                                 }`}
                               >
                                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                                  excluded ? 'border-slate-600' : 'border-blue-500 bg-blue-500'
+                                  excluded ? 'border-slate-600' : 'border-[#20c58f] bg-[#20c58f]'
                                 }`}>
                                   {!excluded && <Check className="w-3 h-3 text-white" />}
                                 </div>
@@ -500,7 +549,7 @@ export function RecurringScheduleWizard({
                                       {format(d.date, 'EEEE d MMMM yyyy', { locale: sv })}
                                     </span>
                                     <span className="text-xs text-slate-500">
-                                      {format(d.date, 'HH:mm')}-{format(d.endDate, 'HH:mm')}
+                                      {format(d.date, 'HH:mm')}–{format(d.endDate, 'HH:mm')}
                                     </span>
                                   </div>
                                   {d.isAdjusted && d.adjustmentReason && (
@@ -519,7 +568,7 @@ export function RecurringScheduleWizard({
 
                         {previewDates.length === 0 && (
                           <div className="text-center py-6 text-slate-500 text-sm">
-                            Inga datum kunde genereras for vald period
+                            Inga datum kunde genereras för vald period
                           </div>
                         )}
                       </>
@@ -540,20 +589,20 @@ export function RecurringScheduleWizard({
               {step === 1 ? 'Avbryt' : 'Tillbaka'}
             </button>
 
-            {step < 6 ? (
+            {step < 5 ? (
               <button
                 onClick={() => setStep((step + 1) as WizardStep)}
                 disabled={!canProceed()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition"
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#20c58f] hover:bg-[#1ab07f] disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition"
               >
-                Nasta
+                Nästa
                 <ChevronRight className="w-4 h-4" />
               </button>
             ) : (
               <button
                 onClick={handleSubmit}
                 disabled={!canProceed() || isSubmitting || loadingPreview}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition"
+                className="flex items-center gap-2 px-4 py-2 bg-[#20c58f] hover:bg-[#1ab07f] disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition"
               >
                 {isSubmitting ? (
                   <>
@@ -563,7 +612,7 @@ export function RecurringScheduleWizard({
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    Skapa {includedCount} kontrolltillfallen
+                    Skapa {includedCount} kontrolltillfällen
                   </>
                 )}
               </button>

@@ -12,6 +12,7 @@ import type {
   GeneratedInspectionDate
 } from '../types/recurringSchedule'
 import { generateInspectionDates } from '../utils/inspectionDateGenerator'
+import { CaseNumberService } from './caseNumberService'
 
 // ============================================
 // CRUD OPERATIONS
@@ -417,6 +418,8 @@ export async function generateAndCreateSessions(
 
 /**
  * Create a schedule and immediately generate its sessions.
+ * For each session, creates a real `cases` row (so it appears in all schedules)
+ * and links the station_inspection_session to the case via case_id.
  */
 export async function createScheduleWithSessions(
   input: CreateRecurringScheduleInput,
@@ -434,29 +437,101 @@ export async function createScheduleWithSessions(
     return { schedule, sessionsCreated: 0, errors: [] }
   }
 
-  // Create sessions from the pre-generated (and user-reviewed) dates
-  const sessionsToCreate = generatedDates.map(d => ({
-    customer_id: schedule.customer_id,
-    technician_id: schedule.technician_id,
-    scheduled_at: d.date.toISOString(),
-    scheduled_end: d.endDate.toISOString(),
-    recurring_schedule_id: schedule.id,
-    status: 'scheduled' as const,
-    notes: d.isAdjusted ? d.adjustmentReason || null : null
-  }))
+  // Fetch technician name for case records
+  const { data: techData } = await supabase
+    .from('technicians')
+    .select('name')
+    .eq('id', schedule.technician_id)
+    .single()
+  const technicianName = techData?.name || null
 
-  const { data: created, error } = await supabase
-    .from('station_inspection_sessions')
-    .insert(sessionsToCreate)
-    .select('id')
+  // Count stations for the customer (outdoor + indoor)
+  const [outdoorResult, indoorResult] = await Promise.all([
+    supabase
+      .from('equipment_placements')
+      .select('id', { count: 'exact' })
+      .eq('customer_id', schedule.customer_id)
+      .eq('status', 'active'),
+    supabase
+      .from('indoor_stations')
+      .select('id, floor_plan_id', { count: 'exact' })
+      .eq('status', 'active')
+      .in('floor_plan_id',
+        (await supabase
+          .from('floor_plans')
+          .select('id')
+          .eq('customer_id', schedule.customer_id)
+        ).data?.map(fp => fp.id) || []
+      )
+  ])
+  const outdoorCount = outdoorResult.count || 0
+  const indoorCount = indoorResult.count || 0
 
-  if (error) {
-    console.error('Error creating sessions:', error)
-    errors.push(`Skapade schemat men kunde inte skapa sessioner: ${error.message}`)
-    return { schedule, sessionsCreated: 0, errors }
+  let sessionsCreated = 0
+
+  // Create a case + session for each generated date
+  for (const d of generatedDates) {
+    try {
+      // Generate unique case number
+      const caseNumber = await CaseNumberService.generateUniqueCaseNumber()
+
+      // Create the case
+      const { data: createdCase, error: caseError } = await supabase
+        .from('cases')
+        .insert([{
+          customer_id: schedule.customer_id,
+          title: caseNumber,
+          description: 'Schemalagd stationskontroll',
+          status: 'Bokad',
+          priority: 'normal',
+          service_type: 'inspection',
+          pest_type: null,
+          scheduled_start: d.date.toISOString(),
+          scheduled_end: d.endDate.toISOString(),
+          primary_technician_id: schedule.technician_id,
+          primary_technician_name: technicianName,
+          case_number: caseNumber,
+          price: null
+        }])
+        .select('id')
+        .single()
+
+      if (caseError) {
+        console.error('Error creating case for session:', caseError)
+        errors.push(`Kunde inte skapa ärende: ${caseError.message}`)
+        continue
+      }
+
+      // Create the inspection session linked to the case
+      const { error: sessionError } = await supabase
+        .from('station_inspection_sessions')
+        .insert([{
+          case_id: createdCase.id,
+          customer_id: schedule.customer_id,
+          technician_id: schedule.technician_id,
+          scheduled_at: d.date.toISOString(),
+          scheduled_end: d.endDate.toISOString(),
+          recurring_schedule_id: schedule.id,
+          status: 'scheduled',
+          total_outdoor_stations: outdoorCount,
+          total_indoor_stations: indoorCount,
+          notes: d.isAdjusted ? d.adjustmentReason || null : null
+        }])
+
+      if (sessionError) {
+        console.error('Error creating session:', sessionError)
+        errors.push(`Ärende skapat men session misslyckades: ${sessionError.message}`)
+        continue
+      }
+
+      sessionsCreated++
+    } catch (err) {
+      console.error('Error in createScheduleWithSessions loop:', err)
+      errors.push(`Oväntat fel: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
-  return { schedule, sessionsCreated: created?.length || 0, errors }
+  return { schedule, sessionsCreated, errors }
 }
 
 // ============================================

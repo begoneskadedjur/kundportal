@@ -910,10 +910,10 @@ export default function TechnicianEquipment() {
               className="bg-slate-900 rounded-2xl border border-slate-700 p-6 max-w-sm w-full"
               onClick={e => e.stopPropagation()}
             >
-              <h3 className="text-white font-semibold text-lg mb-2">Aterkommande kontroller</h3>
+              <h3 className="text-white font-semibold text-lg mb-2">Återkommande kontroller</h3>
               <p className="text-slate-400 text-sm mb-5">
-                Vill du schemalägga aterkommande kontroller for {schedulePromptCustomerName}?
-                Du kan aven gora detta senare under kundens schema-flik.
+                Vill du schemalägga återkommande kontroller för {schedulePromptCustomerName}?
+                Du kan även göra detta senare under kundens schema-flik.
               </p>
               <div className="flex gap-3">
                 <button
@@ -927,9 +927,9 @@ export default function TechnicianEquipment() {
                     setShowSchedulePrompt(false)
                     setShowScheduleWizard(true)
                   }}
-                  className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition"
+                  className="flex-1 py-2.5 px-4 bg-[#20c58f] hover:bg-[#1ab07f] text-white text-sm font-medium rounded-lg transition"
                 >
-                  Ja, schemalgg
+                  Ja, schemalägg
                 </button>
               </div>
             </motion.div>
@@ -949,6 +949,11 @@ export default function TechnicianEquipment() {
           customerId={schedulePromptCustomerId}
           customerName={schedulePromptCustomerName}
           technicianId={technicianId}
+          batchInfo={batchScheduleTargets.length > 1 ? {
+            current: batchScheduleIndex + 1,
+            total: batchScheduleTargets.length,
+            unitName: schedulePromptCustomerName
+          } : undefined}
         />
       )}
     </div>
