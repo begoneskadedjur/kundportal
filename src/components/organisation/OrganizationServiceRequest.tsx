@@ -162,7 +162,7 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
           'contract',
           files,
           ['general'],
-          profile?.id
+          profile?.user_id
         )
         if (result.failed.length > 0) {
           toast.error(`${result.failed.length} av ${files.length} bilder kunde inte laddas upp`)

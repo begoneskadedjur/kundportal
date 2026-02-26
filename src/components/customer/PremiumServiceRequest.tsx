@@ -108,7 +108,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
           'contract',
           files,
           ['general'],
-          profile?.id
+          profile?.user_id
         )
         if (result.failed.length > 0) {
           toast.error(`${result.failed.length} av ${files.length} bilder kunde inte laddas upp`)
@@ -119,7 +119,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
       setSubmitted(true)
 
       toast.success('Serviceförfrågan skickad!')
-      
+
       // Reset and close after animation
       setTimeout(() => {
         onClose()
@@ -130,7 +130,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
         setOtherPestType('')
         setFiles([])
         if (onSuccess) onSuccess()
-      }, 30000) // Temporärt 30s för debug
+      }, 2000)
     } catch (error: any) {
       console.error('Error creating case:', error)
       toast.error('Kunde inte skicka förfrågan. Försök igen.')
