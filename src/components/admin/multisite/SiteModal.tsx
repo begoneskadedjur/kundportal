@@ -130,7 +130,7 @@ export default function SiteModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!siteName || !siteCode || !region || !contactEmail) {
+    if (!siteName || !region || !contactEmail) {
       toast.error('Vänligen fyll i alla obligatoriska fält')
       return
     }
@@ -152,7 +152,7 @@ export default function SiteModal({
       const siteData = {
         company_name: `${organizationName} - ${siteName}`,
         site_name: siteName,
-        site_code: siteCode,
+        site_code: siteCode.trim() ? siteCode.trim().toUpperCase() : null,
         region: region,
         organization_number: organizationNumber || null,
         contact_person: contactPerson || null,
@@ -259,14 +259,13 @@ export default function SiteModal({
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Enhetskod *
+                  Enhetskod
                 </label>
                 <Input
                   type="text"
                   value={siteCode}
                   onChange={(e) => setSiteCode(e.target.value.toUpperCase())}
                   placeholder="t.ex. STO01"
-                  required
                 />
               </div>
               <div>

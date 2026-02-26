@@ -556,7 +556,7 @@ function InlineSiteForm({
   }
 
   const handleSubmit = () => {
-    if (!siteName || !siteCode || !region || !contactEmail) {
+    if (!siteName || !region || !contactEmail) {
       toast.error('Fyll i alla obligatoriska fält')
       return
     }
@@ -564,7 +564,7 @@ function InlineSiteForm({
     onSave({
       tempId: existingSite?.tempId || crypto.randomUUID(),
       site_name: siteName,
-      site_code: siteCode.toUpperCase(),
+      site_code: siteCode.trim() ? siteCode.trim().toUpperCase() : null,
       region,
       contact_person: contactPerson,
       contact_email: contactEmail,
@@ -592,7 +592,7 @@ function InlineSiteForm({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-400 mb-1">Enhetskod *</label>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Enhetskod</label>
           <Input
             value={siteCode}
             onChange={e => setSiteCode(e.target.value.toUpperCase())}
