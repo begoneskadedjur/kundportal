@@ -86,10 +86,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const userData of users) {
       try {
         console.log(`Creating user: ${userData.email}`)
-        
+
+        // Find role assignment for this user (needed for auth metadata)
+        const roleAssignment = roleAssignments?.find(r => r.userId === userData.id)
+
         // Generate temporary password
         let tempPassword = generateSecurePassword()
-        
+
         // Check if user already exists
         const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
         const existingAuthUser = existingUsers?.users?.find((u: any) => u.email === userData.email)
@@ -130,7 +133,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             user_metadata: {
               name: userData.name,
               phone: userData.phone,
-              organization_id: organizationId
+              organization_id: organizationId,
+              multisite_role: roleAssignment?.role || 'platsansvarig'
             }
           })
 
@@ -147,76 +151,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           console.log(`Created new auth user ${userData.email} with ID: ${userId}`)
         }
 
-        // Find role assignment for this user
-        const roleAssignment = roleAssignments?.find(r => r.userId === userData.id)
-        
         if (!roleAssignment) {
           console.warn(`No role assignment found for user ${userData.email}`)
           continue
         }
 
-        // Check if profile exists, update or create
-        const { data: existingProfile } = await supabaseAdmin
+        // Triggern skapar profilen automatiskt vid createUser — uppdatera med extra fält
+        const { error: profileUpdateError } = await supabaseAdmin
           .from('profiles')
-          .select('user_id')
+          .update({
+            email: userData.email,
+            email_verified: true,
+            role: 'customer',
+            multisite_role: roleAssignment.role,
+            organization_id: organizationId,
+            display_name: userData.name,
+            phone: userData.phone,
+            is_active: true
+          })
           .eq('user_id', userId)
-          .single()
 
-        if (existingProfile) {
-          // Update existing profile
-          const { error: profileUpdateError } = await supabaseAdmin
-            .from('profiles')
-            .update({
-              email: userData.email,
-              email_verified: true,
-              role: 'customer',
-              multisite_role: roleAssignment.role,
-              organization_id: organizationId,
-              display_name: userData.name,
-              phone: userData.phone,
-              is_active: true
-            })
-            .eq('user_id', userId)
-
-          if (profileUpdateError) {
-            console.error(`Failed to update profile for ${userData.email}:`, profileUpdateError)
-            results.errors.push({
-              email: userData.email,
-              error: `Could not update profile: ${profileUpdateError.message}`
-            })
-            continue
-          }
-          console.log(`Updated existing profile for ${userData.email}`)
-        } else {
-          // Create new profile
-          const { error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .insert({
-              user_id: userId,
-              email: userData.email,
-              email_verified: true,
-              role: 'customer',
-              multisite_role: roleAssignment.role,
-              organization_id: organizationId,
-              display_name: userData.name,
-              phone: userData.phone,
-              is_active: true
-            })
-
-          if (profileError) {
-            console.error(`Failed to create profile for ${userData.email}:`, profileError)
-            // Don't delete auth user if they already existed
-            if (!existingAuthUser) {
-              await supabaseAdmin.auth.admin.deleteUser(userId)
-            }
-            results.errors.push({
-              email: userData.email,
-              error: profileError.message
-            })
-            continue
-          }
-          console.log(`Created new profile for ${userData.email}`)
+        if (profileUpdateError) {
+          console.error(`Failed to update profile for ${userData.email}:`, profileUpdateError)
+          results.errors.push({
+            email: userData.email,
+            error: `Could not update profile: ${profileUpdateError.message}`
+          })
+          continue
         }
+        console.log(`Updated profile for ${userData.email}`)
 
         // Check for existing role and update or create
         const { data: existingRole } = await supabaseAdmin

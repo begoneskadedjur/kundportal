@@ -31,7 +31,7 @@ interface ParentData {
   billing_email?: string
   billing_address?: string
   contract_type?: string
-  account_manager?: string
+  assigned_account_manager?: string
   account_manager_email?: string
   sales_person?: string
   sales_person_email?: string
@@ -93,7 +93,7 @@ export default function SiteModal({
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('billing_email, billing_address, contract_type, account_manager, account_manager_email, sales_person, sales_person_email')
+        .select('billing_email, billing_address, contract_type, assigned_account_manager, account_manager_email, sales_person, sales_person_email')
         .eq('id', parentCustomerId)
         .single()
 
@@ -171,7 +171,7 @@ export default function SiteModal({
         source_type: 'oneflow' as const,
         // Kopiera account manager info från parent om det finns
         ...(parentData && {
-          account_manager: parentData.account_manager,
+          assigned_account_manager: parentData.assigned_account_manager,
           account_manager_email: parentData.account_manager_email,
           sales_person: parentData.sales_person,
           sales_person_email: parentData.sales_person_email
