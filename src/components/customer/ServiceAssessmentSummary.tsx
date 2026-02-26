@@ -48,20 +48,20 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (profile?.customer_id) {
+    if (customerId) {
       fetchAssessmentSummary()
     }
-  }, [profile?.customer_id])
+  }, [customerId])
 
   const fetchAssessmentSummary = async () => {
-    if (!profile?.customer_id) return
+    if (!customerId) return
 
     try {
       // Hämta alla ärenden
       const { data: cases, error } = await supabase
         .from('cases')
         .select('*')
-        .eq('customer_id', profile.customer_id)
+        .eq('customer_id', customerId)
         .order('assessment_date', { ascending: false })
 
       if (error) throw error
