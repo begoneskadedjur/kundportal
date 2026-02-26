@@ -12,7 +12,11 @@ import { sv } from 'date-fns/locale'
 
 type ReportTab = 'inspections' | 'sanitation'
 
-const SanitationReports: React.FC = () => {
+interface SanitationReportsProps {
+  customerId?: string  // Optional override för multisite
+}
+
+const SanitationReports: React.FC<SanitationReportsProps> = ({ customerId: externalCustomerId }) => {
   const [activeTab, setActiveTab] = useState<ReportTab>('inspections')
 
   // Sanitation reports state
@@ -36,25 +40,26 @@ const SanitationReports: React.FC = () => {
   const [downloadingInspection, setDownloadingInspection] = useState<string | null>(null)
 
   const { profile } = useAuth()
+  const effectiveCustomerId = externalCustomerId || profile?.customer_id
 
   useEffect(() => {
-    if (profile?.customer_id) {
+    if (effectiveCustomerId) {
       loadReports()
       loadInspectionSessions()
     }
-  }, [profile])
+  }, [effectiveCustomerId])
 
   useEffect(() => {
     filterReports()
   }, [reports, searchTerm, dateFilter])
 
   const loadReports = async () => {
-    if (!profile?.customer_id) return
+    if (!effectiveCustomerId) return
 
     try {
       setLoading(true)
       const { data, error } = await sanitationReportService.getReports({
-        customer_id: profile.customer_id
+        customer_id: effectiveCustomerId
       })
 
       if (error) {
@@ -73,11 +78,11 @@ const SanitationReports: React.FC = () => {
   }
 
   const loadInspectionSessions = async () => {
-    if (!profile?.customer_id) return
+    if (!effectiveCustomerId) return
 
     try {
       setLoadingInspections(true)
-      const sessions = await getCompletedSessionsWithSummary(profile.customer_id, 100)
+      const sessions = await getCompletedSessionsWithSummary(effectiveCustomerId, 100)
       setInspectionSessions(sessions)
     } catch (error) {
       console.error('Error loading inspection sessions:', error)

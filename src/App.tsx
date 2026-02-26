@@ -80,18 +80,8 @@ import CustomerPortal from './pages/customer/Portal';
 import Cases from './pages/customer/Cases';
 import Schedule from './pages/customer/Schedule';
 
-// Organisation Portal Pages
-import VerksamhetschefDashboard from './pages/organisation/Verksamhetschef'
-import RegionchefDashboard from './pages/organisation/Regionchef'
-import PlatsansvarigDashboard from './pages/organisation/Platsansvarig'
-import OrganisationRedirect from './pages/organisation/Redirect'
-
-// Shared organisation pages
-import OrganisationArenden from './pages/organisation/shared/Arenden';
-import OrganisationStatistik from './pages/organisation/shared/Statistik';
-import OrganisationRapporter from './pages/organisation/shared/Rapporter';
-import OrganisationOfferter from './pages/organisation/shared/Offerter';
-import OrganisationOversikt from './pages/organisation/shared/Oversikt';
+// Organisation Portal
+import OrganisationPortal from './pages/organisation/Portal'
 
 // Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute'
@@ -420,141 +410,20 @@ function App() {
               } 
             />
 
-            {/* Organisation Portal routes */}
-            <Route 
-              path="/organisation" 
+            {/* Organisation Portal — unified multisite portal */}
+            <Route
+              path="/organisation"
               element={
                 <MultisiteProtectedRoute>
-                  <OrganisationRedirect />
+                  <OrganisationPortal />
                 </MultisiteProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/organisation/verksamhetschef" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationOversikt />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/regionchef" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationOversikt />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/platsansvarig" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationOversikt />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            
-            {/* Organisation sub-routes for verksamhetschef */}
-            <Route 
-              path="/organisation/verksamhetschef/statistik" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationStatistik />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/verksamhetschef/arenden" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationArenden />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/verksamhetschef/rapporter" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationRapporter />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/verksamhetschef/offerter" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationOfferter />
-                </MultisiteProtectedRoute>
-              } 
-            />
-
-            {/* Organisation sub-routes for regionchef */}
-            <Route 
-              path="/organisation/regionchef/statistik" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationStatistik />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/regionchef/arenden" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationArenden />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/regionchef/rapporter" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationRapporter />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/regionchef/offerter" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationOfferter />
-                </MultisiteProtectedRoute>
-              } 
-            />
-
-            {/* Organisation sub-routes for platsansvarig */}
-            <Route 
-              path="/organisation/platsansvarig/statistik" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationStatistik />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/platsansvarig/arenden" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationArenden />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/platsansvarig/rapporter" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationRapporter />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/platsansvarig/offerter" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationOfferter />
-                </MultisiteProtectedRoute>
-              } 
-            />
+            {/* Legacy organisation redirects */}
+            <Route path="/organisation/verksamhetschef/*" element={<Navigate to="/organisation" replace />} />
+            <Route path="/organisation/regionchef/*" element={<Navigate to="/organisation" replace />} />
+            <Route path="/organisation/platsansvarig/*" element={<Navigate to="/organisation" replace />} />
+            <Route path="/multisite" element={<Navigate to="/organisation" replace />} />
 
             {/* Default redirects */}
             <Route path="/" element={<Navigate to="/login" replace />} />
