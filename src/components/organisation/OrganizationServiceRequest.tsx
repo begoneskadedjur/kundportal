@@ -1,6 +1,6 @@
 // src/components/organisation/OrganizationServiceRequest.tsx - Service Request för organisationsportalen
 import React, { useState, useEffect } from 'react'
-import { X, AlertCircle, Calendar, MessageSquare, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Building2 } from 'lucide-react'
+import { X, AlertCircle, Calendar, MessageSquare, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Building2, Trash2 } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import toast from 'react-hot-toast'
@@ -10,6 +10,7 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 import { ClickUpStatus } from '../../types/database'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
+import { CaseImageService } from '../../services/caseImageService'
 import { CaseNumberService } from '../../services/caseNumberService'
 
 interface OrganizationServiceRequestProps {
@@ -154,9 +155,25 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
 
       if (error) throw error
 
+      // Ladda upp bilder om det finns några
+      if (data && files.length > 0) {
+        const result = await CaseImageService.uploadMultipleCaseImages(
+          data.id,
+          'contract',
+          files,
+          ['general'],
+          profile?.id
+        )
+        if (result.failed.length > 0) {
+          toast.error(`${result.failed.length} av ${files.length} bilder kunde inte laddas upp`)
+        } else if (result.successful.length > 0) {
+          console.log(`${result.successful.length}/${files.length} bilder uppladdade`)
+        }
+      }
+
       setSubmitting(false)
       setSubmitted(true)
-      
+
       toast.success('Serviceförfrågan skickad!')
       
       // Reset and close after animation
@@ -433,23 +450,53 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Bifoga bilder (valfritt)
               </label>
+
+              {/* Visa valda bilder med preview */}
+              {files.length > 0 && (
+                <div className="mb-3 grid grid-cols-4 gap-2">
+                  {files.map((file, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`Bild ${index + 1}`}
+                        className="w-full h-20 object-cover rounded-lg border border-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFiles(files.filter((_, i) => i !== index))}
+                        className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-3 h-3 text-white" />
+                      </button>
+                      <span className="absolute bottom-1 left-1 text-xs text-white bg-black/60 px-1 rounded">
+                        {(file.size / 1024).toFixed(0)} KB
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="relative">
                 <input
                   type="file"
                   multiple
-                  onChange={handleFileChange}
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setFiles(prev => [...prev, ...Array.from(e.target.files!)])
+                    }
+                  }}
                   className="hidden"
-                  id="file-upload"
+                  id="org-file-upload"
                   accept="image/*"
                 />
                 <label
-                  htmlFor="file-upload"
+                  htmlFor="org-file-upload"
                   className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-700 rounded-lg hover:border-slate-600 cursor-pointer transition-colors"
                 >
                   <Upload className="w-5 h-5 text-slate-400" />
                   <span className="text-slate-400">
-                    {files.length > 0 
-                      ? `${files.length} bild(er) valda` 
+                    {files.length > 0
+                      ? 'Lägg till fler bilder'
                       : 'Klicka för att ladda upp bilder'}
                   </span>
                 </label>
