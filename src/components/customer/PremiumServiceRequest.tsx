@@ -130,7 +130,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
         setOtherPestType('')
         setFiles([])
         if (onSuccess) onSuccess()
-      }, 2000)
+      }, 30000) // Temporärt 30s för debug
     } catch (error: any) {
       console.error('Error creating case:', error)
       toast.error('Kunde inte skicka förfrågan. Försök igen.')
