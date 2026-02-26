@@ -135,6 +135,8 @@ export default function OrganizationsPage() {
   const [confirmLoading, setConfirmLoading] = useState(false)
   // Skapa portalkonto-modal
   const [createAccountOrg, setCreateAccountOrg] = useState<Organization | null>(null)
+  // Konvertera till multisite
+  const [convertingOrgId, setConvertingOrgId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchOrganizations()
@@ -654,6 +656,21 @@ export default function OrganizationsPage() {
   // handleCreatePortalAccount - öppna modal för att skapa portalkonto med lösenord
   const handleCreatePortalAccount = (org: Organization) => {
     setCreateAccountOrg(org)
+  }
+
+  // Konvertera till multisite
+  const handleConvertToMultisite = (org: Organization) => {
+    setConvertingOrgId(org.id)
+    setExpandedOrgId(org.id)
+  }
+
+  const handleConvertSuccess = () => {
+    setConvertingOrgId(null)
+    fetchOrganizations()
+  }
+
+  const handleCancelConvert = () => {
+    setConvertingOrgId(null)
   }
 
   const fetchOrganizationUsers = async (orgId: string, organizationId: string) => {
@@ -1186,6 +1203,10 @@ export default function OrganizationsPage() {
           expandedOrgId={expandedOrgId}
           onInviteToPortal={handleInviteToPortal}
           onCreatePortalAccount={handleCreatePortalAccount}
+          onConvertToMultisite={handleConvertToMultisite}
+          convertingOrgId={convertingOrgId}
+          onCancelConvert={handleCancelConvert}
+          onConvertSuccess={handleConvertSuccess}
         />
       )}
 

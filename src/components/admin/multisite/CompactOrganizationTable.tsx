@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsModal'
+import ConvertToMultisiteInline from './ConvertToMultisiteInline'
 
 interface Organization {
   id: string
@@ -114,6 +115,10 @@ interface CompactOrganizationTableProps {
   expandedOrgId: string | null
   onInviteToPortal?: (org: Organization) => void
   onCreatePortalAccount?: (org: Organization) => void
+  onConvertToMultisite?: (org: Organization) => void
+  convertingOrgId?: string | null
+  onCancelConvert?: () => void
+  onConvertSuccess?: () => void
 }
 
 const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
@@ -133,7 +138,11 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   onDeleteSite,
   expandedOrgId,
   onInviteToPortal,
-  onCreatePortalAccount
+  onCreatePortalAccount,
+  onConvertToMultisite,
+  convertingOrgId,
+  onCancelConvert,
+  onConvertSuccess
 }) => {
   const [hoveredOrgId, setHoveredOrgId] = useState<string | null>(null)
   const [showActionsForOrg, setShowActionsForOrg] = useState<string | null>(null)
@@ -340,6 +349,27 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         ))}
                       </div>
                     </div>
+                  )}
+
+                  {/* Konvertera till multisite — mobil */}
+                  {org.organizationType === 'single' && (
+                    convertingOrgId === org.id ? (
+                      <ConvertToMultisiteInline
+                        customer={org}
+                        onSuccess={onConvertSuccess!}
+                        onCancel={onCancelConvert!}
+                      />
+                    ) : (
+                      <div className="mt-3">
+                        <button
+                          onClick={() => onConvertToMultisite?.(org)}
+                          className="flex items-center gap-1.5 px-3 py-2 text-xs bg-slate-800 text-[#20c58f] rounded-lg hover:bg-slate-700 min-h-[44px]"
+                        >
+                          <Building2 className="w-3.5 h-3.5" />
+                          Konvertera till multisite
+                        </button>
+                      </div>
+                    )
                   )}
                 </div>
               )}
@@ -834,6 +864,32 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                       )}
                     </div>
                   </div>
+
+                  {/* Konvertera till multisite — bara för vanliga kunder */}
+                  {org.organizationType === 'single' && (
+                    convertingOrgId === org.id ? (
+                      <ConvertToMultisiteInline
+                        customer={org}
+                        onSuccess={onConvertSuccess!}
+                        onCancel={onCancelConvert!}
+                      />
+                    ) : (
+                      <div className="mt-4">
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onConvertToMultisite?.(org)
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Building2 className="w-3.5 h-3.5" />
+                          Konvertera till multisite
+                        </Button>
+                      </div>
+                    )
+                  )}
 
                 </div>
               )}
