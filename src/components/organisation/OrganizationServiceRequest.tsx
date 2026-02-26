@@ -50,15 +50,19 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
   const [alternativeContactPhone, setAlternativeContactPhone] = useState('')
   const [alternativeContactEmail, setAlternativeContactEmail] = useState('')
 
-  // Hämta kunddata när site väljs
+  // Auto-välj enhet om bara en finns
+  useEffect(() => {
+    if (!chosenSiteId && sites.length === 1) {
+      setChosenSiteId(sites[0].id)
+    }
+  }, [sites])
+
+  // Hämta kunddata när site väljs (site.id === customer.id i multisite)
   useEffect(() => {
     if (chosenSiteId) {
-      const site = sites.find(s => s.id === chosenSiteId)
-      if (site?.customer_id) {
-        fetchCustomerData(site.customer_id)
-      }
+      fetchCustomerData(chosenSiteId)
     }
-  }, [chosenSiteId, sites])
+  }, [chosenSiteId])
 
   const fetchCustomerData = async (customerId: string) => {
     try {

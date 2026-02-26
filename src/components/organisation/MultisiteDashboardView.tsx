@@ -22,6 +22,7 @@ import SiteCardWithTrafficLight from './SiteCardWithTrafficLight'
 import OrganisationServiceActivityTimeline from './OrganisationServiceActivityTimeline'
 import SiteOverviewModal from './SiteOverviewModal'
 import MultisitePendingQuoteNotification from './MultisitePendingQuoteNotification'
+import OrganizationServiceRequest from './OrganizationServiceRequest'
 
 import { Building2, MapPin, AlertTriangle, CheckCircle, Calendar, Clock } from 'lucide-react'
 
@@ -175,6 +176,7 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
   const [loading, setLoading] = useState(true)
   const [selectedSite, setSelectedSite] = useState<any>(null)
   const [showSiteModal, setShowSiteModal] = useState(false)
+  const [showServiceRequest, setShowServiceRequest] = useState(false)
 
   useEffect(() => {
     fetchStats()
@@ -339,6 +341,25 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
           />
         )}
       </div>
+
+      {/* FAB-knapp för att begära service */}
+      <button
+        onClick={() => setShowServiceRequest(true)}
+        className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full p-4 shadow-lg hover:shadow-emerald-500/25 transition-all duration-300 z-30"
+        title="Begär service"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
+
+      {showServiceRequest && (
+        <OrganizationServiceRequest
+          isOpen={showServiceRequest}
+          onClose={() => setShowServiceRequest(false)}
+          onSuccess={() => { setShowServiceRequest(false); fetchStats() }}
+        />
+      )}
     </div>
   )
 }
