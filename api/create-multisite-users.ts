@@ -88,39 +88,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`Creating user: ${userData.email}`)
 
         // Find role assignment for this user (needed for auth metadata)
-        const roleAssignment = roleAssignments?.find(r => r.userId === userData.id)
+        const roleAssignment = roleAssignments?.find((r: any) => r.userId === userData.id)
 
         // Generate temporary password
         let tempPassword = generateSecurePassword()
+        let isNewUser = true
 
-        // Check if user already exists
-        const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
-        const existingAuthUser = existingUsers?.users?.find((u: any) => u.email === userData.email)
-        
+        // Check if user already exists via profiles table (O(1) lookup, ej listUsers)
+        const { data: existingProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('user_id')
+          .eq('email', userData.email)
+          .maybeSingle()
+
+        let existingAuthUser: any = null
+        if (existingProfile?.user_id) {
+          const { data } = await supabaseAdmin.auth.admin.getUserById(existingProfile.user_id)
+          existingAuthUser = data?.user || null
+        }
+
         let userId: string
-        
+
         if (existingAuthUser) {
           // User already exists, update their metadata and password
-          console.log(`User ${userData.email} already exists, updating metadata and password`)
+          console.log(`User ${userData.email} already exists (ID: ${existingAuthUser.id}), updating`)
           userId = existingAuthUser.id
-          
-          // Generate new password for existing user
+          isNewUser = false
+
           tempPassword = generateSecurePassword()
-          
+
           const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
             password: tempPassword,
             user_metadata: {
               name: userData.name,
               phone: userData.phone,
-              organization_id: organizationId
+              organization_id: organizationId,
+              multisite_role: roleAssignment?.role || 'platsansvarig'
             }
           })
-          
+
           if (updateError) {
             console.error(`Failed to update existing user ${userData.email}:`, updateError)
             results.errors.push({
               email: userData.email,
-              error: `Could not update existing user: ${updateError.message}`
+              error: `Kunde inte uppdatera befintlig användare: ${updateError.message}`
             })
             continue
           }
@@ -140,13 +151,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           if (authError) {
             console.error(`Failed to create auth user ${userData.email}:`, authError)
+            let errorMessage = authError.message
+            if (authError.message.includes('Database error')) {
+              errorMessage = `Databasfel vid skapande av ${userData.email}. E-postadressen kan redan finnas registrerad.`
+            } else if (authError.message.includes('already been registered') || authError.message.includes('duplicate')) {
+              errorMessage = `E-postadressen ${userData.email} finns redan registrerad.`
+            }
             results.errors.push({
               email: userData.email,
-              error: authError.message
+              error: errorMessage
             })
             continue
           }
-          
+
           userId = authUser.user.id
           console.log(`Created new auth user ${userData.email} with ID: ${userId}`)
         }
@@ -156,10 +173,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           continue
         }
 
-        // Triggern skapar profilen automatiskt vid createUser — uppdatera med extra fält
-        const { error: profileUpdateError } = await supabaseAdmin
+        // Vänta på att handle_new_user-triggern ska skapa profilen
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        // Upsert profil — hanterar både: trigger lyckades (uppdatera) och trigger misslyckades (skapa)
+        const { error: profileError } = await supabaseAdmin
           .from('profiles')
-          .update({
+          .upsert({
+            user_id: userId,
             email: userData.email,
             email_verified: true,
             role: 'customer',
@@ -168,18 +189,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             display_name: userData.name,
             phone: userData.phone,
             is_active: true
-          })
-          .eq('user_id', userId)
+          }, { onConflict: 'user_id' })
 
-        if (profileUpdateError) {
-          console.error(`Failed to update profile for ${userData.email}:`, profileUpdateError)
+        if (profileError) {
+          console.error(`Failed to upsert profile for ${userData.email}:`, profileError)
+          // Cleanup: ta bort zombie auth user om vi just skapade den
+          if (isNewUser) {
+            try {
+              await supabaseAdmin.auth.admin.deleteUser(userId)
+              console.log(`Cleaned up auth user ${userId} after profile failure`)
+            } catch (cleanupErr) {
+              console.error(`Cleanup failed for ${userId}:`, cleanupErr)
+            }
+          }
           results.errors.push({
             email: userData.email,
-            error: `Could not update profile: ${profileUpdateError.message}`
+            error: `Kunde inte skapa profil: ${profileError.message}`
           })
           continue
         }
-        console.log(`Updated profile for ${userData.email}`)
+        console.log(`Upserted profile for ${userData.email}`)
 
         // Check for existing role and update or create
         const { data: existingRole } = await supabaseAdmin
@@ -187,7 +216,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .select('id')
           .eq('user_id', userId)
           .eq('organization_id', organizationId)
-          .single()
+          .maybeSingle()
 
         const roleData: any = {
           user_id: userId,
@@ -205,7 +234,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (existingRole) {
-          // Update existing role
           const { error: roleUpdateError } = await supabaseAdmin
             .from('multisite_user_roles')
             .update(roleData)
@@ -215,22 +243,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.error(`Failed to update role for ${userData.email}:`, roleUpdateError)
             results.errors.push({
               email: userData.email,
-              error: `Could not update role: ${roleUpdateError.message}`
+              error: `Kunde inte uppdatera roll: ${roleUpdateError.message}`
             })
             continue
           }
           console.log(`Updated existing role for ${userData.email}`)
         } else {
-          // Create new role
           const { error: roleError } = await supabaseAdmin
             .from('multisite_user_roles')
             .insert(roleData)
 
           if (roleError) {
             console.error(`Failed to create role for ${userData.email}:`, roleError)
+            // Cleanup: ta bort profil och auth user om roll-skapande misslyckas
+            if (isNewUser) {
+              try {
+                await supabaseAdmin.auth.admin.deleteUser(userId)
+                console.log(`Cleaned up auth user ${userId} after role failure`)
+              } catch (cleanupErr) {
+                console.error(`Cleanup failed for ${userId}:`, cleanupErr)
+              }
+            }
             results.errors.push({
               email: userData.email,
-              error: roleError.message
+              error: `Kunde inte skapa roll: ${roleError.message}`
             })
             continue
           }
@@ -241,8 +277,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (canSendEmails && shouldSendEmail) {
           try {
             const loginLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/login`
-            const isNewUser = !existingAuthUser
-            
+
             const emailHtml = getMultisiteInvitationEmailTemplate({
               organization: orgData,
               recipientEmail: userData.email,
@@ -250,14 +285,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               role: roleAssignment.role,
               loginLink,
               isNewUser,
-              tempPassword: tempPassword  // Always include password
+              tempPassword: tempPassword
             })
 
-            const subject = isNewUser 
+            const subject = isNewUser
               ? `Välkommen till Begone Organisationsportal - ${organizationName}`
               : `Ny organisation tillagd - ${organizationName}`
 
-            // Use Resend API directly
             const emailResponse = await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
@@ -281,23 +315,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           } catch (emailError) {
             console.error(`Failed to send email to ${userData.email}:`, emailError)
-            // Don't fail the whole process if email fails
           }
-        } else {
-          console.warn('RESEND_API_KEY not configured - skipping email invitations')
+        } else if (!canSendEmails) {
+          console.warn('RESEND_API_KEY not configured - skipping email invitation')
         }
 
         results.success.push({
           email: userData.email,
           userId,
-          message: 'User created successfully'
+          message: isNewUser ? 'Användare skapad' : 'Befintlig användare uppdaterad'
         })
 
       } catch (error: any) {
         console.error(`Unexpected error for user ${userData.email}:`, error)
         results.errors.push({
           email: userData.email,
-          error: error.message || 'Unexpected error'
+          error: error.message || 'Oväntat fel'
         })
       }
     }

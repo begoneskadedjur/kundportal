@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
-import { X, User, Mail, Shield, MapPin, Loader2, Send } from 'lucide-react'
+import { X, User, Mail, Shield, MapPin, Loader2, Send, Building2, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface UserModalProps {
@@ -26,6 +26,51 @@ interface Site {
   site_name: string
   region: string
 }
+
+const ROLES = [
+  {
+    value: 'verksamhetschef',
+    label: 'Verksamhetschef',
+    icon: Building2,
+    colorBg: 'bg-purple-500/10',
+    colorBorder: 'border-purple-500/50',
+    colorRing: 'ring-purple-500/30',
+    colorBorderDefault: 'border-purple-500/20',
+    colorIcon: 'text-purple-400',
+    colorLabel: 'text-purple-300',
+    desc: 'Full oversikt over hela organisationen. Ser alla enheter, kan hantera anvandare och installningar.',
+    portalDesc: 'Ser alla enheter och all data i organisationsportalen.',
+    needsSites: false
+  },
+  {
+    value: 'regionchef',
+    label: 'Regionchef',
+    icon: MapPin,
+    colorBg: 'bg-blue-500/10',
+    colorBorder: 'border-blue-500/50',
+    colorRing: 'ring-blue-500/30',
+    colorBorderDefault: 'border-blue-500/20',
+    colorIcon: 'text-blue-400',
+    colorLabel: 'text-blue-300',
+    desc: 'Ansvarar for utvalda enheter inom sin region. Kan bjuda in platsansvariga.',
+    portalDesc: 'Ser enbart sina tilldelade enheter i portalen.',
+    needsSites: true
+  },
+  {
+    value: 'platsansvarig',
+    label: 'Platsansvarig',
+    icon: User,
+    colorBg: 'bg-green-500/10',
+    colorBorder: 'border-green-500/50',
+    colorRing: 'ring-green-500/30',
+    colorBorderDefault: 'border-green-500/20',
+    colorIcon: 'text-green-400',
+    colorLabel: 'text-green-300',
+    desc: 'Ansvarar for specifika enheter. Kan begara service och se rapporter.',
+    portalDesc: 'Ser enbart sin tilldelade enhet i portalen.',
+    needsSites: true
+  }
+] as const
 
 export default function UserModal({
   isOpen,
@@ -53,7 +98,6 @@ export default function UserModal({
         setRoleType(existingUser.role_type)
         setSelectedSites(existingUser.site_ids || [])
       } else {
-        // Reset form for new user
         setEmail('')
         setFullName('')
         setRoleType('platsansvarig')
@@ -66,7 +110,6 @@ export default function UserModal({
   const fetchSites = async () => {
     setLoadingSites(true)
     try {
-      // Hämta organisation för att få organization_id
       const { data: orgData, error: orgError } = await supabase
         .from('customers')
         .select('organization_id')
@@ -74,10 +117,9 @@ export default function UserModal({
         .single()
 
       if (orgError || !orgData) {
-        throw new Error('Kunde inte hämta organisation')
+        throw new Error('Kunde inte hamta organisation')
       }
 
-      // Hämta sites för organisationen
       const { data: sitesData, error: sitesError } = await supabase
         .from('customers')
         .select('id, site_name, company_name, region')
@@ -91,11 +133,11 @@ export default function UserModal({
       setSites((sitesData || []).map(site => ({
         id: site.id,
         site_name: site.site_name || site.company_name,
-        region: site.region || 'Okänd region'
+        region: site.region || 'Okand region'
       })))
     } catch (error) {
       console.error('Error fetching sites:', error)
-      toast.error('Kunde inte hämta enheter')
+      toast.error('Kunde inte hamta enheter')
     } finally {
       setLoadingSites(false)
     }
@@ -103,28 +145,26 @@ export default function UserModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!email || !fullName || !roleType) {
-      toast.error('Vänligen fyll i alla obligatoriska fält')
+      toast.error('Vanligen fyll i alla obligatoriska falt')
       return
     }
 
-    // Validera e-postadress
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      toast.error('Vänligen ange en giltig e-postadress')
+      toast.error('Vanligen ange en giltig e-postadress')
       return
     }
 
-    // För platsansvarig och regionchef måste minst en enhet väljas
-    if ((roleType === 'platsansvarig' || roleType === 'regionchef') && selectedSites.length === 0) {
-      toast.error(`Vänligen välj minst en enhet för ${roleType === 'regionchef' ? 'regionchef' : 'platsansvarig'}`)
+    const currentRole = ROLES.find(r => r.value === roleType)
+    if (currentRole?.needsSites && selectedSites.length === 0) {
+      toast.error(`Vanligen valj minst en enhet for ${currentRole.label.toLowerCase()}`)
       return
     }
 
     setLoading(true)
     try {
-      // Hämta organisation_id från huvudkontoret
       const { data: orgData, error: orgError } = await supabase
         .from('customers')
         .select('organization_id')
@@ -132,11 +172,10 @@ export default function UserModal({
         .single()
 
       if (orgError || !orgData) {
-        throw new Error('Kunde inte hämta organisation')
+        throw new Error('Kunde inte hamta organisation')
       }
 
       if (existingUser) {
-        // Uppdatera befintlig användare
         const { error: updateError } = await supabase
           .from('multisite_user_roles')
           .update({
@@ -148,7 +187,6 @@ export default function UserModal({
 
         if (updateError) throw updateError
 
-        // Uppdatera profil om namn ändrats
         if (fullName !== existingUser.name) {
           const { error: profileError } = await supabase
             .from('profiles')
@@ -157,22 +195,17 @@ export default function UserModal({
 
           if (profileError) {
             console.error('Error updating profile:', profileError)
-            toast.error(`Kunde inte uppdatera användarnamn: ${profileError.message}`)
+            toast.error(`Kunde inte uppdatera anvandarnamn: ${profileError.message}`)
             return
-          } else {
-            console.log('Profile display_name updated successfully for user:', existingUser.user_id)
           }
         }
 
-        toast.success('Användare uppdaterad')
+        toast.success('Anvandare uppdaterad')
       } else {
-        // Skapa ny användare genom API
         const userId = crypto.randomUUID()
         const response = await fetch('/api/create-multisite-users', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             organizationId: orgData.organization_id,
             sendEmail: sendInviteEmail,
@@ -190,19 +223,26 @@ export default function UserModal({
           })
         })
 
+        const result = await response.json()
+
         if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.error || 'Kunde inte skapa användare')
+          throw new Error(result.error || 'Kunde inte skapa anvandare')
         }
 
-        toast.success(sendInviteEmail ? 'Användare skapad och inbjudan skickad' : 'Användare skapad (ingen inbjudan skickad)')
+        // Kolla om det finns enskilda fel i resultatet
+        const failedUsers = result.results?.filter((r: any) => !r.success) || []
+        if (failedUsers.length > 0) {
+          throw new Error(failedUsers[0].error || 'Kunde inte skapa anvandare')
+        }
+
+        toast.success(sendInviteEmail ? 'Anvandare skapad och inbjudan skickad' : 'Anvandare skapad (ingen inbjudan skickad)')
       }
 
       onSuccess()
       onClose()
     } catch (error: any) {
       console.error('Error saving user:', error)
-      toast.error(error.message || 'Kunde inte spara användare')
+      toast.error(error.message || 'Kunde inte spara anvandare')
     } finally {
       setLoading(false)
     }
@@ -210,109 +250,122 @@ export default function UserModal({
 
   if (!isOpen) return null
 
+  const selectedRole = ROLES.find(r => r.value === roleType)
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-slate-700">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="px-4 py-3 border-b border-slate-700">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white">
-              {existingUser ? 'Redigera användare' : 'Lägg till användare'}
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                {existingUser ? 'Redigera anvandare' : 'Lagg till anvandare'}
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Organisation: {organizationName}
+              </p>
+            </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-slate-400" />
             </button>
           </div>
-          <p className="text-sm text-slate-400 mt-1">
-            Organisation: {organizationName}
-          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* E-post */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              <Mail className="w-4 h-4 inline mr-2" />
-              E-postadress *
-            </label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="namn@foretag.se"
-              disabled={!!existingUser}
-              required
-            />
-            {existingUser && (
-              <p className="text-xs text-slate-500 mt-1">
-                E-postadressen kan inte ändras för befintliga användare
-              </p>
-            )}
-          </div>
-
-          {/* Namn */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              <User className="w-4 h-4 inline mr-2" />
-              Fullständigt namn *
-            </label>
-            <Input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="För- och efternamn"
-              required
-            />
-          </div>
-
-          {/* Roll */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              <Shield className="w-4 h-4 inline mr-2" />
-              Roll *
-            </label>
-            <select
-              value={roleType}
-              onChange={(e) => {
-                setRoleType(e.target.value)
-                // Rensa valda enheter om rollen inte är platsansvarig
-                if (e.target.value !== 'platsansvarig') {
-                  setSelectedSites([])
-                }
-              }}
-              className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-              required
-            >
-              <option value="verksamhetschef">Verksamhetschef</option>
-              <option value="regionchef">Regionchef</option>
-              <option value="platsansvarig">Platsansvarig</option>
-            </select>
-            <p className="text-xs text-slate-500 mt-1">
-              {roleType === 'verksamhetschef' && 'Har full översikt över hela organisationen'}
-              {roleType === 'regionchef' && 'Ansvarar för utvalda enheter inom sin region'}
-              {roleType === 'platsansvarig' && 'Ansvarar för specifika enheter'}
-            </p>
-          </div>
-
-          {/* Enheter (för platsansvarig och regionchef) */}
-          {(roleType === 'platsansvarig' || roleType === 'regionchef') && (
+        <form onSubmit={handleSubmit} className="p-4 space-y-3 overflow-y-auto max-h-[calc(90vh-140px)]">
+          {/* E-post & Namn */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                <MapPin className="w-4 h-4 inline mr-2" />
-                Välj enheter *
+              <label className="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5" />
+                E-postadress *
+              </label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="namn@foretag.se"
+                disabled={!!existingUser}
+                required
+              />
+              {existingUser && (
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Kan inte andras for befintliga anvandare
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" />
+                Fullstandigt namn *
+              </label>
+              <Input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="For- och efternamn"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Roll-val med visuella kort */}
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5" />
+              Roll i organisationen *
+            </label>
+            <div className="space-y-2">
+              {ROLES.map(role => {
+                const Icon = role.icon
+                const isSelected = roleType === role.value
+                return (
+                  <button
+                    key={role.value}
+                    type="button"
+                    onClick={() => {
+                      setRoleType(role.value)
+                      if (role.value === 'verksamhetschef') setSelectedSites([])
+                    }}
+                    className={`w-full text-left p-3 rounded-xl border transition-all ${
+                      isSelected
+                        ? `${role.colorBg} ${role.colorBorder} ring-1 ${role.colorRing}`
+                        : 'bg-slate-800/20 border-slate-700/50 hover:border-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon className={`w-4 h-4 ${role.colorIcon}`} />
+                      <span className={`text-sm font-medium ${isSelected ? role.colorLabel : 'text-white'}`}>
+                        {role.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1 ml-6">{role.desc}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Enheter (for platsansvarig och regionchef) */}
+          {selectedRole?.needsSites && (
+            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+              <label className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                Valj enheter *
               </label>
               {loadingSites ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#20c58f]" />
+                  <Loader2 className="w-5 h-5 animate-spin text-[#20c58f]" />
                 </div>
               ) : sites.length > 0 ? (
-                <div className="max-h-48 overflow-y-auto border border-slate-700 rounded-lg">
+                <div className="max-h-40 overflow-y-auto border border-slate-700/50 rounded-lg">
                   {sites.map(site => (
                     <label
                       key={site.id}
-                      className="flex items-center p-3 hover:bg-slate-800/50 cursor-pointer transition-colors"
+                      className="flex items-center px-3 py-2 hover:bg-slate-800/50 cursor-pointer transition-colors"
                     >
                       <input
                         type="checkbox"
@@ -328,26 +381,56 @@ export default function UserModal({
                         className="mr-3 rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
                       />
                       <div>
-                        <p className="text-white font-medium">{site.site_name}</p>
+                        <p className="text-sm text-white font-medium">{site.site_name}</p>
                         <p className="text-xs text-slate-400">{site.region}</p>
                       </div>
                     </label>
                   ))}
                 </div>
               ) : (
-                <p className="text-slate-400 text-sm py-4 text-center border border-slate-700 rounded-lg">
-                  Inga enheter tillgängliga
+                <p className="text-slate-400 text-sm py-4 text-center border border-slate-700/50 rounded-lg">
+                  Inga enheter tillgangliga
                 </p>
               )}
               {selectedSites.length > 0 && (
-                <p className="text-xs text-[#20c58f] mt-2">
+                <p className="text-xs text-[#20c58f] mt-1.5">
                   {selectedSites.length} enhet(er) valda
                 </p>
               )}
             </div>
           )}
 
-          {/* E-post-inbjudan toggle (bara för nya användare) */}
+          {/* Preview: Vad anvandaren kommer se i portalen */}
+          {(roleType === 'verksamhetschef' || selectedSites.length > 0) && (
+            <div className="p-3 bg-[#20c58f]/10 border border-[#20c58f]/20 rounded-xl">
+              <h4 className="text-xs font-medium text-[#20c58f] mb-1.5 flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5" />
+                Denna anvandare kommer se i portalen:
+              </h4>
+              <div className="text-xs text-slate-300">
+                {roleType === 'verksamhetschef' ? (
+                  <p>Alla {sites.length} enheter i {organizationName} — full oversikt med alla rapporter, arenden och statistik.</p>
+                ) : (
+                  <div>
+                    <p className="mb-1">{selectedRole?.portalDesc}</p>
+                    <ul className="space-y-0.5 ml-3">
+                      {selectedSites.map(siteId => {
+                        const site = sites.find(s => s.id === siteId)
+                        return site ? (
+                          <li key={siteId} className="flex items-center gap-1.5">
+                            <MapPin className="w-3 h-3 text-[#20c58f]" />
+                            {site.site_name} <span className="text-slate-500">({site.region})</span>
+                          </li>
+                        ) : null
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* E-post-inbjudan toggle (bara for nya anvandare) */}
           {!existingUser && (
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <label className="flex items-center gap-3 cursor-pointer">
@@ -363,7 +446,7 @@ export default function UserModal({
                     <p className="text-sm font-medium text-white">Skicka inbjudan via e-post</p>
                     <p className="text-xs text-slate-400">
                       {sendInviteEmail
-                        ? 'Användaren får ett mail med inloggningsuppgifter'
+                        ? 'Anvandaren far ett mail med inloggningsuppgifter'
                         : 'Konto skapas utan att skicka e-post (du kan bjuda in senare)'}
                     </p>
                   </div>
@@ -371,28 +454,29 @@ export default function UserModal({
               </label>
             </div>
           )}
-
-          {/* Åtgärdsknappar */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
-            <Button
-              type="button"
-              onClick={onClose}
-              variant="secondary"
-              disabled={loading}
-            >
-              Avbryt
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={loading}
-              className="flex items-center gap-2"
-            >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {existingUser ? 'Uppdatera' : (sendInviteEmail ? 'Lägg till och bjud in' : 'Lägg till användare')}
-            </Button>
-          </div>
         </form>
+
+        {/* Footer */}
+        <div className="px-4 py-2.5 border-t border-slate-700/50 flex justify-end gap-3">
+          <Button
+            type="button"
+            onClick={onClose}
+            variant="secondary"
+            disabled={loading}
+          >
+            Avbryt
+          </Button>
+          <Button
+            type="submit"
+            onClick={handleSubmit}
+            variant="primary"
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {existingUser ? 'Uppdatera' : (sendInviteEmail ? 'Lagg till och bjud in' : 'Lagg till anvandare')}
+          </Button>
+        </div>
       </div>
     </div>
   )

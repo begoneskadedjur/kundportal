@@ -238,6 +238,17 @@ export default function SiteModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+          {/* Info-banner: enhet = fullvärdig kund */}
+          {!existingSite && (
+            <div className="p-3 bg-[#20c58f]/10 border border-[#20c58f]/20 rounded-xl flex items-start gap-2">
+              <Building2 className="w-4 h-4 text-[#20c58f] mt-0.5 shrink-0" />
+              <p className="text-xs text-slate-300">
+                Enheten skapas som en fullvärdig kund i systemet. Ärenden, kontrollrundor,
+                utrustningsplaceringar och scheman kan hanteras direkt på enheten.
+              </p>
+            </div>
+          )}
+
           {/* Grundinformation */}
           <div>
             <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
