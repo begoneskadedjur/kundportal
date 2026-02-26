@@ -60,7 +60,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
       return
     }
 
-    if (!profile?.customer_id) {
+    if (!customer?.id) {
       toast.error('Kunde inte identifiera kundinformation')
       return
     }
@@ -75,7 +75,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
       const { data, error } = await supabase
         .from('cases')
         .insert({
-          customer_id: profile.customer_id,
+          customer_id: customer.id,
           case_number: caseNumber, // Required field
           title: subject,
           description: description,
