@@ -34,6 +34,7 @@ import { CollapsibleMapSection } from '../../components/technician/CollapsibleMa
 import { AddStationWizard } from '../../components/technician/AddStationWizard'
 import { RecurringScheduleWizard } from '../../components/technician/RecurringScheduleWizard'
 import { getRecurringSchedulesByCustomer } from '../../services/recurringScheduleService'
+import type { BatchScheduleUnit } from '../../types/recurringSchedule'
 
 interface Customer {
   id: string
@@ -78,8 +79,7 @@ export default function TechnicianEquipment() {
   const [showScheduleWizard, setShowScheduleWizard] = useState(false)
 
   // Batch-schemaläggning (från kundlistan)
-  const [batchScheduleTargets, setBatchScheduleTargets] = useState<Array<{ customerId: string; customerName: string }>>([])
-  const [batchScheduleIndex, setBatchScheduleIndex] = useState(0)
+  const [batchScheduleUnits, setBatchScheduleUnits] = useState<BatchScheduleUnit[]>([])
 
   // Borttagningsdialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -444,49 +444,38 @@ export default function TechnicianEquipment() {
   }
 
   // Hantera batch-schemaläggning från kundlistan
-  const handleScheduleFromList = (targets: Array<{ customer_id: string; customer_name: string }>) => {
+  const handleScheduleFromList = (targets: CustomerStationSummary[]) => {
     if (targets.length === 0) return
 
-    if (targets.length === 1) {
+    const units: BatchScheduleUnit[] = targets.map(t => ({
+      customerId: t.customer_id,
+      customerName: t.customer_name,
+      address: t.customer_address,
+      durationMinutes: 60
+    }))
+
+    if (units.length === 1) {
       // Enkel kund — öppna wizard direkt
-      setSchedulePromptCustomerId(targets[0].customer_id)
-      setSchedulePromptCustomerName(targets[0].customer_name)
+      setSchedulePromptCustomerId(units[0].customerId)
+      setSchedulePromptCustomerName(units[0].customerName)
       setShowScheduleWizard(true)
     } else {
-      // Batch — öppna wizard för första enheten, spara resten
-      setBatchScheduleTargets(targets.map(t => ({ customerId: t.customer_id, customerName: t.customer_name })))
-      setBatchScheduleIndex(0)
-      setSchedulePromptCustomerId(targets[0].customer_id)
-      setSchedulePromptCustomerName(targets[0].customer_name)
+      // Batch — öppna wizard med alla enheter
+      setBatchScheduleUnits(units)
+      setSchedulePromptCustomerId(units[0].customerId)
+      setSchedulePromptCustomerName(units[0].customerName)
       setShowScheduleWizard(true)
     }
   }
 
-  // Hantera wizard completion — gå vidare till nästa enhet i batch eller avsluta
-  const handleScheduleWizardComplete = () => {
-    if (batchScheduleTargets.length > 0) {
-      const nextIndex = batchScheduleIndex + 1
-      if (nextIndex < batchScheduleTargets.length) {
-        // Öppna wizard för nästa enhet
-        setBatchScheduleIndex(nextIndex)
-        const next = batchScheduleTargets[nextIndex]
-        setSchedulePromptCustomerId(next.customerId)
-        setSchedulePromptCustomerName(next.customerName)
-        // Wizard stängs och öppnas igen via state-change
-        setShowScheduleWizard(false)
-        setTimeout(() => setShowScheduleWizard(true), 100)
-      } else {
-        // Alla klara
-        toast.success(`${batchScheduleTargets.length} scheman skapade`)
-        setBatchScheduleTargets([])
-        setBatchScheduleIndex(0)
-        setShowScheduleWizard(false)
-        setSchedulePromptCustomerId(null)
-      }
-    } else {
-      setShowScheduleWizard(false)
-      setSchedulePromptCustomerId(null)
+  // Hantera wizard completion
+  const handleScheduleWizardComplete = (totalSessions: number) => {
+    if (batchScheduleUnits.length > 1) {
+      toast.success(`${totalSessions} kontrolltillfällen skapade för ${batchScheduleUnits.length} enheter`)
     }
+    setBatchScheduleUnits([])
+    setShowScheduleWizard(false)
+    setSchedulePromptCustomerId(null)
   }
 
   // Hantera klick på karta för att öppna utrustning
@@ -546,9 +535,7 @@ export default function TechnicianEquipment() {
                 customers={allCustomers}
                 loading={loading}
                 onOpenCustomerDetails={handleOpenCustomerDetails}
-                onSchedule={(targets) => handleScheduleFromList(
-                  targets.map(t => ({ customer_id: t.customer_id, customer_name: t.customer_name }))
-                )}
+                onSchedule={(targets) => handleScheduleFromList(targets)}
               />
             </div>
           </div>
@@ -944,16 +931,13 @@ export default function TechnicianEquipment() {
           onClose={() => {
             setShowScheduleWizard(false)
             setSchedulePromptCustomerId(null)
+            setBatchScheduleUnits([])
           }}
           onComplete={handleScheduleWizardComplete}
           customerId={schedulePromptCustomerId}
           customerName={schedulePromptCustomerName}
           technicianId={technicianId}
-          batchInfo={batchScheduleTargets.length > 1 ? {
-            current: batchScheduleIndex + 1,
-            total: batchScheduleTargets.length,
-            unitName: schedulePromptCustomerName
-          } : undefined}
+          batchUnits={batchScheduleUnits.length > 1 ? batchScheduleUnits : undefined}
         />
       )}
     </div>

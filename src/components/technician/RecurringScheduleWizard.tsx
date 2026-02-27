@@ -1,11 +1,12 @@
 // src/components/technician/RecurringScheduleWizard.tsx
 // Wizard for setting up recurring inspection schedules
+// Supports batch mode: multiple units scheduled back-to-back in a single pass
 
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  X, ChevronLeft, ChevronRight, Calendar, Clock, Check,
-  AlertTriangle, Loader2, CalendarDays, Repeat, Settings
+  X, ChevronLeft, ChevronRight, Clock, Check,
+  AlertTriangle, Loader2, CalendarDays, Repeat, Settings, MapPin
 } from 'lucide-react'
 import { format, addMonths } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -16,14 +17,18 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
   previewScheduleDates,
-  createScheduleWithSessions
+  createScheduleWithSessions,
+  fetchTechnicianBookings,
+  fetchTechnicianAbsences
 } from '../../services/recurringScheduleService'
+import { generateInspectionDates } from '../../utils/inspectionDateGenerator'
 import type {
   RecurringFrequency,
   RecurringDayPattern,
   GeneratedInspectionDate,
   CreateRecurringScheduleInput,
-  CustomFrequencyConfig
+  CustomFrequencyConfig,
+  BatchScheduleUnit
 } from '../../types/recurringSchedule'
 import {
   FREQUENCY_CONFIG,
@@ -39,14 +44,26 @@ type WizardStep = 1 | 2 | 3 | 4 | 5
 interface RecurringScheduleWizardProps {
   isOpen: boolean
   onClose: () => void
-  onComplete: (scheduleId: string, sessionsCreated: number) => void
+  onComplete: (totalSessionsCreated: number) => void
   customerId: string
   customerName: string
   technicianId: string
   contractStartDate?: string | null
   contractEndDate?: string | null
   serviceFrequency?: string | null
-  batchInfo?: { current: number; total: number; unitName: string }
+  batchUnits?: BatchScheduleUnit[]
+}
+
+interface BatchPreviewResult {
+  unit: BatchScheduleUnit
+  dates: GeneratedInspectionDate[]
+}
+
+interface GroupedDateRow {
+  dateKey: string
+  displayDate: Date
+  unitSlots: Array<{ unit: BatchScheduleUnit; date: GeneratedInspectionDate }>
+  hasWarnings: boolean
 }
 
 // Swedish day name map for work schedule display
@@ -73,6 +90,13 @@ function parseServiceFrequency(sf: string | null | undefined): RecurringFrequenc
   return null
 }
 
+function formatTotalDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m > 0 ? `${h} tim ${m} min` : `${h} tim`
+}
+
 export function RecurringScheduleWizard({
   isOpen,
   onClose,
@@ -83,18 +107,23 @@ export function RecurringScheduleWizard({
   contractStartDate,
   contractEndDate,
   serviceFrequency,
-  batchInfo
+  batchUnits
 }: RecurringScheduleWizardProps) {
   const { profile } = useAuth()
   const [step, setStep] = useState<WizardStep>(1)
+
+  const isBatch = !!batchUnits && batchUnits.length > 1
 
   // Step 1: Start date
   const [startDate, setStartDate] = useState<Date>(
     contractStartDate ? new Date(contractStartDate) : new Date()
   )
 
-  // Step 2: Duration
+  // Step 2: Duration (single-unit mode)
   const [durationMinutes, setDurationMinutes] = useState(60)
+
+  // Step 2: Duration (batch mode) — per-unit durations
+  const [unitDurations, setUnitDurations] = useState<Record<string, number>>({})
 
   // Step 3: Frequency + Day pattern (merged)
   const [frequency, setFrequency] = useState<RecurringFrequency | null>(
@@ -115,13 +144,80 @@ export function RecurringScheduleWizard({
 
   const preferredTime = `${String(preferredHour).padStart(2, '0')}:${String(preferredMinute).padStart(2, '0')}`
 
-  // Step 5: Preview
+  // Step 5: Preview (single-unit mode)
   const [previewDates, setPreviewDates] = useState<GeneratedInspectionDate[]>([])
   const [excludedIndices, setExcludedIndices] = useState<Set<number>>(new Set())
   const [loadingPreview, setLoadingPreview] = useState(false)
 
+  // Step 5: Preview (batch mode)
+  const [batchPreviewResults, setBatchPreviewResults] = useState<BatchPreviewResult[]>([])
+  const [batchExcludedDates, setBatchExcludedDates] = useState<Set<string>>(new Set())
+
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Resolved custom config
+  const resolvedCustomConfig = frequency === 'custom' ? {
+    ...customConfig,
+    ...(showActivePeriod ? {} : { active_months_start: undefined, active_months_end: undefined })
+  } : undefined
+
+  // Batch: effective units with updated durations
+  const effectiveUnits: BatchScheduleUnit[] = useMemo(() => {
+    if (isBatch) {
+      return batchUnits.map(u => ({
+        ...u,
+        durationMinutes: unitDurations[u.customerId] ?? u.durationMinutes
+      }))
+    }
+    return [{ customerId, customerName, address: null, durationMinutes }]
+  }, [isBatch, batchUnits, unitDurations, customerId, customerName, durationMinutes])
+
+  // Batch: group preview results by date for step 5 display
+  const groupedDates: GroupedDateRow[] = useMemo(() => {
+    if (!isBatch || batchPreviewResults.length === 0) return []
+
+    const dateMap = new Map<string, GroupedDateRow>()
+    for (const result of batchPreviewResults) {
+      for (const d of result.dates) {
+        const dateKey = format(d.date, 'yyyy-MM-dd')
+        if (!dateMap.has(dateKey)) {
+          dateMap.set(dateKey, {
+            dateKey,
+            displayDate: d.date,
+            unitSlots: [],
+            hasWarnings: false
+          })
+        }
+        const row = dateMap.get(dateKey)!
+        row.unitSlots.push({ unit: result.unit, date: d })
+        if (d.hasConflictWarning || d.isAdjusted) row.hasWarnings = true
+      }
+    }
+
+    return Array.from(dateMap.values()).sort(
+      (a, b) => a.displayDate.getTime() - b.displayDate.getTime()
+    )
+  }, [isBatch, batchPreviewResults])
+
+  // Batch: count included dates/sessions
+  const batchIncludedDays = groupedDates.filter(g => !batchExcludedDates.has(g.dateKey)).length
+  const batchTotalSessions = groupedDates.reduce((sum, g) => {
+    if (batchExcludedDates.has(g.dateKey)) return sum
+    return sum + g.unitSlots.length
+  }, 0)
+
+  // Single-unit: count
+  const includedCount = previewDates.length - excludedIndices.size
+
+  // Initialize batch unit durations when opening
+  useEffect(() => {
+    if (isOpen && batchUnits && batchUnits.length > 1) {
+      const initial: Record<string, number> = {}
+      batchUnits.forEach(u => { initial[u.customerId] = u.durationMinutes })
+      setUnitDurations(initial)
+    }
+  }, [isOpen, batchUnits])
 
   // Load technician work schedule on mount
   useEffect(() => {
@@ -145,6 +241,7 @@ export function RecurringScheduleWizard({
       setStep(1)
       setStartDate(contractStartDate ? new Date(contractStartDate) : new Date())
       setDurationMinutes(60)
+      setUnitDurations({})
       setFrequency(parseServiceFrequency(serviceFrequency) || null)
       setDayPattern(null)
       setCustomConfig({ visits_per_period: 1, period_type: 'week' })
@@ -153,13 +250,19 @@ export function RecurringScheduleWizard({
       setPreferredMinute(0)
       setPreviewDates([])
       setExcludedIndices(new Set())
+      setBatchPreviewResults([])
+      setBatchExcludedDates(new Set())
     }
   }, [isOpen])
 
   // Generate preview when entering step 5
   useEffect(() => {
     if (step === 5 && frequency && dayPattern) {
-      generatePreview()
+      if (isBatch) {
+        generateBatchPreview()
+      } else {
+        generatePreview()
+      }
     }
   }, [step])
 
@@ -179,10 +282,7 @@ export function RecurringScheduleWizard({
         startDate,
         endDate: previewEnd,
         technicianWorkSchedule: workSchedule,
-        customFrequencyConfig: frequency === 'custom' ? {
-          ...customConfig,
-          ...(showActivePeriod ? {} : { active_months_start: undefined, active_months_end: undefined })
-        } : undefined
+        customFrequencyConfig: resolvedCustomConfig
       })
 
       setPreviewDates(dates)
@@ -195,39 +295,124 @@ export function RecurringScheduleWizard({
     }
   }
 
+  const generateBatchPreview = async () => {
+    if (!frequency || !dayPattern) return
+    setLoadingPreview(true)
+    try {
+      const previewEnd = addMonths(startDate, 14)
+
+      // Fetch bookings and absences once for all units
+      const [baseBookings, absences] = await Promise.all([
+        fetchTechnicianBookings(technicianId, startDate, previewEnd),
+        fetchTechnicianAbsences(technicianId, startDate, previewEnd)
+      ])
+
+      const results: BatchPreviewResult[] = []
+      let cumulativeBookings = [...baseBookings]
+
+      for (const unit of effectiveUnits) {
+        const dates = generateInspectionDates({
+          frequency,
+          dayPattern,
+          preferredDayOfMonth: dayPattern === 'specific_day' ? preferredDayOfMonth : undefined,
+          preferredTime,
+          estimatedDurationMinutes: unit.durationMinutes,
+          startDate,
+          endDate: previewEnd,
+          technicianWorkSchedule: workSchedule,
+          technicianAbsences: absences,
+          existingBookings: cumulativeBookings,
+          customFrequencyConfig: resolvedCustomConfig
+        })
+
+        results.push({ unit, dates })
+
+        // Add this unit's dates as bookings for subsequent units
+        cumulativeBookings = [
+          ...cumulativeBookings,
+          ...dates.map(d => ({ start: d.date, end: d.endDate }))
+        ]
+      }
+
+      setBatchPreviewResults(results)
+      setBatchExcludedDates(new Set())
+    } catch (error) {
+      console.error('Error generating batch preview:', error)
+      toast.error('Kunde inte generera förhandsvisning')
+    } finally {
+      setLoadingPreview(false)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!frequency || !dayPattern || isSubmitting) return
     setIsSubmitting(true)
 
     try {
-      const includedDates = previewDates.filter((_, i) => !excludedIndices.has(i))
+      if (isBatch) {
+        // Batch mode: create schedule + sessions for each unit
+        let totalSessions = 0
+        for (const result of batchPreviewResults) {
+          const includedDates = result.dates.filter(d => {
+            const dateKey = format(d.date, 'yyyy-MM-dd')
+            return !batchExcludedDates.has(dateKey)
+          })
 
-      const input: CreateRecurringScheduleInput = {
-        customer_id: customerId,
-        technician_id: technicianId,
-        frequency,
-        day_pattern: dayPattern,
-        preferred_day_of_month: dayPattern === 'specific_day' ? preferredDayOfMonth : undefined,
-        preferred_time: preferredTime,
-        estimated_duration_minutes: durationMinutes,
-        schedule_start_date: format(startDate, 'yyyy-MM-dd'),
-        contract_end_date: contractEndDate || undefined,
-        is_auto_renewing: true,
-        created_by: profile?.id,
-        custom_frequency_config: frequency === 'custom' ? {
-          ...customConfig,
-          ...(showActivePeriod ? {} : { active_months_start: undefined, active_months_end: undefined })
-        } : undefined
-      }
+          if (includedDates.length === 0) continue
 
-      const result = await createScheduleWithSessions(input, includedDates)
+          const input: CreateRecurringScheduleInput = {
+            customer_id: result.unit.customerId,
+            technician_id: technicianId,
+            frequency,
+            day_pattern: dayPattern,
+            preferred_day_of_month: dayPattern === 'specific_day' ? preferredDayOfMonth : undefined,
+            preferred_time: preferredTime,
+            estimated_duration_minutes: result.unit.durationMinutes,
+            schedule_start_date: format(startDate, 'yyyy-MM-dd'),
+            contract_end_date: contractEndDate || undefined,
+            is_auto_renewing: true,
+            created_by: profile?.id,
+            custom_frequency_config: resolvedCustomConfig
+          }
 
-      if (result.schedule) {
-        toast.success(`${result.sessionsCreated} kontrolltillfällen skapade`)
-        onComplete(result.schedule.id, result.sessionsCreated)
+          const res = await createScheduleWithSessions(input, includedDates)
+          if (res.schedule) {
+            totalSessions += res.sessionsCreated
+          } else {
+            toast.error(`Misslyckades: ${result.unit.customerName}`)
+          }
+        }
+
+        onComplete(totalSessions)
         onClose()
       } else {
-        toast.error(result.errors[0] || 'Kunde inte skapa schemat')
+        // Single-unit mode
+        const filteredDates = previewDates.filter((_, i) => !excludedIndices.has(i))
+
+        const input: CreateRecurringScheduleInput = {
+          customer_id: customerId,
+          technician_id: technicianId,
+          frequency,
+          day_pattern: dayPattern,
+          preferred_day_of_month: dayPattern === 'specific_day' ? preferredDayOfMonth : undefined,
+          preferred_time: preferredTime,
+          estimated_duration_minutes: durationMinutes,
+          schedule_start_date: format(startDate, 'yyyy-MM-dd'),
+          contract_end_date: contractEndDate || undefined,
+          is_auto_renewing: true,
+          created_by: profile?.id,
+          custom_frequency_config: resolvedCustomConfig
+        }
+
+        const result = await createScheduleWithSessions(input, filteredDates)
+
+        if (result.schedule) {
+          toast.success(`${result.sessionsCreated} kontrolltillfällen skapade`)
+          onComplete(result.sessionsCreated)
+          onClose()
+        } else {
+          toast.error(result.errors[0] || 'Kunde inte skapa schemat')
+        }
       }
     } catch (error) {
       console.error('Error creating schedule:', error)
@@ -246,18 +431,36 @@ export function RecurringScheduleWizard({
     })
   }
 
-  const includedCount = previewDates.length - excludedIndices.size
+  const toggleBatchExcludeDate = (dateKey: string) => {
+    setBatchExcludedDates(prev => {
+      const next = new Set(prev)
+      if (next.has(dateKey)) next.delete(dateKey)
+      else next.add(dateKey)
+      return next
+    })
+  }
 
   const canProceed = (): boolean => {
     switch (step) {
       case 1: return !!startDate
-      case 2: return durationMinutes > 0
+      case 2:
+        if (isBatch) {
+          return effectiveUnits.every(u => (unitDurations[u.customerId] ?? 0) > 0)
+        }
+        return durationMinutes > 0
       case 3: return !!frequency && !!dayPattern
       case 4: return !!preferredTime
-      case 5: return includedCount > 0
+      case 5:
+        if (isBatch) return batchIncludedDays > 0
+        return includedCount > 0
       default: return false
     }
   }
+
+  // Submit button label
+  const submitLabel = isBatch
+    ? `Skapa ${batchTotalSessions} kontrolltillfällen (${effectiveUnits.length} enheter)`
+    : `Skapa ${includedCount} kontrolltillfällen`
 
   const stepLabels = ['Startdatum', 'Tid per besök', 'Frekvens & dag', 'Klockslag', 'Förhandsvisning']
 
@@ -286,7 +489,9 @@ export function RecurringScheduleWizard({
               </div>
               <div>
                 <h2 className="text-white font-semibold text-base">Återkommande kontroller</h2>
-                <p className="text-slate-400 text-xs">{customerName}</p>
+                <p className="text-slate-400 text-xs">
+                  {isBatch ? `${batchUnits.length} enheter` : customerName}
+                </p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
@@ -342,38 +547,84 @@ export function RecurringScheduleWizard({
 
                 {step === 2 && (
                   <div className="space-y-4">
-                    {batchInfo ? (
+                    {isBatch ? (
                       <>
-                        <p className="text-slate-300 text-sm font-medium">
-                          Tid per besök — {batchInfo.unitName} ({batchInfo.current} av {batchInfo.total})
+                        <p className="text-slate-300 text-sm">
+                          Hur lång tid tar en kontrollrunda hos <strong className="text-slate-200">varje enhet</strong>?
+                          Enheterna schemaläggs i följd — enhet 2 börjar direkt när enhet 1 är klar.
                         </p>
-                        <p className="text-slate-400 text-sm">
-                          Hur lång tid tar en kontrollrunda hos <strong className="text-slate-200">denna enhet</strong>?
-                          Detta används för att undvika krockar med andra ärenden.
-                        </p>
+                        <div className="space-y-3">
+                          {effectiveUnits.map((unit, idx) => (
+                            <div key={unit.customerId} className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs text-slate-500 font-medium bg-slate-800 px-1.5 py-0.5 rounded">
+                                  {idx + 1}
+                                </span>
+                                <span className="text-sm text-slate-200 font-medium truncate">
+                                  {unit.customerName}
+                                </span>
+                                {unit.address && (
+                                  <span className="text-xs text-slate-500 truncate hidden sm:flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 flex-shrink-0" />
+                                    {unit.address}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {DURATION_OPTIONS.map(opt => (
+                                  <button
+                                    key={opt.value}
+                                    onClick={() => setUnitDurations(prev => ({
+                                      ...prev,
+                                      [unit.customerId]: opt.value
+                                    }))}
+                                    className={`p-2 rounded-lg border text-xs font-medium transition-all ${
+                                      (unitDurations[unit.customerId] ?? 60) === opt.value
+                                        ? 'border-[#20c58f] bg-[#20c58f]/20 text-[#20c58f]'
+                                        : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600'
+                                    }`}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Total time summary */}
+                        <div className="p-2.5 bg-slate-800/20 border border-slate-700/50 rounded-xl">
+                          <p className="text-xs text-slate-400">
+                            Total tid per besöksdag:{' '}
+                            <span className="text-slate-200 font-medium">
+                              {formatTotalDuration(effectiveUnits.reduce((s, u) => s + u.durationMinutes, 0))}
+                            </span>
+                          </p>
+                        </div>
                       </>
                     ) : (
-                      <p className="text-slate-300 text-sm">
-                        Hur lång tid tar en kontrollrunda hos denna kund?
-                        Detta används för att undvika krockar med andra ärenden.
-                      </p>
+                      <>
+                        <p className="text-slate-300 text-sm">
+                          Hur lång tid tar en kontrollrunda hos denna kund?
+                          Detta används för att undvika krockar med andra ärenden.
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {DURATION_OPTIONS.map(opt => (
+                            <button
+                              key={opt.value}
+                              onClick={() => setDurationMinutes(opt.value)}
+                              className={`p-3 rounded-lg border text-sm font-medium transition-all ${
+                                durationMinutes === opt.value
+                                  ? 'border-[#20c58f] bg-[#20c58f]/20 text-[#20c58f]'
+                                  : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600'
+                              }`}
+                            >
+                              <Clock className="w-4 h-4 inline mr-2" />
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
                     )}
-                    <div className="grid grid-cols-2 gap-2">
-                      {DURATION_OPTIONS.map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => setDurationMinutes(opt.value)}
-                          className={`p-3 rounded-lg border text-sm font-medium transition-all ${
-                            durationMinutes === opt.value
-                              ? 'border-[#20c58f] bg-[#20c58f]/20 text-[#20c58f]'
-                              : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600'
-                          }`}
-                        >
-                          <Clock className="w-4 h-4 inline mr-2" />
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 )}
 
@@ -603,7 +854,7 @@ export function RecurringScheduleWizard({
                 {step === 4 && (
                   <div className="space-y-4">
                     <p className="text-slate-300 text-sm">
-                      Vilken tid på dagen ska kontrollen börja?
+                      Vilken tid på dagen ska {isBatch ? 'första kontrollen' : 'kontrollen'} börja?
                     </p>
                     <div className="flex justify-center">
                       <div className="flex items-center gap-2">
@@ -628,6 +879,11 @@ export function RecurringScheduleWizard({
                         </select>
                       </div>
                     </div>
+                    {isBatch && (
+                      <p className="text-xs text-slate-500 text-center">
+                        Efterföljande enheter schemaläggs direkt efter föregående
+                      </p>
+                    )}
                     {workSchedule && (
                       <div className="text-xs text-slate-500 text-center space-y-0.5">
                         <p>Dina arbetstider:</p>
@@ -652,7 +908,85 @@ export function RecurringScheduleWizard({
                         <Loader2 className="w-8 h-8 text-[#20c58f] animate-spin" />
                         <p className="text-slate-400 text-sm">Kontrollerar tillgänglighet...</p>
                       </div>
+                    ) : isBatch ? (
+                      /* ===== BATCH PREVIEW ===== */
+                      <>
+                        <div className="flex items-center justify-between">
+                          <p className="text-slate-300 text-sm">
+                            {batchIncludedDays} besöksdagar
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {batchTotalSessions} kontrolltillfällen totalt
+                          </p>
+                        </div>
+
+                        {/* Warning if any conflicts */}
+                        {groupedDates.some(g => g.hasWarnings && !batchExcludedDates.has(g.dateKey)) && (
+                          <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-amber-400">
+                              Vissa datum har justerats eller varningar. Kontrollera tiderna.
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {groupedDates.map(({ dateKey, displayDate, unitSlots, hasWarnings }) => {
+                            const excluded = batchExcludedDates.has(dateKey)
+                            return (
+                              <button
+                                key={dateKey}
+                                onClick={() => toggleBatchExcludeDate(dateKey)}
+                                className={`w-full p-3 rounded-xl border text-left transition-all ${
+                                  excluded
+                                    ? 'border-slate-800 bg-slate-900 opacity-40'
+                                    : hasWarnings
+                                      ? 'border-amber-500/50 bg-amber-500/5'
+                                      : 'border-slate-700 bg-slate-800/30'
+                                }`}
+                              >
+                                {/* Date header with checkbox */}
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                    excluded ? 'border-slate-600' : 'border-[#20c58f] bg-[#20c58f]'
+                                  }`}>
+                                    {!excluded && <Check className="w-3 h-3 text-white" />}
+                                  </div>
+                                  <CalendarDays className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                                  <span className={`text-sm font-medium ${excluded ? 'text-slate-600 line-through' : 'text-slate-200'}`}>
+                                    {format(displayDate, 'EEEE d MMMM yyyy', { locale: sv })}
+                                  </span>
+                                </div>
+                                {/* Per-unit slots */}
+                                <div className="space-y-1 ml-7">
+                                  {unitSlots.map(({ unit, date: d }) => (
+                                    <div key={unit.customerId} className="flex items-center gap-2 text-xs">
+                                      <Clock className="w-3 h-3 text-slate-600 flex-shrink-0" />
+                                      <span className={`font-medium truncate ${excluded ? 'text-slate-600' : 'text-slate-300'}`}>
+                                        {unit.customerName}
+                                      </span>
+                                      <span className={excluded ? 'text-slate-700' : 'text-slate-500'}>
+                                        {format(d.date, 'HH:mm')}–{format(d.endDate, 'HH:mm')}
+                                      </span>
+                                      {d.isAdjusted && !excluded && (
+                                        <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        {groupedDates.length === 0 && (
+                          <div className="text-center py-6 text-slate-500 text-sm">
+                            Inga datum kunde genereras för vald period
+                          </div>
+                        )}
+                      </>
                     ) : (
+                      /* ===== SINGLE-UNIT PREVIEW ===== */
                       <>
                         <div className="flex items-center justify-between">
                           <p className="text-slate-300 text-sm">
@@ -757,7 +1091,7 @@ export function RecurringScheduleWizard({
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    Skapa {includedCount} kontrolltillfällen
+                    {submitLabel}
                   </>
                 )}
               </button>

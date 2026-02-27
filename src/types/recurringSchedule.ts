@@ -104,6 +104,17 @@ export const SWEDISH_MONTH_NAMES = [
 ]
 
 // ============================================
+// BATCH SCHEDULING
+// ============================================
+
+export interface BatchScheduleUnit {
+  customerId: string
+  customerName: string
+  address: string | null
+  durationMinutes: number  // default 60, set in wizard step 2
+}
+
+// ============================================
 // DATABASE TYPES
 // ============================================
 
