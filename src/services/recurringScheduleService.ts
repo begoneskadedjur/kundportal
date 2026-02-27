@@ -9,7 +9,8 @@ import type {
   CreateRecurringScheduleInput,
   UpdateRecurringScheduleInput,
   DateGenerationParams,
-  GeneratedInspectionDate
+  GeneratedInspectionDate,
+  CustomerScheduleInfo
 } from '../types/recurringSchedule'
 import { generateInspectionDates } from '../utils/inspectionDateGenerator'
 import { CaseNumberService } from './caseNumberService'
@@ -637,4 +638,39 @@ export async function getFutureSessionsForSchedule(
   }
 
   return data || []
+}
+
+// ============================================
+// ON-DEMAND SCHEDULE INFO
+// ============================================
+
+/**
+ * Get aggregated schedule info for a customer (on-demand).
+ * Returns the first active schedule with future session counts/dates.
+ */
+export async function getCustomerScheduleInfo(
+  customerId: string
+): Promise<CustomerScheduleInfo | null> {
+  const schedules = await getRecurringSchedulesByCustomer(customerId)
+  const activeSchedule = schedules.find(s => s.status === 'active')
+  if (!activeSchedule) return null
+
+  const futureSessions = await getFutureSessionsForSchedule(activeSchedule.id)
+
+  return {
+    scheduleId: activeSchedule.id,
+    customerId: activeSchedule.customer_id,
+    customerName: activeSchedule.customer?.company_name || '',
+    frequency: activeSchedule.frequency,
+    status: activeSchedule.status,
+    preferredTime: activeSchedule.preferred_time,
+    dayPattern: activeSchedule.day_pattern,
+    estimatedDurationMinutes: activeSchedule.estimated_duration_minutes,
+    remainingSessions: futureSessions.length,
+    nextSessionDate: futureSessions.length > 0 ? futureSessions[0].scheduled_at : null,
+    futureSessions: futureSessions.map(s => ({
+      scheduled_at: s.scheduled_at,
+      scheduled_end: s.scheduled_end || ''
+    }))
+  }
 }

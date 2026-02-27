@@ -104,6 +104,24 @@ export const SWEDISH_MONTH_NAMES = [
 ]
 
 // ============================================
+// SCHEDULE INFO (for on-demand display)
+// ============================================
+
+export interface CustomerScheduleInfo {
+  scheduleId: string
+  customerId: string
+  customerName: string
+  frequency: RecurringFrequency
+  status: RecurringScheduleStatus
+  preferredTime: string
+  dayPattern: RecurringDayPattern
+  estimatedDurationMinutes: number
+  remainingSessions: number
+  nextSessionDate: string | null
+  futureSessions: { scheduled_at: string; scheduled_end: string }[]
+}
+
+// ============================================
 // BATCH SCHEDULING
 // ============================================
 

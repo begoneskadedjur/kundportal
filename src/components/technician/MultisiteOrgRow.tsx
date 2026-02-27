@@ -13,7 +13,8 @@ import {
   CalendarClock,
   CheckSquare,
   Square,
-  Loader2
+  Loader2,
+  ClipboardList
 } from 'lucide-react'
 import { StationHealthBadge, HealthStatus } from '../shared/StationHealthBadge'
 import { CustomerStationSummary } from '../../services/equipmentService'
@@ -25,6 +26,7 @@ interface MultisiteOrgRowProps {
   onToggleExpand: () => void
   onOpenSiteDetails: (site: CustomerStationSummary) => void
   onScheduleSelected: (sites: CustomerStationSummary[]) => void
+  onOpenSchedulePanel?: (customerId: string, customerName: string, sites?: { customerId: string; siteName: string }[]) => void
 }
 
 // Hälsostatus prioritet (sämst = lägst nummer)
@@ -41,7 +43,8 @@ export function MultisiteOrgRow({
   isExpanded,
   onToggleExpand,
   onOpenSiteDetails,
-  onScheduleSelected
+  onScheduleSelected,
+  onOpenSchedulePanel
 }: MultisiteOrgRowProps) {
   const [selectedSiteIds, setSelectedSiteIds] = useState<Set<string>>(new Set())
 
@@ -142,6 +145,24 @@ export function MultisiteOrgRow({
 
             {totalStations > 0 && (
               <StationHealthBadge status={worstHealth} size="sm" />
+            )}
+
+            {/* Schema-info panel */}
+            {onOpenSchedulePanel && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const siteTargets = sites.map(s => ({
+                    customerId: s.customer_id,
+                    siteName: s.site_name || s.customer_name.split(' - ').pop() || s.customer_name
+                  }))
+                  onOpenSchedulePanel(sites[0].customer_id, orgName, siteTargets)
+                }}
+                className="p-1.5 text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 rounded-lg transition-colors"
+                title="Visa schema och kontroller"
+              >
+                <ClipboardList className="w-4 h-4" />
+              </button>
             )}
 
             {/* Kalender-ikon för att schemalägga alla */}

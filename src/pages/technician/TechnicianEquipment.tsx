@@ -33,8 +33,10 @@ import { CustomerStationsModal } from '../../components/technician/CustomerStati
 import { CollapsibleMapSection } from '../../components/technician/CollapsibleMapSection'
 import { AddStationWizard } from '../../components/technician/AddStationWizard'
 import { RecurringScheduleWizard } from '../../components/technician/RecurringScheduleWizard'
+import { ScheduleInfoPanel } from '../../components/technician/ScheduleInfoPanel'
+import { EditScheduleFrequencyModal } from '../../components/technician/EditScheduleFrequencyModal'
 import { getRecurringSchedulesByCustomer } from '../../services/recurringScheduleService'
-import type { BatchScheduleUnit } from '../../types/recurringSchedule'
+import type { BatchScheduleUnit, RecurringFrequency } from '../../types/recurringSchedule'
 
 interface Customer {
   id: string
@@ -80,6 +82,19 @@ export default function TechnicianEquipment() {
 
   // Batch-schemaläggning (från kundlistan)
   const [batchScheduleUnits, setBatchScheduleUnits] = useState<BatchScheduleUnit[]>([])
+
+  // Schema-info panel (bottom sheet / sidopanel)
+  const [schedulePanelTarget, setSchedulePanelTarget] = useState<{
+    customerId: string
+    customerName: string
+    sites?: { customerId: string; siteName: string }[]
+  } | null>(null)
+
+  // Frekvensredigering
+  const [editFrequencyTarget, setEditFrequencyTarget] = useState<{
+    scheduleId: string
+    currentFrequency: RecurringFrequency
+  } | null>(null)
 
   // Borttagningsdialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -536,6 +551,9 @@ export default function TechnicianEquipment() {
                 loading={loading}
                 onOpenCustomerDetails={handleOpenCustomerDetails}
                 onSchedule={(targets) => handleScheduleFromList(targets)}
+                onOpenSchedulePanel={(customerId, customerName, sites) => {
+                  setSchedulePanelTarget({ customerId, customerName, sites })
+                }}
               />
             </div>
           </div>
@@ -940,6 +958,35 @@ export default function TechnicianEquipment() {
           batchUnits={batchScheduleUnits.length > 1 ? batchScheduleUnits : undefined}
         />
       )}
+
+      {/* Schema-info panel (bottom sheet / sidopanel) */}
+      <ScheduleInfoPanel
+        isOpen={!!schedulePanelTarget}
+        onClose={() => setSchedulePanelTarget(null)}
+        customerId={schedulePanelTarget?.customerId ?? ''}
+        customerName={schedulePanelTarget?.customerName ?? ''}
+        siteCustomerIds={schedulePanelTarget?.sites}
+        onEditFrequency={(scheduleId, currentFrequency) => {
+          setEditFrequencyTarget({ scheduleId, currentFrequency })
+        }}
+      />
+
+      {/* Frekvensredigeringsmodal */}
+      <EditScheduleFrequencyModal
+        isOpen={!!editFrequencyTarget}
+        onClose={() => setEditFrequencyTarget(null)}
+        onUpdated={() => {
+          setEditFrequencyTarget(null)
+          // Re-open panel to refresh data
+          if (schedulePanelTarget) {
+            const target = { ...schedulePanelTarget }
+            setSchedulePanelTarget(null)
+            setTimeout(() => setSchedulePanelTarget(target), 100)
+          }
+        }}
+        scheduleId={editFrequencyTarget?.scheduleId ?? ''}
+        currentFrequency={editFrequencyTarget?.currentFrequency ?? 'monthly'}
+      />
     </div>
   )
 }

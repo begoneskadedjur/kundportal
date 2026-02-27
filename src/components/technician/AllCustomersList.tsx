@@ -16,6 +16,7 @@ interface AllCustomersListProps {
   loading?: boolean
   onOpenCustomerDetails: (customer: CustomerStationSummary) => void
   onSchedule?: (customers: CustomerStationSummary[]) => void
+  onOpenSchedulePanel?: (customerId: string, customerName: string, sites?: { customerId: string; siteName: string }[]) => void
 }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -76,7 +77,8 @@ export function AllCustomersList({
   customers,
   loading = false,
   onOpenCustomerDetails,
-  onSchedule
+  onSchedule,
+  onOpenSchedulePanel
 }: AllCustomersListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('name')
@@ -292,6 +294,7 @@ export function AllCustomersList({
                   onToggleExpand={() => toggleExpanded(`org-${item.orgId}`)}
                   onOpenSiteDetails={onOpenCustomerDetails}
                   onScheduleSelected={handleSchedule}
+                  onOpenSchedulePanel={onOpenSchedulePanel}
                 />
               )
             } else {
@@ -303,6 +306,7 @@ export function AllCustomersList({
                   onToggleExpand={() => toggleExpanded(item.customer.customer_id)}
                   onOpenFullDetails={onOpenCustomerDetails}
                   onSchedule={onSchedule ? () => handleSchedule([item.customer]) : undefined}
+                  onOpenSchedulePanel={onOpenSchedulePanel ? (cId, cName) => onOpenSchedulePanel(cId, cName) : undefined}
                 />
               )
             }
