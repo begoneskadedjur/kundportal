@@ -8,7 +8,7 @@ import {
   X, ChevronLeft, ChevronRight, Clock, Check,
   AlertTriangle, Loader2, CalendarDays, Repeat, Settings, MapPin
 } from 'lucide-react'
-import { format, addMonths } from 'date-fns'
+import { format, addMonths, addMinutes } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import DatePicker from 'react-datepicker'
 import '../../styles/DatePickerDarkTheme.css'
@@ -17,11 +17,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
   previewScheduleDates,
-  createScheduleWithSessions,
-  fetchTechnicianBookings,
-  fetchTechnicianAbsences
+  createScheduleWithSessions
 } from '../../services/recurringScheduleService'
-import { generateInspectionDates } from '../../utils/inspectionDateGenerator'
 import type {
   RecurringFrequency,
   RecurringDayPattern,
@@ -301,37 +298,46 @@ export function RecurringScheduleWizard({
     try {
       const previewEnd = addMonths(startDate, 14)
 
-      // Fetch bookings and absences once for all units
-      const [baseBookings, absences] = await Promise.all([
-        fetchTechnicianBookings(technicianId, startDate, previewEnd),
-        fetchTechnicianAbsences(technicianId, startDate, previewEnd)
-      ])
+      // Generate dates for the FIRST unit using the full conflict-aware algorithm
+      const firstUnit = effectiveUnits[0]
+      const firstDates = await previewScheduleDates({
+        technicianId,
+        frequency,
+        dayPattern,
+        preferredDayOfMonth: dayPattern === 'specific_day' ? preferredDayOfMonth : undefined,
+        preferredTime,
+        estimatedDurationMinutes: firstUnit.durationMinutes,
+        startDate,
+        endDate: previewEnd,
+        technicianWorkSchedule: workSchedule,
+        customFrequencyConfig: resolvedCustomConfig
+      })
 
-      const results: BatchPreviewResult[] = []
-      let cumulativeBookings = [...baseBookings]
+      const results: BatchPreviewResult[] = [{ unit: firstUnit, dates: firstDates }]
 
-      for (const unit of effectiveUnits) {
-        const dates = generateInspectionDates({
-          frequency,
-          dayPattern,
-          preferredDayOfMonth: dayPattern === 'specific_day' ? preferredDayOfMonth : undefined,
-          preferredTime,
-          estimatedDurationMinutes: unit.durationMinutes,
-          startDate,
-          endDate: previewEnd,
-          technicianWorkSchedule: workSchedule,
-          technicianAbsences: absences,
-          existingBookings: cumulativeBookings,
-          customFrequencyConfig: resolvedCustomConfig
+      // For each subsequent unit: chain directly after the previous unit's end time
+      for (let i = 1; i < effectiveUnits.length; i++) {
+        const unit = effectiveUnits[i]
+        const unitDates: GeneratedInspectionDate[] = firstDates.map((refDate, dateIdx) => {
+          // Find the latest end time among all previous units for this date
+          let chainEnd = refDate.endDate
+          for (let p = 1; p < i; p++) {
+            const prevDate = results[p]?.dates[dateIdx]
+            if (prevDate && prevDate.endDate > chainEnd) chainEnd = prevDate.endDate
+          }
+          const unitStart = new Date(chainEnd)
+          const unitEnd = addMinutes(unitStart, unit.durationMinutes)
+          return {
+            date: unitStart,
+            endDate: unitEnd,
+            periodStart: refDate.periodStart,
+            periodEnd: refDate.periodEnd,
+            isAdjusted: refDate.isAdjusted,
+            adjustmentReason: refDate.adjustmentReason,
+            hasConflictWarning: refDate.hasConflictWarning
+          }
         })
-
-        results.push({ unit, dates })
-
-        // Add this unit's dates as bookings for subsequent units
-        cumulativeBookings = [
-          ...cumulativeBookings,
-          ...dates.map(d => ({ start: d.date, end: d.endDate }))
-        ]
+        results.push({ unit, dates: unitDates })
       }
 
       setBatchPreviewResults(results)
