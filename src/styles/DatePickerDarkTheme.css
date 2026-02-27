@@ -8,6 +8,7 @@
   color: #e2e8f0 !important;
   font-family: inherit !important;
   border-radius: 0.75rem !important;
+  overflow: hidden !important;
 }
 
 .react-datepicker__month-container {
@@ -19,6 +20,8 @@
   background-color: #1e293b !important;
   border-bottom-color: #334155 !important;
   padding-top: 0.75rem !important;
+  border-top-left-radius: 0.75rem !important;
+  border-top-right-radius: 0.75rem !important;
 }
 
 .react-datepicker__current-month,
