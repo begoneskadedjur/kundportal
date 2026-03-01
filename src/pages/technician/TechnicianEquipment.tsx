@@ -34,9 +34,9 @@ import { CollapsibleMapSection } from '../../components/technician/CollapsibleMa
 import { AddStationWizard } from '../../components/technician/AddStationWizard'
 import { RecurringScheduleWizard } from '../../components/technician/RecurringScheduleWizard'
 import { ScheduleInfoPanel } from '../../components/technician/ScheduleInfoPanel'
-import { EditScheduleFrequencyModal } from '../../components/technician/EditScheduleFrequencyModal'
+import { EditScheduleModal } from '../../components/technician/EditScheduleModal'
 import { getRecurringSchedulesByCustomer } from '../../services/recurringScheduleService'
-import type { BatchScheduleUnit, RecurringFrequency } from '../../types/recurringSchedule'
+import type { BatchScheduleUnit } from '../../types/recurringSchedule'
 
 interface Customer {
   id: string
@@ -90,11 +90,8 @@ export default function TechnicianEquipment() {
     sites?: { customerId: string; siteName: string }[]
   } | null>(null)
 
-  // Frekvensredigering
-  const [editFrequencyTarget, setEditFrequencyTarget] = useState<{
-    scheduleId: string
-    currentFrequency: RecurringFrequency
-  } | null>(null)
+  // Schema-redigering
+  const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
 
   // Borttagningsdialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -966,17 +963,17 @@ export default function TechnicianEquipment() {
         customerId={schedulePanelTarget?.customerId ?? ''}
         customerName={schedulePanelTarget?.customerName ?? ''}
         siteCustomerIds={schedulePanelTarget?.sites}
-        onEditFrequency={(scheduleId, currentFrequency) => {
-          setEditFrequencyTarget({ scheduleId, currentFrequency })
+        onEditSchedule={(scheduleId) => {
+          setEditScheduleId(scheduleId)
         }}
       />
 
-      {/* Frekvensredigeringsmodal */}
-      <EditScheduleFrequencyModal
-        isOpen={!!editFrequencyTarget}
-        onClose={() => setEditFrequencyTarget(null)}
+      {/* Schema-redigeringsmodal */}
+      <EditScheduleModal
+        isOpen={!!editScheduleId}
+        onClose={() => setEditScheduleId(null)}
         onUpdated={() => {
-          setEditFrequencyTarget(null)
+          setEditScheduleId(null)
           // Re-open panel to refresh data
           if (schedulePanelTarget) {
             const target = { ...schedulePanelTarget }
@@ -984,8 +981,7 @@ export default function TechnicianEquipment() {
             setTimeout(() => setSchedulePanelTarget(target), 100)
           }
         }}
-        scheduleId={editFrequencyTarget?.scheduleId ?? ''}
-        currentFrequency={editFrequencyTarget?.currentFrequency ?? 'monthly'}
+        scheduleId={editScheduleId ?? ''}
       />
     </div>
   )

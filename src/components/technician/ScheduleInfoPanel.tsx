@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { getCustomerScheduleInfo } from '../../services/recurringScheduleService'
 import { FREQUENCY_CONFIG, DAY_PATTERN_CONFIG } from '../../types/recurringSchedule'
-import type { CustomerScheduleInfo, RecurringFrequency } from '../../types/recurringSchedule'
+import type { CustomerScheduleInfo } from '../../types/recurringSchedule'
 
 interface SiteTarget {
   customerId: string
@@ -23,7 +23,7 @@ interface ScheduleInfoPanelProps {
   customerId: string
   customerName: string
   siteCustomerIds?: SiteTarget[]
-  onEditFrequency: (scheduleId: string, currentFrequency: RecurringFrequency) => void
+  onEditSchedule: (scheduleId: string) => void
 }
 
 export function ScheduleInfoPanel({
@@ -32,7 +32,7 @@ export function ScheduleInfoPanel({
   customerId,
   customerName,
   siteCustomerIds,
-  onEditFrequency
+  onEditSchedule
 }: ScheduleInfoPanelProps) {
   const [loading, setLoading] = useState(false)
   const [scheduleInfos, setScheduleInfos] = useState<(CustomerScheduleInfo | null)[]>([])
@@ -150,7 +150,7 @@ export function ScheduleInfoPanel({
                       key={labels[idx] || idx}
                       siteName={labels[idx]}
                       info={info}
-                      onEditFrequency={onEditFrequency}
+                      onEditSchedule={onEditSchedule}
                     />
                   ))}
                 </>
@@ -180,11 +180,11 @@ export function ScheduleInfoPanel({
 function SiteScheduleCard({
   siteName,
   info,
-  onEditFrequency
+  onEditSchedule
 }: {
   siteName: string
   info: CustomerScheduleInfo | null
-  onEditFrequency: (scheduleId: string, currentFrequency: RecurringFrequency) => void
+  onEditSchedule: (scheduleId: string) => void
 }) {
   const [showAllDates, setShowAllDates] = useState(false)
 
@@ -207,9 +207,9 @@ function SiteScheduleCard({
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-slate-200">{siteName}</p>
         <button
-          onClick={() => onEditFrequency(info.scheduleId, info.frequency)}
+          onClick={() => onEditSchedule(info.scheduleId)}
           className="flex items-center gap-1 px-2 py-1 text-xs text-slate-400 hover:text-[#20c58f] hover:bg-slate-800 rounded-lg transition-colors"
-          title="Ändra frekvens"
+          title="Redigera schema"
         >
           <Pencil className="w-3 h-3" />
           <span>Ändra</span>

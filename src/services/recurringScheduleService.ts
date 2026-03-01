@@ -418,43 +418,38 @@ export async function generateAndCreateSessions(
   return { created: created?.length || 0, errors }
 }
 
-/**
- * Create a schedule and immediately generate its sessions.
- * For each session, creates a real `cases` row (so it appears in all schedules)
- * and links the station_inspection_session to the case via case_id.
- */
-export async function createScheduleWithSessions(
-  input: CreateRecurringScheduleInput,
-  generatedDates: GeneratedInspectionDate[]
-): Promise<{ schedule: RecurringSchedule | null; sessionsCreated: number; errors: string[] }> {
-  const errors: string[] = []
+// ============================================
+// SHARED: Create case + session for a single date
+// ============================================
 
-  // Create the schedule record
-  const schedule = await createRecurringSchedule(input)
-  if (!schedule) {
-    return { schedule: null, sessionsCreated: 0, errors: ['Kunde inte skapa schemat'] }
-  }
+interface SessionCreationContext {
+  schedule: RecurringSchedule
+  technicianName: string | null
+  customerData: {
+    contact_person: string | null
+    contact_email: string | null
+    contact_phone: string | null
+    contact_address: string | null
+  } | null
+  outdoorCount: number
+  indoorCount: number
+}
 
-  if (generatedDates.length === 0) {
-    return { schedule, sessionsCreated: 0, errors: [] }
-  }
-
-  // Fetch technician name for case records
+async function fetchSessionCreationContext(
+  schedule: RecurringSchedule
+): Promise<SessionCreationContext> {
   const { data: techData } = await supabase
     .from('technicians')
     .select('name')
     .eq('id', schedule.technician_id)
     .single()
-  const technicianName = techData?.name || null
 
-  // Fetch customer contact data for case records
   const { data: customerData } = await supabase
     .from('customers')
     .select('contact_person, contact_email, contact_phone, contact_address')
     .eq('id', schedule.customer_id)
     .single()
 
-  // Count stations for the customer (outdoor + indoor)
   const [outdoorResult, indoorResult] = await Promise.all([
     supabase
       .from('equipment_placements')
@@ -473,73 +468,113 @@ export async function createScheduleWithSessions(
         ).data?.map(fp => fp.id) || []
       )
   ])
-  const outdoorCount = outdoorResult.count || 0
-  const indoorCount = indoorResult.count || 0
 
+  return {
+    schedule,
+    technicianName: techData?.name || null,
+    customerData,
+    outdoorCount: outdoorResult.count || 0,
+    indoorCount: indoorResult.count || 0
+  }
+}
+
+async function createCaseAndSession(
+  ctx: SessionCreationContext,
+  d: GeneratedInspectionDate
+): Promise<{ success: boolean; error?: string }> {
+  const { schedule, technicianName, customerData, outdoorCount, indoorCount } = ctx
+
+  const caseNumber = await CaseNumberService.generateUniqueCaseNumber()
+
+  const { data: createdCase, error: caseError } = await supabase
+    .from('cases')
+    .insert([{
+      customer_id: schedule.customer_id,
+      title: caseNumber,
+      description: 'Schemalagd stationskontroll',
+      status: 'Bokad',
+      priority: 'normal',
+      service_type: 'inspection',
+      pest_type: null,
+      scheduled_start: d.date.toISOString(),
+      scheduled_end: d.endDate.toISOString(),
+      primary_technician_id: schedule.technician_id,
+      primary_technician_name: technicianName,
+      case_number: caseNumber,
+      price: null,
+      contact_person: customerData?.contact_person || null,
+      contact_email: customerData?.contact_email || null,
+      contact_phone: customerData?.contact_phone || null,
+      address: customerData?.contact_address
+        ? { formatted_address: customerData.contact_address }
+        : null
+    }])
+    .select('id')
+    .single()
+
+  if (caseError) {
+    console.error('Error creating case for session:', caseError)
+    return { success: false, error: `Kunde inte skapa ärende: ${caseError.message}` }
+  }
+
+  const { error: sessionError } = await supabase
+    .from('station_inspection_sessions')
+    .insert([{
+      case_id: createdCase.id,
+      customer_id: schedule.customer_id,
+      technician_id: schedule.technician_id,
+      scheduled_at: d.date.toISOString(),
+      scheduled_end: d.endDate.toISOString(),
+      recurring_schedule_id: schedule.id,
+      status: 'scheduled',
+      total_outdoor_stations: outdoorCount,
+      total_indoor_stations: indoorCount,
+      notes: d.isAdjusted ? d.adjustmentReason || null : null
+    }])
+
+  if (sessionError) {
+    console.error('Error creating session:', sessionError)
+    return { success: false, error: `Ärende skapat men session misslyckades: ${sessionError.message}` }
+  }
+
+  return { success: true }
+}
+
+// ============================================
+// CREATE SCHEDULE WITH SESSIONS
+// ============================================
+
+/**
+ * Create a schedule and immediately generate its sessions.
+ * For each session, creates a real `cases` row (so it appears in all schedules)
+ * and links the station_inspection_session to the case via case_id.
+ */
+export async function createScheduleWithSessions(
+  input: CreateRecurringScheduleInput,
+  generatedDates: GeneratedInspectionDate[]
+): Promise<{ schedule: RecurringSchedule | null; sessionsCreated: number; errors: string[] }> {
+  const errors: string[] = []
+
+  const schedule = await createRecurringSchedule(input)
+  if (!schedule) {
+    return { schedule: null, sessionsCreated: 0, errors: ['Kunde inte skapa schemat'] }
+  }
+
+  if (generatedDates.length === 0) {
+    return { schedule, sessionsCreated: 0, errors: [] }
+  }
+
+  const ctx = await fetchSessionCreationContext(schedule)
   let sessionsCreated = 0
 
-  // Create a case + session for each generated date
   for (const d of generatedDates) {
     try {
-      // Generate unique case number
-      const caseNumber = await CaseNumberService.generateUniqueCaseNumber()
-
-      // Create the case
-      const { data: createdCase, error: caseError } = await supabase
-        .from('cases')
-        .insert([{
-          customer_id: schedule.customer_id,
-          title: caseNumber,
-          description: 'Schemalagd stationskontroll',
-          status: 'Bokad',
-          priority: 'normal',
-          service_type: 'inspection',
-          pest_type: null,
-          scheduled_start: d.date.toISOString(),
-          scheduled_end: d.endDate.toISOString(),
-          primary_technician_id: schedule.technician_id,
-          primary_technician_name: technicianName,
-          case_number: caseNumber,
-          price: null,
-          contact_person: customerData?.contact_person || null,
-          contact_email: customerData?.contact_email || null,
-          contact_phone: customerData?.contact_phone || null,
-          address: customerData?.contact_address
-            ? { formatted_address: customerData.contact_address }
-            : null
-        }])
-        .select('id')
-        .single()
-
-      if (caseError) {
-        console.error('Error creating case for session:', caseError)
-        errors.push(`Kunde inte skapa ärende: ${caseError.message}`)
-        continue
+      const result = await createCaseAndSession(ctx, d)
+      if (result.success) {
+        sessionsCreated++
+      } else if (result.error) {
+        errors.push(result.error)
       }
-
-      // Create the inspection session linked to the case
-      const { error: sessionError } = await supabase
-        .from('station_inspection_sessions')
-        .insert([{
-          case_id: createdCase.id,
-          customer_id: schedule.customer_id,
-          technician_id: schedule.technician_id,
-          scheduled_at: d.date.toISOString(),
-          scheduled_end: d.endDate.toISOString(),
-          recurring_schedule_id: schedule.id,
-          status: 'scheduled',
-          total_outdoor_stations: outdoorCount,
-          total_indoor_stations: indoorCount,
-          notes: d.isAdjusted ? d.adjustmentReason || null : null
-        }])
-
-      if (sessionError) {
-        console.error('Error creating session:', sessionError)
-        errors.push(`Ärende skapat men session misslyckades: ${sessionError.message}`)
-        continue
-      }
-
-      sessionsCreated++
     } catch (err) {
       console.error('Error in createScheduleWithSessions loop:', err)
       errors.push(`Oväntat fel: ${err instanceof Error ? err.message : String(err)}`)
@@ -547,6 +582,108 @@ export async function createScheduleWithSessions(
   }
 
   return { schedule, sessionsCreated, errors }
+}
+
+// ============================================
+// RESCHEDULE EXISTING SESSIONS
+// ============================================
+
+/**
+ * Delete all future scheduled sessions (and their cases), update the schedule,
+ * and create new sessions + cases with the updated settings.
+ */
+export async function rescheduleExistingSessions(
+  scheduleId: string,
+  updates: UpdateRecurringScheduleInput,
+  generatedDates: GeneratedInspectionDate[]
+): Promise<{ deleted: number; created: number; errors: string[] }> {
+  const errors: string[] = []
+
+  // 1. Fetch future sessions with case_id
+  const { data: futureSessions, error: fetchError } = await supabase
+    .from('station_inspection_sessions')
+    .select('id, case_id')
+    .eq('recurring_schedule_id', scheduleId)
+    .eq('status', 'scheduled')
+    .gt('scheduled_at', new Date().toISOString())
+
+  if (fetchError) {
+    console.error('Error fetching future sessions:', fetchError)
+    return { deleted: 0, created: 0, errors: [`Kunde inte hämta sessioner: ${fetchError.message}`] }
+  }
+
+  const sessionIds = (futureSessions || []).map(s => s.id)
+  const caseIds = (futureSessions || []).filter(s => s.case_id).map(s => s.case_id)
+
+  // 2. DELETE sessions
+  if (sessionIds.length > 0) {
+    const { error: delSessionErr } = await supabase
+      .from('station_inspection_sessions')
+      .delete()
+      .in('id', sessionIds)
+
+    if (delSessionErr) {
+      console.error('Error deleting sessions:', delSessionErr)
+      return { deleted: 0, created: 0, errors: [`Kunde inte radera sessioner: ${delSessionErr.message}`] }
+    }
+  }
+
+  // 3. DELETE linked cases
+  if (caseIds.length > 0) {
+    const { error: delCaseErr } = await supabase
+      .from('cases')
+      .delete()
+      .in('id', caseIds)
+
+    if (delCaseErr) {
+      console.error('Error deleting cases:', delCaseErr)
+      errors.push(`Sessioner raderade men ärenden kunde inte tas bort: ${delCaseErr.message}`)
+    }
+  }
+
+  const deleted = sessionIds.length
+
+  // 4. Update the schedule
+  const updatedSchedule = await updateRecurringSchedule(scheduleId, updates)
+  if (!updatedSchedule) {
+    return { deleted, created: 0, errors: [...errors, 'Kunde inte uppdatera schemat'] }
+  }
+
+  // 5. Create new sessions + cases
+  if (generatedDates.length === 0) {
+    return { deleted, created: 0, errors }
+  }
+
+  const ctx = await fetchSessionCreationContext(updatedSchedule)
+  let created = 0
+
+  for (const d of generatedDates) {
+    try {
+      const result = await createCaseAndSession(ctx, d)
+      if (result.success) {
+        created++
+      } else if (result.error) {
+        errors.push(result.error)
+      }
+    } catch (err) {
+      console.error('Error in rescheduleExistingSessions loop:', err)
+      errors.push(`Oväntat fel: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  // 6. Update generated_until
+  const latestDate = generatedDates.length > 0
+    ? generatedDates[generatedDates.length - 1].date
+    : new Date()
+  await supabase
+    .from('recurring_schedules')
+    .update({
+      generated_until: format(latestDate, 'yyyy-MM-dd'),
+      last_generated_at: new Date().toISOString()
+    })
+    .eq('id', scheduleId)
+
+  return { deleted, created, errors }
 }
 
 // ============================================
