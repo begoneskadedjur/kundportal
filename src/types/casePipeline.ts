@@ -47,7 +47,7 @@ export interface PipelineOfferRow {
   action: CoordinatorCaseAction | null
 }
 
-/** Legacy: ClickUp-baserad rad (behålls för bakåtkompatibilitet med schema-v2) */
+/** Legacy: ClickUp-baserad rad (behålls för bakåtkompatibilitet med schemat) */
 export interface PipelineCaseRow {
   id: string
   case_type: 'private' | 'business'

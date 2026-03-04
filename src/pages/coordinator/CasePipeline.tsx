@@ -266,7 +266,7 @@ export default function CasePipeline() {
 
   const handleBookOffer = useCallback((o: PipelineOfferRow) => {
     if (o.source_id) {
-      navigate(`/koordinator/schema-v2?scheduleCase=${o.source_id}`)
+      navigate(`/koordinator/schema?scheduleCase=${o.source_id}`)
     } else {
       toast.error('Offerten saknar koppling till ett ärende.')
     }

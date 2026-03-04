@@ -173,9 +173,9 @@ export class CasePipelineService {
     if (error) throw error
   }
 
-  // ─── Legacy ClickUp-metoder (behålls för schema-v2 drawern) ───
+  // ─── Legacy ClickUp-metoder (behålls för schema-drawern) ───
 
-  /** Hämta coordinator actions för en lista med ärende-IDn (för Schema V2 drawern) */
+  /** Hämta coordinator actions för en lista med ärende-IDn (för schema-drawern) */
   static async getActionsForCases(caseIds: string[]): Promise<Record<string, CoordinatorCaseAction>> {
     if (caseIds.length === 0) return {}
 
