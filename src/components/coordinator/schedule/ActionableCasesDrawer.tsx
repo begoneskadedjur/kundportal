@@ -1,5 +1,6 @@
 // ActionableCasesDrawer.tsx — Expanderbar panel med actions för ärenden att boka in
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -460,7 +461,7 @@ function ContactPopover({ anchorRef, onConfirm, onClose }: {
     onConfirm(selectedMethod, note || undefined)
   }
 
-  return (
+  return createPortal(
     <div ref={ref} className="fixed z-[100] w-56 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-2.5" style={{ top: pos.top, right: pos.right }}>
       <p className="text-[10px] text-slate-400 mb-2 font-medium">Logga kontaktförsök</p>
       <div className="flex gap-1.5 mb-2">
@@ -500,6 +501,7 @@ function ContactPopover({ anchorRef, onConfirm, onClose }: {
           <Check className="w-3.5 h-3.5" />
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
