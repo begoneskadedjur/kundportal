@@ -24,6 +24,7 @@ interface ActionableCasesDrawerProps {
   onScheduleCase: (caseData: BeGoneCaseRow) => void
   onActionUpdate: (caseId: string, action: CoordinatorCaseAction) => void
   onOpenHistory?: (caseData: BeGoneCaseRow) => void
+  onOpenCase?: (caseData: BeGoneCaseRow) => void
   onClose: () => void
 }
 
@@ -46,7 +47,7 @@ function formatRelativeDate(dateStr: string | null): string {
   return date.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
 }
 
-export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActionUpdate, onOpenHistory, onClose }: ActionableCasesDrawerProps) {
+export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActionUpdate, onOpenHistory, onOpenCase, onClose }: ActionableCasesDrawerProps) {
   const navigate = useNavigate()
   const [sortBy, setSortBy] = useState<DrawerSort>('default')
 
@@ -149,6 +150,7 @@ export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActi
                     onScheduleCase={onScheduleCase}
                     onActionUpdate={onActionUpdate}
                     onOpenHistory={onOpenHistory}
+                    onOpenCase={onOpenCase}
                   />
                 ))}
               </tbody>
@@ -168,9 +170,10 @@ interface DrawerRowProps {
   onScheduleCase: (caseData: BeGoneCaseRow) => void
   onActionUpdate: (caseId: string, action: CoordinatorCaseAction) => void
   onOpenHistory?: (caseData: BeGoneCaseRow) => void
+  onOpenCase?: (caseData: BeGoneCaseRow) => void
 }
 
-function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenHistory }: DrawerRowProps) {
+function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenHistory, onOpenCase }: DrawerRowProps) {
   const { user, profile } = useAuth()
   const [expanded, setExpanded] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
@@ -215,11 +218,17 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
     try {
       const updated = await CasePipelineService.logContactAttempt(c.id, c.case_type as 'private' | 'business' | 'contract', user.id, profile.display_name, method, note)
       onActionUpdate(c.id, updated)
+      // Logga som intern kommentar i case_comments
+      const methodLabel = method === 'phone' ? 'Telefon' : method === 'email' ? 'E-post' : 'SMS'
+      const commentText = note
+        ? `Kontaktförsök via ${methodLabel}: ${note}`
+        : `Kontaktförsök via ${methodLabel}`
+      await addComment(commentText)
       setContactOpen(false)
       toast.success('Kontaktförsök loggat')
     } catch { toast.error('Kunde inte logga') }
     finally { setActionLoading(null) }
-  }, [c.id, c.case_type, user, profile, onActionUpdate])
+  }, [c.id, c.case_type, user, profile, onActionUpdate, addComment])
 
 
   const handleStatusChange = useCallback(async (newStatus: CoordinatorCaseStatus) => {
@@ -313,6 +322,17 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
                 />
               )}
             </div>
+
+            {/* Öppna ärende */}
+            {onOpenCase && (
+              <button
+                onClick={() => onOpenCase(c)}
+                className="p-1 rounded text-slate-400 hover:bg-slate-700/50 transition-colors"
+                title="Öppna ärende"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            )}
 
             {/* Historik */}
             {onOpenHistory && (

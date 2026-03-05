@@ -388,6 +388,7 @@ export default function CoordinatorSchedule() {
               onScheduleCase={handleScheduleFromDrawer}
               onActionUpdate={handleActionUpdate}
               onOpenHistory={handleOpenHistory}
+              onOpenCase={handleOpenCaseModal}
               onClose={() => setIsActionableDrawerOpen(false)}
             />
           )}
