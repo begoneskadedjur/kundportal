@@ -81,7 +81,7 @@ export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActi
       animate={{ height: 'auto', opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50 overflow-hidden flex-shrink-0"
+      className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50 overflow-visible flex-shrink-0"
     >
       <div className="px-4 py-2.5">
         {/* Header */}
