@@ -13,6 +13,9 @@ import { BeGoneCaseRow } from '../../../types/database'
 import { CasePipelineService } from '../../../services/casePipelineService'
 import { COORDINATOR_STATUS_CONFIG } from '../../../types/casePipeline'
 import type { CoordinatorCaseAction, CoordinatorCaseStatus, ContactMethod } from '../../../types/casePipeline'
+import CommentInput from '../../communication/CommentInput'
+import { useCaseComments } from '../../../hooks/useCaseComments'
+import type { TrackedMention } from '../../../hooks/useMentions'
 import { formatAddress } from './scheduleUtils'
 
 interface ActionableCasesDrawerProps {
@@ -171,8 +174,6 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
   const { user, profile } = useAuth()
   const [expanded, setExpanded] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
-  const [noteText, setNoteText] = useState(action?.coordinator_notes || '')
-  const [savingNote, setSavingNote] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const isNew = !action || action.coordinator_status === 'new'
@@ -181,9 +182,21 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
   const isScheduled = !!(c.start_date && c.due_date)
   const notePreview = action?.coordinator_notes || ''
 
-  useEffect(() => {
-    setNoteText(action?.coordinator_notes || '')
-  }, [action?.coordinator_notes])
+  const { addComment, isSubmitting: commentSubmitting } = useCaseComments({
+    caseId: c.id,
+    caseType: c.case_type as 'private' | 'business' | 'contract',
+    caseTitle: c.title,
+  })
+
+  const handleAddComment = useCallback(async (
+    content: string,
+    attachments?: File[],
+    mentions?: TrackedMention[],
+    parentCommentId?: string
+  ) => {
+    await addComment(content, attachments, mentions, parentCommentId)
+    toast.success('Kommentar sparad')
+  }, [addComment])
 
   const handleAcknowledge = useCallback(async () => {
     if (!user?.id || !profile?.display_name) return
@@ -208,16 +221,6 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
     finally { setActionLoading(null) }
   }, [c.id, c.case_type, user, profile, onActionUpdate])
 
-  const handleSaveNote = useCallback(async () => {
-    if (!user?.id || !profile?.display_name) return
-    setSavingNote(true)
-    try {
-      const updated = await CasePipelineService.updateNotes(c.id, c.case_type as 'private' | 'business' | 'contract', noteText, user.id, profile.display_name)
-      onActionUpdate(c.id, updated)
-      toast.success('Anteckning sparad')
-    } catch { toast.error('Kunde inte spara') }
-    finally { setSavingNote(false) }
-  }, [c.id, c.case_type, noteText, user, profile, onActionUpdate])
 
   const handleStatusChange = useCallback(async (newStatus: CoordinatorCaseStatus) => {
     try {
@@ -382,23 +385,14 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
                   </select>
                 </div>
 
-                {/* Anteckning */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={noteText}
-                    onChange={e => setNoteText(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleSaveNote() }}
-                    placeholder="Anteckning..."
-                    className="flex-1 px-2 py-1 text-[11px] bg-slate-800/60 border border-slate-700/50 rounded text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                {/* Kommentar med @mention-stöd */}
+                <div className="relative">
+                  <CommentInput
+                    onSubmit={handleAddComment}
+                    isSubmitting={commentSubmitting}
+                    placeholder="Skriv kommentar... (@namn för att nämna)"
+                    autoFocus={false}
                   />
-                  <button
-                    onClick={handleSaveNote}
-                    disabled={savingNote || noteText === (action?.coordinator_notes || '')}
-                    className="px-2 py-1 text-[10px] font-medium rounded bg-[#20c58f]/15 text-[#20c58f] hover:bg-[#20c58f]/25 transition-colors disabled:opacity-40"
-                  >
-                    {savingNote ? 'Sparar...' : 'Spara'}
-                  </button>
                 </div>
               </div>
             </motion.div>
