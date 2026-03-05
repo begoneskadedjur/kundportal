@@ -152,7 +152,7 @@ export default function CoordinatorSchedule() {
     try {
       if (isInitialLoad.current) setLoading(true)
 
-      const [techResult, privateResult, businessResult, contractResult, absenceResult] = await Promise.all([
+      const [techResult, privateResult, businessResult, contractResult, absenceResult, signedOffersResult] = await Promise.all([
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
         supabase.from('private_cases').select(`
           id, title, status, priority, start_date, due_date, created_at, updated_at,
@@ -187,6 +187,12 @@ export default function CoordinatorSchedule() {
           )
         `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('technician_absences').select('*'),
+        // Hämta signerade offerter för att berika private/business cases med oneflow_contract_id
+        supabase.from('contracts')
+          .select('source_id, oneflow_contract_id')
+          .eq('type', 'offer')
+          .eq('status', 'signed')
+          .not('source_id', 'is', null),
       ])
 
       if (techResult.error) throw techResult.error
@@ -200,9 +206,14 @@ export default function CoordinatorSchedule() {
       setAbsences(absenceResult.data || [])
       setContractCases(contractResult.data || [])
 
+      // Lookup-map: source_id → oneflow_contract_id (för att berika private/business cases)
+      const offerMap = new Map(
+        (signedOffersResult.data || []).map(o => [o.source_id, o.oneflow_contract_id])
+      )
+
       const combinedCases = [
-        ...(privateResult.data || []).map(c => ({ ...c, case_type: 'private' as const })),
-        ...(businessResult.data || []).map(c => ({ ...c, case_type: 'business' as const })),
+        ...(privateResult.data || []).map(c => ({ ...c, case_type: 'private' as const, oneflow_contract_id: offerMap.get(c.id) || null })),
+        ...(businessResult.data || []).map(c => ({ ...c, case_type: 'business' as const, oneflow_contract_id: offerMap.get(c.id) || null })),
         ...(contractResult.data || []).map(adaptCaseToBeGoneRow),
       ]
       setAllCases(combinedCases as BeGoneCaseRow[])
