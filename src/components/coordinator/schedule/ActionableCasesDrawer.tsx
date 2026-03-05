@@ -448,11 +448,12 @@ function ContactPopover({ anchorRef, onConfirm, onClose }: {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      const target = e.target as Node
+      if (ref.current && !ref.current.contains(target) && anchorRef.current && !anchorRef.current.contains(target)) onClose()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
+  }, [onClose, anchorRef])
 
   const handleConfirm = () => {
     if (!selectedMethod) return
