@@ -1254,6 +1254,7 @@ const logOfferEventToEventLog = async (
 }
 
 // Uppdatera ärendestatus baserat på source_id-koppling
+// Provar cases → private_cases → business_cases (samma mönster som logOfferEventToCase)
 const updateCaseStatusViaSourceId = async (
   contractId: string,
   newStatus: string,
@@ -1262,21 +1263,54 @@ const updateCaseStatusViaSourceId = async (
   try {
     const { data: contract } = await supabase
       .from('contracts')
-      .select('source_id')
+      .select('source_id, source_type')
       .eq('oneflow_contract_id', contractId)
       .single()
 
-    if (contract?.source_id) {
-      const updateData: Record<string, any> = { status: newStatus, ...extraFields }
-      const { error } = await supabase
-        .from('cases')
-        .update(updateData)
-        .eq('id', contract.source_id)
+    if (!contract?.source_id) return
 
-      if (!error) {
-        console.log(`✅ Ärendestatus uppdaterad till '${newStatus}' via source_id`)
-      }
+    const updateData: Record<string, any> = { status: newStatus, ...extraFields }
+
+    // Prova cases först (legacy)
+    const { data: caseRow } = await supabase
+      .from('cases')
+      .update(updateData)
+      .eq('id', contract.source_id)
+      .select('id')
+      .maybeSingle()
+
+    if (caseRow) {
+      console.log(`✅ Ärendestatus uppdaterad till '${newStatus}' i cases`)
+      return
     }
+
+    // Prova private_cases
+    const { data: privateRow } = await supabase
+      .from('private_cases')
+      .update(updateData)
+      .eq('id', contract.source_id)
+      .select('id')
+      .maybeSingle()
+
+    if (privateRow) {
+      console.log(`✅ Ärendestatus uppdaterad till '${newStatus}' i private_cases`)
+      return
+    }
+
+    // Prova business_cases
+    const { data: businessRow } = await supabase
+      .from('business_cases')
+      .update(updateData)
+      .eq('id', contract.source_id)
+      .select('id')
+      .maybeSingle()
+
+    if (businessRow) {
+      console.log(`✅ Ärendestatus uppdaterad till '${newStatus}' i business_cases`)
+      return
+    }
+
+    console.log(`⚠️ Kunde inte hitta ärende med source_id: ${contract.source_id}`)
   } catch (error) {
     console.error('❌ Fel vid updateCaseStatusViaSourceId:', error)
   }
