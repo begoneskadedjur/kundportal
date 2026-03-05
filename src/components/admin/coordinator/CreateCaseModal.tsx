@@ -894,24 +894,24 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const getModalSize = () => {
     if (step === 'selectType') return 'max-w-2xl'; // Smalare för typval
     // Alla ärendetyper med tvåkolumnslayout behöver full bredd
-    return 'max-w-5xl';
+    return 'max-w-4xl';
   };
 
   return (
-      <Modal isOpen={isOpen} onClose={onClose} title={getModalTitle()} size={`w-full sm:w-11/12 ${getModalSize()}`} preventClose={loading} footer={footer} usePortal={true}>
-        <div className="p-4 max-h-[85vh] overflow-y-auto">
+      <Modal isOpen={isOpen} onClose={onClose} title={getModalTitle()} size={`w-full sm:w-[95%] ${getModalSize()}`} preventClose={loading} footer={footer} usePortal={true}>
+        <div className="p-4 max-h-[80vh] overflow-y-auto">
           {step === 'selectType' && !initialCaseData && (
               <div className="space-y-3">
                 {/* Rad 1: Engångsärenden */}
                 <div className="flex flex-col md:flex-row gap-3">
-                  <button type="button" onClick={() => selectCaseType('private')} className="flex-1 p-4 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
-                    <User className="w-8 h-8 mx-auto mb-2 text-blue-400" />
-                    <h3 className="text-base font-semibold">Privatperson</h3>
+                  <button type="button" onClick={() => selectCaseType('private')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
+                    <User className="w-6 h-6 mx-auto mb-1.5 text-blue-400" />
+                    <h3 className="text-sm font-semibold">Privatperson</h3>
                     <p className="text-xs text-slate-400 mt-1">Engångsjobb via ClickUp</p>
                   </button>
-                  <button type="button" onClick={() => selectCaseType('business')} className="flex-1 p-4 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
-                    <Building className="w-8 h-8 mx-auto mb-2 text-green-400" />
-                    <h3 className="text-base font-semibold">Företag</h3>
+                  <button type="button" onClick={() => selectCaseType('business')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
+                    <Building className="w-6 h-6 mx-auto mb-1.5 text-green-400" />
+                    <h3 className="text-sm font-semibold">Företag</h3>
                     <p className="text-xs text-slate-400 mt-1">Engångsjobb via ClickUp</p>
                   </button>
                 </div>
@@ -920,17 +920,17 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <div className="pt-2 border-t border-slate-700">
                   <p className="text-xs text-slate-500 mb-2 uppercase tracking-wider">Avtalskunder</p>
                   <div className="flex flex-col md:flex-row gap-3">
-                    <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-4 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
-                      <FileCheck className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
-                      <h3 className="text-base font-semibold">Servicebesök</h3>
+                    <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
+                      <FileCheck className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
+                      <h3 className="text-sm font-semibold">Servicebesök</h3>
                       <p className="text-xs text-slate-400 mt-1">Återkommande tjänster</p>
                       {contractCustomers.length > 0 && (
                         <p className="text-xs text-emerald-400 mt-1">{contractCustomers.length} kunder</p>
                       )}
                     </button>
-                    <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-4 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
-                      <ClipboardCheck className="w-8 h-8 mx-auto mb-2 text-cyan-400" />
-                      <h3 className="text-base font-semibold">Stationskontroll</h3>
+                    <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
+                      <ClipboardCheck className="w-6 h-6 mx-auto mb-1.5 text-cyan-400" />
+                      <h3 className="text-sm font-semibold">Stationskontroll</h3>
                       <p className="text-xs text-slate-400 mt-1">Kontroll av fällor & stationer</p>
                       {contractCustomers.length > 0 && (
                         <p className="text-xs text-cyan-400 mt-1">{contractCustomers.length} kunder</p>
@@ -1699,7 +1699,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         </div>
                       )}
 
-                      <p className="text-sm text-slate-400">
+                      <p className="text-xs text-slate-400">
                         Lägg till bilder som dokumenterar ärendet. Kategorisera som "Före", "Efter" eller "Övrigt".
                       </p>
                       <CaseImageSelector
