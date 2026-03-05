@@ -1,5 +1,5 @@
 // ActionableCasesDrawer.tsx — Expanderbar panel med actions för ärenden att boka in
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -81,7 +81,7 @@ export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActi
       animate={{ height: 'auto', opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50 overflow-visible flex-shrink-0"
+      className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50 overflow-hidden flex-shrink-0"
     >
       <div className="px-4 py-2.5">
         {/* Header */}
@@ -178,6 +178,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
   const [expanded, setExpanded] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const contactBtnRef = useRef<HTMLButtonElement>(null)
 
   const isNew = !action || action.coordinator_status === 'new'
   const status = action?.coordinator_status || 'new'
@@ -306,22 +307,22 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
             )}
 
             {/* Logga kontakt */}
-            <div className="relative">
-              <button
-                onClick={() => setContactOpen(!contactOpen)}
-                disabled={actionLoading === 'contact'}
-                className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors disabled:opacity-50"
-                title="Logga kontaktförsök"
-              >
-                {actionLoading === 'contact' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Phone className="w-3.5 h-3.5" />}
-              </button>
-              {contactOpen && (
-                <ContactPopover
-                  onConfirm={handleLogContact}
-                  onClose={() => setContactOpen(false)}
-                />
-              )}
-            </div>
+            <button
+              ref={contactBtnRef}
+              onClick={() => setContactOpen(!contactOpen)}
+              disabled={actionLoading === 'contact'}
+              className="p-1 rounded text-purple-400 hover:bg-purple-500/20 transition-colors disabled:opacity-50"
+              title="Logga kontaktförsök"
+            >
+              {actionLoading === 'contact' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Phone className="w-3.5 h-3.5" />}
+            </button>
+            {contactOpen && (
+              <ContactPopover
+                anchorRef={contactBtnRef}
+                onConfirm={handleLogContact}
+                onClose={() => setContactOpen(false)}
+              />
+            )}
 
             {/* Öppna ärende */}
             {onOpenCase && (
@@ -425,13 +426,25 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
 
 // ─── Kontaktförsök-popover (tvåstegs: välj metod → bekräfta) ───
 
-function ContactPopover({ onConfirm, onClose }: {
+function ContactPopover({ anchorRef, onConfirm, onClose }: {
+  anchorRef: React.RefObject<HTMLButtonElement | null>
   onConfirm: (method: ContactMethod, note?: string) => void
   onClose: () => void
 }) {
   const [selectedMethod, setSelectedMethod] = useState<ContactMethod | null>(null)
   const [note, setNote] = useState('')
   const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+
+  useLayoutEffect(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect()
+      setPos({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+  }, [anchorRef])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -447,7 +460,7 @@ function ContactPopover({ onConfirm, onClose }: {
   }
 
   return (
-    <div ref={ref} className="absolute right-0 top-full mt-1 z-50 w-56 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-2.5">
+    <div ref={ref} className="fixed z-[100] w-56 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-2.5" style={{ top: pos.top, right: pos.right }}>
       <p className="text-[10px] text-slate-400 mb-2 font-medium">Logga kontaktförsök</p>
       <div className="flex gap-1.5 mb-2">
         {([
