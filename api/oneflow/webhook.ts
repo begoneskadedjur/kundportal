@@ -1569,7 +1569,10 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
             // Uppdatera ärendets huvudstatus till bokningsbar (för offerter)
             if (contractData.type === 'offer') {
-              await updateCaseStatusViaSourceId(contractId, 'Offert signerad - boka in')
+              await updateCaseStatusViaSourceId(contractId, 'Offert signerad - boka in', {
+                start_date: null,
+                due_date: null,
+              })
             }
 
             // Logga systemevent till kommunikationspanelen
