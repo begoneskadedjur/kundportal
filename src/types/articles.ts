@@ -4,7 +4,7 @@
 /**
  * Tillgängliga enheter för artiklar
  */
-export type ArticleUnit = 'st' | 'timme' | 'm2' | 'kg' | 'l' | 'dag' | 'månad'
+export type ArticleUnit = 'st' | 'timme' | 'm2' | 'kg' | 'l' | 'dag' | 'månad' | 'fp' | 'm'
 
 /**
  * Artikelkategorier
@@ -199,7 +199,9 @@ export const ARTICLE_UNIT_CONFIG: Record<ArticleUnit, {
   kg: { label: 'Kilogram', shortLabel: 'kg' },
   l: { label: 'Liter', shortLabel: 'l' },
   dag: { label: 'Dag', shortLabel: 'dag' },
-  månad: { label: 'Månad', shortLabel: 'mån' }
+  månad: { label: 'Månad', shortLabel: 'mån' },
+  fp: { label: 'Förpackning', shortLabel: 'fp' },
+  m: { label: 'Meter', shortLabel: 'm' }
 }
 
 /**
@@ -240,7 +242,7 @@ export const ARTICLE_CATEGORY_CONFIG: Record<ArticleCategory, {
 /**
  * Alla tillgängliga enheter som array
  */
-export const ARTICLE_UNITS: ArticleUnit[] = ['st', 'timme', 'm2', 'kg', 'l', 'dag', 'månad']
+export const ARTICLE_UNITS: ArticleUnit[] = ['st', 'timme', 'm2', 'kg', 'l', 'dag', 'månad', 'fp', 'm']
 
 /**
  * Alla tillgängliga kategorier som array
