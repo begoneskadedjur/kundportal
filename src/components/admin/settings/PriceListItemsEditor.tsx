@@ -650,7 +650,20 @@ export function PriceListItemsEditor({
                         <code className="text-xs font-mono text-slate-400 flex-shrink-0">{article.code}</code>
                         <span className="text-sm text-white truncate">{article.name}</span>
                       </div>
-                      <span className="text-xs text-slate-500 flex-shrink-0">Inköp: {formatArticlePrice(article.default_price)}</span>
+                      <span className="text-xs text-slate-500 flex-shrink-0">
+                        Inköp: {formatArticlePrice(article.default_price)}
+                        {priceType !== 'standard' && (() => {
+                          const cp = priceType === 'custom'
+                            ? parseFloat(state?.customPrice || '0')
+                            : discountedPrice
+                          const pct = article.default_price !== 0
+                            ? ((cp / article.default_price) - 1) * 100
+                            : 0
+                          const sign = pct > 0 ? '+' : ''
+                          const color = pct > 0 ? 'text-[#20c58f]' : 'text-amber-400'
+                          return <span className={`ml-1 ${color}`}>({sign}{pct.toFixed(0)}%)</span>
+                        })()}
+                      </span>
                     </div>
 
                     {/* Rad 2: Pristyp + Input */}
@@ -733,6 +746,9 @@ export function PriceListItemsEditor({
                 <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Inköpspris
                 </th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Påslag
+                </th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Pristyp
                 </th>
@@ -744,7 +760,7 @@ export function PriceListItemsEditor({
             <tbody className="divide-y divide-slate-700/30">
               {filteredArticles.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
                     {searchTerm ? 'Inga artiklar matchar sökningen' : 'Inga artiklar tillgängliga'}
                   </td>
                 </tr>
@@ -805,6 +821,31 @@ export function PriceListItemsEditor({
                         <span className="text-sm text-slate-500">
                           {formatArticlePrice(article.default_price)}
                         </span>
+                      </td>
+
+                      {/* Påslag */}
+                      <td className="px-3 py-2 whitespace-nowrap text-right">
+                        {(() => {
+                          if (priceType === 'standard') {
+                            return <span className="text-sm text-slate-500">—</span>
+                          }
+                          const customerPrice = priceType === 'custom'
+                            ? parseFloat(state?.customPrice || '0')
+                            : discountedPrice
+                          const diff = customerPrice - article.default_price
+                          const pct = article.default_price !== 0
+                            ? ((customerPrice / article.default_price) - 1) * 100
+                            : 0
+                          const isPositive = diff > 0
+                          const isNegative = diff < 0
+                          const color = isPositive ? 'text-[#20c58f]' : isNegative ? 'text-amber-400' : 'text-slate-500'
+                          const sign = isPositive ? '+' : ''
+                          return (
+                            <span className={`text-sm ${color}`}>
+                              {sign}{Math.round(diff)} kr ({sign}{pct.toFixed(1)}%)
+                            </span>
+                          )
+                        })()}
                       </td>
 
                       {/* Pristyp */}
