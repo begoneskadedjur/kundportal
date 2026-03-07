@@ -53,6 +53,8 @@ export function PriceListItemsEditor({
   // Selection & bulk markup
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [markupPercent, setMarkupPercent] = useState<string>('')
+  const [appliedMarkup, setAppliedMarkup] = useState<string | null>(null)
+  const [isBulkSaving, setIsBulkSaving] = useState(false)
 
   // Ladda artikelpriser
   useEffect(() => {
@@ -170,6 +172,7 @@ export function PriceListItemsEditor({
     }
 
     setPriceStates(newStates)
+    setAppliedMarkup(markup.toString())
     toast.success(`Påslag +${markup}% tillagt på ${selectedIds.size} artiklar`)
     setSelectedIds(new Set())
     setMarkupPercent('')
@@ -406,17 +409,103 @@ export function PriceListItemsEditor({
     return { customCount, discountCount, dirtyCount }
   }, [priceStates])
 
-  // Bekräfta alla osparade
+  // Bekräfta alla osparade (batch)
   const confirmAllDirty = async () => {
-    const dirtyArticles = Object.entries(priceStates)
+    const dirtyEntries = Object.entries(priceStates)
       .filter(([_, state]) => state.isDirty)
-      .map(([articleId]) => articleId)
 
-    for (const articleId of dirtyArticles) {
-      const article = articles.find(a => a.id === articleId)
-      if (article) {
-        await confirmPrice(articleId, article)
+    if (dirtyEntries.length === 0) return
+
+    setIsBulkSaving(true)
+
+    try {
+      // Separera removals (standard) och upserts (custom/discount)
+      const removals: string[] = []
+      const upserts: { price_list_id: string; article_id: string; custom_price: number; discount_percent: number }[] = []
+
+      for (const [articleId, state] of dirtyEntries) {
+        const article = articles.find(a => a.id === articleId)
+        if (!article) continue
+
+        if (state.priceType === 'standard') {
+          removals.push(articleId)
+        } else if (state.priceType === 'custom') {
+          const price = parseFloat(state.customPrice)
+          if (isNaN(price) || price < 0) continue
+          upserts.push({
+            price_list_id: priceListId,
+            article_id: articleId,
+            custom_price: price,
+            discount_percent: 0
+          })
+        } else if (state.priceType === 'discount') {
+          const discount = parseFloat(state.discountPercent)
+          if (isNaN(discount) || discount < 0 || discount > 100) continue
+          const discountedPrice = Math.round(article.default_price * (1 - discount / 100) * 100) / 100
+          upserts.push({
+            price_list_id: priceListId,
+            article_id: articleId,
+            custom_price: discountedPrice,
+            discount_percent: discount
+          })
+        }
       }
+
+      // Kör removals individuellt (sällan många)
+      for (const articleId of removals) {
+        await PriceListService.removePriceListItem(priceListId, articleId)
+      }
+
+      // Kör upserts i en batch
+      if (upserts.length > 0) {
+        await PriceListService.bulkUpsertPriceListItems(upserts)
+      }
+
+      // Uppdatera alla dirty states till saved
+      setPriceStates(prev => {
+        const next = { ...prev }
+        for (const [articleId, state] of dirtyEntries) {
+          if (state.priceType === 'standard') {
+            delete next[articleId]
+          } else {
+            next[articleId] = {
+              ...next[articleId],
+              isSaving: false,
+              savedAt: Date.now(),
+              isDirty: false,
+              originalPriceType: state.priceType,
+              originalCustomPrice: state.priceType === 'custom' ? state.customPrice : next[articleId]?.customPrice || '',
+              originalDiscountPercent: state.priceType === 'discount' ? state.discountPercent : ''
+            }
+          }
+        }
+        return next
+      })
+
+      const totalSaved = removals.length + upserts.length
+      toast.success(`${totalSaved} pris${totalSaved > 1 ? 'er' : ''} sparade`)
+      setAppliedMarkup(null)
+
+      // Rensa savedAt efter 2 sekunder
+      setTimeout(() => {
+        setPriceStates(prev => {
+          const next = { ...prev }
+          for (const [articleId] of dirtyEntries) {
+            if (next[articleId]) {
+              next[articleId] = { ...next[articleId], savedAt: null }
+            }
+          }
+          return next
+        })
+      }, 2000)
+
+      loadItems()
+      onUpdate()
+    } catch (error) {
+      console.error('Fel vid batch-sparande:', error)
+      toast.error('Kunde inte spara priserna')
+    } finally {
+      setIsBulkSaving(false)
     }
   }
 
@@ -429,6 +518,7 @@ export function PriceListItemsEditor({
     dirtyArticles.forEach(articleId => {
       resetPrice(articleId)
     })
+    setAppliedMarkup(null)
   }
 
   // Hjälpfunktion för rad-styling
@@ -829,19 +919,28 @@ export function PriceListItemsEditor({
 
       {/* Sammanfattning */}
       <div className="mt-4 pt-4 border-t border-slate-700/50 flex items-center justify-between text-sm">
-        <span className="text-slate-400">
-          {articles.length} artiklar
-          {stats.customCount > 0 && (
-            <span className="ml-2">
-              • <span className="text-purple-400">{stats.customCount} anpassade</span>
+        <div className="flex items-center gap-3">
+          <span className="text-slate-400">
+            {articles.length} artiklar
+            {stats.customCount > 0 && (
+              <span className="ml-2">
+                • <span className="text-purple-400">{stats.customCount} anpassade</span>
+              </span>
+            )}
+            {stats.discountCount > 0 && (
+              <span className="ml-2">
+                • <span className="text-emerald-400">{stats.discountCount} med rabatt</span>
+              </span>
+            )}
+          </span>
+
+          {appliedMarkup && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#20c58f]/15 border border-[#20c58f]/30 rounded-lg text-[#20c58f] text-xs font-medium">
+              <Percent className="w-3 h-3" />
+              Påslag +{appliedMarkup}% applicerat
             </span>
           )}
-          {stats.discountCount > 0 && (
-            <span className="ml-2">
-              • <span className="text-emerald-400">{stats.discountCount} med rabatt</span>
-            </span>
-          )}
-        </span>
+        </div>
 
         {/* Global bekräftelse om det finns dirty rows */}
         {stats.dirtyCount > 0 && (
@@ -851,14 +950,20 @@ export function PriceListItemsEditor({
             </span>
             <button
               onClick={confirmAllDirty}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
+              disabled={isBulkSaving}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
             >
-              <Check className="w-4 h-4" />
-              Spara alla
+              {isBulkSaving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Check className="w-4 h-4" />
+              )}
+              {isBulkSaving ? 'Sparar...' : 'Spara alla'}
             </button>
             <button
               onClick={resetAllDirty}
-              className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg transition-colors"
+              disabled={isBulkSaving}
+              className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg transition-colors disabled:opacity-50"
             >
               Ångra alla
             </button>
