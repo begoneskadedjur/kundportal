@@ -61,6 +61,7 @@ export interface Article {
   description: string | null
   unit: ArticleUnit
   default_price: number
+  recommended_price: number | null
   vat_rate: number
   category: ArticleCategory
   group_id: string | null
@@ -113,6 +114,7 @@ export interface UpdateArticleInput {
   is_active?: boolean
   sort_order?: number
   fortnox_article_id?: string | null
+  recommended_price?: number | null
   rot_eligible?: boolean
   rut_eligible?: boolean
 }

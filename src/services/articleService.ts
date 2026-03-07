@@ -143,6 +143,7 @@ export class ArticleService {
     if (input.is_active !== undefined) updateData.is_active = input.is_active
     if (input.sort_order !== undefined) updateData.sort_order = input.sort_order
     if (input.fortnox_article_id !== undefined) updateData.fortnox_article_id = input.fortnox_article_id
+    if (input.recommended_price !== undefined) updateData.recommended_price = input.recommended_price
     if (input.rot_eligible !== undefined) updateData.rot_eligible = input.rot_eligible
     if (input.rut_eligible !== undefined) updateData.rut_eligible = input.rut_eligible
 

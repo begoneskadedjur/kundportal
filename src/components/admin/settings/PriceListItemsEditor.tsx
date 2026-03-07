@@ -7,7 +7,8 @@ import {
   Search,
   Check,
   X,
-  RotateCcw
+  RotateCcw,
+  Percent
 } from 'lucide-react'
 import { PriceListService } from '../../../services/priceListService'
 import {
@@ -48,6 +49,10 @@ export function PriceListItemsEditor({
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [priceStates, setPriceStates] = useState<Record<string, ArticlePriceState>>({})
+
+  // Selection & bulk markup
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [markupPercent, setMarkupPercent] = useState<string>('')
 
   // Ladda artikelpriser
   useEffect(() => {
@@ -109,6 +114,66 @@ export function PriceListItemsEditor({
       article.category.toLowerCase().includes(search)
     )
   }, [articles, searchTerm])
+
+  // Selection helpers
+  const toggleSelection = (articleId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(articleId)) {
+        next.delete(articleId)
+      } else {
+        next.add(articleId)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredArticles.map(a => a.id)))
+    }
+  }
+
+  const isAllSelected = filteredArticles.length > 0 && filteredArticles.every(a => selectedIds.has(a.id))
+  const isSomeSelected = selectedIds.size > 0
+
+  // Bulk markup
+  const applyBulkMarkup = () => {
+    const markup = parseFloat(markupPercent)
+    if (isNaN(markup) || markup <= 0) return
+
+    const newStates = { ...priceStates }
+
+    for (const articleId of selectedIds) {
+      const article = articles.find(a => a.id === articleId)
+      if (!article) continue
+
+      const calculatedPrice = Math.round(article.default_price * (1 + markup / 100))
+      const currentState = newStates[articleId]
+      const originalPriceType = currentState?.originalPriceType || 'standard'
+      const originalCustomPrice = currentState?.originalCustomPrice || ''
+      const originalDiscountPercent = currentState?.originalDiscountPercent || ''
+
+      newStates[articleId] = {
+        priceType: 'custom',
+        customPrice: calculatedPrice.toString(),
+        discountPercent: '',
+        isSaving: false,
+        savedAt: null,
+        isDirty: true,
+        originalPriceType,
+        originalCustomPrice,
+        originalDiscountPercent
+      }
+    }
+
+    setPriceStates(newStates)
+    toast.success(`Påslag +${markup}% tillagt på ${selectedIds.size} artiklar`)
+    setSelectedIds(new Set())
+    setMarkupPercent('')
+  }
 
   // Spara pris till databas
   const confirmPrice = async (articleId: string, article: Article) => {
@@ -403,6 +468,62 @@ export function PriceListItemsEditor({
         />
       </div>
 
+      {/* Bulk-påslag toolbar */}
+      {isSomeSelected && (
+        <div className="mb-3 p-3 bg-slate-800/50 border border-[#20c58f]/30 rounded-xl flex flex-wrap items-center gap-2">
+          <span className="text-sm text-white font-medium">
+            {selectedIds.size} artikel{selectedIds.size > 1 ? 'er' : ''} markerade
+          </span>
+          <div className="h-5 w-px bg-slate-700" />
+
+          {/* Preset-knappar */}
+          {[10, 15, 20, 25].map(pct => (
+            <button
+              key={pct}
+              onClick={() => setMarkupPercent(pct.toString())}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                markupPercent === pct.toString()
+                  ? 'bg-[#20c58f] text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              +{pct}%
+            </button>
+          ))}
+
+          {/* Eget input */}
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              value={markupPercent}
+              onChange={(e) => setMarkupPercent(e.target.value)}
+              placeholder="Annat"
+              min="0"
+              max="500"
+              step="1"
+              className="w-16 px-2 py-1.5 bg-slate-900 border border-slate-600 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+            />
+            <span className="text-xs text-slate-500">%</span>
+          </div>
+
+          <button
+            onClick={applyBulkMarkup}
+            disabled={!markupPercent || parseFloat(markupPercent) <= 0}
+            className="px-4 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <Percent className="w-3.5 h-3.5" />
+            Lägg till påslag
+          </button>
+
+          <button
+            onClick={() => { setSelectedIds(new Set()); setMarkupPercent('') }}
+            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg transition-colors ml-auto"
+          >
+            Avmarkera alla
+          </button>
+        </div>
+      )}
+
       {/* Tabell */}
       <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="max-h-96 overflow-y-auto">
@@ -423,16 +544,23 @@ export function PriceListItemsEditor({
                 const discountPercent = parseFloat(state?.discountPercent || '0')
                 const discountedPrice = article.default_price * (1 - discountPercent / 100)
                 const rowClass = getRowClass(priceType, isDirty)
+                const isSelected = selectedIds.has(article.id)
 
                 return (
                   <div key={article.id} className={`p-3 ${rowClass}`}>
-                    {/* Rad 1: Art nr + Namn + Standardpris */}
+                    {/* Rad 1: Checkbox + Art nr + Namn + Inköpspris */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(article.id)}
+                          className="w-4 h-4 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f] flex-shrink-0"
+                        />
                         <code className="text-xs font-mono text-slate-400 flex-shrink-0">{article.code}</code>
                         <span className="text-sm text-white truncate">{article.name}</span>
                       </div>
-                      <span className="text-xs text-slate-500 flex-shrink-0">{formatArticlePrice(article.default_price)}</span>
+                      <span className="text-xs text-slate-500 flex-shrink-0">Inköp: {formatArticlePrice(article.default_price)}</span>
                     </div>
 
                     {/* Rad 2: Pristyp + Input */}
@@ -495,6 +623,14 @@ export function PriceListItemsEditor({
           <table className="w-full hidden md:table">
             <thead className="bg-slate-900/80 sticky top-0 z-10">
               <tr>
+                <th className="px-3 py-2 w-8">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
+                  />
+                </th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Art nr
                 </th>
@@ -504,18 +640,21 @@ export function PriceListItemsEditor({
                 <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Kategori
                 </th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Inköpspris
+                </th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Pristyp
                 </th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Pris
+                  Kundpris
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/30">
               {filteredArticles.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
                     {searchTerm ? 'Inga artiklar matchar sökningen' : 'Inga artiklar tillgängliga'}
                   </td>
                 </tr>
@@ -527,6 +666,7 @@ export function PriceListItemsEditor({
                   const categoryConfig = ARTICLE_CATEGORY_CONFIG[article.category]
                   const isSaving = state?.isSaving
                   const justSaved = state?.savedAt && Date.now() - state.savedAt < 2000
+                  const isSelected = selectedIds.has(article.id)
 
                   // Beräkna rabatterat pris
                   const discountPercent = parseFloat(state?.discountPercent || '0')
@@ -539,6 +679,16 @@ export function PriceListItemsEditor({
                       key={article.id}
                       className={`hover:bg-slate-800/30 transition-colors ${rowClass}`}
                     >
+                      {/* Checkbox */}
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(article.id)}
+                          className="w-4 h-4 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
+                        />
+                      </td>
+
                       {/* Art nr */}
                       <td className="px-3 py-2 whitespace-nowrap">
                         <code className="text-xs font-mono text-slate-400">
@@ -560,6 +710,13 @@ export function PriceListItemsEditor({
                         </span>
                       </td>
 
+                      {/* Inköpspris */}
+                      <td className="px-3 py-2 whitespace-nowrap text-right">
+                        <span className="text-sm text-slate-500">
+                          {formatArticlePrice(article.default_price)}
+                        </span>
+                      </td>
+
                       {/* Pristyp */}
                       <td className="px-3 py-2 whitespace-nowrap">
                         <select
@@ -573,7 +730,7 @@ export function PriceListItemsEditor({
                         </select>
                       </td>
 
-                      {/* Pris */}
+                      {/* Kundpris */}
                       <td className="px-3 py-2 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {priceType === 'standard' && (

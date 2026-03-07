@@ -397,7 +397,7 @@ export function ArticleEditModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-white mb-1">
-                Pris (exkl. moms) <span className="text-red-400">*</span>
+                Inköpspris (exkl. moms) <span className="text-red-400">*</span>
               </label>
               <div className="relative">
                 <input
