@@ -43,20 +43,34 @@ export class ArticleService {
    * Hämta alla artiklar med gruppdata (many-to-many via junction-tabell)
    */
   static async getAllArticlesWithGroups(): Promise<ArticleWithGroup[]> {
-    const { data, error } = await supabase
-      .from('articles')
-      .select(`
-        *,
-        group:article_groups!articles_group_id_fkey(*),
-        groups:article_group_memberships!article_group_memberships_article_id_fkey(
-          group:article_groups!article_group_memberships_group_id_fkey(*)
-        )
-      `)
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true })
+    const [articlesResult, membershipsResult] = await Promise.all([
+      supabase
+        .from('articles')
+        .select('*, group:article_groups!articles_group_id_fkey(*)')
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true }),
+      supabase
+        .from('article_group_memberships')
+        .select('article_id, group:article_groups(*)')
+    ])
 
-    if (error) throw new Error(`Databasfel: ${error.message}`)
-    return data || []
+    if (articlesResult.error) throw new Error(`Databasfel: ${articlesResult.error.message}`)
+    if (membershipsResult.error) throw new Error(`Databasfel: ${membershipsResult.error.message}`)
+
+    const articles = articlesResult.data || []
+    const memberships = membershipsResult.data || []
+
+    // Bygg map: article_id → Array<{ group: ArticleGroup }>
+    const groupsByArticle: Record<string, Array<{ group: any }>> = {}
+    memberships.forEach((m: any) => {
+      if (!groupsByArticle[m.article_id]) groupsByArticle[m.article_id] = []
+      if (m.group) groupsByArticle[m.article_id].push({ group: m.group })
+    })
+
+    return articles.map(article => ({
+      ...article,
+      groups: groupsByArticle[article.id] || []
+    }))
   }
 
   /**
