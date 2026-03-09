@@ -40,14 +40,15 @@ export class ArticleService {
   }
 
   /**
-   * Hämta alla artiklar med gruppdata (för tabellvy)
+   * Hämta alla artiklar med gruppdata (many-to-many via junction-tabell)
    */
   static async getAllArticlesWithGroups(): Promise<ArticleWithGroup[]> {
     const { data, error } = await supabase
       .from('articles')
       .select(`
         *,
-        group:article_groups(*)
+        group:article_groups(*),
+        groups:article_group_memberships(group:article_groups(*))
       `)
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true })

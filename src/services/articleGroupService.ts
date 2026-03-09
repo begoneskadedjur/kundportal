@@ -169,11 +169,11 @@ export class ArticleGroupService {
   }
 
   /**
-   * Hämta antal artiklar i en grupp
+   * Hämta antal artiklar i en grupp (via junction-tabell)
    */
   static async getArticleCountByGroup(groupId: string): Promise<number> {
     const { count, error } = await supabase
-      .from('articles')
+      .from('article_group_memberships')
       .select('*', { count: 'exact', head: true })
       .eq('group_id', groupId)
 
@@ -185,11 +185,11 @@ export class ArticleGroupService {
   }
 
   /**
-   * Hämta antal artiklar per grupp (för statistik)
+   * Hämta antal artiklar per grupp (via junction-tabell)
    */
   static async getArticleCountsByGroup(): Promise<Record<string, number>> {
     const { data, error } = await supabase
-      .from('articles')
+      .from('article_group_memberships')
       .select('group_id')
 
     if (error) {
@@ -197,12 +197,81 @@ export class ArticleGroupService {
     }
 
     const counts: Record<string, number> = {}
-    data?.forEach(article => {
-      if (article.group_id) {
-        counts[article.group_id] = (counts[article.group_id] || 0) + 1
-      }
+    data?.forEach(row => {
+      counts[row.group_id] = (counts[row.group_id] || 0) + 1
     })
 
     return counts
+  }
+
+  /**
+   * Lägg till artikel i grupp
+   */
+  static async addArticleToGroup(articleId: string, groupId: string): Promise<void> {
+    const { error } = await supabase
+      .from('article_group_memberships')
+      .upsert({ article_id: articleId, group_id: groupId }, { onConflict: 'article_id,group_id' })
+
+    if (error) {
+      throw new Error(`Kunde inte lägga till artikel i grupp: ${error.message}`)
+    }
+  }
+
+  /**
+   * Ta bort artikel från grupp
+   */
+  static async removeArticleFromGroup(articleId: string, groupId: string): Promise<void> {
+    const { error } = await supabase
+      .from('article_group_memberships')
+      .delete()
+      .eq('article_id', articleId)
+      .eq('group_id', groupId)
+
+    if (error) {
+      throw new Error(`Kunde inte ta bort artikel från grupp: ${error.message}`)
+    }
+  }
+
+  /**
+   * Sätt grupper för en artikel (ersätter alla befintliga)
+   */
+  static async setArticleGroups(articleId: string, groupIds: string[]): Promise<void> {
+    // Ta bort alla befintliga
+    const { error: deleteError } = await supabase
+      .from('article_group_memberships')
+      .delete()
+      .eq('article_id', articleId)
+
+    if (deleteError) {
+      throw new Error(`Kunde inte uppdatera grupper: ${deleteError.message}`)
+    }
+
+    // Lägg till nya
+    if (groupIds.length > 0) {
+      const rows = groupIds.map(groupId => ({ article_id: articleId, group_id: groupId }))
+      const { error: insertError } = await supabase
+        .from('article_group_memberships')
+        .insert(rows)
+
+      if (insertError) {
+        throw new Error(`Kunde inte lägga till grupper: ${insertError.message}`)
+      }
+    }
+  }
+
+  /**
+   * Hämta grupp-ID:n för en artikel
+   */
+  static async getArticleGroupIds(articleId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('article_group_memberships')
+      .select('group_id')
+      .eq('article_id', articleId)
+
+    if (error) {
+      throw new Error(`Kunde inte hämta grupper: ${error.message}`)
+    }
+
+    return data?.map(row => row.group_id) || []
   }
 }

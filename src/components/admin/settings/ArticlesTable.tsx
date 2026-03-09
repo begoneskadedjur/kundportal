@@ -20,7 +20,8 @@ import {
   PriceList,
   ARTICLE_CATEGORY_CONFIG,
   ARTICLE_UNIT_CONFIG,
-  formatArticlePrice
+  formatArticlePrice,
+  getArticleGroups
 } from '../../../types/articles'
 
 // Typ för prislista-kopplingar per artikel
@@ -117,14 +118,15 @@ export function ArticlesTable({
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color}`}>
                   {categoryConfig.label}
                 </span>
-                {article.group && (
+                {getArticleGroups(article).map(g => (
                   <span
+                    key={g.id}
                     className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
-                    style={{ backgroundColor: `${article.group.color}20`, color: article.group.color }}
+                    style={{ backgroundColor: `${g.color}20`, color: g.color }}
                   >
-                    {article.group.name}
+                    {g.name}
                   </span>
-                )}
+                ))}
                 <span className="text-xs text-slate-400">{unitConfig.shortLabel}</span>
               </div>
 
@@ -284,20 +286,29 @@ export function ArticlesTable({
                   </td>
 
                   {/* Artikelgrupp */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {article.group ? (
-                      <span
-                        className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium"
-                        style={{
-                          backgroundColor: `${article.group.color}20`,
-                          color: article.group.color
-                        }}
-                      >
-                        {article.group.name}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-500">-</span>
-                    )}
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const articleGroups = getArticleGroups(article)
+                      if (articleGroups.length === 0) {
+                        return <span className="text-xs text-slate-500">-</span>
+                      }
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {articleGroups.map(g => (
+                            <span
+                              key={g.id}
+                              className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium"
+                              style={{
+                                backgroundColor: `${g.color}20`,
+                                color: g.color
+                              }}
+                            >
+                              {g.name}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </td>
 
                   {/* Kategori */}

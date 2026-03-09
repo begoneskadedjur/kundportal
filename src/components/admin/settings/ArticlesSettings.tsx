@@ -22,7 +22,8 @@ import {
   ArticleCategory,
   PriceList,
   ARTICLE_CATEGORIES,
-  ARTICLE_CATEGORY_CONFIG
+  ARTICLE_CATEGORY_CONFIG,
+  getArticleGroups
 } from '../../../types/articles'
 import { ArticlesTable } from './ArticlesTable'
 import { ArticleGroupFilter } from './ArticleGroupFilter'
@@ -81,13 +82,14 @@ export function ArticlesSettings() {
     }
   }
 
-  // Beräkna antal artiklar per grupp
+  // Beräkna antal artiklar per grupp (many-to-many)
   const articleCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     articles.forEach(article => {
-      if (article.group_id) {
-        counts[article.group_id] = (counts[article.group_id] || 0) + 1
-      }
+      const articleGroups = getArticleGroups(article)
+      articleGroups.forEach(g => {
+        counts[g.id] = (counts[g.id] || 0) + 1
+      })
     })
     return counts
   }, [articles])
@@ -112,12 +114,13 @@ export function ArticlesSettings() {
         return false
       }
 
-      // Gruppfilter
+      // Gruppfilter (many-to-many)
       if (groupFilter !== 'all') {
+        const articleGroups = getArticleGroups(article)
         if (groupFilter === 'ungrouped') {
-          if (article.group_id) return false
+          if (articleGroups.length > 0) return false
         } else {
-          if (article.group_id !== groupFilter) return false
+          if (!articleGroups.some(g => g.id === groupFilter)) return false
         }
       }
 
@@ -144,8 +147,8 @@ export function ArticlesSettings() {
             bVal = b.category
             break
           case 'group':
-            aVal = a.group?.name?.toLowerCase() || 'zzz'
-            bVal = b.group?.name?.toLowerCase() || 'zzz'
+            aVal = getArticleGroups(a).map(g => g.name).sort().join(', ').toLowerCase() || 'zzz'
+            bVal = getArticleGroups(b).map(g => g.name).sort().join(', ').toLowerCase() || 'zzz'
             break
           case 'default_price':
             aVal = a.default_price
@@ -289,6 +292,7 @@ export function ArticlesSettings() {
             selectedGroupId={groupFilter}
             articleCounts={articleCounts}
             totalCount={articles.length}
+            ungroupedCount={articles.filter(a => getArticleGroups(a).length === 0).length}
             onSelectGroup={setGroupFilter}
             onGroupsChanged={loadData}
           />

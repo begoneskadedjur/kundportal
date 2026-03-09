@@ -14,6 +14,7 @@ import {
 import { ArticleService } from '../../../services/articleService'
 import { PriceListService } from '../../../services/priceListService'
 import { ArticleGroupService } from '../../../services/articleGroupService'
+import { getArticleGroups } from '../../../types/articles'
 import {
   Article,
   ArticleGroup,
@@ -54,7 +55,7 @@ export function ArticleEditModal({
   const [defaultPrice, setDefaultPrice] = useState('')
   const [vatRate, setVatRate] = useState('25')
   const [category, setCategory] = useState<ArticleCategory>('Övrigt')
-  const [groupId, setGroupId] = useState<string | null>(null)
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
   const [isActive, setIsActive] = useState(true)
   const [rotEligible, setRotEligible] = useState(false)
   const [rutEligible, setRutEligible] = useState(false)
@@ -114,7 +115,7 @@ export function ArticleEditModal({
       setDefaultPrice(article.default_price.toString())
       setVatRate(article.vat_rate.toString())
       setCategory(article.category)
-      setGroupId(article.group_id)
+      setSelectedGroupIds(getArticleGroups(article as any).map(g => g.id))
       setIsActive(article.is_active)
       setRotEligible(article.rot_eligible ?? false)
       setRutEligible(article.rut_eligible ?? false)
@@ -130,7 +131,7 @@ export function ArticleEditModal({
       setDefaultPrice('')
       setVatRate('25')
       setCategory('Övrigt')
-      setGroupId(null)
+      setSelectedGroupIds([])
       setIsActive(true)
       setRotEligible(false)
       setRutEligible(false)
@@ -193,7 +194,7 @@ export function ArticleEditModal({
         default_price: parseFloat(defaultPrice),
         vat_rate: parseFloat(vatRate),
         category,
-        group_id: groupId,
+        group_id: selectedGroupIds.length > 0 ? selectedGroupIds[0] : null,
         is_active: isActive,
         rot_eligible: rotEligible,
         rut_eligible: rutEligible,
@@ -205,9 +206,11 @@ export function ArticleEditModal({
 
       if (isEditing && article) {
         savedArticle = await ArticleService.updateArticle(article.id, input)
+        await ArticleGroupService.setArticleGroups(article.id, selectedGroupIds)
         toast.success('Artikel uppdaterad')
       } else {
         savedArticle = await ArticleService.createArticle(input)
+        await ArticleGroupService.setArticleGroups(savedArticle.id, selectedGroupIds)
 
         // Lägg till artikeln i valda prislistor
         if (selectedPriceListIds.length > 0) {
@@ -317,35 +320,45 @@ export function ArticleEditModal({
               <p className="text-slate-500 text-sm">Inga grupper skapade än. Hantera grupper via kugghjulsikonen på artikelsidan.</p>
             ) : (
               <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setGroupId(null)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    groupId === null
-                      ? 'bg-slate-600 text-white border-2 border-slate-500'
-                      : 'bg-slate-700 text-slate-400 border-2 border-transparent hover:bg-slate-600'
-                  }`}
-                >
-                  Ingen
-                </button>
-                {groups.map((group) => (
+                {groups.map((group) => {
+                  const isSelected = selectedGroupIds.includes(group.id)
+                  return (
+                    <button
+                      key={group.id}
+                      onClick={() => setSelectedGroupIds(prev =>
+                        isSelected
+                          ? prev.filter(id => id !== group.id)
+                          : [...prev, group.id]
+                      )}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all border-2 ${
+                        isSelected
+                          ? ''
+                          : 'bg-slate-700 text-slate-300 border-transparent hover:bg-slate-600'
+                      }`}
+                      style={isSelected ? {
+                        backgroundColor: `${group.color}20`,
+                        borderColor: `${group.color}50`,
+                        color: group.color
+                      } : undefined}
+                    >
+                      {group.name}
+                    </button>
+                  )
+                })}
+                {selectedGroupIds.length > 0 && (
                   <button
-                    key={group.id}
-                    onClick={() => setGroupId(group.id)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all border-2 ${
-                      groupId === group.id
-                        ? ''
-                        : 'bg-slate-700 text-slate-300 border-transparent hover:bg-slate-600'
-                    }`}
-                    style={groupId === group.id ? {
-                      backgroundColor: `${group.color}20`,
-                      borderColor: `${group.color}50`,
-                      color: group.color
-                    } : undefined}
+                    onClick={() => setSelectedGroupIds([])}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-slate-700 text-slate-400 border-2 border-transparent hover:bg-slate-600 hover:text-slate-300"
                   >
-                    {group.name}
+                    Rensa
                   </button>
-                ))}
+                )}
               </div>
+              {selectedGroupIds.length > 1 && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Artikeln tillhör {selectedGroupIds.length} grupper
+                </p>
+              )}
             )}
           </div>
 

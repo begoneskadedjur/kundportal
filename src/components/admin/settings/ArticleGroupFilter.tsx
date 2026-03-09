@@ -11,6 +11,7 @@ interface ArticleGroupFilterProps {
   selectedGroupId: string | 'all'
   articleCounts: Record<string, number>
   totalCount: number
+  ungroupedCount: number
   onSelectGroup: (groupId: string | 'all') => void
   onGroupsChanged: () => void
 }
@@ -20,13 +21,11 @@ export function ArticleGroupFilter({
   selectedGroupId,
   articleCounts,
   totalCount,
+  ungroupedCount,
   onSelectGroup,
   onGroupsChanged
 }: ArticleGroupFilterProps) {
   const [showManager, setShowManager] = useState(false)
-
-  // Beräkna antal utan grupp
-  const ungroupedCount = totalCount - Object.values(articleCounts).reduce((a, b) => a + b, 0)
 
   return (
     <>

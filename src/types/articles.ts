@@ -77,10 +77,34 @@ export interface Article {
 }
 
 /**
- * Artikel med grupp (för joins)
+ * Artikel med grupper (many-to-many via junction-tabell)
  */
 export interface ArticleWithGroup extends Article {
   group?: ArticleGroup | null
+  groups?: Array<{ group: ArticleGroup }> | null
+}
+
+/**
+ * Membership i junction-tabellen article_group_memberships
+ */
+export interface ArticleGroupMembership {
+  id: string
+  article_id: string
+  group_id: string
+  created_at: string
+}
+
+/**
+ * Hjälpfunktion: hämta platta grupper från ArticleWithGroup
+ */
+export const getArticleGroups = (article: ArticleWithGroup): ArticleGroup[] => {
+  if (article.groups && article.groups.length > 0) {
+    return article.groups.map(m => m.group).filter(Boolean)
+  }
+  if (article.group) {
+    return [article.group]
+  }
+  return []
 }
 
 /**
