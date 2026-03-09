@@ -34,6 +34,7 @@ interface ArticlesTableProps {
   articlePriceLists: ArticlePriceListMap
   sortField: SortField | null
   sortDirection: 'asc' | 'desc'
+  visibleColumns: Set<string>
   onSort: (field: SortField) => void
   onEdit: (article: ArticleWithGroup) => void
   onToggleActive: (id: string, isActive: boolean) => void
@@ -47,6 +48,7 @@ export function ArticlesTable({
   articlePriceLists,
   sortField,
   sortDirection,
+  visibleColumns,
   onSort,
   onEdit,
   onToggleActive,
@@ -200,54 +202,66 @@ export function ArticlesTable({
                   {getSortIcon('name')}
                 </div>
               </th>
-              <th
-                className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                onClick={() => onSort('group')}
-              >
-                <div className="flex items-center gap-1.5">
-                  Artikelgrupp
-                  {getSortIcon('group')}
-                </div>
-              </th>
-              <th
-                className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                onClick={() => onSort('category')}
-              >
-                <div className="flex items-center gap-1.5">
-                  Kategori
-                  {getSortIcon('category')}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Prislistor
-              </th>
-              <th
-                className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                onClick={() => onSort('default_price')}
-              >
-                <div className="flex items-center justify-end gap-1.5">
-                  Inköpspris
-                  {getSortIcon('default_price')}
-                </div>
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                onClick={() => onSort('unit')}
-              >
-                <div className="flex items-center justify-center gap-1.5">
-                  Enhet
-                  {getSortIcon('unit')}
-                </div>
-              </th>
-              <th
-                className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                onClick={() => onSort('is_active')}
-              >
-                <div className="flex items-center justify-center gap-1.5">
-                  Status
-                  {getSortIcon('is_active')}
-                </div>
-              </th>
+              {visibleColumns.has('group') && (
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                  onClick={() => onSort('group')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    Artikelgrupp
+                    {getSortIcon('group')}
+                  </div>
+                </th>
+              )}
+              {visibleColumns.has('category') && (
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                  onClick={() => onSort('category')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    Kategori
+                    {getSortIcon('category')}
+                  </div>
+                </th>
+              )}
+              {visibleColumns.has('priceLists') && (
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Prislistor
+                </th>
+              )}
+              {visibleColumns.has('price') && (
+                <th
+                  className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                  onClick={() => onSort('default_price')}
+                >
+                  <div className="flex items-center justify-end gap-1.5">
+                    Inköpspris
+                    {getSortIcon('default_price')}
+                  </div>
+                </th>
+              )}
+              {visibleColumns.has('unit') && (
+                <th
+                  className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                  onClick={() => onSort('unit')}
+                >
+                  <div className="flex items-center justify-center gap-1.5">
+                    Enhet
+                    {getSortIcon('unit')}
+                  </div>
+                </th>
+              )}
+              {visibleColumns.has('status') && (
+                <th
+                  className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                  onClick={() => onSort('is_active')}
+                >
+                  <div className="flex items-center justify-center gap-1.5">
+                    Status
+                    {getSortIcon('is_active')}
+                  </div>
+                </th>
+              )}
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                 Åtgärder
               </th>
@@ -286,126 +300,137 @@ export function ArticlesTable({
                   </td>
 
                   {/* Artikelgrupp */}
-                  <td className="px-4 py-3">
-                    {(() => {
-                      const articleGroups = getArticleGroups(article)
-                      if (articleGroups.length === 0) {
-                        return <span className="text-xs text-slate-500">-</span>
-                      }
-                      return (
-                        <div className="flex flex-wrap gap-1">
-                          {articleGroups.map(g => (
-                            <span
-                              key={g.id}
-                              className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium"
-                              style={{
-                                backgroundColor: `${g.color}20`,
-                                color: g.color
-                              }}
-                            >
-                              {g.name}
-                            </span>
-                          ))}
-                        </div>
-                      )
-                    })()}
-                  </td>
+                  {visibleColumns.has('group') && (
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const articleGroups = getArticleGroups(article)
+                        if (articleGroups.length === 0) {
+                          return <span className="text-xs text-slate-500">-</span>
+                        }
+                        return (
+                          <div className="flex flex-wrap gap-1">
+                            {articleGroups.map(g => (
+                              <span
+                                key={g.id}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium"
+                                style={{
+                                  backgroundColor: `${g.color}20`,
+                                  color: g.color
+                                }}
+                              >
+                                {g.name}
+                              </span>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </td>
+                  )}
 
                   {/* Kategori */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color}`}>
-                      {categoryConfig.label}
-                    </span>
-                  </td>
+                  {visibleColumns.has('category') && (
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color}`}>
+                        {categoryConfig.label}
+                      </span>
+                    </td>
+                  )}
 
                   {/* Prislistor */}
-                  <td className="px-4 py-3">
-                    {(() => {
-                      const priceLists = articlePriceLists[article.id] || []
-                      if (priceLists.length === 0) {
-                        return <span className="text-xs text-slate-500">-</span>
-                      }
+                  {visibleColumns.has('priceLists') && (
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const priceLists = articlePriceLists[article.id] || []
+                        if (priceLists.length === 0) {
+                          return <span className="text-xs text-slate-500">-</span>
+                        }
 
-                      // Visa max 2 prislistor + overflow
-                      const maxVisible = 2
-                      const visibleLists = priceLists.slice(0, maxVisible)
-                      const hiddenCount = priceLists.length - maxVisible
+                        const maxVisible = 2
+                        const visibleLists = priceLists.slice(0, maxVisible)
+                        const hiddenCount = priceLists.length - maxVisible
 
-                      return (
-                        <div className="flex flex-wrap gap-1">
-                          {visibleLists.map(({ priceList }) => (
-                            <button
-                              key={priceList.id}
-                              onClick={() => navigate('/admin/prislistor')}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer ${
-                                priceList.is_default
-                                  ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
-                                  : 'bg-slate-600/30 text-slate-300 hover:bg-slate-600/50'
-                              }`}
-                              title={`Gå till ${priceList.name}`}
-                            >
-                              {priceList.is_default && <Star className="w-3 h-3" />}
-                              {priceList.name.length > 12 ? `${priceList.name.slice(0, 12)}...` : priceList.name}
-                            </button>
-                          ))}
-                          {hiddenCount > 0 && (
-                            <span
-                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-400"
-                              title={priceLists.slice(maxVisible).map(p => p.priceList.name).join(', ')}
-                            >
-                              +{hiddenCount} till
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </td>
+                        return (
+                          <div className="flex flex-wrap gap-1">
+                            {visibleLists.map(({ priceList }) => (
+                              <button
+                                key={priceList.id}
+                                onClick={() => navigate('/admin/prislistor')}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer ${
+                                  priceList.is_default
+                                    ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+                                    : 'bg-slate-600/30 text-slate-300 hover:bg-slate-600/50'
+                                }`}
+                                title={`Gå till ${priceList.name}`}
+                              >
+                                {priceList.is_default && <Star className="w-3 h-3" />}
+                                {priceList.name.length > 12 ? `${priceList.name.slice(0, 12)}...` : priceList.name}
+                              </button>
+                            ))}
+                            {hiddenCount > 0 && (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-400"
+                                title={priceLists.slice(maxVisible).map(p => p.priceList.name).join(', ')}
+                              >
+                                +{hiddenCount} till
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </td>
+                  )}
 
                   {/* Pris */}
-                  <td className="px-4 py-3 whitespace-nowrap text-right">
-                    <div>
-                      <span className="text-sm font-medium text-white">
-                        {formatArticlePrice(article.default_price)}
-                      </span>
-                      <span className="text-xs text-slate-500 ml-1">
-                        +{article.vat_rate}%
-                      </span>
-                      {article.pack_size && article.pack_size > 1 && article.pack_price && (
-                        <p className="text-xs text-slate-500" title={`Leverantör säljer i ${article.pack_size}-pack för ${formatArticlePrice(article.pack_price)}`}>
-                          {article.pack_size}-pack: {formatArticlePrice(article.pack_price)}
-                        </p>
-                      )}
-                    </div>
-                  </td>
+                  {visibleColumns.has('price') && (
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
+                      <div>
+                        <span className="text-sm font-medium text-white">
+                          {formatArticlePrice(article.default_price)}
+                        </span>
+                        <span className="text-xs text-slate-500 ml-1">
+                          +{article.vat_rate}%
+                        </span>
+                        {article.pack_size && article.pack_size > 1 && article.pack_price && (
+                          <p className="text-xs text-slate-500" title={`Leverantör säljer i ${article.pack_size}-pack för ${formatArticlePrice(article.pack_price)}`}>
+                            {article.pack_size}-pack: {formatArticlePrice(article.pack_price)}
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                  )}
 
                   {/* Enhet */}
-                  <td className="px-4 py-3 whitespace-nowrap text-center">
-                    <span className="text-sm text-slate-400">
-                      {unitConfig.shortLabel}
-                    </span>
-                  </td>
+                  {visibleColumns.has('unit') && (
+                    <td className="px-4 py-3 whitespace-nowrap text-center">
+                      <span className="text-sm text-slate-400">
+                        {unitConfig.shortLabel}
+                      </span>
+                    </td>
+                  )}
 
                   {/* Status */}
-                  <td className="px-4 py-3 whitespace-nowrap text-center">
-                    <button
-                      onClick={() => onToggleActive(article.id, !article.is_active)}
-                      disabled={isToggling}
-                      className={`p-1 rounded transition-colors ${
-                        article.is_active
-                          ? 'text-emerald-400 hover:bg-emerald-500/20'
-                          : 'text-slate-500 hover:bg-slate-700'
-                      }`}
-                      title={article.is_active ? 'Aktiv - klicka för att inaktivera' : 'Inaktiv - klicka för att aktivera'}
-                    >
-                      {isToggling ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : article.is_active ? (
-                        <ToggleRight className="w-5 h-5" />
-                      ) : (
-                        <ToggleLeft className="w-5 h-5" />
-                      )}
-                    </button>
-                  </td>
+                  {visibleColumns.has('status') && (
+                    <td className="px-4 py-3 whitespace-nowrap text-center">
+                      <button
+                        onClick={() => onToggleActive(article.id, !article.is_active)}
+                        disabled={isToggling}
+                        className={`p-1 rounded transition-colors ${
+                          article.is_active
+                            ? 'text-emerald-400 hover:bg-emerald-500/20'
+                            : 'text-slate-500 hover:bg-slate-700'
+                        }`}
+                        title={article.is_active ? 'Aktiv - klicka för att inaktivera' : 'Inaktiv - klicka för att aktivera'}
+                      >
+                        {isToggling ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : article.is_active ? (
+                          <ToggleRight className="w-5 h-5" />
+                        ) : (
+                          <ToggleLeft className="w-5 h-5" />
+                        )}
+                      </button>
+                    </td>
+                  )}
 
                   {/* Åtgärder */}
                   <td className="px-4 py-3 whitespace-nowrap text-right">

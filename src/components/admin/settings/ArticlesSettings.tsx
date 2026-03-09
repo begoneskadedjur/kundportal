@@ -29,6 +29,7 @@ import { ArticlesTable } from './ArticlesTable'
 import { ArticleGroupFilter } from './ArticleGroupFilter'
 import { ArticleEditModal } from './ArticleEditModal'
 import { ArticlePriceListNav } from './ArticlePriceListNav'
+import ArticleColumnSelector, { useArticleColumnVisibility } from './ArticleColumnSelector'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
 
@@ -39,6 +40,7 @@ type ArticlePriceListMap = Record<string, Array<{ priceList: PriceList; customPr
 
 export function ArticlesSettings() {
   const navigate = useNavigate()
+  const { visibleColumns, toggleColumn, resetToDefaults } = useArticleColumnVisibility()
   const [articles, setArticles] = useState<ArticleWithGroup[]>([])
   const [groups, setGroups] = useState<ArticleGroup[]>([])
   const [articlePriceLists, setArticlePriceLists] = useState<ArticlePriceListMap>({})
@@ -238,7 +240,7 @@ export function ArticlesSettings() {
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-cyan-500/5" />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-4">
@@ -325,6 +327,11 @@ export function ArticlesSettings() {
               ))}
             </select>
 
+            <ArticleColumnSelector
+              visibleColumns={visibleColumns}
+              onToggle={toggleColumn}
+              onReset={resetToDefaults}
+            />
             <Button
               variant="secondary"
               size="sm"
@@ -360,6 +367,7 @@ export function ArticlesSettings() {
             articlePriceLists={articlePriceLists}
             sortField={sortField}
             sortDirection={sortDirection}
+            visibleColumns={visibleColumns}
             onSort={handleSort}
             onEdit={setEditingArticle}
             onToggleActive={handleToggleActive}
