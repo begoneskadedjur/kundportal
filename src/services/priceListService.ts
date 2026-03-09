@@ -198,6 +198,27 @@ export class PriceListService {
   }
 
   /**
+   * Bulk-upsert artikelpriser i en prislista (ett enda DB-anrop)
+   */
+  static async bulkUpsertPriceListItems(items: UpsertPriceListItemInput[]): Promise<void> {
+    if (items.length === 0) return
+
+    const rows = items.map(item => ({
+      price_list_id: item.price_list_id,
+      article_id: item.article_id,
+      custom_price: item.custom_price,
+      discount_percent: item.discount_percent ?? 0,
+      updated_at: new Date().toISOString()
+    }))
+
+    const { error } = await supabase
+      .from('price_list_items')
+      .upsert(rows, { onConflict: 'price_list_id,article_id' })
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+  }
+
+  /**
    * Ta bort artikelpris från prislista
    */
   static async removePriceListItem(priceListId: string, articleId: string): Promise<void> {

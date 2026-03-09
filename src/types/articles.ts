@@ -9,7 +9,7 @@ export type ArticleUnit = 'st' | 'timme' | 'm2' | 'kg' | 'l' | 'dag' | 'månad' 
 /**
  * Artikelkategorier
  */
-export type ArticleCategory = 'Inspektion' | 'Bekämpning' | 'Tillbehör' | 'Övrigt'
+export type ArticleCategory = 'Inspektion' | 'Bekämpning' | 'Tillbehör' | 'Arbetstid' | 'Övrigt'
 
 /**
  * Artikelgrupp från databasen
@@ -239,6 +239,12 @@ export const ARTICLE_CATEGORY_CONFIG: Record<ArticleCategory, {
     bgColor: 'bg-purple-500/20',
     borderColor: 'border-purple-500/50'
   },
+  Arbetstid: {
+    label: 'Arbetstid',
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500/20',
+    borderColor: 'border-orange-500/50'
+  },
   Övrigt: {
     label: 'Övrigt',
     color: 'text-slate-400',
@@ -255,7 +261,7 @@ export const ARTICLE_UNITS: ArticleUnit[] = ['st', 'timme', 'm2', 'kg', 'l', 'da
 /**
  * Alla tillgängliga kategorier som array
  */
-export const ARTICLE_CATEGORIES: ArticleCategory[] = ['Inspektion', 'Bekämpning', 'Tillbehör', 'Övrigt']
+export const ARTICLE_CATEGORIES: ArticleCategory[] = ['Inspektion', 'Bekämpning', 'Tillbehör', 'Arbetstid', 'Övrigt']
 
 /**
  * Beräkna pris med moms
