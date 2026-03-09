@@ -70,6 +70,8 @@ export interface Article {
   fortnox_article_id: string | null
   rot_eligible: boolean
   rut_eligible: boolean
+  pack_size: number | null
+  pack_price: number | null
   created_at: string
   updated_at: string
 }
@@ -98,6 +100,8 @@ export interface CreateArticleInput {
   fortnox_article_id?: string
   rot_eligible?: boolean
   rut_eligible?: boolean
+  pack_size?: number | null
+  pack_price?: number | null
 }
 
 /**
@@ -117,6 +121,8 @@ export interface UpdateArticleInput {
   recommended_price?: number | null
   rot_eligible?: boolean
   rut_eligible?: boolean
+  pack_size?: number | null
+  pack_price?: number | null
 }
 
 /**

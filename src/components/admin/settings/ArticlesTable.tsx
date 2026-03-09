@@ -106,6 +106,9 @@ export function ArticlesTable({
                 <div className="text-right flex-shrink-0">
                   <span className="text-sm font-medium text-white">{formatArticlePrice(article.default_price)}</span>
                   <span className="text-xs text-slate-500 ml-1">+{article.vat_rate}%</span>
+                  {article.pack_size && article.pack_size > 1 && article.pack_price && (
+                    <p className="text-xs text-slate-500">{article.pack_size}-pack: {formatArticlePrice(article.pack_price)}</p>
+                  )}
                 </div>
               </div>
 
@@ -349,12 +352,19 @@ export function ArticlesTable({
 
                   {/* Pris */}
                   <td className="px-4 py-3 whitespace-nowrap text-right">
-                    <span className="text-sm font-medium text-white">
-                      {formatArticlePrice(article.default_price)}
-                    </span>
-                    <span className="text-xs text-slate-500 ml-1">
-                      +{article.vat_rate}%
-                    </span>
+                    <div>
+                      <span className="text-sm font-medium text-white">
+                        {formatArticlePrice(article.default_price)}
+                      </span>
+                      <span className="text-xs text-slate-500 ml-1">
+                        +{article.vat_rate}%
+                      </span>
+                      {article.pack_size && article.pack_size > 1 && article.pack_price && (
+                        <p className="text-xs text-slate-500" title={`Leverantör säljer i ${article.pack_size}-pack för ${formatArticlePrice(article.pack_price)}`}>
+                          {article.pack_size}-pack: {formatArticlePrice(article.pack_price)}
+                        </p>
+                      )}
+                    </div>
                   </td>
 
                   {/* Enhet */}
