@@ -328,6 +328,7 @@ export const generateArticleCode = (name: string, category: ArticleCategory): st
     Inspektion: 'INS',
     Bekämpning: 'BEK',
     Tillbehör: 'TIL',
+    Arbetstid: 'ARB',
     Övrigt: 'OVR'
   }[category]
 

@@ -292,7 +292,15 @@ export function ArticleEditModal({
                 return (
                   <button
                     key={cat}
-                    onClick={() => setCategory(cat)}
+                    onClick={() => {
+                      setCategory(cat)
+                      if (cat === 'Arbetstid') {
+                        setUnit('timme')
+                        setSelectedGroupIds([])
+                        setPackSize('')
+                        setPackPrice('')
+                      }
+                    }}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       category === cat
                         ? `${config.bgColor} ${config.color} border-2 ${config.borderColor}`
@@ -306,8 +314,8 @@ export function ArticleEditModal({
             </div>
           </div>
 
-          {/* Grupp */}
-          <div>
+          {/* Grupp (dölj vid Arbetstid) */}
+          {category !== 'Arbetstid' && <div>
             <label className="block text-sm font-medium text-white mb-2">
               Artikelgrupp
             </label>
@@ -360,7 +368,7 @@ export function ArticleEditModal({
                 </p>
               )}
             </>)}
-          </div>
+          </div>}
 
           {/* Namn */}
           <div>
@@ -418,7 +426,7 @@ export function ArticleEditModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-white mb-1">
-                Inköpspris (exkl. moms) <span className="text-red-400">*</span>
+                {category === 'Arbetstid' ? 'Standardpris (exkl. moms)' : 'Inköpspris (exkl. moms)'} <span className="text-red-400">*</span>
               </label>
               <div className="relative">
                 <input
@@ -475,44 +483,54 @@ export function ArticleEditModal({
             </div>
           )}
 
-          {/* Förpackningsinfo */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-white mb-1">
-                Antal/förpackning
-              </label>
-              <input
-                type="number"
-                value={packSize}
-                onChange={(e) => setPackSize(e.target.value)}
-                placeholder="T.ex. 10"
-                min="1"
-                step="1"
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-white mb-1">
-                Förpackningspris
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={packPrice}
-                  onChange={(e) => setPackPrice(e.target.value)}
-                  placeholder="0"
-                  min="0"
-                  step="0.01"
-                  className="w-full px-4 py-2 pr-12 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">kr</span>
-              </div>
-            </div>
-          </div>
-          {packSize && packPrice && parseInt(packSize) > 1 && (
-            <p className="text-xs text-slate-400 -mt-3">
-              Leverantör säljer i {packSize}-pack för {formatArticlePrice(parseFloat(packPrice))}
+          {category === 'Arbetstid' && (
+            <p className="text-xs text-slate-400 -mt-2">
+              Kundspecifika timpriser sätts i prislistor (privat/företag)
             </p>
+          )}
+
+          {/* Förpackningsinfo - dölj för Arbetstid */}
+          {category !== 'Arbetstid' && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-white mb-1">
+                    Antal/förpackning
+                  </label>
+                  <input
+                    type="number"
+                    value={packSize}
+                    onChange={(e) => setPackSize(e.target.value)}
+                    placeholder="T.ex. 10"
+                    min="1"
+                    step="1"
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white mb-1">
+                    Förpackningspris
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={packPrice}
+                      onChange={(e) => setPackPrice(e.target.value)}
+                      placeholder="0"
+                      min="0"
+                      step="0.01"
+                      className="w-full px-4 py-2 pr-12 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">kr</span>
+                  </div>
+                </div>
+              </div>
+              {packSize && packPrice && parseInt(packSize) > 1 && (
+                <p className="text-xs text-slate-400 -mt-3">
+                  Leverantör säljer i {packSize}-pack för {formatArticlePrice(parseFloat(packPrice))}
+                </p>
+              )}
+            </>
           )}
 
           {/* Enhet */}
