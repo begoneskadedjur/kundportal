@@ -22,6 +22,7 @@ interface PriceListsTableProps {
   itemCounts: Record<string, number>
   articles: Article[]
   expandedListId: string | null
+  visibleColumns: Set<string>
   onToggleExpand: (id: string) => void
   onEdit: (priceList: PriceList) => void
   onCopy: (priceList: PriceList) => void
@@ -37,6 +38,7 @@ export function PriceListsTable({
   itemCounts,
   articles,
   expandedListId,
+  visibleColumns,
   onToggleExpand,
   onEdit,
   onCopy,
@@ -174,18 +176,26 @@ export function PriceListsTable({
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                 Namn
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">
-                Beskrivning
-              </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Artiklar
-              </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">
-                Giltighet
-              </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Status
-              </th>
+              {visibleColumns.has('description') && (
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Beskrivning
+                </th>
+              )}
+              {visibleColumns.has('articles') && (
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Artiklar
+                </th>
+              )}
+              {visibleColumns.has('validity') && (
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Giltighet
+                </th>
+              )}
+              {visibleColumns.has('status') && (
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Status
+                </th>
+              )}
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                 Åtgärder
               </th>
@@ -235,42 +245,50 @@ export function PriceListsTable({
                     </td>
 
                     {/* Beskrivning */}
-                    <td className="px-4 py-3 hidden sm:table-cell">
-                      <span className="text-sm text-slate-400 truncate max-w-xs block">
-                        {priceList.description || '-'}
-                      </span>
-                    </td>
+                    {visibleColumns.has('description') && (
+                      <td className="px-4 py-3">
+                        <span className="text-sm text-slate-400 truncate max-w-xs block">
+                          {priceList.description || '-'}
+                        </span>
+                      </td>
+                    )}
 
                     {/* Artiklar */}
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-700 rounded text-sm text-slate-300">
-                        <FileText className="w-3 h-3" />
-                        {count}
-                      </span>
-                    </td>
+                    {visibleColumns.has('articles') && (
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-700 rounded text-sm text-slate-300">
+                          <FileText className="w-3 h-3" />
+                          {count}
+                        </span>
+                      </td>
+                    )}
 
                     {/* Giltighet */}
-                    <td className="px-4 py-3 text-center hidden md:table-cell">
-                      {priceList.valid_from || priceList.valid_to ? (
-                        <div className="inline-flex items-center gap-1 text-xs text-slate-400">
-                          <Calendar className="w-3 h-3" />
-                          {formatDate(priceList.valid_from)} - {formatDate(priceList.valid_to)}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-500">Ingen begränsning</span>
-                      )}
-                    </td>
+                    {visibleColumns.has('validity') && (
+                      <td className="px-4 py-3 text-center">
+                        {priceList.valid_from || priceList.valid_to ? (
+                          <div className="inline-flex items-center gap-1 text-xs text-slate-400">
+                            <Calendar className="w-3 h-3" />
+                            {formatDate(priceList.valid_from)} - {formatDate(priceList.valid_to)}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-500">Ingen begränsning</span>
+                        )}
+                      </td>
+                    )}
 
                     {/* Status */}
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
-                        priceList.is_active
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-slate-600/20 text-slate-400'
-                      }`}>
-                        {priceList.is_active ? 'Aktiv' : 'Inaktiv'}
-                      </span>
-                    </td>
+                    {visibleColumns.has('status') && (
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
+                          priceList.is_active
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-slate-600/20 text-slate-400'
+                        }`}>
+                          {priceList.is_active ? 'Aktiv' : 'Inaktiv'}
+                        </span>
+                      </td>
+                    )}
 
                     {/* Åtgärder */}
                     <td className="px-4 py-3">
@@ -336,7 +354,7 @@ export function PriceListsTable({
                   <AnimatePresence>
                     {isExpanded && (
                       <tr key={`${priceList.id}-expanded`}>
-                        <td colSpan={7} className="p-0">
+                        <td colSpan={visibleColumns.size} className="p-0">
                           <motion.div
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}

@@ -18,11 +18,13 @@ import { PriceList, Article } from '../../../types/articles'
 import { PriceListEditModal } from './PriceListEditModal'
 import { PriceListsTable } from './PriceListsTable'
 import { ArticlePriceListNav } from './ArticlePriceListNav'
+import PriceListColumnSelector, { usePriceListColumnVisibility } from './PriceListColumnSelector'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
 
 export function PriceListsSettings() {
   const navigate = useNavigate()
+  const { visibleColumns, toggleColumn, resetToDefaults } = usePriceListColumnVisibility()
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
   const [articles, setArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
@@ -129,7 +131,7 @@ export function PriceListsSettings() {
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-purple-500/5" />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-4">
@@ -180,6 +182,11 @@ export function PriceListsSettings() {
             Visar {priceLists.length} prislistor
           </div>
           <div className="flex items-center gap-2">
+            <PriceListColumnSelector
+              visibleColumns={visibleColumns}
+              onToggle={toggleColumn}
+              onReset={resetToDefaults}
+            />
             <Button
               variant="secondary"
               size="sm"
@@ -222,6 +229,7 @@ export function PriceListsSettings() {
             itemCounts={itemCounts}
             articles={articles}
             expandedListId={expandedListId}
+            visibleColumns={visibleColumns}
             onToggleExpand={handleToggleExpand}
             onEdit={setEditingPriceList}
             onCopy={handleCopy}
