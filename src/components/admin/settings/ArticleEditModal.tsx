@@ -319,7 +319,7 @@ export function ArticleEditModal({
             ) : groups.length === 0 ? (
               <p className="text-slate-500 text-sm">Inga grupper skapade än. Hantera grupper via kugghjulsikonen på artikelsidan.</p>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <><div className="flex flex-wrap gap-2">
                 {groups.map((group) => {
                   const isSelected = selectedGroupIds.includes(group.id)
                   return (
@@ -359,7 +359,7 @@ export function ArticleEditModal({
                   Artikeln tillhör {selectedGroupIds.length} grupper
                 </p>
               )}
-            )}
+            </>)}
           </div>
 
           {/* Namn */}
