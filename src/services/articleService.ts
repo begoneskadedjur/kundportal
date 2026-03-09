@@ -47,8 +47,10 @@ export class ArticleService {
       .from('articles')
       .select(`
         *,
-        group:article_groups(*),
-        groups:article_group_memberships(group:article_groups(*))
+        group:article_groups!articles_group_id_fkey(*),
+        groups:article_group_memberships!article_group_memberships_article_id_fkey(
+          group:article_groups!article_group_memberships_group_id_fkey(*)
+        )
       `)
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true })
