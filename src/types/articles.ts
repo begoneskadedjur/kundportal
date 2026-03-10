@@ -9,7 +9,7 @@ export type ArticleUnit = 'st' | 'timme' | 'm2' | 'kg' | 'l' | 'dag' | 'månad' 
 /**
  * Doseringsenhet för produkter som doseras i gram eller ml
  */
-export type DosageUnit = 'g' | 'ml'
+export type DosageUnit = 'g' | 'ml' | 'm'
 
 /**
  * Artikelkategorier
@@ -345,7 +345,8 @@ export const DOSAGE_UNIT_CONFIG: Record<DosageUnit, {
   shortLabel: string
 }> = {
   g: { label: 'Gram', shortLabel: 'g' },
-  ml: { label: 'Milliliter', shortLabel: 'ml' }
+  ml: { label: 'Milliliter', shortLabel: 'ml' },
+  m: { label: 'Meter', shortLabel: 'm' }
 }
 
 /**
