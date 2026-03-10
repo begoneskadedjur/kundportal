@@ -28,7 +28,7 @@ import type {
   CaseBillingSummary
 } from '../../types/caseBilling'
 import type { ArticleCategory } from '../../types/articles'
-import { ARTICLE_CATEGORY_CONFIG, ARTICLE_UNIT_CONFIG } from '../../types/articles'
+import { ARTICLE_CATEGORY_CONFIG, ARTICLE_UNIT_CONFIG, DOSAGE_UNIT_CONFIG, calculatePricePerDosageUnit } from '../../types/articles'
 
 interface CaseArticleSelectorProps {
   caseId: string
@@ -51,6 +51,14 @@ const formatPrice = (price: number) =>
     maximumFractionDigits: 0
   }).format(price)
 
+const formatDosagePrice = (price: number) =>
+  new Intl.NumberFormat('sv-SE', {
+    style: 'currency',
+    currency: 'SEK',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(price)
+
 export default function CaseArticleSelector({
   caseId,
   caseType,
@@ -71,6 +79,7 @@ export default function CaseArticleSelector({
   const [expandedCategories, setExpandedCategories] = useState<Set<ArticleCategory>>(new Set(ALL_CATEGORIES))
   const [showArticleList, setShowArticleList] = useState(false)
   const discountTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const dosageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -96,10 +105,11 @@ export default function CaseArticleSelector({
     loadData()
   }, [loadData])
 
-  // Cleanup discount timers
+  // Cleanup timers
   useEffect(() => {
     return () => {
       Object.values(discountTimers.current).forEach(clearTimeout)
+      Object.values(dosageTimers.current).forEach(clearTimeout)
     }
   }, [])
 
@@ -132,17 +142,22 @@ export default function CaseArticleSelector({
   const handleAddArticle = async (articleWithPrice: ArticleWithEffectivePrice) => {
     if (readOnly || saving) return
     setSaving(true)
+    const { article } = articleWithPrice
+    const isDosage = article.is_dosage_product && article.total_content && article.dosage_unit
+    const unitPrice = isDosage
+      ? Math.round(calculatePricePerDosageUnit(articleWithPrice.effective_price, article.total_content!) * 100) / 100
+      : articleWithPrice.effective_price
     try {
       await CaseBillingService.addArticleToCase({
         case_id: caseId,
         case_type: caseType,
         customer_id: customerId,
-        article_id: articleWithPrice.article.id,
-        article_code: articleWithPrice.article.code,
-        article_name: articleWithPrice.article.name,
+        article_id: article.id,
+        article_code: article.code,
+        article_name: article.name,
         quantity: 1,
-        unit_price: articleWithPrice.effective_price,
-        vat_rate: articleWithPrice.article.vat_rate,
+        unit_price: unitPrice,
+        vat_rate: article.vat_rate,
         price_source: articleWithPrice.price_source,
         added_by_technician_id: technicianId || undefined,
         added_by_technician_name: technicianName || undefined
@@ -160,7 +175,7 @@ export default function CaseArticleSelector({
   const handleUpdateQuantity = async (item: CaseBillingItem, delta: number) => {
     if (readOnly || saving) return
     const newQuantity = item.quantity + delta
-    if (newQuantity < 1) return
+    if (newQuantity < 0.1) return
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(item.id, { quantity: newQuantity })
@@ -208,6 +223,15 @@ export default function CaseArticleSelector({
     if (discountTimers.current[item.id]) clearTimeout(discountTimers.current[item.id])
     discountTimers.current[item.id] = setTimeout(() => {
       handleUpdateDiscount(item, value)
+    }, 600)
+  }
+
+  // Debounced dosage amount update
+  const handleDosageChange = (item: CaseBillingItem, rawValue: string) => {
+    const value = Math.max(0.1, parseFloat(rawValue) || 1)
+    if (dosageTimers.current[item.id]) clearTimeout(dosageTimers.current[item.id])
+    dosageTimers.current[item.id] = setTimeout(() => {
+      handleUpdateQuantity(item, value - item.quantity)
     }, 600)
   }
 
@@ -386,12 +410,28 @@ export default function CaseArticleSelector({
                               )}
 
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <span className="text-[#20c58f] text-sm font-medium">
-                                  {formatPrice(item.effective_price)}
-                                </span>
-                                <span className="text-[10px] text-slate-500">
-                                  / {unit.shortLabel}
-                                </span>
+                                {item.article.is_dosage_product && item.article.total_content && item.article.dosage_unit ? (
+                                  <>
+                                    <span className="text-[#20c58f] text-sm font-medium">
+                                      {formatDosagePrice(calculatePricePerDosageUnit(item.effective_price, item.article.total_content))}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500">
+                                      / {DOSAGE_UNIT_CONFIG[item.article.dosage_unit].shortLabel}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500">
+                                      ({formatPrice(item.effective_price)} / {item.article.total_content}{item.article.dosage_unit})
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="text-[#20c58f] text-sm font-medium">
+                                      {formatPrice(item.effective_price)}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500">
+                                      / {unit.shortLabel}
+                                    </span>
+                                  </>
+                                )}
                                 {hasPack && (
                                   <span className="text-[10px] text-slate-500">
                                     Fp: {item.article.pack_size} st — {formatPrice(item.article.pack_price!)} /fp
@@ -445,6 +485,8 @@ export default function CaseArticleSelector({
             const article = getArticleForItem(item)
             const unitLabel = article ? ARTICLE_UNIT_CONFIG[article.unit].shortLabel : 'st'
             const isTimeUnit = article?.unit === 'timme'
+            const isDosage = article?.is_dosage_product && article?.total_content && article?.dosage_unit
+            const dosageUnitLabel = isDosage ? DOSAGE_UNIT_CONFIG[article.dosage_unit!].shortLabel : null
 
             return (
               <div
@@ -481,35 +523,73 @@ export default function CaseArticleSelector({
                     <div className="flex items-center gap-3 mt-1.5 text-sm flex-wrap">
                       {/* Kvantitet */}
                       <div className="flex items-center gap-0.5">
-                        {!readOnly && (
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuantity(item, -1)}
-                            disabled={saving || item.quantity <= 1}
-                            className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
+                        {isDosage && !readOnly ? (
+                          <>
+                            <input
+                              type="number"
+                              min="0.1"
+                              step="0.1"
+                              defaultValue={item.quantity}
+                              key={`dosage-${item.id}-${item.quantity}`}
+                              onChange={(e) => handleDosageChange(item, e.target.value)}
+                              disabled={saving}
+                              className="w-14 px-1.5 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-white text-center focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateQuantity(item, -1)}
+                              disabled={saving || item.quantity <= 1}
+                              className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateQuantity(item, 1)}
+                              disabled={saving}
+                              className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-xs text-slate-500 ml-0.5">{dosageUnitLabel}</span>
+                          </>
+                        ) : (
+                          <>
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(item, -1)}
+                                disabled={saving || item.quantity <= 1}
+                                className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <span className="w-7 text-center text-white text-sm">{item.quantity}</span>
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(item, 1)}
+                                disabled={saving}
+                                className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <span className="text-xs text-slate-500 ml-0.5">{unitLabel}</span>
+                          </>
                         )}
-                        <span className="w-7 text-center text-white text-sm">{item.quantity}</span>
-                        {!readOnly && (
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuantity(item, 1)}
-                            disabled={saving}
-                            className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <span className="text-xs text-slate-500 ml-0.5">{unitLabel}</span>
                       </div>
 
                       <span className="text-slate-600">×</span>
 
                       {/* Enhetspris */}
                       <span className="text-sm text-slate-400">
-                        {formatPrice(item.unit_price)}
+                        {isDosage ? (
+                          <>{formatDosagePrice(item.unit_price)}<span className="text-[10px] text-slate-500">/{dosageUnitLabel}</span></>
+                        ) : (
+                          formatPrice(item.unit_price)
+                        )}
                       </span>
 
                       {/* Rabatt */}
