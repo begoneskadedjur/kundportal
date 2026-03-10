@@ -7,6 +7,11 @@
 export type ArticleUnit = 'st' | 'timme' | 'm2' | 'kg' | 'l' | 'dag' | 'månad' | 'fp' | 'm'
 
 /**
+ * Doseringsenhet för produkter som doseras i gram eller ml
+ */
+export type DosageUnit = 'g' | 'ml'
+
+/**
  * Artikelkategorier
  */
 export type ArticleCategory = 'Inspektion' | 'Bekämpning' | 'Tillbehör' | 'Arbetstid' | 'Övrigt'
@@ -72,6 +77,9 @@ export interface Article {
   rut_eligible: boolean
   pack_size: number | null
   pack_price: number | null
+  is_dosage_product: boolean
+  dosage_unit: DosageUnit | null
+  total_content: number | null
   created_at: string
   updated_at: string
 }
@@ -126,6 +134,9 @@ export interface CreateArticleInput {
   rut_eligible?: boolean
   pack_size?: number | null
   pack_price?: number | null
+  is_dosage_product?: boolean
+  dosage_unit?: DosageUnit | null
+  total_content?: number | null
 }
 
 /**
@@ -147,6 +158,9 @@ export interface UpdateArticleInput {
   rut_eligible?: boolean
   pack_size?: number | null
   pack_price?: number | null
+  is_dosage_product?: boolean
+  dosage_unit?: DosageUnit | null
+  total_content?: number | null
 }
 
 /**
@@ -323,6 +337,40 @@ export const getEffectivePrice = (
 /**
  * Generera artikelkod från namn
  */
+/**
+ * Konfiguration för doseringsenheter
+ */
+export const DOSAGE_UNIT_CONFIG: Record<DosageUnit, {
+  label: string
+  shortLabel: string
+}> = {
+  g: { label: 'Gram', shortLabel: 'g' },
+  ml: { label: 'Milliliter', shortLabel: 'ml' }
+}
+
+/**
+ * Beräkna doseringspris (pris per doseringsenhet × mängd)
+ */
+export const calculateDosagePrice = (
+  effectivePrice: number,
+  totalContent: number,
+  dosageAmount: number
+): number => {
+  if (totalContent <= 0) return 0
+  return (effectivePrice / totalContent) * dosageAmount
+}
+
+/**
+ * Beräkna pris per doseringsenhet
+ */
+export const calculatePricePerDosageUnit = (
+  effectivePrice: number,
+  totalContent: number
+): number => {
+  if (totalContent <= 0) return 0
+  return effectivePrice / totalContent
+}
+
 export const generateArticleCode = (name: string, category: ArticleCategory): string => {
   const prefix = {
     Inspektion: 'INS',

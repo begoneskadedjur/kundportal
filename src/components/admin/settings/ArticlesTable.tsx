@@ -20,7 +20,9 @@ import {
   PriceList,
   ARTICLE_CATEGORY_CONFIG,
   ARTICLE_UNIT_CONFIG,
+  DOSAGE_UNIT_CONFIG,
   formatArticlePrice,
+  calculatePricePerDosageUnit,
   getArticleGroups
 } from '../../../types/articles'
 
@@ -111,6 +113,11 @@ export function ArticlesTable({
                   <span className="text-xs text-slate-500 ml-1">+{article.vat_rate}%</span>
                   {article.pack_size && article.pack_size > 1 && article.pack_price && (
                     <p className="text-xs text-slate-500">{article.pack_size}-pack: {formatArticlePrice(article.pack_price)}</p>
+                  )}
+                  {article.is_dosage_product && article.total_content && article.dosage_unit && (
+                    <p className="text-xs text-[#20c58f]">
+                      {formatArticlePrice(calculatePricePerDosageUnit(article.default_price, article.total_content))}/{article.dosage_unit}
+                    </p>
                   )}
                 </div>
               </div>
@@ -393,6 +400,11 @@ export function ArticlesTable({
                         {article.pack_size && article.pack_size > 1 && article.pack_price && (
                           <p className="text-xs text-slate-500" title={`Leverantör säljer i ${article.pack_size}-pack för ${formatArticlePrice(article.pack_price)}`}>
                             {article.pack_size}-pack: {formatArticlePrice(article.pack_price)}
+                          </p>
+                        )}
+                        {article.is_dosage_product && article.total_content && article.dosage_unit && (
+                          <p className="text-xs text-[#20c58f]" title={`Doseringsprodukt: ${article.total_content}${article.dosage_unit} totalt`}>
+                            {formatArticlePrice(calculatePricePerDosageUnit(article.default_price, article.total_content))}/{article.dosage_unit}
                           </p>
                         )}
                       </div>

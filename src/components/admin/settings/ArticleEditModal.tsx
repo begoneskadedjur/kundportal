@@ -21,14 +21,17 @@ import {
   CreateArticleInput,
   ArticleUnit,
   ArticleCategory,
+  DosageUnit,
   PriceList,
   ARTICLE_UNITS,
   ARTICLE_CATEGORIES,
   ARTICLE_UNIT_CONFIG,
   ARTICLE_CATEGORY_CONFIG,
+  DOSAGE_UNIT_CONFIG,
   generateArticleCode,
   formatArticlePrice,
-  calculatePriceWithVat
+  calculatePriceWithVat,
+  calculatePricePerDosageUnit
 } from '../../../types/articles'
 import toast from 'react-hot-toast'
 
@@ -61,6 +64,9 @@ export function ArticleEditModal({
   const [rutEligible, setRutEligible] = useState(false)
   const [packSize, setPackSize] = useState('')
   const [packPrice, setPackPrice] = useState('')
+  const [isDosageProduct, setIsDosageProduct] = useState(false)
+  const [dosageUnit, setDosageUnit] = useState<DosageUnit>('g')
+  const [totalContent, setTotalContent] = useState('')
 
   // Gruppstate
   const [groups, setGroups] = useState<ArticleGroup[]>([])
@@ -121,6 +127,9 @@ export function ArticleEditModal({
       setRutEligible(article.rut_eligible ?? false)
       setPackSize(article.pack_size ? article.pack_size.toString() : '')
       setPackPrice(article.pack_price ? article.pack_price.toString() : '')
+      setIsDosageProduct(article.is_dosage_product ?? false)
+      setDosageUnit(article.dosage_unit ?? 'g')
+      setTotalContent(article.total_content ? article.total_content.toString() : '')
       setSelectedPriceListIds([]) // Vid redigering behåller vi inte prislista-val
     } else {
       // Återställ för ny
@@ -137,6 +146,9 @@ export function ArticleEditModal({
       setRutEligible(false)
       setPackSize('')
       setPackPrice('')
+      setIsDosageProduct(false)
+      setDosageUnit('g')
+      setTotalContent('')
       // selectedPriceListIds hanteras i loadPriceLists
     }
     setErrors({})
@@ -199,7 +211,10 @@ export function ArticleEditModal({
         rot_eligible: rotEligible,
         rut_eligible: rutEligible,
         pack_size: packSize ? parseInt(packSize) : null,
-        pack_price: packPrice ? parseFloat(packPrice) : null
+        pack_price: packPrice ? parseFloat(packPrice) : null,
+        is_dosage_product: isDosageProduct,
+        dosage_unit: isDosageProduct ? dosageUnit : null,
+        total_content: isDosageProduct && totalContent ? parseFloat(totalContent) : null
       }
 
       let savedArticle: Article
@@ -299,6 +314,8 @@ export function ArticleEditModal({
                         setSelectedGroupIds([])
                         setPackSize('')
                         setPackPrice('')
+                        setIsDosageProduct(false)
+                        setTotalContent('')
                       }
                     }}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -531,6 +548,76 @@ export function ArticleEditModal({
                 </p>
               )}
             </>
+          )}
+
+          {/* Dosering - dölj för Arbetstid */}
+          {category !== 'Arbetstid' && (
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isDosageProduct}
+                  onChange={(e) => {
+                    setIsDosageProduct(e.target.checked)
+                    if (!e.target.checked) {
+                      setTotalContent('')
+                    }
+                  }}
+                  className="w-5 h-5 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
+                />
+                <span className="text-white">Doseringsprodukt</span>
+                <span className="text-slate-500 text-sm">(doseras i gram eller ml)</span>
+              </label>
+
+              {isDosageProduct && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-1">
+                        Doseringsenhet
+                      </label>
+                      <select
+                        value={dosageUnit}
+                        onChange={(e) => setDosageUnit(e.target.value as DosageUnit)}
+                        className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                      >
+                        {(Object.keys(DOSAGE_UNIT_CONFIG) as DosageUnit[]).map(u => (
+                          <option key={u} value={u}>{DOSAGE_UNIT_CONFIG[u].label} ({u})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-1">
+                        Total mängd ({dosageUnit})
+                      </label>
+                      <input
+                        type="number"
+                        value={totalContent}
+                        onChange={(e) => setTotalContent(e.target.value)}
+                        placeholder={`T.ex. ${dosageUnit === 'g' ? '200' : '500'}`}
+                        min="0.1"
+                        step="any"
+                        className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                      />
+                    </div>
+                  </div>
+                  {defaultPrice && totalContent && parseFloat(totalContent) > 0 && (
+                    <div className="bg-[#20c58f]/10 rounded-lg p-3 border border-[#20c58f]/30">
+                      <p className="text-sm text-[#20c58f]">
+                        Beräknat doseringspris:{' '}
+                        <span className="font-semibold">
+                          {formatArticlePrice(calculatePricePerDosageUnit(parseFloat(defaultPrice), parseFloat(totalContent)))}
+                          /{dosageUnit}
+                        </span>
+                        <span className="text-slate-400 ml-2">
+                          (exkl. moms)
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
 
           {/* Enhet */}

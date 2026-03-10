@@ -135,7 +135,10 @@ export class ArticleService {
         sort_order: input.sort_order ?? 0,
         fortnox_article_id: input.fortnox_article_id || null,
         rot_eligible: input.rot_eligible ?? false,
-        rut_eligible: input.rut_eligible ?? false
+        rut_eligible: input.rut_eligible ?? false,
+        is_dosage_product: input.is_dosage_product ?? false,
+        dosage_unit: input.dosage_unit || null,
+        total_content: input.total_content ?? null
       })
       .select()
       .single()
@@ -163,6 +166,9 @@ export class ArticleService {
     if (input.recommended_price !== undefined) updateData.recommended_price = input.recommended_price
     if (input.rot_eligible !== undefined) updateData.rot_eligible = input.rot_eligible
     if (input.rut_eligible !== undefined) updateData.rut_eligible = input.rut_eligible
+    if (input.is_dosage_product !== undefined) updateData.is_dosage_product = input.is_dosage_product
+    if (input.dosage_unit !== undefined) updateData.dosage_unit = input.dosage_unit
+    if (input.total_content !== undefined) updateData.total_content = input.total_content
 
     const { data, error } = await supabase
       .from('articles')
