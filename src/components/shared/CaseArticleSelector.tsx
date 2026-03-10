@@ -1,7 +1,8 @@
 // src/components/shared/CaseArticleSelector.tsx
 // Komponent för tekniker att välja artiklar/tjänster för ett ärende
+// Visar fullständig artikelinformation: enhet, beskrivning, paketinfo, ROT/RUT (bara arbetstid)
 
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Package,
   Search,
@@ -9,11 +10,12 @@ import {
   Minus,
   Trash2,
   Percent,
-  Tag,
   AlertCircle,
   ChevronDown,
   ChevronRight,
-  RefreshCw
+  Loader2,
+  Clock,
+  ShieldCheck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { CaseBillingService } from '../../services/caseBillingService'
@@ -26,8 +28,7 @@ import type {
   CaseBillingSummary
 } from '../../types/caseBilling'
 import type { ArticleCategory } from '../../types/articles'
-import { ARTICLE_CATEGORY_CONFIG, ARTICLE_UNIT_CONFIG, formatArticlePrice } from '../../types/articles'
-import { formatPriceSource } from '../../types/caseBilling'
+import { ARTICLE_CATEGORY_CONFIG, ARTICLE_UNIT_CONFIG } from '../../types/articles'
 
 interface CaseArticleSelectorProps {
   caseId: string
@@ -40,6 +41,16 @@ interface CaseArticleSelectorProps {
   className?: string
 }
 
+const ALL_CATEGORIES: ArticleCategory[] = ['Inspektion', 'Bekämpning', 'Tillbehör', 'Arbetstid', 'Övrigt']
+
+const formatPrice = (price: number) =>
+  new Intl.NumberFormat('sv-SE', {
+    style: 'currency',
+    currency: 'SEK',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(price)
+
 export default function CaseArticleSelector({
   caseId,
   caseType,
@@ -50,17 +61,17 @@ export default function CaseArticleSelector({
   readOnly = false,
   className = ''
 }: CaseArticleSelectorProps) {
-  // State
   const [articles, setArticles] = useState<ArticleWithEffectivePrice[]>([])
   const [selectedItems, setSelectedItems] = useState<CaseBillingItemWithRelations[]>([])
   const [summary, setSummary] = useState<CaseBillingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [expandedCategories, setExpandedCategories] = useState<Set<ArticleCategory>>(new Set())
+  const [categoryFilter, setCategoryFilter] = useState<ArticleCategory | 'all'>('all')
+  const [expandedCategories, setExpandedCategories] = useState<Set<ArticleCategory>>(new Set(ALL_CATEGORIES))
   const [showArticleList, setShowArticleList] = useState(false)
+  const discountTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
-  // Ladda artiklar och befintliga items
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -69,14 +80,10 @@ export default function CaseArticleSelector({
         CaseBillingService.getCaseBillingItems(caseId, caseType),
         CaseBillingService.getCaseBillingSummary(caseId, caseType)
       ])
-
       setArticles(articlesData)
       setSelectedItems(itemsData)
       setSummary(summaryData)
-
-      if (onChange) {
-        onChange(itemsData, summaryData)
-      }
+      if (onChange) onChange(itemsData, summaryData)
     } catch (error) {
       console.error('Kunde inte ladda artikeldata:', error)
       toast.error('Kunde inte ladda artiklar')
@@ -89,41 +96,41 @@ export default function CaseArticleSelector({
     loadData()
   }, [loadData])
 
-  // Filtrera artiklar baserat på sökning
+  // Cleanup discount timers
+  useEffect(() => {
+    return () => {
+      Object.values(discountTimers.current).forEach(clearTimeout)
+    }
+  }, [])
+
+  // Filtrera artiklar
   const filteredArticles = articles.filter(item => {
     const search = searchTerm.toLowerCase()
-    return (
+    const matchesSearch = !search ||
       item.article.name.toLowerCase().includes(search) ||
       item.article.code.toLowerCase().includes(search) ||
-      item.article.category.toLowerCase().includes(search)
-    )
+      (item.article.description?.toLowerCase().includes(search) ?? false)
+    const matchesCategory = categoryFilter === 'all' || item.article.category === categoryFilter
+    return matchesSearch && matchesCategory
   })
 
-  // Gruppera artiklar per kategori
+  // Gruppera per kategori
   const articlesByCategory = filteredArticles.reduce((acc, item) => {
-    const category = item.article.category
-    if (!acc[category]) {
-      acc[category] = []
-    }
-    acc[category].push(item)
+    const cat = item.article.category
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push(item)
     return acc
-  }, {} as Record<ArticleCategory, ArticleWithEffectivePrice[]>)
+  }, {} as Partial<Record<ArticleCategory, ArticleWithEffectivePrice[]>>)
 
-  // Toggle kategori expansion
   const toggleCategory = (category: ArticleCategory) => {
-    const newExpanded = new Set(expandedCategories)
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category)
-    } else {
-      newExpanded.add(category)
-    }
-    setExpandedCategories(newExpanded)
+    const next = new Set(expandedCategories)
+    if (next.has(category)) next.delete(category)
+    else next.add(category)
+    setExpandedCategories(next)
   }
 
-  // Lägg till artikel
   const handleAddArticle = async (articleWithPrice: ArticleWithEffectivePrice) => {
     if (readOnly || saving) return
-
     setSaving(true)
     try {
       await CaseBillingService.addArticleToCase({
@@ -140,7 +147,6 @@ export default function CaseArticleSelector({
         added_by_technician_id: technicianId || undefined,
         added_by_technician_name: technicianName || undefined
       })
-
       toast.success(`${articleWithPrice.article.name} tillagd`)
       await loadData()
     } catch (error) {
@@ -151,13 +157,10 @@ export default function CaseArticleSelector({
     }
   }
 
-  // Uppdatera kvantitet
   const handleUpdateQuantity = async (item: CaseBillingItem, delta: number) => {
     if (readOnly || saving) return
-
     const newQuantity = item.quantity + delta
     if (newQuantity < 1) return
-
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(item.id, { quantity: newQuantity })
@@ -170,22 +173,15 @@ export default function CaseArticleSelector({
     }
   }
 
-  // Uppdatera rabatt
   const handleUpdateDiscount = async (item: CaseBillingItem, discountPercent: number) => {
     if (readOnly || saving) return
-
-    // Kolla om detta är en ny rabatt (tidigare ingen rabatt)
     const hadNoDiscount = item.discount_percent === 0
     const willHaveDiscount = discountPercent > 0
-
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(item.id, { discount_percent: discountPercent })
-
       if (willHaveDiscount) {
         toast.success('Rabatt tillagd - kräver admin-godkännande')
-
-        // Skicka notifikation till admins om detta är en ny rabatt
         if (hadNoDiscount) {
           DiscountNotificationService.notifyAdminsOfDiscountRequest({
             caseId,
@@ -194,12 +190,9 @@ export default function CaseArticleSelector({
             discountPercent,
             technicianId,
             technicianName
-          }).catch(err => {
-            console.warn('Kunde inte skicka rabatt-notifikation:', err)
-          })
+          }).catch(err => console.warn('Kunde inte skicka rabatt-notifikation:', err))
         }
       }
-
       await loadData()
     } catch (error) {
       console.error('Kunde inte uppdatera rabatt:', error)
@@ -209,10 +202,17 @@ export default function CaseArticleSelector({
     }
   }
 
-  // Ta bort artikel
+  // Debounced discount update
+  const handleDiscountChange = (item: CaseBillingItem, rawValue: string) => {
+    const value = Math.min(100, Math.max(0, parseInt(rawValue) || 0))
+    if (discountTimers.current[item.id]) clearTimeout(discountTimers.current[item.id])
+    discountTimers.current[item.id] = setTimeout(() => {
+      handleUpdateDiscount(item, value)
+    }, 600)
+  }
+
   const handleRemoveArticle = async (itemId: string) => {
     if (readOnly || saving) return
-
     setSaving(true)
     try {
       await CaseBillingService.removeCaseArticle(itemId)
@@ -226,139 +226,195 @@ export default function CaseArticleSelector({
     }
   }
 
-  // Formatera pris
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('sv-SE', {
-      style: 'currency',
-      currency: 'SEK',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(price)
+  // Hitta artikeldata för en vald item (för att visa enhet etc.)
+  const getArticleForItem = (item: CaseBillingItemWithRelations) => {
+    if (item.article) return item.article
+    return articles.find(a => a.article.id === item.article_id)?.article ?? null
   }
 
   if (loading) {
     return (
-      <div className={`bg-slate-800/50 rounded-lg p-4 ${className}`}>
-        <div className="flex items-center justify-center py-8">
-          <RefreshCw className="w-6 h-6 text-slate-400 animate-spin" />
-          <span className="ml-2 text-slate-400">Laddar artiklar...</span>
+      <div className={`p-3 bg-slate-800/30 border border-slate-700 rounded-xl ${className}`}>
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+          <span className="ml-2 text-sm text-slate-400">Laddar artiklar...</span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`bg-slate-800/50 rounded-lg ${className}`}>
+    <div className={`p-3 bg-slate-800/30 border border-slate-700 rounded-xl ${className}`}>
       {/* Header */}
-      <div className="p-4 border-b border-slate-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Package className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-semibold text-white">
-              Utförda tjänster & artiklar
-            </h3>
-            {selectedItems.length > 0 && (
-              <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-400">
-                {selectedItems.length} st
-              </span>
-            )}
-          </div>
-          {!readOnly && (
-            <button
-              onClick={() => setShowArticleList(!showArticleList)}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Lägg till
-            </button>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <Package className="w-4 h-4 text-[#20c58f]" />
+          <h3 className="text-sm font-semibold text-white">Produkter & tjänster</h3>
+          {selectedItems.length > 0 && (
+            <span className="px-1.5 py-0.5 text-xs rounded-full bg-[#20c58f]/20 text-[#20c58f]">
+              {selectedItems.length}
+            </span>
           )}
         </div>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => setShowArticleList(!showArticleList)}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-[#20c58f] hover:bg-[#1bb07e] text-white rounded-lg transition-colors"
+          >
+            {showArticleList ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <Plus className="w-3.5 h-3.5" />
+            )}
+            {showArticleList ? 'Stäng' : 'Lägg till'}
+          </button>
+        )}
       </div>
 
       {/* Artikelväljare (expanderbar) */}
       {showArticleList && !readOnly && (
-        <div className="p-4 border-b border-slate-700 bg-slate-900/50">
+        <div className="mb-3 p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
           {/* Sökfält */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="relative mb-2">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Sök artikel..."
+              placeholder="Sök artikel (namn, kod, beskrivning)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+              className="w-full pl-8 pr-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
             />
           </div>
 
-          {/* Artikellista grupperad per kategori */}
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {(Object.keys(articlesByCategory) as ArticleCategory[]).map(category => {
-              const categoryArticles = articlesByCategory[category]
-              if (!categoryArticles || categoryArticles.length === 0) return null
+          {/* Kategorifilter */}
+          <div className="flex flex-wrap gap-1 mb-2">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('all')}
+              className={`px-2 py-0.5 text-xs rounded-md transition-colors ${
+                categoryFilter === 'all'
+                  ? 'bg-[#20c58f] text-white'
+                  : 'bg-slate-700/50 text-slate-400 hover:text-white'
+              }`}
+            >
+              Alla
+            </button>
+            {ALL_CATEGORIES.map(cat => {
+              const config = ARTICLE_CATEGORY_CONFIG[cat]
+              const count = articles.filter(a => a.article.category === cat).length
+              if (count === 0) return null
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategoryFilter(cat)}
+                  className={`px-2 py-0.5 text-xs rounded-md transition-colors ${
+                    categoryFilter === cat
+                      ? 'bg-[#20c58f] text-white'
+                      : 'bg-slate-700/50 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {config.label} ({count})
+                </button>
+              )
+            })}
+          </div>
 
+          {/* Artikellista */}
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
+            {(Object.keys(articlesByCategory) as ArticleCategory[]).map(category => {
+              const items = articlesByCategory[category]
+              if (!items || items.length === 0) return null
               const isExpanded = expandedCategories.has(category)
               const config = ARTICLE_CATEGORY_CONFIG[category]
 
               return (
-                <div key={category} className="border border-slate-700 rounded-lg overflow-hidden">
+                <div key={category} className="border border-slate-700/50 rounded-lg overflow-hidden">
                   <button
+                    type="button"
                     onClick={() => toggleCategory(category)}
-                    className="w-full flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 transition-colors"
+                    className="w-full flex items-center justify-between px-3 py-2 bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-slate-400" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-slate-400" />
-                      )}
-                      <span className={`px-2 py-0.5 text-xs rounded ${config.bgColor} ${config.color}`}>
+                      {isExpanded
+                        ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                        : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                      }
+                      <span className={`px-1.5 py-0.5 text-xs rounded ${config.bgColor} ${config.color}`}>
                         {config.label}
                       </span>
-                      <span className="text-sm text-slate-400">
-                        ({categoryArticles.length} artiklar)
+                      <span className="text-xs text-slate-500">
+                        {items.length} {items.length === 1 ? 'artikel' : 'artiklar'}
                       </span>
                     </div>
                   </button>
 
                   {isExpanded && (
-                    <div className="divide-y divide-slate-700/50">
-                      {categoryArticles.map(item => (
-                        <div
-                          key={item.article.id}
-                          className="flex items-center justify-between p-3 hover:bg-slate-800/30 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-white font-medium truncate">
-                                {item.article.name}
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                {item.article.code}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-blue-400 font-medium">
-                                {formatPrice(item.effective_price)}
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                / {ARTICLE_UNIT_CONFIG[item.article.unit].shortLabel}
-                              </span>
-                              {item.price_source === 'customer_list' && (
-                                <span className="px-1.5 py-0.5 text-xs rounded bg-green-500/20 text-green-400">
-                                  Kundpris
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleAddArticle(item)}
-                            disabled={saving}
-                            className="ml-2 p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors disabled:opacity-50"
+                    <div className="divide-y divide-slate-700/30">
+                      {items.map(item => {
+                        const unit = ARTICLE_UNIT_CONFIG[item.article.unit]
+                        const hasPack = item.article.pack_size && item.article.pack_price
+                        const showRotRut = item.article.category === 'Arbetstid' &&
+                          (item.article.rot_eligible || item.article.rut_eligible)
+
+                        return (
+                          <div
+                            key={item.article.id}
+                            className="flex items-start justify-between px-3 py-2 hover:bg-slate-800/20 transition-colors"
                           >
-                            <Plus className="w-5 h-5" />
-                          </button>
-                        </div>
-                      ))}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-sm text-white font-medium truncate">
+                                  {item.article.name}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {item.article.code}
+                                </span>
+                                {showRotRut && (
+                                  <span className="flex items-center gap-0.5 px-1 py-0.5 text-[10px] rounded bg-emerald-500/20 text-emerald-400">
+                                    <ShieldCheck className="w-3 h-3" />
+                                    {item.article.rot_eligible ? 'ROT' : 'RUT'}
+                                  </span>
+                                )}
+                              </div>
+
+                              {item.article.description && (
+                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                                  {item.article.description}
+                                </p>
+                              )}
+
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className="text-[#20c58f] text-sm font-medium">
+                                  {formatPrice(item.effective_price)}
+                                </span>
+                                <span className="text-[10px] text-slate-500">
+                                  / {unit.shortLabel}
+                                </span>
+                                {hasPack && (
+                                  <span className="text-[10px] text-slate-500">
+                                    Fp: {item.article.pack_size} st — {formatPrice(item.article.pack_price!)} /fp
+                                  </span>
+                                )}
+                                {item.price_source === 'customer_list' && (
+                                  <span className="px-1 py-0.5 text-[10px] rounded bg-green-500/20 text-green-400">
+                                    Kundpris
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleAddArticle(item)}
+                              disabled={saving}
+                              className="ml-2 p-1.5 text-[#20c58f] hover:bg-[#20c58f]/20 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -366,8 +422,8 @@ export default function CaseArticleSelector({
             })}
 
             {Object.keys(articlesByCategory).length === 0 && (
-              <div className="text-center py-4 text-slate-400">
-                Inga artiklar hittades
+              <div className="text-center py-4 text-sm text-slate-500">
+                Inga artiklar matchar sökningen
               </div>
             )}
           </div>
@@ -375,148 +431,158 @@ export default function CaseArticleSelector({
       )}
 
       {/* Valda artiklar */}
-      <div className="p-4">
-        {selectedItems.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
-            <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Inga artiklar tillagda</p>
-            {!readOnly && (
-              <p className="text-sm mt-1">Klicka på "Lägg till" för att välja artiklar</p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {selectedItems.map(item => (
+      {selectedItems.length === 0 ? (
+        <div className="text-center py-4">
+          <Package className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+          <p className="text-sm text-slate-500">Inga artiklar tillagda</p>
+          {!readOnly && (
+            <p className="text-xs text-slate-600 mt-0.5">Klicka "Lägg till" för att välja produkter & tjänster</p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {selectedItems.map(item => {
+            const article = getArticleForItem(item)
+            const unitLabel = article ? ARTICLE_UNIT_CONFIG[article.unit].shortLabel : 'st'
+            const isTimeUnit = article?.unit === 'timme'
+
+            return (
               <div
                 key={item.id}
-                className={`p-3 rounded-lg border ${
+                className={`px-3 py-2 rounded-xl border ${
                   item.requires_approval
-                    ? 'border-orange-500/50 bg-orange-500/10'
-                    : 'border-slate-700 bg-slate-800/30'
+                    ? 'border-orange-500/50 bg-orange-500/5'
+                    : 'border-slate-700/50 bg-slate-800/20'
                 }`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-medium">{item.article_name}</span>
+                    {/* Artikelnamn + badges */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {isTimeUnit && <Clock className="w-3.5 h-3.5 text-orange-400 shrink-0" />}
+                      <span className="text-sm text-white font-medium">{item.article_name}</span>
                       {item.article_code && (
-                        <span className="text-xs text-slate-500">{item.article_code}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">{item.article_code}</span>
+                      )}
+                      {item.price_source === 'customer_list' && (
+                        <span className="px-1 py-0.5 text-[10px] rounded bg-green-500/20 text-green-400">
+                          Kundpris
+                        </span>
                       )}
                       {item.requires_approval && (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-orange-500/20 text-orange-400">
+                        <span className="flex items-center gap-0.5 px-1 py-0.5 text-[10px] rounded bg-orange-500/20 text-orange-400">
                           <AlertCircle className="w-3 h-3" />
                           Kräver godkännande
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-4 mt-2 text-sm">
+                    {/* Kontroller: kvantitet, pris, rabatt */}
+                    <div className="flex items-center gap-3 mt-1.5 text-sm flex-wrap">
                       {/* Kvantitet */}
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5">
                         {!readOnly && (
                           <button
+                            type="button"
                             onClick={() => handleUpdateQuantity(item, -1)}
                             disabled={saving || item.quantity <= 1}
-                            className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
+                            className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
                           >
-                            <Minus className="w-4 h-4" />
+                            <Minus className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <span className="w-8 text-center text-white">{item.quantity}</span>
+                        <span className="w-7 text-center text-white text-sm">{item.quantity}</span>
                         {!readOnly && (
                           <button
+                            type="button"
                             onClick={() => handleUpdateQuantity(item, 1)}
                             disabled={saving}
-                            className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
+                            className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
                           >
-                            <Plus className="w-4 h-4" />
+                            <Plus className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <span className="text-slate-500 ml-1">st</span>
+                        <span className="text-xs text-slate-500 ml-0.5">{unitLabel}</span>
                       </div>
 
-                      {/* Pris */}
-                      <div className="flex items-center gap-1 text-slate-400">
-                        <Tag className="w-4 h-4" />
-                        <span>{formatPrice(item.unit_price)}</span>
-                        {item.price_source === 'customer_list' && (
-                          <span className="text-xs text-green-400">(Kundpris)</span>
-                        )}
-                      </div>
+                      <span className="text-slate-600">×</span>
+
+                      {/* Enhetspris */}
+                      <span className="text-sm text-slate-400">
+                        {formatPrice(item.unit_price)}
+                      </span>
 
                       {/* Rabatt */}
                       {!readOnly && (
-                        <div className="flex items-center gap-1">
-                          <Percent className="w-4 h-4 text-slate-400" />
+                        <div className="flex items-center gap-0.5">
+                          <Percent className="w-3.5 h-3.5 text-slate-500" />
                           <input
                             type="number"
                             min="0"
                             max="100"
-                            value={item.discount_percent}
-                            onChange={(e) => {
-                              const value = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
-                              handleUpdateDiscount(item, value)
-                            }}
+                            defaultValue={item.discount_percent}
+                            onChange={(e) => handleDiscountChange(item, e.target.value)}
                             disabled={saving}
-                            className="w-16 px-2 py-1 text-sm bg-slate-700 border border-slate-600 rounded text-white text-center focus:outline-none focus:border-blue-500"
+                            className="w-12 px-1.5 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-white text-center focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                           />
-                          <span className="text-slate-500">%</span>
+                          <span className="text-xs text-slate-500">%</span>
                         </div>
                       )}
                       {readOnly && item.discount_percent > 0 && (
-                        <span className="text-orange-400">-{item.discount_percent}%</span>
+                        <span className="text-xs text-orange-400">-{item.discount_percent}%</span>
                       )}
                     </div>
                   </div>
 
-                  {/* Totalpris och ta bort */}
-                  <div className="flex items-center gap-3 ml-4">
-                    <span className="text-lg font-semibold text-blue-400">
+                  {/* Totalpris + ta bort */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-semibold text-[#20c58f]">
                       {formatPrice(item.total_price)}
                     </span>
                     {!readOnly && (
                       <button
+                        type="button"
                         onClick={() => handleRemoveArticle(item.id)}
                         disabled={saving}
-                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-1 text-red-400/70 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Summering */}
       {summary && selectedItems.length > 0 && (
-        <div className="p-4 border-t border-slate-700 bg-slate-900/30">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-slate-400">
-              <span>{summary.item_count} artikel{summary.item_count !== 1 ? 'ar' : ''}</span>
+        <div className="mt-3 pt-2 border-t border-slate-700/50">
+          <div className="flex items-end justify-between">
+            <div className="text-xs text-slate-500">
+              {summary.item_count} artikel{summary.item_count !== 1 ? 'ar' : ''}
               {summary.total_discount > 0 && (
-                <span className="ml-2 text-orange-400">
-                  (Rabatt: {formatPrice(summary.total_discount)})
+                <span className="ml-1.5 text-orange-400">
+                  Rabatt: -{formatPrice(summary.total_discount)}
                 </span>
               )}
             </div>
             <div className="text-right">
-              <div className="text-sm text-slate-400">
+              <div className="text-xs text-slate-500">
                 Exkl. moms: {formatPrice(summary.subtotal)}
               </div>
-              <div className="text-lg font-bold text-white">
-                Totalt: {formatPrice(summary.total_amount)}
-                <span className="text-sm font-normal text-slate-400 ml-1">inkl. moms</span>
+              <div className="text-sm font-bold text-white">
+                {formatPrice(summary.total_amount)}
+                <span className="text-xs font-normal text-slate-500 ml-1">inkl. moms</span>
               </div>
             </div>
           </div>
           {summary.requires_approval && (
-            <div className="mt-2 flex items-center gap-2 text-orange-400 text-sm">
-              <AlertCircle className="w-4 h-4" />
-              <span>En eller flera artiklar har rabatt och kräver admin-godkännande</span>
+            <div className="mt-1.5 flex items-center gap-1.5 text-orange-400 text-xs">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>Rabatt kräver admin-godkännande innan fakturering</span>
             </div>
           )}
         </div>

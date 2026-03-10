@@ -92,6 +92,8 @@ interface TechnicianCase {
   r_servicebil?: number;
   // Rapport
   rapport?: string;
+  // Kund-koppling
+  customer_id?: string | null;
   // Följeärende-fält
   parent_case_id?: string | null;
   created_by_technician_id?: string | null;
@@ -1582,6 +1584,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 <CaseArticleSelector
                   caseId={currentCase.id}
                   caseType={currentCase.case_type === 'private' ? 'private' : 'business'}
+                  customerId={currentCase.customer_id}
                   technicianId={currentCase.primary_assignee_id || undefined}
                   technicianName={currentCase.primary_assignee_name || undefined}
                 />
