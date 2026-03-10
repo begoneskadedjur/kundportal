@@ -81,8 +81,8 @@ export default function CaseArticleSelector({
   const discountTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const dosageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const loadData = useCallback(async (showLoader = false) => {
+    if (showLoader) setLoading(true)
     try {
       const [articlesData, itemsData, summaryData] = await Promise.all([
         CaseBillingService.getArticlesWithPrices(customerId),
@@ -102,7 +102,7 @@ export default function CaseArticleSelector({
   }, [caseId, caseType, customerId, onChange])
 
   useEffect(() => {
-    loadData()
+    loadData(true)
   }, [loadData])
 
   // Cleanup timers
@@ -642,7 +642,7 @@ export default function CaseArticleSelector({
         <div className="mt-3 pt-2 border-t border-slate-700/50">
           <div className="flex items-end justify-between">
             <div className="text-xs text-slate-500">
-              {summary.item_count} artikel{summary.item_count !== 1 ? 'ar' : ''}
+              {summary.item_count} {summary.item_count === 1 ? 'artikel' : 'artiklar'}
               {summary.total_discount > 0 && (
                 <span className="ml-1.5 text-orange-400">
                   Rabatt: -{formatPrice(summary.total_discount)}
