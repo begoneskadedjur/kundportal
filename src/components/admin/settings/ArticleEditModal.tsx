@@ -566,7 +566,7 @@ export function ArticleEditModal({
                   className="w-5 h-5 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                 />
                 <span className="text-white">Doseringsprodukt</span>
-                <span className="text-slate-500 text-sm">(doseras i gram eller ml)</span>
+                <span className="text-slate-500 text-sm">(doseras i gram, ml eller meter)</span>
               </label>
 
               {isDosageProduct && (
