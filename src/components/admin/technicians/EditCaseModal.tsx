@@ -15,7 +15,7 @@ import toast from 'react-hot-toast'
 import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
-import "react-datepicker/dist/react-datepicker.css"
+import "../../../styles/DatePickerDarkTheme.css"
 
 // Rapport funktionalitet
 import WorkReportDropdown from '../../shared/WorkReportDropdown'
@@ -918,33 +918,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     }
   };
 
-  // Fix React-DatePicker z-index conflicts when using Portal
-  // IMPORTANT: All hooks must be called before any conditional returns
-  useEffect(() => {
-    if (isOpen && currentCase) {
-      const portalStyles = document.createElement('style');
-      portalStyles.id = 'edit-case-modal-portal-styles';
-      portalStyles.textContent = `
-        .react-datepicker-popper {
-          z-index: 10000 !important;
-        }
-        .react-datepicker {
-          z-index: 10000 !important;
-        }
-        .react-datepicker__portal {
-          z-index: 10000 !important;
-        }
-      `;
-      document.head.appendChild(portalStyles);
-      
-      return () => {
-        const existingStyles = document.getElementById('edit-case-modal-portal-styles');
-        if (existingStyles && document.head.contains(existingStyles)) {
-          document.head.removeChild(existingStyles);
-        }
-      };
-    }
-  }, [isOpen, currentCase]);
+  // z-index for datepicker now handled in DatePickerDarkTheme.css
 
   if (!currentCase) return null;
   
