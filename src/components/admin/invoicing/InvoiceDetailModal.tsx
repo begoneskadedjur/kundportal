@@ -1,5 +1,5 @@
 // src/components/admin/invoicing/InvoiceDetailModal.tsx
-// Modal för att visa och hantera fakturadetaljer
+// Modal för att visa och hantera fakturadetaljer med ärendekontext och kommunikation
 
 import { useState, useEffect } from 'react'
 import {
@@ -18,13 +18,27 @@ import {
   XCircle,
   Download,
   RefreshCw,
-  Percent
+  Bug,
+  Users,
+  Clock,
+  ClipboardCheck,
+  ChevronDown,
+  ChevronUp,
+  MessageSquare
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { InvoiceService } from '../../../services/invoiceService'
-import type { InvoiceWithItems, InvoiceStatus, InvoiceItem } from '../../../types/invoice'
+import type { InvoiceWithItems, InvoiceStatus } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import { calculateRotRutDeduction, ROT_RUT_PERCENT } from '../../../types/caseBilling'
+import { useCaseContext } from '../../../hooks/useCaseContext'
+import { formatSwedishDateTime } from '../../../types/database'
+import CommentSection from '../../communication/CommentSection'
+import CaseContextImagePreview from '../../communication/CaseContextImagePreview'
+import EmbeddedMapPreview from '../../communication/EmbeddedMapPreview'
+import { createSystemComment } from '../../../services/communicationService'
+import { useAuth } from '../../../contexts/AuthContext'
+import type { CaseType } from '../../../types/communication'
 
 interface InvoiceDetailModalProps {
   isOpen: boolean
@@ -39,9 +53,17 @@ export default function InvoiceDetailModal({
   invoiceId,
   onStatusChange
 }: InvoiceDetailModalProps) {
+  const { user, profile } = useAuth()
   const [invoice, setInvoice] = useState<InvoiceWithItems | null>(null)
   const [loading, setLoading] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [contextExpanded, setContextExpanded] = useState(false)
+
+  // Hämta ärendekontext via case_id/case_type
+  const { caseContext, isLoading: contextLoading } = useCaseContext(
+    isOpen && invoice ? invoice.case_id : null,
+    isOpen && invoice ? (invoice.case_type as CaseType) : null
+  )
 
   // Ladda fakturadata
   useEffect(() => {
@@ -49,6 +71,11 @@ export default function InvoiceDetailModal({
       loadInvoice()
     }
   }, [isOpen, invoiceId])
+
+  // Reset context expanded on close
+  useEffect(() => {
+    if (!isOpen) setContextExpanded(false)
+  }, [isOpen])
 
   const loadInvoice = async () => {
     if (!invoiceId) return
@@ -65,13 +92,31 @@ export default function InvoiceDetailModal({
     }
   }
 
-  // Hantera statusändring
+  // Hantera statusändring + logga system-event
   const handleStatusChange = async (newStatus: InvoiceStatus) => {
     if (!invoice) return
 
     setUpdating(true)
     try {
       await InvoiceService.updateInvoiceStatus(invoice.id, newStatus)
+
+      // Logga statusändring i ärendets kommunikationspanel
+      if (user && invoice.case_id) {
+        const authorName = profile?.display_name || profile?.technicians?.name || profile?.email || 'Okänd'
+        try {
+          await createSystemComment(
+            invoice.case_id,
+            invoice.case_type as CaseType,
+            'status_change',
+            `Fakturastatus ändrad till "${INVOICE_STATUS_CONFIG[newStatus].label}" (${invoice.invoice_number})`,
+            user.id,
+            authorName
+          )
+        } catch (err) {
+          console.warn('Kunde inte logga statusändring:', err)
+        }
+      }
+
       toast.success('Status uppdaterad')
       await loadInvoice()
       onStatusChange?.()
@@ -113,14 +158,14 @@ export default function InvoiceDetailModal({
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-3xl max-h-[90vh] bg-slate-900 rounded-xl shadow-2xl border border-slate-700 overflow-hidden">
+      {/* Modal — bredare för split-view */}
+      <div className="relative w-full max-w-6xl max-h-[92vh] bg-slate-900 rounded-xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/50">
+        <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/50">
           <div className="flex items-center gap-3">
-            <FileText className="w-6 h-6 text-blue-400" />
+            <FileText className="w-5 h-5 text-blue-400" />
             <div>
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-base font-semibold text-white">
                 Faktura {invoice?.invoice_number || '...'}
               </h2>
               {invoice && statusConfig && (
@@ -138,226 +183,436 @@ export default function InvoiceDetailModal({
           </button>
         </div>
 
-        {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-8rem)]">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="w-6 h-6 text-slate-400 animate-spin" />
-              <span className="ml-2 text-slate-400">Laddar...</span>
-            </div>
-          ) : invoice ? (
-            <div className="p-6 space-y-6">
-              {/* Kundinformation */}
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-slate-400 mb-3">Kundinformation</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-start gap-2">
-                    <User className="w-4 h-4 text-slate-400 mt-0.5" />
-                    <div>
-                      <div className="text-white font-medium">{invoice.customer_name}</div>
-                      {invoice.organization_number && (
-                        <div className="text-xs text-slate-400">Org.nr: {invoice.organization_number}</div>
-                      )}
-                    </div>
-                  </div>
-                  {invoice.customer_email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-slate-400" />
-                      <span className="text-slate-300">{invoice.customer_email}</span>
-                    </div>
-                  )}
-                  {invoice.customer_phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-slate-400" />
-                      <span className="text-slate-300">{invoice.customer_phone}</span>
-                    </div>
-                  )}
-                  {invoice.customer_address && (
+        {/* Content — split-view desktop, stacked mobile */}
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
+          {/* Vänster: Fakturadetaljer */}
+          <div className="flex-1 min-h-0 overflow-y-auto lg:border-r lg:border-slate-700">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="w-6 h-6 text-slate-400 animate-spin" />
+                <span className="ml-2 text-slate-400">Laddar...</span>
+              </div>
+            ) : invoice ? (
+              <div className="p-4 space-y-4">
+                {/* Kundinformation */}
+                <div className="bg-slate-800/50 rounded-lg p-3">
+                  <h3 className="text-xs font-medium text-slate-400 mb-2">Kundinformation</h3>
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
-                      <span className="text-slate-300">{invoice.customer_address}</span>
-                    </div>
-                  )}
-                  {invoice.fastighetsbeteckning && (
-                    <div className="flex items-start gap-2">
-                      <Building2 className="w-4 h-4 text-slate-400 mt-0.5" />
+                      <User className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
                       <div>
-                        <div className="text-xs text-slate-400">Fastighetsbeteckning</div>
-                        <div className="text-white">{invoice.fastighetsbeteckning}</div>
+                        <div className="text-sm text-white font-medium">{invoice.customer_name}</div>
+                        {invoice.organization_number && (
+                          <div className="text-xs text-slate-400">Org.nr: {invoice.organization_number}</div>
+                        )}
                       </div>
                     </div>
-                  )}
+                    {invoice.customer_email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-sm text-slate-300 truncate">{invoice.customer_email}</span>
+                      </div>
+                    )}
+                    {invoice.customer_phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-sm text-slate-300">{invoice.customer_phone}</span>
+                      </div>
+                    )}
+                    {invoice.customer_address && (
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
+                        <span className="text-sm text-slate-300">{invoice.customer_address}</span>
+                      </div>
+                    )}
+                    {invoice.fastighetsbeteckning && (
+                      <div className="flex items-start gap-2">
+                        <Building2 className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
+                        <div>
+                          <div className="text-xs text-slate-400">Fastighetsbeteckning</div>
+                          <div className="text-sm text-white">{invoice.fastighetsbeteckning}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Datum */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-slate-800/50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
-                    <Calendar className="w-4 h-4" />
-                    Skapad
+                {/* Datum — kompakt */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-slate-800/50 rounded-lg p-3">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Skapad
+                    </div>
+                    <div className="text-sm text-white font-medium">{formatInvoiceDate(invoice.created_at)}</div>
                   </div>
-                  <div className="text-white font-medium">{formatInvoiceDate(invoice.created_at)}</div>
+                  <div className={`rounded-lg p-3 ${isOverdue ? 'bg-red-500/20' : 'bg-slate-800/50'}`}>
+                    <div className={`flex items-center gap-1.5 text-xs mb-1 ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
+                      <Calendar className="w-3.5 h-3.5" />
+                      Förfaller
+                    </div>
+                    <div className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-white'}`}>
+                      {formatInvoiceDate(invoice.due_date)}
+                      {isOverdue && <span className="text-xs ml-1">(Förfallen)</span>}
+                    </div>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-1">
+                      <Building2 className="w-3.5 h-3.5" />
+                      Ärendetyp
+                    </div>
+                    <div className="text-sm text-white font-medium">
+                      {invoice.case_type === 'private' ? 'Privatperson' : 'Företag'}
+                    </div>
+                  </div>
                 </div>
-                <div className={`rounded-lg p-4 ${isOverdue ? 'bg-red-500/20' : 'bg-slate-800/50'}`}>
-                  <div className={`flex items-center gap-2 text-sm mb-1 ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
-                    <Calendar className="w-4 h-4" />
-                    Förfaller
-                  </div>
-                  <div className={`font-medium ${isOverdue ? 'text-red-400' : 'text-white'}`}>
-                    {formatInvoiceDate(invoice.due_date)}
-                    {isOverdue && <span className="text-xs ml-1">(Förfallen)</span>}
-                  </div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
-                    <Building2 className="w-4 h-4" />
-                    Ärendetyp
-                  </div>
-                  <div className="text-white font-medium">
-                    {invoice.case_type === 'private' ? 'Privatperson' : 'Företag'}
-                  </div>
-                </div>
-              </div>
 
-              {/* Fakturarader */}
-              <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-                <div className="p-4 border-b border-slate-700">
-                  <h3 className="text-sm font-medium text-slate-400">Fakturarader</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-900/50">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-400">Artikel</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-400">Antal</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-400">Pris</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-400">Rabatt</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-400">Moms</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-400">Summa</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-700/50">
-                      {invoice.items.map(item => (
-                        <tr key={item.id}>
-                          <td className="px-4 py-3">
-                            <div className="text-white">{item.article_name}</div>
-                            {item.article_code && (
-                              <div className="text-xs text-slate-500">{item.article_code}</div>
-                            )}
-                            {item.rot_rut_type && (
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="px-1.5 py-0.5 text-[10px] rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
-                                  {item.rot_rut_type} ({ROT_RUT_PERCENT[item.rot_rut_type]}%)
-                                </span>
-                                {item.fastighetsbeteckning && (
-                                  <span className="text-[10px] text-slate-500">
-                                    Fastighet: {item.fastighetsbeteckning}
+                {/* Fakturarader */}
+                <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 border-b border-slate-700">
+                    <h3 className="text-xs font-medium text-slate-400">Fakturarader</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-slate-900/50">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-400">Artikel</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-slate-400">Antal</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-slate-400">Pris</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-slate-400">Rabatt</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-slate-400">Moms</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-slate-400">Summa</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/50">
+                        {invoice.items.map(item => (
+                          <tr key={item.id}>
+                            <td className="px-3 py-2">
+                              <div className="text-sm text-white">{item.article_name}</div>
+                              {item.article_code && (
+                                <div className="text-xs text-slate-500">{item.article_code}</div>
+                              )}
+                              {item.rot_rut_type && (
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
+                                    {item.rot_rut_type} ({ROT_RUT_PERCENT[item.rot_rut_type]}%)
                                   </span>
-                                )}
+                                  {item.fastighetsbeteckning && (
+                                    <span className="text-[10px] text-slate-500">
+                                      Fastighet: {item.fastighetsbeteckning}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right text-sm text-slate-300">{item.quantity}</td>
+                            <td className="px-3 py-2 text-right text-sm text-slate-300">
+                              {formatInvoiceAmount(item.unit_price)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-sm">
+                              {item.discount_percent > 0 ? (
+                                <span className="text-orange-400">-{item.discount_percent}%</span>
+                              ) : (
+                                <span className="text-slate-500">-</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right text-sm text-slate-400">
+                              {item.vat_rate}%
+                            </td>
+                            <td className="px-3 py-2 text-right text-sm text-white font-medium">
+                              {formatInvoiceAmount(item.total_price)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Summering */}
+                <div className="bg-slate-800/50 rounded-lg p-3">
+                  {(() => {
+                    const rotRutDeduction = invoice.items.reduce((sum, item) =>
+                      sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type), 0)
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-sm text-slate-400">
+                          <span>Summa exkl. moms</span>
+                          <span className="text-white">{formatInvoiceAmount(invoice.subtotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-slate-400">
+                          <span>Moms</span>
+                          <span className="text-white">{formatInvoiceAmount(invoice.vat_amount)}</span>
+                        </div>
+                        <div className="pt-2 border-t border-slate-700 flex justify-between items-baseline">
+                          <span className="text-sm font-semibold text-white">Totalt</span>
+                          <span className="text-xl font-bold text-emerald-400">
+                            {formatInvoiceAmount(invoice.total_amount)}
+                          </span>
+                        </div>
+                        {rotRutDeduction > 0 && (
+                          <>
+                            <div className="flex justify-between text-sm text-[#20c58f]">
+                              <span>{invoice.rot_rut_type}-avdrag ({ROT_RUT_PERCENT[invoice.rot_rut_type!]}%)</span>
+                              <span>-{formatInvoiceAmount(rotRutDeduction)}</span>
+                            </div>
+                            <div className="pt-2 border-t border-slate-700 flex justify-between items-baseline">
+                              <span className="text-sm font-semibold text-[#20c58f]">Att betala efter avdrag</span>
+                              <span className="text-xl font-bold text-[#20c58f]">
+                                {formatInvoiceAmount(invoice.total_amount - rotRutDeduction)}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                {/* Varning om rabatt kräver godkännande */}
+                {invoice.requires_approval && invoice.status === 'pending_approval' && (
+                  <div className="flex items-start gap-3 p-3 bg-orange-500/20 border border-orange-500/30 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-sm font-medium text-orange-400">Rabatt kräver godkännande</div>
+                      <p className="text-xs text-orange-300 mt-0.5">
+                        Fakturan innehåller rabatterade artiklar och måste godkännas innan den kan skickas.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Anteckningar */}
+                {invoice.notes && (
+                  <div className="bg-slate-800/50 rounded-lg p-3">
+                    <h3 className="text-xs font-medium text-slate-400 mb-1.5">Anteckningar</h3>
+                    <p className="text-sm text-slate-300">{invoice.notes}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-slate-400">
+                Faktura hittades inte
+              </div>
+            )}
+          </div>
+
+          {/* Höger: Ärendekontext + Kommunikation */}
+          {invoice && (
+            <div className="lg:w-[400px] flex-shrink-0 flex flex-col min-h-0 border-t lg:border-t-0 border-slate-700">
+              {/* Desktop: always visible context + comm */}
+              <div className="hidden lg:flex lg:flex-col lg:h-full lg:min-h-0">
+                {/* Ärendekontext — scrollbar topp-del */}
+                <div className="flex-shrink-0 max-h-[45%] overflow-y-auto border-b border-slate-700">
+                  {contextLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
+                    </div>
+                  ) : caseContext ? (
+                    <div className="p-3 space-y-3">
+                      {/* Ärendetitel + status */}
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-100 truncate">{caseContext.title}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                            style={{
+                              backgroundColor: `${caseContext.statusColor}20`,
+                              color: caseContext.statusColor
+                            }}
+                          >
+                            {caseContext.status}
+                          </span>
+                          {caseContext.pestType && (
+                            <span className="inline-flex items-center gap-1 text-xs text-orange-400">
+                              <Bug className="w-3 h-3" />
+                              {caseContext.pestType}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Tekniker */}
+                      {(caseContext.primaryAssigneeName || caseContext.secondaryAssigneeName) && (
+                        <div className="space-y-1">
+                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                            <Users className="w-3 h-3 text-blue-400" />
+                            Tekniker
+                          </h4>
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 space-y-0.5">
+                            {caseContext.primaryAssigneeName && (
+                              <p className="text-sm text-slate-200">{caseContext.primaryAssigneeName}</p>
+                            )}
+                            {caseContext.secondaryAssigneeName && (
+                              <p className="text-sm text-slate-400">{caseContext.secondaryAssigneeName}</p>
+                            )}
+                            {caseContext.tertiaryAssigneeName && (
+                              <p className="text-sm text-slate-400">{caseContext.tertiaryAssigneeName}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Schema */}
+                      {(caseContext.startDate || caseContext.dueDate) && (
+                        <div className="space-y-1">
+                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                            <Calendar className="w-3 h-3 text-purple-400" />
+                            Schemalagt
+                          </h4>
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 space-y-1">
+                            {caseContext.startDate && (
+                              <div className="flex items-center gap-1.5 text-sm">
+                                <Clock className="w-3 h-3 text-slate-500" />
+                                <span className="text-slate-400">Start:</span>
+                                <span className="text-slate-200">{formatSwedishDateTime(caseContext.startDate)}</span>
                               </div>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-right text-slate-300">{item.quantity}</td>
-                          <td className="px-4 py-3 text-right text-slate-300">
-                            {formatInvoiceAmount(item.unit_price)}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {item.discount_percent > 0 ? (
-                              <span className="text-orange-400">-{item.discount_percent}%</span>
-                            ) : (
-                              <span className="text-slate-500">-</span>
+                            {caseContext.dueDate && (
+                              <div className="flex items-center gap-1.5 text-sm">
+                                <Clock className="w-3 h-3 text-slate-500" />
+                                <span className="text-slate-400">Slut:</span>
+                                <span className="text-slate-200">{formatSwedishDateTime(caseContext.dueDate)}</span>
+                              </div>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-right text-slate-400">
-                            {item.vat_rate}%
-                          </td>
-                          <td className="px-4 py-3 text-right text-white font-medium">
-                            {formatInvoiceAmount(item.total_price)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Summering */}
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                {(() => {
-                  const rotRutDeduction = invoice.items.reduce((sum, item) =>
-                    sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type), 0)
-                  return (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-slate-400">
-                        <span>Summa exkl. moms</span>
-                        <span className="text-white">{formatInvoiceAmount(invoice.subtotal)}</span>
-                      </div>
-                      <div className="flex justify-between text-slate-400">
-                        <span>Moms</span>
-                        <span className="text-white">{formatInvoiceAmount(invoice.vat_amount)}</span>
-                      </div>
-                      <div className="pt-2 border-t border-slate-700 flex justify-between">
-                        <span className="text-lg font-semibold text-white">Totalt</span>
-                        <span className="text-2xl font-bold text-emerald-400">
-                          {formatInvoiceAmount(invoice.total_amount)}
-                        </span>
-                      </div>
-                      {rotRutDeduction > 0 && (
-                        <>
-                          <div className="flex justify-between text-[#20c58f]">
-                            <span>{invoice.rot_rut_type}-avdrag ({ROT_RUT_PERCENT[invoice.rot_rut_type!]}%)</span>
-                            <span>-{formatInvoiceAmount(rotRutDeduction)}</span>
                           </div>
-                          <div className="pt-2 border-t border-slate-700 flex justify-between">
-                            <span className="text-lg font-semibold text-[#20c58f]">Att betala efter avdrag</span>
-                            <span className="text-2xl font-bold text-[#20c58f]">
-                              {formatInvoiceAmount(invoice.total_amount - rotRutDeduction)}
-                            </span>
-                          </div>
-                        </>
+                        </div>
                       )}
-                    </div>
-                  )
-                })()}
-              </div>
 
-              {/* Varning om rabatt kräver godkännande */}
-              {invoice.requires_approval && invoice.status === 'pending_approval' && (
-                <div className="flex items-start gap-3 p-4 bg-orange-500/20 border border-orange-500/30 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-medium text-orange-400">Rabatt kräver godkännande</div>
-                    <p className="text-sm text-orange-300 mt-1">
-                      Denna faktura innehåller rabatterade artiklar och måste godkännas innan den kan skickas.
-                    </p>
+                      {/* Beskrivning */}
+                      {caseContext.description && (
+                        <div className="space-y-1">
+                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                            <FileText className="w-3 h-3 text-blue-400" />
+                            Beskrivning
+                          </h4>
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
+                            <p className="text-sm text-slate-300 whitespace-pre-wrap line-clamp-4">{caseContext.description}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Saneringsrapport */}
+                      {caseContext.rapport && (
+                        <div className="space-y-1">
+                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-amber-400 uppercase tracking-wide">
+                            <ClipboardCheck className="w-3 h-3" />
+                            Dokumentation Tekniker
+                          </h4>
+                          <div className="bg-amber-500/5 rounded-lg p-2.5 border border-amber-500/20">
+                            <p className="text-sm text-slate-300 whitespace-pre-wrap line-clamp-4">{caseContext.rapport}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Plats */}
+                      {caseContext.address && (
+                        <EmbeddedMapPreview
+                          lat={caseContext.addressLat}
+                          lng={caseContext.addressLng}
+                          address={caseContext.address}
+                          height={120}
+                        />
+                      )}
+
+                      {/* Bilder */}
+                      <CaseContextImagePreview
+                        caseId={caseContext.id}
+                        caseType={caseContext.caseType}
+                        maxThumbnails={4}
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-sm text-slate-500">
+                      Kunde inte ladda ärendedata
+                    </div>
+                  )}
+                </div>
+
+                {/* Kommunikation */}
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700 bg-slate-800/30">
+                    <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Kommunikation</span>
+                  </div>
+                  <div className="flex-1 min-h-0 flex flex-col px-3 py-2">
+                    <CommentSection
+                      caseId={invoice.case_id}
+                      caseType={invoice.case_type as CaseType}
+                      caseTitle={caseContext?.title || invoice.customer_name}
+                      compact={true}
+                    />
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* Anteckningar */}
-              {invoice.notes && (
-                <div className="bg-slate-800/50 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-slate-400 mb-2">Anteckningar</h3>
-                  <p className="text-slate-300">{invoice.notes}</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-slate-400">
-              Faktura hittades inte
+              {/* Mobil: Collapsible ärendekontext + kommunikation */}
+              <div className="lg:hidden">
+                <button
+                  onClick={() => setContextExpanded(!contextExpanded)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-slate-300 hover:text-white transition-colors"
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <MessageSquare className="w-4 h-4 text-purple-400" />
+                    Ärende & Kommunikation
+                  </span>
+                  {contextExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {contextExpanded && (
+                  <div className="px-4 pb-4 space-y-3">
+                    {/* Ärendekontext — kompakt mobil */}
+                    {caseContext && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            style={{
+                              backgroundColor: `${caseContext.statusColor}20`,
+                              color: caseContext.statusColor
+                            }}
+                          >
+                            {caseContext.status}
+                          </span>
+                          {caseContext.pestType && (
+                            <span className="text-xs text-orange-400">{caseContext.pestType}</span>
+                          )}
+                          {caseContext.primaryAssigneeName && (
+                            <span className="text-xs text-slate-400">• {caseContext.primaryAssigneeName}</span>
+                          )}
+                        </div>
+                        {caseContext.rapport && (
+                          <div className="bg-amber-500/5 rounded-lg p-2 border border-amber-500/20">
+                            <p className="text-xs text-slate-300 line-clamp-3">{caseContext.rapport}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Kommunikation */}
+                    <div className="min-h-[200px]">
+                      <CommentSection
+                        caseId={invoice.case_id}
+                        caseType={invoice.case_type as CaseType}
+                        caseTitle={caseContext?.title || invoice.customer_name}
+                        compact={true}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         {/* Footer med åtgärder */}
         {invoice && (
-          <div className="p-4 border-t border-slate-700 bg-slate-800/50 flex justify-between">
+          <div className="flex-shrink-0 px-4 py-2.5 border-t border-slate-700 bg-slate-800/50 flex justify-between items-center">
             <button
               onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-sm text-white rounded-lg transition-colors"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               Exportera
             </button>
 
@@ -366,9 +621,9 @@ export default function InvoiceDetailModal({
                 <button
                   onClick={() => handleStatusChange('ready')}
                   disabled={updating}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <CheckCircle className="w-4 h-4" />
+                  <CheckCircle className="w-3.5 h-3.5" />
                   Godkänn
                 </button>
               )}
@@ -376,9 +631,9 @@ export default function InvoiceDetailModal({
                 <button
                   onClick={() => handleStatusChange('sent')}
                   disabled={updating}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-3.5 h-3.5" />
                   Markera skickad
                 </button>
               )}
@@ -386,9 +641,9 @@ export default function InvoiceDetailModal({
                 <button
                   onClick={() => handleStatusChange('paid')}
                   disabled={updating}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <DollarSign className="w-4 h-4" />
+                  <DollarSign className="w-3.5 h-3.5" />
                   Markera betald
                 </button>
               )}
@@ -396,9 +651,9 @@ export default function InvoiceDetailModal({
                 <button
                   onClick={() => handleStatusChange('cancelled')}
                   disabled={updating}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-sm border border-red-500/30 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <XCircle className="w-4 h-4" />
+                  <XCircle className="w-3.5 h-3.5" />
                   Makulera
                 </button>
               )}
