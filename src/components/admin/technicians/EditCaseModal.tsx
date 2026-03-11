@@ -961,13 +961,23 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   }
 
   const footer = (
-    <div className="flex justify-end gap-2 px-4 py-2 bg-slate-800/50">
-      <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={loading || timeTrackingLoading}>
-        Avbryt
-      </Button>
-      <Button type="submit" form="edit-case-form" size="sm" loading={loading} disabled={loading || timeTrackingLoading}>
-        Spara ändringar
-      </Button>
+    <div className="flex items-center px-4 py-2 bg-slate-800/50">
+      <button
+        type="button"
+        onClick={() => setShowDeleteDialog(true)}
+        className="flex items-center gap-1.5 text-xs text-red-400/60 hover:text-red-400 transition-colors"
+      >
+        <Trash2 className="w-3 h-3" />
+        Radera
+      </button>
+      <div className="ml-auto flex items-center gap-2">
+        <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={loading || timeTrackingLoading}>
+          Avbryt
+        </Button>
+        <Button type="submit" form="edit-case-form" size="sm" loading={loading} disabled={loading || timeTrackingLoading}>
+          Spara ändringar
+        </Button>
+      </div>
     </div>
   );
 
@@ -1405,43 +1415,57 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             {showTimeTracking && (
               <div className="space-y-2 pt-3 border-t border-slate-700/50">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><User className="w-4 h-4 text-green-400" />Kontaktinformation</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Input label="Kontaktperson" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
-                  {currentCase.case_type === 'business' && ( <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} /> )}
-                  {currentCase.case_type === 'private' && ( <Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} /> )}
+                <div className="grid grid-cols-2 gap-2">
+                  <Input name="kontaktperson" placeholder="Kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
+                  {currentCase.case_type === 'business' ? (
+                    <Input name="org_nr" placeholder="Org.nummer" value={formData.org_nr || ''} onChange={handleChange} />
+                  ) : (
+                    <Input name="personnummer" placeholder="Personnummer" value={formData.personnummer || ''} onChange={handleChange} />
+                  )}
+                  <Input name="telefon_kontaktperson" placeholder="Telefon" value={formData.telefon_kontaktperson || ''} onChange={handleChange} />
+                  <Input name="e_post_kontaktperson" placeholder="E-post" type="email" value={formData.e_post_kontaktperson || ''} onChange={handleChange} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Input label="Telefon" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} />
-                  <Input label="E-post" name="e_post_kontaktperson" type="email" value={formData.e_post_kontaktperson || ''} onChange={handleChange} />
-                </div>
-                <div className="col-span-full">
-                  <label className="block text-xs font-medium text-slate-400 mb-1">
-                    Adress
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      name="adress"
-                      value={formatAddress(formData.adress)}
-                      onChange={handleAddressChange}
-                      placeholder="Ange fullständig adress..."
-                      className="w-full px-3 py-1.5 pr-12 bg-slate-800/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200"
-                    />
-                    {formatAddress(formData.adress) && (
-                      <button
-                        type="button"
-                        onClick={() => openInMaps(formData.adress)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-teal-400 hover:text-teal-300 transition-colors rounded-md hover:bg-slate-700/50"
-                        title="Öppna i Maps"
-                      >
-                        <MapPin className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="adress"
+                    value={formatAddress(formData.adress)}
+                    onChange={handleAddressChange}
+                    placeholder="Adress..."
+                    className="w-full px-3 py-1.5 pr-10 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  />
+                  {formatAddress(formData.adress) && (
+                    <button
+                      type="button"
+                      onClick={() => openInMaps(formData.adress)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-teal-400 hover:text-teal-300 transition-colors rounded-md hover:bg-slate-700/50"
+                      title="Öppna i Maps"
+                    >
+                      <MapPin className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             )}
             
+            {/* Saneringsrapport sektion */}
+            {showTimeTracking && (
+              <div className="space-y-1.5 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-purple-400" />Saneringsrapport
+                </h3>
+                <textarea
+                  name="rapport"
+                  value={formData.rapport || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors"
+                  placeholder="Metoder, resultat, rekommendationer..."
+                />
+              </div>
+            )}
+
+            {/* Tidtagning */}
             {showTimeTracking && (
               <div className="pt-3 border-t border-slate-700/50">
                 <div className="flex items-center gap-3">
@@ -1481,23 +1505,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     )}
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Saneringsrapport sektion */}
-            {showTimeTracking && (
-              <div className="space-y-1.5 pt-3 border-t border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-purple-400" />Saneringsrapport
-                </h3>
-                <textarea
-                  name="rapport"
-                  value={formData.rapport || ''}
-                  onChange={handleChange}
-                  rows={2}
-                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors"
-                  placeholder="Metoder, resultat, rekommendationer..."
-                />
               </div>
             )}
 
@@ -1550,19 +1557,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 />
               </div>
             )}
-
-            {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* Radera ärende */}
-            <div className="pt-3 border-t border-slate-700/50">
-              <button
-                type="button"
-                onClick={() => setShowDeleteDialog(true)}
-                className="flex items-center gap-2 text-xs text-red-400/70 hover:text-red-400 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Radera ärende</span>
-              </button>
-            </div>
 
           </div>
         </form>

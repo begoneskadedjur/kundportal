@@ -843,11 +843,11 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
         </div>
       )}
 
-      {/* Draft mode upload button */}
+      {/* Draft mode upload — kompakt inline */}
       {draftMode && canEdit && (
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/40 text-teal-300 rounded-lg cursor-pointer transition-colors text-sm">
-            <Plus className="w-4 h-4" />
+          <label className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-teal-300 cursor-pointer transition-colors">
+            <Plus className="w-3.5 h-3.5" />
             Lägg till bilder
             <input
               type="file"
@@ -858,8 +858,8 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
             />
           </label>
           {pendingUploads.length > 0 && (
-            <span className="text-sm text-slate-400">
-              {pendingUploads.length} ny{pendingUploads.length > 1 ? 'a' : ''} bild{pendingUploads.length > 1 ? 'er' : ''} att ladda upp
+            <span className="text-xs text-slate-500">
+              {pendingUploads.length} ny{pendingUploads.length > 1 ? 'a' : ''} bild{pendingUploads.length > 1 ? 'er' : ''}
             </span>
           )}
         </div>
@@ -920,12 +920,9 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
         </div>
       )}
 
-      {/* Tomt state */}
-      {displayImages.length === 0 && (
-        <div className="flex items-center gap-2 py-1.5 text-slate-500">
-          <ImageIcon className="w-4 h-4 opacity-50" />
-          <span className="text-xs">Inga bilder</span>
-        </div>
+      {/* Tomt state — visas bara om ingen upload-knapp finns */}
+      {displayImages.length === 0 && !(draftMode && canEdit) && (
+        <span className="text-xs text-slate-500">Inga bilder</span>
       )}
 
       {/* Bildrutnät */}
