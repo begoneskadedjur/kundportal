@@ -58,21 +58,38 @@ export class InvoiceService {
       throw new Error('Inga fakturerbara artiklar på ärendet')
     }
 
-    // Beräkna summor
-    const totals = calculateInvoiceTotals(billingItems.map(item => ({
-      id: item.id,
-      invoice_id: '',
-      case_billing_item_id: item.id,
-      article_id: item.article_id,
-      article_code: item.article_code,
-      article_name: item.article_name,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      discount_percent: item.discount_percent,
-      total_price: item.total_price,
-      vat_rate: item.vat_rate,
-      created_at: item.created_at
-    })))
+    // Kolla om anpassat pris finns
+    const customPrice = await CaseBillingService.getCustomPrice(caseId, caseType)
+
+    // Beräkna summor — anpassat pris eller standard
+    let subtotal: number
+    let vat_amount: number
+    let total_amount: number
+
+    if (customPrice) {
+      // Anpassat pris (lagrat exkl. moms)
+      subtotal = customPrice
+      vat_amount = customPrice * 0.25
+      total_amount = customPrice * 1.25
+    } else {
+      const totals = calculateInvoiceTotals(billingItems.map(item => ({
+        id: item.id,
+        invoice_id: '',
+        case_billing_item_id: item.id,
+        article_id: item.article_id,
+        article_code: item.article_code,
+        article_name: item.article_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount_percent: item.discount_percent,
+        total_price: item.total_price,
+        vat_rate: item.vat_rate,
+        created_at: item.created_at
+      })))
+      subtotal = totals.subtotal
+      vat_amount = totals.vat_amount
+      total_amount = totals.total_amount
+    }
 
     // Kontrollera om godkännande krävs
     const requiresApproval = billingItems.some(item => item.requires_approval)
@@ -92,9 +109,9 @@ export class InvoiceService {
         customer_phone: customerInfo.phone || null,
         customer_address: customerInfo.address || null,
         organization_number: customerInfo.organization_number || null,
-        subtotal: totals.subtotal,
-        vat_amount: totals.vat_amount,
-        total_amount: totals.total_amount,
+        subtotal,
+        vat_amount,
+        total_amount,
         status: requiresApproval ? 'pending_approval' : 'ready',
         requires_approval: requiresApproval,
         due_date: calculateDueDate(30),
@@ -108,28 +125,80 @@ export class InvoiceService {
 
     // Skapa fakturarader
     const invoiceItems: InvoiceItem[] = []
-    for (const item of billingItems) {
-      const { data: invoiceItem, error: itemError } = await supabase
+
+    if (customPrice) {
+      // Med anpassat pris: artikelrader som referens (pris 0) + en "Anpassat pris"-rad
+      for (const item of billingItems) {
+        const { data: invoiceItem, error: itemError } = await supabase
+          .from('invoice_items')
+          .insert({
+            invoice_id: invoice.id,
+            case_billing_item_id: item.id,
+            article_id: item.article_id,
+            article_code: item.article_code,
+            article_name: item.article_name,
+            quantity: item.quantity,
+            unit_price: 0,
+            discount_percent: 0,
+            total_price: 0,
+            vat_rate: item.vat_rate,
+            rot_rut_type: item.rot_rut_type || null,
+            fastighetsbeteckning: item.fastighetsbeteckning || null
+          })
+          .select()
+          .single()
+
+        if (itemError) throw new Error(`Databasfel: ${itemError.message}`)
+        invoiceItems.push(invoiceItem)
+      }
+
+      // Lägg till summeringsrad med det anpassade priset
+      const { data: customItem, error: customItemError } = await supabase
         .from('invoice_items')
         .insert({
           invoice_id: invoice.id,
-          case_billing_item_id: item.id,
-          article_id: item.article_id,
-          article_code: item.article_code,
-          article_name: item.article_name,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          discount_percent: item.discount_percent,
-          total_price: item.total_price,
-          vat_rate: item.vat_rate,
-          rot_rut_type: item.rot_rut_type || null,
-          fastighetsbeteckning: item.fastighetsbeteckning || null
+          case_billing_item_id: null,
+          article_id: null,
+          article_code: null,
+          article_name: 'Anpassat pris',
+          quantity: 1,
+          unit_price: customPrice,
+          discount_percent: 0,
+          total_price: customPrice,
+          vat_rate: 25,
+          rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
+          fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null
         })
         .select()
         .single()
 
-      if (itemError) throw new Error(`Databasfel: ${itemError.message}`)
-      invoiceItems.push(invoiceItem)
+      if (customItemError) throw new Error(`Databasfel: ${customItemError.message}`)
+      invoiceItems.push(customItem)
+    } else {
+      // Utan anpassat pris: standard — alla artiklar med sina priser
+      for (const item of billingItems) {
+        const { data: invoiceItem, error: itemError } = await supabase
+          .from('invoice_items')
+          .insert({
+            invoice_id: invoice.id,
+            case_billing_item_id: item.id,
+            article_id: item.article_id,
+            article_code: item.article_code,
+            article_name: item.article_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount_percent: item.discount_percent,
+            total_price: item.total_price,
+            vat_rate: item.vat_rate,
+            rot_rut_type: item.rot_rut_type || null,
+            fastighetsbeteckning: item.fastighetsbeteckning || null
+          })
+          .select()
+          .single()
+
+        if (itemError) throw new Error(`Databasfel: ${itemError.message}`)
+        invoiceItems.push(invoiceItem)
+      }
     }
 
     // Uppdatera billing items status
