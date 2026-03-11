@@ -48,6 +48,7 @@ export interface CaseBillingItem {
   notes: string | null
   rot_rut_type: RotRutType | null
   fastighetsbeteckning: string | null
+  min_quantity: number | null
   created_at: string
   updated_at: string
 }
@@ -92,6 +93,7 @@ export interface UpdateCaseArticleInput {
   notes?: string
   rot_rut_type?: RotRutType | null
   fastighetsbeteckning?: string | null
+  min_quantity?: number | null
 }
 
 /**

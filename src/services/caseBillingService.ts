@@ -251,7 +251,9 @@ export class CaseBillingService {
       throw new Error('Post hittades inte')
     }
 
-    const quantity = input.quantity ?? existing.quantity
+    const minQuantity = input.min_quantity !== undefined ? input.min_quantity : existing.min_quantity
+    const rawQuantity = input.quantity ?? existing.quantity
+    const quantity = minQuantity ? Math.max(rawQuantity, minQuantity) : rawQuantity
     const discountPercent = input.discount_percent ?? existing.discount_percent
 
     // Beräkna nya priser
@@ -262,6 +264,7 @@ export class CaseBillingService {
       .from('case_billing_items')
       .update({
         quantity,
+        min_quantity: minQuantity,
         discount_percent: discountPercent,
         discounted_price: discountedPrice,
         total_price: totalPrice,

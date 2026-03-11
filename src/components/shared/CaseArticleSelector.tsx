@@ -179,7 +179,8 @@ export default function CaseArticleSelector({
   const handleUpdateQuantity = async (item: CaseBillingItem, delta: number) => {
     if (readOnly || saving) return
     const newQuantity = item.quantity + delta
-    if (newQuantity < 0.1) return
+    const minQty = item.min_quantity || 0.1
+    if (newQuantity < minQty) return
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(item.id, { quantity: newQuantity })
@@ -252,6 +253,24 @@ export default function CaseArticleSelector({
     } catch (error) {
       console.error('Kunde inte uppdatera ROT/RUT:', error)
       toast.error('Kunde inte uppdatera ROT/RUT')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Kortare ärende (min. 3 tim) toggle
+  const handleMinQuantityToggle = async (item: CaseBillingItem, enabled: boolean) => {
+    if (readOnly || saving) return
+    setSaving(true)
+    try {
+      await CaseBillingService.updateCaseArticle(item.id, {
+        min_quantity: enabled ? 3 : null,
+        quantity: enabled ? Math.max(3, item.quantity) : item.quantity
+      })
+      await loadData()
+    } catch (error) {
+      console.error('Kunde inte uppdatera minimidebitering:', error)
+      toast.error('Kunde inte uppdatera minimidebitering')
     } finally {
       setSaving(false)
     }
@@ -651,6 +670,27 @@ export default function CaseArticleSelector({
                         <span className="text-xs text-orange-400">-{item.discount_percent}%</span>
                       )}
                     </div>
+
+                    {/* Kortare ärende — alla kundtyper, bara arbetstid */}
+                    {article && article.category === 'Arbetstid' && (
+                      <div className="mt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!item.min_quantity}
+                            onChange={(e) => handleMinQuantityToggle(item, e.target.checked)}
+                            disabled={readOnly || saving}
+                            className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
+                          />
+                          <span className="text-xs text-slate-300">Kortare ärende (min. 3 tim)</span>
+                          {item.min_quantity && (
+                            <span className="px-1.5 py-0.5 text-[10px] rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
+                              Min. {item.min_quantity} tim
+                            </span>
+                          )}
+                        </label>
+                      </div>
+                    )}
 
                     {/* ROT/RUT — bara för privatärenden med arbetstid/avdragsgiltiga artiklar */}
                     {caseType === 'private' && article && (article.category === 'Arbetstid' || article.rot_eligible || article.rut_eligible) && (
