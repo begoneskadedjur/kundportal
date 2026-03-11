@@ -22,7 +22,7 @@ import WorkReportDropdown from '../../shared/WorkReportDropdown'
 import { useWorkReportGeneration } from '../../../hooks/useWorkReportGeneration'
 
 // Tekniker-dropdown
-import TechnicianDropdown from '../TechnicianDropdown'
+// TechnicianDropdown ersatt av inline initialer-cirklar
 
 // Bildhantering - med draft-läge
 import CaseImageGallery, { CaseImageGalleryRef } from '../../shared/CaseImageGallery'
@@ -370,6 +370,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [showActionDialog, setShowActionDialog] = useState(false)
   const [showRevisitModal, setShowRevisitModal] = useState(false)
 
+  // Tekniker-lista för initialer-cirklar
+  const [technicianList, setTechnicianList] = useState<{ id: string; name: string; role: string }[]>([])
+
   // Inline title edit state
   const [editingTitle, setEditingTitle] = useState(false)
 
@@ -386,6 +389,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       setShowCommunicationPanel(true)
     }
   }, [isOpen, openCommunicationOnLoad, caseData])
+
+  // Hämta tekniker-lista för initialer-cirklar
+  useEffect(() => {
+    const fetchTechs = async () => {
+      const { data } = await supabase
+        .from('technicians')
+        .select('id, name, role')
+        .eq('is_active', true)
+        .order('name')
+      if (data) setTechnicianList(data)
+    }
+    if (isOpen) fetchTechs()
+  }, [isOpen])
 
   // Ref för bildgalleriet så vi kan anropa commitChanges
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
@@ -945,7 +961,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   }
 
   const footer = (
-    <div className="flex gap-3 p-6 bg-slate-800/50">
+    <div className="flex gap-3 px-4 py-2.5 bg-slate-800/50">
       <Button type="button" variant="secondary" onClick={onClose} disabled={loading || timeTrackingLoading} className="flex-1">
         Avbryt
       </Button>
@@ -984,10 +1000,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         </button>
       ) : undefined}
     >
-      <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+      <div className="p-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
         {/* Enhanced header with report, contract, and offer functionality */}
         {currentCase && (
-          <div className="mb-6 -mt-6 -mx-6 px-4 sm:px-6 py-4 bg-slate-800/30 border-b border-slate-700">
+          <div className="mb-4 -mt-4 -mx-4 px-4 py-3 bg-slate-800/30 border-b border-slate-700">
             {/* Snabbåtgärder - Mobil-responsiv layout */}
             <div className="flex flex-col gap-3">
               {/* Rad 1: Produktiva åtgärder - grid på mobil, flex på desktop */}
@@ -1195,13 +1211,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">
                   Skadedjurstyp för det nya ärendet *
                 </label>
                 <select
                   value={followUpPestType}
                   onChange={(e) => setFollowUpPestType(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all duration-200"
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all duration-200"
                 >
                   <option value="">Välj skadedjurstyp...</option>
                   {PEST_TYPE_OPTIONS.map((pest) => (
@@ -1242,7 +1258,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
         <BackupRestorePrompt pendingRestore={pendingRestore} onRestore={handleSuccessfulRestore} onDismiss={clearBackup} />
 
-        <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-6">
+        <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -1250,8 +1266,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             </div>
           )}
           
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium text-white flex items-center gap-2"><FileText className="w-5 h-5 text-teal-400" />Ärendeinformation</h3>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><FileText className="w-4 h-4 text-teal-400" />Ärendeinformation</h3>
             {editingTitle && (
               <div className="flex items-center gap-2">
                 <input name="title" value={formData.title || ''} onChange={handleChange}
@@ -1264,24 +1280,24 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning</label>
               <textarea 
                 name="description" 
                 value={formData.description || ''} 
                 onChange={handleChange} 
-                rows={4} 
-                className="w-full px-4 py-3 bg-slate-900/60 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 leading-relaxed resize-vertical min-h-[100px]" 
+                rows={2}
+                className="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 leading-relaxed resize-vertical" 
                 placeholder="Beskriv ärendet i detalj..."
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Status</label>
                 <select 
                   name="status" 
                   value={formData.status || ''} 
                   onChange={handleChange} 
-                  className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 appearance-none cursor-pointer"
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 appearance-none cursor-pointer"
                   style={{ 
                     maxHeight: '200px',
                     overflowY: 'auto' as const
@@ -1300,45 +1316,62 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             </div>
 
             {/* Tekniker-tilldelningar */}
-            <div className="space-y-4 pt-6 border-t border-slate-700">
-              <h3 className="text-lg font-medium text-white flex items-center gap-2">
-                <User className="w-5 h-5 text-orange-400" />
-                Tekniker-tilldelningar
+            <div className="space-y-2 pt-3 border-t border-slate-700/50">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                <User className="w-4 h-4 text-orange-400" />
+                Tekniker
               </h3>
-              <div className="grid grid-cols-1 gap-4">
-                <TechnicianDropdown
-                  label="Primär tekniker"
-                  value={formData.primary_assignee_id || ''}
-                  onChange={(value) => setFormData(prev => ({ ...prev, primary_assignee_id: value }))}
-                  placeholder="Välj primär tekniker..."
-                  includeUnassigned={true}
-                />
-                <TechnicianDropdown
-                  label="Sekundär tekniker (valfritt)"
-                  value={formData.secondary_assignee_id || ''}
-                  onChange={(value) => setFormData(prev => ({ ...prev, secondary_assignee_id: value }))}
-                  placeholder="Välj sekundär tekniker..."
-                  includeUnassigned={true}
-                />
-                <TechnicianDropdown
-                  label="Tertiär tekniker (valfritt)"
-                  value={formData.tertiary_assignee_id || ''}
-                  onChange={(value) => setFormData(prev => ({ ...prev, tertiary_assignee_id: value }))}
-                  placeholder="Välj tertiär tekniker..."
-                  includeUnassigned={true}
-                />
+              <div className="flex items-center gap-2">
+                {([
+                  { key: 'primary_assignee_id', label: 'Primär' },
+                  { key: 'secondary_assignee_id', label: 'Sekundär' },
+                  { key: 'tertiary_assignee_id', label: 'Tertiär' }
+                ] as const).map((slot) => {
+                  const techId = formData[slot.key] || ''
+                  const tech = technicianList.find(t => t.id === techId)
+                  const initials = tech ? tech.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : ''
+                  return (
+                    <div key={slot.key} className="relative">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+                          tech
+                            ? 'bg-[#20c58f]/20 border-2 border-[#20c58f]'
+                            : 'border-2 border-dashed border-slate-600 hover:border-slate-500'
+                        }`}
+                        title={tech ? `${tech.name} (${slot.label})` : `${slot.label} tekniker`}
+                      >
+                        {tech ? (
+                          <span className="text-xs font-bold text-[#20c58f]">{initials}</span>
+                        ) : (
+                          <Plus className="w-3.5 h-3.5 text-slate-500" />
+                        )}
+                      </div>
+                      <select
+                        value={techId}
+                        onChange={(e) => setFormData(prev => ({ ...prev, [slot.key]: e.target.value }))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        title={slot.label}
+                      >
+                        <option value="">Ingen</option>
+                        {technicianList.map(t => (
+                          <option key={t.id} value={t.id}>{t.name} - {t.role}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
 
-          <div className="space-y-4 pt-6 border-t border-slate-700">
+          <div className="space-y-3 pt-3 border-t border-slate-700/50">
             {/* ✅ UPPDATERAD SEKTION FÖR SCHEMALÄGGNING */}
             {showTimeTracking && (
-              <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-white flex items-center gap-2"><CalendarIcon className="w-5 h-5 text-purple-400" />Schemaläggning</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><CalendarIcon className="w-4 h-4 text-purple-400" />Schemaläggning</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Starttid</label>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Starttid</label>
                           <DatePicker
                               selected={formData.start_date ? new Date(formData.start_date) : null}
                               onChange={(date) => handleDateChange(date, 'start_date')}
@@ -1352,7 +1385,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                           />
                       </div>
                       <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Sluttid</label>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Sluttid</label>
                           <DatePicker
                               selected={formData.due_date ? new Date(formData.due_date) : null}
                               onChange={(date) => handleDateChange(date, 'due_date')}
@@ -1370,19 +1403,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             )}
 
             {showTimeTracking && (
-              <div className="space-y-4 pt-6 border-t border-slate-700">
-                <h3 className="text-lg font-medium text-white flex items-center gap-2"><User className="w-5 h-5 text-green-400" />Kontaktinformation</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><User className="w-4 h-4 text-green-400" />Kontaktinformation</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Input label="Kontaktperson" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
                   {currentCase.case_type === 'business' && ( <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} /> )}
                   {currentCase.case_type === 'private' && ( <Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} /> )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Input label="Telefon" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} />
                   <Input label="E-post" name="e_post_kontaktperson" type="email" value={formData.e_post_kontaktperson || ''} onChange={handleChange} />
                 </div>
                 <div className="col-span-full">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-xs font-medium text-slate-400 mb-1">
                     Adress
                   </label>
                   <div className="relative">
@@ -1392,7 +1425,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                       value={formatAddress(formData.adress)}
                       onChange={handleAddressChange}
                       placeholder="Ange fullständig adress..."
-                      className="w-full px-3 py-2 pr-12 bg-slate-800/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200"
+                      className="w-full px-3 py-1.5 pr-12 bg-slate-800/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200"
                     />
                     {formatAddress(formData.adress) && (
                       <button
@@ -1410,11 +1443,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             )}
             
             {showTimeTracking && (
-              <div className="space-y-4 pt-6 border-t border-slate-700">
-                <div className="p-4 bg-slate-800/50 rounded-lg border-2 border-slate-700">
-                  <div className="flex items-center justify-between mb-4">
-                    <label className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                      <Clock className="w-4 h-4" />Arbetstid
+              <div className="space-y-3 pt-3 border-t border-slate-700/50">
+                <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />Arbetstid
                       <span className="text-xs text-slate-500">({currentCase.id.slice(0, 8)})</span>
                     </label>
                     <div className="flex items-center gap-2 text-xs">
@@ -1423,8 +1456,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     </div>
                   </div>
 
-                  <div className="text-center mb-6">
-                    <div className={`text-4xl font-bold font-mono mb-2 transition-colors duration-300 ${isRunning ? 'text-green-400' : 'text-white'}`}>
+                  <div className="text-center mb-3">
+                    <div className={`text-2xl font-bold font-mono mb-1 transition-colors duration-300 ${isRunning ? 'text-green-400' : 'text-white'}`}>
                       {formatMinutesDetailed(displayTime)}
                     </div>
                     <div className="text-sm text-slate-400">
@@ -1456,8 +1489,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                         </Button>
                       </div>
                     ) : (
-                      <Button type="button" variant="primary" onClick={() => handleTimeTracking('start')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="w-full flex items-center justify-center gap-2 py-3">
-                        <Play className="w-5 h-5" />{timeTrackingLoading ? 'Startar...' : (displayTime > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid')}
+                      <Button type="button" variant="primary" onClick={() => handleTimeTracking('start')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="w-full flex items-center justify-center gap-2">
+                        <Play className="w-4 h-4" />{timeTrackingLoading ? 'Startar...' : (displayTime > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid')}
                       </Button>
                     )}
                     {displayTime > 0 && !isRunning && (
@@ -1472,18 +1505,18 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
             {/* Saneringsrapport sektion */}
             {showTimeTracking && (
-              <div className="space-y-4 pt-6 border-t border-slate-700">
-                <h3 className="text-lg font-medium text-white flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-purple-400" />Saneringsrapport
+              <div className="space-y-3 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-purple-400" />Saneringsrapport
                 </h3>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Rapport & Dokumentation</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Rapport & Dokumentation</label>
                   <textarea
                     name="rapport"
                     value={formData.rapport || ''}
                     onChange={handleChange}
-                    rows={6}
-                    className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    rows={3}
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
                     placeholder="Skriv en detaljerad rapport över utfört arbete, använda metoder, resultat och eventuella rekommendationer för kunden..."
                   />
                 </div>
@@ -1498,7 +1531,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
             {/* Använda preparat - Visas INTE för Inspektion */}
             {currentCase && formData.skadedjur !== 'Inspektion' && (
-              <div className="pt-6 border-t border-slate-700">
+              <div className="pt-3 border-t border-slate-700/50">
                 <CasePreparationsSection
                   caseId={currentCase.id}
                   caseType={currentCase.case_type === 'private' ? 'private' : 'business'}
@@ -1512,7 +1545,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
             {/* Utförda tjänster/artiklar för fakturering */}
             {currentCase && (
-              <div className="pt-6 border-t border-slate-700">
+              <div className="pt-3 border-t border-slate-700/50">
                 <CaseArticleSelector
                   caseId={currentCase.id}
                   caseType={currentCase.case_type === 'private' ? 'private' : 'business'}
@@ -1525,13 +1558,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
             {/* Bilder sektion - visas för alla ärendetyper */}
             {currentCase && (
-              <div className="space-y-4 pt-6 border-t border-slate-700">
-                <h3 className="text-lg font-medium text-white flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-cyan-400" />Bilder
+              <div className="space-y-3 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-cyan-400" />Bilder
                 </h3>
-                <p className="text-sm text-slate-400">
-                  Dokumentera ärendet med bilder. Kategorisera som "Före" (innan behandling), "Efter" (resultat) eller "Övrigt".
-                </p>
 
                 {/* Bildgalleri med draft-läge - ändringar sparas först när man klickar "Spara ändringar" */}
                 <CaseImageGallery
@@ -1552,8 +1582,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             {/* ═══════════════════════════════════════════════════════════════════ */}
             {/* DANGER ZONE - Radera ärende (separerad från arbetsflödet)           */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            <div className="mt-8 pt-6 border-t-2 border-red-500/30">
-              <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-lg">
+            <div className="mt-4 pt-3 border-t-2 border-red-500/30">
+              <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
                 {/* Rubrik med varningsikon */}
                 <div className="flex items-center gap-2 mb-3">
                   <AlertTriangle className="w-5 h-5 text-red-400" />
