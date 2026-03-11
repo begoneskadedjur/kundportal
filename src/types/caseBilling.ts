@@ -115,6 +115,18 @@ export interface ArticlesByCategory {
 }
 
 /**
+ * Override för anpassat pris på ärendenivå
+ */
+export interface CaseBillingOverride {
+  id: string
+  case_id: string
+  case_type: BillableCaseType
+  custom_total_price: number
+  created_at: string
+  updated_at: string
+}
+
+/**
  * Summering av case billing items
  */
 export interface CaseBillingSummary {
@@ -125,6 +137,7 @@ export interface CaseBillingSummary {
   total_amount: number
   requires_approval: boolean
   rot_rut_deduction: number
+  custom_total_price: number | null
 }
 
 /**

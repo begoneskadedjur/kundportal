@@ -337,6 +337,9 @@ export class CaseBillingService {
       return sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type)
     }, 0)
 
+    // Hämta eventuellt anpassat pris
+    const override = await this.getCustomPrice(caseId, caseType)
+
     return {
       item_count: items.length,
       subtotal,
@@ -344,7 +347,8 @@ export class CaseBillingService {
       vat_amount: vatAmount,
       total_amount: subtotal + vatAmount,
       requires_approval: requiresApproval,
-      rot_rut_deduction: rotRutDeduction
+      rot_rut_deduction: rotRutDeduction,
+      custom_total_price: override
     }
   }
 
@@ -420,5 +424,59 @@ export class CaseBillingService {
 
     if (error) throw new Error(`Databasfel: ${error.message}`)
     return (count || 0) > 0
+  }
+
+  /**
+   * Hämta anpassat pris för ärende (eller null)
+   */
+  static async getCustomPrice(
+    caseId: string,
+    caseType: BillableCaseType
+  ): Promise<number | null> {
+    const { data, error } = await supabase
+      .from('case_billing_overrides')
+      .select('custom_total_price')
+      .eq('case_id', caseId)
+      .eq('case_type', caseType)
+      .maybeSingle()
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return data?.custom_total_price ?? null
+  }
+
+  /**
+   * Sätt anpassat pris för ärende (upsert)
+   */
+  static async setCustomPrice(
+    caseId: string,
+    caseType: BillableCaseType,
+    price: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('case_billing_overrides')
+      .upsert({
+        case_id: caseId,
+        case_type: caseType,
+        custom_total_price: price,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'case_id,case_type' })
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+  }
+
+  /**
+   * Ta bort anpassat pris för ärende
+   */
+  static async clearCustomPrice(
+    caseId: string,
+    caseType: BillableCaseType
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('case_billing_overrides')
+      .delete()
+      .eq('case_id', caseId)
+      .eq('case_type', caseType)
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
   }
 }

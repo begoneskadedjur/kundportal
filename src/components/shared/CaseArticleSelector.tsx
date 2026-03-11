@@ -80,9 +80,12 @@ export default function CaseArticleSelector({
   const [categoryFilter, setCategoryFilter] = useState<ArticleCategory | 'all'>('all')
   const [expandedCategories, setExpandedCategories] = useState<Set<ArticleCategory>>(new Set(ALL_CATEGORIES))
   const [showArticleList, setShowArticleList] = useState(false)
+  const [customPriceEnabled, setCustomPriceEnabled] = useState(false)
+  const [customPriceInput, setCustomPriceInput] = useState('')
   const discountTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const dosageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const fastighetsTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const customPriceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadData = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true)
@@ -95,6 +98,10 @@ export default function CaseArticleSelector({
       setArticles(articlesData)
       setSelectedItems(itemsData)
       setSummary(summaryData)
+      if (summaryData.custom_total_price !== null) {
+        setCustomPriceEnabled(true)
+        setCustomPriceInput(String(summaryData.custom_total_price))
+      }
       if (onChange) onChange(itemsData, summaryData)
     } catch (error) {
       console.error('Kunde inte ladda artikeldata:', error)
@@ -114,6 +121,7 @@ export default function CaseArticleSelector({
       Object.values(discountTimers.current).forEach(clearTimeout)
       Object.values(dosageTimers.current).forEach(clearTimeout)
       Object.values(fastighetsTimers.current).forEach(clearTimeout)
+      if (customPriceTimer.current) clearTimeout(customPriceTimer.current)
     }
   }, [])
 
@@ -274,6 +282,46 @@ export default function CaseArticleSelector({
     } finally {
       setSaving(false)
     }
+  }
+
+  // Anpassat pris toggle
+  const handleCustomPriceToggle = async (enabled: boolean) => {
+    if (readOnly || saving) return
+    setCustomPriceEnabled(enabled)
+    if (!enabled) {
+      setSaving(true)
+      try {
+        await CaseBillingService.clearCustomPrice(caseId, caseType)
+        setCustomPriceInput('')
+        await loadData()
+      } catch (error) {
+        console.error('Kunde inte ta bort anpassat pris:', error)
+      } finally {
+        setSaving(false)
+      }
+    } else if (summary) {
+      setCustomPriceInput(String(summary.subtotal))
+    }
+  }
+
+  // Debounced anpassat pris update
+  const handleCustomPriceChange = (value: string) => {
+    setCustomPriceInput(value)
+    if (customPriceTimer.current) clearTimeout(customPriceTimer.current)
+    customPriceTimer.current = setTimeout(async () => {
+      const price = parseFloat(value)
+      if (!price || price <= 0) return
+      if (readOnly || saving) return
+      setSaving(true)
+      try {
+        await CaseBillingService.setCustomPrice(caseId, caseType, price)
+        await loadData()
+      } catch (error) {
+        console.error('Kunde inte spara anpassat pris:', error)
+      } finally {
+        setSaving(false)
+      }
+    }, 600)
   }
 
   // Debounced fastighetsbeteckning update
@@ -800,17 +848,91 @@ export default function CaseArticleSelector({
               <div className="text-xs text-slate-500">
                 Exkl. moms: {formatPrice(summary.subtotal)}
               </div>
-              <div className="text-sm font-bold text-white">
+              <div className={`text-sm font-bold ${customPriceEnabled ? 'text-slate-500' : 'text-white'}`}>
                 {formatPrice(summary.total_amount)}
-                <span className="text-xs font-normal text-slate-500 ml-1">inkl. moms</span>
+                <span className="text-xs font-normal text-slate-500 ml-1">
+                  inkl. moms{customPriceEnabled ? ' (föreslaget minimipris)' : ''}
+                </span>
               </div>
-              {summary.rot_rut_deduction > 0 && (
+              {!customPriceEnabled && summary.rot_rut_deduction > 0 && (
                 <div className="text-xs text-[#20c58f] font-medium">
                   Att betala: {formatPrice(summary.total_amount - summary.rot_rut_deduction)}
                 </div>
               )}
             </div>
           </div>
+
+          {/* Anpassat pris */}
+          {!readOnly && (
+            <div className="mt-2 pt-2 border-t border-slate-700/30">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={customPriceEnabled}
+                  onChange={(e) => handleCustomPriceToggle(e.target.checked)}
+                  disabled={saving}
+                  className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
+                />
+                <span className="text-xs text-slate-300">Anpassat pris</span>
+              </label>
+              {customPriceEnabled && (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={summary.subtotal}
+                    step="100"
+                    value={customPriceInput}
+                    onChange={(e) => handleCustomPriceChange(e.target.value)}
+                    disabled={saving}
+                    className="w-28 px-2.5 py-1.5 text-sm bg-slate-700 border border-slate-600 rounded text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                  />
+                  <span className="text-xs text-slate-400">kr exkl. moms</span>
+                  <div className="flex-1 text-right">
+                    {(() => {
+                      const cp = parseFloat(customPriceInput) || 0
+                      const cpInkl = cp * 1.25
+                      const isBelowMin = cp < summary.subtotal
+                      return (
+                        <>
+                          {isBelowMin ? (
+                            <div className="text-xs text-orange-400">
+                              Priset måste överstiga {formatPrice(summary.subtotal)}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="text-sm font-bold text-[#20c58f]">
+                                {formatPrice(cpInkl)}
+                                <span className="text-xs font-normal text-slate-500 ml-1">inkl. moms</span>
+                              </div>
+                              {summary.rot_rut_deduction > 0 && (
+                                <div className="text-xs text-[#20c58f] font-medium">
+                                  Att betala: {formatPrice(cpInkl - summary.rot_rut_deduction)}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {readOnly && customPriceEnabled && summary.custom_total_price && (
+            <div className="mt-2 pt-2 border-t border-slate-700/30">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">Anpassat pris</span>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-[#20c58f]">
+                    {formatPrice(summary.custom_total_price * 1.25)}
+                    <span className="text-xs font-normal text-slate-500 ml-1">inkl. moms</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {summary.requires_approval && (
             <div className="mt-1.5 flex items-center gap-1.5 text-orange-400 text-xs">
               <AlertCircle className="w-3.5 h-3.5" />
