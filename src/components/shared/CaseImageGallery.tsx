@@ -534,8 +534,8 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
+      <div className="flex items-center justify-center py-3">
+        <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
       </div>
     )
   }
@@ -831,7 +831,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
   )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Pending changes indicator */}
       {draftMode && pendingChangesCount > 0 && (
         <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/20 border border-amber-500/40 rounded-lg text-amber-300 text-sm">
@@ -922,9 +922,9 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
 
       {/* Tomt state */}
       {displayImages.length === 0 && (
-        <div className="text-center py-8 text-slate-500">
-          <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>Inga bilder</p>
+        <div className="text-center py-3 text-slate-500">
+          <ImageIcon className="w-6 h-6 mx-auto mb-1 opacity-50" />
+          <p className="text-xs">Inga bilder</p>
         </div>
       )}
 

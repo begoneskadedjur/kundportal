@@ -1266,7 +1266,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             </div>
           )}
           
-          <div className="space-y-3">
+          <div className="space-y-2">
             <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><FileText className="w-4 h-4 text-teal-400" />Ärendeinformation</h3>
             {editingTitle && (
               <div className="flex items-center gap-2">
@@ -1364,10 +1364,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             </div>
           </div>
 
-          <div className="space-y-3 pt-3 border-t border-slate-700/50">
+          <div className="space-y-2 pt-3 border-t border-slate-700/50">
             {/* ✅ UPPDATERAD SEKTION FÖR SCHEMALÄGGNING */}
             {showTimeTracking && (
-              <div className="space-y-3">
+              <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><CalendarIcon className="w-4 h-4 text-purple-400" />Schemaläggning</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
@@ -1403,7 +1403,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             )}
 
             {showTimeTracking && (
-              <div className="space-y-3 pt-3 border-t border-slate-700/50">
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><User className="w-4 h-4 text-green-400" />Kontaktinformation</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Input label="Kontaktperson" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
@@ -1443,60 +1443,41 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             )}
             
             {showTimeTracking && (
-              <div className="space-y-3 pt-3 border-t border-slate-700/50">
-                <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />Arbetstid
-                      <span className="text-xs text-slate-500">({currentCase.id.slice(0, 8)})</span>
-                    </label>
-                    <div className="flex items-center gap-2 text-xs">
-                      {isRunning && <div className="flex items-center gap-2 text-green-400"><div className="w-2 h-2 bg-green-400 rounded-full animate-ping"></div>AKTIV</div>}
-                      {lastBackup && <span className="text-slate-500">Backup: {lastBackup.toLocaleTimeString()}</span>}
-                    </div>
-                  </div>
-
-                  <div className="text-center mb-3">
-                    <div className={`text-2xl font-bold font-mono mb-1 transition-colors duration-300 ${isRunning ? 'text-green-400' : 'text-white'}`}>
-                      {formatMinutesDetailed(displayTime)}
-                    </div>
-                    <div className="text-sm text-slate-400">
-                      {isRunning ? (
-                        <span className="text-green-400 flex items-center justify-center gap-2">
-                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                          Startad kl. {new Date(currentCase.work_started_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      ) : displayTime > 0 ? 'Pausad' : 'Ej påbörjad'}
-                    </div>
-                    {isRunning && displayTime > (currentCase.time_spent_minutes || 0) && (
-                      <div className="mt-2 text-xs text-slate-500">
-                        Denna session: {formatMinutesDetailed(displayTime - (currentCase.time_spent_minutes || 0))}
-                        {(currentCase.time_spent_minutes || 0) > 0 && (
-                          <span className="ml-2">(Tidigare: {formatMinutesDetailed(currentCase.time_spent_minutes)})</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
+              <div className="pt-3 border-t border-slate-700/50">
+                <div className="flex items-center gap-3">
+                  <Clock className={`w-4 h-4 flex-shrink-0 ${isRunning ? 'text-green-400' : 'text-slate-400'}`} />
+                  <span className={`text-lg font-bold font-mono ${isRunning ? 'text-green-400' : 'text-white'}`}>
+                    {formatMinutesDetailed(displayTime)}
+                  </span>
+                  <span className="text-xs text-slate-500">
                     {isRunning ? (
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button type="button" variant="warning" onClick={() => handleTimeTracking('pause')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center justify-center gap-2">
-                          <Pause className="w-4 h-4" />{timeTrackingLoading ? 'Pausar...' : 'Pausa'}
+                      <span className="text-green-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                        Aktiv
+                      </span>
+                    ) : displayTime > 0 ? 'Pausad' : 'Ej påbörjad'}
+                  </span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {isRunning ? (
+                      <>
+                        <Button type="button" variant="warning" size="sm" onClick={() => handleTimeTracking('pause')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center gap-1 text-xs px-2.5 py-1">
+                          <Pause className="w-3 h-3" />Pausa
                         </Button>
-                        <Button type="button" variant="success" onClick={() => handleTimeTracking('complete')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center justify-center gap-2">
-                          <Save className="w-4 h-4" />{timeTrackingLoading ? 'Slutför...' : 'Slutför'}
+                        <Button type="button" variant="success" size="sm" onClick={() => handleTimeTracking('complete')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center gap-1 text-xs px-2.5 py-1">
+                          <Save className="w-3 h-3" />Slutför
                         </Button>
-                      </div>
+                      </>
                     ) : (
-                      <Button type="button" variant="primary" onClick={() => handleTimeTracking('start')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="w-full flex items-center justify-center gap-2">
-                        <Play className="w-4 h-4" />{timeTrackingLoading ? 'Startar...' : (displayTime > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid')}
-                      </Button>
-                    )}
-                    {displayTime > 0 && !isRunning && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => handleTimeTracking('reset')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-400 transition-colors">
-                        <RotateCcw className="w-4 h-4" />{timeTrackingLoading ? 'Återställer...' : 'Nollställ arbetstid'}
-                      </Button>
+                      <>
+                        <Button type="button" variant="primary" size="sm" onClick={() => handleTimeTracking('start')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center gap-1 text-xs px-2.5 py-1">
+                          <Play className="w-3 h-3" />{displayTime > 0 ? 'Återuppta' : 'Starta'}
+                        </Button>
+                        {displayTime > 0 && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => handleTimeTracking('reset')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center gap-1 text-xs px-2 py-1 text-slate-400 hover:text-red-400">
+                            <RotateCcw className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1505,27 +1486,18 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
             {/* Saneringsrapport sektion */}
             {showTimeTracking && (
-              <div className="space-y-3 pt-3 border-t border-slate-700/50">
+              <div className="space-y-1.5 pt-3 border-t border-slate-700/50">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
                   <BookOpen className="w-4 h-4 text-purple-400" />Saneringsrapport
                 </h3>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Rapport & Dokumentation</label>
-                  <textarea
-                    name="rapport"
-                    value={formData.rapport || ''}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                    placeholder="Skriv en detaljerad rapport över utfört arbete, använda metoder, resultat och eventuella rekommendationer för kunden..."
-                  />
-                </div>
-                <div className="text-xs text-slate-400">
-                  <p>• Beskriv vilka metoder som användes</p>
-                  <p>• Dokumentera resultatet av behandlingen</p>
-                  <p>• Ge rekommendationer för framtida förebyggande åtgärder</p>
-                  <p>• Notera eventuella uppföljningsbehov</p>
-                </div>
+                <textarea
+                  name="rapport"
+                  value={formData.rapport || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors"
+                  placeholder="Metoder, resultat, rekommendationer..."
+                />
               </div>
             )}
 
@@ -1558,7 +1530,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
             {/* Bilder sektion - visas för alla ärendetyper */}
             {currentCase && (
-              <div className="space-y-3 pt-3 border-t border-slate-700/50">
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
                   <ImageIcon className="w-4 h-4 text-cyan-400" />Bilder
                 </h3>

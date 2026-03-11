@@ -11,9 +11,9 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, InputProps>(
-  ({ label, error, helperText, icon, as = 'input', rows = 4, className = '', ...props }, ref) => {
+  ({ label, error, helperText, icon, as = 'input', rows = 2, className = '', ...props }, ref) => {
     const baseStyles = `
-      w-full px-4 py-2.5 
+      w-full px-3 py-1.5 
       bg-slate-900/50 
       border border-slate-700 
       rounded-lg 
@@ -32,7 +32,7 @@ const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-slate-300 mb-2">
+          <label className="block text-xs font-medium text-slate-400 mb-1">
             {label}
             {props.required && <span className="text-red-400 ml-1">*</span>}
           </label>
