@@ -103,7 +103,7 @@ export default function CaseArticleSelector({
       setSummary(summaryData)
       if (summaryData.custom_total_price !== null) {
         setCustomPriceEnabled(true)
-        setCustomPriceInput(String(summaryData.custom_total_price))
+        setCustomPriceInput(String(Math.round(summaryData.custom_total_price * 1.25)))
       }
       if (onChange) onChange(itemsData, summaryData)
     } catch (error) {
@@ -303,17 +303,18 @@ export default function CaseArticleSelector({
         setSaving(false)
       }
     } else if (summary) {
-      setCustomPriceInput(String(summary.subtotal))
+      setCustomPriceInput(String(Math.round(summary.subtotal * 1.25)))
     }
   }
 
-  // Debounced anpassat pris update
+  // Debounced anpassat pris update (input är inkl. moms, sparas exkl.)
   const handleCustomPriceChange = (value: string) => {
     setCustomPriceInput(value)
     if (customPriceTimer.current) clearTimeout(customPriceTimer.current)
     customPriceTimer.current = setTimeout(async () => {
-      const price = parseFloat(value)
-      if (!price || price <= 0) return
+      const priceIncl = parseFloat(value)
+      if (!priceIncl || priceIncl <= 0) return
+      const price = priceIncl / 1.25
       if (readOnly || saving) return
       setSaving(true)
       try {
@@ -882,18 +883,17 @@ export default function CaseArticleSelector({
                 <div className="mt-2 space-y-2">
                   <div className="flex items-center gap-1.5">
                     {PRESET_PRICES_INCL.map((priceIncl) => {
-                      const priceExcl = priceIncl / 1.25
-                      const isActive = Math.abs((parseFloat(customPriceInput) || 0) - priceExcl) < 1
-                      const isDisabled = priceExcl < (summary?.subtotal || 0)
+                      const isActive = Math.abs((parseFloat(customPriceInput) || 0) - priceIncl) < 1
+                      const isDisabled = priceIncl < ((summary?.subtotal || 0) * 1.25)
                       return (
                         <button
                           key={priceIncl}
                           type="button"
                           disabled={isDisabled || saving}
                           onClick={() => {
-                            const exclStr = String(Math.round(priceExcl))
-                            setCustomPriceInput(exclStr)
-                            handleCustomPriceChange(exclStr)
+                            const inclStr = String(priceIncl)
+                            setCustomPriceInput(inclStr)
+                            handleCustomPriceChange(inclStr)
                           }}
                           className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
                             isActive
@@ -911,30 +911,31 @@ export default function CaseArticleSelector({
                   <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    min={summary.subtotal}
+                    min={Math.round(summary.subtotal * 1.25)}
                     step="100"
                     value={customPriceInput}
                     onChange={(e) => handleCustomPriceChange(e.target.value)}
                     disabled={saving}
                     className="w-28 px-2.5 py-1.5 text-sm bg-slate-700 border border-slate-600 rounded text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                   />
-                  <span className="text-xs text-slate-400">kr exkl. moms</span>
+                  <span className="text-xs text-slate-400">kr inkl. moms</span>
                   <div className="flex-1 text-right">
                     {(() => {
-                      const cp = parseFloat(customPriceInput) || 0
-                      const cpInkl = cp * 1.25
-                      const isBelowMin = cp < summary.subtotal
+                      const cpInkl = parseFloat(customPriceInput) || 0
+                      const cpExkl = cpInkl / 1.25
+                      const momsAmount = cpInkl - cpExkl
+                      const minInkl = summary.subtotal * 1.25
+                      const isBelowMin = cpInkl < minInkl
                       return (
                         <>
                           {isBelowMin ? (
                             <div className="text-xs text-orange-400">
-                              Priset måste överstiga {formatPrice(summary.subtotal)}
+                              Priset måste överstiga {formatPrice(minInkl)}
                             </div>
                           ) : (
                             <>
-                              <div className="text-sm font-bold text-[#20c58f]">
-                                {formatPrice(cpInkl)}
-                                <span className="text-xs font-normal text-slate-500 ml-1">inkl. moms</span>
+                              <div className="text-xs text-slate-400">
+                                {formatPrice(cpExkl)} + {formatPrice(momsAmount)} moms
                               </div>
                               {summary.rot_rut_deduction > 0 && (
                                 <div className="text-xs text-[#20c58f] font-medium">
