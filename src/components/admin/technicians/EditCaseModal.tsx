@@ -878,10 +878,16 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     }
   }
 
+  const autoResize = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 256) + 'px'
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const finalValue = type === 'number' ? (value === '' ? null : parseFloat(value)) : value;
     setFormData(prev => ({ ...prev, [name]: finalValue }));
+    if (e.target instanceof HTMLTextAreaElement) autoResize(e.target);
   }
 
   // Specialhanterare för adressfältet som bevarar JSON-struktur men uppdaterar formatted_address
@@ -1269,8 +1275,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 name="description"
                 value={formData.description || ''}
                 onChange={handleChange}
-                style={{ fieldSizing: 'content' as any, minHeight: '3.5rem', maxHeight: '16rem' }}
-                className="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 leading-relaxed overflow-y-auto"
+                ref={(el) => { if (el) autoResize(el) }}
+                rows={2}
+                style={{ maxHeight: '16rem' }}
+                className="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 leading-relaxed overflow-y-auto resize-none"
                 placeholder="Beskriv ärendet i detalj..."
               />
             </div>
@@ -1434,8 +1442,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   name="rapport"
                   value={formData.rapport || ''}
                   onChange={handleChange}
-                  style={{ fieldSizing: 'content' as any, minHeight: '3.5rem', maxHeight: '16rem' }}
-                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors overflow-y-auto"
+                  ref={(el) => { if (el) autoResize(el) }}
+                  rows={2}
+                  style={{ maxHeight: '16rem' }}
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors overflow-y-auto resize-none"
                   placeholder="Metoder, resultat, rekommendationer..."
                 />
               </div>
