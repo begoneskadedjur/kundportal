@@ -23,6 +23,7 @@ import {
   Wrench,
   AlertCircle,
   ClipboardList,
+  AlertTriangle,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -80,6 +81,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/teknikerstatistik' },
       { label: 'Användarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
+      { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/admin/tillbud-avvikelser' },
     ]
   },
   {
@@ -153,4 +155,5 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/artiklar': 'Artiklar',
   '/admin/prislistor': 'Prislistor',
   '/admin/kundgrupper': 'Kundgrupper',
+  '/admin/tillbud-avvikelser': 'Tillbud & Avvikelser',
 }

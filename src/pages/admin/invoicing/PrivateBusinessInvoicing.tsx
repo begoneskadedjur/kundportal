@@ -13,12 +13,17 @@ import {
   FileEdit,
   XCircle,
   Eye,
-  Clock
+  Clock,
+  Home,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { InvoiceService } from '../../../services/invoiceService'
 import type { Invoice, InvoiceStatus, InvoiceStats } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
+import { calculateRotRutDeduction, ROT_RUT_PERCENT } from '../../../types/caseBilling'
+import type { RotRutType } from '../../../types/caseBilling'
 import InvoiceDetailModal from '../../../components/admin/invoicing/InvoiceDetailModal'
 
 export default function PrivateBusinessInvoicing() {
@@ -33,6 +38,8 @@ export default function PrivateBusinessInvoicing() {
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'all'>('all')
   const [caseTypeFilter, setCaseTypeFilter] = useState<'all' | 'private' | 'business'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [rotRutExpanded, setRotRutExpanded] = useState(false)
+  const [rotRutFilter, setRotRutFilter] = useState<'all' | 'ROT' | 'RUT'>('all')
 
   // Ladda data
   const loadData = useCallback(async () => {
@@ -202,6 +209,90 @@ export default function PrivateBusinessInvoicing() {
           Fortnox
         </button>
       </div>
+
+      {/* ROT/RUT-sammanställning */}
+      {(() => {
+        const rotRutInvoices = invoices.filter(i => i.rot_rut_type && i.status !== 'cancelled' && i.status !== 'paid')
+        if (rotRutInvoices.length === 0) return null
+
+        const filteredRotRut = rotRutFilter === 'all' ? rotRutInvoices : rotRutInvoices.filter(i => i.rot_rut_type === rotRutFilter)
+        const totalDeduction = filteredRotRut.reduce((sum, inv) => {
+          return sum + calculateRotRutDeduction(inv.subtotal, inv.rot_rut_type as RotRutType)
+        }, 0)
+        const rotCount = rotRutInvoices.filter(i => i.rot_rut_type === 'ROT').length
+        const rutCount = rotRutInvoices.filter(i => i.rot_rut_type === 'RUT').length
+
+        return (
+          <div className="bg-[#20c58f]/5 border border-[#20c58f]/20 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setRotRutExpanded(!rotRutExpanded)}
+              className="w-full flex items-center justify-between px-3 py-2 hover:bg-[#20c58f]/10 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Home className="w-4 h-4 text-[#20c58f]" />
+                <span className="text-sm font-semibold text-[#20c58f]">ROT/RUT att ansöka om</span>
+                <span className="px-1.5 py-0.5 text-xs rounded-full bg-[#20c58f]/20 text-[#20c58f]">
+                  {rotRutInvoices.length} fakturor
+                </span>
+                {rotCount > 0 && <span className="px-1.5 py-0.5 text-xs rounded bg-amber-500/20 text-amber-400">ROT: {rotCount}</span>}
+                {rutCount > 0 && <span className="px-1.5 py-0.5 text-xs rounded bg-blue-500/20 text-blue-400">RUT: {rutCount}</span>}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-[#20c58f]">{formatInvoiceAmount(totalDeduction)}</span>
+                {rotRutExpanded ? <ChevronUp className="w-4 h-4 text-[#20c58f]" /> : <ChevronDown className="w-4 h-4 text-[#20c58f]" />}
+              </div>
+            </button>
+
+            {rotRutExpanded && (
+              <div className="px-3 pb-3 border-t border-[#20c58f]/20">
+                <div className="flex items-center gap-2 py-2">
+                  {(['all', 'ROT', 'RUT'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setRotRutFilter(f)}
+                      className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                        rotRutFilter === f ? 'bg-[#20c58f] text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {f === 'all' ? 'Alla' : f}
+                    </button>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  {filteredRotRut.map(inv => {
+                    const deduction = calculateRotRutDeduction(inv.subtotal, inv.rot_rut_type as RotRutType)
+                    const percent = ROT_RUT_PERCENT[inv.rot_rut_type as RotRutType]
+                    return (
+                      <div key={inv.id} className="flex items-center justify-between px-2 py-1.5 bg-slate-800/40 rounded text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-slate-400">{inv.invoice_number || '-'}</span>
+                          <span className="text-white">{inv.customer_name}</span>
+                          <span className={`px-1 py-0.5 text-xs rounded ${
+                            inv.rot_rut_type === 'ROT' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'
+                          }`}>{inv.rot_rut_type} {percent}%</span>
+                          <StatusBadge status={inv.status} />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {inv.fastighetsbeteckning && (
+                            <span className="text-xs text-slate-500">{inv.fastighetsbeteckning}</span>
+                          )}
+                          <span className="font-medium text-[#20c58f]">{formatInvoiceAmount(deduction)}</span>
+                          <button
+                            onClick={() => setSelectedInvoiceId(inv.id)}
+                            className="p-0.5 text-slate-400 hover:text-white"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Tabell med sticky header */}
       <div className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden">

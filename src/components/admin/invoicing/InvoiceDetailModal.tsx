@@ -400,6 +400,40 @@ export default function InvoiceDetailModal({
                   })()}
                 </div>
 
+                {/* ROT/RUT att ansöka om — framträdande ruta */}
+                {(() => {
+                  const rotRutDeduction = invoice.items.reduce((sum, item) =>
+                    sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type), 0)
+                  if (rotRutDeduction <= 0) return null
+                  return (
+                    <div className="bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Home className="w-4 h-4 text-[#20c58f]" />
+                        <h3 className="text-sm font-semibold text-[#20c58f]">Att ansöka om hos Skatteverket</h3>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-sm text-slate-300">
+                            {invoice.rot_rut_type}-avdrag ({ROT_RUT_PERCENT[invoice.rot_rut_type!]}%)
+                          </span>
+                          <span className="text-lg font-bold text-[#20c58f]">
+                            {formatInvoiceAmount(rotRutDeduction)}
+                          </span>
+                        </div>
+                        {invoice.fastighetsbeteckning && (
+                          <div className="text-xs text-slate-400">
+                            Fastighetsbeteckning: <span className="text-slate-300">{invoice.fastighetsbeteckning}</span>
+                          </div>
+                        )}
+                        <div className="text-xs text-slate-400">
+                          Kund: <span className="text-slate-300">{invoice.customer_name}</span>
+                          {invoice.organization_number && ` (${invoice.organization_number})`}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* Varning om rabatt kräver godkännande */}
                 {invoice.requires_approval && invoice.status === 'pending_approval' && (
                   <div className="flex items-start gap-3 p-3 bg-orange-500/20 border border-orange-500/30 rounded-lg">
