@@ -84,7 +84,7 @@ export default function CasePreparationsSection({
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-800/70 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-800/70 transition-colors"
       >
         <div className="flex items-center gap-2">
           <div className="p-1.5 bg-purple-500/20 rounded-lg">
@@ -168,7 +168,7 @@ export default function CasePreparationsSection({
               {!isReadOnly && (
                 <>
                   {showAddForm ? (
-                    <div className="p-4 bg-slate-700/30 rounded-lg space-y-3 border border-slate-600">
+                    <div className="p-3 bg-slate-700/30 rounded-lg space-y-3 border border-slate-600">
                       {/* Välj preparat */}
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">

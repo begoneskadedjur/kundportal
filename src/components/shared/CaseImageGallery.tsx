@@ -846,7 +846,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
       {/* Draft mode upload button */}
       {draftMode && canEdit && (
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 px-4 py-2 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/40 text-teal-300 rounded-lg cursor-pointer transition-colors">
+          <label className="flex items-center gap-2 px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/40 text-teal-300 rounded-lg cursor-pointer transition-colors text-sm">
             <Plus className="w-4 h-4" />
             Lägg till bilder
             <input
@@ -922,9 +922,9 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
 
       {/* Tomt state */}
       {displayImages.length === 0 && (
-        <div className="text-center py-3 text-slate-500">
-          <ImageIcon className="w-6 h-6 mx-auto mb-1 opacity-50" />
-          <p className="text-xs">Inga bilder</p>
+        <div className="flex items-center gap-2 py-1.5 text-slate-500">
+          <ImageIcon className="w-4 h-4 opacity-50" />
+          <span className="text-xs">Inga bilder</span>
         </div>
       )}
 

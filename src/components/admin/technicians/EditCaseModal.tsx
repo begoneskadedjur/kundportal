@@ -961,11 +961,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   }
 
   const footer = (
-    <div className="flex gap-3 px-4 py-2.5 bg-slate-800/50">
-      <Button type="button" variant="secondary" onClick={onClose} disabled={loading || timeTrackingLoading} className="flex-1">
+    <div className="flex justify-end gap-2 px-4 py-2 bg-slate-800/50">
+      <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={loading || timeTrackingLoading}>
         Avbryt
       </Button>
-      <Button type="submit" form="edit-case-form" loading={loading} disabled={loading || timeTrackingLoading} className="flex-1">
+      <Button type="submit" form="edit-case-form" size="sm" loading={loading} disabled={loading || timeTrackingLoading}>
         Spara ändringar
       </Button>
     </div>
@@ -1258,7 +1258,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
         <BackupRestorePrompt pendingRestore={pendingRestore} onRestore={handleSuccessfulRestore} onDismiss={clearBackup} />
 
-        <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-4">
+        <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-3">
           {error && (
             <div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -1552,34 +1552,16 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             )}
 
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* DANGER ZONE - Radera ärende (separerad från arbetsflödet)           */}
-            {/* ═══════════════════════════════════════════════════════════════════ */}
-            <div className="mt-4 pt-3 border-t-2 border-red-500/30">
-              <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
-                {/* Rubrik med varningsikon */}
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertTriangle className="w-5 h-5 text-red-400" />
-                  <h4 className="text-sm font-medium text-red-400">
-                    Farligt område
-                  </h4>
-                </div>
-
-                {/* Förklarande text */}
-                <p className="text-xs text-slate-400 mb-4">
-                  Radering av ärende kan inte ångras. All data, inklusive bilder och kommunikation, kommer att tas bort permanent.
-                </p>
-
-                {/* Radera-knapp - medvetet mindre framträdande */}
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 text-sm text-red-400 bg-transparent border border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 rounded-lg transition-all duration-200"
-                  aria-label="Radera ärende permanent - kan inte ångras"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Radera detta ärende</span>
-                </button>
-              </div>
+            {/* Radera ärende */}
+            <div className="pt-3 border-t border-slate-700/50">
+              <button
+                type="button"
+                onClick={() => setShowDeleteDialog(true)}
+                className="flex items-center gap-2 text-xs text-red-400/70 hover:text-red-400 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Radera ärende</span>
+              </button>
             </div>
 
           </div>
