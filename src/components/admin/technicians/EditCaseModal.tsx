@@ -1265,12 +1265,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             )}
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning</label>
-              <textarea 
-                name="description" 
-                value={formData.description || ''} 
-                onChange={handleChange} 
-                rows={2}
-                className="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 leading-relaxed resize-vertical" 
+              <textarea
+                name="description"
+                value={formData.description || ''}
+                onChange={handleChange}
+                style={{ fieldSizing: 'content' as any, minHeight: '3.5rem', maxHeight: '16rem' }}
+                className="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 leading-relaxed overflow-y-auto"
                 placeholder="Beskriv ärendet i detalj..."
               />
             </div>
@@ -1361,6 +1361,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                               onChange={(date) => handleDateChange(date, 'start_date')}
                               locale="sv"
                               showTimeSelect
+                              timeCaption="Tid"
                               timeFormat="HH:mm"
                               timeIntervals={15}
                               dateFormat="yyyy-MM-dd HH:mm"
@@ -1375,6 +1376,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                               onChange={(date) => handleDateChange(date, 'due_date')}
                               locale="sv"
                               showTimeSelect
+                              timeCaption="Tid"
                               timeFormat="HH:mm"
                               timeIntervals={15}
                               dateFormat="yyyy-MM-dd HH:mm"
@@ -1432,8 +1434,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   name="rapport"
                   value={formData.rapport || ''}
                   onChange={handleChange}
-                  rows={2}
-                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors"
+                  style={{ fieldSizing: 'content' as any, minHeight: '3.5rem', maxHeight: '16rem' }}
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors overflow-y-auto"
                   placeholder="Metoder, resultat, rekommendationer..."
                 />
               </div>
