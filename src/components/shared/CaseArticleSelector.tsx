@@ -45,6 +45,9 @@ interface CaseArticleSelectorProps {
 
 const ALL_CATEGORIES: ArticleCategory[] = ['Inspektion', 'Bekämpning', 'Tillbehör', 'Arbetstid', 'Övrigt']
 
+// Förvalda priser inkl. moms för snabbval
+const PRESET_PRICES_INCL = [3490, 4490, 5490]
+
 const formatPrice = (price: number) =>
   new Intl.NumberFormat('sv-SE', {
     style: 'currency',
@@ -876,7 +879,36 @@ export default function CaseArticleSelector({
                 <span className="text-xs text-slate-300">Anpassat pris</span>
               </label>
               {customPriceEnabled && (
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    {PRESET_PRICES_INCL.map((priceIncl) => {
+                      const priceExcl = priceIncl / 1.25
+                      const isActive = Math.abs((parseFloat(customPriceInput) || 0) - priceExcl) < 1
+                      const isDisabled = priceExcl < (summary?.subtotal || 0)
+                      return (
+                        <button
+                          key={priceIncl}
+                          type="button"
+                          disabled={isDisabled || saving}
+                          onClick={() => {
+                            const exclStr = String(Math.round(priceExcl))
+                            setCustomPriceInput(exclStr)
+                            handleCustomPriceChange(exclStr)
+                          }}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                            isActive
+                              ? 'bg-[#20c58f]/20 border-[#20c58f] text-[#20c58f]'
+                              : isDisabled
+                                ? 'bg-slate-700/50 border-slate-600/50 text-slate-500 opacity-50 cursor-not-allowed'
+                                : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          {new Intl.NumberFormat('sv-SE').format(priceIncl)} kr
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2">
                   <input
                     type="number"
                     min={summary.subtotal}
@@ -915,6 +947,7 @@ export default function CaseArticleSelector({
                       )
                     })()}
                   </div>
+                </div>
                 </div>
               )}
             </div>
