@@ -2,19 +2,25 @@
 // Admin-sida för att visa alla tillbud & avvikelser
 
 import { useState, useEffect, useCallback } from 'react'
-import { AlertTriangle, Search, RefreshCw, Calendar, User, Filter } from 'lucide-react'
+import { AlertTriangle, Search, RefreshCw, Calendar } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import type { CaseIncident, IncidentType } from '../../types/caseIncidents'
 import { INCIDENT_TYPE_CONFIG } from '../../types/caseIncidents'
+import DatePicker from 'react-datepicker'
+import { registerLocale } from 'react-datepicker'
+import sv from 'date-fns/locale/sv'
+import '../../styles/DatePickerDarkTheme.css'
+
+registerLocale('sv', sv)
 
 export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<CaseIncident[]>([])
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<'all' | IncidentType>('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [dateFrom, setDateFrom] = useState<Date | null>(null)
+  const [dateTo, setDateTo] = useState<Date | null>(null)
 
   const fetchIncidents = useCallback(async () => {
     setLoading(true)
@@ -28,10 +34,10 @@ export default function IncidentsPage() {
         query = query.eq('type', typeFilter)
       }
       if (dateFrom) {
-        query = query.gte('occurred_at', dateFrom)
+        query = query.gte('occurred_at', dateFrom.toISOString().split('T')[0])
       }
       if (dateTo) {
-        query = query.lte('occurred_at', dateTo + 'T23:59:59')
+        query = query.lte('occurred_at', dateTo.toISOString().split('T')[0] + 'T23:59:59')
       }
 
       const { data, error } = await query
@@ -67,34 +73,56 @@ export default function IncidentsPage() {
   const last30Days = incidents.filter(i => new Date(i.occurred_at) >= thirtyDaysAgo).length
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500">
+            <AlertTriangle className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Tillbud & Avvikelser</h1>
+            <p className="text-slate-400 text-sm">Rapporterade tillbud och avvikelser från fältarbete</p>
+          </div>
+        </div>
+        <button
+          onClick={fetchIncidents}
+          disabled={loading}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-white transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Uppdatera
+        </button>
+      </div>
+
       {/* Statistik-kort */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-medium text-amber-400 uppercase">Tillbud</span>
+            <span className="text-xs font-medium text-amber-400 uppercase tracking-wide">Tillbud</span>
           </div>
           <span className="text-2xl font-bold text-white">{totalTillbud}</span>
         </div>
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            <span className="text-xs font-medium text-red-400 uppercase">Avvikelser</span>
+            <span className="text-xs font-medium text-red-400 uppercase tracking-wide">Avvikelser</span>
           </div>
           <span className="text-2xl font-bold text-white">{totalAvvikelse}</span>
         </div>
-        <div className="bg-slate-700/30 border border-slate-700 rounded-lg p-3">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
             <Calendar className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-400 uppercase">Senaste 30 dagar</span>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Senaste 30 dagar</span>
           </div>
           <span className="text-2xl font-bold text-white">{last30Days}</span>
         </div>
       </div>
 
       {/* Filter-rad */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-800/50 rounded-lg">
+        {/* Sök */}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -102,109 +130,116 @@ export default function IncidentsPage() {
             placeholder="Sök beskrivning, tekniker..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8 pr-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#20c58f] w-56"
+            className="pl-8 pr-3 py-2 text-sm bg-slate-900/50 border border-slate-700 rounded-md text-white placeholder-slate-500 focus:outline-none focus:border-[#20c58f] w-56"
           />
         </div>
 
-        <div className="w-px h-6 bg-slate-700" />
+        <div className="w-px h-7 bg-slate-700" />
 
-        {(['all', 'tillbud', 'avvikelse'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTypeFilter(t)}
-            className={`px-2.5 py-1.5 text-sm rounded-lg border transition-colors ${
-              typeFilter === t
-                ? t === 'tillbud' ? 'bg-amber-500/20 text-amber-400 border-amber-500'
-                  : t === 'avvikelse' ? 'bg-red-500/20 text-red-400 border-red-500'
-                  : 'bg-[#20c58f]/20 text-[#20c58f] border-[#20c58f]'
-                : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600'
-            }`}
-          >
-            {t === 'all' ? 'Alla' : INCIDENT_TYPE_CONFIG[t].label}
-          </button>
-        ))}
+        {/* Typ-filter */}
+        {(['all', 'tillbud', 'avvikelse'] as const).map(t => {
+          const isActive = typeFilter === t
+          const activeColor = t === 'tillbud'
+            ? 'bg-amber-500/20 text-amber-400'
+            : t === 'avvikelse'
+              ? 'bg-red-500/20 text-red-400'
+              : 'bg-[#20c58f]/20 text-[#20c58f]'
+          return (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                isActive ? activeColor : 'bg-transparent text-slate-400 hover:bg-slate-700/50'
+              }`}
+            >
+              <span>{t === 'all' ? 'Alla' : INCIDENT_TYPE_CONFIG[t].label}</span>
+              <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${isActive ? 'bg-white/20' : 'bg-slate-700'}`}>
+                {t === 'all' ? incidents.length : incidents.filter(i => i.type === t).length}
+              </span>
+            </button>
+          )
+        })}
 
-        <div className="w-px h-6 bg-slate-700" />
+        <div className="w-px h-7 bg-slate-700" />
 
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="px-2.5 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-[#20c58f]"
-        />
-        <span className="text-slate-500 text-sm">—</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="px-2.5 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-[#20c58f]"
-        />
-
-        <div className="flex-1" />
-
-        <button
-          onClick={fetchIncidents}
-          disabled={loading}
-          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
-          title="Uppdatera"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        {/* Datumväljare */}
+        <div className="flex items-center gap-2">
+          <DatePicker
+            selected={dateFrom}
+            onChange={(date) => setDateFrom(date)}
+            dateFormat="yyyy-MM-dd"
+            locale="sv"
+            placeholderText="Från datum"
+            isClearable
+            className="px-3 py-2 text-sm bg-slate-900/50 border border-slate-700 rounded-md text-white placeholder-slate-500 focus:outline-none focus:border-[#20c58f] w-36"
+          />
+          <span className="text-slate-500 text-sm">—</span>
+          <DatePicker
+            selected={dateTo}
+            onChange={(date) => setDateTo(date)}
+            dateFormat="yyyy-MM-dd"
+            locale="sv"
+            placeholderText="Till datum"
+            isClearable
+            className="px-3 py-2 text-sm bg-slate-900/50 border border-slate-700 rounded-md text-white placeholder-slate-500 focus:outline-none focus:border-[#20c58f] w-36"
+          />
+        </div>
       </div>
 
       {/* Tabell */}
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-12">
             <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
             <span className="ml-2 text-sm text-slate-400">Laddar...</span>
           </div>
         ) : filteredIncidents.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
-            <AlertTriangle className="w-10 h-10 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Inga tillbud eller avvikelser hittades</p>
+          <div className="text-center py-12 text-slate-400">
+            <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-medium">Inga tillbud eller avvikelser hittades</p>
+            <p className="text-xs text-slate-500 mt-1">Tillbud och avvikelser rapporteras via ärenden</p>
           </div>
         ) : (
-          <div className="max-h-[calc(100vh-380px)] overflow-auto">
+          <div className="max-h-[calc(100vh-480px)] overflow-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-900/80 sticky top-0 z-10">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Typ</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Beskrivning</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Ärende</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Tekniker</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Rapporterad av</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Datum</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Typ</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Beskrivning</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Ärende</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Tekniker</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Rapporterad av</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Datum</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
                 {filteredIncidents.map(incident => {
                   const config = INCIDENT_TYPE_CONFIG[incident.type as IncidentType]
                   return (
-                    <tr key={incident.id} className="hover:bg-slate-700/30">
-                      <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${config.bgColor} ${config.color}`}>
+                    <tr key={incident.id} className="hover:bg-slate-700/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${config.bgColor} ${config.color}`}>
                           {config.label}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-white max-w-md">
+                      <td className="px-4 py-3 text-white max-w-md">
                         <p className="truncate">{incident.description}</p>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         <span className="text-xs text-slate-400 font-mono">{incident.case_id.slice(0, 8)}...</span>
-                        <span className={`ml-1 px-1 py-0.5 text-xs rounded ${
+                        <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded ${
                           incident.case_type === 'private' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
                         }`}>
                           {incident.case_type === 'private' ? 'Privat' : incident.case_type === 'business' ? 'Företag' : 'Avtal'}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-slate-300">
+                      <td className="px-4 py-3 text-slate-300">
                         {incident.technician_name || '-'}
                       </td>
-                      <td className="px-3 py-2 text-slate-300">
+                      <td className="px-4 py-3 text-slate-300">
                         {incident.reported_by_name}
                       </td>
-                      <td className="px-3 py-2 text-slate-400 text-xs whitespace-nowrap">
+                      <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
                         {new Date(incident.occurred_at).toLocaleDateString('sv-SE')}{' '}
                         {new Date(incident.occurred_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
                       </td>
@@ -217,7 +252,7 @@ export default function IncidentsPage() {
         )}
 
         {filteredIncidents.length > 0 && (
-          <div className="px-3 py-2 bg-slate-900/50 border-t border-slate-700 text-sm text-slate-400">
+          <div className="px-4 py-2.5 bg-slate-900/50 border-t border-slate-700 text-sm text-slate-400">
             {filteredIncidents.length} poster
           </div>
         )}
