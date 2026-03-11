@@ -24,9 +24,13 @@ import {
   ClipboardCheck,
   ChevronDown,
   ChevronUp,
-  MessageSquare
+  MessageSquare,
+  FlaskConical,
+  Timer,
+  Home
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { supabase } from '../../../lib/supabase'
 import { InvoiceService } from '../../../services/invoiceService'
 import type { InvoiceWithItems, InvoiceStatus } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
@@ -39,6 +43,17 @@ import EmbeddedMapPreview from '../../communication/EmbeddedMapPreview'
 import { createSystemComment } from '../../../services/communicationService'
 import { useAuth } from '../../../contexts/AuthContext'
 import type { CaseType } from '../../../types/communication'
+import type { CasePreparationWithDetails } from '../../../types/casePreparations'
+
+// Formatera minuter till "Xh Ym"
+const formatTimeSpent = (minutes: number | null): string | null => {
+  if (!minutes || minutes <= 0) return null
+  const h = Math.floor(minutes / 60)
+  const m = Math.round(minutes % 60)
+  if (h > 0 && m > 0) return `${h}h ${m}m`
+  if (h > 0) return `${h}h`
+  return `${m}m`
+}
 
 interface InvoiceDetailModalProps {
   isOpen: boolean
@@ -58,12 +73,28 @@ export default function InvoiceDetailModal({
   const [loading, setLoading] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [contextExpanded, setContextExpanded] = useState(false)
+  const [preparations, setPreparations] = useState<CasePreparationWithDetails[]>([])
 
   // Hämta ärendekontext via case_id/case_type
   const { caseContext, isLoading: contextLoading } = useCaseContext(
     isOpen && invoice ? invoice.case_id : null,
     isOpen && invoice ? (invoice.case_type as CaseType) : null
   )
+
+  // Hämta preparat för ärendet
+  useEffect(() => {
+    if (!invoice) { setPreparations([]); return }
+    const fetchPreparations = async () => {
+      const { data } = await supabase
+        .from('case_preparations')
+        .select('*, preparation:preparations(*)')
+        .eq('case_id', invoice.case_id)
+        .eq('case_type', invoice.case_type)
+        .order('created_at', { ascending: true })
+      setPreparations((data as CasePreparationWithDetails[] | null) || [])
+    }
+    fetchPreparations()
+  }, [invoice?.case_id, invoice?.case_type])
 
   // Ladda fakturadata
   useEffect(() => {
@@ -505,6 +536,62 @@ export default function InvoiceDetailModal({
                         </div>
                       )}
 
+                      {/* Arbetstid */}
+                      {formatTimeSpent(caseContext.timeSpentMinutes) && (
+                        <div className="space-y-1">
+                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                            <Timer className="w-3 h-3 text-green-400" />
+                            Arbetstid
+                          </h4>
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
+                            <p className="text-sm text-slate-200 font-medium">{formatTimeSpent(caseContext.timeSpentMinutes)}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ROT/RUT */}
+                      {caseContext.rotRut && (
+                        <div className="space-y-1">
+                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                            <Home className="w-3 h-3 text-[#20c58f]" />
+                            {caseContext.rotRut}-avdrag
+                          </h4>
+                          <div className="bg-[#20c58f]/5 rounded-lg p-2.5 border border-[#20c58f]/20">
+                            <span className="px-1.5 py-0.5 text-xs rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
+                              {caseContext.rotRut}
+                            </span>
+                            {caseContext.fastighetsbeteckning && (
+                              <p className="text-xs text-slate-400 mt-1">Fastighet: {caseContext.fastighetsbeteckning}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Preparat */}
+                      {preparations.length > 0 && (
+                        <div className="space-y-1">
+                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                            <FlaskConical className="w-3 h-3 text-teal-400" />
+                            Använda preparat
+                          </h4>
+                          <div className="bg-slate-900/50 rounded-lg border border-slate-700/50 divide-y divide-slate-700/50">
+                            {preparations.map(p => (
+                              <div key={p.id} className="px-2.5 py-2 flex items-center justify-between">
+                                <div>
+                                  <span className="text-sm text-slate-200">{p.preparation?.name || 'Okänt preparat'}</span>
+                                  {p.preparation?.type && (
+                                    <span className="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-teal-500/20 text-teal-400 font-medium">
+                                      {p.preparation.type}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-slate-400">{p.quantity} {p.unit}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Plats */}
                       {caseContext.address && (
                         <EmbeddedMapPreview
@@ -580,10 +667,22 @@ export default function InvoiceDetailModal({
                           {caseContext.primaryAssigneeName && (
                             <span className="text-xs text-slate-400">• {caseContext.primaryAssigneeName}</span>
                           )}
+                          {formatTimeSpent(caseContext.timeSpentMinutes) && (
+                            <span className="text-xs text-green-400">• {formatTimeSpent(caseContext.timeSpentMinutes)}</span>
+                          )}
                         </div>
                         {caseContext.rapport && (
                           <div className="bg-amber-500/5 rounded-lg p-2 border border-amber-500/20">
                             <p className="text-xs text-slate-300 line-clamp-3">{caseContext.rapport}</p>
+                          </div>
+                        )}
+                        {preparations.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {preparations.map(p => (
+                              <span key={p.id} className="px-1.5 py-0.5 text-[10px] rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                                {p.preparation?.name} ({p.quantity} {p.unit})
+                              </span>
+                            ))}
                           </div>
                         )}
                       </div>

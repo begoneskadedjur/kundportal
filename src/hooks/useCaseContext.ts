@@ -41,6 +41,13 @@ export interface CaseContext {
   // Price
   price: number | null;
 
+  // Time tracking
+  timeSpentMinutes: number | null;
+
+  // ROT/RUT (private cases only)
+  rotRut: string | null;
+  fastighetsbeteckning: string | null;
+
   // Assignees
   primaryAssigneeName: string | null;
   secondaryAssigneeName: string | null;
@@ -124,6 +131,9 @@ const transformPrivateCase = (data: PrivateCasesRow): CaseContext => {
     description: data.description,
     rapport: data.rapport,
     price: data.pris,
+    timeSpentMinutes: data.time_spent_minutes ?? null,
+    rotRut: data.r_rot_rut ?? null,
+    fastighetsbeteckning: data.r_fastighetsbeteckning ?? null,
     primaryAssigneeName: data.primary_assignee_name,
     secondaryAssigneeName: data.secondary_assignee_name,
     tertiaryAssigneeName: data.tertiary_assignee_name,
@@ -155,6 +165,9 @@ const transformBusinessCase = (data: BusinessCasesRow): CaseContext => {
     description: data.description,
     rapport: data.rapport,
     price: data.pris,
+    timeSpentMinutes: data.time_spent_minutes ?? null,
+    rotRut: null,
+    fastighetsbeteckning: null,
     primaryAssigneeName: data.primary_assignee_name,
     secondaryAssigneeName: data.secondary_assignee_name,
     tertiaryAssigneeName: data.tertiary_assignee_name,
