@@ -19,6 +19,7 @@ import {
   calculateDiscountedPrice,
   calculateTotalPrice,
   calculateVatAmount,
+  calculateRotRutDeduction,
   itemRequiresApproval
 } from '../types/caseBilling'
 import { PriceListService } from './priceListService'
@@ -266,6 +267,8 @@ export class CaseBillingService {
         total_price: totalPrice,
         requires_approval: itemRequiresApproval(discountPercent),
         notes: input.notes !== undefined ? input.notes : existing.notes,
+        rot_rut_type: input.rot_rut_type !== undefined ? input.rot_rut_type : existing.rot_rut_type,
+        fastighetsbeteckning: input.fastighetsbeteckning !== undefined ? input.fastighetsbeteckning : existing.fastighetsbeteckning,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -327,6 +330,9 @@ export class CaseBillingService {
       return sum + calculateVatAmount(item.total_price, item.vat_rate)
     }, 0)
     const requiresApproval = items.some(item => item.requires_approval)
+    const rotRutDeduction = items.reduce((sum, item) => {
+      return sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type)
+    }, 0)
 
     return {
       item_count: items.length,
@@ -334,7 +340,8 @@ export class CaseBillingService {
       total_discount: totalDiscount,
       vat_amount: vatAmount,
       total_amount: subtotal + vatAmount,
-      requires_approval: requiresApproval
+      requires_approval: requiresApproval,
+      rot_rut_deduction: rotRutDeduction
     }
   }
 

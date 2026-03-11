@@ -24,6 +24,7 @@ import toast from 'react-hot-toast'
 import { InvoiceService } from '../../../services/invoiceService'
 import type { InvoiceWithItems, InvoiceStatus, InvoiceItem } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
+import { calculateRotRutDeduction, ROT_RUT_PERCENT } from '../../../types/caseBilling'
 
 interface InvoiceDetailModalProps {
   isOpen: boolean
@@ -177,6 +178,15 @@ export default function InvoiceDetailModal({
                       <span className="text-slate-300">{invoice.customer_address}</span>
                     </div>
                   )}
+                  {invoice.fastighetsbeteckning && (
+                    <div className="flex items-start gap-2">
+                      <Building2 className="w-4 h-4 text-slate-400 mt-0.5" />
+                      <div>
+                        <div className="text-xs text-slate-400">Fastighetsbeteckning</div>
+                        <div className="text-white">{invoice.fastighetsbeteckning}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -235,6 +245,18 @@ export default function InvoiceDetailModal({
                             {item.article_code && (
                               <div className="text-xs text-slate-500">{item.article_code}</div>
                             )}
+                            {item.rot_rut_type && (
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="px-1.5 py-0.5 text-[10px] rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
+                                  {item.rot_rut_type} ({ROT_RUT_PERCENT[item.rot_rut_type]}%)
+                                </span>
+                                {item.fastighetsbeteckning && (
+                                  <span className="text-[10px] text-slate-500">
+                                    Fastighet: {item.fastighetsbeteckning}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right text-slate-300">{item.quantity}</td>
                           <td className="px-4 py-3 text-right text-slate-300">
@@ -262,22 +284,42 @@ export default function InvoiceDetailModal({
 
               {/* Summering */}
               <div className="bg-slate-800/50 rounded-lg p-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-slate-400">
-                    <span>Summa exkl. moms</span>
-                    <span className="text-white">{formatInvoiceAmount(invoice.subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-400">
-                    <span>Moms</span>
-                    <span className="text-white">{formatInvoiceAmount(invoice.vat_amount)}</span>
-                  </div>
-                  <div className="pt-2 border-t border-slate-700 flex justify-between">
-                    <span className="text-lg font-semibold text-white">Totalt att betala</span>
-                    <span className="text-2xl font-bold text-emerald-400">
-                      {formatInvoiceAmount(invoice.total_amount)}
-                    </span>
-                  </div>
-                </div>
+                {(() => {
+                  const rotRutDeduction = invoice.items.reduce((sum, item) =>
+                    sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type), 0)
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-slate-400">
+                        <span>Summa exkl. moms</span>
+                        <span className="text-white">{formatInvoiceAmount(invoice.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>Moms</span>
+                        <span className="text-white">{formatInvoiceAmount(invoice.vat_amount)}</span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-700 flex justify-between">
+                        <span className="text-lg font-semibold text-white">Totalt</span>
+                        <span className="text-2xl font-bold text-emerald-400">
+                          {formatInvoiceAmount(invoice.total_amount)}
+                        </span>
+                      </div>
+                      {rotRutDeduction > 0 && (
+                        <>
+                          <div className="flex justify-between text-[#20c58f]">
+                            <span>{invoice.rot_rut_type}-avdrag ({ROT_RUT_PERCENT[invoice.rot_rut_type!]}%)</span>
+                            <span>-{formatInvoiceAmount(rotRutDeduction)}</span>
+                          </div>
+                          <div className="pt-2 border-t border-slate-700 flex justify-between">
+                            <span className="text-lg font-semibold text-[#20c58f]">Att betala efter avdrag</span>
+                            <span className="text-2xl font-bold text-[#20c58f]">
+                              {formatInvoiceAmount(invoice.total_amount - rotRutDeduction)}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Varning om rabatt kräver godkännande */}

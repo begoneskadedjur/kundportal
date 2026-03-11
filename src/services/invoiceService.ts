@@ -97,7 +97,9 @@ export class InvoiceService {
         total_amount: totals.total_amount,
         status: requiresApproval ? 'pending_approval' : 'ready',
         requires_approval: requiresApproval,
-        due_date: calculateDueDate(30)
+        due_date: calculateDueDate(30),
+        rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
+        fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null
       })
       .select()
       .single()
@@ -119,7 +121,9 @@ export class InvoiceService {
           unit_price: item.unit_price,
           discount_percent: item.discount_percent,
           total_price: item.total_price,
-          vat_rate: item.vat_rate
+          vat_rate: item.vat_rate,
+          rot_rut_type: item.rot_rut_type || null,
+          fastighetsbeteckning: item.fastighetsbeteckning || null
         })
         .select()
         .single()
@@ -178,6 +182,13 @@ export class InvoiceService {
 
     if (error) throw new Error(`Databasfel: ${error.message}`)
     return data || []
+  }
+
+  /**
+   * Hämta faktura med rader (alias)
+   */
+  static async getInvoice(id: string): Promise<InvoiceWithItems | null> {
+    return this.getInvoiceWithItems(id)
   }
 
   /**

@@ -19,6 +19,11 @@ export type PriceSource = 'standard' | 'customer_list'
 export type CaseBillingItemStatus = 'pending' | 'approved' | 'billed' | 'cancelled'
 
 /**
+ * ROT/RUT-typ för skatteavdrag
+ */
+export type RotRutType = 'ROT' | 'RUT'
+
+/**
  * Case billing item från databasen
  */
 export interface CaseBillingItem {
@@ -41,6 +46,8 @@ export interface CaseBillingItem {
   status: CaseBillingItemStatus
   requires_approval: boolean
   notes: string | null
+  rot_rut_type: RotRutType | null
+  fastighetsbeteckning: string | null
   created_at: string
   updated_at: string
 }
@@ -83,6 +90,8 @@ export interface UpdateCaseArticleInput {
   quantity?: number
   discount_percent?: number
   notes?: string
+  rot_rut_type?: RotRutType | null
+  fastighetsbeteckning?: string | null
 }
 
 /**
@@ -113,6 +122,7 @@ export interface CaseBillingSummary {
   vat_amount: number
   total_amount: number
   requires_approval: boolean
+  rot_rut_deduction: number
 }
 
 /**
@@ -192,4 +202,23 @@ export const formatPriceSource = (source: PriceSource): string => {
  */
 export const itemRequiresApproval = (discountPercent: number): boolean => {
   return discountPercent > 0
+}
+
+/**
+ * ROT/RUT-avdragsprocent
+ */
+export const ROT_RUT_PERCENT: Record<RotRutType, number> = {
+  ROT: 30,
+  RUT: 50
+}
+
+/**
+ * Beräkna ROT/RUT-avdrag på arbetskostnad
+ */
+export const calculateRotRutDeduction = (
+  totalPrice: number,
+  rotRutType: RotRutType | null
+): number => {
+  if (!rotRutType) return 0
+  return totalPrice * (ROT_RUT_PERCENT[rotRutType] / 100)
 }

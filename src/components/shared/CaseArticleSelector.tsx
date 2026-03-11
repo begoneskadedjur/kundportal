@@ -25,8 +25,10 @@ import type {
   CaseBillingItemWithRelations,
   ArticleWithEffectivePrice,
   BillableCaseType,
-  CaseBillingSummary
+  CaseBillingSummary,
+  RotRutType
 } from '../../types/caseBilling'
+import { calculateRotRutDeduction, ROT_RUT_PERCENT } from '../../types/caseBilling'
 import type { ArticleCategory } from '../../types/articles'
 import { ARTICLE_CATEGORY_CONFIG, ARTICLE_UNIT_CONFIG, DOSAGE_UNIT_CONFIG, calculatePricePerDosageUnit } from '../../types/articles'
 
@@ -80,6 +82,7 @@ export default function CaseArticleSelector({
   const [showArticleList, setShowArticleList] = useState(false)
   const discountTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const dosageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const fastighetsTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   const loadData = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true)
@@ -110,6 +113,7 @@ export default function CaseArticleSelector({
     return () => {
       Object.values(discountTimers.current).forEach(clearTimeout)
       Object.values(dosageTimers.current).forEach(clearTimeout)
+      Object.values(fastighetsTimers.current).forEach(clearTimeout)
     }
   }, [])
 
@@ -232,6 +236,41 @@ export default function CaseArticleSelector({
     if (dosageTimers.current[item.id]) clearTimeout(dosageTimers.current[item.id])
     dosageTimers.current[item.id] = setTimeout(() => {
       handleUpdateQuantity(item, value - item.quantity)
+    }, 600)
+  }
+
+  // ROT/RUT type update
+  const handleRotRutChange = async (item: CaseBillingItem, rotRutType: RotRutType | null) => {
+    if (readOnly || saving) return
+    setSaving(true)
+    try {
+      await CaseBillingService.updateCaseArticle(item.id, {
+        rot_rut_type: rotRutType,
+        fastighetsbeteckning: rotRutType ? item.fastighetsbeteckning : null
+      })
+      await loadData()
+    } catch (error) {
+      console.error('Kunde inte uppdatera ROT/RUT:', error)
+      toast.error('Kunde inte uppdatera ROT/RUT')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Debounced fastighetsbeteckning update
+  const handleFastighetsChange = (item: CaseBillingItem, value: string) => {
+    if (fastighetsTimers.current[item.id]) clearTimeout(fastighetsTimers.current[item.id])
+    fastighetsTimers.current[item.id] = setTimeout(async () => {
+      if (readOnly || saving) return
+      setSaving(true)
+      try {
+        await CaseBillingService.updateCaseArticle(item.id, { fastighetsbeteckning: value || null })
+        await loadData()
+      } catch (error) {
+        console.error('Kunde inte uppdatera fastighetsbeteckning:', error)
+      } finally {
+        setSaving(false)
+      }
     }, 600)
   }
 
@@ -612,6 +651,69 @@ export default function CaseArticleSelector({
                         <span className="text-xs text-orange-400">-{item.discount_percent}%</span>
                       )}
                     </div>
+
+                    {/* ROT/RUT — bara för privatärenden med arbetstid/avdragsgiltiga artiklar */}
+                    {caseType === 'private' && article && (article.category === 'Arbetstid' || article.rot_eligible || article.rut_eligible) && (
+                      <div className="mt-2 p-2 bg-slate-800/30 border border-slate-700/50 rounded-lg">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`rot-rut-${item.id}`}
+                              checked={!item.rot_rut_type}
+                              onChange={() => handleRotRutChange(item, null)}
+                              disabled={readOnly || saving}
+                              className="text-[#20c58f] focus:ring-[#20c58f]"
+                            />
+                            <span className="text-xs text-slate-400">Inget avdrag</span>
+                          </label>
+                          {(article.rot_eligible !== false) && (
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`rot-rut-${item.id}`}
+                                checked={item.rot_rut_type === 'ROT'}
+                                onChange={() => handleRotRutChange(item, 'ROT')}
+                                disabled={readOnly || saving}
+                                className="text-[#20c58f] focus:ring-[#20c58f]"
+                              />
+                              <span className="text-xs text-white">ROT ({ROT_RUT_PERCENT.ROT}%)</span>
+                            </label>
+                          )}
+                          {(article.rut_eligible !== false) && (
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`rot-rut-${item.id}`}
+                                checked={item.rot_rut_type === 'RUT'}
+                                onChange={() => handleRotRutChange(item, 'RUT')}
+                                disabled={readOnly || saving}
+                                className="text-[#20c58f] focus:ring-[#20c58f]"
+                              />
+                              <span className="text-xs text-white">RUT ({ROT_RUT_PERCENT.RUT}%)</span>
+                            </label>
+                          )}
+                          {item.rot_rut_type && (
+                            <span className="px-1.5 py-0.5 text-[10px] rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
+                              Avdrag: -{formatPrice(calculateRotRutDeduction(item.total_price, item.rot_rut_type))}
+                            </span>
+                          )}
+                        </div>
+                        {item.rot_rut_type && (
+                          <div className="mt-2">
+                            <input
+                              type="text"
+                              placeholder="Fastighetsbeteckning (t.ex. Lennartsnässundet 3:12)"
+                              defaultValue={item.fastighetsbeteckning || ''}
+                              key={`fastighet-${item.id}-${item.rot_rut_type}`}
+                              onChange={(e) => handleFastighetsChange(item, e.target.value)}
+                              disabled={readOnly || saving}
+                              className="w-full px-2.5 py-1 text-xs bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Totalpris + ta bort */}
@@ -648,6 +750,11 @@ export default function CaseArticleSelector({
                   Rabatt: -{formatPrice(summary.total_discount)}
                 </span>
               )}
+              {summary.rot_rut_deduction > 0 && (
+                <span className="ml-1.5 text-[#20c58f]">
+                  ROT/RUT: -{formatPrice(summary.rot_rut_deduction)}
+                </span>
+              )}
             </div>
             <div className="text-right">
               <div className="text-xs text-slate-500">
@@ -657,6 +764,11 @@ export default function CaseArticleSelector({
                 {formatPrice(summary.total_amount)}
                 <span className="text-xs font-normal text-slate-500 ml-1">inkl. moms</span>
               </div>
+              {summary.rot_rut_deduction > 0 && (
+                <div className="text-xs text-[#20c58f] font-medium">
+                  Att betala: {formatPrice(summary.total_amount - summary.rot_rut_deduction)}
+                </div>
+              )}
             </div>
           </div>
           {summary.requires_approval && (

@@ -270,6 +270,11 @@ export default function PrivateBusinessInvoicing() {
                         }`}>
                           {invoice.case_type === 'private' ? 'Privat' : 'Företag'}
                         </span>
+                        {invoice.rot_rut_type && (
+                          <span className="ml-1 px-1.5 py-0.5 text-xs rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
+                            {invoice.rot_rut_type}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-slate-400 text-xs">
                         <div>{formatInvoiceDate(invoice.created_at)}</div>

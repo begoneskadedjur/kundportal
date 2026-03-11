@@ -1,7 +1,7 @@
 // src/types/invoice.ts
 // Typer för fakturor (privat/företag direktfakturering)
 
-import type { BillableCaseType } from './caseBilling'
+import type { BillableCaseType, RotRutType } from './caseBilling'
 
 /**
  * Fakturastatus
@@ -41,6 +41,10 @@ export interface Invoice {
   due_date: string | null
 
   notes: string | null
+
+  // ROT/RUT (aggregerat från items)
+  rot_rut_type: RotRutType | null
+  fastighetsbeteckning: string | null
 }
 
 /**
@@ -77,6 +81,8 @@ export interface InvoiceItem {
   discount_percent: number
   total_price: number
   vat_rate: number
+  rot_rut_type: RotRutType | null
+  fastighetsbeteckning: string | null
   created_at: string
 }
 
@@ -108,6 +114,8 @@ export interface CreateInvoiceItemInput {
   unit_price: number
   discount_percent?: number
   vat_rate?: number
+  rot_rut_type?: RotRutType | null
+  fastighetsbeteckning?: string | null
 }
 
 /**
