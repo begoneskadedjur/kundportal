@@ -19,7 +19,7 @@ import { convertArticlesToOneflowProducts, generateArticleContractDescription } 
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
-import { CaseBillingService } from '../../services/CaseBillingService'
+import { CaseBillingService } from '../../services/caseBillingService'
 import toast from 'react-hot-toast'
 
 interface WizardData {
