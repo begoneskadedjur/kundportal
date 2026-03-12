@@ -3,10 +3,17 @@
 
 export type IncidentType = 'tillbud' | 'avvikelse'
 
+export interface IncidentEmployee {
+  id: string
+  incident_id: string
+  technician_id: string
+  technician_name: string
+}
+
 export interface CaseIncident {
   id: string
-  case_id: string
-  case_type: 'private' | 'business' | 'contract'
+  case_id: string | null
+  case_type: 'private' | 'business' | 'contract' | null
   type: IncidentType
   description: string
   occurred_at: string
@@ -16,11 +23,12 @@ export interface CaseIncident {
   technician_name: string | null
   created_at: string
   updated_at: string
+  incident_employees?: IncidentEmployee[]
 }
 
 export interface CreateCaseIncidentInput {
-  case_id: string
-  case_type: 'private' | 'business' | 'contract'
+  case_id?: string | null
+  case_type?: 'private' | 'business' | 'contract' | null
   type: IncidentType
   description: string
   occurred_at?: string

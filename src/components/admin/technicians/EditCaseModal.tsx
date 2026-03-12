@@ -54,8 +54,6 @@ import type { DeleteableCaseType } from '../../../services/caseDeleteService'
 // Återbesök modal
 import RevisitModal from './RevisitModal'
 
-// Tillbud & Avvikelser
-import CaseIncidentsSection from '../../shared/CaseIncidentsSection'
 
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
@@ -1547,17 +1545,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               </div>
             )}
 
-            {/* Tillbud & Avvikelser */}
-            {currentCase && (
-              <CaseIncidentsSection
-                caseId={currentCase.id}
-                caseType={currentCase.case_type as 'private' | 'business'}
-                technicianId={currentCase.primary_assignee_id || null}
-                technicianName={currentCase.primary_assignee_name || null}
-                reportedById={profile?.id || null}
-                reportedByName={profile?.full_name || profile?.email || 'Okänd'}
-              />
-            )}
 
           </div>
         </form>

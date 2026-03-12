@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import {
   DollarSign, FileText, ClipboardList, Calendar,
-  TrendingUp, Award, Clock, AlertCircle,
+  TrendingUp, Award, Clock, AlertCircle, AlertTriangle,
   Plus, Eye, ArrowRight, ChevronDown, ChevronUp, Info, Briefcase, Target, MapPin, Sparkles
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -740,6 +740,24 @@ export default function TechnicianDashboard() {
                 </motion.div>
                 <div className="text-left"><p className="font-medium text-white">Team AI Chat</p><p className="text-cyan-300 text-sm">AI-assistent & bildanalys</p></div>
                 <ArrowRight className="w-4 h-4 text-cyan-400 ml-auto group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/technician/tillbud-avvikelser')}
+              className="p-4 bg-gradient-to-br from-amber-500/20 to-red-600/20 border border-amber-500/30 rounded-lg hover:from-amber-500/30 hover:to-red-600/30 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <motion.div
+                  whileHover={{ rotate: 10 }}
+                  className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center group-hover:bg-amber-500/30 transition-colors"
+                >
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                </motion.div>
+                <div className="text-left"><p className="font-medium text-white">Rapportera tillbud</p><p className="text-amber-300 text-sm">Tillbud & avvikelser</p></div>
+                <ArrowRight className="w-4 h-4 text-amber-400 ml-auto group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.button>
 

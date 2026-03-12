@@ -452,6 +452,12 @@ export default function CoordinatorDashboard() {
           description="AI-optimerad inbokning"
           to="/koordinator/booking-assistant"
         />
+        <QuickActionCard
+          icon={AlertTriangle}
+          label="Rapportera tillbud"
+          description="Tillbud & avvikelser"
+          to="/koordinator/tillbud-avvikelser"
+        />
       </motion.div>
 
       {/* === E. Insights Row (2 columns) === */}

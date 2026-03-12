@@ -221,6 +221,7 @@ function App() {
 
               {/* Organisation */}
               <Route path="tickets" element={<ProtectedRoute requiredRole="koordinator"><InternAdministration /></ProtectedRoute>} />
+              <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="koordinator"><IncidentsPage /></ProtectedRoute>} />
 
               {/* Verktyg */}
               <Route path="team-chat" element={<ProtectedRoute requiredRole="koordinator"><TeamChat /></ProtectedRoute>} />
@@ -353,6 +354,15 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="technician">
                   <CaseDeletionGuide />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/technician/tillbud-avvikelser"
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <IncidentsPage />
                 </ProtectedRoute>
               }
             />
