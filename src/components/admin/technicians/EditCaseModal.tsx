@@ -486,19 +486,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     const customerData = prepareCustomerData();
     if (!customerData || !currentCase) return;
 
-    // Bestäm rätt offertmall baserat på ärendetyp och ROT/RUT
-    let selectedTemplate = '8919037' // Default: Privatperson inkl moms
-    if (currentCase.case_type === 'business') {
-      selectedTemplate = '8598798' // Företag exkl moms
-    } else {
-      const rotRut = formData.r_rot_rut || currentCase.r_rot_rut || ''
-      if (rotRut.toLowerCase().includes('rot')) {
-        selectedTemplate = '8919012' // ROT
-      } else if (rotRut.toLowerCase().includes('rut')) {
-        selectedTemplate = '8919059' // RUT
-      }
-    }
-
     // Hämta prislista-ID (kundens eller standard)
     let selectedPriceListId: string | null = null
     try {
@@ -522,9 +509,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
     // Hämta ärendets artiklar för förifyllning
     let prefillArticles: any[] = []
+    let billingItems: any[] = []
     try {
       const caseType = currentCase.case_type === 'private' ? 'private' : 'business'
-      const billingItems = await CaseBillingService.getCaseBillingItems(currentCase.id, caseType as any)
+      billingItems = await CaseBillingService.getCaseBillingItems(currentCase.id, caseType as any)
       prefillArticles = billingItems
         .filter(item => item.article) // Bara items med kopplad artikel
         .map(item => ({
@@ -538,6 +526,23 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       console.warn('Kunde inte hämta ärendets artiklar:', err)
     }
 
+    // Härleda deductionType från artiklarnas faktiska rot_rut_type
+    let deductionType: 'rot' | 'rut' | 'none' = 'none'
+    const hasRot = billingItems.some(item => item.rot_rut_type === 'ROT')
+    const hasRut = billingItems.some(item => item.rot_rut_type === 'RUT')
+    if (hasRot) deductionType = 'rot'
+    else if (hasRut) deductionType = 'rut'
+
+    // Bestäm rätt offertmall baserat på ärendetyp och artiklarnas avdragsval
+    let selectedTemplate = '8919037' // Default: Privatperson inkl moms
+    if (currentCase.case_type === 'business') {
+      selectedTemplate = '8598798' // Företag exkl moms
+    } else if (deductionType === 'rot') {
+      selectedTemplate = '8919012' // ROT
+    } else if (deductionType === 'rut') {
+      selectedTemplate = '8919059' // RUT
+    }
+
     // Spara data för förifyllning
     sessionStorage.setItem('prefill_customer_data', JSON.stringify({
       ...customerData,
@@ -545,7 +550,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       autoSelectTemplate: true,
       selectedTemplate,
       selectedPriceListId,
-      prefillArticles
+      prefillArticles,
+      deductionType
     }));
 
     // Navigera till avtalskaparen med rollbaserad route

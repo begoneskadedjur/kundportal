@@ -48,6 +48,7 @@ interface WizardData {
   // Steg 6 - Prislista & Artiklar
   selectedPriceListId: string | null
   selectedArticles: SelectedArticleItem[]
+  deductionType: 'rot' | 'rut' | 'none' | null
   selectedProducts: SelectedProduct[]
   
   // Steg 7 - Avtalsobjekt
@@ -131,6 +132,7 @@ export default function OneflowContractCreator() {
     'org-nr': '',
     selectedPriceListId: null,
     selectedArticles: [],
+    deductionType: null,
     selectedProducts: [],
     agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
     sendForSigning: true,
@@ -187,6 +189,8 @@ export default function OneflowContractCreator() {
             selectedArticles: customerData.prefillArticles?.length > 0
               ? customerData.prefillArticles
               : prev.selectedArticles,
+            // ROT/RUT-avdragstyp från ärendet
+            deductionType: customerData.deductionType || prev.deductionType,
           }))
           
           // Debug-logging för att spåra prefill-processen
@@ -1061,6 +1065,7 @@ export default function OneflowContractCreator() {
                   <ArticleSummary
                     selectedArticles={wizardData.selectedArticles}
                     customerType={wizardData.partyType as CustomerType}
+                    deductionType={wizardData.deductionType}
                   />
                 </div>
               </div>
@@ -1219,6 +1224,7 @@ export default function OneflowContractCreator() {
               <ArticleSummary
                 selectedArticles={wizardData.selectedArticles}
                 customerType={wizardData.partyType as CustomerType}
+                deductionType={wizardData.deductionType}
               />
             )}
 

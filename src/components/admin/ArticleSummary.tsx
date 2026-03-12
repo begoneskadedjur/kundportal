@@ -17,6 +17,7 @@ interface ArticleSummaryProps {
   priceListName?: string
   onRemoveArticle?: (articleId: string) => void
   className?: string
+  deductionType?: 'rot' | 'rut' | 'none' | null
 }
 
 export default function ArticleSummary({
@@ -24,7 +25,8 @@ export default function ArticleSummary({
   customerType,
   priceListName,
   onRemoveArticle,
-  className = ''
+  className = '',
+  deductionType
 }: ArticleSummaryProps) {
   if (selectedArticles.length === 0) {
     return (
@@ -36,7 +38,7 @@ export default function ArticleSummary({
     )
   }
 
-  const summary = calculateArticlePriceSummary(selectedArticles, customerType)
+  const summary = calculateArticlePriceSummary(selectedArticles, customerType, deductionType)
 
   return (
     <div className={`space-y-4 ${className}`}>

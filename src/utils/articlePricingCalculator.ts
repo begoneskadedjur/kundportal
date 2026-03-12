@@ -35,12 +35,18 @@ export function calculateArticleRUTDeduction(items: SelectedArticleItem[]): numb
 
 export function calculateArticlePriceSummary(
   items: SelectedArticleItem[],
-  customerType: CustomerType
+  customerType: CustomerType,
+  deductionType?: 'rot' | 'rut' | 'none' | null
 ) {
   const subtotal = calculateArticleSubtotal(items)
   const vatAmount = calculateArticleVAT(items)
-  const rotDeduction = customerType === 'individual' ? calculateArticleROTDeduction(items) : 0
-  const rutDeduction = customerType === 'individual' ? calculateArticleRUTDeduction(items) : 0
+
+  // 'rot' → bara ROT. 'rut' → bara RUT. Allt annat → inga avdrag.
+  const showRot = deductionType === 'rot'
+  const showRut = deductionType === 'rut'
+
+  const rotDeduction = (customerType === 'individual' && showRot) ? calculateArticleROTDeduction(items) : 0
+  const rutDeduction = (customerType === 'individual' && showRut) ? calculateArticleRUTDeduction(items) : 0
 
   const totalBeforeDeduction = customerType === 'company'
     ? subtotal + vatAmount
