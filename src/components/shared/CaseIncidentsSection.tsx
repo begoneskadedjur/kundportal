@@ -84,6 +84,39 @@ export default function CaseIncidentsSection({
 
       if (error) throw error
 
+      // Skicka notis till alla incidentmottagare
+      try {
+        const { data: recipients } = await supabase
+          .from('profiles')
+          .select('id, display_name')
+          .eq('incident_recipient', true)
+
+        if (recipients?.length) {
+          const typeLabel = INCIDENT_TYPE_CONFIG[formData.type].label
+          const notifications = recipients
+            .filter(r => r.id !== reportedById) // Exkludera avsändaren
+            .map(r => ({
+              recipient_id: r.id,
+              case_id: caseId,
+              case_type: caseType,
+              title: `Ny ${typeLabel.toLowerCase()}`,
+              preview: formData.description.trim().slice(0, 200),
+              sender_name: reportedByName,
+              sender_id: reportedById,
+              is_read: false,
+              source_comment_id: null,
+              case_title: technicianName ? `Tekniker: ${technicianName}` : null
+            }))
+
+          if (notifications.length > 0) {
+            await supabase.from('notifications').insert(notifications)
+          }
+        }
+      } catch (notifErr) {
+        console.error('Error sending incident notifications:', notifErr)
+        // Fortsätt ändå — incidenten är sparad
+      }
+
       toast.success(`${INCIDENT_TYPE_CONFIG[formData.type].label} rapporterad`)
       setFormData({ type: 'tillbud', description: '' })
       setShowForm(false)

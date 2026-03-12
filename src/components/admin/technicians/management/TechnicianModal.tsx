@@ -2,7 +2,8 @@
 // FULLSTÄNDIG VERSION MED KOMPETENSKARTA INTEGRERAD
 
 import React, { useState, useEffect } from 'react'
-import { User, Key, Car, Wrench, AlertCircle, Shield } from 'lucide-react'
+import { User, Key, Car, Wrench, AlertCircle, Shield, AlertTriangle } from 'lucide-react'
+import { supabase } from '../../../../lib/supabase'
 import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
 import LoadingSpinner from '../../../shared/LoadingSpinner'
@@ -29,6 +30,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
   const [formData, setFormData] = useState<Partial<TechnicianFormData>>({})
   const [selectedCompetencies, setSelectedCompetencies] = useState<Set<PestType>>(new Set())
   const [alsoAdmin, setAlsoAdmin] = useState(false)
+  const [incidentRecipient, setIncidentRecipient] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -44,6 +46,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
           display_name: technician.display_name || technician.name || ''
         });
         setAlsoAdmin(technician.is_admin || false);
+        setIncidentRecipient(technician.incident_recipient || false);
         // Hämta och sätt befintliga kompetenser
         const currentCompetencies = await technicianManagementService.getCompetencies(technician.id);
         setSelectedCompetencies(new Set(currentCompetencies));
@@ -52,6 +55,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
         setFormData({ name: '', role: 'Skadedjurstekniker', email: '', direct_phone: '', office_phone: '', address: '', abax_vehicle_id: '' });
         setSelectedCompetencies(new Set());
         setAlsoAdmin(false);
+        setIncidentRecipient(false);
       }
       setPassword('');
     };
@@ -97,6 +101,13 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
           if (shouldBeAdmin !== (technician.is_admin || false)) {
             await technicianManagementService.toggleAdminAccess(technician.id, shouldBeAdmin);
           }
+        }
+        // Synka incident_recipient om ändrats
+        if (technician.has_login && incidentRecipient !== (technician.incident_recipient || false)) {
+          await supabase
+            .from('profiles')
+            .update({ incident_recipient: incidentRecipient })
+            .eq('technician_id', technician.id)
         }
         if (password.trim() && technician.user_id) {
           await technicianManagementService.updateUserPassword(technician.user_id, password);
@@ -163,6 +174,24 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
                 <div>
                   <span className="text-sm font-medium text-slate-300">Även admin-behörighet</span>
                   <p className="text-xs text-slate-500">Personen får tillgång till admin-panelen utöver sin primära roll</p>
+                </div>
+              </div>
+            </label>
+          )}
+          {/* Incidentmottagare - visas om personen har inloggning */}
+          {technician?.has_login && (
+            <label className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer hover:border-slate-600 transition-colors">
+              <input
+                type="checkbox"
+                checked={incidentRecipient}
+                onChange={(e) => setIncidentRecipient(e.target.checked)}
+                className="h-4 w-4 rounded bg-slate-700 border-slate-500 text-[#20c58f] focus:ring-[#20c58f]"
+              />
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <div>
+                  <span className="text-sm font-medium text-slate-300">Mottagare av tillbud & avvikelser</span>
+                  <p className="text-xs text-slate-500">Får notiser och kan se detaljer vid inkomna tillbud och avvikelser</p>
                 </div>
               </div>
             </label>

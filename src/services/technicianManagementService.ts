@@ -40,6 +40,7 @@ export type Technician = {
   user_id?: string | null
   display_name?: string | null
   is_admin?: boolean
+  incident_recipient?: boolean
 }
 
 export type TechnicianFormData = {
@@ -157,7 +158,7 @@ export const technicianManagementService = {
     try {
       const [techniciansRes, profilesRes] = await Promise.all([
         supabase.from('technicians').select('*').order('name', { ascending: true }),
-        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin')
+        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, incident_recipient')
       ]);
       if (techniciansRes.error) throw techniciansRes.error;
       if (profilesRes.error) throw profilesRes.error;
@@ -174,7 +175,8 @@ export const technicianManagementService = {
           has_login: !!profile,
           user_id: profile?.user_id || null,
           display_name: profile?.display_name || tech.name,
-          is_admin: profile?.is_admin || false
+          is_admin: profile?.is_admin || false,
+          incident_recipient: profile?.incident_recipient || false
         };
       });
       return enrichedData;
@@ -425,7 +427,7 @@ export const technicianManagementService = {
 
   async getTechnicianById(id: string): Promise<Technician> {
     try {
-      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name)`).eq('id', id).single();
+      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, incident_recipient)`).eq('id', id).single();
       if (error) throw error;
 
       // FK-join hittar profiler direkt (alla roller har nu technician_id)
@@ -435,7 +437,9 @@ export const technicianManagementService = {
         ...data,
         has_login: !!profile?.user_id,
         user_id: profile?.user_id || null,
-        display_name: profile?.display_name || data.name
+        display_name: profile?.display_name || data.name,
+        is_admin: profile?.is_admin || false,
+        incident_recipient: profile?.incident_recipient || false
       };
     } catch (error: any) {
       console.error('Error fetching staff member:', error);

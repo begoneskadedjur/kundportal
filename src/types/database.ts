@@ -335,6 +335,7 @@ export type Database = {
           customer_id: string | null
           email: string
           is_admin: boolean
+          incident_recipient: boolean
           is_active: boolean
           last_login: string | null
           created_at: string
