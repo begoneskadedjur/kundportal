@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   Search, Plus, Minus, ExternalLink, Copy, FileText,
-  ChevronDown, ChevronRight, ShieldCheck, Leaf, Loader2
+  ChevronDown, ChevronRight, ShieldCheck, Leaf, Loader2, Lock
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -52,7 +52,7 @@ export default function PriceListArticleSelector({
   const [loadingItems, setLoadingItems] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<ArticleCategory | 'all'>('all')
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Bekämpning', 'Inspektion', 'Tillbehör', 'Övrigt']))
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
   // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -248,6 +248,16 @@ export default function PriceListArticleSelector({
 
   return (
     <div className={`space-y-6 ${className}`}>
+      {/* Varning vid readOnly (anpassat pris) */}
+      {readOnly && (
+        <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2">
+          <Lock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <p className="text-sm text-amber-400">
+            Artiklar kan inte ändras eftersom ett anpassat pris är satt på ärendet.
+          </p>
+        </div>
+      )}
+
       {/* Sektion A: Prislisteväljare */}
       <Card className="p-5 border-slate-700">
         <div className="space-y-4">
