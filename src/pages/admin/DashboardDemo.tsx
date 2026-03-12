@@ -316,7 +316,6 @@ const DashboardDemo: React.FC = () => {
 
   const handleSignOut = async () => {
     await signOut()
-    window.location.href = '/login'
   }
 
   return (

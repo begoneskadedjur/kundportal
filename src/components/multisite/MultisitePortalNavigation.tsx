@@ -26,7 +26,6 @@ const MultisitePortalNavigation: React.FC<MultisitePortalNavigationProps> = ({
 
   const handleSignOut = async () => {
     await signOut()
-    window.location.href = '/login'
   }
 
   // Get role display name in Swedish

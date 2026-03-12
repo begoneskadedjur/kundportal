@@ -116,7 +116,6 @@ export default function MultisitePortalLayout({
 
   const handleSignOut = async () => {
     await signOut()
-    window.location.href = '/login'
   }
 
   const selectedSiteName = selectedSiteId === 'all'

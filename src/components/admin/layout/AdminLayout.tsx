@@ -32,7 +32,6 @@ export default function AdminLayout() {
 
   const handleSignOut = async () => {
     await signOut()
-    window.location.href = '/login'
   }
 
   return (

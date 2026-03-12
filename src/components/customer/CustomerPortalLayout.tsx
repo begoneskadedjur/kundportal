@@ -100,7 +100,6 @@ export function CustomerPortalLayout({
 
   const handleSignOut = async () => {
     await signOut()
-    window.location.href = '/login'
   }
 
   return (
