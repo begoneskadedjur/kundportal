@@ -98,6 +98,7 @@ export interface SelectedArticleItem {
   effectivePrice: number
   quantity: number
   notes?: string
+  caseBillingItemId?: string  // Koppling till case_billing_items.id för synk
 }
 
 // Prissammanfattning

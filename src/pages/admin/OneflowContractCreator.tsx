@@ -19,6 +19,7 @@ import { convertArticlesToOneflowProducts, generateArticleContractDescription } 
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
+import { CaseBillingService } from '../../services/CaseBillingService'
 import toast from 'react-hot-toast'
 
 interface WizardData {
@@ -312,6 +313,74 @@ export default function OneflowContractCreator() {
       return updated
     })
   }
+
+  // Synka artikeländringar tillbaka till ärendet (case_billing_items)
+  const handleArticleSelectionChange = useCallback(async (newArticles: SelectedArticleItem[]) => {
+    const oldArticles = wizardData.selectedArticles
+
+    // Uppdatera wizard-state direkt
+    updateWizardData('selectedArticles', newArticles)
+
+    // Ingen case-koppling → avbryt
+    if (!wizardData.case_id) return
+
+    // Anpassat pris → blockera + revert
+    if (wizardData.customTotalPrice != null && wizardData.customTotalPrice > 0) {
+      toast.error('Kan inte ändra artiklar när anpassat pris är aktivt. Ta bort det anpassade priset i ärendet först.')
+      updateWizardData('selectedArticles', oldArticles)
+      return
+    }
+
+    const caseType = wizardData.partyType === 'company' ? 'business' : 'private'
+    const oldMap = new Map(oldArticles.map(a => [a.article.id, a]))
+    const newMap = new Map(newArticles.map(a => [a.article.id, a]))
+
+    try {
+      // BORTTAGNA: finns i old men inte new
+      for (const [articleId, oldItem] of oldMap) {
+        if (!newMap.has(articleId) && oldItem.caseBillingItemId) {
+          await CaseBillingService.removeCaseArticle(oldItem.caseBillingItemId)
+        }
+      }
+
+      // TILLAGDA: finns i new men inte old
+      for (const [articleId, newItem] of newMap) {
+        if (!oldMap.has(articleId)) {
+          const result = await CaseBillingService.addArticleToCase({
+            case_id: wizardData.case_id,
+            case_type: caseType as any,
+            article_id: articleId,
+            article_name: newItem.article.name,
+            article_code: newItem.article.code,
+            unit_price: newItem.effectivePrice,
+            quantity: newItem.quantity,
+            vat_rate: newItem.article.vat_rate,
+            price_source: newItem.priceListItem ? 'customer_list' : 'standard'
+          })
+          newItem.caseBillingItemId = result.id
+        }
+      }
+
+      // KVANTITET ÄNDRAD: samma artikel, annan kvantitet
+      for (const [articleId, newItem] of newMap) {
+        const oldItem = oldMap.get(articleId)
+        if (oldItem && oldItem.quantity !== newItem.quantity && oldItem.caseBillingItemId) {
+          await CaseBillingService.updateCaseArticle(oldItem.caseBillingItemId, {
+            quantity: newItem.quantity
+          })
+          newItem.caseBillingItemId = oldItem.caseBillingItemId
+        } else if (oldItem?.caseBillingItemId && !newItem.caseBillingItemId) {
+          newItem.caseBillingItemId = oldItem.caseBillingItemId
+        }
+      }
+
+      // Uppdatera med patchade IDs
+      updateWizardData('selectedArticles', [...newArticles])
+    } catch (err) {
+      console.error('Synk-fel:', err)
+      toast.error('Kunde inte spara artikeländring till ärendet')
+    }
+  }, [wizardData.case_id, wizardData.customTotalPrice, wizardData.partyType, wizardData.selectedArticles])
 
   // Steg-nummer för produkter-steget (6 för offerter, 7 för avtal)
   const productsStep = isContract ? 7 : 6
@@ -1058,9 +1127,9 @@ export default function OneflowContractCreator() {
                   selectedPriceListId={wizardData.selectedPriceListId}
                   onPriceListChange={(id) => updateWizardData('selectedPriceListId', id)}
                   selectedArticles={wizardData.selectedArticles}
-                  onSelectionChange={(articles) => updateWizardData('selectedArticles', articles)}
+                  onSelectionChange={handleArticleSelectionChange}
                   customerType={wizardData.partyType as CustomerType}
-                  readOnly={profile?.role === 'technician'}
+                  readOnly={!!wizardData.case_id && !!wizardData.customTotalPrice && wizardData.customTotalPrice > 0}
                 />
               </div>
 

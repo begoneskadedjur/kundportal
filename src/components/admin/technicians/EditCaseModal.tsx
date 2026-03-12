@@ -520,7 +520,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           priceListItem: null,
           effectivePrice: item.unit_price,
           quantity: item.quantity,
-          notes: item.notes || undefined
+          notes: item.notes || undefined,
+          caseBillingItemId: item.id
         }))
     } catch (err) {
       console.warn('Kunde inte hämta ärendets artiklar:', err)
