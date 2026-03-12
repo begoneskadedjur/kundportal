@@ -251,6 +251,15 @@ export default function CaseArticleSelector({
     }, 600)
   }
 
+  // Debounced quantity update (for non-dosage articles)
+  const handleQuantityChange = (item: CaseBillingItem, rawValue: string) => {
+    const value = Math.max(1, parseInt(rawValue) || 1)
+    if (dosageTimers.current[item.id]) clearTimeout(dosageTimers.current[item.id])
+    dosageTimers.current[item.id] = setTimeout(() => {
+      handleUpdateQuantity(item, value - item.quantity)
+    }, 600)
+  }
+
   // ROT/RUT type update
   const handleRotRutChange = async (item: CaseBillingItem, rotRutType: RotRutType | null) => {
     if (readOnly || saving) return
@@ -675,7 +684,20 @@ export default function CaseArticleSelector({
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
                             )}
-                            <span className="w-7 text-center text-white text-sm">{item.quantity}</span>
+                            {readOnly ? (
+                              <span className="w-10 text-center text-white text-sm">{item.quantity}</span>
+                            ) : (
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                defaultValue={item.quantity}
+                                key={`qty-${item.id}-${item.quantity}`}
+                                onChange={(e) => handleQuantityChange(item, e.target.value)}
+                                disabled={saving}
+                                className="w-10 px-1 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-white text-center focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                              />
+                            )}
                             {!readOnly && (
                               <button
                                 type="button"
@@ -912,7 +934,7 @@ export default function CaseArticleSelector({
                   <input
                     type="number"
                     min={Math.round(summary.subtotal * 1.25)}
-                    step="100"
+                    step="1"
                     value={customPriceInput}
                     onChange={(e) => handleCustomPriceChange(e.target.value)}
                     disabled={saving}
