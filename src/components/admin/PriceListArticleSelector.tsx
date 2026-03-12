@@ -491,7 +491,7 @@ export default function PriceListArticleSelector({
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <button
                                   onClick={() => handleQuantityChange(article, -1)}
-                                  disabled={qty === 0}
+                                  disabled={qty === 0 || readOnly}
                                   className="w-7 h-7 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                 >
                                   <Minus className="w-3.5 h-3.5" />
@@ -505,7 +505,8 @@ export default function PriceListArticleSelector({
 
                                 <button
                                   onClick={() => handleQuantityChange(article, 1)}
-                                  className="w-7 h-7 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+                                  disabled={readOnly}
+                                  className="w-7 h-7 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                 >
                                   <Plus className="w-3.5 h-3.5" />
                                 </button>
