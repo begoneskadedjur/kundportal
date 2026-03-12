@@ -543,6 +543,15 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       selectedTemplate = '8919059' // RUT
     }
 
+    // Hämta eventuellt anpassat pris (exkl moms)
+    let customTotalPrice: number | null = null
+    try {
+      const caseType = currentCase.case_type === 'private' ? 'private' : 'business'
+      customTotalPrice = await CaseBillingService.getCustomPrice(currentCase.id, caseType as any)
+    } catch (err) {
+      console.warn('Kunde inte hämta anpassat pris:', err)
+    }
+
     // Spara data för förifyllning
     sessionStorage.setItem('prefill_customer_data', JSON.stringify({
       ...customerData,
@@ -551,7 +560,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       selectedTemplate,
       selectedPriceListId,
       prefillArticles,
-      deductionType
+      deductionType,
+      customTotalPrice
     }));
 
     // Navigera till avtalskaparen med rollbaserad route

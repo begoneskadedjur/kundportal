@@ -18,6 +18,7 @@ interface ArticleSummaryProps {
   onRemoveArticle?: (articleId: string) => void
   className?: string
   deductionType?: 'rot' | 'rut' | 'none' | null
+  customTotalPrice?: number | null
 }
 
 export default function ArticleSummary({
@@ -26,7 +27,8 @@ export default function ArticleSummary({
   priceListName,
   onRemoveArticle,
   className = '',
-  deductionType
+  deductionType,
+  customTotalPrice
 }: ArticleSummaryProps) {
   if (selectedArticles.length === 0) {
     return (
@@ -38,7 +40,13 @@ export default function ArticleSummary({
     )
   }
 
-  const summary = calculateArticlePriceSummary(selectedArticles, customerType, deductionType)
+  const hasCustomPrice = customTotalPrice != null && customTotalPrice > 0
+  const summary = hasCustomPrice ? null : calculateArticlePriceSummary(selectedArticles, customerType, deductionType)
+
+  // Anpassat pris: beräkna inkl/exkl moms
+  const customPriceExkl = hasCustomPrice ? customTotalPrice : 0
+  const customPriceInkl = hasCustomPrice ? Math.round(customTotalPrice * 1.25) : 0
+  const customVat = hasCustomPrice ? customPriceInkl - customPriceExkl : 0
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -55,7 +63,7 @@ export default function ArticleSummary({
         <div className="flex items-center gap-2 mb-3">
           <Calculator className="w-4 h-4 text-green-400" />
           <h3 className="text-sm font-semibold text-white">
-            Valda artiklar ({summary.itemCount})
+            Valda artiklar ({selectedArticles.reduce((sum, i) => sum + i.quantity, 0)})
           </h3>
         </div>
 
@@ -78,43 +86,48 @@ export default function ArticleSummary({
                     <span className="text-xs text-slate-400">× {item.quantity}</span>
                   </div>
 
-                  {/* ROT/RUT badges */}
-                  <div className="flex gap-1 mt-1">
-                    {item.article.rot_eligible && (
-                      <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 text-[10px] rounded flex items-center gap-0.5">
-                        <ShieldCheck className="w-2.5 h-2.5" />
-                        ROT
-                      </span>
-                    )}
-                    {item.article.rut_eligible && (
-                      <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-[10px] rounded flex items-center gap-0.5">
-                        <Leaf className="w-2.5 h-2.5" />
-                        RUT
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <div className="text-right">
-                    <div className="text-sm text-white font-medium">
-                      {formatArticlePrice(lineTotal)}
+                  {/* ROT/RUT badges — döljs vid anpassat pris */}
+                  {!hasCustomPrice && (
+                    <div className="flex gap-1 mt-1">
+                      {item.article.rot_eligible && (
+                        <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 text-[10px] rounded flex items-center gap-0.5">
+                          <ShieldCheck className="w-2.5 h-2.5" />
+                          ROT
+                        </span>
+                      )}
+                      {item.article.rut_eligible && (
+                        <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-[10px] rounded flex items-center gap-0.5">
+                          <Leaf className="w-2.5 h-2.5" />
+                          RUT
+                        </span>
+                      )}
                     </div>
-                    <div className="text-[10px] text-slate-500">
-                      {formatArticlePrice(item.effectivePrice)} / {item.article.unit}
-                    </div>
-                  </div>
-
-                  {onRemoveArticle && (
-                    <button
-                      onClick={() => onRemoveArticle(item.article.id)}
-                      className="p-1 text-slate-500 hover:text-red-400 transition-colors"
-                      title="Ta bort"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
                   )}
                 </div>
+
+                {/* Priser — döljs vid anpassat pris */}
+                {!hasCustomPrice && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="text-right">
+                      <div className="text-sm text-white font-medium">
+                        {formatArticlePrice(lineTotal)}
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        {formatArticlePrice(item.effectivePrice)} / {item.article.unit}
+                      </div>
+                    </div>
+
+                    {onRemoveArticle && (
+                      <button
+                        onClick={() => onRemoveArticle(item.article.id)}
+                        className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                        title="Ta bort"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -125,62 +138,81 @@ export default function ArticleSummary({
       <Card className="p-4">
         <h3 className="text-sm font-semibold text-white mb-3">Prissammanfattning</h3>
 
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between text-slate-300">
-            <span>Summa exkl. moms</span>
-            <span>{formatArticlePrice(summary.subtotal)}</span>
-          </div>
-
-          <div className="flex justify-between text-slate-300">
-            <span>Moms</span>
-            <span>{formatArticlePrice(summary.vatAmount)}</span>
-          </div>
-
-          <div className="border-t border-slate-700 pt-2">
-            <div className="flex justify-between font-semibold text-white">
-              <span>Totalt inkl. moms</span>
-              <span>{formatArticlePrice(summary.totalBeforeDeduction)}</span>
+        {hasCustomPrice ? (
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-slate-300">
+              <span>Anpassat pris exkl. moms</span>
+              <span>{formatArticlePrice(customPriceExkl)}</span>
+            </div>
+            <div className="flex justify-between text-slate-300">
+              <span>Moms</span>
+              <span>{formatArticlePrice(customVat)}</span>
+            </div>
+            <div className="border-t border-slate-700 pt-2">
+              <div className="flex justify-between font-bold text-lg text-[#20c58f]">
+                <span>Totalt inkl. moms</span>
+                <span>{formatArticlePrice(customPriceInkl)}</span>
+              </div>
             </div>
           </div>
+        ) : summary && (
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-slate-300">
+              <span>Summa exkl. moms</span>
+              <span>{formatArticlePrice(summary.subtotal)}</span>
+            </div>
 
-          {/* ROT/RUT-avdrag (bara privatkunder) */}
-          {customerType === 'individual' && (summary.rotDeduction > 0 || summary.rutDeduction > 0) && (
-            <>
-              {summary.rotDeduction > 0 && (
-                <div className="flex justify-between text-blue-400">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    ROT-avdrag (30%)
-                  </span>
-                  <span>-{formatArticlePrice(summary.rotDeduction)}</span>
-                </div>
-              )}
+            <div className="flex justify-between text-slate-300">
+              <span>Moms</span>
+              <span>{formatArticlePrice(summary.vatAmount)}</span>
+            </div>
 
-              {summary.rutDeduction > 0 && (
-                <div className="flex justify-between text-green-400">
-                  <span className="flex items-center gap-1">
-                    <Leaf className="w-3.5 h-3.5" />
-                    RUT-avdrag (50%)
-                  </span>
-                  <span>-{formatArticlePrice(summary.rutDeduction)}</span>
-                </div>
-              )}
-
-              <div className="border-t border-slate-700 pt-2">
-                <div className="flex justify-between font-bold text-lg text-green-400">
-                  <span>Att betala</span>
-                  <span>{formatArticlePrice(summary.totalAfterDeduction)}</span>
-                </div>
+            <div className="border-t border-slate-700 pt-2">
+              <div className="flex justify-between font-semibold text-white">
+                <span>Totalt inkl. moms</span>
+                <span>{formatArticlePrice(summary.totalBeforeDeduction)}</span>
               </div>
+            </div>
 
-              <div className="text-[10px] text-slate-500 bg-slate-900/50 p-2 rounded">
-                <Info className="w-3 h-3 inline mr-1" />
-                {summary.rotDeduction > 0 && 'ROT-avdrag 30% av arbetskostnaden, max 50 000 kr/år. '}
-                {summary.rutDeduction > 0 && 'RUT-avdrag 50% av arbetskostnaden, max 75 000 kr/år.'}
-              </div>
-            </>
-          )}
-        </div>
+            {/* ROT/RUT-avdrag (bara privatkunder) */}
+            {customerType === 'individual' && (summary.rotDeduction > 0 || summary.rutDeduction > 0) && (
+              <>
+                {summary.rotDeduction > 0 && (
+                  <div className="flex justify-between text-blue-400">
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      ROT-avdrag (30%)
+                    </span>
+                    <span>-{formatArticlePrice(summary.rotDeduction)}</span>
+                  </div>
+                )}
+
+                {summary.rutDeduction > 0 && (
+                  <div className="flex justify-between text-green-400">
+                    <span className="flex items-center gap-1">
+                      <Leaf className="w-3.5 h-3.5" />
+                      RUT-avdrag (50%)
+                    </span>
+                    <span>-{formatArticlePrice(summary.rutDeduction)}</span>
+                  </div>
+                )}
+
+                <div className="border-t border-slate-700 pt-2">
+                  <div className="flex justify-between font-bold text-lg text-green-400">
+                    <span>Att betala</span>
+                    <span>{formatArticlePrice(summary.totalAfterDeduction)}</span>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-500 bg-slate-900/50 p-2 rounded">
+                  <Info className="w-3 h-3 inline mr-1" />
+                  {summary.rotDeduction > 0 && 'ROT-avdrag 30% av arbetskostnaden, max 50 000 kr/år. '}
+                  {summary.rutDeduction > 0 && 'RUT-avdrag 50% av arbetskostnaden, max 75 000 kr/år.'}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   )

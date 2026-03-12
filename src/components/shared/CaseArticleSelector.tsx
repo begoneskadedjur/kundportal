@@ -269,6 +269,13 @@ export default function CaseArticleSelector({
         rot_rut_type: rotRutType,
         fastighetsbeteckning: rotRutType ? item.fastighetsbeteckning : null
       })
+      // Om ROT/RUT aktiveras och anpassat pris är på → stäng av anpassat pris
+      if (rotRutType && customPriceEnabled) {
+        await CaseBillingService.clearCustomPrice(caseId, caseType)
+        setCustomPriceEnabled(false)
+        setCustomPriceInput('')
+        toast('Anpassat pris avaktiverat — ej tillgängligt med ROT/RUT', { icon: 'ℹ️' })
+      }
       await loadData()
     } catch (error) {
       console.error('Kunde inte uppdatera ROT/RUT:', error)
@@ -888,18 +895,21 @@ export default function CaseArticleSelector({
             </div>
           </div>
 
-          {/* Anpassat pris */}
-          {!readOnly && (
+          {/* Anpassat pris — ej tillgängligt med ROT/RUT */}
+          {!readOnly && (() => {
+            const hasRotRut = selectedItems.some(i => i.rot_rut_type === 'ROT' || i.rot_rut_type === 'RUT')
+            return (
             <div className="mt-2 pt-2 border-t border-slate-700/30">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className={`flex items-center gap-2 ${hasRotRut ? 'opacity-50' : 'cursor-pointer'}`}>
                 <input
                   type="checkbox"
                   checked={customPriceEnabled}
                   onChange={(e) => handleCustomPriceToggle(e.target.checked)}
-                  disabled={saving}
+                  disabled={saving || hasRotRut}
                   className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
                 />
                 <span className="text-xs text-slate-300">Anpassat pris</span>
+                {hasRotRut && <span className="text-[10px] text-amber-400">Ej tillgängligt med ROT/RUT</span>}
               </label>
               {customPriceEnabled && (
                 <div className="mt-2 space-y-2">
@@ -974,7 +984,8 @@ export default function CaseArticleSelector({
                 </div>
               )}
             </div>
-          )}
+            )
+          })()}
           {readOnly && customPriceEnabled && summary.custom_total_price && (
             <div className="mt-2 pt-2 border-t border-slate-700/30">
               <div className="flex items-center justify-between">

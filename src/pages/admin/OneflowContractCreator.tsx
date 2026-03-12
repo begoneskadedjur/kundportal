@@ -49,6 +49,7 @@ interface WizardData {
   selectedPriceListId: string | null
   selectedArticles: SelectedArticleItem[]
   deductionType: 'rot' | 'rut' | 'none' | null
+  customTotalPrice: number | null
   selectedProducts: SelectedProduct[]
   
   // Steg 7 - Avtalsobjekt
@@ -133,6 +134,7 @@ export default function OneflowContractCreator() {
     selectedPriceListId: null,
     selectedArticles: [],
     deductionType: null,
+    customTotalPrice: null,
     selectedProducts: [],
     agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
     sendForSigning: true,
@@ -191,6 +193,8 @@ export default function OneflowContractCreator() {
               : prev.selectedArticles,
             // ROT/RUT-avdragstyp från ärendet
             deductionType: customerData.deductionType || prev.deductionType,
+            // Anpassat pris från ärendet (exkl moms)
+            customTotalPrice: customerData.customTotalPrice ?? prev.customTotalPrice,
           }))
           
           // Debug-logging för att spåra prefill-processen
@@ -209,11 +213,11 @@ export default function OneflowContractCreator() {
                 customerData.selectedTemplate &&
                 customerData.Kontaktperson &&
                 customerData['e-post-kontaktperson']) {
-              // Vi har all data - hoppa till produktval (steg 6 för offert, 7 för avtal)
+              // Vi har all data - hoppa förbi produktval till avtalsobjekt (steg 7 för offert, 8 för avtal)
               const docType = customerData.documentType || prefillType
-              const targetProductStep = docType === 'contract' ? 7 : 6
-              console.log('Auto-selecting template and jumping to product step:', targetProductStep)
-              setCurrentStep(targetProductStep)
+              const targetStep = docType === 'contract' ? 8 : 7
+              console.log('Auto-selecting template and jumping to step:', targetStep)
+              setCurrentStep(targetStep)
             } else if (customerData.autoSelectTemplate && customerData.selectedTemplate) {
               // Om vi har template men inte all kontaktdata, gå till steg 2 med förvald mall
               console.log('Auto-selecting template at step 2:', customerData.selectedTemplate)
@@ -1066,6 +1070,7 @@ export default function OneflowContractCreator() {
                     selectedArticles={wizardData.selectedArticles}
                     customerType={wizardData.partyType as CustomerType}
                     deductionType={wizardData.deductionType}
+                    customTotalPrice={wizardData.customTotalPrice}
                   />
                 </div>
               </div>
@@ -1225,6 +1230,7 @@ export default function OneflowContractCreator() {
                 selectedArticles={wizardData.selectedArticles}
                 customerType={wizardData.partyType as CustomerType}
                 deductionType={wizardData.deductionType}
+                customTotalPrice={wizardData.customTotalPrice}
               />
             )}
 
