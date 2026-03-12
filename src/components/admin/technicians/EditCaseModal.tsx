@@ -36,6 +36,7 @@ import CaseArticleSelector from '../../shared/CaseArticleSelector'
 // Fakturering - auto-generera vid ärendeavslut
 import { InvoiceService } from '../../../services/invoiceService'
 import { CaseBillingService } from '../../../services/caseBillingService'
+import { PriceListService } from '../../../services/priceListService'
 
 // Kommunikation
 import { CommunicationSlidePanel } from '../../communication'
@@ -481,23 +482,78 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     toast.success('Navigerar till avtalskapning med kundinformation...');
   }, [prepareCustomerData, navigate, getOneflowRoute]);
 
-  const handleCreateOffer = useCallback(() => {
+  const handleCreateOffer = useCallback(async () => {
     const customerData = prepareCustomerData();
-    if (!customerData) return;
-    
+    if (!customerData || !currentCase) return;
+
+    // Bestäm rätt offertmall baserat på ärendetyp och ROT/RUT
+    let selectedTemplate = '8919037' // Default: Privatperson inkl moms
+    if (currentCase.case_type === 'business') {
+      selectedTemplate = '8598798' // Företag exkl moms
+    } else {
+      const rotRut = formData.r_rot_rut || currentCase.r_rot_rut || ''
+      if (rotRut.toLowerCase().includes('rot')) {
+        selectedTemplate = '8919012' // ROT
+      } else if (rotRut.toLowerCase().includes('rut')) {
+        selectedTemplate = '8919059' // RUT
+      }
+    }
+
+    // Hämta prislista-ID (kundens eller standard)
+    let selectedPriceListId: string | null = null
+    try {
+      if (currentCase.customer_id) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('price_list_id')
+          .eq('id', currentCase.customer_id)
+          .single()
+        if (customer?.price_list_id) {
+          selectedPriceListId = customer.price_list_id
+        }
+      }
+      if (!selectedPriceListId) {
+        const defaultList = await PriceListService.getDefaultPriceList()
+        if (defaultList) selectedPriceListId = defaultList.id
+      }
+    } catch (err) {
+      console.warn('Kunde inte hämta prislista:', err)
+    }
+
+    // Hämta ärendets artiklar för förifyllning
+    let prefillArticles: any[] = []
+    try {
+      const caseType = currentCase.case_type === 'private' ? 'private' : 'business'
+      const billingItems = await CaseBillingService.getCaseBillingItems(currentCase.id, caseType as any)
+      prefillArticles = billingItems
+        .filter(item => item.article) // Bara items med kopplad artikel
+        .map(item => ({
+          article: item.article,
+          priceListItem: null,
+          effectivePrice: item.unit_price,
+          quantity: item.quantity,
+          notes: item.notes || undefined
+        }))
+    } catch (err) {
+      console.warn('Kunde inte hämta ärendets artiklar:', err)
+    }
+
     // Spara data för förifyllning
     sessionStorage.setItem('prefill_customer_data', JSON.stringify({
       ...customerData,
       documentType: 'offer',
-      targetStep: 2 // Gå direkt till mallval
+      autoSelectTemplate: true,
+      selectedTemplate,
+      selectedPriceListId,
+      prefillArticles
     }));
-    
+
     // Navigera till avtalskaparen med rollbaserad route
     const oneflowRoute = getOneflowRoute();
     navigate(`${oneflowRoute}?prefill=offer`);
-    
+
     toast.success('Navigerar till offertskapning med kundinformation...');
-  }, [prepareCustomerData, navigate, getOneflowRoute]);
+  }, [prepareCustomerData, navigate, getOneflowRoute, currentCase, formData]);
 
   // Hantera skapning av följeärende
   const handleCreateFollowUpCase = useCallback(async () => {

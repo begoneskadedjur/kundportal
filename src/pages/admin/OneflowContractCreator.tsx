@@ -183,6 +183,10 @@ export default function OneflowContractCreator() {
             case_id: customerData.case_id || undefined,
             // Lägg till prislista från kunden
             selectedPriceListId: customerData.selectedPriceListId || prev.selectedPriceListId,
+            // Förifylla artiklar från ärendet
+            selectedArticles: customerData.prefillArticles?.length > 0
+              ? customerData.prefillArticles
+              : prev.selectedArticles,
           }))
           
           // Debug-logging för att spåra prefill-processen
@@ -1048,6 +1052,7 @@ export default function OneflowContractCreator() {
                   selectedArticles={wizardData.selectedArticles}
                   onSelectionChange={(articles) => updateWizardData('selectedArticles', articles)}
                   customerType={wizardData.partyType as CustomerType}
+                  readOnly={profile?.role === 'technician'}
                 />
               </div>
 

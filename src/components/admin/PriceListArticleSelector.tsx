@@ -25,6 +25,7 @@ interface PriceListArticleSelectorProps {
   onSelectionChange: (articles: SelectedArticleItem[]) => void
   customerType: CustomerType
   className?: string
+  readOnly?: boolean
 }
 
 const CATEGORY_CONFIG: Record<ArticleCategory, { label: string; icon: string; color: string; bgColor: string }> = {
@@ -40,7 +41,8 @@ export default function PriceListArticleSelector({
   selectedArticles,
   onSelectionChange,
   customerType,
-  className = ''
+  className = '',
+  readOnly = false
 }: PriceListArticleSelectorProps) {
   // State
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
@@ -273,7 +275,8 @@ export default function PriceListArticleSelector({
                 // Rensa valda artiklar vid byte av prislista
                 onSelectionChange([])
               }}
-              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              disabled={readOnly}
+              className={`w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent ${readOnly ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
               <option value="">-- Välj prislista --</option>
               {priceLists.map(pl => (
@@ -284,7 +287,8 @@ export default function PriceListArticleSelector({
             </select>
           )}
 
-          {/* Åtgärdsknappar */}
+          {/* Åtgärdsknappar — döljs i readOnly-läge */}
+          {!readOnly && (
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
@@ -322,6 +326,7 @@ export default function PriceListArticleSelector({
               Hantera prislistor
             </a>
           </div>
+          )}
 
           {/* Vald prislista info */}
           {selectedPriceList && (
