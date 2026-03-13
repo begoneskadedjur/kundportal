@@ -112,6 +112,62 @@ export function convertArticlesToOneflowProducts(
   }))
 }
 
+// Variant för anpassat pris: artiklar utan priser + en totalrad
+export function convertArticlesToOneflowProductsCustomPrice(
+  items: SelectedArticleItem[],
+  customTotalPrice: number,  // exkl. moms
+  partyType: CustomerType
+): SelectedProduct[] {
+  // Artiklar utan pris — visas bara som namn + beskrivning + antal
+  const zeroProducts: SelectedProduct[] = items.map(item => ({
+    product: {
+      id: item.article.id,
+      name: item.article.name,
+      description: item.article.description || item.article.name,
+      category: mapArticleCategoryToProductCategory(item.article.category),
+      pricing: {
+        company: { basePrice: 0, vatRate: item.article.vat_rate / 100 },
+        individual: { basePrice: 0 }
+      },
+      quantityType: 'quantity' as const,
+      oneflowCompatible: true,
+      defaultQuantity: 1,
+      rotEligible: false,
+      rutEligible: false,
+      contractDescription: item.article.description || item.article.name
+    },
+    quantity: item.quantity,
+    hidePrice: true
+  }))
+
+  // Extra rad med anpassat totalpris
+  const priceForParty = partyType === 'company'
+    ? customTotalPrice
+    : Math.round(customTotalPrice * 1.25)
+
+  const totalProduct: SelectedProduct = {
+    product: {
+      id: 'custom-total',
+      name: 'Totalpris',
+      description: 'Anpassat pris för tjänsten',
+      category: 'pest_control',
+      pricing: {
+        company: { basePrice: customTotalPrice, vatRate: 0.25 },
+        individual: { basePrice: priceForParty }
+      },
+      quantityType: 'quantity' as const,
+      oneflowCompatible: true,
+      defaultQuantity: 1,
+      rotEligible: false,
+      rutEligible: false,
+      contractDescription: 'Anpassat pris'
+    },
+    quantity: 1
+  }
+
+  return [...zeroProducts, totalProduct]
+}
+
 function mapArticleCategoryToProductCategory(
   category: ArticleCategory
 ): 'pest_control' | 'preventive' | 'specialty' | 'additional' {

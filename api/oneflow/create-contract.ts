@@ -122,11 +122,11 @@ function convertProductsToOneflow(
   price_1: {
     base_amount: { amount: string }
     discount_amount: { amount: string }
-  }
+  } | null
   price_2: {
     base_amount: { amount: string }
     discount_amount: { amount: string }
-  }
+  } | null
   quantity: {
     type: string
     amount: number
@@ -140,8 +140,28 @@ function convertProductsToOneflow(
   return selectedProducts
     .filter(sp => sp.product.oneflowCompatible)
     .map(selectedProduct => {
-      const { product, quantity, customPrice, selectedVariant } = selectedProduct
-      
+      const { product, quantity, customPrice, selectedVariant, hidePrice } = selectedProduct as any
+
+      // Konvertera kvantitetstyp
+      let oneflowQuantityType = 'quantity'
+      if (product.quantityType === 'single_choice') {
+        oneflowQuantityType = 'single_choice'
+      } else if (product.quantityType === 'multiple_choice') {
+        oneflowQuantityType = 'multiple_choice'
+      }
+
+      // Dölj pris för artiklar vid anpassat totalpris
+      if (hidePrice) {
+        return {
+          name: product.name,
+          description: product.description,
+          price_1: null,
+          price_2: null,
+          quantity: { type: oneflowQuantityType, amount: quantity },
+          counterparty_lock: false
+        }
+      }
+
       // Bestäm vilken prissättning som ska användas
       // 1. Anpassat pris (högsta prioritet)
       // 2. Vald variant 
@@ -162,14 +182,6 @@ function convertProductsToOneflow(
       if (pricing?.discountPercent && !customPrice) {
         discountAmount = basePrice * (pricing.discountPercent / 100)
         basePrice = basePrice - discountAmount
-      }
-
-      // Konvertera kvantitetstyp
-      let oneflowQuantityType = 'quantity'
-      if (product.quantityType === 'single_choice') {
-        oneflowQuantityType = 'single_choice'
-      } else if (product.quantityType === 'multiple_choice') {
-        oneflowQuantityType = 'multiple_choice'
       }
 
       const basePriceString = Math.round(originalPrice).toString()

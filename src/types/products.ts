@@ -89,6 +89,7 @@ export interface SelectedProduct {
   selectedVariant?: PriceVariant  // Vald prisvariant (om produkten har varianter)
   customPrice?: number
   notes?: string
+  hidePrice?: boolean  // Dölj pris i Oneflow (vid anpassat totalpris)
 }
 
 // Artikelbaserat val i wizard (ersätter SelectedProduct för prislisteflöde)

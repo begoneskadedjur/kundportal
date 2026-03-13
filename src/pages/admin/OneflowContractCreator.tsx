@@ -15,7 +15,7 @@ import PriceListArticleSelector from '../../components/admin/PriceListArticleSel
 import ArticleSummary from '../../components/admin/ArticleSummary'
 import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
 import { SelectedProduct, CustomerType, SelectedArticleItem } from '../../types/products'
-import { convertArticlesToOneflowProducts, generateArticleContractDescription } from '../../utils/articlePricingCalculator'
+import { convertArticlesToOneflowProducts, convertArticlesToOneflowProductsCustomPrice, generateArticleContractDescription } from '../../utils/articlePricingCalculator'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
@@ -500,8 +500,11 @@ export default function OneflowContractCreator() {
 
   const handleSubmit = async () => {
     // Konvertera artiklar → SelectedProduct-format för API:et
+    const hasCustomPrice = wizardData.customTotalPrice != null && wizardData.customTotalPrice > 0
     const convertedProducts = wizardData.selectedArticles.length > 0
-      ? convertArticlesToOneflowProducts(wizardData.selectedArticles, wizardData.partyType as CustomerType)
+      ? hasCustomPrice
+        ? convertArticlesToOneflowProductsCustomPrice(wizardData.selectedArticles, wizardData.customTotalPrice!, wizardData.partyType as CustomerType)
+        : convertArticlesToOneflowProducts(wizardData.selectedArticles, wizardData.partyType as CustomerType)
       : wizardData.selectedProducts
 
     const LIMIT = 1024
