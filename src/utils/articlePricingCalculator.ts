@@ -149,7 +149,7 @@ export function convertArticlesToOneflowProductsCustomPrice(
     product: {
       id: 'custom-total',
       name: 'Totalpris',
-      description: 'Anpassat pris för tjänsten',
+      description: 'Avser tjänst, material, administrativa avgifter & transport',
       category: 'pest_control',
       pricing: {
         company: { basePrice: customTotalPrice, vatRate: 0.25 },
@@ -160,7 +160,7 @@ export function convertArticlesToOneflowProductsCustomPrice(
       defaultQuantity: 1,
       rotEligible: false,
       rutEligible: false,
-      contractDescription: 'Anpassat pris'
+      contractDescription: 'Avser tjänst, material, administrativa avgifter & transport'
     },
     quantity: 1
   }
