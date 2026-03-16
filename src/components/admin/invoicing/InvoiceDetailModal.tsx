@@ -496,6 +496,14 @@ export default function InvoiceDetailModal({
                   </div>
                 )}
 
+                {/* Märkning faktura */}
+                {invoice.invoice_marking && (
+                  <div className="bg-slate-800/50 rounded-lg p-3">
+                    <h3 className="text-xs font-medium text-slate-400 mb-1.5">Märkning faktura</h3>
+                    <p className="text-sm text-slate-300">{invoice.invoice_marking}</p>
+                  </div>
+                )}
+
                 {/* Anteckningar */}
                 {invoice.notes && (
                   <div className="bg-slate-800/50 rounded-lg p-3">

@@ -49,6 +49,7 @@ export class InvoiceService {
       phone?: string
       address?: string
       organization_number?: string
+      invoice_marking?: string
     }
   ): Promise<InvoiceWithItems> {
     // Hämta billing items för ärendet
@@ -116,7 +117,8 @@ export class InvoiceService {
         requires_approval: requiresApproval,
         due_date: calculateDueDate(30),
         rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
-        fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null
+        fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null,
+        invoice_marking: customerInfo.invoice_marking || null
       })
       .select()
       .single()

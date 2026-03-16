@@ -716,6 +716,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           r_arbetskostnad: caseData.r_arbetskostnad || 0,
           r_material_utrustning: caseData.r_material_utrustning || 0,
           r_servicebil: caseData.r_servicebil || 0,
+          // Företagsfält (business cases)
+          bestallare: caseData.bestallare || '',
+          company_name: caseData.company_name || '',
+          markning_faktura: caseData.markning_faktura || '',
+          e_post_faktura: caseData.e_post_faktura || '',
         });
         setError(null);
         setTimeTrackingLoading(false);
@@ -794,7 +799,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         updateData.r_material_utrustning = formData.r_material_utrustning || null;
         updateData.r_servicebil = formData.r_servicebil || null;
       } 
-      else if (tableName === 'business_cases') { updateData.org_nr = formData.org_nr; } 
+      else if (tableName === 'business_cases') {
+        updateData.org_nr = formData.org_nr;
+        updateData.bestallare = formData.bestallare || null;
+        updateData.company_name = formData.company_name || null;
+        updateData.markning_faktura = formData.markning_faktura || null;
+        updateData.e_post_faktura = formData.e_post_faktura || null;
+      }
       else if (tableName === 'cases') { 
         updateData.price = formData.case_price;
         // Automatically set completed_date when status changes to "Avslutat"
@@ -853,12 +864,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 currentCase.id,
                 billingCaseType,
                 {
-                  name: formData.kontaktperson || currentCase.kontaktperson || 'Okänd kund',
-                  email: formData.e_post_kontaktperson || currentCase.e_post_kontaktperson,
+                  name: billingCaseType === 'business'
+                    ? (formData.company_name || currentCase.company_name || formData.bestallare || currentCase.bestallare || formData.kontaktperson || currentCase.kontaktperson || 'Okänd kund')
+                    : (formData.kontaktperson || currentCase.kontaktperson || 'Okänd kund'),
+                  email: billingCaseType === 'business'
+                    ? (formData.e_post_faktura || currentCase.e_post_faktura || formData.e_post_kontaktperson || currentCase.e_post_kontaktperson)
+                    : (formData.e_post_kontaktperson || currentCase.e_post_kontaktperson),
                   phone: formData.telefon_kontaktperson || currentCase.telefon_kontaktperson,
                   address: formatAddress(formData.adress || currentCase.adress),
                   organization_number: billingCaseType === 'business'
                     ? (formData.org_nr || currentCase.org_nr)
+                    : undefined,
+                  invoice_marking: billingCaseType === 'business'
+                    ? (formData.markning_faktura || currentCase.markning_faktura)
                     : undefined
                 }
               );
@@ -1505,7 +1523,20 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 </div>
               </div>
             )}
-            
+
+            {/* Företagsinfo & Fakturering (bara business cases) */}
+            {currentCase.case_type === 'business' && (
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><FileText className="w-4 h-4 text-blue-400" />Företag & Fakturering</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input name="company_name" placeholder="Företagsnamn" value={formData.company_name || ''} onChange={handleChange} />
+                  <Input name="bestallare" placeholder="Beställare" value={formData.bestallare || ''} onChange={handleChange} />
+                  <Input name="markning_faktura" placeholder="Märkning faktura" value={formData.markning_faktura || ''} onChange={handleChange} />
+                  <Input name="e_post_faktura" placeholder="E-post faktura" type="email" value={formData.e_post_faktura || ''} onChange={handleChange} />
+                </div>
+              </div>
+            )}
+
             {/* Saneringsrapport sektion */}
             {showTimeTracking && (
               <div className="space-y-1.5 pt-3 border-t border-slate-700/50">

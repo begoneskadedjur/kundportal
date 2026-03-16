@@ -41,6 +41,7 @@ export interface Invoice {
   due_date: string | null
 
   notes: string | null
+  invoice_marking: string | null
 
   // ROT/RUT (aggregerat från items)
   rot_rut_type: RotRutType | null
