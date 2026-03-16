@@ -27,7 +27,9 @@ import {
   MessageSquare,
   FlaskConical,
   Timer,
-  Home
+  Home,
+  RotateCcw,
+  Trash2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
@@ -180,6 +182,24 @@ export default function InvoiceDetailModal({
     } catch (error) {
       console.error('Kunde inte uppdatera status:', error)
       toast.error('Kunde inte uppdatera status')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!invoice) return
+    if (!confirm(`Vill du radera faktura ${invoice.invoice_number} permanent? Detta går inte att ångra.`)) return
+
+    setUpdating(true)
+    try {
+      await InvoiceService.deleteInvoice(invoice.id)
+      toast.success('Fakturan har raderats')
+      onStatusChange?.()
+      onClose()
+    } catch (error) {
+      console.error('Kunde inte radera faktura:', error)
+      toast.error('Kunde inte radera fakturan')
     } finally {
       setUpdating(false)
     }
@@ -846,6 +866,26 @@ export default function InvoiceDetailModal({
                   <XCircle className="w-3.5 h-3.5" />
                   Makulera
                 </button>
+              )}
+              {invoice.status === 'cancelled' && (
+                <>
+                  <button
+                    onClick={() => handleStatusChange('ready')}
+                    disabled={updating}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Återställ
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={updating}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-sm border border-red-500/30 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Radera
+                  </button>
+                </>
               )}
             </div>
           </div>

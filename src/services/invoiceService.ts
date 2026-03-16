@@ -360,6 +360,31 @@ export class InvoiceService {
   }
 
   /**
+   * Återställ makulerad faktura till "Redo att skicka"
+   */
+  static async restoreInvoice(id: string): Promise<Invoice> {
+    return this.updateInvoiceStatus(id, 'ready')
+  }
+
+  /**
+   * Radera faktura permanent (inkl. fakturarader)
+   */
+  static async deleteInvoice(id: string): Promise<void> {
+    // Radera invoice_items först (FK-beroende)
+    const { error: itemsError } = await supabase
+      .from('invoice_items')
+      .delete()
+      .eq('invoice_id', id)
+    if (itemsError) throw new Error(`Databasfel: ${itemsError.message}`)
+
+    const { error } = await supabase
+      .from('invoices')
+      .delete()
+      .eq('id', id)
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+  }
+
+  /**
    * Hämta statistik
    */
   static async getInvoiceStats(): Promise<InvoiceStats> {
