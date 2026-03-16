@@ -286,6 +286,12 @@ export class CaseBillingService {
    * Ta bort case billing item
    */
   static async removeCaseArticle(id: string): Promise<void> {
+    // Koppla loss från eventuella invoice_items först (FK-constraint)
+    await supabase
+      .from('invoice_items')
+      .update({ case_billing_item_id: null })
+      .eq('case_billing_item_id', id)
+
     const { error } = await supabase
       .from('case_billing_items')
       .delete()

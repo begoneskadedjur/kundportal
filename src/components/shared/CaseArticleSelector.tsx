@@ -352,7 +352,10 @@ export default function CaseArticleSelector({
       setSaving(true)
       try {
         await CaseBillingService.updateCaseArticle(item.id, { fastighetsbeteckning: value || null })
-        await loadData()
+        // Uppdatera lokalt istället för loadData() — undviker fokusförlust
+        setSelectedItems(prev => prev.map(i =>
+          i.id === item.id ? { ...i, fastighetsbeteckning: value || null } : i
+        ))
       } catch (error) {
         console.error('Kunde inte uppdatera fastighetsbeteckning:', error)
       } finally {
