@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
@@ -1628,20 +1628,58 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           <div><label className="block text-xs font-medium text-slate-400 mb-1">Starttid *</label><DatePicker selected={formData.start_date ? new Date(formData.start_date) : null} onChange={(date) => handleDateChange(date, 'start_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" timeCaption="Tid" timeInputLabel="Tid:" placeholderText="Välj starttid..." isClearable required className="w-full" /></div>
                           <div><label className="block text-xs font-medium text-slate-400 mb-1">Sluttid *</label><DatePicker selected={formData.due_date ? new Date(formData.due_date) : null} onChange={(date) => handleDateChange(date, 'due_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" timeCaption="Tid" timeInputLabel="Tid:" placeholderText="Välj sluttid..." isClearable required className="w-full" /></div>
                       </div>
-                      <div className="space-y-3">
-                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Ansvarig tekniker *</label><select name="primary_assignee_id" value={formData.primary_assignee_id || ''} onChange={handleChange} required className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"><option value="" disabled>Välj tekniker...</option>{technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Extra tekniker (valfri)</label><select name="secondary_assignee_id" value={formData.secondary_assignee_id || ''} onChange={handleChange} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"><option value="">Ingen vald</option>{technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.tertiary_assignee_id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Extra tekniker 2 (valfri)</label><select name="tertiary_assignee_id" value={formData.tertiary_assignee_id || ''} onChange={handleChange} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"><option value="">Ingen vald</option>{technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.secondary_assignee_id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1.5">Tekniker</label>
+                        <div className="flex items-center gap-2">
+                          {([
+                            { key: 'primary_assignee_id', label: 'Ansvarig' },
+                            { key: 'secondary_assignee_id', label: 'Extra 1' },
+                            { key: 'tertiary_assignee_id', label: 'Extra 2' }
+                          ] as const).map((slot) => {
+                            const techId = (formData as Record<string, string>)[slot.key] || ''
+                            const tech = technicians.find(t => t.id === techId)
+                            const initials = tech ? tech.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : ''
+                            return (
+                              <div key={slot.key} className="relative">
+                                <div
+                                  className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+                                    tech
+                                      ? 'bg-[#20c58f]/20 border-2 border-[#20c58f]'
+                                      : 'border-2 border-dashed border-slate-600 hover:border-slate-500'
+                                  }`}
+                                  title={tech ? `${tech.name} (${slot.label})` : slot.label}
+                                >
+                                  {tech ? (
+                                    <span className="text-xs font-bold text-[#20c58f]">{initials}</span>
+                                  ) : (
+                                    <Plus className="w-3.5 h-3.5 text-slate-500" />
+                                  )}
+                                </div>
+                                <select
+                                  value={techId}
+                                  onChange={handleChange}
+                                  name={slot.key}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  title={slot.label}
+                                >
+                                  <option value="">Ingen</option>
+                                  {technicians.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                   </div>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                        <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Briefcase size={14}/> Ärendeinformation</h4>
                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={2} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" placeholder="Kort om ärendet, portkod, etc."/></div>
-                       {caseType === 'business' && (<Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />)}
                   </div>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Euro size={14}/> Ekonomi & Utskick</h4>
-                      <Input type="number" label={caseType === 'private' ? 'Pris (inkl. moms)' : 'Pris (exkl. moms)'} name="pris" value={formData.pris ?? ''} onChange={handleChange} />
+                      {caseType === 'business' && (<Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />)}
                       {caseType === 'private' && (
                           <div>
                               <label className="block text-xs font-medium text-slate-400 mb-1">ROT/RUT</label>
