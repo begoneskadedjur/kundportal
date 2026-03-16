@@ -470,8 +470,11 @@ export class InvoiceService {
     const countMismatch = caseItems.length !== invoiceLinkedItems
 
     // Kolla om artiklar uppdaterats efter fakturaskapande
+    // Lägg till 10 sekunders tolerans — vid auto-fakturering skapas fakturan
+    // i samma flöde som ärendet uppdateras, så timestamps kan vara nästan identiska
+    const invoiceCreatedMs = new Date(invoice.created_at).getTime() + 10000
     const modifiedAfter = caseItems.some(item =>
-      new Date(item.updated_at) > new Date(invoice.created_at)
+      new Date(item.updated_at).getTime() > invoiceCreatedMs
     )
 
     // Kolla om anpassat pris ändrats
