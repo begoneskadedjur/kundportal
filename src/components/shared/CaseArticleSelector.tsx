@@ -15,10 +15,12 @@ import {
   ChevronRight,
   Loader2,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  Info
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { CaseBillingService } from '../../services/caseBillingService'
+import { InvoiceService } from '../../services/invoiceService'
 import { DiscountNotificationService } from '../../services/discountNotificationService'
 import type {
   CaseBillingItem,
@@ -85,6 +87,7 @@ export default function CaseArticleSelector({
   const [showArticleList, setShowArticleList] = useState(false)
   const [customPriceEnabled, setCustomPriceEnabled] = useState(false)
   const [customPriceInput, setCustomPriceInput] = useState('')
+  const [hasUnsentInvoice, setHasUnsentInvoice] = useState(false)
   const discountTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const dosageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const fastighetsTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
@@ -106,6 +109,12 @@ export default function CaseArticleSelector({
         setCustomPriceInput(String(Math.round(summaryData.custom_total_price * 1.25)))
       }
       if (onChange) onChange(itemsData, summaryData)
+
+      // Kolla om det finns en icke-skickad faktura
+      try {
+        const hasInvoice = await InvoiceService.hasUnsentInvoiceForCase(caseId, caseType as 'private' | 'business')
+        setHasUnsentInvoice(hasInvoice)
+      } catch { /* ignorera */ }
     } catch (error) {
       console.error('Kunde inte ladda artikeldata:', error)
       toast.error('Kunde inte ladda artiklar')
@@ -424,6 +433,16 @@ export default function CaseArticleSelector({
           </button>
         )}
       </div>
+
+      {/* Info-banner: faktura kopplad till ärendet */}
+      {hasUnsentInvoice && !readOnly && (
+        <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+          <p className="text-xs text-blue-400">
+            Det finns en faktura kopplad till detta ärende. Ändringar här uppdaterar inte fakturan automatiskt.
+          </p>
+        </div>
+      )}
 
       {/* Artikelväljare (expanderbar) */}
       {showArticleList && !readOnly && (

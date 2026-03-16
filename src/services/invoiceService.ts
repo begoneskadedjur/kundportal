@@ -448,6 +448,199 @@ export class InvoiceService {
   }
 
   /**
+   * Kontrollera om fakturan är inaktuell (artiklar ändrade sedan skapande)
+   */
+  static async isInvoiceStale(invoiceId: string): Promise<{ stale: boolean; reason?: string }> {
+    const invoice = await this.getInvoiceWithItems(invoiceId)
+    if (!invoice) return { stale: false }
+
+    // Bara relevant för icke-skickade/betalda fakturor
+    if (['sent', 'paid', 'cancelled'].includes(invoice.status)) return { stale: false }
+
+    // Hämta aktuella case_billing_items
+    const caseItems = await CaseBillingService.getCaseBillingItems(
+      invoice.case_id,
+      invoice.case_type
+    )
+
+    // Jämför antal (exkludera "Anpassat pris"-raden som har case_billing_item_id = null)
+    const invoiceLinkedItems = invoice.items.filter(i => i.case_billing_item_id != null).length
+    const countMismatch = caseItems.length !== invoiceLinkedItems
+
+    // Kolla om artiklar uppdaterats efter fakturaskapande
+    const modifiedAfter = caseItems.some(item =>
+      new Date(item.updated_at) > new Date(invoice.created_at)
+    )
+
+    // Kolla om anpassat pris ändrats
+    const customPrice = await CaseBillingService.getCustomPrice(invoice.case_id, invoice.case_type)
+    const invoiceCustomRow = invoice.items.find(i => i.case_billing_item_id === null && i.article_name === 'Anpassat pris')
+    const customPriceChanged = customPrice
+      ? (!invoiceCustomRow || invoiceCustomRow.unit_price !== customPrice)
+      : (!!invoiceCustomRow)
+
+    if (countMismatch) {
+      return { stale: true, reason: 'Artiklar har lagts till eller tagits bort' }
+    }
+    if (customPriceChanged) {
+      return { stale: true, reason: 'Anpassat pris har ändrats' }
+    }
+    if (modifiedAfter) {
+      return { stale: true, reason: 'Artiklar har uppdaterats' }
+    }
+    return { stale: false }
+  }
+
+  /**
+   * Regenerera fakturarader från aktuella case_billing_items
+   */
+  static async regenerateInvoiceItems(invoiceId: string): Promise<InvoiceWithItems> {
+    const invoice = await this.getInvoiceWithItems(invoiceId)
+    if (!invoice) throw new Error('Faktura hittades inte')
+    if (['sent', 'paid', 'cancelled'].includes(invoice.status)) {
+      throw new Error('Kan inte uppdatera en skickad/betald/avbruten faktura')
+    }
+
+    // Hämta aktuella billing items + custom price
+    const billingItems = await CaseBillingService.getCaseBillingItems(invoice.case_id, invoice.case_type)
+    if (billingItems.length === 0) throw new Error('Inga fakturerbara artiklar på ärendet')
+
+    const customPrice = await CaseBillingService.getCustomPrice(invoice.case_id, invoice.case_type)
+
+    // Radera befintliga invoice_items
+    const { error: deleteError } = await supabase
+      .from('invoice_items')
+      .delete()
+      .eq('invoice_id', invoiceId)
+    if (deleteError) throw new Error(`Databasfel: ${deleteError.message}`)
+
+    // Skapa nya invoice_items (samma logik som createInvoiceFromCase)
+    const invoiceItems: InvoiceItem[] = []
+
+    if (customPrice) {
+      for (const item of billingItems) {
+        const { data: invoiceItem, error: itemError } = await supabase
+          .from('invoice_items')
+          .insert({
+            invoice_id: invoiceId,
+            case_billing_item_id: item.id,
+            article_id: item.article_id,
+            article_code: item.article_code,
+            article_name: item.article_name,
+            quantity: item.quantity,
+            unit_price: 0,
+            discount_percent: 0,
+            total_price: 0,
+            vat_rate: item.vat_rate,
+            rot_rut_type: item.rot_rut_type || null,
+            fastighetsbeteckning: item.fastighetsbeteckning || null
+          })
+          .select()
+          .single()
+        if (itemError) throw new Error(`Databasfel: ${itemError.message}`)
+        invoiceItems.push(invoiceItem)
+      }
+
+      const { data: customItem, error: customItemError } = await supabase
+        .from('invoice_items')
+        .insert({
+          invoice_id: invoiceId,
+          case_billing_item_id: null,
+          article_id: null,
+          article_code: null,
+          article_name: 'Anpassat pris',
+          quantity: 1,
+          unit_price: customPrice,
+          discount_percent: 0,
+          total_price: customPrice,
+          vat_rate: 25,
+          rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
+          fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null
+        })
+        .select()
+        .single()
+      if (customItemError) throw new Error(`Databasfel: ${customItemError.message}`)
+      invoiceItems.push(customItem)
+    } else {
+      for (const item of billingItems) {
+        const { data: invoiceItem, error: itemError } = await supabase
+          .from('invoice_items')
+          .insert({
+            invoice_id: invoiceId,
+            case_billing_item_id: item.id,
+            article_id: item.article_id,
+            article_code: item.article_code,
+            article_name: item.article_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount_percent: item.discount_percent,
+            total_price: item.total_price,
+            vat_rate: item.vat_rate,
+            rot_rut_type: item.rot_rut_type || null,
+            fastighetsbeteckning: item.fastighetsbeteckning || null
+          })
+          .select()
+          .single()
+        if (itemError) throw new Error(`Databasfel: ${itemError.message}`)
+        invoiceItems.push(invoiceItem)
+      }
+    }
+
+    // Beräkna nya summor
+    let subtotal: number, vat_amount: number, total_amount: number
+    if (customPrice) {
+      subtotal = customPrice
+      vat_amount = customPrice * 0.25
+      total_amount = customPrice * 1.25
+    } else {
+      const totals = calculateInvoiceTotals(invoiceItems)
+      subtotal = totals.subtotal
+      vat_amount = totals.vat_amount
+      total_amount = totals.total_amount
+    }
+
+    // Uppdatera fakturans summor + ROT/RUT-info
+    const { error: updateError } = await supabase
+      .from('invoices')
+      .update({
+        subtotal,
+        vat_amount,
+        total_amount,
+        requires_approval: billingItems.some(item => item.requires_approval),
+        rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
+        fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null
+      })
+      .eq('id', invoiceId)
+    if (updateError) throw new Error(`Databasfel: ${updateError.message}`)
+
+    return {
+      ...invoice,
+      subtotal,
+      vat_amount,
+      total_amount,
+      items: invoiceItems
+    }
+  }
+
+  /**
+   * Kolla om ärende har en icke-skickad faktura
+   */
+  static async hasUnsentInvoiceForCase(
+    caseId: string,
+    caseType: 'private' | 'business'
+  ): Promise<boolean> {
+    const { count, error } = await supabase
+      .from('invoices')
+      .select('*', { count: 'exact', head: true })
+      .eq('case_id', caseId)
+      .eq('case_type', caseType)
+      .in('status', ['draft', 'pending_approval', 'ready'])
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return (count || 0) > 0
+  }
+
+  /**
    * Kontrollera om ärende redan har faktura
    */
   static async caseHasInvoice(

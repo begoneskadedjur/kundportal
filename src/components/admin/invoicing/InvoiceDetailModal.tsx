@@ -74,6 +74,8 @@ export default function InvoiceDetailModal({
   const [updating, setUpdating] = useState(false)
   const [contextExpanded, setContextExpanded] = useState(false)
   const [preparations, setPreparations] = useState<CasePreparationWithDetails[]>([])
+  const [staleInfo, setStaleInfo] = useState<{ stale: boolean; reason?: string } | null>(null)
+  const [regenerating, setRegenerating] = useState(false)
 
   // Hämta ärendekontext via case_id/case_type
   const { caseContext, isLoading: contextLoading } = useCaseContext(
@@ -115,11 +117,35 @@ export default function InvoiceDetailModal({
     try {
       const data = await InvoiceService.getInvoice(invoiceId)
       setInvoice(data)
+
+      // Kolla om fakturan är inaktuell
+      if (data && !['sent', 'paid', 'cancelled'].includes(data.status)) {
+        const stale = await InvoiceService.isInvoiceStale(invoiceId)
+        setStaleInfo(stale)
+      } else {
+        setStaleInfo(null)
+      }
     } catch (error) {
       console.error('Kunde inte ladda faktura:', error)
       toast.error('Kunde inte ladda fakturadetaljer')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRegenerate = async () => {
+    if (!invoice) return
+    setRegenerating(true)
+    try {
+      await InvoiceService.regenerateInvoiceItems(invoice.id)
+      toast.success('Fakturarader uppdaterade')
+      await loadInvoice()
+      onStatusChange?.()
+    } catch (error) {
+      console.error('Kunde inte uppdatera faktura:', error)
+      toast.error('Kunde inte uppdatera fakturarader')
+    } finally {
+      setRegenerating(false)
     }
   }
 
@@ -433,6 +459,29 @@ export default function InvoiceDetailModal({
                     </div>
                   )
                 })()}
+
+                {/* Varning om inaktuella fakturarader */}
+                {staleInfo?.stale && (
+                  <div className="flex items-center justify-between gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                      <div>
+                        <div className="text-sm font-medium text-amber-400">Fakturan är inaktuell</div>
+                        <p className="text-xs text-amber-300/80 mt-0.5">
+                          {staleInfo.reason} sedan fakturan skapades
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleRegenerate}
+                      disabled={regenerating}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-400 border border-amber-500/50 rounded-lg hover:bg-amber-500/10 transition-colors disabled:opacity-50 flex-shrink-0"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? 'animate-spin' : ''}`} />
+                      Uppdatera
+                    </button>
+                  </div>
+                )}
 
                 {/* Varning om rabatt kräver godkännande */}
                 {invoice.requires_approval && invoice.status === 'pending_approval' && (
