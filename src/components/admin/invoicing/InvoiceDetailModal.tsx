@@ -280,7 +280,7 @@ export default function InvoiceDetailModal({
                       <div>
                         <div className="text-sm text-white font-medium">{invoice.customer_name}</div>
                         {invoice.organization_number && (
-                          <div className="text-xs text-slate-400">Org.nr: {invoice.organization_number}</div>
+                          <div className="text-xs text-slate-400">{invoice.case_type === 'private' ? 'Personnr' : 'Org.nr'}: {invoice.organization_number}</div>
                         )}
                       </div>
                     </div>
@@ -473,7 +473,7 @@ export default function InvoiceDetailModal({
                         )}
                         <div className="text-xs text-slate-400">
                           Kund: <span className="text-slate-300">{invoice.customer_name}</span>
-                          {invoice.organization_number && ` (${invoice.organization_number})`}
+                          {invoice.organization_number && ` (${invoice.case_type === 'private' ? 'Personnr' : 'Org.nr'}: ${invoice.organization_number})`}
                         </div>
                       </div>
                     </div>

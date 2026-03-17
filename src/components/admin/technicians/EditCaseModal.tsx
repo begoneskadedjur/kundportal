@@ -874,7 +874,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   address: formatAddress(formData.adress || currentCase.adress),
                   organization_number: billingCaseType === 'business'
                     ? (formData.org_nr || currentCase.org_nr)
-                    : undefined,
+                    : (formData.personnummer || currentCase.personnummer),
                   invoice_marking: billingCaseType === 'business'
                     ? (formData.markning_faktura || currentCase.markning_faktura)
                     : undefined
