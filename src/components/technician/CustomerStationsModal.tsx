@@ -37,11 +37,13 @@ import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
+import { IndoorStationDetailSheet } from '../shared/indoor/IndoorStationDetailSheet'
 import { StationLegend } from '../shared/indoor/IndoorStationMarker'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG, EQUIPMENT_STATUS_CONFIG } from '../../types/database'
 import type {
   FloorPlanWithRelations,
   IndoorStationWithRelations,
+  IndoorStationInspectionWithRelations,
   IndoorStationType,
   PlacementMode,
   CreateFloorPlanInput,
@@ -144,6 +146,10 @@ export function CustomerStationsModal({
   const replaceImageInputRef = useRef<HTMLInputElement>(null)
   const replacePlanIdRef = useRef<string | null>(null)
 
+  // Inomhus stationsdetalj
+  const [selectedIndoorStation, setSelectedIndoorStation] = useState<IndoorStationWithRelations | null>(null)
+  const [indoorInspections, setIndoorInspections] = useState<IndoorStationInspectionWithRelations[]>([])
+
   // Ladda data när modal öppnas
   useEffect(() => {
     if (isOpen && customer) {
@@ -157,11 +163,31 @@ export function CustomerStationsModal({
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = ''
+      // Rensa inomhusdetalj vid stängning
+      setSelectedIndoorStation(null)
+      setIndoorInspections([])
     }
     return () => {
       document.body.style.overflow = ''
     }
   }, [isOpen])
+
+  // Öppna inomhusstation med inspektionshistorik
+  const handleIndoorStationClick = async (station: IndoorStationWithRelations) => {
+    setSelectedIndoorStation(station)
+    setIndoorInspections([])
+    try {
+      const inspections = await IndoorStationService.getInspectionsByStation(station.id)
+      setIndoorInspections(inspections)
+    } catch (error) {
+      console.error('Fel vid laddning av inspektioner:', error)
+    }
+  }
+
+  const closeIndoorDetail = () => {
+    setSelectedIndoorStation(null)
+    setIndoorInspections([])
+  }
 
   const loadAllData = async () => {
     if (!customer) return
@@ -395,7 +421,7 @@ export function CustomerStationsModal({
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed inset-2 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:h-auto md:max-h-[90vh] z-50 flex flex-col"
           >
-            <div className="flex-1 min-h-0 bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex-1 min-h-0 bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col relative">
               {/* Header */}
               <div className="px-5 py-4 border-b border-slate-700 flex-shrink-0 bg-slate-800">
                 <div className="flex items-start justify-between gap-3">
@@ -629,7 +655,7 @@ export function CustomerStationsModal({
                                   previewPosition={previewPosition}
                                   onImageClick={handleImageClick}
                                   onCancelPlacement={resetPlacementMode}
-                                  onStationClick={(station) => onStationClick?.(station, 'indoor')}
+                                  onStationClick={(station) => handleIndoorStationClick(station)}
                                   height="350px"
                                   showNumbers={true}
                                 />
@@ -743,7 +769,7 @@ export function CustomerStationsModal({
                                                   return (
                                                     <button
                                                       key={station.id}
-                                                      onClick={() => onStationClick?.(station, 'indoor')}
+                                                      onClick={() => handleIndoorStationClick(station)}
                                                       className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 border-2 border-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer z-10"
                                                       style={{
                                                         left: `${station.position_x_percent}%`,
@@ -867,7 +893,7 @@ export function CustomerStationsModal({
                                     <IndoorStationCard
                                       key={station.id}
                                       station={station}
-                                      onClick={() => onStationClick?.(station, 'indoor')}
+                                      onClick={() => handleIndoorStationClick(station)}
                                     />
                                   ))}
                                 </div>
@@ -923,6 +949,49 @@ export function CustomerStationsModal({
                   </button>
                 </div>
               )}
+              {/* Inomhus stationsdetalj overlay */}
+              <AnimatePresence>
+                {selectedIndoorStation && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-30 flex items-end rounded-2xl overflow-hidden"
+                  >
+                    <div
+                      className="absolute inset-0 bg-black/40"
+                      onClick={closeIndoorDetail}
+                    />
+                    <motion.div
+                      initial={{ y: '100%' }}
+                      animate={{ y: 0 }}
+                      exit={{ y: '100%' }}
+                      transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                      className="relative w-full max-h-[80%] overflow-y-auto"
+                    >
+                      <IndoorStationDetailSheet
+                        station={selectedIndoorStation}
+                        inspections={indoorInspections}
+                        onClose={closeIndoorDetail}
+                        onDelete={async () => {
+                          if (!confirm('Är du säker på att du vill ta bort denna station?')) return
+                          try {
+                            await IndoorStationService.deleteStation(selectedIndoorStation.id)
+                            toast.success('Station borttagen')
+                            closeIndoorDetail()
+                            if (customer) {
+                              const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+                              setIndoorStations(indoor)
+                            }
+                          } catch (error) {
+                            toast.error('Kunde inte ta bort station')
+                          }
+                        }}
+                      />
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
 

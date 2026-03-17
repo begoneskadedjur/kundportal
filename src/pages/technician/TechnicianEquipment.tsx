@@ -90,6 +90,9 @@ export default function TechnicianEquipment() {
     sites?: { customerId: string; siteName: string }[]
   } | null>(null)
 
+  // Återgå till kundmodal efter redigering av utomhusstation
+  const [returnToCustomer, setReturnToCustomer] = useState<CustomerStationSummary | null>(null)
+
   // Schema-redigering
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
 
@@ -230,17 +233,18 @@ export default function TechnicianEquipment() {
     setSelectedCustomerForModal(customer)
   }
 
-  // Hantera stationsklick i modal
+  // Hantera stationsklick i modal (utomhus öppnar redigeringsformulär, inomhus hanteras i modalen)
   const handleStationClick = (station: EquipmentPlacementWithRelations, type: 'outdoor' | 'indoor') => {
     if (type === 'outdoor') {
-      // Öppna redigeringsformulär
+      // Spara kunden så vi kan återgå efter redigering
+      setReturnToCustomer(selectedCustomerForModal)
       setEditingEquipment(station)
       setPreviewPosition({ lat: station.latitude, lng: station.longitude })
       setWizardCustomerId(station.customer_id)
       setIsFormOpen(true)
       setSelectedCustomerForModal(null)
     }
-    // För inomhus hanteras det i IndoorEquipmentView i modalen
+    // Inomhus hanteras internt i CustomerStationsModal
   }
 
   // Hantera "Lägg till station" från modal
@@ -327,14 +331,20 @@ export default function TechnicianEquipment() {
       }
 
       if (editingEquipment) {
-        // Redigering — stäng allt direkt
+        // Redigering — stäng formulär och återgå till kundmodal om möjligt
+        const customerToReturn = returnToCustomer
         setIsFormOpen(false)
         setEditingEquipment(null)
         setPreviewPosition(null)
         setWizardCustomerId(null)
         setBatchCount(0)
         setBatchCustomerName('')
+        setReturnToCustomer(null)
         await refreshData()
+        if (customerToReturn) {
+          const freshCustomer = allCustomers.find(c => c.customer_id === customerToReturn.customer_id)
+          setSelectedCustomerForModal(freshCustomer || customerToReturn)
+        }
       } else {
         // Ny station — visa success-state för batch-placering
         const customerName = customers.find(c => c.id === customerId)?.company_name
@@ -439,6 +449,7 @@ export default function TechnicianEquipment() {
   const handleFinishBatch = async () => {
     const finishedCustomerId = wizardCustomerId
     const finishedCustomerName = batchCustomerName
+    const customerToReturn = returnToCustomer
 
     setShowSuccessState(false)
     setIsFormOpen(false)
@@ -449,8 +460,13 @@ export default function TechnicianEquipment() {
     setBatchCustomerName('')
     setLastEquipmentType(null)
     setLastUsedMap(false)
+    setReturnToCustomer(null)
 
-    if (finishedCustomerId) {
+    if (customerToReturn) {
+      // Återgå till kundmodalen efter redigering
+      const freshCustomer = allCustomers.find(c => c.customer_id === customerToReturn.customer_id)
+      setSelectedCustomerForModal(freshCustomer || customerToReturn)
+    } else if (finishedCustomerId) {
       await checkAndPromptSchedule(finishedCustomerId, finishedCustomerName)
     }
   }
