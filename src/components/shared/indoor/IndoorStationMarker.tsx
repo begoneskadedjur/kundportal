@@ -72,17 +72,17 @@ export function IndoorStationMarker({
   // Storlek ökas för highlighted
   const actualSize = isHighlighted ? 'large' : size
 
-  // Storlek baserat på prop - ökade för bättre mobil touch (min 44px)
+  // Storlek baserat på prop - visuellt kompakta, touch-target via padding
   const sizeClasses = {
-    small: 'w-8 h-8',    // 32px
-    medium: 'w-11 h-11', // 44px - Apple/Google minimum touch target
-    large: 'w-14 h-14'   // 56px
+    small: 'w-6 h-6',    // 24px visuellt
+    medium: 'w-8 h-8',   // 32px visuellt
+    large: 'w-10 h-10'   // 40px visuellt
   }
 
   const iconSize = {
-    small: 'text-xs',
-    medium: 'text-sm',
-    large: 'text-base'
+    small: 'text-[8px]',
+    medium: 'text-xs',
+    large: 'text-sm'
   }
 
   // Opacity baserat på status
@@ -117,7 +117,7 @@ export function IndoorStationMarker({
   return (
     <div
       className={`
-        absolute cursor-pointer transition-all duration-200
+        absolute cursor-pointer transition-all duration-200 p-2
         ${getOpacity(station.status)}
         ${isHighlighted ? 'z-30 scale-125' : isSelected ? 'z-20 scale-125' : 'z-10 hover:scale-110'}
       `}

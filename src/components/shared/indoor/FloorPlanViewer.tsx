@@ -3,7 +3,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch'
-import { ZoomIn, ZoomOut, Maximize, Move, Plus, X } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize, Move, Plus, X, Check } from 'lucide-react'
 import type { IndoorStationWithRelations, PlacementMode, IndoorStationType } from '../../../types/indoor'
 import { INDOOR_STATION_TYPE_CONFIG } from '../../../types/indoor'
 import { IndoorStationMarker } from './IndoorStationMarker'
@@ -74,6 +74,10 @@ export function FloorPlanViewer({
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null)
   // Cover-dimensioner för att fylla containern kant-till-kant
   const [coverDimensions, setCoverDimensions] = useState<{ width: number; height: number } | null>(null)
+  // Tvåstegs-placering: pending position som kan dras till rätt plats
+  const [pendingPosition, setPendingPosition] = useState<{ x: number; y: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStartRef = useRef<{ pointerId: number; startX: number; startY: number } | null>(null)
 
   // Skapa mappning från station ID till nummer (1, 2, 3...)
   // Baserat på placed_at i stigande ordning (äldsta placering = nummer 1)
@@ -126,26 +130,27 @@ export function FloorPlanViewer({
     }
   }, [])
 
-  // Beräkna klickposition i procent
+  // Beräkna klickposition i procent — sätter pendingPosition (steg 1)
   const handleImageClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (placementMode !== 'place' && placementMode !== 'move') return
     if (!imageRef.current || !onImageClick) return
+    if (isDragging) return
 
     const rect = imageRef.current.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * 100
     const y = ((e.clientY - rect.top) / rect.height) * 100
 
-    // Validera att klicket är inom bilden
     if (x >= 0 && x <= 100 && y >= 0 && y <= 100) {
-      onImageClick(x, y)
+      setPendingPosition({ x, y })
     }
-  }, [placementMode, onImageClick])
+  }, [placementMode, onImageClick, isDragging])
 
-  // Hantera touch för mobil
+  // Hantera touch för mobil — sätter pendingPosition (steg 1)
   const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (placementMode !== 'place' && placementMode !== 'move') return
     if (!imageRef.current || !onImageClick) return
-    if (e.touches.length > 0) return // Ignorera om fler fingrar finns (pinch)
+    if (isDragging) return
+    if (e.touches.length > 0) return
 
     const touch = e.changedTouches[0]
     const rect = imageRef.current.getBoundingClientRect()
@@ -153,9 +158,60 @@ export function FloorPlanViewer({
     const y = ((touch.clientY - rect.top) / rect.height) * 100
 
     if (x >= 0 && x <= 100 && y >= 0 && y <= 100) {
-      onImageClick(x, y)
+      setPendingPosition({ x, y })
     }
-  }, [placementMode, onImageClick])
+  }, [placementMode, onImageClick, isDragging])
+
+  // Bekräfta pendingPosition → anropa onImageClick (steg 2)
+  const handleConfirmPosition = useCallback(() => {
+    if (pendingPosition && onImageClick) {
+      onImageClick(pendingPosition.x, pendingPosition.y)
+      setPendingPosition(null)
+    }
+  }, [pendingPosition, onImageClick])
+
+  // Avbryt pendingPosition
+  const handleCancelPending = useCallback(() => {
+    setPendingPosition(null)
+  }, [])
+
+  // Drag-hantering för pending-markör via pointer events
+  const handleMarkerPointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const target = e.currentTarget as HTMLElement
+    target.setPointerCapture(e.pointerId)
+    dragStartRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY }
+    setIsDragging(true)
+  }, [])
+
+  const handleMarkerPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragStartRef.current || !imageRef.current || !pendingPosition) return
+    e.stopPropagation()
+    e.preventDefault()
+
+    const rect = imageRef.current.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    const y = ((e.clientY - rect.top) / rect.height) * 100
+
+    // Clampa till 0-100
+    setPendingPosition({
+      x: Math.max(0, Math.min(100, x)),
+      y: Math.max(0, Math.min(100, y))
+    })
+  }, [pendingPosition])
+
+  const handleMarkerPointerUp = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation()
+    dragStartRef.current = null
+    // Fördröj isDragging=false så att klick inte triggar ny placering
+    setTimeout(() => setIsDragging(false), 50)
+  }, [])
+
+  // Nollställ pendingPosition när placement-läge ändras
+  useEffect(() => {
+    setPendingPosition(null)
+  }, [placementMode])
 
   // Återställ zoom till 1x och centrera
   const handleResetZoom = useCallback(() => {
@@ -197,7 +253,7 @@ export function FloorPlanViewer({
                         Placera {typeConfig.label}
                       </p>
                       <p className="text-emerald-100 text-xs">
-                        Tryck på bilden för att välja position
+                        {pendingPosition ? 'Dra markören till rätt plats' : 'Tryck på bilden för att välja position'}
                       </p>
                     </div>
                   </>
@@ -209,7 +265,7 @@ export function FloorPlanViewer({
                   <div>
                     <p className="text-white font-medium text-sm">Flytta station</p>
                     <p className="text-emerald-100 text-xs">
-                      Tryck på bilden för att välja ny position
+                      {pendingPosition ? 'Dra markören till rätt plats' : 'Tryck på bilden för att välja ny position'}
                     </p>
                   </div>
                 </div>
@@ -258,9 +314,8 @@ export function FloorPlanViewer({
         maxScale={4}
         centerOnInit
         limitToBounds={false}
-        disabled={isPlacementActive} // Disable pan/zoom in placement mode
-        panning={{ disabled: isPlacementActive }}
-        pinch={{ disabled: isPlacementActive }}
+        panning={{ disabled: isDragging }}
+        pinch={{ disabled: isDragging }}
         doubleClick={{ disabled: isPlacementActive }}
       >
         <TransformComponent
@@ -309,8 +364,45 @@ export function FloorPlanViewer({
               />
             ))}
 
-            {/* Preview marker for new placement */}
-            {imageLoaded && previewPosition && (
+            {/* Draggbar pending-markör (tvåstegs-placering) */}
+            {imageLoaded && pendingPosition && (
+              <div
+                className="absolute z-40 touch-none"
+                style={{
+                  left: `${pendingPosition.x}%`,
+                  top: `${pendingPosition.y}%`,
+                  transform: 'translate(-50%, -50%)'
+                }}
+                onPointerDown={handleMarkerPointerDown}
+                onPointerMove={handleMarkerPointerMove}
+                onPointerUp={handleMarkerPointerUp}
+              >
+                <div className="relative">
+                  {/* Pulsating ring */}
+                  <div className="absolute inset-[-4px] animate-ping rounded-full bg-emerald-400 opacity-50" />
+
+                  {/* Draggbar markör */}
+                  <div
+                    className="w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing"
+                    style={{
+                      backgroundColor: getTypeConfig(selectedType, selectedTypeData).color
+                    }}
+                  >
+                    <Plus className="w-4 h-4 text-white" />
+                  </div>
+
+                  {/* Instruktionstext under markören */}
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap pointer-events-none">
+                    <span className="text-[10px] bg-slate-900/90 text-white px-2 py-1 rounded-full shadow-lg">
+                      Dra för att justera
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Legacy preview marker (för extern previewPosition-prop) */}
+            {imageLoaded && previewPosition && !pendingPosition && (
               <div
                 className="absolute pointer-events-none"
                 style={{
@@ -320,12 +412,9 @@ export function FloorPlanViewer({
                 }}
               >
                 <div className="relative">
-                  {/* Pulsating ring */}
                   <div className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-75" />
-
-                  {/* Main marker */}
                   <div
-                    className="w-8 h-8 rounded-full border-3 border-white shadow-lg flex items-center justify-center"
+                    className="w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center"
                     style={{
                       backgroundColor: getTypeConfig(selectedType, selectedTypeData).color
                     }}
@@ -337,7 +426,7 @@ export function FloorPlanViewer({
             )}
 
             {/* Crosshair overlay in placement mode */}
-            {isPlacementActive && !previewPosition && (
+            {isPlacementActive && !previewPosition && !pendingPosition && (
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                 <div className="relative">
                   <div className="absolute w-px h-8 bg-emerald-400/50 -translate-x-1/2 -translate-y-full" />
@@ -351,6 +440,25 @@ export function FloorPlanViewer({
           </div>
         </TransformComponent>
       </TransformWrapper>
+
+      {/* Bekräfta/avbryt position */}
+      {pendingPosition && (
+        <div className="absolute bottom-4 left-4 z-20 flex gap-2">
+          <button
+            onClick={handleConfirmPosition}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ab07f] text-white text-sm font-medium rounded-xl shadow-lg transition-colors min-h-[44px]"
+          >
+            <Check className="w-4 h-4" />
+            Bekräfta position
+          </button>
+          <button
+            onClick={handleCancelPending}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-800/90 hover:bg-slate-700 text-white text-sm rounded-xl shadow-lg transition-colors min-h-[44px]"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Loading state */}
       {!imageLoaded && (
