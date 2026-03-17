@@ -53,7 +53,9 @@ export function IndoorStationDetailSheet({
 }: IndoorStationDetailSheetProps) {
   const [showAllInspections, setShowAllInspections] = useState(false)
 
-  const typeConfig = INDOOR_STATION_TYPE_CONFIG[station.station_type]
+  const typeConfig = station.station_type_data
+    ? { label: station.station_type_data.name, color: station.station_type_data.color, bgColor: '', requiresSerialNumber: false, prefix: '' }
+    : INDOOR_STATION_TYPE_CONFIG[station.station_type] || { label: station.station_type, color: '#64748b', bgColor: 'bg-slate-500/20', requiresSerialNumber: false, prefix: '' }
   const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
 
   const displayedInspections = showAllInspections ? inspections : inspections.slice(0, 3)
@@ -298,7 +300,9 @@ export function IndoorStationCard({
   isSelected?: boolean
   onClick?: () => void
 }) {
-  const typeConfig = INDOOR_STATION_TYPE_CONFIG[station.station_type]
+  const typeConfig = station.station_type_data
+    ? { label: station.station_type_data.name, color: station.station_type_data.color, bgColor: '', requiresSerialNumber: false, prefix: '' }
+    : INDOOR_STATION_TYPE_CONFIG[station.station_type] || { label: station.station_type, color: '#64748b', bgColor: 'bg-slate-500/20', requiresSerialNumber: false, prefix: '' }
   const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
 
   // Visa calculated_status om aktiv station har warning/critical
