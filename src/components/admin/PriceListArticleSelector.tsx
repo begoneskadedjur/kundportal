@@ -33,6 +33,7 @@ const CATEGORY_CONFIG: Record<ArticleCategory, { label: string; icon: string; co
   Inspektion: { label: 'Inspektion', icon: '🔍', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
   Bekämpning: { label: 'Bekämpning', icon: '🐭', color: 'text-green-400', bgColor: 'bg-green-500/20' },
   Tillbehör: { label: 'Tillbehör', icon: '🛡️', color: 'text-purple-400', bgColor: 'bg-purple-500/20' },
+  Arbetstid: { label: 'Arbetstid', icon: '⏱️', color: 'text-orange-400', bgColor: 'bg-orange-500/20' },
   Övrigt: { label: 'Övrigt', icon: '📋', color: 'text-slate-400', bgColor: 'bg-slate-500/20' }
 }
 
@@ -156,6 +157,7 @@ export default function PriceListArticleSelector({
       Inspektion: [],
       Bekämpning: [],
       Tillbehör: [],
+      Arbetstid: [],
       Övrigt: []
     }
     for (const article of filteredArticles) {

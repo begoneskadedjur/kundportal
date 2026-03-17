@@ -6,10 +6,9 @@ import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
 import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus, ShoppingCart } from 'lucide-react';
-import PriceListArticleSelector from '../PriceListArticleSelector';
-import { SelectedArticleItem } from '../../../types/products';
+import CaseArticleSelector from '../../shared/CaseArticleSelector';
 import { CaseBillingService } from '../../../services/caseBillingService';
-import { PriceListService } from '../../../services/priceListService';
+import type { CaseBillingItemWithRelations } from '../../../types/caseBilling';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
@@ -77,10 +76,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
   const [existingImages, setExistingImages] = useState<CaseImageWithUrl[]>([]);
-  const [selectedPriceListId, setSelectedPriceListId] = useState<string | null>(null);
-  const [selectedArticles, setSelectedArticles] = useState<SelectedArticleItem[]>([]);
+  const [draftBillingItems, setDraftBillingItems] = useState<CaseBillingItemWithRelations[]>([]);
   const [showArticles, setShowArticles] = useState(false);
-  const [defaultPriceListId, setDefaultPriceListId] = useState<string | undefined>(undefined);
   const [offerDetails, setOfferDetails] = useState<{
     agreement_text: string | null;
     selected_products: any[] | null;
@@ -203,19 +200,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       }
     };
 
-    const fetchDefaultPriceList = async () => {
-      try {
-        const lists = await PriceListService.getActivePriceLists();
-        const defaultList = lists.find(pl => pl.is_default);
-        if (defaultList) setDefaultPriceListId(defaultList.id);
-      } catch { /* ignorera */ }
-    };
-
     if (isOpen) {
       fetchContractCustomers();
       fetchMultisiteRoles();
       fetchCustomersWithStations();
-      fetchDefaultPriceList();
     }
   }, [isOpen]);
 
@@ -869,23 +857,24 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       }
 
       // Spara valda artiklar om det finns några
-      if (selectedArticles.length > 0 && finalCaseId) {
+      if (draftBillingItems.length > 0 && finalCaseId) {
         try {
-          for (const item of selectedArticles) {
+          for (const item of draftBillingItems) {
             await CaseBillingService.addArticleToCase({
               case_id: finalCaseId,
               case_type: finalCaseType,
               customer_id: actualCustomerId || undefined,
-              article_id: item.article.id,
-              article_code: item.article.article_number,
-              article_name: item.article.name,
+              article_id: item.article_id || '',
+              article_code: item.article_code || undefined,
+              article_name: item.article_name,
               quantity: item.quantity,
-              unit_price: item.effectivePrice,
-              discount_percent: 0,
-              vat_rate: 25,
+              unit_price: item.unit_price,
+              discount_percent: item.discount_percent || 0,
+              vat_rate: item.vat_rate || 25,
+              price_source: item.price_source,
             })
           }
-          toast.success(`${selectedArticles.length} artikel${selectedArticles.length > 1 ? 'ar' : ''} tillagda`)
+          toast.success(`${draftBillingItems.length} artikel${draftBillingItems.length > 1 ? 'ar' : ''} tillagda`)
         } catch {
           toast.error('Kunde inte spara artiklar')
         }
@@ -1510,21 +1499,19 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
                           <ShoppingCart size={14} /> Artiklar & Prissättning
                           <span className="text-xs font-normal text-slate-500">(valfritt)</span>
-                          {selectedArticles.length > 0 && (
+                          {draftBillingItems.length > 0 && (
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f]">
-                              {selectedArticles.length}
+                              {draftBillingItems.length}
                             </span>
                           )}
                         </h4>
                         <ChevronDown size={16} className={`text-slate-400 transition-transform ${showArticles ? 'rotate-180' : ''}`} />
                       </button>
                       {showArticles && (
-                        <PriceListArticleSelector
-                          selectedPriceListId={selectedPriceListId}
-                          onPriceListChange={setSelectedPriceListId}
-                          selectedArticles={selectedArticles}
-                          onSelectionChange={setSelectedArticles}
-                          customerType={caseType === 'business' ? 'Företag' : 'Privatperson'}
+                        <CaseArticleSelector
+                          draftMode
+                          caseType={caseType === 'business' ? 'business' : 'private'}
+                          onChange={(items) => setDraftBillingItems(items)}
                         />
                       )}
                     </div>
@@ -1823,22 +1810,19 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
                           <ShoppingCart size={14} /> Artiklar & Prissättning
                           <span className="text-xs font-normal text-slate-500">(valfritt)</span>
-                          {selectedArticles.length > 0 && (
+                          {draftBillingItems.length > 0 && (
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f]">
-                              {selectedArticles.length}
+                              {draftBillingItems.length}
                             </span>
                           )}
                         </h4>
                         <ChevronDown size={16} className={`text-slate-400 transition-transform ${showArticles ? 'rotate-180' : ''}`} />
                       </button>
                       {showArticles && (
-                        <PriceListArticleSelector
-                          selectedPriceListId={selectedPriceListId}
-                          onPriceListChange={setSelectedPriceListId}
-                          selectedArticles={selectedArticles}
-                          onSelectionChange={setSelectedArticles}
-                          customerType={caseType === 'business' ? 'Företag' : 'Privatperson'}
-                          fixedPriceListId={defaultPriceListId}
+                        <CaseArticleSelector
+                          draftMode
+                          caseType={caseType === 'business' ? 'business' : 'private'}
+                          onChange={(items) => setDraftBillingItems(items)}
                         />
                       )}
                   </div>

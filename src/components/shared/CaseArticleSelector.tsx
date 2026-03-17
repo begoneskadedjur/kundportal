@@ -30,12 +30,12 @@ import type {
   CaseBillingSummary,
   RotRutType
 } from '../../types/caseBilling'
-import { calculateRotRutDeduction, ROT_RUT_PERCENT } from '../../types/caseBilling'
+import { calculateRotRutDeduction, calculateDiscountedPrice, calculateTotalPrice, itemRequiresApproval, ROT_RUT_PERCENT } from '../../types/caseBilling'
 import type { ArticleCategory } from '../../types/articles'
 import { ARTICLE_CATEGORY_CONFIG, ARTICLE_UNIT_CONFIG, DOSAGE_UNIT_CONFIG, calculatePricePerDosageUnit } from '../../types/articles'
 
 interface CaseArticleSelectorProps {
-  caseId: string
+  caseId?: string
   caseType: BillableCaseType
   customerId?: string | null
   technicianId?: string | null
@@ -43,6 +43,28 @@ interface CaseArticleSelectorProps {
   onChange?: (items: CaseBillingItemWithRelations[], summary: CaseBillingSummary) => void
   readOnly?: boolean
   className?: string
+  draftMode?: boolean
+}
+
+// Beräkna summering lokalt (för draft mode)
+function computeLocalSummary(items: CaseBillingItemWithRelations[], customTotalPrice: number | null): CaseBillingSummary {
+  const subtotal = items.reduce((sum, i) => sum + i.total_price, 0)
+  const totalDiscount = items.reduce((sum, i) => sum + (i.unit_price * i.quantity - i.total_price), 0)
+  const vatAmount = items.reduce((sum, i) => sum + i.total_price * (i.vat_rate / 100), 0)
+  const rotRutDeduction = items.reduce((sum, i) => {
+    if (i.rot_rut_type) return sum + calculateRotRutDeduction(i.total_price, i.rot_rut_type)
+    return sum
+  }, 0)
+  return {
+    item_count: items.length,
+    subtotal,
+    total_discount: totalDiscount,
+    vat_amount: vatAmount,
+    total_amount: subtotal + vatAmount,
+    requires_approval: items.some(i => i.requires_approval),
+    rot_rut_deduction: rotRutDeduction,
+    custom_total_price: customTotalPrice
+  }
 }
 
 const ALL_CATEGORIES: ArticleCategory[] = ['Inspektion', 'Bekämpning', 'Tillbehör', 'Arbetstid', 'Övrigt']
@@ -74,7 +96,8 @@ export default function CaseArticleSelector({
   technicianName,
   onChange,
   readOnly = false,
-  className = ''
+  className = '',
+  draftMode = false
 }: CaseArticleSelectorProps) {
   const [articles, setArticles] = useState<ArticleWithEffectivePrice[]>([])
   const [selectedItems, setSelectedItems] = useState<CaseBillingItemWithRelations[]>([])
@@ -93,35 +116,52 @@ export default function CaseArticleSelector({
   const fastighetsTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const customPriceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Helper: uppdatera draft items + summary + anropa onChange
+  const updateDraftState = useCallback((newItems: CaseBillingItemWithRelations[]) => {
+    setSelectedItems(newItems)
+    const newSummary = computeLocalSummary(newItems, null)
+    setSummary(newSummary)
+    if (onChange) onChange(newItems, newSummary)
+  }, [onChange])
+
   const loadData = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true)
     try {
-      const [articlesData, itemsData, summaryData] = await Promise.all([
-        CaseBillingService.getArticlesWithPrices(customerId),
-        CaseBillingService.getCaseBillingItems(caseId, caseType),
-        CaseBillingService.getCaseBillingSummary(caseId, caseType)
-      ])
-      setArticles(articlesData)
-      setSelectedItems(itemsData)
-      setSummary(summaryData)
-      if (summaryData.custom_total_price !== null) {
-        setCustomPriceEnabled(true)
-        setCustomPriceInput(String(Math.round(summaryData.custom_total_price * 1.25)))
-      }
-      if (onChange) onChange(itemsData, summaryData)
+      if (draftMode) {
+        // Draft mode: ladda bara artiklar, inga befintliga billing items
+        const articlesData = await CaseBillingService.getArticlesWithPrices(customerId)
+        setArticles(articlesData)
+        // Behåll befintliga selectedItems (reset sker inte vid omladdning i draft)
+        const currentSummary = computeLocalSummary(selectedItems, null)
+        setSummary(currentSummary)
+      } else {
+        const [articlesData, itemsData, summaryData] = await Promise.all([
+          CaseBillingService.getArticlesWithPrices(customerId),
+          CaseBillingService.getCaseBillingItems(caseId!, caseType),
+          CaseBillingService.getCaseBillingSummary(caseId!, caseType)
+        ])
+        setArticles(articlesData)
+        setSelectedItems(itemsData)
+        setSummary(summaryData)
+        if (summaryData.custom_total_price !== null) {
+          setCustomPriceEnabled(true)
+          setCustomPriceInput(String(Math.round(summaryData.custom_total_price * 1.25)))
+        }
+        if (onChange) onChange(itemsData, summaryData)
 
-      // Kolla om det finns en icke-skickad faktura
-      try {
-        const hasInvoice = await InvoiceService.hasUnsentInvoiceForCase(caseId, caseType as 'private' | 'business')
-        setHasUnsentInvoice(hasInvoice)
-      } catch { /* ignorera */ }
+        // Kolla om det finns en icke-skickad faktura
+        try {
+          const hasInvoice = await InvoiceService.hasUnsentInvoiceForCase(caseId!, caseType as 'private' | 'business')
+          setHasUnsentInvoice(hasInvoice)
+        } catch { /* ignorera */ }
+      }
     } catch (error) {
       console.error('Kunde inte ladda artikeldata:', error)
       toast.error('Kunde inte ladda artiklar')
     } finally {
       setLoading(false)
     }
-  }, [caseId, caseType, customerId, onChange])
+  }, [caseId, caseType, customerId, onChange, draftMode])
 
   useEffect(() => {
     loadData(true)
@@ -165,15 +205,53 @@ export default function CaseArticleSelector({
 
   const handleAddArticle = async (articleWithPrice: ArticleWithEffectivePrice) => {
     if (readOnly || saving) return
-    setSaving(true)
     const { article } = articleWithPrice
     const isDosage = article.is_dosage_product && article.total_content && article.dosage_unit
     const unitPrice = isDosage
       ? Math.round(calculatePricePerDosageUnit(articleWithPrice.effective_price, article.total_content!) * 100) / 100
       : articleWithPrice.effective_price
+
+    if (draftMode) {
+      // Draft mode: skapa lokalt item
+      const discountedPrice = calculateDiscountedPrice(unitPrice, 0)
+      const totalPrice = calculateTotalPrice(discountedPrice, 1)
+      const draftItem: CaseBillingItemWithRelations = {
+        id: crypto.randomUUID(),
+        case_id: '',
+        case_type: caseType,
+        customer_id: customerId || null,
+        article_id: article.id,
+        article_code: article.code,
+        article_name: article.name,
+        quantity: 1,
+        unit_price: unitPrice,
+        discount_percent: 0,
+        discounted_price: discountedPrice,
+        total_price: totalPrice,
+        vat_rate: article.vat_rate,
+        price_source: articleWithPrice.price_source,
+        added_by_technician_id: technicianId || null,
+        added_by_technician_name: technicianName || null,
+        status: 'pending',
+        requires_approval: false,
+        notes: null,
+        rot_rut_type: null,
+        fastighetsbeteckning: null,
+        min_quantity: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        article: article
+      }
+      const newItems = [...selectedItems, draftItem]
+      updateDraftState(newItems)
+      toast.success(`${article.name} tillagd`)
+      return
+    }
+
+    setSaving(true)
     try {
       await CaseBillingService.addArticleToCase({
-        case_id: caseId,
+        case_id: caseId!,
         case_type: caseType,
         customer_id: customerId,
         article_id: article.id,
@@ -201,6 +279,18 @@ export default function CaseArticleSelector({
     const newQuantity = item.quantity + delta
     const minQty = item.min_quantity || 0.1
     if (newQuantity < minQty) return
+
+    if (draftMode) {
+      const newItems = selectedItems.map(i => {
+        if (i.id !== item.id) return i
+        const dp = calculateDiscountedPrice(i.unit_price, i.discount_percent)
+        const tp = calculateTotalPrice(dp, newQuantity)
+        return { ...i, quantity: newQuantity, discounted_price: dp, total_price: tp }
+      })
+      updateDraftState(newItems)
+      return
+    }
+
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(item.id, { quantity: newQuantity })
@@ -215,6 +305,19 @@ export default function CaseArticleSelector({
 
   const handleUpdateDiscount = async (item: CaseBillingItem, discountPercent: number) => {
     if (readOnly || saving) return
+
+    if (draftMode) {
+      const newItems = selectedItems.map(i => {
+        if (i.id !== item.id) return i
+        const dp = calculateDiscountedPrice(i.unit_price, discountPercent)
+        const tp = calculateTotalPrice(dp, i.quantity)
+        return { ...i, discount_percent: discountPercent, discounted_price: dp, total_price: tp, requires_approval: itemRequiresApproval(discountPercent) }
+      })
+      updateDraftState(newItems)
+      if (discountPercent > 0) toast.success('Rabatt tillagd')
+      return
+    }
+
     const hadNoDiscount = item.discount_percent === 0
     const willHaveDiscount = discountPercent > 0
     setSaving(true)
@@ -224,7 +327,7 @@ export default function CaseArticleSelector({
         toast.success('Rabatt tillagd - kräver admin-godkännande')
         if (hadNoDiscount) {
           DiscountNotificationService.notifyAdminsOfDiscountRequest({
-            caseId,
+            caseId: caseId!,
             caseType,
             articleName: item.article_name,
             discountPercent,
@@ -272,15 +375,29 @@ export default function CaseArticleSelector({
   // ROT/RUT type update
   const handleRotRutChange = async (item: CaseBillingItem, rotRutType: RotRutType | null) => {
     if (readOnly || saving) return
+
+    if (draftMode) {
+      const newItems = selectedItems.map(i => {
+        if (i.id !== item.id) return i
+        return { ...i, rot_rut_type: rotRutType, fastighetsbeteckning: rotRutType ? i.fastighetsbeteckning : null }
+      })
+      if (rotRutType && customPriceEnabled) {
+        setCustomPriceEnabled(false)
+        setCustomPriceInput('')
+        toast('Anpassat pris avaktiverat — ej tillgängligt med ROT/RUT', { icon: 'ℹ️' })
+      }
+      updateDraftState(newItems)
+      return
+    }
+
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(item.id, {
         rot_rut_type: rotRutType,
         fastighetsbeteckning: rotRutType ? item.fastighetsbeteckning : null
       })
-      // Om ROT/RUT aktiveras och anpassat pris är på → stäng av anpassat pris
       if (rotRutType && customPriceEnabled) {
-        await CaseBillingService.clearCustomPrice(caseId, caseType)
+        await CaseBillingService.clearCustomPrice(caseId!, caseType)
         setCustomPriceEnabled(false)
         setCustomPriceInput('')
         toast('Anpassat pris avaktiverat — ej tillgängligt med ROT/RUT', { icon: 'ℹ️' })
@@ -297,6 +414,19 @@ export default function CaseArticleSelector({
   // Kortare ärende (min. 3 tim) toggle
   const handleMinQuantityToggle = async (item: CaseBillingItem, enabled: boolean) => {
     if (readOnly || saving) return
+
+    if (draftMode) {
+      const newItems = selectedItems.map(i => {
+        if (i.id !== item.id) return i
+        const newQty = enabled ? Math.max(3, i.quantity) : i.quantity
+        const dp = calculateDiscountedPrice(i.unit_price, i.discount_percent)
+        const tp = calculateTotalPrice(dp, newQty)
+        return { ...i, min_quantity: enabled ? 3 : null, quantity: newQty, discounted_price: dp, total_price: tp }
+      })
+      updateDraftState(newItems)
+      return
+    }
+
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(item.id, {
@@ -317,9 +447,16 @@ export default function CaseArticleSelector({
     if (readOnly || saving) return
     setCustomPriceEnabled(enabled)
     if (!enabled) {
+      if (draftMode) {
+        setCustomPriceInput('')
+        const newSummary = computeLocalSummary(selectedItems, null)
+        setSummary(newSummary)
+        if (onChange) onChange(selectedItems, newSummary)
+        return
+      }
       setSaving(true)
       try {
-        await CaseBillingService.clearCustomPrice(caseId, caseType)
+        await CaseBillingService.clearCustomPrice(caseId!, caseType)
         setCustomPriceInput('')
         await loadData()
       } catch (error) {
@@ -341,9 +478,17 @@ export default function CaseArticleSelector({
       if (!priceIncl || priceIncl <= 0) return
       const price = priceIncl / 1.25
       if (readOnly || saving) return
+
+      if (draftMode) {
+        const newSummary = computeLocalSummary(selectedItems, price)
+        setSummary(newSummary)
+        if (onChange) onChange(selectedItems, newSummary)
+        return
+      }
+
       setSaving(true)
       try {
-        await CaseBillingService.setCustomPrice(caseId, caseType, price)
+        await CaseBillingService.setCustomPrice(caseId!, caseType, price)
         await loadData()
       } catch (error) {
         console.error('Kunde inte spara anpassat pris:', error)
@@ -358,10 +503,18 @@ export default function CaseArticleSelector({
     if (fastighetsTimers.current[item.id]) clearTimeout(fastighetsTimers.current[item.id])
     fastighetsTimers.current[item.id] = setTimeout(async () => {
       if (readOnly || saving) return
+
+      if (draftMode) {
+        const newItems = selectedItems.map(i =>
+          i.id === item.id ? { ...i, fastighetsbeteckning: value || null } : i
+        )
+        updateDraftState(newItems)
+        return
+      }
+
       setSaving(true)
       try {
         await CaseBillingService.updateCaseArticle(item.id, { fastighetsbeteckning: value || null })
-        // Uppdatera lokalt istället för loadData() — undviker fokusförlust
         setSelectedItems(prev => prev.map(i =>
           i.id === item.id ? { ...i, fastighetsbeteckning: value || null } : i
         ))
@@ -375,6 +528,14 @@ export default function CaseArticleSelector({
 
   const handleRemoveArticle = async (itemId: string) => {
     if (readOnly || saving) return
+
+    if (draftMode) {
+      const newItems = selectedItems.filter(i => i.id !== itemId)
+      updateDraftState(newItems)
+      toast.success('Artikel borttagen')
+      return
+    }
+
     setSaving(true)
     try {
       await CaseBillingService.removeCaseArticle(itemId)
@@ -435,7 +596,7 @@ export default function CaseArticleSelector({
       </div>
 
       {/* Info-banner: faktura kopplad till ärendet */}
-      {hasUnsentInvoice && !readOnly && (
+      {hasUnsentInvoice && !readOnly && !draftMode && (
         <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
           <p className="text-xs text-blue-400">
