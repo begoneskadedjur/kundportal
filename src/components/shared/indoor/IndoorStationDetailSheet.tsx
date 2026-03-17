@@ -18,7 +18,11 @@ import {
   AlertCircle,
   ChevronRight,
   ClipboardList,
-  Activity
+  Activity,
+  Crosshair,
+  Box,
+  Target,
+  Hash
 } from 'lucide-react'
 import type {
   IndoorStationWithRelations,
@@ -109,17 +113,69 @@ export function IndoorStationDetailSheet({
       </div>
 
       {/* Content - scrollable */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {/* Photo */}
-        {station.photo_url && (
-          <div className="rounded-xl overflow-hidden bg-slate-900">
-            <img
-              src={station.photo_url}
-              alt="Stationsfoto"
-              className="w-full h-40 object-cover"
-            />
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        {/* Utrustningstyp - prominent som utomhus */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-3">
+            Utrustningstyp
+          </label>
+          <div className="inline-flex">
+            <div className="p-4 rounded-xl border-2 border-blue-500 bg-blue-500/10">
+              <div
+                className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
+                style={{ backgroundColor: typeConfig.color }}
+              >
+                <StationTypeIcon type={station.station_type} stationTypeData={station.station_type_data} />
+              </div>
+              <p className="text-sm font-medium text-blue-400 text-center">
+                {typeConfig.label}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Serienummer */}
+        {station.station_number && (
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Serienummer
+            </label>
+            <div className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white">
+              {station.station_number}
+            </div>
           </div>
         )}
+
+        {/* Status - liknande utomhus status-knappar */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Status
+          </label>
+          <div className="flex flex-wrap gap-3">
+            {(Object.entries(INDOOR_STATION_STATUS_CONFIG) as [string, typeof INDOOR_STATION_STATUS_CONFIG[keyof typeof INDOOR_STATION_STATUS_CONFIG]][]).map(
+              ([status, config]) => {
+                const isSelected = station.status === status
+                return (
+                  <div
+                    key={status}
+                    className={`px-4 py-2.5 rounded-lg border-2 text-sm font-medium ${
+                      isSelected
+                        ? `${config.bgColor} ${config.textColor} border-current`
+                        : 'border-slate-700 bg-slate-800/50 text-slate-500'
+                    }`}
+                  >
+                    {config.label}
+                  </div>
+                )
+              }
+            )}
+          </div>
+          {station.status !== 'active' && station.status_updated_at && (
+            <p className="text-xs text-slate-500 mt-2">
+              Sedan {format(new Date(station.status_updated_at), 'd MMM yyyy', { locale: sv })}
+            </p>
+          )}
+        </div>
 
         {/* Measurement status - visa om stationstypen har tröskelvärden */}
         {station.station_type_data && (station.station_type_data.threshold_warning || station.station_type_data.threshold_critical) && (
@@ -133,57 +189,49 @@ export function IndoorStationDetailSheet({
           />
         )}
 
-        {/* Details grid */}
-        <div className="space-y-3">
-          {/* Position */}
-          <div className="flex items-start gap-3 p-3 bg-slate-900/50 rounded-lg">
-            <MapPin className="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-xs text-slate-400 mb-0.5">Position</p>
-              <p className="text-sm text-white">
-                {station.position_x_percent.toFixed(1)}%, {station.position_y_percent.toFixed(1)}%
-              </p>
-              {station.location_description && (
-                <p className="text-sm text-slate-300 mt-1">{station.location_description}</p>
-              )}
+        {/* Kommentar */}
+        {station.comment && (
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Kommentar
+            </label>
+            <div className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white whitespace-pre-wrap">
+              {station.comment}
             </div>
           </div>
+        )}
 
-          {/* Placed by */}
-          <div className="flex items-start gap-3 p-3 bg-slate-900/50 rounded-lg">
-            <User className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-xs text-slate-400 mb-0.5">Placerad av</p>
-              <p className="text-sm text-white">
-                {station.technician?.name || 'Okänd'}
-              </p>
+        {/* Foto */}
+        {station.photo_url && (
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Foto
+            </label>
+            <div className="relative rounded-lg overflow-hidden">
+              <img
+                src={station.photo_url}
+                alt="Stationsfoto"
+                className="w-full h-48 object-cover rounded-lg"
+              />
             </div>
           </div>
+        )}
 
-          {/* Placed date */}
-          <div className="flex items-start gap-3 p-3 bg-slate-900/50 rounded-lg">
-            <Calendar className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-xs text-slate-400 mb-0.5">Placerad</p>
-              <p className="text-sm text-white">
-                {format(new Date(station.placed_at), "d MMMM yyyy 'kl' HH:mm", { locale: sv })}
-              </p>
-            </div>
+        {/* Placeringsinfo - kompakt */}
+        <div className="flex items-start gap-3 p-3 bg-slate-900/50 rounded-lg">
+          <User className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs text-slate-400 mb-0.5">Placerad av</p>
+            <p className="text-sm text-white">
+              {station.technician?.name || 'Okänd'} • {format(new Date(station.placed_at), "d MMMM yyyy 'kl' HH:mm", { locale: sv })}
+            </p>
+            {station.location_description && (
+              <p className="text-xs text-slate-400 mt-1">{station.location_description}</p>
+            )}
           </div>
-
-          {/* Comment */}
-          {station.comment && (
-            <div className="flex items-start gap-3 p-3 bg-slate-900/50 rounded-lg">
-              <FileText className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-slate-400 mb-0.5">Kommentar</p>
-                <p className="text-sm text-white">{station.comment}</p>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Inspections */}
+        {/* Kontrollhistorik */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2">
@@ -259,6 +307,22 @@ export function IndoorStationDetailSheet({
       </div>
     </div>
   )
+}
+
+// Ikon-mappning för stationstyper
+const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
+  crosshair: Crosshair,
+  box: Box,
+  target: Target,
+  mechanical_trap: Crosshair,
+  concrete_station: Box,
+  bait_station: Target
+}
+
+function StationTypeIcon({ type, stationTypeData }: { type: string; stationTypeData?: { icon: string } | null }) {
+  const iconKey = stationTypeData?.icon || type
+  const Icon = STATION_TYPE_ICONS[iconKey] || Box
+  return <Icon className="w-5 h-5 text-white" />
 }
 
 // Inspektionsrad
