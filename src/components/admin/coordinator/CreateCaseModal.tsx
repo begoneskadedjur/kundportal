@@ -9,6 +9,7 @@ import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, Ale
 import PriceListArticleSelector from '../PriceListArticleSelector';
 import { SelectedArticleItem } from '../../../types/products';
 import { CaseBillingService } from '../../../services/caseBillingService';
+import { PriceListService } from '../../../services/priceListService';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
@@ -79,6 +80,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [selectedPriceListId, setSelectedPriceListId] = useState<string | null>(null);
   const [selectedArticles, setSelectedArticles] = useState<SelectedArticleItem[]>([]);
   const [showArticles, setShowArticles] = useState(false);
+  const [defaultPriceListId, setDefaultPriceListId] = useState<string | undefined>(undefined);
   const [offerDetails, setOfferDetails] = useState<{
     agreement_text: string | null;
     selected_products: any[] | null;
@@ -201,10 +203,19 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       }
     };
 
+    const fetchDefaultPriceList = async () => {
+      try {
+        const lists = await PriceListService.getActivePriceLists();
+        const defaultList = lists.find(pl => pl.is_default);
+        if (defaultList) setDefaultPriceListId(defaultList.id);
+      } catch { /* ignorera */ }
+    };
+
     if (isOpen) {
       fetchContractCustomers();
       fetchMultisiteRoles();
       fetchCustomersWithStations();
+      fetchDefaultPriceList();
     }
   }, [isOpen]);
 
@@ -1740,6 +1751,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />
                               <Input label="Beställare" name="bestallare" value={formData.bestallare || ''} onChange={handleChange} />
                             </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />
+                              <Input type="email" label="E-post Faktura" name="e_post_faktura" value={formData.e_post_faktura || ''} onChange={handleChange} />
+                            </div>
                           </>
                       )}
                   </div>
@@ -1823,13 +1838,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           selectedArticles={selectedArticles}
                           onSelectionChange={setSelectedArticles}
                           customerType={caseType === 'business' ? 'Företag' : 'Privatperson'}
+                          fixedPriceListId={defaultPriceListId}
                         />
                       )}
                   </div>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><MapPin size={14}/> Utskick</h4>
-                      {caseType === 'business' && (<Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />)}
-                      {caseType === 'business' && (<Input type="email" label="E-post Faktura" name="e_post_faktura" value={formData.e_post_faktura || ''} onChange={handleChange} />)}
                       <div>
                           <label className="block text-xs font-medium text-slate-400 mb-2">Skicka bokningsbekräftelse?</label>
                           <div className="flex gap-3">

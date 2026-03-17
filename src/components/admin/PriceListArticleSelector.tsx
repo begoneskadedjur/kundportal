@@ -26,6 +26,7 @@ interface PriceListArticleSelectorProps {
   customerType: CustomerType
   className?: string
   readOnly?: boolean
+  fixedPriceListId?: string
 }
 
 const CATEGORY_CONFIG: Record<ArticleCategory, { label: string; icon: string; color: string; bgColor: string }> = {
@@ -42,7 +43,8 @@ export default function PriceListArticleSelector({
   onSelectionChange,
   customerType,
   className = '',
-  readOnly = false
+  readOnly = false,
+  fixedPriceListId
 }: PriceListArticleSelectorProps) {
   // State
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
@@ -65,6 +67,13 @@ export default function PriceListArticleSelector({
   useEffect(() => {
     loadInitialData()
   }, [])
+
+  // Auto-välj fixed prislista om angiven
+  useEffect(() => {
+    if (fixedPriceListId && selectedPriceListId !== fixedPriceListId) {
+      onPriceListChange(fixedPriceListId)
+    }
+  }, [fixedPriceListId])
 
   // Ladda prislistans artikelpriser vid val
   useEffect(() => {
@@ -258,7 +267,8 @@ export default function PriceListArticleSelector({
         </div>
       )}
 
-      {/* Sektion A: Prislisteväljare */}
+      {/* Sektion A: Prislisteväljare (döljs om fixedPriceListId) */}
+      {!fixedPriceListId && (
       <Card className="p-5 border-slate-700">
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-2">
@@ -363,6 +373,7 @@ export default function PriceListArticleSelector({
           )}
         </div>
       </Card>
+      )}
 
       {/* Sektion B: Artikelgrid (visas efter prislisteval) */}
       {selectedPriceListId && (
