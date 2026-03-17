@@ -1,10 +1,83 @@
 // src/components/shared/indoor/FloorPlanUploadForm.tsx
 // Formulär för att ladda upp nya planritningar
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Upload, X, Image as ImageIcon, Building2, FileText } from 'lucide-react'
 import type { CreateFloorPlanInput } from '../../../types/indoor'
 import { ALLOWED_FLOOR_PLAN_TYPES, MAX_FLOOR_PLAN_SIZE } from '../../../services/floorPlanService'
+
+const MAX_IMAGE_DIMENSION = 2048 // Max bredd/höjd i pixlar
+
+/**
+ * Komprimera bild till max MAX_IMAGE_DIMENSION px och returnera som ny File.
+ * Löser problem med stora mobilfoton som inte kan uploadas via fetch.
+ */
+async function compressImage(file: File): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        let { width, height } = img
+
+        // Behöver vi ens komprimera?
+        if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION && file.size <= 2 * 1024 * 1024) {
+          URL.revokeObjectURL(img.src)
+          resolve(file) // Liten fil, returnera original
+          return
+        }
+
+        // Beräkna ny storlek med bibehållet aspect ratio
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+          const ratio = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height)
+          width = Math.round(width * ratio)
+          height = Math.round(height * ratio)
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          URL.revokeObjectURL(img.src)
+          resolve(file) // Fallback
+          return
+        }
+
+        ctx.drawImage(img, 0, 0, width, height)
+        URL.revokeObjectURL(img.src)
+
+        // Exportera — behåll PNG för planritningar med text/linjer
+        const isPng = file.type === 'image/png'
+        const mimeType = isPng ? 'image/png' : 'image/jpeg'
+        const quality = isPng ? undefined : 0.85
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file) // Fallback
+              return
+            }
+            const ext = isPng ? 'png' : 'jpg'
+            const compressedFile = new File([blob], `planritning.${ext}`, {
+              type: mimeType,
+              lastModified: Date.now()
+            })
+            resolve(compressedFile)
+          },
+          mimeType,
+          quality
+        )
+      } catch {
+        resolve(file) // Fallback vid fel
+      }
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src)
+      resolve(file) // Fallback
+    }
+    img.src = URL.createObjectURL(file)
+  })
+}
 
 interface FloorPlanUploadFormProps {
   customerId: string
@@ -32,30 +105,47 @@ export function FloorPlanUploadForm({
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Hantera filval
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isCompressing, setIsCompressing] = useState(false)
+
+  // Hantera filval med automatisk komprimering
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validera filtyp
-    if (!ALLOWED_FLOOR_PLAN_TYPES.includes(file.type)) {
+    // Validera filtyp — tillåt även tom type (vanligt på Android)
+    if (file.type && !ALLOWED_FLOOR_PLAN_TYPES.includes(file.type)) {
       setError(`Ogiltigt format. Tillåtna: ${ALLOWED_FLOOR_PLAN_TYPES.map(t => t.split('/')[1]).join(', ')}`)
       return
     }
 
-    // Validera storlek
+    // Validera storlek (före komprimering)
     if (file.size > MAX_FLOOR_PLAN_SIZE) {
       setError(`Filen är för stor. Max ${MAX_FLOOR_PLAN_SIZE / 1024 / 1024}MB`)
       return
     }
 
     setError(null)
-    setSelectedFile(file)
+    setIsCompressing(true)
 
-    // Skapa preview
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
-  }
+    try {
+      // Komprimera bilden (resize + optimera för upload)
+      const compressed = await compressImage(file)
+      setSelectedFile(compressed)
+
+      // Skapa preview
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      const url = URL.createObjectURL(compressed)
+      setPreviewUrl(url)
+    } catch {
+      // Fallback — använd original
+      setSelectedFile(file)
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      const url = URL.createObjectURL(file)
+      setPreviewUrl(url)
+    } finally {
+      setIsCompressing(false)
+    }
+  }, [previewUrl])
 
   // Rensa vald fil
   const clearFile = () => {

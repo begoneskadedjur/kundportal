@@ -126,13 +126,32 @@ export class FloorPlanService {
       const fileExt = input.image.name.split('.').pop()?.toLowerCase() || 'jpg'
       const imagePath = `${input.customer_id}/${tempId}/image.${fileExt}`
 
+      // Konvertera File till Blob med explicit content-type (fixar mobilproblem)
+      const contentType = input.image.type || 'image/jpeg'
+      let uploadBody: Blob
+      try {
+        const buffer = await input.image.arrayBuffer()
+        uploadBody = new Blob([buffer], { type: contentType })
+      } catch {
+        // Fallback — använd File direkt
+        uploadBody = input.image
+      }
+
       // Ladda upp bild till storage
-      const { error: uploadError } = await supabase.storage
-        .from(FLOOR_PLANS_BUCKET)
-        .upload(imagePath, input.image, {
-          cacheControl: '3600',
-          upsert: false
-        })
+      let uploadError: { message: string } | null = null
+      try {
+        const result = await supabase.storage
+          .from(FLOOR_PLANS_BUCKET)
+          .upload(imagePath, uploadBody, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType
+          })
+        uploadError = result.error
+      } catch (fetchErr) {
+        console.error('Nätverksfel vid uppladdning:', fetchErr)
+        throw new Error('Kunde inte ladda upp bilden. Kontrollera din internetanslutning och försök igen.')
+      }
 
       if (uploadError) {
         console.error('Fel vid uppladdning av bild:', uploadError)
@@ -273,12 +292,30 @@ export class FloorPlanService {
       const fileExt = newImage.name.split('.').pop()?.toLowerCase() || 'jpg'
       const newImagePath = `${existing.customer_id}/${tempId}/image.${fileExt}`
 
-      const { error: uploadError } = await supabase.storage
-        .from(FLOOR_PLANS_BUCKET)
-        .upload(newImagePath, newImage, {
-          cacheControl: '3600',
-          upsert: false
-        })
+      // Konvertera File till Blob med explicit content-type (fixar mobilproblem)
+      const contentType = newImage.type || 'image/jpeg'
+      let uploadBody: Blob
+      try {
+        const buffer = await newImage.arrayBuffer()
+        uploadBody = new Blob([buffer], { type: contentType })
+      } catch {
+        uploadBody = newImage
+      }
+
+      let uploadError: { message: string } | null = null
+      try {
+        const result = await supabase.storage
+          .from(FLOOR_PLANS_BUCKET)
+          .upload(newImagePath, uploadBody, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType
+          })
+        uploadError = result.error
+      } catch (fetchErr) {
+        console.error('Nätverksfel vid uppladdning:', fetchErr)
+        throw new Error('Kunde inte ladda upp bilden. Kontrollera din internetanslutning och försök igen.')
+      }
 
       if (uploadError) {
         throw new Error(`Kunde inte ladda upp bild: ${uploadError.message}`)
