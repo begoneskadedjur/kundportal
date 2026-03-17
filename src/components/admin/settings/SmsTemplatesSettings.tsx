@@ -32,7 +32,9 @@ interface SmsTemplate {
 }
 
 const AVAILABLE_VARIABLES = [
-  { key: 'kundnamn', description: 'Kundens namn' },
+  { key: 'kundnamn', description: 'Kundens fullständiga namn' },
+  { key: 'fornamn', description: 'Kundens förnamn' },
+  { key: 'efternamn', description: 'Kundens efternamn' },
   { key: 'datum', description: 'Bokningsdatum (t.ex. 17 mars)' },
   { key: 'tid', description: 'Exakt klockslag (t.ex. 10:00)' },
   { key: 'starttid', description: 'Starttid för tidsspann' },
@@ -44,6 +46,8 @@ const AVAILABLE_VARIABLES = [
 
 const EXAMPLE_VALUES: Record<string, string> = {
   kundnamn: 'Anna Svensson',
+  fornamn: 'Anna',
+  efternamn: 'Svensson',
   datum: '17 mars',
   tid: '10:00',
   starttid: '10:00',

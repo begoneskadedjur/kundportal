@@ -857,8 +857,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           const endDate = formData.due_date ? new Date(formData.due_date) : null
           const primaryTech = technicians.find(t => t.id === formData.primary_assignee_id)
 
+          const fullName = formData.kontaktperson || customer?.contact_person || customer?.company_name || ''
+          const nameParts = fullName.trim().split(/\s+/)
+
           const variables: Record<string, string> = {
-            kundnamn: formData.kontaktperson || customer?.contact_person || customer?.company_name || '',
+            kundnamn: fullName,
+            fornamn: nameParts[0] || '',
+            efternamn: nameParts.slice(1).join(' ') || '',
             adress: formData.adress || '',
             skadedjur: formData.skadedjur || '',
             tekniker: primaryTech?.name || '',
