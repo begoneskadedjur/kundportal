@@ -31,6 +31,7 @@ import PreparationsPage from './pages/admin/settings/PreparationsPage';
 import ArticlesPage from './pages/admin/settings/ArticlesPage';
 import PriceListsPage from './pages/admin/settings/PriceListsPage';
 import CustomerGroupsPage from './pages/admin/settings/CustomerGroupsPage';
+import SmsTemplatesPage from './pages/admin/settings/SmsTemplatesPage';
 import InvoicingPage from './pages/admin/invoicing';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
@@ -141,6 +142,7 @@ function App() {
               <Route path="offerthantering" element={<ProtectedRoute requiredRole="admin"><CasePipeline /></ProtectedRoute>} />
               <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
               <Route path="kundgrupper" element={<ProtectedRoute requiredRole="admin"><CustomerGroupsPage /></ProtectedRoute>} />
+              <Route path="sms-mallar" element={<ProtectedRoute requiredRole="admin"><SmsTemplatesPage /></ProtectedRoute>} />
               <Route path="oneflow-test" element={<Navigate to="/admin/skapa-avtal" replace />} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="admin"><InternAdministration /></ProtectedRoute>} />
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="admin"><IncidentsPage /></ProtectedRoute>} />

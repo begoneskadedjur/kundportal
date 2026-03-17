@@ -107,6 +107,7 @@ export const navGroups: NavGroup[] = [
     icon: Settings,
     items: [
       { label: 'Kundgrupper', icon: Users, path: '/admin/kundgrupper' },
+      { label: 'SMS Mallar', icon: MessageSquareText, path: '/admin/sms-mallar' },
       { label: 'Webhook-config', icon: Wrench, path: '/admin/webhook-config' },
       { label: 'Avtalsdiagnostik', icon: AlertCircle, path: '/admin/avtalsdiagnostik' },
     ]

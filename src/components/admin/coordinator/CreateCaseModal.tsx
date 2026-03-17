@@ -845,6 +845,50 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         }
       }
       
+      // Skicka SMS bokningsbekräftelse om valt
+      if (formData.skicka_bokningsbekraftelse && formData.skicka_bokningsbekraftelse !== 'Nej') {
+        const phoneNumber = formData.telefon_kontaktperson || customer?.contact_phone
+        if (phoneNumber) {
+          const templateSlug = formData.skicka_bokningsbekraftelse.includes('Tidsspann')
+            ? 'booking_timespan'
+            : 'booking_first_time'
+
+          const startDate = formData.start_date ? new Date(formData.start_date) : null
+          const endDate = formData.due_date ? new Date(formData.due_date) : null
+          const primaryTech = technicians.find(t => t.id === formData.primary_assignee_id)
+
+          const variables: Record<string, string> = {
+            kundnamn: formData.kontaktperson || customer?.contact_person || customer?.company_name || '',
+            adress: formData.adress || '',
+            skadedjur: formData.skadedjur || '',
+            tekniker: primaryTech?.name || '',
+          }
+          if (startDate) {
+            variables.datum = startDate.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long' })
+            variables.tid = startDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+            variables.starttid = startDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+          }
+          if (endDate) {
+            variables.sluttid = endDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+          }
+
+          try {
+            const smsRes = await fetch('/api/send-sms', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ to: phoneNumber, templateSlug, variables })
+            })
+            if (smsRes.ok) {
+              toast.success('Bokningsbekräftelse skickad via SMS')
+            } else {
+              toast.error('Kunde inte skicka SMS-bekräftelse')
+            }
+          } catch {
+            toast.error('Kunde inte skicka SMS-bekräftelse')
+          }
+        }
+      }
+
       setSubmitted(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1500);
     } catch (err: any) {
