@@ -37,6 +37,8 @@ import { ScheduleInfoPanel } from '../../components/technician/ScheduleInfoPanel
 import { EditScheduleModal } from '../../components/technician/EditScheduleModal'
 import { getRecurringSchedulesByCustomer } from '../../services/recurringScheduleService'
 import type { BatchScheduleUnit } from '../../types/recurringSchedule'
+import { getOutdoorInspectionsByStation } from '../../services/inspectionSessionService'
+import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
 
 interface Customer {
   id: string
@@ -54,6 +56,7 @@ export default function TechnicianEquipment() {
   const [loading, setLoading] = useState(true)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEquipment, setEditingEquipment] = useState<EquipmentPlacementWithRelations | null>(null)
+  const [outdoorInspections, setOutdoorInspections] = useState<OutdoorInspectionWithRelations[]>([])
   const [previewPosition, setPreviewPosition] = useState<{ lat: number; lng: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
@@ -243,6 +246,8 @@ export default function TechnicianEquipment() {
       setWizardCustomerId(station.customer_id)
       setIsFormOpen(true)
       setSelectedCustomerForModal(null)
+      // Hämta kontrollhistorik
+      getOutdoorInspectionsByStation(station.id).then(setOutdoorInspections)
     }
     // Inomhus hanteras internt i CustomerStationsModal
   }
@@ -415,6 +420,7 @@ export default function TechnicianEquipment() {
     setPreviewPosition({ lat: equipment.latitude, lng: equipment.longitude })
     setWizardCustomerId(equipment.customer_id)
     setIsFormOpen(true)
+    getOutdoorInspectionsByStation(equipment.id).then(setOutdoorInspections)
   }
 
   // Hantera GPS-fångst
@@ -454,6 +460,7 @@ export default function TechnicianEquipment() {
     setShowSuccessState(false)
     setIsFormOpen(false)
     setEditingEquipment(null)
+    setOutdoorInspections([])
     setPreviewPosition(null)
     setWizardCustomerId(null)
     setBatchCount(0)
@@ -603,7 +610,7 @@ export default function TechnicianEquipment() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end justify-center"
               onClick={(e) => {
                 if (e.target === e.currentTarget) {
                   handleFinishBatch()
@@ -611,10 +618,11 @@ export default function TechnicianEquipment() {
               }}
             >
               <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="bg-slate-900 rounded-t-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 {showSuccessState ? (
@@ -687,6 +695,7 @@ export default function TechnicianEquipment() {
                         initialEquipmentType={lastEquipmentType || undefined}
                         autoShowMap={lastUsedMap}
                         existingStations={customerExistingStations}
+                        inspections={editingEquipment ? outdoorInspections : []}
                         onSubmit={handleFormSubmit}
                         onCancel={handleFinishBatch}
                         onLocationCapture={handleLocationCapture}

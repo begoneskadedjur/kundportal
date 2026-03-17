@@ -2,15 +2,21 @@
 // Formulär för att skapa/redigera inomhusstationer
 
 import { useState, useRef, useEffect } from 'react'
-import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2 } from 'lucide-react'
+import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp } from 'lucide-react'
+import { format } from 'date-fns'
+import { sv } from 'date-fns/locale'
 import type {
   IndoorStationType,
+  IndoorStationStatus,
   IndoorStationWithRelations,
+  IndoorStationInspectionWithRelations,
   CreateIndoorStationInput,
   UpdateIndoorStationInput
 } from '../../../types/indoor'
 import {
   INDOOR_STATION_TYPE_CONFIG,
+  INDOOR_STATION_STATUS_CONFIG,
+  INSPECTION_STATUS_CONFIG,
   generateStationNumber
 } from '../../../types/indoor'
 import { MAX_STATION_PHOTO_SIZE, ALLOWED_PHOTO_TYPES } from '../../../services/indoorStationService'
@@ -31,8 +37,10 @@ interface IndoorStationFormProps {
   position: { x: number; y: number }
   existingStation?: IndoorStationWithRelations | null
   existingStationNumbers?: string[]
+  inspections?: IndoorStationInspectionWithRelations[]
   onSubmit: (input: CreateIndoorStationInput | UpdateIndoorStationInput) => Promise<void>
   onCancel: () => void
+  onDelete?: () => void
   isSubmitting?: boolean
 }
 
@@ -41,8 +49,10 @@ export function IndoorStationForm({
   position,
   existingStation,
   existingStationNumbers = [],
+  inspections = [],
   onSubmit,
   onCancel,
+  onDelete,
   isSubmitting = false
 }: IndoorStationFormProps) {
   const isEditing = !!existingStation
@@ -57,6 +67,7 @@ export function IndoorStationForm({
   )
   const [stationNumber, setStationNumber] = useState(existingStation?.station_number || '')
   const [locationDescription, setLocationDescription] = useState(existingStation?.location_description || '')
+  const [status, setStatus] = useState<IndoorStationStatus>(existingStation?.status || 'active')
   const [comment, setComment] = useState(existingStation?.comment || '')
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(existingStation?.photo_url || null)
@@ -171,6 +182,7 @@ export function IndoorStationForm({
           position_y_percent: position.y,
           location_description: locationDescription.trim() || undefined,
           comment: comment.trim() || undefined,
+          status,
           photo: selectedPhoto || undefined
         }
         await onSubmit(updateInput)
@@ -279,27 +291,55 @@ export function IndoorStationForm({
           )}
         </div>
 
-      {/* Station number - endast för typer som kräver serienummer */}
-      {currentTypeConfig?.requiresSerialNumber && (
+      {/* Serienummer */}
+      <div>
+        <label htmlFor="stationNumber" className="block text-sm font-medium text-slate-300 mb-2">
+          Serienummer {currentTypeConfig?.requiresSerialNumber ? '*' : ''}
+        </label>
+        <div className="relative">
+          <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input
+            id="stationNumber"
+            type="text"
+            value={stationNumber}
+            onChange={(e) => setStationNumber(e.target.value)}
+            placeholder={currentTypeConfig?.requiresSerialNumber ? 'Ange serienummer' : 'Valfritt serienummer'}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            required={currentTypeConfig?.requiresSerialNumber}
+          />
+        </div>
+      </div>
+
+      {/* Status (endast vid redigering) */}
+      {isEditing && (
         <div>
-          <label htmlFor="stationNumber" className="block text-sm font-medium text-slate-300 mb-2">
-            Serienummer *
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Status
           </label>
-          <div className="relative">
-            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <input
-              id="stationNumber"
-              type="text"
-              value={stationNumber}
-              onChange={(e) => setStationNumber(e.target.value)}
-              placeholder={`T.ex. ${currentTypeConfig?.prefix || 'ST'}-001`}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              required
-            />
+          <div className="grid grid-cols-3 gap-3">
+            {(Object.entries(INDOOR_STATION_STATUS_CONFIG) as [IndoorStationStatus, typeof INDOOR_STATION_STATUS_CONFIG[IndoorStationStatus]][]).map(
+              ([statusKey, config]) => {
+                const isSelected = status === statusKey
+
+                return (
+                  <button
+                    key={statusKey}
+                    type="button"
+                    onClick={() => setStatus(statusKey)}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      isSelected
+                        ? `border-${config.color} ${config.bgColor}`
+                        : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                    }`}
+                  >
+                    <p className={`text-sm font-medium ${isSelected ? config.textColor : 'text-slate-300'}`}>
+                      {config.label}
+                    </p>
+                  </button>
+                )
+              }
+            )}
           </div>
-          <p className="mt-1 text-xs text-slate-500">
-            Ange serienummer för denna station
-          </p>
         </div>
       )}
 
@@ -350,7 +390,7 @@ export function IndoorStationForm({
             <img
               src={photoPreview}
               alt="Förhandsvisning"
-              className="w-full h-32 object-cover"
+              className="w-full max-h-48 object-contain"
             />
             <button
               type="button"
@@ -381,6 +421,11 @@ export function IndoorStationForm({
         />
       </div>
 
+      {/* Kontrollhistorik */}
+      {isEditing && inspections.length > 0 && (
+        <InspectionHistory inspections={inspections} />
+      )}
+
       {/* Error message */}
       {error && (
         <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
@@ -390,6 +435,16 @@ export function IndoorStationForm({
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
+        {onDelete && isEditing && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isSubmitting}
+            className="py-2.5 px-4 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
         <button
           type="button"
           onClick={onCancel}
@@ -548,6 +603,64 @@ export function StationTypeSelector({
                 )}
               </div>
             </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Kontrollhistorik-sektion för inomhusstationer
+function InspectionHistory({ inspections }: { inspections: IndoorStationInspectionWithRelations[] }) {
+  const [showAll, setShowAll] = useState(false)
+  const displayed = showAll ? inspections : inspections.slice(0, 3)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+          <ClipboardList className="w-4 h-4" />
+          Kontrollhistorik ({inspections.length})
+        </h4>
+        {inspections.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(!showAll)}
+            className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+          >
+            {showAll ? (
+              <>Visa färre <ChevronUp className="w-3 h-3" /></>
+            ) : (
+              <>Visa alla <ChevronDown className="w-3 h-3" /></>
+            )}
+          </button>
+        )}
+      </div>
+      <div className="space-y-2">
+        {displayed.map((inspection) => {
+          const statusConfig = INSPECTION_STATUS_CONFIG[inspection.status]
+          return (
+            <div key={inspection.id} className="p-3 bg-slate-900/50 rounded-lg">
+              <div className="flex items-start gap-2">
+                <div className={`w-6 h-6 rounded-full ${statusConfig.bgColor} flex items-center justify-center flex-shrink-0`}>
+                  <span className="text-xs">{statusConfig.icon}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{statusConfig.label}</p>
+                  {inspection.findings && (
+                    <p className="text-xs text-slate-400 mt-0.5">{inspection.findings}</p>
+                  )}
+                  {inspection.measurement_value !== null && inspection.measurement_value !== undefined && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {inspection.station?.station_type_data?.measurement_label || 'Mätvärde'}: {inspection.measurement_value} {inspection.measurement_unit || 'st'}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-500 mt-1">
+                    {inspection.technician?.name || 'Okänd'} • {format(new Date(inspection.inspected_at), "d MMM HH:mm", { locale: sv })}
+                  </p>
+                </div>
+              </div>
+            </div>
           )
         })}
       </div>

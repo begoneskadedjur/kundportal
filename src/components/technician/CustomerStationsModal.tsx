@@ -37,7 +37,6 @@ import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
-import { IndoorStationDetailSheet } from '../shared/indoor/IndoorStationDetailSheet'
 import { StationLegend } from '../shared/indoor/IndoorStationMarker'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG, EQUIPMENT_STATUS_CONFIG } from '../../types/database'
 import type {
@@ -150,7 +149,6 @@ export function CustomerStationsModal({
   // Inomhus stationsdetalj
   const [selectedIndoorStation, setSelectedIndoorStation] = useState<IndoorStationWithRelations | null>(null)
   const [indoorInspections, setIndoorInspections] = useState<IndoorStationInspectionWithRelations[]>([])
-  const [isEditingIndoor, setIsEditingIndoor] = useState(false)
 
   // Ladda data när modal öppnas
   useEffect(() => {
@@ -189,7 +187,6 @@ export function CustomerStationsModal({
   const closeIndoorDetail = () => {
     setSelectedIndoorStation(null)
     setIndoorInspections([])
-    setIsEditingIndoor(false)
   }
 
   const loadAllData = async () => {
@@ -972,40 +969,30 @@ export function CustomerStationsModal({
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                       className="relative w-full max-h-[80%] overflow-y-auto"
                     >
-                      {isEditingIndoor ? (
-                        <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
-                          <IndoorStationForm
-                            floorPlanId={selectedIndoorStation.floor_plan_id}
-                            position={{ x: selectedIndoorStation.position_x_percent, y: selectedIndoorStation.position_y_percent }}
-                            existingStation={selectedIndoorStation}
-                            onSubmit={async (input) => {
-                              try {
-                                await IndoorStationService.updateStation(
-                                  selectedIndoorStation.id,
-                                  input as UpdateIndoorStationInput,
-                                  profile?.technician_id || undefined
-                                )
-                                toast.success('Station uppdaterad')
-                                setIsEditingIndoor(false)
-                                setSelectedIndoorStation(null)
-                                if (customer) {
-                                  const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
-                                  setIndoorStations(indoor)
-                                }
-                              } catch (error) {
-                                toast.error('Kunde inte uppdatera station')
-                              }
-                            }}
-                            onCancel={() => setIsEditingIndoor(false)}
-                            isSubmitting={isSubmitting}
-                          />
-                        </div>
-                      ) : (
-                        <IndoorStationDetailSheet
-                          station={selectedIndoorStation}
+                      <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
+                        <IndoorStationForm
+                          floorPlanId={selectedIndoorStation.floor_plan_id}
+                          position={{ x: selectedIndoorStation.position_x_percent, y: selectedIndoorStation.position_y_percent }}
+                          existingStation={selectedIndoorStation}
                           inspections={indoorInspections}
-                          onClose={closeIndoorDetail}
-                          onEdit={() => setIsEditingIndoor(true)}
+                          onSubmit={async (input) => {
+                            try {
+                              await IndoorStationService.updateStation(
+                                selectedIndoorStation.id,
+                                input as UpdateIndoorStationInput,
+                                profile?.technician_id || undefined
+                              )
+                              toast.success('Station uppdaterad')
+                              closeIndoorDetail()
+                              if (customer) {
+                                const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+                                setIndoorStations(indoor)
+                              }
+                            } catch (error) {
+                              toast.error('Kunde inte uppdatera station')
+                            }
+                          }}
+                          onCancel={closeIndoorDetail}
                           onDelete={async () => {
                             if (!confirm('Är du säker på att du vill ta bort denna station?')) return
                             try {
@@ -1020,8 +1007,9 @@ export function CustomerStationsModal({
                               toast.error('Kunde inte ta bort station')
                             }
                           }}
+                          isSubmitting={isSubmitting}
                         />
-                      )}
+                      </div>
                     </motion.div>
                   </motion.div>
                 )}

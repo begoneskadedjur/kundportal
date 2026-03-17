@@ -13,6 +13,11 @@ import { useGpsLocation } from '../../../hooks/useGpsLocation'
 import { MapLocationPicker, type ExistingStation } from './MapLocationPicker'
 import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
+import { format } from 'date-fns'
+import { sv } from 'date-fns/locale'
+import type { OutdoorInspectionWithRelations } from '../../../types/inspectionSession'
+import { INSPECTION_STATUS_CONFIG } from '../../../types/indoor'
+import type { InspectionStatus } from '../../../types/indoor'
 import {
   MapPin,
   Crosshair,
@@ -28,7 +33,9 @@ import {
   Map,
   Building,
   Search,
-  ChevronDown
+  ChevronDown,
+  ChevronUp,
+  ClipboardList
 } from 'lucide-react'
 
 // Ikon-mappning för dynamiska stationstyper
@@ -64,6 +71,8 @@ interface EquipmentPlacementFormProps {
   autoShowMap?: boolean
   // Befintliga stationer att visa på kartan
   existingStations?: ExistingStation[]
+  // Kontrollhistorik
+  inspections?: OutdoorInspectionWithRelations[]
 }
 
 export interface FormData {
@@ -96,7 +105,8 @@ export function EquipmentPlacementForm({
   showCustomerPicker = false,
   initialEquipmentType,
   autoShowMap = false,
-  existingStations
+  existingStations,
+  inspections = []
 }: EquipmentPlacementFormProps) {
   const isEditing = !!existingEquipment
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -812,6 +822,11 @@ export function EquipmentPlacementForm({
         )}
       </div>
 
+      {/* Kontrollhistorik */}
+      {isEditing && inspections.length > 0 && (
+        <OutdoorInspectionHistory inspections={inspections} />
+      )}
+
       {/* Knappar */}
       <div className="flex gap-3 pt-4">
         <button
@@ -842,6 +857,74 @@ export function EquipmentPlacementForm({
         </motion.button>
       </div>
     </form>
+  )
+}
+
+// Kontrollhistorik-sektion för utomhusstationer
+function OutdoorInspectionHistory({ inspections }: { inspections: OutdoorInspectionWithRelations[] }) {
+  const [showAll, setShowAll] = useState(false)
+  const displayed = showAll ? inspections : inspections.slice(0, 3)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+          <ClipboardList className="w-4 h-4" />
+          Kontrollhistorik ({inspections.length})
+        </h4>
+        {inspections.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(!showAll)}
+            className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+          >
+            {showAll ? (
+              <>Visa färre <ChevronUp className="w-3 h-3" /></>
+            ) : (
+              <>Visa alla <ChevronDown className="w-3 h-3" /></>
+            )}
+          </button>
+        )}
+      </div>
+      <div className="space-y-2">
+        {displayed.map((inspection) => {
+          const statusConfig = INSPECTION_STATUS_CONFIG[inspection.status as InspectionStatus] || {
+            label: inspection.status || 'Okänd',
+            bgColor: 'bg-slate-500/20',
+            icon: '?'
+          }
+          return (
+            <div key={inspection.id} className="p-3 bg-slate-800/50 rounded-lg">
+              <div className="flex items-start gap-2">
+                <div className={`w-6 h-6 rounded-full ${statusConfig.bgColor} flex items-center justify-center flex-shrink-0`}>
+                  <span className="text-xs">{statusConfig.icon}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{statusConfig.label}</p>
+                  {inspection.findings && (
+                    <p className="text-xs text-slate-400 mt-0.5">{inspection.findings}</p>
+                  )}
+                  {inspection.measurement_value !== null && inspection.measurement_value !== undefined && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {inspection.station?.station_type_data?.measurement_label || 'Mätvärde'}: {inspection.measurement_value} {inspection.measurement_unit || 'st'}
+                    </p>
+                  )}
+                  {inspection.preparation && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {inspection.preparation.name}
+                      {inspection.preparation.registration_number && ` (${inspection.preparation.registration_number})`}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-500 mt-1">
+                    {inspection.technician?.name || 'Okänd'} • {format(new Date(inspection.inspected_at), "d MMM HH:mm", { locale: sv })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
