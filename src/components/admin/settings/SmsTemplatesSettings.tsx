@@ -395,15 +395,19 @@ export function SmsTemplatesSettings() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {AVAILABLE_VARIABLES.map(v => (
-                      <button
-                        key={v.key}
-                        onClick={() => insertVariable(v.key)}
-                        className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md transition-colors group"
-                        title={v.description}
-                      >
-                        <Copy size={10} className="text-slate-500 group-hover:text-[#20c58f]" />
-                        <span className="text-xs font-mono text-slate-300">{`{{${v.key}}}`}</span>
-                      </button>
+                      <div key={v.key} className="relative group/tip">
+                        <button
+                          onClick={() => insertVariable(v.key)}
+                          className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md transition-colors"
+                        >
+                          <Copy size={10} className="text-slate-500 group-hover/tip:text-[#20c58f]" />
+                          <span className="text-xs font-mono text-slate-300">{`{{${v.key}}}`}</span>
+                        </button>
+                        <div className="invisible group-hover/tip:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-slate-700 text-xs text-slate-200 rounded-md whitespace-nowrap z-10 shadow-lg">
+                          {v.description}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-700" />
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
