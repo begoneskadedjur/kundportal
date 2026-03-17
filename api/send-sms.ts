@@ -64,6 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         messages: [{
           source: 'begone-kundportal',
+          from: 'Begone',
           body: messageBody,
           to: formattedPhone
         }]
