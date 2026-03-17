@@ -5,7 +5,10 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus, ShoppingCart } from 'lucide-react';
+import PriceListArticleSelector from '../PriceListArticleSelector';
+import { SelectedArticleItem } from '../../../types/products';
+import { CaseBillingService } from '../../../services/caseBillingService';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
@@ -73,6 +76,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
   const [existingImages, setExistingImages] = useState<CaseImageWithUrl[]>([]);
+  const [selectedPriceListId, setSelectedPriceListId] = useState<string | null>(null);
+  const [selectedArticles, setSelectedArticles] = useState<SelectedArticleItem[]>([]);
+  const [showArticles, setShowArticles] = useState(false);
   const [offerDetails, setOfferDetails] = useState<{
     agreement_text: string | null;
     selected_products: any[] | null;
@@ -623,6 +629,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let finalCaseId: string | null = null;
+    let finalCaseType: 'private' | 'business' | 'contract' = (caseType as any) || 'private';
 
     // För inspection-ärenden krävs inte title från användaren
     if (!caseType) {
@@ -810,6 +818,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           }
         }
 
+        finalCaseId = createdCaseId;
+        finalCaseType = 'contract';
         toast.success(`Ärende ${caseNumber} har bokats in!`);
       } else {
         // Hantera ClickUp-ärenden (private/business)
@@ -843,8 +853,33 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             toast.error(`${failed} bild${failed > 1 ? 'er' : ''} kunde inte laddas upp`);
           }
         }
+        finalCaseId = createdClickUpCaseId;
+        finalCaseType = caseType === 'business' ? 'business' : 'private';
       }
-      
+
+      // Spara valda artiklar om det finns några
+      if (selectedArticles.length > 0 && finalCaseId) {
+        try {
+          for (const item of selectedArticles) {
+            await CaseBillingService.addArticleToCase({
+              case_id: finalCaseId,
+              case_type: finalCaseType,
+              customer_id: actualCustomerId || undefined,
+              article_id: item.article.id,
+              article_code: item.article.article_number,
+              article_name: item.article.name,
+              quantity: item.quantity,
+              unit_price: item.effectivePrice,
+              discount_percent: 0,
+              vat_rate: 25,
+            })
+          }
+          toast.success(`${selectedArticles.length} artikel${selectedArticles.length > 1 ? 'ar' : ''} tillagda`)
+        } catch {
+          toast.error('Kunde inte spara artiklar')
+        }
+      }
+
       // Skicka SMS bokningsbekräftelse om valt
       if (formData.skicka_bokningsbekraftelse && formData.skicka_bokningsbekraftelse !== 'Nej') {
         const phoneNumber = formData.telefon_kontaktperson || customer?.contact_phone
@@ -1454,6 +1489,35 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       </div>
                     </div>
 
+                    {/* Artiklar (valfritt) */}
+                    <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowArticles(!showArticles)}
+                        className="w-full flex items-center justify-between"
+                      >
+                        <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                          <ShoppingCart size={14} /> Artiklar & Prissättning
+                          <span className="text-xs font-normal text-slate-500">(valfritt)</span>
+                          {selectedArticles.length > 0 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f]">
+                              {selectedArticles.length}
+                            </span>
+                          )}
+                        </h4>
+                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${showArticles ? 'rotate-180' : ''}`} />
+                      </button>
+                      {showArticles && (
+                        <PriceListArticleSelector
+                          selectedPriceListId={selectedPriceListId}
+                          onPriceListChange={setSelectedPriceListId}
+                          selectedArticles={selectedArticles}
+                          onSelectionChange={setSelectedArticles}
+                          customerType={caseType === 'business' ? 'Företag' : 'Privatperson'}
+                        />
+                      )}
+                    </div>
+
                     {/* Utskick */}
                     <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
@@ -1734,8 +1798,36 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                        <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Briefcase size={14}/> Ärendeinformation</h4>
                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={2} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" placeholder="Kort om ärendet, portkod, etc."/></div>
                   </div>
+                  {/* Artiklar (valfritt) */}
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
-                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Euro size={14}/> Ekonomi & Utskick</h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowArticles(!showArticles)}
+                        className="w-full flex items-center justify-between"
+                      >
+                        <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                          <ShoppingCart size={14} /> Artiklar & Prissättning
+                          <span className="text-xs font-normal text-slate-500">(valfritt)</span>
+                          {selectedArticles.length > 0 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f]">
+                              {selectedArticles.length}
+                            </span>
+                          )}
+                        </h4>
+                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${showArticles ? 'rotate-180' : ''}`} />
+                      </button>
+                      {showArticles && (
+                        <PriceListArticleSelector
+                          selectedPriceListId={selectedPriceListId}
+                          onPriceListChange={setSelectedPriceListId}
+                          selectedArticles={selectedArticles}
+                          onSelectionChange={setSelectedArticles}
+                          customerType={caseType === 'business' ? 'Företag' : 'Privatperson'}
+                        />
+                      )}
+                  </div>
+                  <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><MapPin size={14}/> Utskick</h4>
                       {caseType === 'business' && (<Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />)}
                       {caseType === 'business' && (<Input type="email" label="E-post Faktura" name="e_post_faktura" value={formData.e_post_faktura || ''} onChange={handleChange} />)}
                       <div>
