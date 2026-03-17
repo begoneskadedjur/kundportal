@@ -25,7 +25,7 @@ import {
   Hash,
   Image as ImageIcon
 } from 'lucide-react'
-import { ImageLightbox } from '../ImageLightbox'
+import ImageLightbox from '../ImageLightbox'
 import type {
   IndoorStationWithRelations,
   IndoorStationInspectionWithRelations,

@@ -27,7 +27,7 @@ import {
   getEquipmentStatusLabel
 } from '../../../types/database'
 import { formatCoordinates, openInMapsApp } from '../../../utils/equipmentMapUtils'
-import { ImageLightbox } from '../ImageLightbox'
+import ImageLightbox from '../ImageLightbox'
 
 // Hjälpfunktion för att hämta typkonfiguration med fallback för dynamiska typer
 function getTypeConfig(equipment: EquipmentPlacementWithRelations) {
