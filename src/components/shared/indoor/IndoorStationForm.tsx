@@ -239,9 +239,9 @@ export function IndoorStationForm({
       </div>
 
       {/* Position info - Förenklad visning */}
-      <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-        <MapPin className="w-4 h-4 text-emerald-400" />
-        <span className="text-sm text-emerald-300">
+      <div className="flex items-center gap-2 p-3 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg">
+        <MapPin className="w-4 h-4 text-[#20c58f]" />
+        <span className="text-sm text-[#20c58f]">
           Position vald på planritningen
         </span>
       </div>
@@ -253,7 +253,7 @@ export function IndoorStationForm({
           </label>
           {loadingTypes ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+              <Loader2 className="w-6 h-6 text-[#20c58f] animate-spin" />
             </div>
           ) : (
             <div className={`grid gap-2 ${typesToRender.length <= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
@@ -272,7 +272,7 @@ export function IndoorStationForm({
                     className={`
                       p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 min-h-[80px]
                       ${stationType === typeCode
-                        ? 'border-emerald-500 bg-emerald-500/10'
+                        ? 'border-[#20c58f] bg-[#20c58f]/10'
                         : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
                       }
                     `}
@@ -283,7 +283,7 @@ export function IndoorStationForm({
                     >
                       <Icon className="w-4 h-4 text-white" />
                     </div>
-                    <span className={`text-xs text-center font-medium ${stationType === typeCode ? 'text-emerald-400' : 'text-slate-300'}`}>
+                    <span className={`text-xs text-center font-medium ${stationType === typeCode ? 'text-[#20c58f]' : 'text-slate-300'}`}>
                       {typeName}
                     </span>
                   </button>
@@ -306,7 +306,7 @@ export function IndoorStationForm({
             value={stationNumber}
             onChange={(e) => setStationNumber(e.target.value)}
             placeholder={currentTypeConfig?.requiresSerialNumber ? 'Ange serienummer' : 'Valfritt serienummer'}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
             required={currentTypeConfig?.requiresSerialNumber}
           />
         </div>
@@ -358,7 +358,7 @@ export function IndoorStationForm({
             value={locationDescription}
             onChange={(e) => setLocationDescription(e.target.value)}
             placeholder="T.ex. Vid diskbänk, Hörn mot fönster"
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
           />
         </div>
       </div>
@@ -376,7 +376,7 @@ export function IndoorStationForm({
             onChange={(e) => setComment(e.target.value)}
             placeholder="Eventuella anteckningar..."
             rows={2}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent resize-none"
           />
         </div>
       </div>
@@ -467,7 +467,7 @@ export function IndoorStationForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="flex-1 px-4 py-3 bg-[#20c58f] hover:bg-[#1ab07f] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
             <>
@@ -528,7 +528,7 @@ export function StationTypeSelector({
   if (loading) {
     return (
       <div className="p-4 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-[#20c58f] animate-spin" />
       </div>
     )
   }
@@ -557,7 +557,7 @@ export function StationTypeSelector({
                 className={`
                   w-full p-4 rounded-lg border-2 transition-all flex items-center gap-4 text-left min-h-[64px]
                   ${selectedType === type
-                    ? 'border-emerald-500 bg-emerald-500/10'
+                    ? 'border-[#20c58f] bg-[#20c58f]/10'
                     : 'border-slate-600 bg-slate-700/50 hover:border-slate-500 hover:bg-slate-700'
                   }
                 `}
@@ -569,7 +569,7 @@ export function StationTypeSelector({
                   <Icon className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
-                  <p className={`font-medium ${selectedType === type ? 'text-emerald-400' : 'text-white'}`}>
+                  <p className={`font-medium ${selectedType === type ? 'text-[#20c58f]' : 'text-white'}`}>
                     {config.label}
                   </p>
                   {config.requiresSerialNumber && (
@@ -601,7 +601,7 @@ export function StationTypeSelector({
               className={`
                 w-full p-4 rounded-lg border-2 transition-all flex items-center gap-4 text-left min-h-[64px]
                 ${isSelected
-                  ? 'border-emerald-500 bg-emerald-500/10'
+                  ? 'border-[#20c58f] bg-[#20c58f]/10'
                   : 'border-slate-600 bg-slate-700/50 hover:border-slate-500 hover:bg-slate-700'
                 }
               `}
@@ -613,7 +613,7 @@ export function StationTypeSelector({
                 <Icon className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <p className={`font-medium ${isSelected ? 'text-emerald-400' : 'text-white'}`}>
+                <p className={`font-medium ${isSelected ? 'text-[#20c58f]' : 'text-white'}`}>
                   {stationType.name}
                 </p>
                 {stationType.requires_serial_number && (
@@ -647,7 +647,7 @@ function InspectionHistory({ inspections }: { inspections: IndoorStationInspecti
           <button
             type="button"
             onClick={() => setShowAll(!showAll)}
-            className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+            className="text-xs text-[#20c58f] hover:text-[#20c58f]/80 flex items-center gap-1"
           >
             {showAll ? (
               <>Visa färre <ChevronUp className="w-3 h-3" /></>

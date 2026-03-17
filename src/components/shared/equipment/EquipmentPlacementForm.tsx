@@ -354,7 +354,21 @@ export function EquipmentPlacementForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-700">
+        <h3 className="text-lg font-semibold text-white">
+          {isEditing ? 'Redigera station' : 'Ny station'}
+        </h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
       {/* Sökbar kundväljare (visas när showCustomerPicker är true) */}
       {showCustomerPicker && customers.length > 0 && (
         <div ref={dropdownRef} className="relative">
@@ -381,7 +395,7 @@ export function EquipmentPlacementForm({
               }}
               onKeyDown={handleCustomerKeyDown}
               placeholder="Sök kund..."
-              className={`w-full pl-10 pr-10 py-3 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full pl-10 pr-10 py-3 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] ${
                 selectedCustomerName ? 'border-green-500/50' : 'border-slate-700'
               }`}
             />
@@ -416,7 +430,7 @@ export function EquipmentPlacementForm({
                       }}
                       className={`w-full px-4 py-3 text-left flex items-center gap-2 transition-colors ${
                         index === highlightedIndex
-                          ? 'bg-blue-500/20 text-blue-300'
+                          ? 'bg-[#20c58f]/20 text-[#20c58f]'
                           : customer.id === customerId
                             ? 'bg-green-500/10 text-green-300'
                             : 'text-slate-300 hover:bg-slate-700/50'
@@ -451,7 +465,7 @@ export function EquipmentPlacementForm({
         </label>
         {loadingTypes ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+            <Loader2 className="w-6 h-6 text-[#20c58f] animate-spin" />
           </div>
         ) : dynamicStationTypes.length > 0 ? (
           // Visa dynamiska stationstyper från databasen
@@ -469,7 +483,7 @@ export function EquipmentPlacementForm({
                   onClick={() => setFormData(prev => ({ ...prev, equipment_type: stationType.code as EquipmentType }))}
                   className={`p-4 rounded-xl border-2 transition-all ${
                     isSelected
-                      ? 'border-blue-500 bg-blue-500/10'
+                      ? 'border-[#20c58f] bg-[#20c58f]/10'
                       : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
                   }`}
                 >
@@ -479,7 +493,7 @@ export function EquipmentPlacementForm({
                   >
                     <Icon className="w-5 h-5 text-white" />
                   </div>
-                  <p className={`text-sm font-medium text-center ${isSelected ? 'text-blue-400' : 'text-slate-300'}`}>
+                  <p className={`text-sm font-medium text-center ${isSelected ? 'text-[#20c58f]' : 'text-slate-300'}`}>
                     {stationType.name}
                   </p>
                 </motion.button>
@@ -503,7 +517,7 @@ export function EquipmentPlacementForm({
                     onClick={() => setFormData(prev => ({ ...prev, equipment_type: type }))}
                     className={`p-4 rounded-xl border-2 transition-all ${
                       isSelected
-                        ? 'border-blue-500 bg-blue-500/10'
+                        ? 'border-[#20c58f] bg-[#20c58f]/10'
                         : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
                     }`}
                   >
@@ -513,7 +527,7 @@ export function EquipmentPlacementForm({
                     >
                       <Icon className="w-5 h-5 text-white" />
                     </div>
-                    <p className={`text-sm font-medium ${isSelected ? 'text-blue-400' : 'text-slate-300'}`}>
+                    <p className={`text-sm font-medium ${isSelected ? 'text-[#20c58f]' : 'text-slate-300'}`}>
                       {config.label}
                     </p>
                   </motion.button>
@@ -536,7 +550,7 @@ export function EquipmentPlacementForm({
           placeholder={currentTypeRequiresSerial
             ? 'Ange serienummer'
             : 'Valfritt serienummer'}
-          className={`w-full px-4 py-3 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`w-full px-4 py-2.5 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] ${
             errors.serial_number ? 'border-red-500' : 'border-slate-700'
           }`}
         />
@@ -594,13 +608,13 @@ export function EquipmentPlacementForm({
                 className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${
                   hasLocation && !manualLocationSet
                     ? 'border-green-500 bg-green-500/10'
-                    : 'border-slate-700 bg-slate-800/50 hover:border-blue-500'
+                    : 'border-slate-700 bg-slate-800/50 hover:border-[#20c58f]'
                 }`}
               >
                 {gpsLoading ? (
                   <>
-                    <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-                    <span className="text-blue-400 text-sm">Hämtar...</span>
+                    <Loader2 className="w-6 h-6 text-[#20c58f] animate-spin" />
+                    <span className="text-[#20c58f] text-sm">Hämtar...</span>
                   </>
                 ) : hasLocation && !manualLocationSet ? (
                   <>
@@ -624,7 +638,7 @@ export function EquipmentPlacementForm({
                 className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${
                   manualLocationSet
                     ? 'border-green-500 bg-green-500/10'
-                    : 'border-slate-700 bg-slate-800/50 hover:border-blue-500'
+                    : 'border-slate-700 bg-slate-800/50 hover:border-[#20c58f]'
                 }`}
               >
                 {manualLocationSet ? (
@@ -645,7 +659,7 @@ export function EquipmentPlacementForm({
             {(formData.latitude !== 0 && formData.longitude !== 0) && (
               <div className={`mt-3 p-3 rounded-lg ${
                 manualLocationSet
-                  ? 'bg-blue-500/10 border border-blue-500/30'
+                  ? 'bg-[#20c58f]/10 border border-[#20c58f]/30'
                   : !isHighAccuracy
                     ? 'bg-amber-500/10 border border-amber-500/30'
                     : 'bg-slate-800/50'
@@ -685,7 +699,7 @@ export function EquipmentPlacementForm({
                   )}
                   {manualLocationSet && (
                     <div className="text-right">
-                      <p className="text-xs text-blue-400">
+                      <p className="text-xs text-[#20c58f]">
                         Markerad manuellt
                       </p>
                     </div>
@@ -766,21 +780,21 @@ export function EquipmentPlacementForm({
       {/* Kommentar */}
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
-          Kommentar
+          Kommentar (valfritt)
         </label>
         <textarea
           value={formData.comment}
           onChange={(e) => setFormData(prev => ({ ...prev, comment: e.target.value }))}
-          placeholder="Valfri kommentar om placeringen..."
-          rows={3}
-          className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          placeholder="Eventuella anteckningar..."
+          rows={2}
+          className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] resize-none"
         />
       </div>
 
       {/* Foto */}
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
-          Foto
+          Foto (valfritt)
         </label>
 
         {photoPreview ? (
@@ -812,7 +826,7 @@ export function EquipmentPlacementForm({
           </div>
         ) : (
           <label className="block cursor-pointer">
-            <div className="w-full p-8 border-2 border-dashed border-slate-700 rounded-xl hover:border-slate-600 transition-colors flex flex-col items-center gap-3">
+            <div className="w-full p-8 border-2 border-dashed border-slate-700 rounded-xl hover:border-[#20c58f] transition-colors flex flex-col items-center gap-3">
               <Camera className="w-8 h-8 text-slate-500" />
               <p className="text-sm text-slate-400">Klicka för att ta foto eller välja från galleri</p>
             </div>
@@ -898,7 +912,7 @@ function OutdoorInspectionHistory({ inspections }: { inspections: OutdoorInspect
           <button
             type="button"
             onClick={() => setShowAll(!showAll)}
-            className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+            className="text-xs text-[#20c58f] hover:text-[#20c58f]/80 flex items-center gap-1"
           >
             {showAll ? (
               <>Visa färre <ChevronUp className="w-3 h-3" /></>

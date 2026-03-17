@@ -1,6 +1,8 @@
 // src/components/shared/equipment/EquipmentDetailSheet.tsx
 // Responsiv detalj-vy för utrustning - bottom-sheet på mobil, sidopanel på desktop
 import { useEffect, useState } from 'react'
+import { format } from 'date-fns'
+import { sv } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X,
@@ -17,7 +19,9 @@ import {
   ChevronRight,
   Crosshair,
   Box,
-  Target
+  Target,
+  ClipboardList,
+  Camera
 } from 'lucide-react'
 import {
   EquipmentPlacementWithRelations,
@@ -28,6 +32,9 @@ import {
 } from '../../../types/database'
 import { formatCoordinates, openInMapsApp } from '../../../utils/equipmentMapUtils'
 import ImageLightbox from '../ImageLightbox'
+import type { OutdoorInspectionWithRelations } from '../../../types/inspectionSession'
+import { INSPECTION_STATUS_CONFIG } from '../../../types/indoor'
+import type { InspectionStatus } from '../../../types/indoor'
 
 // Hjälpfunktion för att hämta typkonfiguration med fallback för dynamiska typer
 function getTypeConfig(equipment: EquipmentPlacementWithRelations) {
@@ -55,6 +62,8 @@ interface EquipmentDetailSheetProps {
   readOnly?: boolean
   /** When true, renders only the content without fixed positioning/backdrop (for use inside modals) */
   embedded?: boolean
+  /** Inspection history for this station */
+  inspections?: OutdoorInspectionWithRelations[]
 }
 
 // Ikon-komponent baserat på utrustningstyp
@@ -78,10 +87,12 @@ export function EquipmentDetailSheet({
   onEdit,
   onDelete,
   readOnly = false,
-  embedded = false
+  embedded = false,
+  inspections = []
 }: EquipmentDetailSheetProps) {
   const [showLightbox, setShowLightbox] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [showAllInspections, setShowAllInspections] = useState(false)
 
   // Detektera skarmstorlek
   useEffect(() => {
@@ -291,6 +302,66 @@ export function EquipmentDetailSheet({
                   <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Kommentar</p>
                   <p className="text-slate-300 mt-0.5 whitespace-pre-wrap">{equipment.comment}</p>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Separator */}
+          <div className="border-t border-slate-700/50" />
+
+          {/* Kontrollhistorik */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <ClipboardList className="w-4 h-4" />
+                Kontrollhistorik
+              </h4>
+              {inspections.length > 3 && (
+                <button
+                  onClick={() => setShowAllInspections(!showAllInspections)}
+                  className="text-xs text-[#20c58f] hover:text-[#20c58f]/80"
+                >
+                  {showAllInspections ? 'Visa färre' : `Visa alla (${inspections.length})`}
+                </button>
+              )}
+            </div>
+
+            {inspections.length === 0 ? (
+              <div className="p-4 bg-slate-800/50 rounded-lg text-center">
+                <p className="text-sm text-slate-400">Inga kontroller registrerade</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(showAllInspections ? inspections : inspections.slice(0, 3)).map((inspection) => {
+                  const statusConfig = INSPECTION_STATUS_CONFIG[inspection.status as InspectionStatus] || {
+                    label: inspection.status || 'Okänd',
+                    bgColor: 'bg-slate-500/20',
+                    icon: '?'
+                  }
+                  return (
+                    <div key={inspection.id} className="p-3 bg-slate-800/50 rounded-lg">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2">
+                          <div className={`w-6 h-6 rounded-full ${statusConfig.bgColor} flex items-center justify-center flex-shrink-0`}>
+                            <span className="text-xs">{statusConfig.icon}</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-white">{statusConfig.label}</p>
+                            {inspection.findings && (
+                              <p className="text-xs text-slate-400 mt-0.5">{inspection.findings}</p>
+                            )}
+                            <p className="text-xs text-slate-500 mt-1">
+                              {inspection.technician?.name || 'Okänd'} • {format(new Date(inspection.inspected_at), 'd MMM HH:mm', { locale: sv })}
+                            </p>
+                          </div>
+                        </div>
+                        {inspection.photo_path && (
+                          <Camera className="w-4 h-4 text-slate-500" />
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

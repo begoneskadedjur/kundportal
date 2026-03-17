@@ -511,7 +511,7 @@ export function CustomerStationsModal({
                   </div>
                   <button
                     onClick={onClose}
-                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                    className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -591,7 +591,7 @@ export function CustomerStationsModal({
                         {outdoorStations.length > 0 ? (
                           <>
                             {/* Karta - fixad höjd */}
-                            <div className="h-[300px] md:h-[350px] flex-shrink-0" style={{ visibility: selectedOutdoorStation ? 'hidden' : 'visible' }}>
+                            <div className="h-[250px] md:h-[350px] flex-shrink-0" style={{ visibility: selectedOutdoorStation ? 'hidden' : 'visible' }}>
                               <EquipmentMap
                                 equipment={outdoorStations}
                                 onEquipmentClick={(eq) => handleOutdoorStationClick(eq)}
@@ -999,7 +999,7 @@ export function CustomerStationsModal({
                       animate={{ y: 0 }}
                       exit={{ y: '100%' }}
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                      className="relative w-full max-h-[80%] overflow-y-auto"
+                      className="relative w-full max-h-[85%] overflow-y-auto"
                     >
                       {editingIndoorStation ? (
                         <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
@@ -1088,7 +1088,7 @@ export function CustomerStationsModal({
                       animate={{ y: 0 }}
                       exit={{ y: '100%' }}
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                      className="relative w-full max-h-[80%] overflow-y-auto"
+                      className="relative w-full max-h-[85%] overflow-y-auto"
                     >
                       {editingOutdoorStation ? (
                         <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
@@ -1139,6 +1139,7 @@ export function CustomerStationsModal({
                             // Trigger delete via parent - handled by TechnicianEquipment
                             closeOutdoorDetail()
                           }}
+                          inspections={outdoorInspections}
                           embedded
                         />
                       )}

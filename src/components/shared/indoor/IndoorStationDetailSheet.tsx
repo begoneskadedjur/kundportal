@@ -97,7 +97,7 @@ export function IndoorStationDetailSheet({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -165,7 +165,7 @@ export function IndoorStationDetailSheet({
           {/* Plats */}
           {station.location_description && (
             <div className="flex items-start gap-3 p-3 bg-slate-900/50 rounded-lg">
-              <MapPin className="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" />
+              <MapPin className="w-4 h-4 text-[#20c58f] mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-xs text-slate-400 mb-0.5">Plats</p>
                 <p className="text-sm text-white">{station.location_description}</p>
