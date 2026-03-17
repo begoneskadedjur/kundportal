@@ -56,6 +56,8 @@ import type { OutdoorInspectionWithRelations } from '../../types/inspectionSessi
 import { openInMapsApp } from '../../utils/equipmentMapUtils'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { IndoorStationDetailSheet } from '../shared/indoor/IndoorStationDetailSheet'
+import { EquipmentDetailSheet } from '../shared/equipment/EquipmentDetailSheet'
 import { RecurringScheduleManagement } from './RecurringScheduleManagement'
 import { RecurringScheduleWizard } from './RecurringScheduleWizard'
 import toast from 'react-hot-toast'
@@ -157,6 +159,10 @@ export function CustomerStationsModal({
   const [selectedOutdoorStation, setSelectedOutdoorStation] = useState<EquipmentPlacementWithRelations | null>(null)
   const [outdoorInspections, setOutdoorInspections] = useState<OutdoorInspectionWithRelations[]>([])
 
+  // Edit-mode states (visa detaljvy först, sedan formulär vid klick på redigera)
+  const [editingIndoorStation, setEditingIndoorStation] = useState(false)
+  const [editingOutdoorStation, setEditingOutdoorStation] = useState(false)
+
   // Ladda data när modal öppnas
   useEffect(() => {
     if (isOpen && customer) {
@@ -194,6 +200,7 @@ export function CustomerStationsModal({
   const closeIndoorDetail = () => {
     setSelectedIndoorStation(null)
     setIndoorInspections([])
+    setEditingIndoorStation(false)
   }
 
   // Öppna utomhusstation med inspektionshistorik
@@ -211,6 +218,7 @@ export function CustomerStationsModal({
   const closeOutdoorDetail = () => {
     setSelectedOutdoorStation(null)
     setOutdoorInspections([])
+    setEditingOutdoorStation(false)
   }
 
   const loadAllData = async () => {
@@ -527,14 +535,14 @@ export function CustomerStationsModal({
                     onClick={() => setActiveView('outdoor')}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                       activeView === 'outdoor'
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-[#20c58f] text-white'
                         : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
                     <MapPin className="w-4 h-4" />
                     Utomhus
                     <span className={`px-1.5 py-0.5 rounded text-xs ${
-                      activeView === 'outdoor' ? 'bg-blue-600' : 'bg-slate-600'
+                      activeView === 'outdoor' ? 'bg-[#20c58f]/80' : 'bg-slate-600'
                     }`}>
                       {outdoorStations.length}
                     </span>
@@ -543,14 +551,14 @@ export function CustomerStationsModal({
                     onClick={() => setActiveView('indoor')}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                       activeView === 'indoor'
-                        ? 'bg-cyan-500 text-white'
+                        ? 'bg-[#20c58f] text-white'
                         : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
                     <Home className="w-4 h-4" />
                     Inomhus
                     <span className={`px-1.5 py-0.5 rounded text-xs ${
-                      activeView === 'indoor' ? 'bg-cyan-600' : 'bg-slate-600'
+                      activeView === 'indoor' ? 'bg-[#20c58f]/80' : 'bg-slate-600'
                     }`}>
                       {indoorStations.length}
                     </span>
@@ -559,7 +567,7 @@ export function CustomerStationsModal({
                     onClick={() => setActiveView('schedule')}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                       activeView === 'schedule'
-                        ? 'bg-purple-500 text-white'
+                        ? 'bg-[#20c58f] text-white'
                         : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
@@ -583,7 +591,7 @@ export function CustomerStationsModal({
                         {outdoorStations.length > 0 ? (
                           <>
                             {/* Karta - fixad höjd */}
-                            <div className="h-[300px] md:h-[350px] flex-shrink-0">
+                            <div className="h-[300px] md:h-[350px] flex-shrink-0" style={{ visibility: selectedOutdoorStation ? 'hidden' : 'visible' }}>
                               <EquipmentMap
                                 equipment={outdoorStations}
                                 onEquipmentClick={(eq) => handleOutdoorStationClick(eq)}
@@ -644,20 +652,20 @@ export function CustomerStationsModal({
                                     className={`
                                       flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap
                                       ${plan.id === selectedFloorPlan?.id
-                                        ? 'bg-cyan-600 text-white'
+                                        ? 'bg-[#20c58f] text-white'
                                         : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                                       }
                                     `}
                                   >
                                     {plan.name}
-                                    <span className={`ml-1.5 ${plan.id === selectedFloorPlan?.id ? 'text-cyan-200' : 'text-slate-500'}`}>
+                                    <span className={`ml-1.5 ${plan.id === selectedFloorPlan?.id ? 'text-white/70' : 'text-slate-500'}`}>
                                       ({plan.station_count || 0})
                                     </span>
                                   </button>
                                 ))}
                                 <button
                                   onClick={() => setShowUploadModal(true)}
-                                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700/30 text-cyan-400 hover:bg-cyan-600/10 border border-dashed border-slate-600 hover:border-cyan-500 transition-all flex items-center gap-1"
+                                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700/30 text-[#20c58f] hover:bg-[#20c58f]/10 border border-dashed border-slate-600 hover:border-[#20c58f] transition-all flex items-center gap-1"
                                 >
                                   <Plus className="w-3 h-3" />
                                   Ny
@@ -685,7 +693,7 @@ export function CustomerStationsModal({
                                 />
                               ) : (
                                 <div className="flex items-center justify-center h-full min-h-[300px]">
-                                  <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                                  <div className="w-8 h-8 border-2 border-[#20c58f] border-t-transparent rounded-full animate-spin" />
                                 </div>
                               )}
 
@@ -693,7 +701,7 @@ export function CustomerStationsModal({
                               {placementMode === 'view' && selectedFloorPlan && (
                                 <button
                                   onClick={() => setShowTypeSelector(true)}
-                                  className="absolute bottom-4 right-4 w-14 h-14 bg-cyan-600 hover:bg-cyan-500 text-white rounded-full shadow-lg shadow-cyan-600/30 flex items-center justify-center transition-all hover:scale-105 z-20"
+                                  className="absolute bottom-4 right-4 w-14 h-14 bg-[#20c58f] hover:bg-[#1ab07f] text-white rounded-full shadow-lg shadow-[#20c58f]/30 flex items-center justify-center transition-all hover:scale-105 z-20"
                                 >
                                   <Plus className="w-6 h-6" />
                                 </button>
@@ -712,7 +720,7 @@ export function CustomerStationsModal({
                                   {floorPlanStations.length > 0 && placementMode === 'view' && (
                                     <button
                                       onClick={() => setShowTypeSelector(true)}
-                                      className="px-4 py-2 text-sm text-cyan-300 hover:text-white bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 rounded-lg transition-colors flex items-center gap-1.5"
+                                      className="px-4 py-2 text-sm text-[#20c58f] hover:text-white bg-[#20c58f]/20 hover:bg-[#20c58f]/30 border border-[#20c58f]/30 rounded-lg transition-colors flex items-center gap-1.5"
                                     >
                                       <Plus className="w-3.5 h-3.5" />
                                       Placera fler
@@ -734,14 +742,14 @@ export function CustomerStationsModal({
 
                             {/* Placeringsindikator */}
                             {placementMode === 'place' && (
-                              <div className="px-4 py-3 bg-cyan-600/20 border-t border-cyan-500/30 flex-shrink-0">
+                              <div className="px-4 py-3 bg-[#20c58f]/20 border-t border-[#20c58f]/30 flex-shrink-0">
                                 <div className="flex items-center justify-between">
-                                  <p className="text-cyan-300 text-sm">
+                                  <p className="text-[#20c58f] text-sm">
                                     Klicka på planritningen för att placera stationen
                                   </p>
                                   <button
                                     onClick={resetPlacementMode}
-                                    className="px-3 py-1 text-sm text-cyan-400 hover:text-white transition-colors"
+                                    className="px-3 py-1 text-sm text-slate-400 hover:text-white transition-colors"
                                   >
                                     Avbryt
                                   </button>
@@ -897,7 +905,7 @@ export function CustomerStationsModal({
                                 <p className="text-slate-400 mb-4">Inga planritningar uppladdade</p>
                                 <button
                                   onClick={() => setShowUploadModal(true)}
-                                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-lg transition-colors inline-flex items-center gap-2"
+                                  className="px-4 py-2 bg-[#20c58f] hover:bg-[#1ab07f] text-white font-medium rounded-lg transition-colors inline-flex items-center gap-2"
                                 >
                                   <Upload className="w-4 h-4" />
                                   Ladda upp planritning
@@ -954,8 +962,8 @@ export function CustomerStationsModal({
                     onClick={handleAddStationClick}
                     className={`w-full py-3 px-4 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
                       activeView === 'outdoor'
-                        ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                        : 'bg-cyan-500 hover:bg-cyan-600 text-white'
+                        ? 'bg-[#20c58f] hover:bg-[#1ab07f] text-white'
+                        : 'bg-[#20c58f] hover:bg-[#1ab07f] text-white'
                     }`}
                   >
                     <Plus className="w-5 h-5" />
@@ -993,30 +1001,54 @@ export function CustomerStationsModal({
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                       className="relative w-full max-h-[80%] overflow-y-auto"
                     >
-                      <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
-                        <IndoorStationForm
-                          floorPlanId={selectedIndoorStation.floor_plan_id}
-                          position={{ x: selectedIndoorStation.position_x_percent, y: selectedIndoorStation.position_y_percent }}
-                          existingStation={selectedIndoorStation}
-                          inspections={indoorInspections}
-                          onSubmit={async (input) => {
-                            try {
-                              await IndoorStationService.updateStation(
-                                selectedIndoorStation.id,
-                                input as UpdateIndoorStationInput,
-                                profile?.technician_id || undefined
-                              )
-                              toast.success('Station uppdaterad')
-                              closeIndoorDetail()
-                              if (customer) {
-                                const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
-                                setIndoorStations(indoor)
+                      {editingIndoorStation ? (
+                        <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
+                          <IndoorStationForm
+                            floorPlanId={selectedIndoorStation.floor_plan_id}
+                            position={{ x: selectedIndoorStation.position_x_percent, y: selectedIndoorStation.position_y_percent }}
+                            existingStation={selectedIndoorStation}
+                            inspections={indoorInspections}
+                            onSubmit={async (input) => {
+                              try {
+                                await IndoorStationService.updateStation(
+                                  selectedIndoorStation.id,
+                                  input as UpdateIndoorStationInput,
+                                  profile?.technician_id || undefined
+                                )
+                                toast.success('Station uppdaterad')
+                                closeIndoorDetail()
+                                if (customer) {
+                                  const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+                                  setIndoorStations(indoor)
+                                }
+                              } catch (error) {
+                                toast.error('Kunde inte uppdatera station')
                               }
-                            } catch (error) {
-                              toast.error('Kunde inte uppdatera station')
-                            }
-                          }}
-                          onCancel={closeIndoorDetail}
+                            }}
+                            onCancel={() => setEditingIndoorStation(false)}
+                            onDelete={async () => {
+                              if (!confirm('Är du säker på att du vill ta bort denna station?')) return
+                              try {
+                                await IndoorStationService.deleteStation(selectedIndoorStation.id)
+                                toast.success('Station borttagen')
+                                closeIndoorDetail()
+                                if (customer) {
+                                  const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+                                  setIndoorStations(indoor)
+                                }
+                              } catch (error) {
+                                toast.error('Kunde inte ta bort station')
+                              }
+                            }}
+                            isSubmitting={isSubmitting}
+                          />
+                        </div>
+                      ) : (
+                        <IndoorStationDetailSheet
+                          station={selectedIndoorStation}
+                          inspections={indoorInspections}
+                          onClose={closeIndoorDetail}
+                          onEdit={() => setEditingIndoorStation(true)}
                           onDelete={async () => {
                             if (!confirm('Är du säker på att du vill ta bort denna station?')) return
                             try {
@@ -1031,15 +1063,14 @@ export function CustomerStationsModal({
                               toast.error('Kunde inte ta bort station')
                             }
                           }}
-                          isSubmitting={isSubmitting}
                         />
-                      </div>
+                      )}
                     </motion.div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* Utomhus stationsredigering overlay */}
+              {/* Utomhus stationsdetalj / redigering overlay */}
               <AnimatePresence>
                 {selectedOutdoorStation && (
                   <motion.div
@@ -1059,44 +1090,58 @@ export function CustomerStationsModal({
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                       className="relative w-full max-h-[80%] overflow-y-auto"
                     >
-                      <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
-                        <EquipmentPlacementForm
-                          customerId={customer?.customer_id || ''}
-                          technicianId={profile?.technician_id || ''}
-                          existingEquipment={selectedOutdoorStation}
-                          inspections={outdoorInspections}
-                          onSubmit={async (formData: EquipmentFormData) => {
-                            try {
-                              setIsSubmitting(true)
-                              const result = await EquipmentService.updateEquipment(selectedOutdoorStation.id, {
-                                equipment_type: formData.equipment_type,
-                                serial_number: formData.serial_number || null,
-                                latitude: formData.latitude,
-                                longitude: formData.longitude,
-                                comment: formData.comment || null,
-                                status: formData.status
-                              })
-                              if (!result.success) throw new Error(result.error)
-                              if (formData.photo) {
-                                await EquipmentService.uploadEquipmentPhoto(selectedOutdoorStation.id, formData.photo)
+                      {editingOutdoorStation ? (
+                        <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
+                          <EquipmentPlacementForm
+                            customerId={customer?.customer_id || ''}
+                            technicianId={profile?.technician_id || ''}
+                            existingEquipment={selectedOutdoorStation}
+                            inspections={outdoorInspections}
+                            onSubmit={async (formData: EquipmentFormData) => {
+                              try {
+                                setIsSubmitting(true)
+                                const result = await EquipmentService.updateEquipment(selectedOutdoorStation.id, {
+                                  equipment_type: formData.equipment_type,
+                                  serial_number: formData.serial_number || null,
+                                  latitude: formData.latitude,
+                                  longitude: formData.longitude,
+                                  comment: formData.comment || null,
+                                  status: formData.status
+                                })
+                                if (!result.success) throw new Error(result.error)
+                                if (formData.photo) {
+                                  await EquipmentService.uploadEquipmentPhoto(selectedOutdoorStation.id, formData.photo)
+                                }
+                                toast.success('Utrustning uppdaterad')
+                                closeOutdoorDetail()
+                                if (customer) {
+                                  const { outdoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+                                  setOutdoorStations(outdoor)
+                                }
+                              } catch (error) {
+                                toast.error('Kunde inte uppdatera utrustning')
+                              } finally {
+                                setIsSubmitting(false)
                               }
-                              toast.success('Utrustning uppdaterad')
-                              closeOutdoorDetail()
-                              if (customer) {
-                                const { outdoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
-                                setOutdoorStations(outdoor)
-                              }
-                            } catch (error) {
-                              toast.error('Kunde inte uppdatera utrustning')
-                            } finally {
-                              setIsSubmitting(false)
-                            }
+                            }}
+                            onCancel={() => setEditingOutdoorStation(false)}
+                            isSubmitting={isSubmitting}
+                            showCustomerPicker={false}
+                          />
+                        </div>
+                      ) : (
+                        <EquipmentDetailSheet
+                          equipment={selectedOutdoorStation}
+                          isOpen={true}
+                          onClose={closeOutdoorDetail}
+                          onEdit={() => setEditingOutdoorStation(true)}
+                          onDelete={(eq) => {
+                            // Trigger delete via parent - handled by TechnicianEquipment
+                            closeOutdoorDetail()
                           }}
-                          onCancel={closeOutdoorDetail}
-                          isSubmitting={isSubmitting}
-                          showCustomerPicker={false}
+                          embedded
                         />
-                      </div>
+                      )}
                     </motion.div>
                   </motion.div>
                 )}

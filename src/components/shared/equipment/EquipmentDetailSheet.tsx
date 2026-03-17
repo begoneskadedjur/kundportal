@@ -27,6 +27,7 @@ import {
   getEquipmentStatusLabel
 } from '../../../types/database'
 import { formatCoordinates, openInMapsApp } from '../../../utils/equipmentMapUtils'
+import { ImageLightbox } from '../ImageLightbox'
 
 // Hjälpfunktion för att hämta typkonfiguration med fallback för dynamiska typer
 function getTypeConfig(equipment: EquipmentPlacementWithRelations) {
@@ -52,6 +53,8 @@ interface EquipmentDetailSheetProps {
   onEdit?: (equipment: EquipmentPlacementWithRelations) => void
   onDelete?: (equipment: EquipmentPlacementWithRelations) => void
   readOnly?: boolean
+  /** When true, renders only the content without fixed positioning/backdrop (for use inside modals) */
+  embedded?: boolean
 }
 
 // Ikon-komponent baserat på utrustningstyp
@@ -74,7 +77,8 @@ export function EquipmentDetailSheet({
   onClose,
   onEdit,
   onDelete,
-  readOnly = false
+  readOnly = false,
+  embedded = false
 }: EquipmentDetailSheetProps) {
   const [showLightbox, setShowLightbox] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -321,6 +325,25 @@ export function EquipmentDetailSheet({
     </div>
   )
 
+  // Embedded mode: render just the content without fixed positioning
+  if (embedded) {
+    return (
+      <>
+        <div className="bg-slate-800 rounded-t-2xl shadow-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          {sheetContent}
+        </div>
+        {equipment.photo_url && (
+          <ImageLightbox
+            images={[{ url: equipment.photo_url, alt: 'Utrustningsfoto' }]}
+            initialIndex={0}
+            isOpen={showLightbox}
+            onClose={() => setShowLightbox(false)}
+          />
+        )}
+      </>
+    )
+  }
+
   return (
     <>
       <AnimatePresence>
@@ -371,37 +394,14 @@ export function EquipmentDetailSheet({
       </AnimatePresence>
 
       {/* Lightbox for foto */}
-      <AnimatePresence>
-        {showLightbox && equipment.photo_url && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-4"
-            onClick={() => setShowLightbox(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center"
-            >
-              <img
-                src={equipment.photo_url}
-                alt="Utrustningsfoto"
-                className="max-w-full max-h-full object-contain rounded-lg"
-              />
-              <button
-                onClick={() => setShowLightbox(false)}
-                className="absolute top-4 right-4 p-3 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors min-w-[52px] min-h-[52px] flex items-center justify-center"
-                aria-label="Stang bild"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {equipment.photo_url && (
+        <ImageLightbox
+          images={[{ url: equipment.photo_url, alt: 'Utrustningsfoto' }]}
+          initialIndex={0}
+          isOpen={showLightbox}
+          onClose={() => setShowLightbox(false)}
+        />
+      )}
     </>
   )
 }

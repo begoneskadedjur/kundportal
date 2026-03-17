@@ -22,8 +22,10 @@ import {
   Crosshair,
   Box,
   Target,
-  Hash
+  Hash,
+  Image as ImageIcon
 } from 'lucide-react'
+import { ImageLightbox } from '../ImageLightbox'
 import type {
   IndoorStationWithRelations,
   IndoorStationInspectionWithRelations,
@@ -56,6 +58,7 @@ export function IndoorStationDetailSheet({
   onRegisterInspection
 }: IndoorStationDetailSheetProps) {
   const [showAllInspections, setShowAllInspections] = useState(false)
+  const [showLightbox, setShowLightbox] = useState(false)
 
   const typeConfig = station.station_type_data
     ? { label: station.station_type_data.name, color: station.station_type_data.color, bgColor: '', requiresSerialNumber: false, prefix: '' }
@@ -65,6 +68,7 @@ export function IndoorStationDetailSheet({
   const displayedInspections = showAllInspections ? inspections : inspections.slice(0, 3)
 
   return (
+    <>
     <div className="bg-slate-800 rounded-t-2xl shadow-2xl max-h-[85vh] overflow-hidden flex flex-col">
       {/* Drag handle */}
       <div className="flex justify-center pt-3 pb-2">
@@ -116,13 +120,21 @@ export function IndoorStationDetailSheet({
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Foto */}
         {station.photo_url && (
-          <div className="rounded-xl overflow-hidden bg-slate-900">
+          <button
+            onClick={() => setShowLightbox(true)}
+            className="w-full rounded-xl overflow-hidden bg-slate-900 relative group cursor-zoom-in"
+          >
             <img
               src={station.photo_url}
               alt="Stationsfoto"
-              className="w-full h-48 object-cover"
+              className="w-full aspect-video object-cover transition-transform duration-300 group-hover:scale-105"
             />
-          </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            <div className="absolute bottom-3 left-3 flex items-center gap-2 text-white/80 text-sm">
+              <ImageIcon className="w-4 h-4" />
+              <span>Tryck för att förstora</span>
+            </div>
+          </button>
         )}
 
         {/* Measurement status */}
@@ -194,7 +206,7 @@ export function IndoorStationDetailSheet({
             {inspections.length > 3 && (
               <button
                 onClick={() => setShowAllInspections(!showAllInspections)}
-                className="text-xs text-teal-400 hover:text-teal-300"
+                className="text-xs text-[#20c58f] hover:text-[#20c58f]/80"
               >
                 {showAllInspections ? 'Visa färre' : `Visa alla (${inspections.length})`}
               </button>
@@ -221,7 +233,7 @@ export function IndoorStationDetailSheet({
         {onRegisterInspection && station.status === 'active' && (
           <button
             onClick={onRegisterInspection}
-            className="w-full py-3 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 bg-[#20c58f] hover:bg-[#1ab07f] text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-5 h-5" />
             Registrera kontroll
@@ -259,6 +271,15 @@ export function IndoorStationDetailSheet({
         </div>
       </div>
     </div>
+    {station.photo_url && (
+      <ImageLightbox
+        images={[{ url: station.photo_url, alt: 'Stationsfoto' }]}
+        initialIndex={0}
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+      />
+    )}
+    </>
   )
 }
 
@@ -338,7 +359,7 @@ export function IndoorStationCard({
       className={`
         w-full p-3 rounded-lg text-left transition-all
         ${isSelected
-          ? 'bg-teal-600/20 border border-teal-500'
+          ? 'bg-[#20c58f]/20 border border-[#20c58f]'
           : 'bg-slate-800 hover:bg-slate-700 border border-transparent'
         }
       `}

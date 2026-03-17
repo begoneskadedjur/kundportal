@@ -397,7 +397,7 @@ export function IndoorStationForm({
               <img
                 src={photoPreview}
                 alt="Förhandsvisning"
-                className="w-full max-h-48 object-contain"
+                className="w-full aspect-video object-cover"
               />
               <div className="absolute bottom-2 left-2 p-1.5 bg-slate-900/70 rounded-lg">
                 <ZoomIn className="w-3.5 h-3.5 text-white" />
@@ -415,7 +415,7 @@ export function IndoorStationForm({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="w-full p-4 border-2 border-dashed border-slate-600 hover:border-emerald-500 rounded-lg text-center transition-colors"
+            className="w-full p-4 border-2 border-dashed border-slate-600 hover:border-[#20c58f] rounded-lg text-center transition-colors"
           >
             <Camera className="w-6 h-6 text-slate-500 mx-auto mb-2" />
             <p className="text-sm text-slate-400">Ta eller välj foto</p>

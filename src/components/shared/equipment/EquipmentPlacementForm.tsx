@@ -793,7 +793,7 @@ export function EquipmentPlacementForm({
               <img
                 src={photoPreview}
                 alt="Förhandsgranskning"
-                className="w-full max-h-48 object-contain"
+                className="w-full aspect-video object-cover"
               />
               <div className="absolute bottom-2 left-2 p-1.5 bg-slate-900/70 rounded-lg">
                 <ZoomIn className="w-3.5 h-3.5 text-white" />
@@ -853,7 +853,7 @@ export function EquipmentPlacementForm({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           disabled={isSubmitting}
-          className="flex-1 px-4 py-3 bg-blue-600 rounded-lg text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="flex-1 px-4 py-3 bg-[#20c58f] rounded-lg text-white font-medium hover:bg-[#1ab07f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
             <>
