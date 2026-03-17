@@ -2,7 +2,7 @@
 // Bekräftelsedialog för radering av ärenden
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Trash2, X, Loader2, MessageSquare, Image, Bell, FileText, Clock } from 'lucide-react';
+import { AlertTriangle, Trash2, X, Loader2, MessageSquare, Image, Bell, FileText, Clock, Receipt, Package } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { getCaseDeleteInfo, deleteCase, type CaseDeleteInfo, type DeleteableCaseType } from '../../services/caseDeleteService';
@@ -97,7 +97,9 @@ export default function DeleteCaseConfirmDialog({
       relatedData.notifications +
       relatedData.readReceipts +
       relatedData.visits +
-      relatedData.billingLogs
+      relatedData.billingLogs +
+      relatedData.invoices +
+      relatedData.billingItems
     );
   };
 
@@ -173,6 +175,24 @@ export default function DeleteCaseConfirmDialog({
               </div>
             )}
 
+            {/* Varning om fakturor */}
+            {deleteInfo.canDelete && deleteInfo.relatedData.invoices > 0 && (
+              <div className="bg-amber-500/20 border border-amber-500/40 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Receipt className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-400 font-medium">Fakturor kopplade till ärendet</p>
+                    <p className="text-amber-300 text-sm mt-1">
+                      {deleteInfo.relatedData.invoices} faktur{deleteInfo.relatedData.invoices !== 1 ? 'or' : 'a'}
+                      {deleteInfo.relatedData.billingItems > 0 && (
+                        <> och {deleteInfo.relatedData.billingItems} artikelrad{deleteInfo.relatedData.billingItems !== 1 ? 'er' : ''}</>
+                      )} kommer att raderas permanent.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Relaterad data som kommer att raderas */}
             {deleteInfo.canDelete && getTotalRelatedItems() > 0 && (
               <div className="space-y-3">
@@ -209,6 +229,22 @@ export default function DeleteCaseConfirmDialog({
                       <Clock className="w-4 h-4 text-green-400" />
                       <span className="text-sm text-slate-300">
                         {deleteInfo.relatedData.visits} besök
+                      </span>
+                    </div>
+                  )}
+                  {deleteInfo.relatedData.invoices > 0 && (
+                    <div className="flex items-center gap-2 bg-slate-800/30 rounded px-3 py-2">
+                      <Receipt className="w-4 h-4 text-amber-400" />
+                      <span className="text-sm text-slate-300">
+                        {deleteInfo.relatedData.invoices} faktur{deleteInfo.relatedData.invoices !== 1 ? 'or' : 'a'}
+                      </span>
+                    </div>
+                  )}
+                  {deleteInfo.relatedData.billingItems > 0 && (
+                    <div className="flex items-center gap-2 bg-slate-800/30 rounded px-3 py-2">
+                      <Package className="w-4 h-4 text-orange-400" />
+                      <span className="text-sm text-slate-300">
+                        {deleteInfo.relatedData.billingItems} artikelrad{deleteInfo.relatedData.billingItems !== 1 ? 'er' : ''}
                       </span>
                     </div>
                   )}

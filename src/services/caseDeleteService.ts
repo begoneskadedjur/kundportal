@@ -18,6 +18,8 @@ export interface CaseDeleteInfo {
     visits: number;
     billingLogs: number;
     childCases: number;
+    invoices: number;
+    billingItems: number;
   };
   canDelete: boolean;
   blockReason?: string;
@@ -143,6 +145,20 @@ export async function getCaseDeleteInfo(
     .eq('case_id', caseId)
     .eq('case_type', caseType);
 
+  // Räkna fakturor
+  const { count: invoicesCount } = await supabase
+    .from('invoices')
+    .select('id', { count: 'exact', head: true })
+    .eq('case_id', caseId)
+    .eq('case_type', caseType);
+
+  // Räkna faktureringsartiklar
+  const { count: billingItemsCount } = await supabase
+    .from('case_billing_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('case_id', caseId)
+    .eq('case_type', caseType);
+
   // Bestäm om ärendet kan raderas
   const canDelete = childCasesCount === 0;
   const blockReason = childCasesCount > 0
@@ -161,7 +177,9 @@ export async function getCaseDeleteInfo(
       readReceipts: readReceiptsCount || 0,
       visits: visitsCount,
       billingLogs: billingLogsCount || 0,
-      childCases: childCasesCount
+      childCases: childCasesCount,
+      invoices: invoicesCount || 0,
+      billingItems: billingItemsCount || 0,
     },
     canDelete,
     blockReason
@@ -297,7 +315,50 @@ export async function deleteCase(
       }
     }
 
-    // 6. Radera billing audit log
+    // 6. Radera fakturor och tillhörande rader
+    const { data: invoiceIds } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('case_id', caseId)
+      .eq('case_type', caseType);
+
+    if (invoiceIds && invoiceIds.length > 0) {
+      const ids = invoiceIds.map(i => i.id);
+      const { error: invoiceItemsError } = await supabase
+        .from('invoice_items')
+        .delete()
+        .in('invoice_id', ids);
+      if (invoiceItemsError) console.error('Error deleting invoice items:', invoiceItemsError);
+
+      const { error: invoicesError } = await supabase
+        .from('invoices')
+        .delete()
+        .in('id', ids);
+      if (invoicesError) console.error('Error deleting invoices:', invoicesError);
+    }
+
+    // 7. Radera case_billing_items (koppla loss FK först)
+    const { data: billingItemIds } = await supabase
+      .from('case_billing_items')
+      .select('id')
+      .eq('case_id', caseId)
+      .eq('case_type', caseType);
+
+    if (billingItemIds && billingItemIds.length > 0) {
+      const bIds = billingItemIds.map(b => b.id);
+      await supabase
+        .from('invoice_items')
+        .update({ case_billing_item_id: null })
+        .in('case_billing_item_id', bIds);
+
+      const { error: billingItemsError } = await supabase
+        .from('case_billing_items')
+        .delete()
+        .in('id', bIds);
+      if (billingItemsError) console.error('Error deleting billing items:', billingItemsError);
+    }
+
+    // 8. Radera billing audit log
     const { error: billingError } = await supabase
       .from('billing_audit_log')
       .delete()
