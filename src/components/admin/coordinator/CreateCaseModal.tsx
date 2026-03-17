@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
@@ -875,7 +875,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     </div>
   ) : null;
   
-  const showRotRutDetails = formData.r_rot_rut === 'ROT' || formData.r_rot_rut === 'RUT';
 
   // Dynamisk titel för modalen
   const getModalTitle = () => {
@@ -1412,17 +1411,26 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <MapPin size={14}/> Utskick
                       </h4>
                       <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">Skicka bokningsbekräftelse?</label>
-                        <select
-                          name="skicka_bokningsbekraftelse"
-                          value={formData.skicka_bokningsbekraftelse || 'Nej'}
-                          onChange={handleChange}
-                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
-                        >
-                          <option value="Nej">Nej</option>
-                          <option value="JA - Första Klockslaget">JA - Första Klockslaget</option>
-                          <option value="JA - Tidsspann">JA - Tidsspann</option>
-                        </select>
+                        <label className="block text-xs font-medium text-slate-400 mb-2">Skicka bokningsbekräftelse?</label>
+                        <div className="flex gap-3">
+                          {[
+                            { value: 'Nej', label: 'Nej' },
+                            { value: 'JA - Första Klockslaget', label: 'Ja, första klockslaget' },
+                            { value: 'JA - Tidsspann', label: 'Ja, tidsspann' }
+                          ].map(opt => (
+                            <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="skicka_bokningsbekraftelse"
+                                value={opt.value}
+                                checked={(formData.skicka_bokningsbekraftelse || 'Nej') === opt.value}
+                                onChange={handleChange}
+                                className="text-[#20c58f] focus:ring-[#20c58f]"
+                              />
+                              <span className="text-sm text-slate-300">{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -1680,31 +1688,28 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Euro size={14}/> Ekonomi & Utskick</h4>
                       {caseType === 'business' && (<Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />)}
-                      {caseType === 'private' && (
-                          <div>
-                              <label className="block text-xs font-medium text-slate-400 mb-1">ROT/RUT</label>
-                              <select name="r_rot_rut" value={formData.r_rot_rut || 'Nej'} onChange={handleChange} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
-                                  <option value="Nej">Ej avdragsgillt</option><option value="ROT">ROT</option><option value="RUT">RUT</option><option value="INKL moms">Pris inkl. moms</option>
-                              </select>
-                          </div>
-                      )}
-                      {showRotRutDetails && (
-                          <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
-                               <h5 className="text-sm font-semibold text-white flex items-center gap-1.5"><Percent size={14}/> Detaljer för ROT/RUT-avdrag</h5>
-                               <Input label="Fastighetsbeteckning" name="r_fastighetsbeteckning" value={formData.r_fastighetsbeteckning || ''} onChange={handleChange} />
-                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                  <Input type="number" label="Arbetskostnad" name="r_arbetskostnad" value={formData.r_arbetskostnad ?? ''} onChange={handleChange} />
-                                  <Input type="number" label="Material & Utrustning" name="r_material_utrustning" value={formData.r_material_utrustning ?? ''} onChange={handleChange} />
-                                  <Input type="number" label="Servicebil" name="r_servicebil" value={formData.r_servicebil ?? ''} onChange={handleChange} />
-                               </div>
-                          </div>
-                      )}
                       {caseType === 'business' && (<Input type="email" label="E-post Faktura" name="e_post_faktura" value={formData.e_post_faktura || ''} onChange={handleChange} />)}
                       <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">Skicka bokningsbekräftelse?</label>
-                          <select name="skicka_bokningsbekraftelse" value={formData.skicka_bokningsbekraftelse || 'Nej'} onChange={handleChange} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
-                              <option value="Nej">Nej</option><option value="JA - Första Klockslaget">JA - Första Klockslaget</option><option value="JA - Tidsspann">JA - Tidsspann</option>
-                          </select>
+                          <label className="block text-xs font-medium text-slate-400 mb-2">Skicka bokningsbekräftelse?</label>
+                          <div className="flex gap-3">
+                            {[
+                              { value: 'Nej', label: 'Nej' },
+                              { value: 'JA - Första Klockslaget', label: 'Ja, första klockslaget' },
+                              { value: 'JA - Tidsspann', label: 'Ja, tidsspann' }
+                            ].map(opt => (
+                              <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="skicka_bokningsbekraftelse"
+                                  value={opt.value}
+                                  checked={(formData.skicka_bokningsbekraftelse || 'Nej') === opt.value}
+                                  onChange={handleChange}
+                                  className="text-[#20c58f] focus:ring-[#20c58f]"
+                                />
+                                <span className="text-sm text-slate-300">{opt.label}</span>
+                              </label>
+                            ))}
+                          </div>
                       </div>
                   </div>
                   {/* Bilder sektion */}
