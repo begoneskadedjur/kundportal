@@ -1201,6 +1201,7 @@ export function CustomerStationsModal({
                     floorPlanId={selectedFloorPlan.id}
                     position={previewPosition}
                     existingStationNumbers={floorPlanStations.map(s => s.station_number).filter(Boolean) as string[]}
+                    initialStationType={selectedStationType || undefined}
                     onSubmit={handleCreateStation}
                     onCancel={() => { setShowStationForm(false); resetPlacementMode() }}
                     isSubmitting={isSubmitting}

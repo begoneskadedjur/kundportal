@@ -39,6 +39,7 @@ interface IndoorStationFormProps {
   existingStation?: IndoorStationWithRelations | null
   existingStationNumbers?: string[]
   inspections?: IndoorStationInspectionWithRelations[]
+  initialStationType?: IndoorStationType
   onSubmit: (input: CreateIndoorStationInput | UpdateIndoorStationInput) => Promise<void>
   onCancel: () => void
   onDelete?: () => void
@@ -51,6 +52,7 @@ export function IndoorStationForm({
   existingStation,
   existingStationNumbers = [],
   inspections = [],
+  initialStationType,
   onSubmit,
   onCancel,
   onDelete,
@@ -64,7 +66,7 @@ export function IndoorStationForm({
 
   // Form state
   const [stationType, setStationType] = useState<IndoorStationType>(
-    existingStation?.station_type || ''
+    existingStation?.station_type || initialStationType || ''
   )
   const [stationNumber, setStationNumber] = useState(existingStation?.station_number || '')
   const [locationDescription, setLocationDescription] = useState(existingStation?.location_description || '')
@@ -84,7 +86,7 @@ export function IndoorStationForm({
         const types = await StationTypeService.getActiveStationTypes()
         setDynamicStationTypes(types)
         // Sätt default-typ till första om ingen är vald och vi skapar ny
-        if (!isEditing && !stationType && types.length > 0) {
+        if (!isEditing && !stationType && !initialStationType && types.length > 0) {
           setStationType(types[0].code)
         }
       } catch (err) {
