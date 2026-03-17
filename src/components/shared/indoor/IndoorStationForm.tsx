@@ -98,6 +98,16 @@ export function IndoorStationForm({
     loadStationTypes()
   }, [isEditing])
 
+  // Säkerställ att initialStationType tillämpas efter typladdning
+  useEffect(() => {
+    if (!isEditing && initialStationType && dynamicStationTypes.length > 0) {
+      setStationType(initialStationType)
+      const config = getCurrentTypeConfig(initialStationType)
+      const suggested = generateStationNumber(initialStationType, existingStationNumbers, config?.prefix)
+      setStationNumber(suggested)
+    }
+  }, [dynamicStationTypes, initialStationType, isEditing])
+
   // Hämta aktuell stationstyp-config (dynamisk eller legacy)
   const getCurrentTypeConfig = (typeCode: string) => {
     const dynamicType = dynamicStationTypes.find(t => t.code === typeCode)
