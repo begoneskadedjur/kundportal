@@ -47,7 +47,8 @@ import type {
   IndoorStationType,
   PlacementMode,
   CreateFloorPlanInput,
-  CreateIndoorStationInput
+  CreateIndoorStationInput,
+  UpdateIndoorStationInput
 } from '../../types/indoor'
 import type { StationType } from '../../types/stationTypes'
 import { openInMapsApp } from '../../utils/equipmentMapUtils'
@@ -149,6 +150,7 @@ export function CustomerStationsModal({
   // Inomhus stationsdetalj
   const [selectedIndoorStation, setSelectedIndoorStation] = useState<IndoorStationWithRelations | null>(null)
   const [indoorInspections, setIndoorInspections] = useState<IndoorStationInspectionWithRelations[]>([])
+  const [isEditingIndoor, setIsEditingIndoor] = useState(false)
 
   // Ladda data när modal öppnas
   useEffect(() => {
@@ -187,6 +189,7 @@ export function CustomerStationsModal({
   const closeIndoorDetail = () => {
     setSelectedIndoorStation(null)
     setIndoorInspections([])
+    setIsEditingIndoor(false)
   }
 
   const loadAllData = async () => {
@@ -949,7 +952,7 @@ export function CustomerStationsModal({
                   </button>
                 </div>
               )}
-              {/* Inomhus stationsdetalj overlay */}
+              {/* Inomhus stationsdetalj / redigering overlay */}
               <AnimatePresence>
                 {selectedIndoorStation && (
                   <motion.div
@@ -969,25 +972,56 @@ export function CustomerStationsModal({
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                       className="relative w-full max-h-[80%] overflow-y-auto"
                     >
-                      <IndoorStationDetailSheet
-                        station={selectedIndoorStation}
-                        inspections={indoorInspections}
-                        onClose={closeIndoorDetail}
-                        onDelete={async () => {
-                          if (!confirm('Är du säker på att du vill ta bort denna station?')) return
-                          try {
-                            await IndoorStationService.deleteStation(selectedIndoorStation.id)
-                            toast.success('Station borttagen')
-                            closeIndoorDetail()
-                            if (customer) {
-                              const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
-                              setIndoorStations(indoor)
+                      {isEditingIndoor ? (
+                        <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
+                          <IndoorStationForm
+                            floorPlanId={selectedIndoorStation.floor_plan_id}
+                            position={{ x: selectedIndoorStation.position_x_percent, y: selectedIndoorStation.position_y_percent }}
+                            existingStation={selectedIndoorStation}
+                            onSubmit={async (input) => {
+                              try {
+                                await IndoorStationService.updateStation(
+                                  selectedIndoorStation.id,
+                                  input as UpdateIndoorStationInput,
+                                  profile?.technician_id || undefined
+                                )
+                                toast.success('Station uppdaterad')
+                                setIsEditingIndoor(false)
+                                setSelectedIndoorStation(null)
+                                if (customer) {
+                                  const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+                                  setIndoorStations(indoor)
+                                }
+                              } catch (error) {
+                                toast.error('Kunde inte uppdatera station')
+                              }
+                            }}
+                            onCancel={() => setIsEditingIndoor(false)}
+                            isSubmitting={isSubmitting}
+                          />
+                        </div>
+                      ) : (
+                        <IndoorStationDetailSheet
+                          station={selectedIndoorStation}
+                          inspections={indoorInspections}
+                          onClose={closeIndoorDetail}
+                          onEdit={() => setIsEditingIndoor(true)}
+                          onDelete={async () => {
+                            if (!confirm('Är du säker på att du vill ta bort denna station?')) return
+                            try {
+                              await IndoorStationService.deleteStation(selectedIndoorStation.id)
+                              toast.success('Station borttagen')
+                              closeIndoorDetail()
+                              if (customer) {
+                                const { indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+                                setIndoorStations(indoor)
+                              }
+                            } catch (error) {
+                              toast.error('Kunde inte ta bort station')
                             }
-                          } catch (error) {
-                            toast.error('Kunde inte ta bort station')
-                          }
-                        }}
-                      />
+                          }}
+                        />
+                      )}
                     </motion.div>
                   </motion.div>
                 )}

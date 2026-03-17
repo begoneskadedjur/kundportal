@@ -161,7 +161,11 @@ export function IndoorStationForm({
 
     try {
       if (isEditing) {
+        // Hitta station_type_id från dynamiska typer
+        const matchedType = dynamicStationTypes.find(t => t.code === stationType)
         const updateInput: UpdateIndoorStationInput = {
+          station_type: stationType,
+          station_type_id: matchedType?.id || null,
           station_number: stationNumber.trim() || undefined,
           position_x_percent: position.x,
           position_y_percent: position.y,
@@ -228,9 +232,8 @@ export function IndoorStationForm({
         </span>
       </div>
 
-      {/* Station type (only for new stations) */}
-      {!isEditing && (
-        <div>
+      {/* Station type */}
+      <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Stationstyp *
           </label>
@@ -275,7 +278,6 @@ export function IndoorStationForm({
             </div>
           )}
         </div>
-      )}
 
       {/* Station number - endast för typer som kräver serienummer */}
       {currentTypeConfig?.requiresSerialNumber && (

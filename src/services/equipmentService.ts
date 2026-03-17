@@ -1,5 +1,6 @@
 // src/services/equipmentService.ts - Service för utrustningsplacering
 import { supabase } from '../lib/supabase'
+import { IndoorStationService } from './indoorStationService'
 import {
   EquipmentPlacement,
   EquipmentPlacementInsert,
@@ -888,7 +889,12 @@ export class EquipmentService {
           .select(`
             *,
             technician:technicians!placed_by_technician_id(id, name),
-            floor_plan:floor_plans!floor_plan_id(id, name, customer_id)
+            floor_plan:floor_plans!floor_plan_id(id, name, customer_id),
+            station_type_data:station_types!station_type_id(
+              id, code, name, color, icon, prefix,
+              measurement_unit, measurement_label,
+              threshold_warning, threshold_critical, threshold_direction
+            )
           `)
           .in('floor_plan_id', floorPlanIds)
           .order('placed_at', { ascending: false })
@@ -900,7 +906,7 @@ export class EquipmentService {
         }
       }
 
-      // Lägg till signerade URLs för foton
+      // Lägg till signerade URLs för foton (utomhus)
       const outdoorWithUrls = await Promise.all(
         (outdoorData || []).map(async (equipment) => ({
           ...equipment,
@@ -910,11 +916,21 @@ export class EquipmentService {
         }))
       )
 
-      console.log('Stationer hämtade - utomhus:', outdoorWithUrls.length, 'inomhus:', indoorData.length)
+      // Lägg till signerade URLs för foton (inomhus)
+      const indoorWithUrls = await Promise.all(
+        indoorData.map(async (station: any) => ({
+          ...station,
+          photo_url: station.photo_path
+            ? await IndoorStationService.getStationPhotoUrl(station.photo_path)
+            : undefined
+        }))
+      )
+
+      console.log('Stationer hämtade - utomhus:', outdoorWithUrls.length, 'inomhus:', indoorWithUrls.length)
 
       return {
         outdoor: outdoorWithUrls,
-        indoor: indoorData
+        indoor: indoorWithUrls
       }
 
     } catch (error) {

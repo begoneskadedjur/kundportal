@@ -270,6 +270,8 @@ export interface CreateIndoorStationInput {
 }
 
 export interface UpdateIndoorStationInput {
+  station_type?: IndoorStationType;
+  station_type_id?: string | null;
   station_number?: string;
   position_x_percent?: number;
   position_y_percent?: number;
