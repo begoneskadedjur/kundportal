@@ -77,6 +77,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
   const [existingImages, setExistingImages] = useState<CaseImageWithUrl[]>([]);
   const [draftBillingItems, setDraftBillingItems] = useState<CaseBillingItemWithRelations[]>([]);
+  const handleDraftArticlesChange = useCallback((items: CaseBillingItemWithRelations[]) => {
+    setDraftBillingItems(items)
+  }, []);
   const [showArticles, setShowArticles] = useState(false);
   const [offerDetails, setOfferDetails] = useState<{
     agreement_text: string | null;
@@ -1511,7 +1514,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <CaseArticleSelector
                           draftMode
                           caseType={caseType === 'business' ? 'business' : 'private'}
-                          onChange={(items) => setDraftBillingItems(items)}
+                          onChange={handleDraftArticlesChange}
                         />
                       )}
                     </div>
@@ -1822,7 +1825,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <CaseArticleSelector
                           draftMode
                           caseType={caseType === 'business' ? 'business' : 'private'}
-                          onChange={(items) => setDraftBillingItems(items)}
+                          onChange={handleDraftArticlesChange}
                         />
                       )}
                   </div>

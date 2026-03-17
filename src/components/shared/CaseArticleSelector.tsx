@@ -690,11 +690,17 @@ export default function CaseArticleSelector({
                         const hasPack = item.article.pack_size && item.article.pack_price
                         const showRotRut = item.article.category === 'Arbetstid' &&
                           (item.article.rot_eligible || item.article.rut_eligible)
+                        const selectedCount = selectedItems.filter(si => si.article_id === item.article.id).length
+                        const isAdded = selectedCount > 0
 
                         return (
                           <div
                             key={item.article.id}
-                            className="flex items-start justify-between px-3 py-2 hover:bg-slate-800/20 transition-colors"
+                            className={`flex items-start justify-between px-3 py-2 transition-colors ${
+                              isAdded
+                                ? 'bg-[#20c58f]/5 border-l-2 border-[#20c58f]/40'
+                                : 'hover:bg-slate-800/20'
+                            }`}
                           >
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -753,14 +759,19 @@ export default function CaseArticleSelector({
                                 )}
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleAddArticle(item)}
-                              disabled={saving}
-                              className="ml-2 p-1.5 text-[#20c58f] hover:bg-[#20c58f]/20 rounded-lg transition-colors disabled:opacity-50 shrink-0"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-1 ml-2 shrink-0">
+                              {isAdded && (
+                                <span className="text-[10px] text-[#20c58f] font-medium">{selectedCount}×</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleAddArticle(item)}
+                                disabled={saving}
+                                className="p-1.5 text-[#20c58f] hover:bg-[#20c58f]/20 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         )
                       })}
