@@ -79,15 +79,22 @@ export function IndoorStationForm({
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Hämta dynamiska stationstyper vid mount
+  // Hämta dynamiska stationstyper och sätt initial typ
   useEffect(() => {
     const loadStationTypes = async () => {
       try {
         const types = await StationTypeService.getActiveStationTypes()
         setDynamicStationTypes(types)
-        // Sätt default-typ till första om ingen är vald och vi skapar ny
-        if (!isEditing && !stationType && !initialStationType && types.length > 0) {
-          setStationType(types[0].code)
+
+        if (!isEditing && types.length > 0) {
+          // initialStationType har högsta prioritet, annars första typen
+          const targetType = initialStationType || types[0].code
+          setStationType(targetType)
+          // Auto-generera stationsnummer med korrekt prefix
+          const dynamicType = types.find(t => t.code === targetType)
+          const prefix = dynamicType?.prefix
+          const suggested = generateStationNumber(targetType, existingStationNumbers, prefix)
+          setStationNumber(suggested)
         }
       } catch (err) {
         console.error('Fel vid hämtning av stationstyper:', err)
@@ -96,17 +103,7 @@ export function IndoorStationForm({
       }
     }
     loadStationTypes()
-  }, [isEditing])
-
-  // Säkerställ att initialStationType tillämpas efter typladdning
-  useEffect(() => {
-    if (!isEditing && initialStationType && dynamicStationTypes.length > 0) {
-      setStationType(initialStationType)
-      const config = getCurrentTypeConfig(initialStationType)
-      const suggested = generateStationNumber(initialStationType, existingStationNumbers, config?.prefix)
-      setStationNumber(suggested)
-    }
-  }, [dynamicStationTypes, initialStationType, isEditing])
+  }, [isEditing, initialStationType])
 
   // Hämta aktuell stationstyp-config (dynamisk eller legacy)
   const getCurrentTypeConfig = (typeCode: string) => {
