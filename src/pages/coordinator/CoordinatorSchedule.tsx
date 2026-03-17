@@ -350,6 +350,20 @@ export default function CoordinatorSchedule() {
     setSelectedAbsence(a); setIsAbsenceDetailsModalOpen(true)
   }, [])
 
+  const handleSearchSelectCase = useCallback(async (caseId: string, caseType: 'private' | 'business') => {
+    try {
+      const table = caseType === 'private' ? 'private_cases' : 'business_cases'
+      const { data } = await supabase.from(table).select('*').eq('id', caseId).single()
+      if (data) {
+        const caseData = { ...data, case_type: caseType } as BeGoneCaseRow
+        setSelectedCase(caseData)
+        setIsEditModalOpen(true)
+      }
+    } catch (err) {
+      console.error('Could not open case:', err)
+    }
+  }, [])
+
   const handleCreateSuccess = () => { setIsCreateModalOpen(false); setSelectedCase(null); fetchData() }
   const handleAbsenceCreateSuccess = () => { setIsAbsenceModalOpen(false); fetchData() }
 
@@ -378,6 +392,7 @@ export default function CoordinatorSchedule() {
           setSelectedTechnicianIds={setSelectedTechnicianIds}
           isActionableOpen={isActionableDrawerOpen}
           onToggleActionable={() => setIsActionableDrawerOpen(v => !v)}
+          onSelectCase={handleSearchSelectCase}
         />
 
         <AnimatePresence>

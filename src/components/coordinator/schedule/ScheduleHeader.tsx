@@ -4,6 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, FileText, Calenda
 import { AnimatePresence } from 'framer-motion'
 import Button from '../../ui/Button'
 import { StatusLegend } from './StatusLegend'
+import { ScheduleSearch } from './ScheduleSearch'
 import { getWeekNumber } from './scheduleUtils'
 import { FILTER_STATUSES } from './scheduleConstants'
 import { ScheduleFilterPopover } from './ScheduleFilterPopover'
@@ -30,6 +31,8 @@ interface ScheduleHeaderProps {
   // Actionable drawer
   isActionableOpen?: boolean
   onToggleActionable?: () => void
+  // Sök
+  onSelectCase?: (caseId: string, caseType: 'private' | 'business') => void
 }
 
 export function ScheduleHeader({
@@ -48,6 +51,7 @@ export function ScheduleHeader({
   setSelectedTechnicianIds,
   isActionableOpen,
   onToggleActionable,
+  onSelectCase,
 }: ScheduleHeaderProps) {
   const weekNum = getWeekNumber(currentDate)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -206,6 +210,9 @@ export function ScheduleHeader({
         <div className="hidden xl:block">
           <StatusLegend />
         </div>
+
+        {/* Sökfält */}
+        {onSelectCase && <ScheduleSearch onSelectCase={onSelectCase} />}
 
         {/* Filter-knapp + popover */}
         <div ref={filterRef} className="relative">
