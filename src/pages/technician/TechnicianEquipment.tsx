@@ -93,9 +93,6 @@ export default function TechnicianEquipment() {
     sites?: { customerId: string; siteName: string }[]
   } | null>(null)
 
-  // Återgå till kundmodal efter redigering av utomhusstation
-  const [returnToCustomer, setReturnToCustomer] = useState<CustomerStationSummary | null>(null)
-
   // Schema-redigering
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
 
@@ -237,21 +234,6 @@ export default function TechnicianEquipment() {
   }
 
   // Hantera stationsklick i modal (utomhus öppnar redigeringsformulär, inomhus hanteras i modalen)
-  const handleStationClick = (station: EquipmentPlacementWithRelations, type: 'outdoor' | 'indoor') => {
-    if (type === 'outdoor') {
-      // Spara kunden så vi kan återgå efter redigering
-      setReturnToCustomer(selectedCustomerForModal)
-      setEditingEquipment(station)
-      setPreviewPosition({ lat: station.latitude, lng: station.longitude })
-      setWizardCustomerId(station.customer_id)
-      setIsFormOpen(true)
-      setSelectedCustomerForModal(null)
-      // Hämta kontrollhistorik
-      getOutdoorInspectionsByStation(station.id).then(setOutdoorInspections)
-    }
-    // Inomhus hanteras internt i CustomerStationsModal
-  }
-
   // Hantera "Lägg till station" från modal
   const handleAddStationFromModal = (customerId: string, type: 'outdoor' | 'indoor') => {
     setSelectedCustomerForModal(null)
@@ -336,20 +318,14 @@ export default function TechnicianEquipment() {
       }
 
       if (editingEquipment) {
-        // Redigering — stäng formulär och återgå till kundmodal om möjligt
-        const customerToReturn = returnToCustomer
+        // Redigering — stäng formulär
         setIsFormOpen(false)
         setEditingEquipment(null)
         setPreviewPosition(null)
         setWizardCustomerId(null)
         setBatchCount(0)
         setBatchCustomerName('')
-        setReturnToCustomer(null)
         await refreshData()
-        if (customerToReturn) {
-          const freshCustomer = allCustomers.find(c => c.customer_id === customerToReturn.customer_id)
-          setSelectedCustomerForModal(freshCustomer || customerToReturn)
-        }
       } else {
         // Ny station — visa success-state för batch-placering
         const customerName = customers.find(c => c.id === customerId)?.company_name
@@ -414,15 +390,6 @@ export default function TechnicianEquipment() {
     }
   }
 
-  // Hantera redigering
-  const handleEditEquipment = (equipment: EquipmentPlacementWithRelations) => {
-    setEditingEquipment(equipment)
-    setPreviewPosition({ lat: equipment.latitude, lng: equipment.longitude })
-    setWizardCustomerId(equipment.customer_id)
-    setIsFormOpen(true)
-    getOutdoorInspectionsByStation(equipment.id).then(setOutdoorInspections)
-  }
-
   // Hantera GPS-fångst
   const handleLocationCapture = (lat: number, lng: number) => {
     setPreviewPosition({ lat, lng })
@@ -455,7 +422,6 @@ export default function TechnicianEquipment() {
   const handleFinishBatch = async () => {
     const finishedCustomerId = wizardCustomerId
     const finishedCustomerName = batchCustomerName
-    const customerToReturn = returnToCustomer
 
     setShowSuccessState(false)
     setIsFormOpen(false)
@@ -467,13 +433,8 @@ export default function TechnicianEquipment() {
     setBatchCustomerName('')
     setLastEquipmentType(null)
     setLastUsedMap(false)
-    setReturnToCustomer(null)
 
-    if (customerToReturn) {
-      // Återgå till kundmodalen efter redigering
-      const freshCustomer = allCustomers.find(c => c.customer_id === customerToReturn.customer_id)
-      setSelectedCustomerForModal(freshCustomer || customerToReturn)
-    } else if (finishedCustomerId) {
+    if (finishedCustomerId) {
       await checkAndPromptSchedule(finishedCustomerId, finishedCustomerName)
     }
   }
@@ -585,7 +546,6 @@ export default function TechnicianEquipment() {
           isOpen={!!selectedCustomerForModal}
           onClose={() => setSelectedCustomerForModal(null)}
           onAddStation={handleAddStationFromModal}
-          onStationClick={handleStationClick}
         />
 
         {/* Wizard för att lägga till station */}

@@ -35,8 +35,10 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
-  ClipboardList
+  ClipboardList,
+  ZoomIn
 } from 'lucide-react'
+import ImageLightbox from '../ImageLightbox'
 
 // Ikon-mappning för dynamiska stationstyper
 const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
@@ -231,6 +233,7 @@ export function EquipmentPlacementForm({
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     existingEquipment?.photo_url || null
   )
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const [showMapPicker, setShowMapPicker] = useState(autoShowMap)
   const [manualLocationSet, setManualLocationSet] = useState(false)
 
@@ -781,12 +784,21 @@ export function EquipmentPlacementForm({
         </label>
 
         {photoPreview ? (
-          <div className="relative">
-            <img
-              src={photoPreview}
-              alt="Förhandsgranskning"
-              className="w-full h-48 object-cover rounded-lg"
-            />
+          <div className="relative rounded-lg overflow-hidden bg-slate-800">
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(true)}
+              className="w-full cursor-zoom-in"
+            >
+              <img
+                src={photoPreview}
+                alt="Förhandsgranskning"
+                className="w-full max-h-48 object-contain"
+              />
+              <div className="absolute bottom-2 left-2 p-1.5 bg-slate-900/70 rounded-lg">
+                <ZoomIn className="w-3.5 h-3.5 text-white" />
+              </div>
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -856,6 +868,16 @@ export function EquipmentPlacementForm({
           )}
         </motion.button>
       </div>
+
+      {/* Lightbox för stationsfoto */}
+      {photoPreview && (
+        <ImageLightbox
+          images={[{ url: photoPreview, alt: 'Stationsfoto' }]}
+          initialIndex={0}
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </form>
   )
 }

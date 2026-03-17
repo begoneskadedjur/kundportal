@@ -2,7 +2,8 @@
 // Formulär för att skapa/redigera inomhusstationer
 
 import { useState, useRef, useEffect } from 'react'
-import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn } from 'lucide-react'
+import ImageLightbox from '../ImageLightbox'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import type {
@@ -71,6 +72,7 @@ export function IndoorStationForm({
   const [comment, setComment] = useState(existingStation?.comment || '')
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(existingStation?.photo_url || null)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -387,11 +389,20 @@ export function IndoorStationForm({
 
         {photoPreview ? (
           <div className="relative rounded-lg overflow-hidden bg-slate-800">
-            <img
-              src={photoPreview}
-              alt="Förhandsvisning"
-              className="w-full max-h-48 object-contain"
-            />
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(true)}
+              className="w-full cursor-zoom-in"
+            >
+              <img
+                src={photoPreview}
+                alt="Förhandsvisning"
+                className="w-full max-h-48 object-contain"
+              />
+              <div className="absolute bottom-2 left-2 p-1.5 bg-slate-900/70 rounded-lg">
+                <ZoomIn className="w-3.5 h-3.5 text-white" />
+              </div>
+            </button>
             <button
               type="button"
               onClick={clearPhoto}
@@ -468,6 +479,16 @@ export function IndoorStationForm({
           )}
         </button>
       </div>
+
+      {/* Lightbox för stationsfoto */}
+      {photoPreview && (
+        <ImageLightbox
+          images={[{ url: photoPreview, alt: 'Stationsfoto' }]}
+          initialIndex={0}
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </form>
   )
 }

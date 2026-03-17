@@ -37,6 +37,7 @@ import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
+import { EquipmentPlacementForm, type FormData as EquipmentFormData } from '../shared/equipment/EquipmentPlacementForm'
 import { StationLegend } from '../shared/indoor/IndoorStationMarker'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG, EQUIPMENT_STATUS_CONFIG } from '../../types/database'
 import type {
@@ -50,6 +51,8 @@ import type {
   UpdateIndoorStationInput
 } from '../../types/indoor'
 import type { StationType } from '../../types/stationTypes'
+import { getOutdoorInspectionsByStation } from '../../services/inspectionSessionService'
+import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
 import { openInMapsApp } from '../../utils/equipmentMapUtils'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -150,6 +153,10 @@ export function CustomerStationsModal({
   const [selectedIndoorStation, setSelectedIndoorStation] = useState<IndoorStationWithRelations | null>(null)
   const [indoorInspections, setIndoorInspections] = useState<IndoorStationInspectionWithRelations[]>([])
 
+  // Utomhus stationsdetalj
+  const [selectedOutdoorStation, setSelectedOutdoorStation] = useState<EquipmentPlacementWithRelations | null>(null)
+  const [outdoorInspections, setOutdoorInspections] = useState<OutdoorInspectionWithRelations[]>([])
+
   // Ladda data när modal öppnas
   useEffect(() => {
     if (isOpen && customer) {
@@ -187,6 +194,23 @@ export function CustomerStationsModal({
   const closeIndoorDetail = () => {
     setSelectedIndoorStation(null)
     setIndoorInspections([])
+  }
+
+  // Öppna utomhusstation med inspektionshistorik
+  const handleOutdoorStationClick = async (station: EquipmentPlacementWithRelations) => {
+    setSelectedOutdoorStation(station)
+    setOutdoorInspections([])
+    try {
+      const inspections = await getOutdoorInspectionsByStation(station.id)
+      setOutdoorInspections(inspections)
+    } catch (error) {
+      console.error('Fel vid laddning av inspektioner:', error)
+    }
+  }
+
+  const closeOutdoorDetail = () => {
+    setSelectedOutdoorStation(null)
+    setOutdoorInspections([])
   }
 
   const loadAllData = async () => {
@@ -562,7 +586,7 @@ export function CustomerStationsModal({
                             <div className="h-[300px] md:h-[350px] flex-shrink-0">
                               <EquipmentMap
                                 equipment={outdoorStations}
-                                onEquipmentClick={(eq) => onStationClick?.(eq, 'outdoor')}
+                                onEquipmentClick={(eq) => handleOutdoorStationClick(eq)}
                                 height="100%"
                                 showControls={true}
                                 readOnly={true}
@@ -582,7 +606,7 @@ export function CustomerStationsModal({
                                   <OutdoorStationCard
                                     key={station.id}
                                     station={station}
-                                    onClick={() => onStationClick?.(station, 'outdoor')}
+                                    onClick={() => handleOutdoorStationClick(station)}
                                   />
                                 ))}
                               </div>
@@ -1008,6 +1032,69 @@ export function CustomerStationsModal({
                             }
                           }}
                           isSubmitting={isSubmitting}
+                        />
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Utomhus stationsredigering overlay */}
+              <AnimatePresence>
+                {selectedOutdoorStation && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-30 flex items-end rounded-2xl overflow-hidden"
+                  >
+                    <div
+                      className="absolute inset-0 bg-black/40"
+                      onClick={closeOutdoorDetail}
+                    />
+                    <motion.div
+                      initial={{ y: '100%' }}
+                      animate={{ y: 0 }}
+                      exit={{ y: '100%' }}
+                      transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                      className="relative w-full max-h-[80%] overflow-y-auto"
+                    >
+                      <div className="bg-slate-800 rounded-t-2xl shadow-2xl">
+                        <EquipmentPlacementForm
+                          customerId={customer?.customer_id || ''}
+                          technicianId={profile?.technician_id || ''}
+                          existingEquipment={selectedOutdoorStation}
+                          inspections={outdoorInspections}
+                          onSubmit={async (formData: EquipmentFormData) => {
+                            try {
+                              setIsSubmitting(true)
+                              const result = await EquipmentService.updateEquipment(selectedOutdoorStation.id, {
+                                equipment_type: formData.equipment_type,
+                                serial_number: formData.serial_number || null,
+                                latitude: formData.latitude,
+                                longitude: formData.longitude,
+                                comment: formData.comment || null,
+                                status: formData.status
+                              })
+                              if (!result.success) throw new Error(result.error)
+                              if (formData.photo) {
+                                await EquipmentService.uploadEquipmentPhoto(selectedOutdoorStation.id, formData.photo)
+                              }
+                              toast.success('Utrustning uppdaterad')
+                              closeOutdoorDetail()
+                              if (customer) {
+                                const { outdoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+                                setOutdoorStations(outdoor)
+                              }
+                            } catch (error) {
+                              toast.error('Kunde inte uppdatera utrustning')
+                            } finally {
+                              setIsSubmitting(false)
+                            }
+                          }}
+                          onCancel={closeOutdoorDetail}
+                          isSubmitting={isSubmitting}
+                          showCustomerPicker={false}
                         />
                       </div>
                     </motion.div>
