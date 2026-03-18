@@ -61,6 +61,16 @@ export interface TechnicianShare {
 export interface CommissionSettings {
   engangsjobb_percentage: number
   min_commission_base: number
+  payout_cutoff_day: number
+}
+
+export interface PayoutTechnicianSummary {
+  technician_id: string
+  technician_name: string
+  post_count: number
+  total_commission: number
+  payout_month: string | null
+  statuses: { pending: number; ready: number; approved: number; paid: number }
 }
 
 export interface ProvisionKpi {

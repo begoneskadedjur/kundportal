@@ -19,6 +19,7 @@ export default function ProvisionSettingsPanel({
 }: ProvisionSettingsPanelProps) {
   const [percentage, setPercentage] = useState(settings.engangsjobb_percentage)
   const [minBase, setMinBase] = useState(settings.min_commission_base)
+  const [cutoffDay, setCutoffDay] = useState(settings.payout_cutoff_day)
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
@@ -29,6 +30,9 @@ export default function ProvisionSettingsPanel({
       }
       if (minBase !== settings.min_commission_base) {
         await ProvisionService.updateSetting('min_commission_base', minBase, userEmail)
+      }
+      if (cutoffDay !== settings.payout_cutoff_day) {
+        await ProvisionService.updateSetting('payout_cutoff_day', cutoffDay, userEmail)
       }
       toast.success('Inställningar sparade')
       onSettingsUpdated()
@@ -52,7 +56,7 @@ export default function ProvisionSettingsPanel({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="text-xs font-medium text-slate-400 mb-1 block">
             Provisionsprocent engångsjobb
@@ -85,6 +89,23 @@ export default function ProvisionSettingsPanel({
               className="w-32 px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-slate-200 focus:ring-[#20c58f] focus:border-[#20c58f]"
             />
             <span className="text-sm text-slate-400">kr exkl moms</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-slate-400 mb-1 block">
+            Brytdatum utbetalning
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={28}
+              value={cutoffDay}
+              onChange={e => setCutoffDay(Math.min(28, Math.max(1, Number(e.target.value))))}
+              className="w-20 px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-slate-200 focus:ring-[#20c58f] focus:border-[#20c58f]"
+            />
+            <span className="text-sm text-slate-400">:e varje månad</span>
           </div>
         </div>
       </div>

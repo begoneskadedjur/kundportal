@@ -7,7 +7,8 @@ import type {
   ProvisionKpi,
   ProvisionTechnicianSummary,
   ProvisionFilters,
-  MonthSelection
+  MonthSelection,
+  PayoutTechnicianSummary
 } from '../types/provision'
 import { getCurrentMonth, getMonthOptions } from '../types/provision'
 
@@ -85,6 +86,51 @@ export function useProvisionDashboard() {
       p.technician_name.toLowerCase().includes(q)
     )
   }, [summaries, searchQuery])
+
+  // Aggregerad utbetalningsöversikt per tekniker
+  const payoutSummary: PayoutTechnicianSummary[] = useMemo(() => {
+    const cutoff = settings?.payout_cutoff_day ?? 20
+    const byTech = new Map<string, PayoutTechnicianSummary>()
+
+    for (const post of allPosts) {
+      let existing = byTech.get(post.technician_id)
+      if (!existing) {
+        existing = {
+          technician_id: post.technician_id,
+          technician_name: post.technician_name,
+          post_count: 0,
+          total_commission: 0,
+          payout_month: null,
+          statuses: { pending: 0, ready: 0, approved: 0, paid: 0 }
+        }
+        byTech.set(post.technician_id, existing)
+      }
+      existing.post_count++
+      existing.total_commission += post.commission_amount
+      if (post.status === 'pending_invoice') existing.statuses.pending++
+      else if (post.status === 'ready_for_payout') existing.statuses.ready++
+      else if (post.status === 'approved') existing.statuses.approved++
+      else if (post.status === 'paid_out') existing.statuses.paid++
+
+      // Beräkna utbetalningsmånad baserat på invoice_paid_date + brytdatum
+      if (post.invoice_paid_date) {
+        const paidDate = new Date(post.invoice_paid_date)
+        const day = paidDate.getDate()
+        let payoutYear = paidDate.getFullYear()
+        let payoutMonth = paidDate.getMonth() // 0-indexed
+        if (day > cutoff) {
+          payoutMonth++
+          if (payoutMonth > 11) { payoutMonth = 0; payoutYear++ }
+        }
+        const pm = `${payoutYear}-${String(payoutMonth + 1).padStart(2, '0')}`
+        if (!existing.payout_month || pm < existing.payout_month) {
+          existing.payout_month = pm
+        }
+      }
+    }
+
+    return Array.from(byTech.values()).sort((a, b) => a.technician_name.localeCompare(b.technician_name))
+  }, [allPosts, settings?.payout_cutoff_day])
 
   // Selection
   const toggleSelect = useCallback((id: string) => {
@@ -168,6 +214,7 @@ export function useProvisionDashboard() {
     kpis,
     summaries,
     allPosts,
+    payoutSummary,
     settings,
     loading,
     selectedIds,

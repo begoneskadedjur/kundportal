@@ -39,6 +39,7 @@ const TechnicianCommissions: React.FC = () => {
     searchQuery,
     kpis,
     allPosts,
+    payoutSummary,
     summaries,
     settings,
     loading,
@@ -156,6 +157,61 @@ const TechnicianCommissions: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {/* ═══ UTBETALNINGSÖVERSIKT ═══ */}
+      {payoutSummary.length > 0 && (
+        <div className="mb-4 p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              Utbetalningsöversikt · {selectedMonth.display}
+            </h3>
+            <span className="text-xs text-slate-500">
+              Brytdatum: den {settings?.payout_cutoff_day ?? 20}:e varje månad
+            </span>
+          </div>
+          <div className="divide-y divide-slate-700/50">
+            {payoutSummary.map(tech => (
+              <div key={tech.technician_id} className="flex items-center justify-between py-1.5">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-white font-medium">{tech.technician_name}</span>
+                  <span className="text-xs text-slate-500">{tech.post_count} poster</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-emerald-400">
+                    {formatCurrency(tech.total_commission)}
+                  </span>
+                  {tech.statuses.pending > 0 && (
+                    <span className="px-1.5 py-0.5 text-xs rounded-full bg-yellow-500/10 text-yellow-400">
+                      {tech.statuses.pending} väntar
+                    </span>
+                  )}
+                  {tech.statuses.ready > 0 && (
+                    <span className="px-1.5 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-400">
+                      {tech.statuses.ready} redo
+                    </span>
+                  )}
+                  {tech.statuses.approved > 0 && (
+                    <span className="px-1.5 py-0.5 text-xs rounded-full bg-blue-500/10 text-blue-400">
+                      {tech.statuses.approved} godkänd
+                    </span>
+                  )}
+                  {tech.statuses.paid > 0 && (
+                    <span className="px-1.5 py-0.5 text-xs rounded-full bg-slate-500/10 text-slate-400">
+                      {tech.statuses.paid} utbetald
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-700/50 text-xs text-slate-400">
+            <span>{payoutSummary.reduce((s, t) => s + t.post_count, 0)} poster totalt</span>
+            <span className="text-white font-medium">
+              Totalt: {formatCurrency(payoutSummary.reduce((s, t) => s + t.total_commission, 0))}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ═══ FILTERBAR ═══ */}
       <div className="flex flex-wrap items-center gap-2 mb-4">

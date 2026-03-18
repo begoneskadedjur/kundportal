@@ -23,7 +23,8 @@ export class ProvisionService {
 
     const settings: CommissionSettings = {
       engangsjobb_percentage: 6,
-      min_commission_base: 4000
+      min_commission_base: 4000,
+      payout_cutoff_day: 20
     }
 
     for (const row of data || []) {
@@ -31,6 +32,8 @@ export class ProvisionService {
         settings.engangsjobb_percentage = Number(row.setting_value)
       } else if (row.setting_key === 'min_commission_base') {
         settings.min_commission_base = Number(row.setting_value)
+      } else if (row.setting_key === 'payout_cutoff_day') {
+        settings.payout_cutoff_day = Number(row.setting_value)
       }
     }
 
