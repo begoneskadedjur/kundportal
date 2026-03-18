@@ -73,6 +73,25 @@ export interface PayoutTechnicianSummary {
   statuses: { pending: number; ready: number; approved: number; paid: number }
 }
 
+export interface TechnicianPayoutEntry {
+  technician_id: string
+  technician_name: string
+  posts: CommissionPost[]
+  total_commission: number
+  post_count: number
+  statuses: { pending: number; ready: number; approved: number; paid: number }
+}
+
+export interface MonthlyProvisionSummary {
+  month_key: string
+  month_label: string
+  technicians: TechnicianPayoutEntry[]
+  total_technicians: number
+  total_posts: number
+  total_commission: number
+  statuses: { pending: number; ready: number; approved: number; paid: number }
+}
+
 export interface ProvisionKpi {
   pending_invoice_total: number
   pending_invoice_count: number
