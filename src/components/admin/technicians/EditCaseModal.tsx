@@ -718,8 +718,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           personnummer: caseData.personnummer || '',
           // Tekniker-tilldelningar
           primary_assignee_id: caseData.primary_assignee_id || '',
+          primary_assignee_name: caseData.primary_assignee_name || '',
           secondary_assignee_id: caseData.secondary_assignee_id || '',
+          secondary_assignee_name: caseData.secondary_assignee_name || '',
           tertiary_assignee_id: caseData.tertiary_assignee_id || '',
+          tertiary_assignee_name: caseData.tertiary_assignee_name || '',
           material_cost: caseData.material_cost || 0,
           start_date: caseData.start_date,
           due_date: caseData.due_date,
