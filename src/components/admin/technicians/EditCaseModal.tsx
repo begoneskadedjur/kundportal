@@ -1498,7 +1498,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                       </div>
                       <select
                         value={techId}
-                        onChange={(e) => setFormData(prev => ({ ...prev, [slot.key]: e.target.value }))}
+                        onChange={(e) => {
+                          const selectedTech = technicianList.find(t => t.id === e.target.value)
+                          setFormData(prev => ({
+                            ...prev,
+                            [slot.key]: e.target.value,
+                            [slot.key.replace('_id', '_name')]: selectedTech?.name || ''
+                          }))
+                        }}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         title={slot.label}
                       >
@@ -1701,14 +1708,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   onEligibleChange={setCommissionEligible}
                   assignedTechnicians={
                     [
-                      currentCase.primary_assignee_id && currentCase.primary_assignee_name
-                        ? { id: currentCase.primary_assignee_id, name: currentCase.primary_assignee_name }
+                      formData.primary_assignee_id && formData.primary_assignee_name
+                        ? { id: formData.primary_assignee_id, name: formData.primary_assignee_name }
                         : null,
-                      currentCase.secondary_assignee_id && currentCase.secondary_assignee_name
-                        ? { id: currentCase.secondary_assignee_id, name: currentCase.secondary_assignee_name }
+                      formData.secondary_assignee_id && formData.secondary_assignee_name
+                        ? { id: formData.secondary_assignee_id, name: formData.secondary_assignee_name }
                         : null,
-                      currentCase.tertiary_assignee_id && currentCase.tertiary_assignee_name
-                        ? { id: currentCase.tertiary_assignee_id, name: currentCase.tertiary_assignee_name }
+                      formData.tertiary_assignee_id && formData.tertiary_assignee_name
+                        ? { id: formData.tertiary_assignee_id, name: formData.tertiary_assignee_name }
                         : null,
                     ].filter(Boolean) as { id: string; name: string }[]
                   }
