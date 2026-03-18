@@ -1102,7 +1102,7 @@ export default function EditContractCaseModal({
       if (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat') {
         if (commissionEligible && commissionShares.length > 0 && existingCommissionPosts === 0) {
           try {
-            const casePrice = Number(formData.price) || 0
+            const casePrice = billingSummary?.subtotal || Number(formData.price) || 0
             await ProvisionService.createPostsForCase(
               {
                 case_id: localCaseData.id,

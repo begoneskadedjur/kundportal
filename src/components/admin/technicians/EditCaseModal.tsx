@@ -939,7 +939,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
         if (commissionEligible && commissionShares.length > 0 && existingCommissionPosts === 0) {
           try {
-            const casePrice = Number(formData.case_price) || 0;
+            const casePrice = billingSummary?.subtotal || Number(formData.case_price) || 0;
             const isRotRut = !!(formData.r_rot_rut && formData.r_rot_rut !== 'Nej');
             // Vid ROT/RUT: provision på belopp innan avdrag (= case_price)
             await ProvisionService.createPostsForCase(
