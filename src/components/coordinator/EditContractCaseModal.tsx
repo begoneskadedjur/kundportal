@@ -44,6 +44,11 @@ import { CaseType } from '../../types/communication'
 // Återbesök-modal
 import RevisitContractModal from './RevisitContractModal'
 
+// Provision
+import CommissionSection from '../shared/CommissionSection'
+import { ProvisionService } from '../../services/provisionService'
+import type { TechnicianShare } from '../../types/provision'
+
 // Registrera svensk lokalisering för DatePicker
 registerLocale('sv', sv)
 
@@ -157,6 +162,13 @@ export default function EditContractCaseModal({
 
   // Radering state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+  // Provision state
+  const [commissionEligible, setCommissionEligible] = useState(false)
+  const [commissionShares, setCommissionShares] = useState<TechnicianShare[]>([])
+  const [commissionDeductions, setCommissionDeductions] = useState(0)
+  const [commissionNotes, setCommissionNotes] = useState('')
+  const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
 
   // Följeärende-states (follow-up cases)
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
@@ -324,12 +336,20 @@ export default function EditContractCaseModal({
         const elapsed = Math.floor((now - startTime) / 60000)
         setSessionMinutes(elapsed)
       }
+      // Initiera provision-state
+      setCommissionEligible(caseData.is_commission_eligible || false)
+      setCommissionShares([])
+      setCommissionDeductions(0)
+      setCommissionNotes('')
+      ProvisionService.getPostsByCase(caseData.id)
+        .then(posts => setExistingCommissionPosts(posts.length))
+        .catch(() => setExistingCommissionPosts(0))
     }
   }, [caseData, isOpen])
 
   useEffect(() => {
     fetchTechnicians()
-    
+
     // Generate BE number if not present
     if (isOpen && caseData && !caseData.case_number) {
       CaseNumberService.generateCaseNumber().then(number => {
@@ -961,6 +981,9 @@ export default function EditContractCaseModal({
       // Remove fields that don't exist in database
       delete cleanedFormData.reports
 
+      // Provision-flagga
+      ;(cleanedFormData as any).is_commission_eligible = commissionEligible
+
       // Försök hitta och koppla customer_id om den saknas
       let customerId = formData.customer_id
       if (!customerId && formData.contact_email) {
@@ -1069,9 +1092,41 @@ export default function EditContractCaseModal({
         }
       }
 
+      // ═══════════════════════════════════════════════════════════════════════════
+      // PROVISION: Skapa provisionsposter om ärendet avslutas och är provisionsgrundande
+      // ═══════════════════════════════════════════════════════════════════════════
+      let commissionCreated = false
+      if (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat') {
+        if (commissionEligible && commissionShares.length > 0 && existingCommissionPosts === 0) {
+          try {
+            const casePrice = Number(formData.price) || 0
+            await ProvisionService.createPostsForCase(
+              {
+                case_id: localCaseData.id,
+                case_type: 'contract',
+                case_title: formData.title || localCaseData.title,
+                case_number: formData.case_number || localCaseData.case_number,
+                base_amount: casePrice,
+              },
+              commissionShares,
+              commissionDeductions,
+              commissionNotes || undefined
+            )
+            commissionCreated = true
+          } catch (commErr: any) {
+            console.warn('[EditContractCaseModal] Provision kunde inte skapas:', commErr)
+            toast.error(`Provision: ${commErr.message}`)
+          }
+        }
+      }
+
       // Visa lämpligt meddelande baserat på resultat
-      if (billingItemsCreated > 0) {
+      if (billingItemsCreated > 0 && commissionCreated) {
+        toast.success(`Ärende avslutat! ${billingItemsCreated} artikel(er) till fakturering + provision skapad.`)
+      } else if (billingItemsCreated > 0) {
         toast.success(`Ärende avslutat! ${billingItemsCreated} artikel(er) skickade till fakturering.`)
+      } else if (commissionCreated) {
+        toast.success('Ärende avslutat och provision skapad!')
       } else {
         toast.success('Ärende uppdaterat!')
       }
@@ -1710,6 +1765,37 @@ export default function EditContractCaseModal({
                     customerId={caseData.customer_id || undefined}
                     technicianId={formData.primary_technician_id || undefined}
                     technicianName={formData.primary_technician_name || undefined}
+                  />
+                </div>
+              )}
+
+              {/* Provision sektion */}
+              {caseData?.id && !isCustomerView && (
+                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
+                  <CommissionSection
+                    isEligible={commissionEligible}
+                    onEligibleChange={setCommissionEligible}
+                    assignedTechnicians={
+                      [
+                        formData.primary_technician_id && formData.primary_technician_name
+                          ? { id: formData.primary_technician_id, name: formData.primary_technician_name }
+                          : null,
+                        formData.secondary_technician_id && formData.secondary_technician_name
+                          ? { id: formData.secondary_technician_id, name: formData.secondary_technician_name }
+                          : null,
+                        formData.tertiary_technician_id && formData.tertiary_technician_name
+                          ? { id: formData.tertiary_technician_id, name: formData.tertiary_technician_name }
+                          : null,
+                      ].filter(Boolean) as { id: string; name: string }[]
+                    }
+                    technicianShares={commissionShares}
+                    onSharesChange={setCommissionShares}
+                    deductions={commissionDeductions}
+                    onDeductionsChange={setCommissionDeductions}
+                    notes={commissionNotes}
+                    onNotesChange={setCommissionNotes}
+                    baseAmount={Number(formData.price) || 0}
+                    existingPostCount={existingCommissionPosts}
                   />
                 </div>
               )}

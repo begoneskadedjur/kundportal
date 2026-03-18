@@ -55,6 +55,11 @@ import type { DeleteableCaseType } from '../../../services/caseDeleteService'
 // Återbesök modal
 import RevisitModal from './RevisitModal'
 
+// Provision
+import CommissionSection from '../../shared/CommissionSection'
+import { ProvisionService } from '../../../services/provisionService'
+import type { TechnicianShare } from '../../../types/provision'
+
 
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
@@ -100,6 +105,8 @@ interface TechnicianCase {
   parent_case_id?: string | null;
   created_by_technician_id?: string | null;
   created_by_technician_name?: string | null;
+  // Provision
+  is_commission_eligible?: boolean;
 }
 
 interface EditCaseModalProps {
@@ -384,6 +391,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
   // Radering state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+  // Provision state
+  const [commissionEligible, setCommissionEligible] = useState(false)
+  const [commissionShares, setCommissionShares] = useState<TechnicianShare[]>([])
+  const [commissionDeductions, setCommissionDeductions] = useState(0)
+  const [commissionNotes, setCommissionNotes] = useState('')
+  const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
 
   // Öppna kommunikationspanelen automatiskt om openCommunicationOnLoad är true
   useEffect(() => {
@@ -725,6 +739,16 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         setError(null);
         setTimeTrackingLoading(false);
         setLoading(false);
+
+        // Initiera provision-state
+        setCommissionEligible(caseData.is_commission_eligible || false);
+        setCommissionShares([]);
+        setCommissionDeductions(0);
+        setCommissionNotes('');
+        // Kolla om provisionsposter redan finns
+        ProvisionService.getPostsByCase(caseData.id)
+          .then(posts => setExistingCommissionPosts(posts.length))
+          .catch(() => setExistingCommissionPosts(0));
       }
     }
   }, [caseData]);
@@ -773,6 +797,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         description: formData.description,
       };
       
+      // Provision-flagga (alla tabeller)
+      updateData.is_commission_eligible = commissionEligible;
+
       if (tableName === 'private_cases' || tableName === 'business_cases') {
         // ClickUp-synkade fält - ALLA användare (inklusive tekniker) får uppdatera dessa
         updateData.kontaktperson = formData.kontaktperson;
@@ -891,11 +918,47 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         }
       }
 
+      // ═══════════════════════════════════════════════════════════════════════════
+      // PROVISION: Skapa provisionsposter om ärendet avslutas och är provisionsgrundande
+      // ═══════════════════════════════════════════════════════════════════════════
+      let commissionCreated = false;
+      if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
+        if (commissionEligible && commissionShares.length > 0 && existingCommissionPosts === 0) {
+          try {
+            const casePrice = Number(formData.case_price) || 0;
+            const isRotRut = !!(formData.r_rot_rut && formData.r_rot_rut !== 'Nej');
+            // Vid ROT/RUT: provision på belopp innan avdrag (= case_price)
+            await ProvisionService.createPostsForCase(
+              {
+                case_id: currentCase.id,
+                case_type: currentCase.case_type as 'private' | 'business' | 'contract',
+                case_title: formData.title || currentCase.title,
+                case_number: currentCase.case_number,
+                base_amount: casePrice,
+                is_rot_rut: isRotRut,
+                rot_rut_original_amount: isRotRut ? casePrice : undefined,
+              },
+              commissionShares,
+              commissionDeductions,
+              commissionNotes || undefined
+            );
+            commissionCreated = true;
+          } catch (commErr: any) {
+            console.warn('[EditCaseModal] Provision kunde inte skapas:', commErr);
+            toast.error(`Provision: ${commErr.message}`);
+          }
+        }
+      }
+
       setSubmitted(true);
 
-      // Visa lämpligt meddelande baserat på om faktura genererades
-      if (invoiceGenerated) {
+      // Visa lämpligt meddelande
+      if (invoiceGenerated && commissionCreated) {
+        toast.success('Ärendet avslutat, faktura genererad och provision skapad!');
+      } else if (invoiceGenerated) {
         toast.success('Ärendet avslutat och faktura genererad!');
+      } else if (commissionCreated) {
+        toast.success('Ärendet avslutat och provision skapad!');
       } else {
         toast.success('Ärendet har uppdaterats!');
       }
@@ -1622,6 +1685,39 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   customerId={currentCase.customer_id}
                   technicianId={currentCase.primary_assignee_id || undefined}
                   technicianName={currentCase.primary_assignee_name || undefined}
+                />
+              </div>
+            )}
+
+            {/* Provision sektion */}
+            {currentCase && (
+              <div className="pt-3 border-t border-slate-700/50">
+                <CommissionSection
+                  isEligible={commissionEligible}
+                  onEligibleChange={setCommissionEligible}
+                  assignedTechnicians={
+                    [
+                      currentCase.primary_assignee_id && currentCase.primary_assignee_name
+                        ? { id: currentCase.primary_assignee_id, name: currentCase.primary_assignee_name }
+                        : null,
+                      currentCase.secondary_assignee_id && currentCase.secondary_assignee_name
+                        ? { id: currentCase.secondary_assignee_id, name: currentCase.secondary_assignee_name }
+                        : null,
+                      currentCase.tertiary_assignee_id && currentCase.tertiary_assignee_name
+                        ? { id: currentCase.tertiary_assignee_id, name: currentCase.tertiary_assignee_name }
+                        : null,
+                    ].filter(Boolean) as { id: string; name: string }[]
+                  }
+                  technicianShares={commissionShares}
+                  onSharesChange={setCommissionShares}
+                  deductions={commissionDeductions}
+                  onDeductionsChange={setCommissionDeductions}
+                  notes={commissionNotes}
+                  onNotesChange={setCommissionNotes}
+                  baseAmount={Number(formData.case_price) || 0}
+                  isRotRut={!!(formData.r_rot_rut && formData.r_rot_rut !== 'Nej')}
+                  rotRutOriginalAmount={formData.r_rot_rut && formData.r_rot_rut !== 'Nej' ? Number(formData.case_price) || 0 : undefined}
+                  existingPostCount={existingCommissionPosts}
                 />
               </div>
             )}

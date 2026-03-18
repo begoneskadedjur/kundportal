@@ -194,6 +194,8 @@ export type Database = {
           billing_status: 'pending' | 'sent' | 'paid' | 'skip' | null
           billing_updated_at: string | null
           billing_updated_by_id: string | null
+          // Provision
+          is_commission_eligible: boolean
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>
@@ -254,6 +256,7 @@ export type Database = {
           commission_amount: number | null
           commission_calculated_at: string | null
           billing_status: 'pending' | 'sent' | 'paid' | 'skip' | null
+          is_commission_eligible: boolean
 
           // ✅ FÖLJEÄRENDE-FÄLT (för att länka relaterade ärenden)
           parent_case_id: string | null  // Referens till ursprungsärendet
@@ -318,6 +321,7 @@ export type Database = {
           commission_amount: number | null
           commission_calculated_at: string | null
           billing_status: 'pending' | 'sent' | 'paid' | 'skip' | null
+          is_commission_eligible: boolean
 
           // ✅ FÖLJEÄRENDE-FÄLT (för att länka relaterade ärenden)
           parent_case_id: string | null  // Referens till ursprungsärendet
