@@ -188,8 +188,31 @@ export default function CommissionSection({
                       max={100}
                       value={tech.share_percentage}
                       onChange={(e) => {
+                        const newValue = Math.min(100, Math.max(0, Number(e.target.value)))
                         const newShares = [...technicianShares]
-                        newShares[idx] = { ...tech, share_percentage: Number(e.target.value) }
+                        newShares[idx] = { ...tech, share_percentage: newValue }
+
+                        // Fördela resterande bland andra tekniker
+                        const remaining = 100 - newValue
+                        const otherIndices = newShares.map((_, i) => i).filter(i => i !== idx)
+
+                        if (otherIndices.length === 1) {
+                          newShares[otherIndices[0]] = { ...newShares[otherIndices[0]], share_percentage: remaining }
+                        } else if (otherIndices.length > 1) {
+                          const othersTotal = otherIndices.reduce((s, i) => s + technicianShares[i].share_percentage, 0)
+                          let distributed = 0
+                          otherIndices.forEach((oi, j) => {
+                            if (j === otherIndices.length - 1) {
+                              newShares[oi] = { ...newShares[oi], share_percentage: remaining - distributed }
+                            } else {
+                              const proportion = othersTotal > 0 ? technicianShares[oi].share_percentage / othersTotal : 1 / otherIndices.length
+                              const share = Math.round(remaining * proportion)
+                              newShares[oi] = { ...newShares[oi], share_percentage: share }
+                              distributed += share
+                            }
+                          })
+                        }
+
                         onSharesChange(newShares)
                       }}
                       className="w-16 px-2 py-1 text-sm text-right bg-slate-800 border border-slate-600 rounded text-slate-200 focus:ring-[#20c58f] focus:border-[#20c58f]"
