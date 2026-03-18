@@ -806,6 +806,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       // Provision-flagga (alla tabeller)
       updateData.is_commission_eligible = commissionEligible;
 
+      // Tekniker-tilldelningar (alla tabeller)
+      updateData.primary_assignee_id = formData.primary_assignee_id || null;
+      updateData.primary_assignee_name = formData.primary_assignee_name || null;
+      updateData.secondary_assignee_id = formData.secondary_assignee_id || null;
+      updateData.secondary_assignee_name = formData.secondary_assignee_name || null;
+      updateData.tertiary_assignee_id = formData.tertiary_assignee_id || null;
+      updateData.tertiary_assignee_name = formData.tertiary_assignee_name || null;
+
       if (tableName === 'private_cases' || tableName === 'business_cases') {
         // ClickUp-synkade fält - ALLA användare (inklusive tekniker) får uppdatera dessa
         updateData.kontaktperson = formData.kontaktperson;
