@@ -167,6 +167,7 @@ export default function EditContractCaseModal({
   // Provision state
   const [commissionEligible, setCommissionEligible] = useState(false)
   const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)
+  const handleBillingSummaryChange = useCallback((_items: any, summary: CaseBillingSummary) => setBillingSummary(summary), [])
   const [commissionShares, setCommissionShares] = useState<TechnicianShare[]>([])
   const [commissionDeductions, setCommissionDeductions] = useState(0)
   const [commissionNotes, setCommissionNotes] = useState('')
@@ -1767,7 +1768,7 @@ export default function EditContractCaseModal({
                     customerId={caseData.customer_id || undefined}
                     technicianId={formData.primary_technician_id || undefined}
                     technicianName={formData.primary_technician_name || undefined}
-                    onChange={(_items, summary) => setBillingSummary(summary)}
+                    onChange={handleBillingSummaryChange}
                   />
                 </div>
               )}

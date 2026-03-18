@@ -116,13 +116,17 @@ export default function CaseArticleSelector({
   const fastighetsTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const customPriceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Stabil ref för onChange så att den inte triggar re-fetches
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+
   // Helper: uppdatera draft items + summary + anropa onChange
   const updateDraftState = useCallback((newItems: CaseBillingItemWithRelations[]) => {
     setSelectedItems(newItems)
     const newSummary = computeLocalSummary(newItems, null)
     setSummary(newSummary)
-    if (onChange) onChange(newItems, newSummary)
-  }, [onChange])
+    onChangeRef.current?.(newItems, newSummary)
+  }, [])
 
   const loadData = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true)
@@ -147,7 +151,7 @@ export default function CaseArticleSelector({
           setCustomPriceEnabled(true)
           setCustomPriceInput(String(Math.round(summaryData.custom_total_price * 1.25)))
         }
-        if (onChange) onChange(itemsData, summaryData)
+        onChangeRef.current?.(itemsData, summaryData)
 
         // Kolla om det finns en icke-skickad faktura
         try {
@@ -161,7 +165,7 @@ export default function CaseArticleSelector({
     } finally {
       setLoading(false)
     }
-  }, [caseId, caseType, customerId, onChange, draftMode])
+  }, [caseId, caseType, customerId, draftMode])
 
   useEffect(() => {
     loadData(true)
@@ -451,7 +455,7 @@ export default function CaseArticleSelector({
         setCustomPriceInput('')
         const newSummary = computeLocalSummary(selectedItems, null)
         setSummary(newSummary)
-        if (onChange) onChange(selectedItems, newSummary)
+        onChangeRef.current?.(selectedItems, newSummary)
         return
       }
       setSaving(true)
@@ -482,7 +486,7 @@ export default function CaseArticleSelector({
       if (draftMode) {
         const newSummary = computeLocalSummary(selectedItems, price)
         setSummary(newSummary)
-        if (onChange) onChange(selectedItems, newSummary)
+        onChangeRef.current?.(selectedItems, newSummary)
         return
       }
 

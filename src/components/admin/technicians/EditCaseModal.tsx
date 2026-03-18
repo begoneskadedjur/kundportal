@@ -396,6 +396,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // Provision state
   const [commissionEligible, setCommissionEligible] = useState(false)
   const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)
+  const handleBillingSummaryChange = useCallback((_items: any, summary: CaseBillingSummary) => setBillingSummary(summary), [])
   const [commissionShares, setCommissionShares] = useState<TechnicianShare[]>([])
   const [commissionDeductions, setCommissionDeductions] = useState(0)
   const [commissionNotes, setCommissionNotes] = useState('')
@@ -1687,7 +1688,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   customerId={currentCase.customer_id}
                   technicianId={currentCase.primary_assignee_id || undefined}
                   technicianName={currentCase.primary_assignee_name || undefined}
-                  onChange={(_items, summary) => setBillingSummary(summary)}
+                  onChange={handleBillingSummaryChange}
                 />
               </div>
             )}
