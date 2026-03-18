@@ -57,6 +57,7 @@ import RevisitModal from './RevisitModal'
 
 // Provision
 import CommissionSection from '../../shared/CommissionSection'
+import type { CaseBillingSummary } from '../../../types/caseBilling'
 import { ProvisionService } from '../../../services/provisionService'
 import type { TechnicianShare } from '../../../types/provision'
 
@@ -394,6 +395,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
   // Provision state
   const [commissionEligible, setCommissionEligible] = useState(false)
+  const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)
   const [commissionShares, setCommissionShares] = useState<TechnicianShare[]>([])
   const [commissionDeductions, setCommissionDeductions] = useState(0)
   const [commissionNotes, setCommissionNotes] = useState('')
@@ -1685,6 +1687,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   customerId={currentCase.customer_id}
                   technicianId={currentCase.primary_assignee_id || undefined}
                   technicianName={currentCase.primary_assignee_name || undefined}
+                  onChange={(_items, summary) => setBillingSummary(summary)}
                 />
               </div>
             )}
@@ -1714,9 +1717,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   onDeductionsChange={setCommissionDeductions}
                   notes={commissionNotes}
                   onNotesChange={setCommissionNotes}
-                  baseAmount={Number(formData.case_price) || 0}
+                  baseAmount={billingSummary?.subtotal || Number(formData.case_price) || 0}
                   isRotRut={!!(formData.r_rot_rut && formData.r_rot_rut !== 'Nej')}
-                  rotRutOriginalAmount={formData.r_rot_rut && formData.r_rot_rut !== 'Nej' ? Number(formData.case_price) || 0 : undefined}
+                  rotRutOriginalAmount={formData.r_rot_rut && formData.r_rot_rut !== 'Nej' ? (billingSummary?.subtotal || Number(formData.case_price) || 0) : undefined}
                   existingPostCount={existingCommissionPosts}
                 />
               </div>

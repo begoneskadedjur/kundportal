@@ -48,6 +48,7 @@ import RevisitContractModal from './RevisitContractModal'
 import CommissionSection from '../shared/CommissionSection'
 import { ProvisionService } from '../../services/provisionService'
 import type { TechnicianShare } from '../../types/provision'
+import type { CaseBillingSummary } from '../../types/caseBilling'
 
 // Registrera svensk lokalisering för DatePicker
 registerLocale('sv', sv)
@@ -165,6 +166,7 @@ export default function EditContractCaseModal({
 
   // Provision state
   const [commissionEligible, setCommissionEligible] = useState(false)
+  const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)
   const [commissionShares, setCommissionShares] = useState<TechnicianShare[]>([])
   const [commissionDeductions, setCommissionDeductions] = useState(0)
   const [commissionNotes, setCommissionNotes] = useState('')
@@ -1765,6 +1767,7 @@ export default function EditContractCaseModal({
                     customerId={caseData.customer_id || undefined}
                     technicianId={formData.primary_technician_id || undefined}
                     technicianName={formData.primary_technician_name || undefined}
+                    onChange={(_items, summary) => setBillingSummary(summary)}
                   />
                 </div>
               )}
@@ -1794,7 +1797,7 @@ export default function EditContractCaseModal({
                     onDeductionsChange={setCommissionDeductions}
                     notes={commissionNotes}
                     onNotesChange={setCommissionNotes}
-                    baseAmount={Number(formData.price) || 0}
+                    baseAmount={billingSummary?.subtotal || Number(formData.price) || 0}
                     existingPostCount={existingCommissionPosts}
                   />
                 </div>
