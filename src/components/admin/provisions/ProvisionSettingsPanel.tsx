@@ -7,15 +7,16 @@ import toast from 'react-hot-toast'
 interface ProvisionSettingsPanelProps {
   settings: CommissionSettings
   onSettingsUpdated: () => void
+  onClose: () => void
   userEmail: string
 }
 
 export default function ProvisionSettingsPanel({
   settings,
   onSettingsUpdated,
+  onClose,
   userEmail
 }: ProvisionSettingsPanelProps) {
-  const [isOpen, setIsOpen] = useState(false)
   const [percentage, setPercentage] = useState(settings.engangsjobb_percentage)
   const [minBase, setMinBase] = useState(settings.min_commission_base)
   const [saving, setSaving] = useState(false)
@@ -31,24 +32,12 @@ export default function ProvisionSettingsPanel({
       }
       toast.success('Inställningar sparade')
       onSettingsUpdated()
-      setIsOpen(false)
+      onClose()
     } catch (err: any) {
       toast.error(`Kunde inte spara: ${err.message}`)
     } finally {
       setSaving(false)
     }
-  }
-
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 rounded-lg transition-colors"
-      >
-        <Settings className="w-4 h-4" />
-        Inställningar
-      </button>
-    )
   }
 
   return (
@@ -58,7 +47,7 @@ export default function ProvisionSettingsPanel({
           <Settings className="w-4 h-4 text-slate-400" />
           Provisionsinställningar
         </h3>
-        <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-200">
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
           <X className="w-4 h-4" />
         </button>
       </div>

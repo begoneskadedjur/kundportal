@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ProvisionService } from '../services/provisionService'
 import type {
+  CommissionPost,
   CommissionSettings,
   CommissionStatus,
   ProvisionKpi,
@@ -13,6 +14,7 @@ import { getCurrentMonth, getMonthOptions } from '../types/provision'
 export function useProvisionDashboard() {
   const [selectedMonth, setSelectedMonth] = useState<MonthSelection>(getCurrentMonth())
   const [filters, setFilters] = useState<ProvisionFilters>({})
+  const [searchQuery, setSearchQuery] = useState('')
   const [kpis, setKpis] = useState<ProvisionKpi>({
     pending_invoice_total: 0, pending_invoice_count: 0,
     ready_for_payout_total: 0, ready_for_payout_count: 0,
@@ -71,6 +73,18 @@ export function useProvisionDashboard() {
 
   const canNavigatePrev = monthOptions.findIndex(m => m.value === selectedMonth.value) < monthOptions.length - 1
   const canNavigateNext = monthOptions.findIndex(m => m.value === selectedMonth.value) > 0
+
+  // Flat list of all posts with search filtering
+  const allPosts: CommissionPost[] = useMemo(() => {
+    const posts = summaries.flatMap(s => s.posts)
+    if (!searchQuery.trim()) return posts
+    const q = searchQuery.toLowerCase()
+    return posts.filter(p =>
+      (p.case_number?.toLowerCase().includes(q)) ||
+      (p.case_title?.toLowerCase().includes(q)) ||
+      p.technician_name.toLowerCase().includes(q)
+    )
+  }, [summaries, searchQuery])
 
   // Selection
   const toggleSelect = useCallback((id: string) => {
@@ -150,8 +164,10 @@ export function useProvisionDashboard() {
     // State
     selectedMonth,
     filters,
+    searchQuery,
     kpis,
     summaries,
+    allPosts,
     settings,
     loading,
     selectedIds,
@@ -164,6 +180,7 @@ export function useProvisionDashboard() {
     navigateMonth,
     goToMonth,
     setFilters,
+    setSearchQuery,
     toggleSelect,
     toggleAll,
     clearSelection,
