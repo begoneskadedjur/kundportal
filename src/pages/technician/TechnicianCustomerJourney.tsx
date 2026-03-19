@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   GitBranch, FileText, CheckCircle, XCircle, Zap, AlertTriangle,
   Receipt, BadgeCheck, XOctagon, ClipboardList, RefreshCw,
+  ScrollText, ShieldCheck, ShieldX,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { supabase } from '../../lib/supabase'
@@ -143,15 +144,20 @@ export default function TechnicianCustomerJourney() {
 
     const hasOffer = (c: JourneyCaseRow) => {
       const contract = contractMap.get(c.id)
-      return !!(contract || c.status === 'Offert skickad' || c.status === 'Offert signerad - boka in')
+      return !!((contract && contract.type === 'offer') || c.status === 'Offert skickad' || c.status === 'Offert signerad - boka in')
+    }
+    const hasContract = (c: JourneyCaseRow) => {
+      const contract = contractMap.get(c.id)
+      return !!(contract && contract.type === 'contract')
     }
     const isCompleted = (c: JourneyCaseRow) => c.status === 'Avslutat'
     const isClosed = (c: JourneyCaseRow) => c.status === 'Stängt - slasklogg'
 
     const created = filteredCases
-    const directJobs = filteredCases.filter(c => isCompleted(c) && !hasOffer(c))
-    const offerSent = filteredCases.filter(c => hasOffer(c))
-    const noResult = filteredCases.filter(c => !isCompleted(c) && !isClosed(c) && !hasOffer(c))
+    const directJobs = filteredCases.filter(c => isCompleted(c) && !hasOffer(c) && !hasContract(c))
+    const offerSent = filteredCases.filter(c => hasOffer(c) && !hasContract(c))
+    const contractSent = filteredCases.filter(c => hasContract(c))
+    const noResult = filteredCases.filter(c => !isCompleted(c) && !isClosed(c) && !hasOffer(c) && !hasContract(c))
     const closed = filteredCases.filter(c => isClosed(c))
 
     const accepted = offerSent.filter(c => {
@@ -159,6 +165,15 @@ export default function TechnicianCustomerJourney() {
       return (contract && contract.status === 'signed') || c.status === 'Offert signerad - boka in'
     })
     const declined = offerSent.filter(c => {
+      const contract = contractMap.get(c.id)
+      return contract && (contract.status === 'declined' || contract.status === 'overdue')
+    })
+
+    const contractSigned = contractSent.filter(c => {
+      const contract = contractMap.get(c.id)
+      return contract && (contract.status === 'signed' || contract.status === 'active')
+    })
+    const contractDeclined = contractSent.filter(c => {
       const contract = contractMap.get(c.id)
       return contract && (contract.status === 'declined' || contract.status === 'overdue')
     })
@@ -180,9 +195,12 @@ export default function TechnicianCustomerJourney() {
       { id: 'created', label: 'Skapade ärenden', count: created.length, totalValue: sumValue(created), cases: enrich(created), percentage: 100, icon: ClipboardList, color: 'slate', bgColor: 'bg-slate-500/20', textColor: 'text-slate-400' },
       { id: 'direct', label: 'Direktjobb', count: directJobs.length, totalValue: sumValue(directJobs), cases: enrich(directJobs), percentage: pct(directJobs), icon: Zap, color: 'emerald', bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400' },
       { id: 'offer_sent', label: 'Offert skickad', count: offerSent.length, totalValue: sumValue(offerSent), cases: enrich(offerSent), percentage: pct(offerSent), icon: FileText, color: 'teal', bgColor: 'bg-teal-500/20', textColor: 'text-teal-400' },
+      { id: 'contract_sent', label: 'Avtal skickat', count: contractSent.length, totalValue: sumValue(contractSent), cases: enrich(contractSent), percentage: pct(contractSent), icon: ScrollText, color: 'purple', bgColor: 'bg-purple-500/20', textColor: 'text-purple-400' },
       { id: 'no_result', label: 'Utan avslut', count: noResult.length, totalValue: sumValue(noResult), cases: enrich(noResult), percentage: pct(noResult), icon: AlertTriangle, color: 'orange', bgColor: 'bg-orange-500/20', textColor: 'text-orange-400' },
       { id: 'accepted', label: 'Accepterad', count: accepted.length, totalValue: sumValue(accepted), cases: enrich(accepted), percentage: pct(accepted), icon: CheckCircle, color: 'green', bgColor: 'bg-[#20c58f]/20', textColor: 'text-[#20c58f]' },
       { id: 'declined', label: 'Nekad / Utgången', count: declined.length, totalValue: sumValue(declined), cases: enrich(declined), percentage: pct(declined), icon: XCircle, color: 'red', bgColor: 'bg-red-500/20', textColor: 'text-red-400' },
+      { id: 'contract_signed', label: 'Avtal signerat', count: contractSigned.length, totalValue: sumValue(contractSigned), cases: enrich(contractSigned), percentage: pct(contractSigned), icon: ShieldCheck, color: 'green', bgColor: 'bg-[#20c58f]/20', textColor: 'text-[#20c58f]' },
+      { id: 'contract_declined', label: 'Avtal nekat', count: contractDeclined.length, totalValue: sumValue(contractDeclined), cases: enrich(contractDeclined), percentage: pct(contractDeclined), icon: ShieldX, color: 'red', bgColor: 'bg-red-500/20', textColor: 'text-red-400' },
       { id: 'invoiced', label: 'Fakturerat', count: invoiced.length, totalValue: sumValue(invoiced), cases: enrich(invoiced), percentage: pct(invoiced), icon: Receipt, color: 'blue', bgColor: 'bg-blue-500/20', textColor: 'text-blue-400' },
       { id: 'paid', label: 'Betalt', count: paid.length, totalValue: sumValue(paid), cases: enrich(paid), percentage: pct(paid), icon: BadgeCheck, color: 'emerald', bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400' },
       { id: 'closed', label: 'Stängda', count: closed.length, totalValue: sumValue(closed), cases: enrich(closed), percentage: pct(closed), icon: XOctagon, color: 'red', bgColor: 'bg-red-500/20', textColor: 'text-red-400' },
@@ -196,11 +214,14 @@ export default function TechnicianCustomerJourney() {
     const directCount = stages.find(s => s.id === 'direct')?.count || 0
     const offerCount = stages.find(s => s.id === 'offer_sent')?.count || 0
     const acceptedCount = stages.find(s => s.id === 'accepted')?.count || 0
+    const contractCount = stages.find(s => s.id === 'contract_sent')?.count || 0
+    const contractSignedCount = stages.find(s => s.id === 'contract_signed')?.count || 0
     const noResultCount = stages.find(s => s.id === 'no_result')?.count || 0
     const directRate = total > 0 ? Math.round((directCount / total) * 100) : 0
     const offerAcceptRate = offerCount > 0 ? Math.round((acceptedCount / offerCount) * 100) : 0
+    const contractAcceptRate = contractCount > 0 ? Math.round((contractSignedCount / contractCount) * 100) : 0
 
-    return { total, directRate, offerAcceptRate, noResultCount }
+    return { total, directRate, offerAcceptRate, contractAcceptRate, noResultCount }
   }, [stages])
 
   const selectedStage = stages.find(s => s.id === selectedStageId) || null
@@ -280,11 +301,12 @@ export default function TechnicianCustomerJourney() {
       ) : (
         <>
           {/* KPI row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {[
               { label: 'Totalt skapade', value: kpis.total.toString(), color: 'text-white' },
               { label: 'Direktkonvertering', value: `${kpis.directRate}%`, color: 'text-[#20c58f]' },
               { label: 'Offertacceptans', value: `${kpis.offerAcceptRate}%`, color: 'text-teal-400' },
+              { label: 'Avtalskonvertering', value: `${kpis.contractAcceptRate}%`, color: 'text-purple-400' },
               { label: 'Utan avslut', value: kpis.noResultCount.toString(), color: 'text-orange-400' },
             ].map(kpi => (
               <div key={kpi.label} className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">

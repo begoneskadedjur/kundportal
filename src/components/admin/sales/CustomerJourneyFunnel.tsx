@@ -94,6 +94,7 @@ function StageNode({
             stage.color === 'blue' ? 'bg-blue-500' :
             stage.color === 'emerald' ? 'bg-emerald-500' :
             stage.color === 'orange' ? 'bg-orange-500' :
+            stage.color === 'purple' ? 'bg-purple-500' :
             'bg-slate-500'
           }`}
         />
@@ -104,15 +105,16 @@ function StageNode({
 
 // ─── Branch connectors ───────────────────────────────────
 
-function TripleBranchConnector() {
+function QuadBranchConnector() {
   return (
     <div className="py-1.5">
       <svg width="100%" height="28" className="text-slate-600">
         <line x1="50%" y1="0" x2="50%" y2="10" stroke="currentColor" strokeWidth="1" />
-        <line x1="16.67%" y1="10" x2="83.33%" y2="10" stroke="currentColor" strokeWidth="1" />
-        <line x1="16.67%" y1="10" x2="16.67%" y2="28" stroke="currentColor" strokeWidth="1" />
-        <line x1="50%" y1="10" x2="50%" y2="28" stroke="currentColor" strokeWidth="1" />
-        <line x1="83.33%" y1="10" x2="83.33%" y2="28" stroke="currentColor" strokeWidth="1" />
+        <line x1="12.5%" y1="10" x2="87.5%" y2="10" stroke="currentColor" strokeWidth="1" />
+        <line x1="12.5%" y1="10" x2="12.5%" y2="28" stroke="currentColor" strokeWidth="1" />
+        <line x1="37.5%" y1="10" x2="37.5%" y2="28" stroke="currentColor" strokeWidth="1" />
+        <line x1="62.5%" y1="10" x2="62.5%" y2="28" stroke="currentColor" strokeWidth="1" />
+        <line x1="87.5%" y1="10" x2="87.5%" y2="28" stroke="currentColor" strokeWidth="1" />
       </svg>
     </div>
   )
@@ -140,9 +142,12 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
   const created = get('created')
   const direct = get('direct')
   const offerSent = get('offer_sent')
+  const contractSent = get('contract_sent')
   const noResult = get('no_result')
   const accepted = get('accepted')
   const declined = get('declined')
+  const contractSigned = get('contract_signed')
+  const contractDeclined = get('contract_declined')
   const invoiced = get('invoiced')
   const paid = get('paid')
   const closed = get('closed')
@@ -163,11 +168,11 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
           />
         )}
 
-        {/* Triple branch connector */}
-        <TripleBranchConnector />
+        {/* Quad branch connector */}
+        <QuadBranchConnector />
 
-        {/* Row 2: direct | offer_sent | no_result */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+        {/* Row 2: direct | offer_sent | contract_sent | no_result */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           {direct && (
             <StageNode
               stage={direct}
@@ -186,6 +191,15 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
               size="medium"
             />
           )}
+          {contractSent && (
+            <StageNode
+              stage={contractSent}
+              isSelected={selectedStageId === 'contract_sent'}
+              onClick={() => onSelectStage('contract_sent')}
+              delay={d++ * 0.08}
+              size="medium"
+            />
+          )}
           {noResult && (
             <StageNode
               stage={noResult}
@@ -197,34 +211,72 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
           )}
         </div>
 
-        {/* Sub-branch under offer_sent: accepted / declined */}
-        {offerSent && offerSent.count > 0 && (accepted || declined) && (
-          <div className="flex justify-center">
-            <div className="w-full sm:w-1/2 lg:w-2/5">
-              <DoubleBranchConnector />
-              <div className="grid grid-cols-2 gap-2">
-                {accepted && (
-                  <StageNode
-                    stage={accepted}
-                    isSelected={selectedStageId === 'accepted'}
-                    onClick={() => onSelectStage('accepted')}
-                    delay={d++ * 0.08}
-                    size="small"
-                  />
-                )}
-                {declined && (
-                  <StageNode
-                    stage={declined}
-                    isSelected={selectedStageId === 'declined'}
-                    onClick={() => onSelectStage('declined')}
-                    delay={d++ * 0.08}
-                    size="small"
-                  />
-                )}
-              </div>
-            </div>
+        {/* Sub-branches: offer accepted/declined + contract signed/declined */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          {/* Empty column under direct */}
+          <div className="hidden sm:block" />
+
+          {/* Offer sub-branch */}
+          <div>
+            {offerSent && offerSent.count > 0 && (accepted || declined) && (
+              <>
+                <DoubleBranchConnector />
+                <div className="grid grid-cols-2 gap-1.5">
+                  {accepted && (
+                    <StageNode
+                      stage={accepted}
+                      isSelected={selectedStageId === 'accepted'}
+                      onClick={() => onSelectStage('accepted')}
+                      delay={d++ * 0.08}
+                      size="small"
+                    />
+                  )}
+                  {declined && (
+                    <StageNode
+                      stage={declined}
+                      isSelected={selectedStageId === 'declined'}
+                      onClick={() => onSelectStage('declined')}
+                      delay={d++ * 0.08}
+                      size="small"
+                    />
+                  )}
+                </div>
+              </>
+            )}
           </div>
-        )}
+
+          {/* Contract sub-branch */}
+          <div>
+            {contractSent && contractSent.count > 0 && (contractSigned || contractDeclined) && (
+              <>
+                <DoubleBranchConnector />
+                <div className="grid grid-cols-2 gap-1.5">
+                  {contractSigned && (
+                    <StageNode
+                      stage={contractSigned}
+                      isSelected={selectedStageId === 'contract_signed'}
+                      onClick={() => onSelectStage('contract_signed')}
+                      delay={d++ * 0.08}
+                      size="small"
+                    />
+                  )}
+                  {contractDeclined && (
+                    <StageNode
+                      stage={contractDeclined}
+                      isSelected={selectedStageId === 'contract_declined'}
+                      onClick={() => onSelectStage('contract_declined')}
+                      delay={d++ * 0.08}
+                      size="small"
+                    />
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Empty column under no_result */}
+          <div className="hidden sm:block" />
+        </div>
 
         {/* Bottom flow: invoiced → paid */}
         {invoiced && (
