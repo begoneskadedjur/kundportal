@@ -485,24 +485,6 @@ export default function TechnicianEquipment() {
 
   return (
     <div className="text-white flex flex-col pb-24 md:pb-8">
-      {/* Header - samma design som schedule */}
-      <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-emerald-500/10 p-2 rounded-lg">
-              <MapPin className="w-6 h-6 text-emerald-400" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">Mina Stationer</h1>
-              <p className="text-sm text-slate-400">{profile?.display_name}</p>
-            </div>
-          </div>
-          <Button variant="secondary" onClick={() => navigate('/technician/dashboard')} size="sm">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </div>
-      </header>
-
       {/* Huvudinnehåll */}
       <div className="flex-grow max-w-screen-2xl mx-auto w-full p-4">
         {loading ? (

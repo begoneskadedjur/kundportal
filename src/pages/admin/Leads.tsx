@@ -53,6 +53,26 @@ const Leads: React.FC = () => {
   const [stats, setStats] = useState<LeadStats | null>(null)
   // Load filters from localStorage or use defaults
   const [filters, setFilters] = useState<LeadFilters>(() => {
+    // Tekniker ser alltid bara sina egna leads
+    if (activeView === 'technician') {
+      return {
+        search: '',
+        status: 'all',
+        priority: 'all',
+        assignedTo: 'me',
+        createdBy: 'all',
+        companySize: 'all',
+        contactMethod: 'all',
+        source: 'all',
+        estimatedValueMin: null,
+        estimatedValueMax: null,
+        dateRange: 'all',
+        customStartDate: '',
+        customEndDate: '',
+        followUpToday: false,
+        hasEstimatedValue: 'all'
+      }
+    }
     const saved = localStorage.getItem('leadFilters')
     if (saved) {
       try {

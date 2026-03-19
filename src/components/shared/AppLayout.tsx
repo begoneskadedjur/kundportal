@@ -24,6 +24,7 @@ const EXCLUDED_PREFIXES = [
   '/organisation',
   '/admin',
   '/koordinator',
+  '/technician',
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {
