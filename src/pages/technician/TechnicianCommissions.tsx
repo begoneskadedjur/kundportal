@@ -158,7 +158,7 @@ export default function TechnicianCommissions() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <LoadingSpinner />
       </div>
     )
@@ -166,7 +166,7 @@ export default function TechnicianCommissions() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="p-8 max-w-md bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl">
           <div className="text-center">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
@@ -187,8 +187,7 @@ export default function TechnicianCommissions() {
   // ─── Render ─────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         <div className="flex items-center justify-between mb-6">
           <PageHeader title="Mina Provisioner" backPath="/technician/dashboard" />
           <button
@@ -360,7 +359,6 @@ export default function TechnicianCommissions() {
           </div>
         )}
       </div>
-    </div>
   )
 }
 

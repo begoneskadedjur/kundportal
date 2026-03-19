@@ -388,12 +388,12 @@ export default function TechnicianSchedule() {
     handleOpenModal(caseData as ScheduleCaseType);
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
+  if (loading) return <div className="flex items-center justify-center py-20"><LoadingSpinner /></div>;
   const filtersAreActive = activeStatuses.size !== DEFAULT_ACTIVE_STATUSES.size || !([...DEFAULT_ACTIVE_STATUSES].every(status => activeStatuses.has(status)));
 
   return (
     <>
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col">
+      <div className="text-white flex flex-col min-h-[calc(100vh-3.5rem)]">
         <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-20"><div className="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between"><div className="flex items-center gap-3"><div className="bg-purple-500/10 p-2 rounded-lg"><Calendar className="w-6 h-6 text-purple-400" /></div><div><h1 className="text-xl font-bold text-white">Mitt Schema</h1><p className="text-sm text-slate-400">{profile?.display_name}</p></div></div><Button variant="secondary" onClick={() => navigate('/technician/dashboard')} size="sm"><ArrowLeft className="w-4 h-4" /></Button></div></header>
         <div className="flex-grow max-w-screen-2xl mx-auto w-full p-2 sm:p-4 flex lg:flex-row flex-col gap-4">
           <aside className="hidden lg:block lg:w-1/3 xl:w-1/4"><Card className="p-0 bg-slate-900/50 border-slate-800 sticky top-[76px]"><FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card></aside>

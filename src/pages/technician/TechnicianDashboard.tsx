@@ -279,9 +279,8 @@ export default function TechnicianDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <PageHeader 
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <PageHeader
             title="Laddar..."
             showBackButton={false}
           />
@@ -292,14 +291,13 @@ export default function TechnicianDashboard() {
             <EnhancedSkeleton variant="card" className="h-64" />
             <EnhancedSkeleton variant="card" className="h-64" />
           </div>
-        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <Card className="p-8 max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-white mb-2">Problem med att ladda data</h2>
@@ -314,7 +312,7 @@ export default function TechnicianDashboard() {
   
   if (!data) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <Card className="p-8">
           <p className="text-slate-400">Ingen data tillgänglig</p>
         </Card>
@@ -323,9 +321,8 @@ export default function TechnicianDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <PageHeader 
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+        <PageHeader
           title="Tekniker Dashboard"
           subtitle={`${displayName} • ${data.stats.pending_cases} pågående ärenden`}
           icon={Briefcase}
@@ -788,6 +785,5 @@ export default function TechnicianDashboard() {
           }}
         />
       </div>
-    </div>
   )
 }

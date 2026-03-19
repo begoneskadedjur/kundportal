@@ -1420,7 +1420,7 @@ export default function TicketSystemGuide() {
   const progress = ((currentStep + 1) / guideSteps.length) * 100
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div>
       {/* Header - Sticky */}
       <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800">
         <div className="max-w-4xl mx-auto px-4 py-4">

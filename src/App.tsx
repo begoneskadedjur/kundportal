@@ -19,6 +19,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import DashboardDemo from './pages/admin/DashboardDemo';
 import { AdminLayout } from './components/admin/layout';
 import { CoordinatorLayout } from './components/coordinator/layout';
+import TechnicianLayout from './components/technician/layout';
 import Customers from './pages/admin/Customers';
 import CustomerDetails from './pages/admin/CustomerDetails';
 import Economics from './pages/admin/Economics';
@@ -188,15 +189,8 @@ function App() {
 
             </Route>
 
-            {/* OneflowContractCreator - TILLGÄNGLIG FÖR TEKNIKER (utanfor layout) */}
-            <Route
-              path="/technician/oneflow-contract-creator"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <OneflowContractCreator />
-                </ProtectedRoute>
-              }
-            />
+            {/* OneflowContractCreator - bakåtkompatibilitet (redirect till layout-route) */}
+            <Route path="/technician/oneflow-contract-creator" element={<Navigate to="/technician/oneflow" replace />} />
 
             {/* Koordinator routes — nested under CoordinatorLayout med persistent sidebar */}
             <Route path="/koordinator" element={<CoordinatorLayout />}>
@@ -254,130 +248,26 @@ function App() {
             {/* Redirect gammal engelsk URL */}
             <Route path="/coordinator/leads" element={<Navigate to="/koordinator/leads" replace />} />
 
-            {/* --- TEKNIKER ROUTES (UPPDATERADE MED STRIKT BEHÖRIGHET) --- */}
-            <Route 
-              path="/technician/dashboard" 
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <TechnicianDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/technician/commissions" 
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <TechnicianCommissionsPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/technician/cases" 
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <TechnicianCases />
-                </ProtectedRoute>
-              } 
-            />
-            <Route
-              path="/technician/schedule"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <TechnicianSchedule />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technician/inspection/:caseId"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <StationInspectionModule />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technician/leads" 
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <Leads />
-                </ProtectedRoute>
-              } 
-            />
-            <Route
-              path="/technician/oneflow"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <OneflowContractCreator />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technician/offer-follow-up"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <OfferFollowUp />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technician/equipment"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <TechnicianEquipment />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technician/team-chat"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <TeamChat />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technician/guides/equipment-placement"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <EquipmentPlacementGuide />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technician/guides/follow-up-case"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <FollowUpCaseGuide />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technician/guides/case-deletion"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <CaseDeletionGuide />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/technician/tillbud-avvikelser"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <IncidentsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Ticket System guide for non-admin roles (admin guides are inside AdminLayout, koordinator inside CoordinatorLayout) */}
-            <Route
-              path="/technician/guides/ticket-system"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <TicketSystemGuide />
-                </ProtectedRoute>
-              }
-            />
+            {/* --- TEKNIKER ROUTES — nested under TechnicianLayout med persistent sidebar --- */}
+            <Route path="/technician" element={<TechnicianLayout />}>
+              <Route index element={<Navigate to="/technician/dashboard" replace />} />
+              <Route path="dashboard" element={<ProtectedRoute requiredRole="technician"><TechnicianDashboard /></ProtectedRoute>} />
+              <Route path="commissions" element={<ProtectedRoute requiredRole="technician"><TechnicianCommissionsPage /></ProtectedRoute>} />
+              <Route path="cases" element={<ProtectedRoute requiredRole="technician"><TechnicianCases /></ProtectedRoute>} />
+              <Route path="schedule" element={<ProtectedRoute requiredRole="technician"><TechnicianSchedule /></ProtectedRoute>} />
+              <Route path="inspection/:caseId" element={<ProtectedRoute requiredRole="technician"><StationInspectionModule /></ProtectedRoute>} />
+              <Route path="leads" element={<ProtectedRoute requiredRole="technician"><Leads /></ProtectedRoute>} />
+              <Route path="oneflow" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
+              <Route path="offer-follow-up" element={<ProtectedRoute requiredRole="technician"><OfferFollowUp /></ProtectedRoute>} />
+              <Route path="equipment" element={<ProtectedRoute requiredRole="technician"><TechnicianEquipment /></ProtectedRoute>} />
+              <Route path="team-chat" element={<ProtectedRoute requiredRole="technician"><TeamChat /></ProtectedRoute>} />
+              <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="technician"><IncidentsPage /></ProtectedRoute>} />
+              <Route path="tickets" element={<ProtectedRoute requiredRole="technician"><InternAdministration /></ProtectedRoute>} />
+              <Route path="guides/equipment-placement" element={<ProtectedRoute requiredRole="technician"><EquipmentPlacementGuide /></ProtectedRoute>} />
+              <Route path="guides/follow-up-case" element={<ProtectedRoute requiredRole="technician"><FollowUpCaseGuide /></ProtectedRoute>} />
+              <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="technician"><CaseDeletionGuide /></ProtectedRoute>} />
+              <Route path="guides/ticket-system" element={<ProtectedRoute requiredRole="technician"><TicketSystemGuide /></ProtectedRoute>} />
+            </Route>
 
             {/* Shared routes - accessible by all authenticated users */}
             <Route
@@ -439,21 +329,10 @@ function App() {
 
             {/* Default redirects */}
             <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/technician" element={<Navigate to="/technician/dashboard" replace />} />
-            
+
             {/* Legacy portal redirects */}
             <Route path="/portal" element={<Navigate to="/customer" replace />} />
             <Route path="/customer/portal" element={<Navigate to="/customer" replace />} />
-
-            {/* Tickets Routes (admin inside AdminLayout, koordinator inside CoordinatorLayout) */}
-            <Route
-              path="/technician/tickets"
-              element={
-                <ProtectedRoute requiredRole="technician">
-                  <InternAdministration />
-                </ProtectedRoute>
-              }
-            />
 
             {/* 404 fallback */}
             <Route path="*" element={<Navigate to="/login" replace />} />

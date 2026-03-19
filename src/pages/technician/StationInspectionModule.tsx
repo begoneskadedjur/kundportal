@@ -1167,7 +1167,7 @@ export default function StationInspectionModule() {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <LoadingSpinner text="Laddar inspektion..." />
       </div>
     )
@@ -1176,7 +1176,7 @@ export default function StationInspectionModule() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-4 p-4">
+      <div className="flex flex-col items-center justify-center gap-4 p-4 py-20">
         <AlertCircle className="w-12 h-12 text-red-400" />
         <p className="text-red-400 text-center">{error}</p>
         <Button onClick={() => navigate(-1)}>
@@ -1236,7 +1236,7 @@ export default function StationInspectionModule() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-slate-950"
+      className="min-h-[calc(100vh-3.5rem)]"
     >
       {/* Header - Kompakt för aktiv inspektion */}
       <div className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur border-b border-slate-800">

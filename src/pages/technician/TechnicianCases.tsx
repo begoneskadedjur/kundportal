@@ -173,12 +173,11 @@ export default function TechnicianCases() {
 
   const technicianName = profile?.display_name || 'Tekniker';
 
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /><p className="text-slate-400 mt-4">Laddar ärenden...</p></div>;
-  if (error) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Card className="p-8 max-w-md text-center"><AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" /><h2 className="text-xl font-semibold text-white mb-2">Fel vid laddning</h2><p className="text-slate-400 mb-4">{error}</p><Button onClick={() => fetchCasesDirectly(profile?.technician_id || '')} className="w-full">Försök igen</Button></Card></div>;
+  if (loading) return <div className="flex items-center justify-center py-20"><LoadingSpinner /><p className="text-slate-400 mt-4">Laddar ärenden...</p></div>;
+  if (error) return <div className="flex items-center justify-center py-20"><Card className="p-8 max-w-md text-center"><AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" /><h2 className="text-xl font-semibold text-white mb-2">Fel vid laddning</h2><p className="text-slate-400 mb-4">{error}</p><Button onClick={() => fetchCasesDirectly(profile?.technician_id || '')} className="w-full">Försök igen</Button></Card></div>;
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         <PageHeader 
           title="Mina Ärenden"
           backPath="/technician/dashboard"
@@ -277,6 +276,5 @@ export default function TechnicianCases() {
 
         <EditCaseModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSuccess={handleUpdateSuccess} caseData={selectedCase} />
       </div>
-    </div>
   )
 }
