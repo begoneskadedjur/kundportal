@@ -262,6 +262,10 @@ export type Database = {
           parent_case_id: string | null  // Referens till ursprungsärendet
           created_by_technician_id: string | null  // Tekniker som skapade följeärendet
           created_by_technician_name: string | null  // Namn på teknikern
+
+          // Stängningsorsak
+          close_reason: string | null
+          close_reason_notes: string | null
         }
         Insert: Omit<Database['public']['Tables']['private_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['private_cases']['Insert']>
@@ -327,6 +331,10 @@ export type Database = {
           parent_case_id: string | null  // Referens till ursprungsärendet
           created_by_technician_id: string | null  // Tekniker som skapade följeärendet
           created_by_technician_name: string | null  // Namn på teknikern
+
+          // Stängningsorsak
+          close_reason: string | null
+          close_reason_notes: string | null
         }
         Insert: Omit<Database['public']['Tables']['business_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['business_cases']['Insert']>
