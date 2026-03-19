@@ -24,6 +24,7 @@ import {
   AlertCircle,
   ClipboardList,
   AlertTriangle,
+  GitBranch,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -63,6 +64,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Leads', icon: Target, path: '/admin/leads' },
       { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
       { label: 'Offerthantering', icon: ClipboardList, path: '/admin/offerthantering' },
+      { label: 'Kundresa', icon: GitBranch, path: '/admin/kundresa' },
     ]
   },
   {
@@ -144,6 +146,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/anvandarkonton-kund': 'Användarkonton (Kund)',
   '/admin/trafikljusoversikt': 'Trafikljusöversikt',
   '/admin/offerthantering': 'Offerthantering',
+  '/admin/kundresa': 'Kundresa',
 
   '/admin/ai-assistent': 'AI Assistent',
   '/admin/bildbank': 'Gemensam bildbank',
