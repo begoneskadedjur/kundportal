@@ -4,13 +4,12 @@ import { useNavigate, Link } from 'react-router-dom'
 import {
   AlertCircle, AlertTriangle,
   FileSignature, Sparkles, Target, RefreshCw, Wallet, LayoutDashboard,
-  Calendar, ClipboardList, FileText,
 } from 'lucide-react'
-import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency } from '../../utils/formatters'
 import TodayScheduleCard from '../../components/technician/dashboard/TodayScheduleCard'
 import CaseSummaryCard from '../../components/technician/dashboard/CaseSummaryCard'
 import OfferSummaryCard from '../../components/technician/dashboard/OfferSummaryCard'
+import { ProvisionService } from '../../services/provisionService'
 import { supabase } from '../../lib/supabase'
 
 // ─── Types ─────────────────────────────────────
@@ -71,9 +70,8 @@ export default function TechnicianDashboard() {
   // Leads summary
   const [leadsSummary, setLeadsSummary] = useState<{ active: number; followupsToday: number }>({ active: 0, followupsToday: 0 })
 
-  // KPI counts
-  const [todayCount, setTodayCount] = useState(0)
-  const [offerCount, setOfferCount] = useState(0)
+  // Provision from new system (commission_posts)
+  const [provisionData, setProvisionData] = useState<{ currentMonth: number; ytd: number }>({ currentMonth: 0, ytd: 0 })
 
   useEffect(() => {
     if (profile && !isTechnician) {
@@ -85,7 +83,7 @@ export default function TechnicianDashboard() {
     if (isTechnician && technicianId) {
       fetchDashboardData()
       fetchLeadsSummary()
-      fetchKpiCounts()
+      fetchProvisionData()
     }
   }, [isTechnician, technicianId])
 
@@ -105,44 +103,18 @@ export default function TechnicianDashboard() {
     }
   }
 
-  const fetchKpiCounts = async () => {
+  const fetchProvisionData = async () => {
     if (!technicianId) return
     try {
-      const today = new Date().toISOString().slice(0, 10)
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      const tomorrowStr = tomorrow.toISOString().slice(0, 10)
-
-      // Today's case count
-      const [privToday, bizToday] = await Promise.allSettled([
-        supabase.from('private_cases').select('id', { count: 'exact', head: true })
-          .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
-          .gte('start_date', today).lt('start_date', tomorrowStr)
-          .is('deleted_at', null)
-          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
-        supabase.from('business_cases').select('id', { count: 'exact', head: true })
-          .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
-          .gte('start_date', today).lt('start_date', tomorrowStr)
-          .is('deleted_at', null)
-          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
-      ])
-      setTodayCount(
-        (privToday.status === 'fulfilled' ? privToday.value.count || 0 : 0) +
-        (bizToday.status === 'fulfilled' ? bizToday.value.count || 0 : 0)
-      )
-
-      // Active offers count (pending + overdue)
-      const techEmail = profile?.technicians?.email
-      if (techEmail) {
-        const { count: offerCnt } = await supabase
-          .from('contracts')
-          .select('id', { count: 'exact', head: true })
-          .eq('begone_employee_email', techEmail)
-          .in('status', ['pending', 'overdue'])
-        setOfferCount(offerCnt || 0)
-      }
+      const posts = await ProvisionService.getPostsForTechnician(technicianId)
+      const currentMonth = new Date().toISOString().slice(0, 7)
+      const currentMonthTotal = posts
+        .filter(p => p.created_at.startsWith(currentMonth))
+        .reduce((sum, p) => sum + p.commission_amount, 0)
+      const ytdTotal = posts.reduce((sum, p) => sum + p.commission_amount, 0)
+      setProvisionData({ currentMonth: currentMonthTotal, ytd: ytdTotal })
     } catch {
-      // silent
+      // silent — fall back to 0
     }
   }
 
@@ -177,10 +149,7 @@ export default function TechnicianDashboard() {
         <div className="space-y-4">
           <div className="h-48 bg-slate-800/30 border border-slate-700 rounded-xl animate-pulse" />
           <div className="h-32 bg-slate-800/30 border border-slate-700 rounded-xl animate-pulse" />
-          <div className="grid grid-cols-2 gap-3">
-            <div className="h-28 bg-slate-800/30 border border-slate-700 rounded-xl animate-pulse" />
-            <div className="h-28 bg-slate-800/30 border border-slate-700 rounded-xl animate-pulse" />
-          </div>
+          <div className="h-12 bg-slate-800/30 border border-slate-700 rounded-xl animate-pulse" />
         </div>
       </div>
     )
@@ -221,28 +190,12 @@ export default function TechnicianDashboard() {
           </div>
         </div>
         <button
-          onClick={() => { fetchDashboardData(); fetchLeadsSummary(); fetchKpiCounts() }}
+          onClick={() => { fetchDashboardData(); fetchLeadsSummary(); fetchProvisionData() }}
           className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors w-full sm:w-auto"
         >
           <RefreshCw className="w-4 h-4" />
           Uppdatera
         </button>
-      </div>
-
-      {/* KPI row */}
-      <div className="grid grid-cols-4 gap-2">
-        {[
-          { label: 'Idag', value: todayCount, icon: Calendar, color: 'text-[#20c58f]', bg: 'bg-[#20c58f]/15' },
-          { label: 'Att göra', value: data.stats.pending_cases, icon: ClipboardList, color: 'text-amber-400', bg: 'bg-amber-500/15' },
-          { label: 'Offerter', value: offerCount, icon: FileText, color: 'text-blue-400', bg: 'bg-blue-500/15' },
-          { label: 'Leads', value: leadsSummary.active, icon: Target, color: 'text-purple-400', bg: 'bg-purple-500/15' },
-        ].map(kpi => (
-          <div key={kpi.label} className="flex flex-col items-center gap-1 py-2 bg-slate-800/30 border border-slate-700 rounded-xl">
-            <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
-            <span className="text-lg font-bold text-white">{kpi.value}</span>
-            <span className="text-[10px] text-slate-400 font-medium">{kpi.label}</span>
-          </div>
-        ))}
       </div>
 
       {/* ─── Section 1: Today's Schedule ─── */}
@@ -259,18 +212,18 @@ export default function TechnicianDashboard() {
         <div className="flex items-center gap-2">
           <Wallet className="w-4 h-4 text-[#20c58f]" />
           <span className="text-sm text-slate-300">
-            {formatCurrency(data.stats.current_month_commission)} denna månad
+            {formatCurrency(provisionData.currentMonth)} denna månad
             <span className="text-slate-600 mx-1">|</span>
-            {formatCurrency(data.stats.total_commission_ytd)} i år
+            {formatCurrency(provisionData.ytd)} i år
           </span>
         </div>
         <span className="text-xs text-[#20c58f] font-medium">Visa detaljer</span>
       </Link>
 
-      {/* ─── Section 3b: Offer Summary ─── */}
+      {/* ─── Section 4: Offer Summary ─── */}
       <OfferSummaryCard technicianEmail={data.stats.technician_email} />
 
-      {/* ─── Section 4: Quick Actions ─── */}
+      {/* ─── Section 5: Quick Actions ─── */}
       <div className="grid grid-cols-3 gap-2">
         {[
           { label: 'Skapa avtal', icon: FileSignature, path: '/technician/oneflow', color: 'text-[#20c58f]', bg: 'bg-[#20c58f]/15' },
@@ -290,7 +243,7 @@ export default function TechnicianDashboard() {
         ))}
       </div>
 
-      {/* ─── Section 5: Leads Strip ─── */}
+      {/* ─── Section 6: Leads Strip ─── */}
       {leadsSummary.active > 0 && (
         <Link
           to="/technician/leads"
