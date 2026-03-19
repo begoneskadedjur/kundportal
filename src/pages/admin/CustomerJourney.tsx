@@ -7,6 +7,8 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { supabase } from '../../lib/supabase'
 import { isCompletedStatus } from '../../types/database'
 import { formatCurrency } from '../../utils/formatters'
+import { getAvailableTechnicians } from '../../services/commissionService'
+import type { TechnicianFilter } from '../../types/commission'
 import CustomerJourneyFunnel from '../../components/admin/sales/CustomerJourneyFunnel'
 import FunnelStageDetail from '../../components/admin/sales/FunnelStageDetail'
 
@@ -80,10 +82,18 @@ export default function CustomerJourney() {
   const [period, setPeriod] = useState<Period>('3m')
   const [caseTypeFilter, setCaseTypeFilter] = useState<CaseTypeFilter>('all')
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
+  const [technicians, setTechnicians] = useState<TechnicianFilter[]>([])
+  const [selectedTechId, setSelectedTechId] = useState<string>('all')
 
   const [cases, setCases] = useState<JourneyCaseRow[]>([])
   const [contractMap, setContractMap] = useState<Map<string, ContractInfo>>(new Map())
   const [invoiceMap, setInvoiceMap] = useState<Map<string, InvoiceInfo>>(new Map())
+
+  // ─── Fetch technicians ──────────────────────────
+
+  useEffect(() => {
+    getAvailableTechnicians().then(setTechnicians)
+  }, [])
 
   // ─── Fetch ───────────────────────────────────────
 
@@ -94,9 +104,17 @@ export default function CustomerJourney() {
     try {
       const selectFields = 'id, title, status, kontaktperson, telefon_kontaktperson, pris, start_date, completed_date, created_at, skadedjur'
 
+      let privateQuery = supabase.from('private_cases').select(selectFields).gte('created_at', startDate).is('deleted_at', null)
+      let businessQuery = supabase.from('business_cases').select(`${selectFields}, company_name`).gte('created_at', startDate).is('deleted_at', null)
+
+      if (selectedTechId !== 'all') {
+        privateQuery = privateQuery.eq('primary_assignee_id', selectedTechId)
+        businessQuery = businessQuery.eq('primary_assignee_id', selectedTechId)
+      }
+
       const [privateRes, businessRes] = await Promise.allSettled([
-        supabase.from('private_cases').select(selectFields).gte('created_at', startDate).is('deleted_at', null),
-        supabase.from('business_cases').select(`${selectFields}, company_name`).gte('created_at', startDate).is('deleted_at', null),
+        privateQuery,
+        businessQuery,
       ])
 
       const allCases: JourneyCaseRow[] = [
@@ -152,7 +170,7 @@ export default function CustomerJourney() {
     } finally {
       setLoading(false)
     }
-  }, [period])
+  }, [period, selectedTechId])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -295,6 +313,19 @@ export default function CustomerJourney() {
             </button>
           ))}
         </div>
+
+        {/* Technician */}
+        {technicians.length > 0 && (
+          <select
+            value={selectedTechId}
+            onChange={e => { setSelectedTechId(e.target.value); setSelectedStageId(null) }}
+            className="px-3 py-1.5 bg-slate-800/30 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+          >
+            {technicians.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {loading ? (

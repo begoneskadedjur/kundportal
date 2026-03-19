@@ -107,15 +107,12 @@ function StageNode({
 function TripleBranchConnector() {
   return (
     <div className="py-1.5">
-      <svg width="100%" height="32" className="text-slate-600" preserveAspectRatio="none">
+      <svg width="100%" height="28" className="text-slate-600">
         <line x1="50%" y1="0" x2="50%" y2="10" stroke="currentColor" strokeWidth="1" />
         <line x1="16.67%" y1="10" x2="83.33%" y2="10" stroke="currentColor" strokeWidth="1" />
-        <line x1="16.67%" y1="10" x2="16.67%" y2="26" stroke="currentColor" strokeWidth="1" />
-        <line x1="50%" y1="10" x2="50%" y2="26" stroke="currentColor" strokeWidth="1" />
-        <line x1="83.33%" y1="10" x2="83.33%" y2="26" stroke="currentColor" strokeWidth="1" />
-        <polygon points="14.67,26 16.67,32 18.67,26" fill="currentColor" />
-        <polygon points="48,26 50,32 52,26" fill="currentColor" />
-        <polygon points="81.33,26 83.33,32 85.33,26" fill="currentColor" />
+        <line x1="16.67%" y1="10" x2="16.67%" y2="28" stroke="currentColor" strokeWidth="1" />
+        <line x1="50%" y1="10" x2="50%" y2="28" stroke="currentColor" strokeWidth="1" />
+        <line x1="83.33%" y1="10" x2="83.33%" y2="28" stroke="currentColor" strokeWidth="1" />
       </svg>
     </div>
   )
@@ -124,13 +121,11 @@ function TripleBranchConnector() {
 function DoubleBranchConnector() {
   return (
     <div className="py-1.5">
-      <svg width="100%" height="32" className="text-slate-600" preserveAspectRatio="none">
+      <svg width="100%" height="28" className="text-slate-600">
         <line x1="50%" y1="0" x2="50%" y2="10" stroke="currentColor" strokeWidth="1" />
         <line x1="25%" y1="10" x2="75%" y2="10" stroke="currentColor" strokeWidth="1" />
-        <line x1="25%" y1="10" x2="25%" y2="26" stroke="currentColor" strokeWidth="1" />
-        <line x1="75%" y1="10" x2="75%" y2="26" stroke="currentColor" strokeWidth="1" />
-        <polygon points="23,26 25,32 27,26" fill="currentColor" />
-        <polygon points="73,26 75,32 77,26" fill="currentColor" />
+        <line x1="25%" y1="10" x2="25%" y2="28" stroke="currentColor" strokeWidth="1" />
+        <line x1="75%" y1="10" x2="75%" y2="28" stroke="currentColor" strokeWidth="1" />
       </svg>
     </div>
   )
