@@ -1,12 +1,12 @@
 import React from 'react'
 import {
-  Phone, Mail, ExternalLink, MapPin, ChevronRight, XCircle, Edit,
-  CalendarPlus, CalendarCheck, FileText, RotateCcw, AlertTriangle,
-  FileCheck, Bug
+  Phone, Mail, ExternalLink, MapPin, ChevronRight, Trash2, Edit,
+  Bug, FileSignature, Receipt, Package, MessageSquare
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
-import type { TechnicianCase, WorkflowGroup } from '../../../pages/technician/TechnicianCases'
+import { isCompletedStatus } from '../../../types/database'
+import type { TechnicianCase, WorkflowGroup, CaseSupplementaryData } from '../../../pages/technician/TechnicianCases'
 
 // ─── Helpers ────────────────────────────────────────────
 
@@ -29,27 +29,94 @@ function getAgeTextColor(days: number): string {
   return 'text-red-400'
 }
 
-function getNextStepHint(group: WorkflowGroup, c: TechnicianCase): string {
-  switch (group) {
-    case 'needs_booking': return 'Boka in besök'
-    case 'booked': {
-      if (c.due_date && new Date(c.due_date) < new Date()) return 'Försenat besök!'
-      return 'Genomför besök'
-    }
-    case 'offer_sent': return 'Väntar på kundsvar'
-    case 'revisit': return 'Återbesök planerat'
-    case 'needs_action': {
-      const s = c.status?.toLowerCase() || ''
-      if (s.includes('bomkörning')) return 'Bomkörning – kontakta kund'
-      if (s.includes('ombokning')) return 'Hantera ombokning'
-      if (s.includes('reklamation')) return 'Hantera reklamation'
-      if (s.includes('review')) return 'Inväntar granskning'
-      return 'Kräver åtgärd'
-    }
-    case 'report': return 'Generera saneringsrapport'
-    default: return ''
-  }
+// ─── Smart hint logic ───────────────────────────────────
+
+interface SmartHint {
+  text: string
+  severity: 'info' | 'success' | 'warning' | 'error'
 }
+
+function computeSmartHint(
+  c: TechnicianCase,
+  group: WorkflowGroup | undefined,
+  sup?: CaseSupplementaryData
+): SmartHint | null {
+  const hasContact = !!(c.kontaktperson || c.telefon_kontaktperson || c.e_post_kontaktperson)
+  const age = getDaysAge(c.created_date)
+  const status = c.status?.toLowerCase() || ''
+  const completed = isCompletedStatus(c.status as any)
+
+  // 1. Incomplete data
+  if (!hasContact && !completed) {
+    return { text: 'Saknar kontaktuppgifter', severity: 'error' }
+  }
+
+  // 2. Stale + open
+  if (status.includes('öppen') && age > 90) {
+    if (!hasContact) return { text: 'Borde tas bort', severity: 'error' }
+    return { text: 'Kontakta kund eller ta bort', severity: 'warning' }
+  }
+
+  // 3. Completed flow
+  if (completed) {
+    if (sup?.invoice?.status === 'paid' || c.billing_status === 'paid') {
+      return { text: 'Klart', severity: 'success' }
+    }
+    if (sup?.invoice?.status === 'sent' || c.billing_status === 'sent') {
+      return { text: 'Faktura skickad', severity: 'info' }
+    }
+    if (sup?.invoice) {
+      return { text: 'Faktura skapad', severity: 'info' }
+    }
+    if (sup?.hasBillingItems) {
+      return { text: 'Redo att faktureras', severity: 'warning' }
+    }
+    if (!c.case_price && !sup?.hasBillingItems) {
+      return { text: 'Artiklar/pris saknas', severity: 'warning' }
+    }
+    return { text: 'Lägg till artiklar och fakturera', severity: 'warning' }
+  }
+
+  // 4. Offer/contract flow
+  if (status.includes('offert skickad')) {
+    if (sup?.contract) {
+      if (sup.contract.status === 'declined') return { text: 'Kund avböjt — kontakta', severity: 'warning' }
+      if (sup.contract.status === 'overdue') return { text: 'Offert utgången — kontakta kund', severity: 'warning' }
+      if (sup.contract.status === 'signed') return { text: 'Offert signerad — uppdatera status', severity: 'warning' }
+    }
+    return { text: 'Väntar på kundsvar', severity: 'info' }
+  }
+  if (status.includes('offert signerad')) {
+    return { text: 'Boka in utförande', severity: 'info' }
+  }
+
+  // 5. Normal workflow
+  if (group === 'needs_booking') return { text: 'Boka in besök', severity: 'info' }
+  if (group === 'booked') {
+    if (c.due_date && new Date(c.due_date) < new Date()) return { text: 'Försenat besök!', severity: 'error' }
+    return { text: 'Besök inbokat', severity: 'info' }
+  }
+  if (group === 'revisit') return { text: 'Återbesök planerat', severity: 'info' }
+  if (group === 'report') return { text: 'Generera saneringsrapport', severity: 'info' }
+  if (group === 'needs_action') {
+    if (status.includes('bomkörning')) return { text: 'Bomkörning — kontakta kund', severity: 'warning' }
+    if (status.includes('ombokning')) return { text: 'Hantera ombokning', severity: 'warning' }
+    if (status.includes('reklamation')) return { text: 'Hantera reklamation', severity: 'warning' }
+    if (status.includes('review')) return { text: 'Inväntar granskning', severity: 'info' }
+    return { text: 'Kräver åtgärd', severity: 'warning' }
+  }
+
+  return null
+}
+
+const HINT_COLORS: Record<SmartHint['severity'], { label: string; text: string; bg: string }> = {
+  info:    { label: 'text-slate-500', text: 'text-white',      bg: 'bg-slate-900/50' },
+  success: { label: 'text-green-500', text: 'text-green-300',  bg: 'bg-green-500/10' },
+  warning: { label: 'text-amber-500', text: 'text-amber-300',  bg: 'bg-amber-500/10' },
+  error:   { label: 'text-red-500',   text: 'text-red-300',    bg: 'bg-red-500/10' },
+}
+
+// ─── Other helpers ──────────────────────────────────────
 
 const formatAddress = (address: any): string => {
   if (!address) return 'Saknas'
@@ -88,6 +155,23 @@ const CLOSE_REASON_LABELS: Record<string, string> = {
   ovrigt: 'Övrigt',
 }
 
+const CONTRACT_STATUS_DISPLAY: Record<string, { label: string; color: string }> = {
+  pending:  { label: 'Offert: Skickad',   color: 'text-amber-400' },
+  signed:   { label: 'Avtal: Signerat',   color: 'text-green-400' },
+  declined: { label: 'Offert: Avböjt',    color: 'text-red-400' },
+  overdue:  { label: 'Offert: Utgången',  color: 'text-red-400' },
+  active:   { label: 'Avtal: Aktivt',     color: 'text-green-400' },
+  ended:    { label: 'Avtal: Avslutat',   color: 'text-slate-400' },
+}
+
+const INVOICE_STATUS_DISPLAY: Record<string, { label: string; color: string }> = {
+  paid:             { label: 'Faktura: Betald',           color: 'text-green-400' },
+  sent:             { label: 'Faktura: Skickad',          color: 'text-blue-400' },
+  ready:            { label: 'Faktura: Redo',             color: 'text-amber-400' },
+  draft:            { label: 'Faktura: Under behandling', color: 'text-yellow-400' },
+  pending_approval: { label: 'Faktura: Under behandling', color: 'text-yellow-400' },
+}
+
 // ─── Props ──────────────────────────────────────────────
 
 interface CaseCardProps {
@@ -96,25 +180,46 @@ interface CaseCardProps {
   isExpanded: boolean
   onToggle: () => void
   onEdit: () => void
-  onClose?: () => void
+  onDelete?: () => void
+  onChat?: () => void
   showCheckbox?: boolean
   isChecked?: boolean
   onCheckChange?: (checked: boolean) => void
   showCloseReason?: boolean
+  supplementary?: CaseSupplementaryData
 }
 
 // ─── Component ──────────────────────────────────────────
 
 export default function CaseCard({
   case_, workflowGroup, isExpanded, onToggle,
-  onEdit, onClose, showCheckbox, isChecked, onCheckChange,
-  showCloseReason,
+  onEdit, onDelete, onChat, showCheckbox, isChecked, onCheckChange,
+  showCloseReason, supplementary,
 }: CaseCardProps) {
   const age = getDaysAge(case_.created_date)
   const ageBorder = getAgeBorderColor(age)
   const ageColor = getAgeTextColor(age)
   const typeBadge = caseTypeBadge[case_.case_type] || caseTypeBadge.private
-  const hint = workflowGroup ? getNextStepHint(workflowGroup, case_) : ''
+  const hint = computeSmartHint(case_, workflowGroup, supplementary)
+
+  // Invoice display: only show if real billing activity
+  const hasRealInvoice = !!(
+    supplementary?.invoice ||
+    case_.billing_status === 'sent' ||
+    case_.billing_status === 'paid'
+  )
+  const invoiceDisplay = supplementary?.invoice
+    ? INVOICE_STATUS_DISPLAY[supplementary.invoice.status]
+    : case_.billing_status === 'paid'
+      ? INVOICE_STATUS_DISPLAY.paid
+      : case_.billing_status === 'sent'
+        ? INVOICE_STATUS_DISPLAY.sent
+        : null
+
+  // Contract/offer display
+  const contractDisplay = supplementary?.contract
+    ? CONTRACT_STATUS_DISPLAY[supplementary.contract.status]
+    : null
 
   return (
     <div className={`bg-slate-800/50 rounded-xl border border-slate-700/50 border-l-[3px] ${ageBorder} overflow-hidden transition-colors hover:bg-slate-800/70`}>
@@ -170,14 +275,24 @@ export default function CaseCard({
             )}
           </div>
 
-          {/* Row 3: status + type badges */}
-          <div className="flex items-center gap-2 mt-1.5">
+          {/* Row 3: status + type + contract/invoice badges */}
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>
               {case_.status}
             </span>
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${typeBadge.cls}`}>
               {typeBadge.label}
             </span>
+            {contractDisplay && (
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/50 ${contractDisplay.color}`}>
+                {contractDisplay.label}
+              </span>
+            )}
+            {hasRealInvoice && invoiceDisplay && (
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/50 ${invoiceDisplay.color}`}>
+                {invoiceDisplay.label}
+              </span>
+            )}
             {showCloseReason && case_.close_reason && (
               <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-600/50 text-slate-400">
                 {CLOSE_REASON_LABELS[case_.close_reason] || case_.close_reason}
@@ -214,7 +329,7 @@ export default function CaseCard({
                 </div>
                 <div>
                   <span className="text-xs text-slate-500">Pris</span>
-                  <p className="text-slate-300">{formatCurrency(case_.case_price)}</p>
+                  <p className="text-slate-300">{case_.case_price ? formatCurrency(case_.case_price) : 'Ej satt'}</p>
                 </div>
                 <div>
                   <span className="text-xs text-slate-500">Provision</span>
@@ -226,24 +341,19 @@ export default function CaseCard({
                     <p className="text-slate-300">{formatDate(case_.completed_date)}</p>
                   </div>
                 )}
-                {case_.billing_status && case_.billing_status !== 'skip' && (
-                  <div>
-                    <span className="text-xs text-slate-500">Faktura</span>
-                    <p className={
-                      case_.billing_status === 'paid' ? 'text-green-400' :
-                      case_.billing_status === 'sent' ? 'text-blue-400' : 'text-yellow-400'
-                    }>
-                      {case_.billing_status === 'paid' ? 'Betald' : case_.billing_status === 'sent' ? 'Skickad' : 'Väntande'}
-                    </p>
+                {supplementary?.hasBillingItems && (
+                  <div className="flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs text-slate-400">Artiklar tillagda</span>
                   </div>
                 )}
               </div>
 
-              {/* Next step hint */}
+              {/* Smart hint */}
               {hint && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/50 rounded-lg text-sm">
-                  <span className="text-slate-500">Nästa steg:</span>
-                  <span className="text-white font-medium">{hint}</span>
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${HINT_COLORS[hint.severity].bg}`}>
+                  <span className={HINT_COLORS[hint.severity].label}>Nästa steg:</span>
+                  <span className={`font-medium ${HINT_COLORS[hint.severity].text}`}>{hint.text}</span>
                 </div>
               )}
 
@@ -255,6 +365,14 @@ export default function CaseCard({
                 >
                   <Edit className="w-4 h-4" />Öppna ärende
                 </button>
+                {onChat && (
+                  <button
+                    onClick={onChat}
+                    className="min-h-[48px] min-w-[48px] flex items-center justify-center px-3 py-2.5 bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </button>
+                )}
                 {case_.clickup_url && (
                   <a
                     href={case_.clickup_url}
@@ -265,12 +383,12 @@ export default function CaseCard({
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 )}
-                {onClose && (
+                {onDelete && (
                   <button
-                    onClick={onClose}
+                    onClick={onDelete}
                     className="min-h-[48px] min-w-[48px] flex items-center justify-center px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
                   >
-                    <XCircle className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 )}
               </div>

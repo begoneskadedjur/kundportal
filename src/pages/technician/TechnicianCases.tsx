@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Search, AlertTriangle, CalendarPlus, CalendarCheck, FileText,
   RotateCcw, FileCheck, ChevronDown, ChevronRight, ClipboardList,
-  Clock, CheckCircle, AlertCircle, XCircle
+  Clock, CheckCircle, AlertCircle, Trash2
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -47,6 +47,10 @@ export interface TechnicianCase {
   work_started_at?: string
   close_reason?: string | null
   close_reason_notes?: string | null
+  oneflow_contract_id?: string | null
+  deleted_at?: string | null
+  deleted_by_technician_id?: string | null
+  deleted_by_technician_name?: string | null
 }
 
 export type WorkflowGroup =
@@ -56,6 +60,21 @@ export type WorkflowGroup =
   | 'offer_sent'
   | 'revisit'
   | 'report'
+
+export interface CaseContractInfo {
+  status: string
+  type: string
+}
+
+export interface CaseInvoiceInfo {
+  status: string
+}
+
+export interface CaseSupplementaryData {
+  contract?: CaseContractInfo
+  invoice?: CaseInvoiceInfo
+  hasBillingItems: boolean
+}
 
 // ─── Workflow config ────────────────────────────────────
 
@@ -97,6 +116,11 @@ const WORKFLOW_GROUP_CONFIG: Record<WorkflowGroup, WorkflowGroupConfig> = {
 
 const STALE_THRESHOLD_DAYS = 30
 
+// ─── Invoice priority for dedup ─────────────────────────
+const INVOICE_PRIORITY: Record<string, number> = {
+  paid: 5, sent: 4, ready: 3, pending_approval: 2, draft: 1, cancelled: 0,
+}
+
 // ─── Component ──────────────────────────────────────────
 
 type TabKey = 'active' | 'stale' | 'completed'
@@ -109,6 +133,11 @@ export default function TechnicianCases() {
   const [error, setError] = useState<string | null>(null)
   const [cases, setCases] = useState<TechnicianCase[]>([])
 
+  // Supplementary data maps
+  const [contractMap, setContractMap] = useState<Map<string, CaseContractInfo>>(new Map())
+  const [invoiceMap, setInvoiceMap] = useState<Map<string, CaseInvoiceInfo>>(new Map())
+  const [billingItemsSet, setBillingItemsSet] = useState<Set<string>>(new Set())
+
   const [activeTab, setActiveTab] = useState<TabKey>('active')
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Set<WorkflowGroup>>(new Set(['needs_action', 'needs_booking']))
@@ -117,8 +146,9 @@ export default function TechnicianCases() {
   // Edit modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedCase, setSelectedCase] = useState<TechnicianCase | null>(null)
+  const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false)
 
-  // Close modal
+  // Close modal (soft-delete)
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [casesToClose, setCasesToClose] = useState<TechnicianCase[]>([])
 
@@ -141,10 +171,11 @@ export default function TechnicianCases() {
     setLoading(true)
     setError(null)
     try {
+      // Fetch cases (with soft-delete filter)
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
-        supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
-        supabase.from('cases').select('*').or(`primary_technician_id.eq.${technicianId},secondary_technician_id.eq.${technicianId},tertiary_technician_id.eq.${technicianId}`)
+        supabase.from('private_cases').select('*').is('deleted_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        supabase.from('business_cases').select('*').is('deleted_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        supabase.from('cases').select('*').is('deleted_at', null).or(`primary_technician_id.eq.${technicianId},secondary_technician_id.eq.${technicianId},tertiary_technician_id.eq.${technicianId}`)
       ])
 
       const allCases: TechnicianCase[] = [
@@ -168,12 +199,65 @@ export default function TechnicianCases() {
       ]
 
       setCases(allCases)
+
+      // Fetch supplementary data (contracts, invoices, billing items)
+      const caseIds = allCases.map(c => c.id)
+      if (caseIds.length > 0) {
+        const [contractsRes, invoicesRes, billingRes] = await Promise.allSettled([
+          supabase.from('contracts').select('source_id, status, type').in('source_id', caseIds),
+          supabase.from('invoices').select('case_id, status').in('case_id', caseIds),
+          supabase.from('case_billing_items').select('case_id').in('case_id', caseIds).neq('status', 'cancelled'),
+        ])
+
+        // Build contract map (keep highest priority: signed > active > pending > etc)
+        const cMap = new Map<string, CaseContractInfo>()
+        const contractPrio: Record<string, number> = { signed: 5, active: 4, pending: 3, overdue: 2, declined: 1, ended: 0 }
+        if (contractsRes.status === 'fulfilled') {
+          for (const c of contractsRes.value.data || []) {
+            if (!c.source_id) continue
+            const existing = cMap.get(c.source_id)
+            if (!existing || (contractPrio[c.status] || 0) > (contractPrio[existing.status] || 0)) {
+              cMap.set(c.source_id, { status: c.status, type: c.type })
+            }
+          }
+        }
+        setContractMap(cMap)
+
+        // Build invoice map (keep highest priority: paid > sent > ready > etc)
+        const iMap = new Map<string, CaseInvoiceInfo>()
+        if (invoicesRes.status === 'fulfilled') {
+          for (const inv of invoicesRes.value.data || []) {
+            if (!inv.case_id) continue
+            const existing = iMap.get(inv.case_id)
+            if (!existing || (INVOICE_PRIORITY[inv.status] || 0) > (INVOICE_PRIORITY[existing.status] || 0)) {
+              iMap.set(inv.case_id, { status: inv.status })
+            }
+          }
+        }
+        setInvoiceMap(iMap)
+
+        // Build billing items set
+        const bSet = new Set<string>()
+        if (billingRes.status === 'fulfilled') {
+          for (const b of billingRes.value.data || []) {
+            if (b.case_id) bSet.add(b.case_id)
+          }
+        }
+        setBillingItemsSet(bSet)
+      }
     } catch (err: any) {
       setError(err.message || 'Ett oväntat fel uppstod')
     } finally {
       setLoading(false)
     }
   }
+
+  // ─── Build supplementary for a case ───────────────
+  const getSupplementary = useCallback((c: TechnicianCase): CaseSupplementaryData => ({
+    contract: contractMap.get(c.id),
+    invoice: invoiceMap.get(c.id),
+    hasBillingItems: billingItemsSet.has(c.id),
+  }), [contractMap, invoiceMap, billingItemsSet])
 
   // ─── Search filter ────────────────────────────────
 
@@ -200,7 +284,6 @@ export default function TechnicianCases() {
       const group = STATUS_TO_WORKFLOW[c.status] || 'needs_action'
       groups[group].push(c)
     }
-    // Sort each group oldest first
     for (const key of Object.keys(groups) as WorkflowGroup[]) {
       groups[key].sort((a, b) => getDaysAge(b.created_date) - getDaysAge(a.created_date))
     }
@@ -229,7 +312,6 @@ export default function TechnicianCases() {
       })
   }, [cases, matchesSearch])
 
-  // KPIs
   const kpis = useMemo(() => {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -263,31 +345,35 @@ export default function TechnicianCases() {
   }
 
   const handleEdit = (c: TechnicianCase) => {
+    setOpenCommunicationOnLoad(false)
     setSelectedCase(c)
     setIsEditModalOpen(true)
   }
 
-  const handleCloseCase = (c: TechnicianCase) => {
+  const handleChat = (c: TechnicianCase) => {
+    setOpenCommunicationOnLoad(true)
+    setSelectedCase(c)
+    setIsEditModalOpen(true)
+  }
+
+  const handleDeleteCase = (c: TechnicianCase) => {
     setCasesToClose([c])
     setIsCloseModalOpen(true)
   }
 
-  const handleBatchClose = () => {
+  const handleBatchDelete = () => {
     const selected = staleCases.filter(c => selectedForBatch.has(c.id))
     if (selected.length === 0) return
     setCasesToClose(selected)
     setIsCloseModalOpen(true)
   }
 
-  const handleCloseSuccess = (closedIds: string[]) => {
-    setCases(prev => prev.map(c =>
-      closedIds.includes(c.id)
-        ? { ...c, status: 'Stängt - slasklogg', completed_date: new Date().toISOString() }
-        : c
-    ))
+  const handleDeleteSuccess = (deletedIds: string[]) => {
+    // Remove soft-deleted cases from local state
+    setCases(prev => prev.filter(c => !deletedIds.includes(c.id)))
     setSelectedForBatch(prev => {
       const next = new Set(prev)
-      closedIds.forEach(id => next.delete(id))
+      deletedIds.forEach(id => next.delete(id))
       return next
     })
   }
@@ -393,7 +479,7 @@ export default function TechnicianCases() {
         />
       </div>
 
-      {/* ═══ Active tab ═══ */}
+      {/* Active tab */}
       {activeTab === 'active' && (
         <div className="space-y-3">
           {(Object.keys(WORKFLOW_GROUP_CONFIG) as WorkflowGroup[])
@@ -405,7 +491,6 @@ export default function TechnicianCases() {
               const groupCases = groupedActive[group]
               return (
                 <div key={group}>
-                  {/* Group header */}
                   <button
                     onClick={() => toggleGroup(group)}
                     className="w-full flex items-center gap-3 px-4 py-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-xl transition-colors min-h-[48px]"
@@ -421,8 +506,6 @@ export default function TechnicianCases() {
                       : <ChevronRight className="w-5 h-5 text-slate-500" />
                     }
                   </button>
-
-                  {/* Group cases */}
                   <AnimatePresence>
                     {isOpen && (
                       <motion.div
@@ -441,7 +524,9 @@ export default function TechnicianCases() {
                               isExpanded={expandedCards.has(c.id)}
                               onToggle={() => toggleCard(c.id)}
                               onEdit={() => handleEdit(c)}
-                              onClose={() => handleCloseCase(c)}
+                              onDelete={() => handleDeleteCase(c)}
+                              onChat={() => handleChat(c)}
+                              supplementary={getSupplementary(c)}
                             />
                           ))}
                         </div>
@@ -451,7 +536,6 @@ export default function TechnicianCases() {
                 </div>
               )
             })}
-
           {activeCases.length === 0 && (
             <div className="text-center py-12">
               <CheckCircle className="w-12 h-12 text-[#20c58f] mx-auto mb-3" />
@@ -464,7 +548,7 @@ export default function TechnicianCases() {
         </div>
       )}
 
-      {/* ═══ Stale tab ═══ */}
+      {/* Stale tab */}
       {activeTab === 'stale' && (
         <div>
           {staleCases.length > 0 && (
@@ -473,7 +557,7 @@ export default function TechnicianCases() {
                 {selectedForBatch.size > 0 && `${selectedForBatch.size} markerade`}
               </p>
               <button
-                onClick={handleBatchClose}
+                onClick={handleBatchDelete}
                 disabled={selectedForBatch.size === 0}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium min-h-[44px] transition-colors ${
                   selectedForBatch.size > 0
@@ -481,12 +565,11 @@ export default function TechnicianCases() {
                     : 'bg-slate-800/30 text-slate-600 cursor-not-allowed'
                 }`}
               >
-                <XCircle className="w-4 h-4" />
-                Stäng markerade ({selectedForBatch.size})
+                <Trash2 className="w-4 h-4" />
+                Ta bort markerade ({selectedForBatch.size})
               </button>
             </div>
           )}
-
           <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
             {staleCases.map(c => (
               <CaseCard
@@ -496,14 +579,15 @@ export default function TechnicianCases() {
                 isExpanded={expandedCards.has(c.id)}
                 onToggle={() => toggleCard(c.id)}
                 onEdit={() => handleEdit(c)}
-                onClose={() => handleCloseCase(c)}
+                onDelete={() => handleDeleteCase(c)}
+                onChat={() => handleChat(c)}
                 showCheckbox
                 isChecked={selectedForBatch.has(c.id)}
                 onCheckChange={checked => toggleBatchSelect(c.id, checked)}
+                supplementary={getSupplementary(c)}
               />
             ))}
           </div>
-
           {staleCases.length === 0 && (
             <div className="text-center py-12">
               <CheckCircle className="w-12 h-12 text-[#20c58f] mx-auto mb-3" />
@@ -516,7 +600,7 @@ export default function TechnicianCases() {
         </div>
       )}
 
-      {/* ═══ Completed tab ═══ */}
+      {/* Completed tab */}
       {activeTab === 'completed' && (
         <div>
           <p className="text-sm text-slate-400 mb-3">Senaste 90 dagarna</p>
@@ -528,11 +612,12 @@ export default function TechnicianCases() {
                 isExpanded={expandedCards.has(c.id)}
                 onToggle={() => toggleCard(c.id)}
                 onEdit={() => handleEdit(c)}
+                onChat={() => handleChat(c)}
                 showCloseReason
+                supplementary={getSupplementary(c)}
               />
             ))}
           </div>
-
           {completedCases.length === 0 && (
             <div className="text-center py-12">
               <ClipboardList className="w-12 h-12 text-slate-600 mx-auto mb-3" />
@@ -548,16 +633,18 @@ export default function TechnicianCases() {
       {/* Modals */}
       <EditCaseModal
         isOpen={isEditModalOpen}
-        onClose={() => { setIsEditModalOpen(false); setSelectedCase(null) }}
+        onClose={() => { setIsEditModalOpen(false); setSelectedCase(null); setOpenCommunicationOnLoad(false) }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedCase}
+        openCommunicationOnLoad={openCommunicationOnLoad}
       />
-
       <CloseCaseModal
         isOpen={isCloseModalOpen}
         onClose={() => { setIsCloseModalOpen(false); setCasesToClose([]) }}
         cases={casesToClose}
-        onSuccess={handleCloseSuccess}
+        onSuccess={handleDeleteSuccess}
+        technicianId={profile?.technician_id || ''}
+        technicianName={profile?.display_name || ''}
       />
     </div>
   )

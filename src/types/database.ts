@@ -266,6 +266,11 @@ export type Database = {
           // Stängningsorsak
           close_reason: string | null
           close_reason_notes: string | null
+
+          // Soft-delete
+          deleted_at: string | null
+          deleted_by_technician_id: string | null
+          deleted_by_technician_name: string | null
         }
         Insert: Omit<Database['public']['Tables']['private_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['private_cases']['Insert']>
@@ -335,6 +340,11 @@ export type Database = {
           // Stängningsorsak
           close_reason: string | null
           close_reason_notes: string | null
+
+          // Soft-delete
+          deleted_at: string | null
+          deleted_by_technician_id: string | null
+          deleted_by_technician_name: string | null
         }
         Insert: Omit<Database['public']['Tables']['business_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['business_cases']['Insert']>

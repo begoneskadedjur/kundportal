@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { XCircle } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import { supabase } from '../../../lib/supabase'
@@ -18,7 +18,9 @@ interface CloseCaseModalProps {
   isOpen: boolean
   onClose: () => void
   cases: TechnicianCase[]
-  onSuccess: (closedIds: string[]) => void
+  onSuccess: (deletedIds: string[]) => void
+  technicianId: string
+  technicianName: string
 }
 
 function getTableName(caseType: string): string {
@@ -27,7 +29,9 @@ function getTableName(caseType: string): string {
   return 'private_cases'
 }
 
-export default function CloseCaseModal({ isOpen, onClose, cases, onSuccess }: CloseCaseModalProps) {
+export default function CloseCaseModal({
+  isOpen, onClose, cases, onSuccess, technicianId, technicianName,
+}: CloseCaseModalProps) {
   const [reason, setReason] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -43,10 +47,11 @@ export default function CloseCaseModal({ isOpen, onClose, cases, onSuccess }: Cl
     try {
       const now = new Date().toISOString()
       const updates = {
-        status: 'Stängt - slasklogg',
+        deleted_at: now,
+        deleted_by_technician_id: technicianId,
+        deleted_by_technician_name: technicianName,
         close_reason: reason,
         close_reason_notes: notes.trim() || null,
-        completed_date: now,
       }
 
       const results = await Promise.allSettled(
@@ -63,10 +68,10 @@ export default function CloseCaseModal({ isOpen, onClose, cases, onSuccess }: Cl
 
       if (succeeded.length > 0) {
         onSuccess(succeeded)
-        toast.success(`${succeeded.length} ärende${succeeded.length > 1 ? 'n' : ''} stängt`)
+        toast.success(`${succeeded.length} ärende${succeeded.length > 1 ? 'n' : ''} borttaget`)
       }
       if (failed > 0) {
-        toast.error(`${failed} ärende${failed > 1 ? 'n' : ''} kunde inte stängas`)
+        toast.error(`${failed} ärende${failed > 1 ? 'n' : ''} kunde inte tas bort`)
       }
 
       setReason('')
@@ -89,7 +94,7 @@ export default function CloseCaseModal({ isOpen, onClose, cases, onSuccess }: Cl
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={isBatch ? `Stäng ${cases.length} ärenden` : 'Stäng ärende'}
+      title={isBatch ? `Ta bort ${cases.length} ärenden` : 'Ta bort ärende'}
       size="sm"
       footer={
         <div className="flex items-center justify-end gap-3 px-4 py-2.5">
@@ -100,8 +105,8 @@ export default function CloseCaseModal({ isOpen, onClose, cases, onSuccess }: Cl
             disabled={!canSave || saving}
             loading={saving}
           >
-            <XCircle className="w-4 h-4 mr-1.5" />
-            {isBatch ? `Stäng ${cases.length} ärenden` : 'Stäng ärende'}
+            <Trash2 className="w-4 h-4 mr-1.5" />
+            {isBatch ? `Ta bort ${cases.length} ärenden` : 'Ta bort'}
           </Button>
         </div>
       }
@@ -116,9 +121,13 @@ export default function CloseCaseModal({ isOpen, onClose, cases, onSuccess }: Cl
 
         {isBatch && (
           <p className="text-sm text-slate-400">
-            Alla {cases.length} markerade ärenden kommer att stängas med samma anledning.
+            Alla {cases.length} markerade ärenden kommer att tas bort med samma anledning.
           </p>
         )}
+
+        <p className="text-xs text-slate-500">
+          Ärendet döljs från din vy men behålls i systemet. Admin kan se borttagna ärenden.
+        </p>
 
         <div>
           <label className="text-xs font-medium text-slate-400 mb-1 block">
@@ -145,7 +154,7 @@ export default function CloseCaseModal({ isOpen, onClose, cases, onSuccess }: Cl
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
-              placeholder="Beskriv varför ärendet stängs..."
+              placeholder="Beskriv varför ärendet tas bort..."
               className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-transparent resize-none"
             />
           </div>
