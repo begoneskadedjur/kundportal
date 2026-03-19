@@ -1483,21 +1483,13 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
             if (contractForLink?.source_id) {
               console.log(`🔗 Kopplar offert/kontrakt till ärende via source_id: ${contractForLink.source_id}`)
-              const { error: caseUpdateError } = await supabase
-                .from('cases')
-                .update({
-                  oneflow_contract_id: contractId,
-                  quote_status: contractData.type === 'offer' ? 'sent' : 'pending',
-                  quote_sent_at: new Date().toISOString(),
-                  quote_generated_at: contractDetails.created_time || new Date().toISOString()
-                })
-                .eq('id', contractForLink.source_id)
-
-              if (caseUpdateError) {
-                console.error('❌ Kunde inte koppla offert till ärende:', caseUpdateError)
-              } else {
-                console.log('✅ Offert/kontrakt kopplat till ärende via source_id')
-              }
+              // Uppdatera status till "Offert skickad" på rätt tabell (cases/private_cases/business_cases)
+              await updateCaseStatusViaSourceId(contractId, 'Offert skickad', {
+                oneflow_contract_id: contractId,
+                quote_status: contractData.type === 'offer' ? 'sent' : 'pending',
+                quote_sent_at: new Date().toISOString(),
+                quote_generated_at: contractDetails.created_time || new Date().toISOString(),
+              })
             } else {
               // Fallback: Försök hitta case_id i Oneflow data fields (legacy)
               const caseIdField = contractDetails.data_fields?.find(field =>
@@ -1506,14 +1498,34 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               )
               if (caseIdField?.value) {
                 console.log(`🔗 Kopplar offert till ärende via Oneflow data field: ${caseIdField.value}`)
-                await supabase
+                // Använd updateCaseStatusViaSourceId kan inte användas här (ingen contractId-koppling)
+                // Uppdatera alla tre tabeller manuellt
+                const fallbackUpdate = {
+                  status: 'Offert skickad',
+                  oneflow_contract_id: contractId,
+                  quote_status: contractData.type === 'offer' ? 'sent' : 'pending',
+                  quote_sent_at: new Date().toISOString(),
+                }
+                const { data: caseRow } = await supabase
                   .from('cases')
-                  .update({
-                    oneflow_contract_id: contractId,
-                    quote_status: contractData.type === 'offer' ? 'sent' : 'pending',
-                    quote_sent_at: new Date().toISOString(),
-                  })
+                  .update(fallbackUpdate)
                   .eq('id', caseIdField.value)
+                  .select('id')
+                  .maybeSingle()
+                if (!caseRow) {
+                  const { data: privateRow } = await supabase
+                    .from('private_cases')
+                    .update(fallbackUpdate)
+                    .eq('id', caseIdField.value)
+                    .select('id')
+                    .maybeSingle()
+                  if (!privateRow) {
+                    await supabase
+                      .from('business_cases')
+                      .update(fallbackUpdate)
+                      .eq('id', caseIdField.value)
+                  }
+                }
               }
             }
 

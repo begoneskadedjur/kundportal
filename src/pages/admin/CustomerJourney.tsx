@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  GitBranch, CalendarCheck, FileText, CheckCircle, XCircle,
+  GitBranch, FileText, CheckCircle, XCircle, Zap, AlertTriangle,
   Receipt, BadgeCheck, XOctagon, ClipboardList, RefreshCw,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -63,13 +63,6 @@ const CASE_TYPE_FILTERS: { key: CaseTypeFilter; label: string }[] = [
   { key: 'private', label: 'Privat' },
   { key: 'business', label: 'Företag' },
 ]
-
-// Statuses that imply the case has been booked (passed the "Öppen" stage)
-const BOOKED_OR_LATER = new Set([
-  'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in',
-  'Återbesök', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5',
-  'Generera saneringsrapport', 'Avslutat',
-])
 
 function getStartDate(period: Period): string {
   const now = new Date()
@@ -176,32 +169,38 @@ export default function CustomerJourney() {
     const total = filteredCases.length
     if (total === 0) return []
 
-    // Classify each case
+    // Helper: does this case have an offer?
+    const hasOffer = (c: JourneyCaseRow) => {
+      const contract = contractMap.get(c.id)
+      return !!(contract || c.status === 'Offert skickad' || c.status === 'Offert signerad - boka in')
+    }
+    const isCompleted = (c: JourneyCaseRow) => c.status === 'Avslutat'
+    const isClosed = (c: JourneyCaseRow) => c.status === 'Stängt - slasklogg'
+
+    // Mutually exclusive branches from "created"
     const created = filteredCases
-    const booked = filteredCases.filter(c => BOOKED_OR_LATER.has(c.status))
-    const offerSent = filteredCases.filter(c => {
+    const directJobs = filteredCases.filter(c => isCompleted(c) && !hasOffer(c))
+    const offerSent = filteredCases.filter(c => hasOffer(c))
+    const noResult = filteredCases.filter(c => !isCompleted(c) && !isClosed(c) && !hasOffer(c))
+    const closed = filteredCases.filter(c => isClosed(c))
+
+    // Sub-branches within offer flow
+    const accepted = offerSent.filter(c => {
       const contract = contractMap.get(c.id)
-      return contract || c.status === 'Offert skickad' || c.status === 'Offert signerad - boka in'
+      return (contract && contract.status === 'signed') || c.status === 'Offert signerad - boka in'
     })
-    const accepted = filteredCases.filter(c => {
-      const contract = contractMap.get(c.id)
-      return (contract && contract.status === 'signed') ||
-        c.status === 'Offert signerad - boka in' ||
-        (BOOKED_OR_LATER.has(c.status) && contract?.status === 'signed')
-    })
-    const declined = filteredCases.filter(c => {
+    const declined = offerSent.filter(c => {
       const contract = contractMap.get(c.id)
       return contract && (contract.status === 'declined' || contract.status === 'overdue')
     })
-    const completed = filteredCases.filter(c => c.status === 'Avslutat')
-    const closed = filteredCases.filter(c => c.status === 'Stängt - slasklogg')
+
+    // Bottom flow (cumulative, not exclusive)
     const invoiced = filteredCases.filter(c => invoiceMap.has(c.id))
     const paid = filteredCases.filter(c => invoiceMap.get(c.id)?.status === 'paid')
 
     const sumValue = (arr: JourneyCaseRow[]) => arr.reduce((s, c) => s + (c.pris || 0), 0)
     const pct = (arr: JourneyCaseRow[]) => total > 0 ? Math.round((arr.length / total) * 100) : 0
 
-    // Enrich with contract/invoice status for display
     const enrich = (arr: JourneyCaseRow[]): JourneyCaseRow[] =>
       arr.map(c => ({
         ...c,
@@ -211,14 +210,14 @@ export default function CustomerJourney() {
 
     return [
       { id: 'created', label: 'Skapade ärenden', count: created.length, totalValue: sumValue(created), cases: enrich(created), percentage: 100, icon: ClipboardList, color: 'slate', bgColor: 'bg-slate-500/20', textColor: 'text-slate-400' },
-      { id: 'booked', label: 'Bokade', count: booked.length, totalValue: sumValue(booked), cases: enrich(booked), percentage: pct(booked), icon: CalendarCheck, color: 'amber', bgColor: 'bg-amber-500/20', textColor: 'text-amber-400' },
+      { id: 'direct', label: 'Direktjobb', count: directJobs.length, totalValue: sumValue(directJobs), cases: enrich(directJobs), percentage: pct(directJobs), icon: Zap, color: 'emerald', bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400' },
       { id: 'offer_sent', label: 'Offert skickad', count: offerSent.length, totalValue: sumValue(offerSent), cases: enrich(offerSent), percentage: pct(offerSent), icon: FileText, color: 'teal', bgColor: 'bg-teal-500/20', textColor: 'text-teal-400' },
+      { id: 'no_result', label: 'Utan avslut', count: noResult.length, totalValue: sumValue(noResult), cases: enrich(noResult), percentage: pct(noResult), icon: AlertTriangle, color: 'orange', bgColor: 'bg-orange-500/20', textColor: 'text-orange-400' },
       { id: 'accepted', label: 'Accepterad', count: accepted.length, totalValue: sumValue(accepted), cases: enrich(accepted), percentage: pct(accepted), icon: CheckCircle, color: 'green', bgColor: 'bg-[#20c58f]/20', textColor: 'text-[#20c58f]' },
       { id: 'declined', label: 'Nekad / Utgången', count: declined.length, totalValue: sumValue(declined), cases: enrich(declined), percentage: pct(declined), icon: XCircle, color: 'red', bgColor: 'bg-red-500/20', textColor: 'text-red-400' },
-      { id: 'completed', label: 'Utfört arbete', count: completed.length, totalValue: sumValue(completed), cases: enrich(completed), percentage: pct(completed), icon: CheckCircle, color: 'emerald', bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400' },
-      { id: 'closed', label: 'Stängda', count: closed.length, totalValue: sumValue(closed), cases: enrich(closed), percentage: pct(closed), icon: XOctagon, color: 'red', bgColor: 'bg-red-500/20', textColor: 'text-red-400' },
       { id: 'invoiced', label: 'Fakturerat', count: invoiced.length, totalValue: sumValue(invoiced), cases: enrich(invoiced), percentage: pct(invoiced), icon: Receipt, color: 'blue', bgColor: 'bg-blue-500/20', textColor: 'text-blue-400' },
       { id: 'paid', label: 'Betalt', count: paid.length, totalValue: sumValue(paid), cases: enrich(paid), percentage: pct(paid), icon: BadgeCheck, color: 'emerald', bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400' },
+      { id: 'closed', label: 'Stängda', count: closed.length, totalValue: sumValue(closed), cases: enrich(closed), percentage: pct(closed), icon: XOctagon, color: 'red', bgColor: 'bg-red-500/20', textColor: 'text-red-400' },
     ]
   }, [filteredCases, contractMap, invoiceMap])
 
@@ -226,15 +225,15 @@ export default function CustomerJourney() {
 
   const kpis = useMemo(() => {
     const total = stages.find(s => s.id === 'created')?.count || 0
-    const completedCount = stages.find(s => s.id === 'completed')?.count || 0
-    const paidCount = stages.find(s => s.id === 'paid')?.count || 0
+    const directCount = stages.find(s => s.id === 'direct')?.count || 0
+    const offerCount = stages.find(s => s.id === 'offer_sent')?.count || 0
+    const acceptedCount = stages.find(s => s.id === 'accepted')?.count || 0
+    const noResultCount = stages.find(s => s.id === 'no_result')?.count || 0
     const totalValue = stages.find(s => s.id === 'created')?.totalValue || 0
-    const convRate = total > 0 ? Math.round((completedCount / total) * 100) : 0
-    const avgOrder = completedCount > 0
-      ? Math.round((stages.find(s => s.id === 'completed')?.totalValue || 0) / completedCount)
-      : 0
+    const directRate = total > 0 ? Math.round((directCount / total) * 100) : 0
+    const offerAcceptRate = offerCount > 0 ? Math.round((acceptedCount / offerCount) * 100) : 0
 
-    return { total, convRate, paidCount, totalValue, avgOrder }
+    return { total, directRate, offerAcceptRate, noResultCount, totalValue }
   }, [stages])
 
   const selectedStage = stages.find(s => s.id === selectedStageId) || null
@@ -309,9 +308,9 @@ export default function CustomerJourney() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'Totalt skapade', value: kpis.total.toString(), color: 'text-white' },
-              { label: 'Konvertering → Avslutat', value: `${kpis.convRate}%`, color: 'text-[#20c58f]' },
-              { label: 'Snittorder (avslutat)', value: formatCurrency(kpis.avgOrder), color: 'text-blue-400' },
-              { label: 'Total pipeline-värde', value: formatCurrency(kpis.totalValue), color: 'text-amber-400' },
+              { label: 'Direktkonvertering', value: `${kpis.directRate}%`, color: 'text-[#20c58f]' },
+              { label: 'Offertacceptans', value: `${kpis.offerAcceptRate}%`, color: 'text-teal-400' },
+              { label: 'Utan avslut', value: kpis.noResultCount.toString(), color: 'text-orange-400' },
             ].map(kpi => (
               <div key={kpi.label} className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
                 <p className="text-xs text-slate-400">{kpi.label}</p>
