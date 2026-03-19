@@ -73,6 +73,7 @@ import TechnicianCases from './pages/technician/TechnicianCases';
 import TechnicianSchedule from './pages/technician/TechnicianSchedule';
 import StationInspectionModule from './pages/technician/StationInspectionModule';
 import TechnicianEquipment from './pages/technician/TechnicianEquipment';
+import TechnicianCustomerJourney from './pages/technician/TechnicianCustomerJourney';
 import EquipmentPlacementGuide from './pages/technician/guides/EquipmentPlacementGuide';
 import FollowUpCaseGuide from './pages/technician/guides/FollowUpCaseGuide';
 import CaseDeletionGuide from './pages/technician/guides/CaseDeletionGuide';
@@ -261,6 +262,7 @@ function App() {
               <Route path="leads" element={<ProtectedRoute requiredRole="technician"><Leads /></ProtectedRoute>} />
               <Route path="oneflow" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="offer-follow-up" element={<ProtectedRoute requiredRole="technician"><OfferFollowUp /></ProtectedRoute>} />
+              <Route path="min-kundresa" element={<ProtectedRoute requiredRole="technician"><TechnicianCustomerJourney /></ProtectedRoute>} />
               <Route path="equipment" element={<ProtectedRoute requiredRole="technician"><TechnicianEquipment /></ProtectedRoute>} />
               <Route path="team-chat" element={<ProtectedRoute requiredRole="technician"><TeamChat /></ProtectedRoute>} />
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="technician"><IncidentsPage /></ProtectedRoute>} />

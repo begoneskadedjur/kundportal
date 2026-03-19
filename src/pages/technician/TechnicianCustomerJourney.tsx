@@ -5,48 +5,11 @@ import {
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { supabase } from '../../lib/supabase'
-import { isCompletedStatus } from '../../types/database'
+import { useAuth } from '../../contexts/AuthContext'
 import { formatCurrency } from '../../utils/formatters'
-import { getAvailableTechnicians } from '../../services/commissionService'
-import type { TechnicianFilter } from '../../types/commission'
-import CommissionTechnicianFilter from '../../components/admin/commissions/CommissionTechnicianFilter'
 import CustomerJourneyFunnel from '../../components/admin/sales/CustomerJourneyFunnel'
 import FunnelStageDetail from '../../components/admin/sales/FunnelStageDetail'
-
-// ─── Types ───────────────────────────────────────────────
-
-export interface JourneyCaseRow {
-  id: string
-  title: string
-  status: string
-  kontaktperson: string | null
-  telefon_kontaktperson: string | null
-  pris: number | null
-  start_date: string | null
-  completed_date: string | null
-  created_at: string
-  skadedjur: string | null
-  case_type: 'private' | 'business'
-  company_name?: string | null
-  contractStatus?: string | null
-  invoiceStatus?: string | null
-}
-
-export interface JourneyStage {
-  id: string
-  label: string
-  count: number
-  totalValue: number
-  cases: JourneyCaseRow[]
-  percentage: number
-  icon: React.ElementType
-  color: string
-  bgColor: string
-  textColor: string
-}
-
-interface ContractInfo { status: string; type: string }
-interface InvoiceInfo { status: string }
+import type { JourneyCaseRow, JourneyStage } from '../admin/CustomerJourney'
 
 // ─── Constants ───────────────────────────────────────────
 
@@ -67,6 +30,9 @@ const CASE_TYPE_FILTERS: { key: CaseTypeFilter; label: string }[] = [
   { key: 'business', label: 'Företag' },
 ]
 
+interface ContractInfo { status: string; type: string }
+interface InvoiceInfo { status: string }
+
 function getStartDate(period: Period): string {
   const now = new Date()
   if (period === 'ytd') return `${now.getFullYear()}-01-01`
@@ -78,44 +44,32 @@ function getStartDate(period: Period): string {
 
 // ─── Component ───────────────────────────────────────────
 
-export default function CustomerJourney() {
+export default function TechnicianCustomerJourney() {
+  const { profile } = useAuth()
+  const technicianId = profile?.technician_id
+
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<Period>('3m')
   const [caseTypeFilter, setCaseTypeFilter] = useState<CaseTypeFilter>('all')
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
-  const [technicians, setTechnicians] = useState<TechnicianFilter[]>([])
-  const [selectedTechnician, setSelectedTechnician] = useState<TechnicianFilter>({ id: 'all', name: 'Alla tekniker' })
 
   const [cases, setCases] = useState<JourneyCaseRow[]>([])
   const [contractMap, setContractMap] = useState<Map<string, ContractInfo>>(new Map())
   const [invoiceMap, setInvoiceMap] = useState<Map<string, InvoiceInfo>>(new Map())
 
-  // ─── Fetch technicians ──────────────────────────
-
-  useEffect(() => {
-    getAvailableTechnicians().then(setTechnicians)
-  }, [])
-
   // ─── Fetch ───────────────────────────────────────
 
   const fetchData = useCallback(async () => {
+    if (!technicianId) return
     setLoading(true)
     const startDate = getStartDate(period)
 
     try {
       const selectFields = 'id, title, status, kontaktperson, telefon_kontaktperson, pris, start_date, completed_date, created_at, skadedjur'
 
-      let privateQuery = supabase.from('private_cases').select(selectFields).gte('created_at', startDate).is('deleted_at', null)
-      let businessQuery = supabase.from('business_cases').select(`${selectFields}, company_name`).gte('created_at', startDate).is('deleted_at', null)
-
-      if (selectedTechnician.id !== 'all') {
-        privateQuery = privateQuery.eq('primary_assignee_id', selectedTechnician.id)
-        businessQuery = businessQuery.eq('primary_assignee_id', selectedTechnician.id)
-      }
-
       const [privateRes, businessRes] = await Promise.allSettled([
-        privateQuery,
-        businessQuery,
+        supabase.from('private_cases').select(selectFields).gte('created_at', startDate).is('deleted_at', null).eq('primary_assignee_id', technicianId),
+        supabase.from('business_cases').select(`${selectFields}, company_name`).gte('created_at', startDate).is('deleted_at', null).eq('primary_assignee_id', technicianId),
       ])
 
       const allCases: JourneyCaseRow[] = [
@@ -129,7 +83,6 @@ export default function CustomerJourney() {
 
       setCases(allCases)
 
-      // Batch supplementary
       const caseIds = allCases.map(c => c.id)
       if (caseIds.length > 0) {
         const [contractsRes, invoicesRes] = await Promise.allSettled([
@@ -167,11 +120,11 @@ export default function CustomerJourney() {
         setInvoiceMap(new Map())
       }
     } catch {
-      // silently fail, show empty state
+      // silently fail
     } finally {
       setLoading(false)
     }
-  }, [period, selectedTechnician.id])
+  }, [period, technicianId])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -188,7 +141,6 @@ export default function CustomerJourney() {
     const total = filteredCases.length
     if (total === 0) return []
 
-    // Helper: does this case have an offer?
     const hasOffer = (c: JourneyCaseRow) => {
       const contract = contractMap.get(c.id)
       return !!(contract || c.status === 'Offert skickad' || c.status === 'Offert signerad - boka in')
@@ -196,14 +148,12 @@ export default function CustomerJourney() {
     const isCompleted = (c: JourneyCaseRow) => c.status === 'Avslutat'
     const isClosed = (c: JourneyCaseRow) => c.status === 'Stängt - slasklogg'
 
-    // Mutually exclusive branches from "created"
     const created = filteredCases
     const directJobs = filteredCases.filter(c => isCompleted(c) && !hasOffer(c))
     const offerSent = filteredCases.filter(c => hasOffer(c))
     const noResult = filteredCases.filter(c => !isCompleted(c) && !isClosed(c) && !hasOffer(c))
     const closed = filteredCases.filter(c => isClosed(c))
 
-    // Sub-branches within offer flow
     const accepted = offerSent.filter(c => {
       const contract = contractMap.get(c.id)
       return (contract && contract.status === 'signed') || c.status === 'Offert signerad - boka in'
@@ -213,7 +163,6 @@ export default function CustomerJourney() {
       return contract && (contract.status === 'declined' || contract.status === 'overdue')
     })
 
-    // Bottom flow (cumulative, not exclusive)
     const invoiced = filteredCases.filter(c => invoiceMap.has(c.id))
     const paid = filteredCases.filter(c => invoiceMap.get(c.id)?.status === 'paid')
 
@@ -248,14 +197,21 @@ export default function CustomerJourney() {
     const offerCount = stages.find(s => s.id === 'offer_sent')?.count || 0
     const acceptedCount = stages.find(s => s.id === 'accepted')?.count || 0
     const noResultCount = stages.find(s => s.id === 'no_result')?.count || 0
-    const totalValue = stages.find(s => s.id === 'created')?.totalValue || 0
     const directRate = total > 0 ? Math.round((directCount / total) * 100) : 0
     const offerAcceptRate = offerCount > 0 ? Math.round((acceptedCount / offerCount) * 100) : 0
 
-    return { total, directRate, offerAcceptRate, noResultCount, totalValue }
+    return { total, directRate, offerAcceptRate, noResultCount }
   }, [stages])
 
   const selectedStage = stages.find(s => s.id === selectedStageId) || null
+
+  if (!technicianId) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-slate-400">Kunde inte hitta tekniker-ID</p>
+      </div>
+    )
+  }
 
   // ─── Render ─────────────────────────────────────
 
@@ -266,9 +222,9 @@ export default function CustomerJourney() {
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <GitBranch className="w-5 h-5 text-[#20c58f]" />
-            Kundresa
+            Min Kundresa (Engångskunder)
           </h1>
-          <p className="text-sm text-slate-400 mt-0.5">Visualisering av kundflödet från ärende till betalning</p>
+          <p className="text-sm text-slate-400 mt-0.5">Ditt kundflöde från ärende till betalning</p>
         </div>
         <button
           onClick={fetchData}
@@ -314,16 +270,6 @@ export default function CustomerJourney() {
             </button>
           ))}
         </div>
-
-        {/* Technician */}
-        {technicians.length > 0 && (
-          <CommissionTechnicianFilter
-            selectedTechnician={selectedTechnician}
-            availableTechnicians={technicians}
-            onTechnicianChange={t => { setSelectedTechnician(t); setSelectedStageId(null) }}
-            className="w-64"
-          />
-        )}
       </div>
 
       {loading ? (
