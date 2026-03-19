@@ -4,58 +4,16 @@ import { useNavigate, Link } from 'react-router-dom'
 import {
   AlertCircle, AlertTriangle,
   FileSignature, Sparkles, Target, RefreshCw, Wallet, LayoutDashboard,
+  Calendar, ClipboardList, FileText,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency } from '../../utils/formatters'
-import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import TodayScheduleCard from '../../components/technician/dashboard/TodayScheduleCard'
-import ActionRequiredList from '../../components/technician/dashboard/ActionRequiredList'
+import CaseSummaryCard from '../../components/technician/dashboard/CaseSummaryCard'
+import OfferSummaryCard from '../../components/technician/dashboard/OfferSummaryCard'
 import { supabase } from '../../lib/supabase'
 
 // ─── Types ─────────────────────────────────────
-
-interface TechnicianCase {
-  id: string
-  clickup_task_id: string
-  case_number?: string
-  title: string
-  status: string
-  priority?: string
-  case_type: 'private' | 'business' | 'contract'
-  created_date: string
-  start_date?: string
-  due_date?: string
-  completed_date?: string
-  commission_amount?: number
-  case_price?: number
-  kontaktperson?: string
-  telefon_kontaktperson?: string
-  e_post_kontaktperson?: string
-  adress?: any
-  foretag?: string
-  org_nr?: string
-  skadedjur?: string
-  description?: string
-  billing_status?: 'pending' | 'sent' | 'paid' | 'skip'
-  personnummer?: string
-  material_cost?: number
-  time_spent_minutes?: number
-  work_started_at?: string
-  primary_assignee_id?: string | null
-  primary_assignee_name?: string | null
-  assignee_name?: string
-  r_rot_rut?: string
-  r_fastighetsbeteckning?: string
-  r_arbetskostnad?: number
-  r_material_utrustning?: string
-  r_servicebil?: string
-  rapport?: string
-  filer?: any
-  reklamation?: string
-  avvikelser_tillbud_olyckor?: string
-  annat_skadedjur?: string
-  skicka_bokningsbekraftelse?: string
-}
 
 interface DashboardData {
   stats: {
@@ -110,12 +68,12 @@ export default function TechnicianDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<DashboardData | null>(null)
 
-  // Modal state
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [selectedCase, setSelectedCase] = useState<TechnicianCase | null>(null)
-
   // Leads summary
   const [leadsSummary, setLeadsSummary] = useState<{ active: number; followupsToday: number }>({ active: 0, followupsToday: 0 })
+
+  // KPI counts
+  const [todayCount, setTodayCount] = useState(0)
+  const [offerCount, setOfferCount] = useState(0)
 
   useEffect(() => {
     if (profile && !isTechnician) {
@@ -127,6 +85,7 @@ export default function TechnicianDashboard() {
     if (isTechnician && technicianId) {
       fetchDashboardData()
       fetchLeadsSummary()
+      fetchKpiCounts()
     }
   }, [isTechnician, technicianId])
 
@@ -146,6 +105,47 @@ export default function TechnicianDashboard() {
     }
   }
 
+  const fetchKpiCounts = async () => {
+    if (!technicianId) return
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const tomorrowStr = tomorrow.toISOString().slice(0, 10)
+
+      // Today's case count
+      const [privToday, bizToday] = await Promise.allSettled([
+        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+          .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
+          .gte('start_date', today).lt('start_date', tomorrowStr)
+          .is('deleted_at', null)
+          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
+        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+          .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
+          .gte('start_date', today).lt('start_date', tomorrowStr)
+          .is('deleted_at', null)
+          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
+      ])
+      setTodayCount(
+        (privToday.status === 'fulfilled' ? privToday.value.count || 0 : 0) +
+        (bizToday.status === 'fulfilled' ? bizToday.value.count || 0 : 0)
+      )
+
+      // Active offers count (pending + overdue)
+      const techEmail = profile?.technicians?.email
+      if (techEmail) {
+        const { count: offerCnt } = await supabase
+          .from('contracts')
+          .select('id', { count: 'exact', head: true })
+          .eq('begone_employee_email', techEmail)
+          .in('status', ['pending', 'overdue'])
+        setOfferCount(offerCnt || 0)
+      }
+    } catch {
+      // silent
+    }
+  }
+
   const fetchLeadsSummary = async () => {
     if (!technicianId) return
     try {
@@ -162,63 +162,6 @@ export default function TechnicianDashboard() {
       }
     } catch {
       // silent
-    }
-  }
-
-  // ─── Modal handlers ──────────────────────────
-
-  const handleOpenCase = (pendingCase: any) => {
-    const tc: TechnicianCase = {
-      id: pendingCase.id,
-      clickup_task_id: pendingCase.clickup_task_id,
-      title: pendingCase.title,
-      status: pendingCase.status,
-      case_type: pendingCase.case_type,
-      created_date: pendingCase.created_at,
-      description: pendingCase.description,
-      kontaktperson: pendingCase.kontaktperson,
-      telefon_kontaktperson: pendingCase.telefon_kontaktperson,
-      e_post_kontaktperson: pendingCase.e_post_kontaktperson,
-      skadedjur: pendingCase.skadedjur,
-      personnummer: pendingCase.personnummer,
-      org_nr: pendingCase.org_nr,
-      foretag: pendingCase.foretag,
-      adress: pendingCase.adress,
-      case_price: pendingCase.pris,
-      material_cost: pendingCase.material_cost,
-      time_spent_minutes: pendingCase.time_spent_minutes,
-      work_started_at: pendingCase.work_started_at,
-      start_date: pendingCase.start_date,
-      due_date: pendingCase.due_date,
-      primary_assignee_id: pendingCase.primary_assignee_id || technicianId,
-      primary_assignee_name: pendingCase.primary_assignee_name || displayName,
-      assignee_name: pendingCase.assignee_name || displayName,
-      r_rot_rut: pendingCase.r_rot_rut,
-      r_fastighetsbeteckning: pendingCase.r_fastighetsbeteckning,
-      r_arbetskostnad: pendingCase.r_arbetskostnad,
-      r_material_utrustning: pendingCase.r_material_utrustning,
-      r_servicebil: pendingCase.r_servicebil,
-      rapport: pendingCase.rapport,
-      priority: pendingCase.priority,
-      case_number: pendingCase.case_number,
-      billing_status: pendingCase.billing_status,
-    }
-    setSelectedCase(tc)
-    setIsEditModalOpen(true)
-  }
-
-  const handleUpdateSuccess = (updatedCase?: Partial<TechnicianCase>) => {
-    if (!updatedCase && selectedCase && data) {
-      setData(prev => prev ? {
-        ...prev,
-        pending_cases: prev.pending_cases.filter(c => c.id !== selectedCase.id),
-      } : prev)
-      setIsEditModalOpen(false)
-      setSelectedCase(null)
-      return
-    }
-    if (updatedCase && selectedCase) {
-      setSelectedCase(prev => prev ? { ...prev, ...updatedCase } : prev)
     }
   }
 
@@ -261,8 +204,6 @@ export default function TechnicianDashboard() {
 
   if (!data) return null
 
-  const pendingCases = data.pending_cases || []
-
   return (
     <div className="max-w-3xl mx-auto px-4 py-4 sm:py-6 space-y-4">
 
@@ -280,7 +221,7 @@ export default function TechnicianDashboard() {
           </div>
         </div>
         <button
-          onClick={() => { fetchDashboardData(); fetchLeadsSummary() }}
+          onClick={() => { fetchDashboardData(); fetchLeadsSummary(); fetchKpiCounts() }}
           className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors w-full sm:w-auto"
         >
           <RefreshCw className="w-4 h-4" />
@@ -288,25 +229,27 @@ export default function TechnicianDashboard() {
         </button>
       </div>
 
-      {/* Status pills */}
-      <div className="flex items-center gap-2">
-        {data.stats.pending_cases > 0 && (
-          <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs font-medium rounded-full">
-            {data.stats.pending_cases} att hantera
-          </span>
-        )}
-        {leadsSummary.active > 0 && (
-          <span className="px-2 py-0.5 bg-blue-500/15 text-blue-400 text-xs font-medium rounded-full">
-            {leadsSummary.active} leads
-          </span>
-        )}
+      {/* KPI row */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: 'Idag', value: todayCount, icon: Calendar, color: 'text-[#20c58f]', bg: 'bg-[#20c58f]/15' },
+          { label: 'Att göra', value: data.stats.pending_cases, icon: ClipboardList, color: 'text-amber-400', bg: 'bg-amber-500/15' },
+          { label: 'Offerter', value: offerCount, icon: FileText, color: 'text-blue-400', bg: 'bg-blue-500/15' },
+          { label: 'Leads', value: leadsSummary.active, icon: Target, color: 'text-purple-400', bg: 'bg-purple-500/15' },
+        ].map(kpi => (
+          <div key={kpi.label} className="flex flex-col items-center gap-1 py-2 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
+            <span className="text-lg font-bold text-white">{kpi.value}</span>
+            <span className="text-[10px] text-slate-400 font-medium">{kpi.label}</span>
+          </div>
+        ))}
       </div>
 
       {/* ─── Section 1: Today's Schedule ─── */}
       {technicianId && <TodayScheduleCard technicianId={technicianId} />}
 
-      {/* ─── Section 2: Action Required ─── */}
-      <ActionRequiredList cases={pendingCases} onCaseClick={handleOpenCase} />
+      {/* ─── Section 2: Case Summary ─── */}
+      {technicianId && <CaseSummaryCard technicianId={technicianId} />}
 
       {/* ─── Section 3: Provisions-strip ─── */}
       <Link
@@ -323,6 +266,9 @@ export default function TechnicianDashboard() {
         </div>
         <span className="text-xs text-[#20c58f] font-medium">Visa detaljer</span>
       </Link>
+
+      {/* ─── Section 3b: Offer Summary ─── */}
+      <OfferSummaryCard technicianEmail={data.stats.technician_email} />
 
       {/* ─── Section 4: Quick Actions ─── */}
       <div className="grid grid-cols-3 gap-2">
@@ -370,13 +316,6 @@ export default function TechnicianDashboard() {
         </Link>
       )}
 
-      {/* ─── Modals ─── */}
-      <EditCaseModal
-        isOpen={isEditModalOpen}
-        onClose={() => { setIsEditModalOpen(false); setSelectedCase(null) }}
-        onSuccess={handleUpdateSuccess}
-        caseData={selectedCase}
-      />
     </div>
   )
 }

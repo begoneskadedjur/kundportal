@@ -59,16 +59,18 @@ export default function TodayScheduleCard({ technicianId }: Props) {
     const selectFields = 'id, title, status, start_date, kontaktperson, telefon_kontaktperson, adress, skadedjur, work_started_at, time_spent_minutes'
 
     try {
-      // Today's cases
+      // Today's cases (exclude completed/closed)
       const [privToday, bizToday] = await Promise.allSettled([
         supabase.from('private_cases').select(selectFields)
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
           .gte('start_date', today).lt('start_date', tomorrowStr)
-          .is('deleted_at', null),
+          .is('deleted_at', null)
+          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
         supabase.from('business_cases').select(`${selectFields}, company_name`)
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
           .gte('start_date', today).lt('start_date', tomorrowStr)
-          .is('deleted_at', null),
+          .is('deleted_at', null)
+          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
       ])
 
       const todayCases: ScheduleCase[] = [
@@ -82,16 +84,18 @@ export default function TodayScheduleCard({ technicianId }: Props) {
 
       setCases(todayCases)
 
-      // Tomorrow count
+      // Tomorrow count (exclude completed/closed)
       const [privTmrw, bizTmrw] = await Promise.allSettled([
         supabase.from('private_cases').select('id', { count: 'exact', head: true })
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
           .gte('start_date', tomorrowStr).lt('start_date', dayAfterStr)
-          .is('deleted_at', null),
+          .is('deleted_at', null)
+          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
         supabase.from('business_cases').select('id', { count: 'exact', head: true })
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
           .gte('start_date', tomorrowStr).lt('start_date', dayAfterStr)
-          .is('deleted_at', null),
+          .is('deleted_at', null)
+          .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
       ])
 
       const tmrwCount = (privTmrw.status === 'fulfilled' ? privTmrw.value.count || 0 : 0) +
