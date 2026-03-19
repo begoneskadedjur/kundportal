@@ -9,13 +9,6 @@ interface Props {
   onSelectStage: (id: string) => void
 }
 
-// ─── Layout ──────────────────────────────────────────────
-// Row 1: [created] (full width)
-// Row 2: [direct | offer_sent | no_result] (3-col)
-// Row 3: under offer_sent → [accepted | declined] (2-col)
-// Row 4-5: [invoiced → paid] (full width)
-// Separate: [closed]
-
 function getConversionRate(from: number, to: number): string {
   if (from === 0) return '0%'
   return `${Math.round((to / from) * 100)}%`
@@ -38,15 +31,18 @@ function VerticalConnector({ label }: { label?: string }) {
 // ─── Stage node ──────────────────────────────────────────
 
 function StageNode({
-  stage, isSelected, onClick, delay, compact,
+  stage, isSelected, onClick, delay, size = 'normal',
 }: {
   stage: JourneyStage
   isSelected: boolean
   onClick: () => void
   delay: number
-  compact?: boolean
+  size?: 'normal' | 'medium' | 'small'
 }) {
   const Icon = stage.icon
+  const isSmall = size === 'small'
+  const isMedium = size === 'medium'
+
   return (
     <motion.button
       type="button"
@@ -54,33 +50,37 @@ function StageNode({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.3 }}
       onClick={onClick}
-      className={`w-full text-left p-3 rounded-xl border transition-all ${
+      className={`w-full text-left rounded-xl border transition-all ${
+        isSmall ? 'p-2.5' : 'p-3'
+      } ${
         isSelected
           ? 'border-[#20c58f] bg-[#20c58f]/10 ring-1 ring-[#20c58f]/30'
           : 'border-slate-700 bg-slate-800/30 hover:border-slate-500 hover:bg-slate-800/50'
       }`}
     >
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${stage.bgColor} shrink-0`}>
-          <Icon className={`w-4 h-4 ${stage.textColor}`} />
+      <div className="flex items-center gap-2.5">
+        <div className={`${isSmall ? 'p-1.5' : 'p-2'} rounded-lg ${stage.bgColor} shrink-0`}>
+          <Icon className={`${isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'} ${stage.textColor}`} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <span className={`${compact ? 'text-xs' : 'text-sm'} font-medium text-white truncate`}>{stage.label}</span>
-            <span className={`${compact ? 'text-base' : 'text-lg'} font-bold ${stage.textColor}`}>{stage.count}</span>
+          <div className="flex items-center justify-between gap-1.5">
+            <span className={`${isSmall ? 'text-xs' : isMedium ? 'text-sm' : 'text-sm'} font-medium text-white`}>
+              {stage.label}
+            </span>
+            <span className={`${isSmall ? 'text-sm' : isMedium ? 'text-base' : 'text-lg'} font-bold ${stage.textColor} shrink-0`}>
+              {stage.count}
+            </span>
           </div>
-          {!compact && (
-            <div className="flex items-center justify-between mt-0.5">
-              <span className="text-xs text-slate-500">{stage.percentage}% av totalt</span>
-              {stage.totalValue > 0 && (
-                <span className="text-xs text-slate-400">{formatCurrency(stage.totalValue)}</span>
-              )}
-            </div>
-          )}
+          <div className="flex items-center justify-between mt-0.5">
+            <span className="text-[10px] text-slate-500">{stage.percentage}%</span>
+            {!isSmall && stage.totalValue > 0 && (
+              <span className="text-[10px] text-slate-400">{formatCurrency(stage.totalValue)}</span>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="mt-2 w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+      <div className={`${isSmall ? 'mt-1.5' : 'mt-2'} w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden`}>
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${Math.max(stage.percentage, 2)}%` }}
@@ -102,26 +102,20 @@ function StageNode({
   )
 }
 
-// ─── Branch connector (1 → 3) ────────────────────────────
+// ─── Branch connectors ───────────────────────────────────
 
 function TripleBranchConnector() {
   return (
-    <div className="py-1">
-      <svg width="100%" height="28" className="text-slate-600" preserveAspectRatio="none">
-        {/* Center stem */}
-        <line x1="50%" y1="0" x2="50%" y2="8" stroke="currentColor" strokeWidth="1" />
-        {/* Horizontal bar */}
-        <line x1="16.67%" y1="8" x2="83.33%" y2="8" stroke="currentColor" strokeWidth="1" />
-        {/* Left drop */}
-        <line x1="16.67%" y1="8" x2="16.67%" y2="28" stroke="currentColor" strokeWidth="1" />
-        {/* Center drop */}
-        <line x1="50%" y1="8" x2="50%" y2="28" stroke="currentColor" strokeWidth="1" />
-        {/* Right drop */}
-        <line x1="83.33%" y1="8" x2="83.33%" y2="28" stroke="currentColor" strokeWidth="1" />
-        {/* Arrowheads */}
-        <polygon points="14.17,28 16.67,34 19.17,28" fill="currentColor" />
-        <polygon points="47.5,28 50,34 52.5,28" fill="currentColor" />
-        <polygon points="80.83,28 83.33,34 85.83,28" fill="currentColor" />
+    <div className="py-1.5">
+      <svg width="100%" height="32" className="text-slate-600" preserveAspectRatio="none">
+        <line x1="50%" y1="0" x2="50%" y2="10" stroke="currentColor" strokeWidth="1" />
+        <line x1="16.67%" y1="10" x2="83.33%" y2="10" stroke="currentColor" strokeWidth="1" />
+        <line x1="16.67%" y1="10" x2="16.67%" y2="26" stroke="currentColor" strokeWidth="1" />
+        <line x1="50%" y1="10" x2="50%" y2="26" stroke="currentColor" strokeWidth="1" />
+        <line x1="83.33%" y1="10" x2="83.33%" y2="26" stroke="currentColor" strokeWidth="1" />
+        <polygon points="14.67,26 16.67,32 18.67,26" fill="currentColor" />
+        <polygon points="48,26 50,32 52,26" fill="currentColor" />
+        <polygon points="81.33,26 83.33,32 85.33,26" fill="currentColor" />
       </svg>
     </div>
   )
@@ -129,14 +123,14 @@ function TripleBranchConnector() {
 
 function DoubleBranchConnector() {
   return (
-    <div className="py-1">
-      <svg width="100%" height="28" className="text-slate-600" preserveAspectRatio="none">
-        <line x1="50%" y1="0" x2="50%" y2="8" stroke="currentColor" strokeWidth="1" />
-        <line x1="25%" y1="8" x2="75%" y2="8" stroke="currentColor" strokeWidth="1" />
-        <line x1="25%" y1="8" x2="25%" y2="28" stroke="currentColor" strokeWidth="1" />
-        <line x1="75%" y1="8" x2="75%" y2="28" stroke="currentColor" strokeWidth="1" />
-        <polygon points="22.5,28 25,34 27.5,28" fill="currentColor" />
-        <polygon points="72.5,28 75,34 77.5,28" fill="currentColor" />
+    <div className="py-1.5">
+      <svg width="100%" height="32" className="text-slate-600" preserveAspectRatio="none">
+        <line x1="50%" y1="0" x2="50%" y2="10" stroke="currentColor" strokeWidth="1" />
+        <line x1="25%" y1="10" x2="75%" y2="10" stroke="currentColor" strokeWidth="1" />
+        <line x1="25%" y1="10" x2="25%" y2="26" stroke="currentColor" strokeWidth="1" />
+        <line x1="75%" y1="10" x2="75%" y2="26" stroke="currentColor" strokeWidth="1" />
+        <polygon points="23,26 25,32 27,26" fill="currentColor" />
+        <polygon points="73,26 75,32 77,26" fill="currentColor" />
       </svg>
     </div>
   )
@@ -161,8 +155,8 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
   let d = 0
 
   return (
-    <div className="p-4 bg-slate-800/20 border border-slate-700/50 rounded-xl">
-      <div className="max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 bg-slate-800/20 border border-slate-700/50 rounded-xl">
+      <div className="max-w-3xl mx-auto">
 
         {/* Row 1: Created (full width) */}
         {created && (
@@ -178,14 +172,14 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
         <TripleBranchConnector />
 
         {/* Row 2: direct | offer_sent | no_result */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
           {direct && (
             <StageNode
               stage={direct}
               isSelected={selectedStageId === 'direct'}
               onClick={() => onSelectStage('direct')}
               delay={d++ * 0.08}
-              compact
+              size="medium"
             />
           )}
           {offerSent && (
@@ -194,7 +188,7 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
               isSelected={selectedStageId === 'offer_sent'}
               onClick={() => onSelectStage('offer_sent')}
               delay={d++ * 0.08}
-              compact
+              size="medium"
             />
           )}
           {noResult && (
@@ -203,27 +197,24 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
               isSelected={selectedStageId === 'no_result'}
               onClick={() => onSelectStage('no_result')}
               delay={d++ * 0.08}
-              compact
+              size="medium"
             />
           )}
         </div>
 
         {/* Sub-branch under offer_sent: accepted / declined */}
         {offerSent && offerSent.count > 0 && (accepted || declined) && (
-          <div className="grid grid-cols-3 gap-2">
-            {/* Empty left column (under direct) */}
-            <div />
-            {/* Center column: branch connector + sub-nodes */}
-            <div>
+          <div className="flex justify-center">
+            <div className="w-full sm:w-1/2 lg:w-2/5">
               <DoubleBranchConnector />
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 gap-2">
                 {accepted && (
                   <StageNode
                     stage={accepted}
                     isSelected={selectedStageId === 'accepted'}
                     onClick={() => onSelectStage('accepted')}
                     delay={d++ * 0.08}
-                    compact
+                    size="small"
                   />
                 )}
                 {declined && (
@@ -232,13 +223,11 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
                     isSelected={selectedStageId === 'declined'}
                     onClick={() => onSelectStage('declined')}
                     delay={d++ * 0.08}
-                    compact
+                    size="small"
                   />
                 )}
               </div>
             </div>
-            {/* Empty right column (under no_result) */}
-            <div />
           </div>
         )}
 
@@ -283,7 +272,7 @@ export default function CustomerJourneyFunnel({ stages, selectedStageId, onSelec
               isSelected={selectedStageId === 'closed'}
               onClick={() => onSelectStage('closed')}
               delay={0}
-              compact
+              size="medium"
             />
           </motion.div>
         )}
