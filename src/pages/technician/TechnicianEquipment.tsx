@@ -24,7 +24,8 @@ import {
   AlertCircle,
   ArrowLeft,
   MapPin,
-  Check
+  Check,
+  Wrench
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
@@ -487,6 +488,27 @@ export default function TechnicianEquipment() {
     <div className="text-white flex flex-col pb-24 md:pb-8">
       {/* Huvudinnehåll */}
       <div className="flex-grow max-w-screen-2xl mx-auto w-full p-4">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500">
+                <Wrench className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">Utrustning</h1>
+                <p className="text-slate-400 text-sm">Fordon och utrustningshantering</p>
+              </div>
+            </div>
+            <button
+              onClick={refreshData}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors w-full sm:w-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Uppdatera
+            </button>
+          </div>
+        </div>
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <div className="text-center">

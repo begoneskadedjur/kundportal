@@ -14,7 +14,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction'
 import svLocale from '@fullcalendar/core/locales/sv'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Calendar, Phone, MapPin, ChevronLeft, ChevronRight, User, Users, Clock, AlertCircle, Navigation, Search, Filter, X, BarChart, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Calendar, CalendarDays, Phone, MapPin, ChevronLeft, ChevronRight, User, Users, Clock, AlertCircle, Navigation, Search, Filter, X, BarChart, RefreshCw } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
@@ -394,6 +394,22 @@ export default function TechnicianSchedule() {
   return (
     <>
       <div className="text-white flex flex-col min-h-[calc(100vh-3.5rem)]">
+        <div className="max-w-screen-2xl mx-auto w-full px-2 sm:px-4 pt-2 sm:pt-4">
+          {/* Header */}
+          <div className="mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500">
+                  <CalendarDays className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-white">Schema</h1>
+                  <p className="text-slate-400 text-sm">Bokade besök och planering</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="flex-grow max-w-screen-2xl mx-auto w-full p-2 sm:p-4 flex lg:flex-row flex-col gap-4">
           <aside className="hidden lg:block lg:w-1/3 xl:w-1/4"><Card className="p-0 bg-slate-900/50 border-slate-800 sticky top-[76px]"><FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card></aside>
           <main className="flex-grow w-full lg:w-2/3 xl:w-3/4">

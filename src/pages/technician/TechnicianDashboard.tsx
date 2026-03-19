@@ -1,17 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
 import {
-  DollarSign, Calendar, AlertCircle, AlertTriangle,
-  ChevronDown, ChevronUp, FileSignature, Sparkles, Target, RefreshCw,
+  AlertCircle, AlertTriangle,
+  FileSignature, Sparkles, Target, RefreshCw, Wallet, LayoutDashboard,
 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency } from '../../utils/formatters'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
-import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
-import MonthlyOverviewList from '../../components/technician/MonthlyOverviewList'
-import MonthlyCommissionModal from '../../components/technician/MonthlyCommissionModal'
 import TodayScheduleCard from '../../components/technician/dashboard/TodayScheduleCard'
 import ActionRequiredList from '../../components/technician/dashboard/ActionRequiredList'
 import { supabase } from '../../lib/supabase'
@@ -113,13 +109,10 @@ export default function TechnicianDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<DashboardData | null>(null)
-  const [showCommHistory, setShowCommHistory] = useState(false)
 
   // Modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedCase, setSelectedCase] = useState<TechnicianCase | null>(null)
-  const [selectedMonth, setSelectedMonth] = useState<any | null>(null)
-  const [showMonthlyModal, setShowMonthlyModal] = useState(false)
 
   // Leads summary
   const [leadsSummary, setLeadsSummary] = useState<{ active: number; followupsToday: number }>({ active: 0, followupsToday: 0 })
@@ -273,34 +266,40 @@ export default function TechnicianDashboard() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-4 sm:py-6 space-y-4">
 
-      {/* ─── Section 0: Greeting ─── */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-white">
-            {getGreeting()}, {displayName.split(' ')[0]}
-          </h1>
-          <p className="text-sm text-slate-400 capitalize">{getDateString()}</p>
-
-          {/* Status pills */}
-          <div className="flex items-center gap-2 mt-2">
-            {data.stats.pending_cases > 0 && (
-              <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs font-medium rounded-full">
-                {data.stats.pending_cases} att hantera
-              </span>
-            )}
-            {leadsSummary.active > 0 && (
-              <span className="px-2 py-0.5 bg-blue-500/15 text-blue-400 text-xs font-medium rounded-full">
-                {leadsSummary.active} leads
-              </span>
-            )}
+      {/* ─── Header ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500">
+            <LayoutDashboard className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">
+              {getGreeting()}, {displayName.split(' ')[0]}
+            </h1>
+            <p className="text-slate-400 text-sm capitalize">{getDateString()}</p>
           </div>
         </div>
         <button
           onClick={() => { fetchDashboardData(); fetchLeadsSummary() }}
-          className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/50 transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors w-full sm:w-auto"
         >
           <RefreshCw className="w-4 h-4" />
+          Uppdatera
         </button>
+      </div>
+
+      {/* Status pills */}
+      <div className="flex items-center gap-2">
+        {data.stats.pending_cases > 0 && (
+          <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs font-medium rounded-full">
+            {data.stats.pending_cases} att hantera
+          </span>
+        )}
+        {leadsSummary.active > 0 && (
+          <span className="px-2 py-0.5 bg-blue-500/15 text-blue-400 text-xs font-medium rounded-full">
+            {leadsSummary.active} leads
+          </span>
+        )}
       </div>
 
       {/* ─── Section 1: Today's Schedule ─── */}
@@ -309,41 +308,21 @@ export default function TechnicianDashboard() {
       {/* ─── Section 2: Action Required ─── */}
       <ActionRequiredList cases={pendingCases} onCaseClick={handleOpenCase} />
 
-      {/* ─── Section 3: Commission KPIs ─── */}
-      <div className="grid grid-cols-2 gap-3">
-        <EnhancedKpiCard
-          title="Provision denna månad"
-          value={data.stats.current_month_commission}
-          icon={Calendar}
-          suffix=" kr"
-          decimals={0}
-          trend={(() => {
-            const curr = data.monthly_data[0]
-            const prev = data.monthly_data[1]
-            if (!curr || !prev || prev.total_commission === 0) return 'neutral'
-            return curr.total_commission > prev.total_commission ? 'up' : 'down'
-          })()}
-          trendValue={(() => {
-            const curr = data.monthly_data[0]
-            const prev = data.monthly_data[1]
-            if (!curr || !prev || prev.total_commission === 0) return ''
-            const change = ((curr.total_commission - prev.total_commission) / prev.total_commission) * 100
-            return `${change >= 0 ? '+' : ''}${Math.round(change)}%`
-          })()}
-          customContent={
-            <p className="text-slate-500 text-xs">{data.stats.completed_cases_this_month} avslutade</p>
-          }
-        />
-        <EnhancedKpiCard
-          title="Provision i år"
-          value={data.stats.total_commission_ytd}
-          icon={DollarSign}
-          suffix=" kr"
-          decimals={0}
-          trend="neutral"
-          trendValue={`${data.stats.total_cases_ytd} ärenden`}
-        />
-      </div>
+      {/* ─── Section 3: Provisions-strip ─── */}
+      <Link
+        to="/technician/commissions"
+        className="flex items-center justify-between px-3 py-2.5 bg-slate-800/30 border border-slate-700 rounded-xl hover:bg-slate-800/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-[#20c58f]" />
+          <span className="text-sm text-slate-300">
+            {formatCurrency(data.stats.current_month_commission)} denna månad
+            <span className="text-slate-600 mx-1">|</span>
+            {formatCurrency(data.stats.total_commission_ytd)} i år
+          </span>
+        </div>
+        <span className="text-xs text-[#20c58f] font-medium">Visa detaljer</span>
+      </Link>
 
       {/* ─── Section 4: Quick Actions ─── */}
       <div className="grid grid-cols-3 gap-2">
@@ -391,73 +370,12 @@ export default function TechnicianDashboard() {
         </Link>
       )}
 
-      {/* ─── Section 6: Commission History (collapsed) ─── */}
-      <div className="bg-slate-800/30 border border-slate-700 rounded-xl">
-        <button
-          type="button"
-          onClick={() => setShowCommHistory(!showCommHistory)}
-          className="w-full flex items-center justify-between p-3 text-left"
-        >
-          <div className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-[#20c58f]" />
-            <span className="text-sm font-semibold text-white">Provisionshistorik</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">
-              {formatCurrency(data.stats.total_commission_ytd)} YTD
-            </span>
-            {showCommHistory
-              ? <ChevronUp className="w-4 h-4 text-slate-400" />
-              : <ChevronDown className="w-4 h-4 text-slate-400" />
-            }
-          </div>
-        </button>
-
-        <AnimatePresence>
-          {showCommHistory && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="px-3 pb-3 border-t border-slate-700/50">
-                <MonthlyOverviewList
-                  months={data.monthly_data}
-                  onMonthClick={(month: any) => { setSelectedMonth(month); setShowMonthlyModal(true) }}
-                  maxItems={3}
-                />
-                <Link
-                  to="/technician/commissions"
-                  className="block text-center text-xs text-[#20c58f] font-medium mt-2 hover:underline"
-                >
-                  Visa alla provisioner
-                </Link>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
       {/* ─── Modals ─── */}
       <EditCaseModal
         isOpen={isEditModalOpen}
         onClose={() => { setIsEditModalOpen(false); setSelectedCase(null) }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedCase}
-      />
-      <MonthlyCommissionModal
-        isOpen={showMonthlyModal}
-        onClose={() => { setShowMonthlyModal(false); setSelectedMonth(null) }}
-        month={selectedMonth}
-        technicianId={technicianId || ''}
-        onCaseClick={(caseItem) => {
-          const fullCase = data?.pending_cases?.find((c: any) => c.id === caseItem.id)
-          if (fullCase) handleOpenCase(fullCase)
-          setShowMonthlyModal(false)
-          setSelectedMonth(null)
-        }}
       />
     </div>
   )

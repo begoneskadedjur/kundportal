@@ -14,7 +14,6 @@ import {
   type CommissionPost
 } from '../../types/provision'
 import { formatCurrency } from '../../utils/formatters'
-import { PageHeader } from '../../components/shared'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -188,15 +187,27 @@ export default function TechnicianCommissions() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-        <div className="flex items-center justify-between mb-6">
-          <PageHeader title="Mina Provisioner" backPath="/technician/dashboard" />
-          <button
-            onClick={loadData}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-emerald-400 hover:bg-slate-700 rounded-lg transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span className="hidden sm:inline">Uppdatera</span>
-          </button>
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500">
+                <Wallet className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">Mina Provisioner</h1>
+                <p className="text-slate-400 text-sm">Provisionsposter med brytdatum och villkor</p>
+              </div>
+            </div>
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors disabled:opacity-50 w-full sm:w-auto"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Uppdatera
+            </button>
+          </div>
         </div>
 
         {/* ═══ KPI-kort ═══ */}

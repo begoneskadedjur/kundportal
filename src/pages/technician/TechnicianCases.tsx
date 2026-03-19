@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Search, AlertTriangle, CalendarPlus, CalendarCheck, FileText,
   RotateCcw, FileCheck, ChevronDown, ChevronRight, ClipboardList,
-  Clock, CheckCircle, AlertCircle, Trash2
+  Clock, CheckCircle, AlertCircle, Trash2, Briefcase, RefreshCw
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -426,6 +426,29 @@ export default function TechnicianCases() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500">
+              <Briefcase className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-white">Mina Ärenden</h1>
+              <p className="text-slate-400 text-sm">Aktiva och avslutade ärenden</p>
+            </div>
+          </div>
+          <button
+            onClick={() => fetchCases(profile?.technician_id || '')}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors disabled:opacity-50 w-full sm:w-auto"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Uppdatera
+          </button>
+        </div>
+      </div>
+
       {/* KPI row */}
       <div className="flex overflow-x-auto gap-3 pb-2 mb-4 snap-x lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
         {[
