@@ -58,27 +58,46 @@ function StageNode({
           : 'border-slate-700 bg-slate-800/30 hover:border-slate-500 hover:bg-slate-800/50'
       }`}
     >
-      <div className="flex items-center gap-2.5">
-        <div className={`${isSmall ? 'p-1.5' : 'p-2'} rounded-lg ${stage.bgColor} shrink-0`}>
-          <Icon className={`${isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'} ${stage.textColor}`} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-1.5">
-            <span className={`${isSmall ? 'text-xs' : isMedium ? 'text-sm' : 'text-sm'} font-medium text-white`}>
-              {stage.label}
-            </span>
-            <span className={`${isSmall ? 'text-sm' : isMedium ? 'text-base' : 'text-lg'} font-bold ${stage.textColor} shrink-0`}>
+      {isSmall ? (
+        /* Compact vertical layout for sub-branch nodes */
+        <div className="flex flex-col items-center text-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <div className="p-1 rounded-md shrink-0">
+              <Icon className={`w-3.5 h-3.5 ${stage.textColor}`} />
+            </div>
+            <span className={`text-base font-bold ${stage.textColor}`}>
               {stage.count}
             </span>
           </div>
-          <div className="flex items-center justify-between mt-0.5">
-            <span className="text-[10px] text-slate-500">{stage.percentage}%</span>
-            {!isSmall && stage.totalValue > 0 && (
-              <span className="text-[10px] text-slate-400">{formatCurrency(stage.totalValue)}</span>
-            )}
+          <span className="text-[11px] font-medium text-white truncate w-full leading-tight">
+            {stage.label}
+          </span>
+          <span className="text-[10px] text-slate-500">{stage.percentage}%</span>
+        </div>
+      ) : (
+        /* Normal horizontal layout */
+        <div className="flex items-center gap-2.5">
+          <div className={`p-2 rounded-lg ${stage.bgColor} shrink-0`}>
+            <Icon className={`w-4 h-4 ${stage.textColor}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className={`${isMedium ? 'text-sm' : 'text-sm'} font-medium text-white`}>
+                {stage.label}
+              </span>
+              <span className={`${isMedium ? 'text-base' : 'text-lg'} font-bold ${stage.textColor} shrink-0`}>
+                {stage.count}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mt-0.5">
+              <span className="text-[10px] text-slate-500">{stage.percentage}%</span>
+              {stage.totalValue > 0 && (
+                <span className="text-[10px] text-slate-400">{formatCurrency(stage.totalValue)}</span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className={`${isSmall ? 'mt-1.5' : 'mt-2'} w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden`}>
         <motion.div
