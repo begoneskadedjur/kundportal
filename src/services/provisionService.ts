@@ -57,6 +57,25 @@ export class ProvisionService {
     if (error) throw error
   }
 
+  // ─── Hämta poster för enskild tekniker ──────────────────
+
+  static async getPostsForTechnician(
+    technicianId: string,
+    fromDate?: string
+  ): Promise<CommissionPost[]> {
+    const from = fromDate || `${new Date().getFullYear()}-01-01`
+
+    const { data, error } = await supabase
+      .from('commission_posts')
+      .select('*')
+      .eq('technician_id', technicianId)
+      .gte('created_at', from)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data as CommissionPost[]
+  }
+
   // ─── Beräkning ───────────────────────────────────────────
 
   static calculateCommission(
