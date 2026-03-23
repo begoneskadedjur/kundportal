@@ -25,6 +25,7 @@ import {
   ClipboardList,
   AlertTriangle,
   GitBranch,
+  Trash2,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -65,6 +66,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
       { label: 'Offerthantering', icon: ClipboardList, path: '/admin/offerthantering' },
       { label: 'Kundresa', icon: GitBranch, path: '/admin/kundresa' },
+      { label: 'Avslutade ärenden', icon: Trash2, path: '/admin/avslutade-arenden' },
     ]
   },
   {
@@ -147,6 +149,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/trafikljusoversikt': 'Trafikljusöversikt',
   '/admin/offerthantering': 'Offerthantering',
   '/admin/kundresa': 'Kundresa',
+  '/admin/avslutade-arenden': 'Avslutade ärenden',
 
   '/admin/ai-assistent': 'AI Assistent',
   '/admin/bildbank': 'Gemensam bildbank',

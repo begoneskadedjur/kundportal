@@ -41,6 +41,7 @@ import ImageBank from './pages/admin/ImageBank';
 import TeamChat from './pages/admin/TeamChat';
 import IncidentsPage from './pages/admin/IncidentsPage';
 import CustomerJourney from './pages/admin/CustomerJourney';
+import ClosedCasesFunnel from './pages/admin/ClosedCasesFunnel';
 
 // Multisite pages
 import AdminOrganizationsPage from './pages/admin/multisite/OrganizationsPage';
@@ -144,6 +145,7 @@ function App() {
               <Route path="forsaljningspipeline" element={<ProtectedRoute requiredRole="admin"><ContractsOverview /></ProtectedRoute>} />
               <Route path="offerthantering" element={<ProtectedRoute requiredRole="admin"><CasePipeline /></ProtectedRoute>} />
               <Route path="kundresa" element={<ProtectedRoute requiredRole="admin"><CustomerJourney /></ProtectedRoute>} />
+              <Route path="avslutade-arenden" element={<ProtectedRoute requiredRole="admin"><ClosedCasesFunnel /></ProtectedRoute>} />
               <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
               <Route path="kundgrupper" element={<ProtectedRoute requiredRole="admin"><CustomerGroupsPage /></ProtectedRoute>} />
               <Route path="sms-mallar" element={<ProtectedRoute requiredRole="admin"><SmsTemplatesPage /></ProtectedRoute>} />

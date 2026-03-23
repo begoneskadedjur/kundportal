@@ -148,11 +148,16 @@ const getStatusColor = (status: string) => {
 }
 
 const CLOSE_REASON_LABELS: Record<string, string> = {
+  kund_accepterade_inte_pris: 'Kund accepterade inte kostnadsförslaget',
+  kund_aterkopplade_aldrig: 'Kund återkopplade aldrig',
+  lost_vid_inspektion: 'Löst vid inspektion',
+  kund_avbokade: 'Kund avbokade',
   kund_ej_narbar: 'Kund ej nåbar',
-  kund_avbojt: 'Kund avböjt',
   dublett: 'Dublett',
-  lost_utan_atgard: 'Löst utan åtgärd',
   ovrigt: 'Övrigt',
+  // Legacy (bakåtkompatibilitet)
+  kund_avbojt: 'Kund avböjt',
+  lost_utan_atgard: 'Löst utan åtgärd',
 }
 
 const CONTRACT_STATUS_DISPLAY: Record<string, { label: string; color: string }> = {

@@ -105,7 +105,7 @@ export default function OfferSummaryCard({ technicianEmail }: Props) {
               </div>
               <span className="text-sm text-slate-300">
                 <span className="text-white font-semibold">{insights.overdue}</span>
-                {' '}förfallen{insights.overdue > 1 ? 'a' : ''} — <span className="text-red-400">kontakta kund</span>
+                {' '}förfalln{insights.overdue > 1 ? 'a' : 'en'} — <span className="text-red-400">kontakta kund</span>
               </span>
             </div>
             <ChevronRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition-colors" />

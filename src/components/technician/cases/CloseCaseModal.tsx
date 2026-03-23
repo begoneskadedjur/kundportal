@@ -7,10 +7,12 @@ import toast from 'react-hot-toast'
 import type { TechnicianCase } from '../../../pages/technician/TechnicianCases'
 
 const CLOSE_REASONS = [
+  { value: 'kund_accepterade_inte_pris', label: 'Kund accepterade inte kostnadsförslaget' },
+  { value: 'kund_aterkopplade_aldrig', label: 'Kund återkopplade aldrig' },
+  { value: 'lost_vid_inspektion', label: 'Löst vid inspektion' },
+  { value: 'kund_avbokade', label: 'Kund avbokade' },
   { value: 'kund_ej_narbar', label: 'Kund ej nåbar' },
-  { value: 'kund_avbojt', label: 'Kund avböjt' },
   { value: 'dublett', label: 'Dublett' },
-  { value: 'lost_utan_atgard', label: 'Löst utan åtgärd' },
   { value: 'ovrigt', label: 'Övrigt' },
 ]
 
