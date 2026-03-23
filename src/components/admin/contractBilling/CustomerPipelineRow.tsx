@@ -96,7 +96,7 @@ export function CustomerPipelineRow({
 
       {/* Varningsikon */}
       {entry.has_items_requiring_approval && (
-        <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0" title="Kraver godkannande" />
+        <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0" title="Kräver godkännande" />
       )}
 
       {/* Detalj-ikon (bara om klickbar) */}

@@ -224,8 +224,8 @@ export function MonthlyBillingPipeline() {
     color: string
   }[] = [
     { key: 'awaiting_generation', label: 'Ej genererade', count: totalStats.awaiting_generation, icon: Calendar, color: 'amber' },
-    { key: 'pending', label: 'Vantar', count: totalStats.pending, icon: Clock, color: 'yellow' },
-    { key: 'approved', label: 'Godkanda', count: totalStats.approved, icon: CheckCircle, color: 'blue' },
+    { key: 'pending', label: 'Väntar', count: totalStats.pending, icon: Clock, color: 'yellow' },
+    { key: 'approved', label: 'Godkända', count: totalStats.approved, icon: CheckCircle, color: 'blue' },
     { key: 'invoiced', label: 'Fakturerade', count: totalStats.invoiced, icon: FileText, color: 'purple' },
     { key: 'paid', label: 'Betalda', count: totalStats.paid, icon: DollarSign, color: 'emerald' },
   ]
@@ -256,7 +256,7 @@ export function MonthlyBillingPipeline() {
           <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Sok kund..."
+            placeholder="Sök kund..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-8 pr-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 w-52"
@@ -293,7 +293,7 @@ export function MonthlyBillingPipeline() {
           <button
             onClick={() => setMonthOffset(o => o - 1)}
             className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-            title="1 manad bakåt"
+            title="1 månad bakåt"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -303,7 +303,7 @@ export function MonthlyBillingPipeline() {
           <button
             onClick={() => setMonthOffset(o => o + 1)}
             className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-            title="1 manad framat"
+            title="1 månad framåt"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -311,7 +311,7 @@ export function MonthlyBillingPipeline() {
             <button
               onClick={() => setMonthOffset(0)}
               className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-700 rounded-lg transition-colors"
-              title="Aterstall till nuvarande manad"
+              title="Återställ till nuvarande månad"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
@@ -347,7 +347,7 @@ export function MonthlyBillingPipeline() {
               onClick={() => handleBulkStatusChange('approved')}
               className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
             >
-              Godkann
+              Godkänn
             </button>
             <button
               onClick={() => handleBulkStatusChange('invoiced')}
