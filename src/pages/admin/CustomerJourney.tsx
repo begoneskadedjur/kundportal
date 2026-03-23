@@ -343,7 +343,7 @@ export default function CustomerJourney() {
             selectedTechnician={selectedTechnician}
             availableTechnicians={technicians}
             onTechnicianChange={t => { setSelectedTechnician(t); setSelectedStageId(null) }}
-            className="w-64"
+            compact
           />
         )}
       </div>
