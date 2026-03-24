@@ -14,6 +14,8 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string; bg: string
   Inspektion: { label: 'Inspektion', color: 'text-blue-400', bg: 'bg-blue-500/20' },
   'Bekämpning': { label: 'Bekämpning', color: 'text-green-400', bg: 'bg-green-500/20' },
   'Tillbehör': { label: 'Tillbehör', color: 'text-purple-400', bg: 'bg-purple-500/20' },
+  'Arbetstid': { label: 'Arbetstid', color: 'text-orange-400', bg: 'bg-orange-500/20' },
+  'Underleverantör': { label: 'Underleverantör', color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
   'Övrigt': { label: 'Övrigt', color: 'text-slate-400', bg: 'bg-slate-500/20' },
 }
 

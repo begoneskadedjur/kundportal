@@ -12,6 +12,7 @@ import Input from '../ui/Input'
 import { PriceListEditModal } from './settings/PriceListEditModal'
 import { PriceListService } from '../../services/priceListService'
 import { ArticleService } from '../../services/articleService'
+import { ARTICLE_CATEGORIES } from '../../types/articles'
 import type { PriceList, PriceListItemWithArticle, Article, ArticleCategory, ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
 import type { SelectedArticleItem } from '../../types/products'
 import type { CustomerType } from '../../types/products'
@@ -153,13 +154,7 @@ export default function PriceListArticleSelector({
 
   // Gruppera per kategori
   const groupedArticles = useMemo(() => {
-    const groups: Record<ArticleCategory, Article[]> = {
-      Inspektion: [],
-      Bekämpning: [],
-      Tillbehör: [],
-      Arbetstid: [],
-      Övrigt: []
-    }
+    const groups = Object.fromEntries(ARTICLE_CATEGORIES.map(c => [c, []])) as Record<ArticleCategory, Article[]>
     for (const article of filteredArticles) {
       if (groups[article.category]) {
         groups[article.category].push(article)

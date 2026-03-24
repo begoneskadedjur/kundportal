@@ -31,6 +31,7 @@ import type {
   RotRutType
 } from '../../types/caseBilling'
 import { calculateRotRutDeduction, calculateDiscountedPrice, calculateTotalPrice, itemRequiresApproval, ROT_RUT_PERCENT } from '../../types/caseBilling'
+import { ARTICLE_CATEGORIES } from '../../types/articles'
 import type { ArticleCategory } from '../../types/articles'
 import { ARTICLE_CATEGORY_CONFIG, ARTICLE_UNIT_CONFIG, DOSAGE_UNIT_CONFIG, calculatePricePerDosageUnit } from '../../types/articles'
 
@@ -67,7 +68,7 @@ function computeLocalSummary(items: CaseBillingItemWithRelations[], customTotalP
   }
 }
 
-const ALL_CATEGORIES: ArticleCategory[] = ['Inspektion', 'Bekämpning', 'Tillbehör', 'Arbetstid', 'Övrigt']
+const ALL_CATEGORIES = ARTICLE_CATEGORIES
 
 // Förvalda priser inkl. moms för snabbval
 const PRESET_PRICES_INCL = [3490, 4490, 5490]
