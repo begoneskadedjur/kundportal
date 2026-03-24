@@ -344,7 +344,7 @@ export class CaseBillingService {
     }, 0)
     const subcontractorTotal = items.reduce((sum, item) => {
       const article = (item as any).article
-      if (article?.category === 'Underleverantör') return sum + item.total_price
+      if (article?.category === 'Underentreprenör') return sum + item.total_price
       return sum
     }, 0)
 

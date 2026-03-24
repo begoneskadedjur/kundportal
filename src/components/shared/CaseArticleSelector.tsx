@@ -58,7 +58,7 @@ function computeLocalSummary(items: CaseBillingItemWithRelations[], customTotalP
   }, 0)
   const subcontractorTotal = items.reduce((sum, i) => {
     const article = (i as any).article
-    if (article?.category === 'Underleverantör') return sum + i.total_price
+    if (article?.category === 'Underentreprenör') return sum + i.total_price
     return sum
   }, 0)
   return {

@@ -14,7 +14,7 @@ export type DosageUnit = 'g' | 'ml' | 'm'
 /**
  * Artikelkategorier
  */
-export type ArticleCategory = 'Inspektion' | 'Bekämpning' | 'Tillbehör' | 'Arbetstid' | 'Underleverantör' | 'Övrigt'
+export type ArticleCategory = 'Inspektion' | 'Bekämpning' | 'Tillbehör' | 'Arbetstid' | 'Underentreprenör' | 'Övrigt'
 
 /**
  * Artikelgrupp från databasen
@@ -285,8 +285,8 @@ export const ARTICLE_CATEGORY_CONFIG: Record<ArticleCategory, {
     bgColor: 'bg-orange-500/20',
     borderColor: 'border-orange-500/50'
   },
-  Underleverantör: {
-    label: 'Underleverantör',
+  Underentreprenör: {
+    label: 'Underentreprenör',
     color: 'text-cyan-400',
     bgColor: 'bg-cyan-500/20',
     borderColor: 'border-cyan-500/50'
@@ -307,7 +307,7 @@ export const ARTICLE_UNITS: ArticleUnit[] = ['st', 'timme', 'm2', 'kg', 'l', 'da
 /**
  * Alla tillgängliga kategorier som array
  */
-export const ARTICLE_CATEGORIES: ArticleCategory[] = ['Inspektion', 'Bekämpning', 'Tillbehör', 'Arbetstid', 'Underleverantör', 'Övrigt']
+export const ARTICLE_CATEGORIES: ArticleCategory[] = ['Inspektion', 'Bekämpning', 'Tillbehör', 'Arbetstid', 'Underentreprenör', 'Övrigt']
 
 /**
  * Beräkna pris med moms
@@ -386,7 +386,7 @@ export const generateArticleCode = (name: string, category: ArticleCategory): st
     Bekämpning: 'BEK',
     Tillbehör: 'TIL',
     Arbetstid: 'ARB',
-    Underleverantör: 'UND',
+    Underentreprenör: 'UND',
     Övrigt: 'OVR'
   }[category]
 

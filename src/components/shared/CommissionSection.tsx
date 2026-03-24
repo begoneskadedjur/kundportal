@@ -31,7 +31,7 @@ interface CommissionSectionProps {
   rotRutOriginalAmount?: number
   // Visa om poster redan finns
   existingPostCount?: number
-  // Automatiskt avdrag från underleverantörsartiklar
+  // Automatiskt avdrag från underentreprenörsartiklar
   subcontractorDeduction?: number
 }
 
@@ -265,7 +265,7 @@ export default function CommissionSection({
             </div>
             {subcontractorDeduction > 0 && (
               <p className="text-xs text-cyan-400 mt-1">
-                Varav {new Intl.NumberFormat('sv-SE').format(subcontractorDeduction)} kr från underleverantörsartiklar
+                Varav {new Intl.NumberFormat('sv-SE').format(subcontractorDeduction)} kr från underentreprenörsartiklar
               </p>
             )}
           </div>
