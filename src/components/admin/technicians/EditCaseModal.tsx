@@ -402,6 +402,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [commissionNotes, setCommissionNotes] = useState('')
   const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
 
+  // Auto-sätt avdrag från underleverantörsartiklar
+  useEffect(() => {
+    if (billingSummary && existingCommissionPosts === 0) {
+      setCommissionDeductions(billingSummary.subcontractor_total)
+    }
+  }, [billingSummary?.subcontractor_total, existingCommissionPosts])
+
   // Öppna kommunikationspanelen automatiskt om openCommunicationOnLoad är true
   useEffect(() => {
     if (isOpen && openCommunicationOnLoad && caseData) {
@@ -1740,6 +1747,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   isRotRut={!!(formData.r_rot_rut && formData.r_rot_rut !== 'Nej')}
                   rotRutOriginalAmount={formData.r_rot_rut && formData.r_rot_rut !== 'Nej' ? (billingSummary?.subtotal || Number(formData.case_price) || 0) : undefined}
                   existingPostCount={existingCommissionPosts}
+                  subcontractorDeduction={billingSummary?.subcontractor_total || 0}
                 />
               </div>
             )}

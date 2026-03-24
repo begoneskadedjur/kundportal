@@ -56,6 +56,11 @@ function computeLocalSummary(items: CaseBillingItemWithRelations[], customTotalP
     if (i.rot_rut_type) return sum + calculateRotRutDeduction(i.total_price, i.rot_rut_type)
     return sum
   }, 0)
+  const subcontractorTotal = items.reduce((sum, i) => {
+    const article = (i as any).article
+    if (article?.category === 'Underleverantör') return sum + i.total_price
+    return sum
+  }, 0)
   return {
     item_count: items.length,
     subtotal,
@@ -64,6 +69,7 @@ function computeLocalSummary(items: CaseBillingItemWithRelations[], customTotalP
     total_amount: subtotal + vatAmount,
     requires_approval: items.some(i => i.requires_approval),
     rot_rut_deduction: rotRutDeduction,
+    subcontractor_total: subcontractorTotal,
     custom_total_price: customTotalPrice
   }
 }

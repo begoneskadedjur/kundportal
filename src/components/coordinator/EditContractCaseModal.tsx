@@ -173,6 +173,13 @@ export default function EditContractCaseModal({
   const [commissionNotes, setCommissionNotes] = useState('')
   const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
 
+  // Auto-sätt avdrag från underleverantörsartiklar
+  useEffect(() => {
+    if (billingSummary && existingCommissionPosts === 0) {
+      setCommissionDeductions(billingSummary.subcontractor_total)
+    }
+  }, [billingSummary?.subcontractor_total, existingCommissionPosts])
+
   // Följeärende-states (follow-up cases)
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
   const [followUpPestType, setFollowUpPestType] = useState('')
@@ -1800,6 +1807,7 @@ export default function EditContractCaseModal({
                     onNotesChange={setCommissionNotes}
                     baseAmount={billingSummary?.subtotal || Number(formData.price) || 0}
                     existingPostCount={existingCommissionPosts}
+                    subcontractorDeduction={billingSummary?.subcontractor_total || 0}
                   />
                 </div>
               )}

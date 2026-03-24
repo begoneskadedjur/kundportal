@@ -342,6 +342,11 @@ export class CaseBillingService {
     const rotRutDeduction = items.reduce((sum, item) => {
       return sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type)
     }, 0)
+    const subcontractorTotal = items.reduce((sum, item) => {
+      const article = (item as any).article
+      if (article?.category === 'Underleverantör') return sum + item.total_price
+      return sum
+    }, 0)
 
     // Hämta eventuellt anpassat pris
     const override = await this.getCustomPrice(caseId, caseType)
@@ -354,6 +359,7 @@ export class CaseBillingService {
       total_amount: subtotal + vatAmount,
       requires_approval: requiresApproval,
       rot_rut_deduction: rotRutDeduction,
+      subcontractor_total: subcontractorTotal,
       custom_total_price: override
     }
   }

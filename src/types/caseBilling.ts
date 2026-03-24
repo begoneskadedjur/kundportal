@@ -137,6 +137,7 @@ export interface CaseBillingSummary {
   total_amount: number
   requires_approval: boolean
   rot_rut_deduction: number
+  subcontractor_total: number
   custom_total_price: number | null
 }
 
