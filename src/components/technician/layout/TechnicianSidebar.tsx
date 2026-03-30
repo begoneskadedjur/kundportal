@@ -24,6 +24,7 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
   }
 
   return (
+    <>
     <aside className="fixed left-0 top-0 h-full w-64 bg-slate-900/95 backdrop-blur-xl border-r border-slate-700/50 hidden lg:flex flex-col z-40">
       {/* User Profile */}
       <div className="px-3 py-3 border-b border-slate-700/50">
@@ -109,5 +110,6 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
     </aside>
 
     <BugReportModal isOpen={showBugModal} onClose={() => setShowBugModal(false)} />
+    </>
   )
 }

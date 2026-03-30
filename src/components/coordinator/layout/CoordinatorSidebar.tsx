@@ -41,6 +41,7 @@ export function CoordinatorSidebar({
   }
 
   return (
+    <>
     <aside
       className={`
         fixed left-0 top-0 h-full bg-slate-900/95 backdrop-blur-xl border-r border-slate-700/50
@@ -231,5 +232,6 @@ export function CoordinatorSidebar({
     </aside>
 
     <BugReportModal isOpen={showBugModal} onClose={() => setShowBugModal(false)} />
+    </>
   )
 }
