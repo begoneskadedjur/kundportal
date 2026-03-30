@@ -11,6 +11,7 @@ const ADMIN_EMAIL = 'christian.k@begone.se'
 
 export default function BugReportsPage() {
   const { user } = useAuth()
+  const adminId = user?.id ?? ''
   const [reports, setReports] = useState<BugReport[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -39,7 +40,7 @@ export default function BugReportsPage() {
 
   const handleStatusChange = async (id: string, status: BugReportStatus) => {
     setUpdatingId(id)
-    await BugReportService.updateStatus(id, status)
+    await BugReportService.updateStatus(id, status, adminId)
     setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r))
     setUpdatingId(null)
   }

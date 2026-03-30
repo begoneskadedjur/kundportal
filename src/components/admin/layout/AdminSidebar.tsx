@@ -32,9 +32,10 @@ export function AdminSidebar({
   userName,
   onSignOut,
 }: AdminSidebarProps) {
-  const { hasDualRole, setActiveView } = useAuth()
+  const { hasDualRole, setActiveView, user } = useAuth()
   const navigate = useNavigate()
   const [showBugModal, setShowBugModal] = useState(false)
+  const isBugAdmin = user?.email === 'christian.k@begone.se'
 
   const handleSwitchToTechnician = () => {
     setActiveView('technician')
@@ -229,18 +230,20 @@ export function AdminSidebar({
           </button>
         )}
 
-        {/* Rapportera bugg */}
-        <button
-          onClick={() => setShowBugModal(true)}
-          className={`
-            w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors
-            ${collapsed ? 'justify-center' : ''}
-          `}
-          title={collapsed ? 'Rapportera bugg' : undefined}
-        >
-          <Bug className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && <span className="text-sm">Rapportera bugg</span>}
-        </button>
+        {/* Rapportera bugg — döljs för bug-admin */}
+        {!isBugAdmin && (
+          <button
+            onClick={() => setShowBugModal(true)}
+            className={`
+              w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors
+              ${collapsed ? 'justify-center' : ''}
+            `}
+            title={collapsed ? 'Rapportera bugg' : undefined}
+          >
+            <Bug className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && <span className="text-sm">Rapportera bugg</span>}
+          </button>
+        )}
 
         {/* Help center */}
         <Link

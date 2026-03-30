@@ -2,6 +2,9 @@
 
 import { supabase } from '../lib/supabase'
 import type { BugReport, BugReportStatus, CreateBugReportInput } from '../types/bugReport'
+import { BUG_STATUS_CONFIG } from '../types/bugReport'
+
+const BUG_ADMIN_ID = '4ef86aa9-8f9f-4602-a4fd-967d0424697a'
 
 export class BugReportService {
   static async create(
@@ -11,9 +14,7 @@ export class BugReportService {
     userEmail: string,
     userRole: string
   ): Promise<{ data: BugReport | null; error: string | null }> {
-    let image_path: string | null = null
-
-    // Skapa rapport först för att få id
+    // Skapa rapport
     const { data: report, error: insertError } = await supabase
       .from('bug_reports')
       .insert({
@@ -33,6 +34,7 @@ export class BugReportService {
     if (insertError) return { data: null, error: insertError.message }
 
     // Ladda upp bild om sådan finns
+    let image_path: string | null = null
     if (input.image && report) {
       const uploadResult = await BugReportService.uploadImage(input.image, report.id)
       if (uploadResult.path) {
@@ -42,6 +44,21 @@ export class BugReportService {
           .update({ image_path })
           .eq('id', report.id)
       }
+    }
+
+    // Notis till christian.k@begone.se om ny buggrapport
+    if (userId !== BUG_ADMIN_ID) {
+      await supabase.from('notifications').insert({
+        recipient_id: BUG_ADMIN_ID,
+        case_id: null,
+        case_type: null,
+        title: 'Ny buggrapport inkom',
+        preview: `${userName}: ${input.title}`,
+        sender_id: userId,
+        sender_name: userName,
+        source_comment_id: null,
+        case_title: input.title,
+      })
     }
 
     return { data: { ...report, image_path }, error: null }
@@ -67,13 +84,41 @@ export class BugReportService {
     return data as BugReport[]
   }
 
-  static async updateStatus(id: string, status: BugReportStatus): Promise<{ error: string | null }> {
+  static async updateStatus(
+    id: string,
+    status: BugReportStatus,
+    adminId: string
+  ): Promise<{ error: string | null }> {
+    // Hämta rapporten för att kunna skicka notis till rapportören
+    const { data: report } = await supabase
+      .from('bug_reports')
+      .select('reported_by_id, reported_by_name, title')
+      .eq('id', id)
+      .single()
+
     const { error } = await supabase
       .from('bug_reports')
       .update({ status })
       .eq('id', id)
 
-    return { error: error?.message ?? null }
+    if (error) return { error: error.message }
+
+    // Skicka notis till rapportören (om det inte är admin själv)
+    if (report?.reported_by_id && report.reported_by_id !== BUG_ADMIN_ID) {
+      await supabase.from('notifications').insert({
+        recipient_id: report.reported_by_id,
+        case_id: null,
+        case_type: null,
+        title: 'Din buggrapport uppdaterades',
+        preview: `Status ändrades till: ${BUG_STATUS_CONFIG[status].label}`,
+        sender_id: adminId,
+        sender_name: 'BeGone Support',
+        source_comment_id: null,
+        case_title: report.title,
+      })
+    }
+
+    return { error: null }
   }
 
   static async uploadImage(file: File, reportId: string): Promise<{ path: string | null }> {
@@ -91,7 +136,7 @@ export class BugReportService {
   static async getImageUrl(path: string): Promise<string | null> {
     const { data } = await supabase.storage
       .from('bug-reports')
-      .createSignedUrl(path, 60 * 60) // 1 timme
+      .createSignedUrl(path, 60 * 60)
 
     return data?.signedUrl ?? null
   }
