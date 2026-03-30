@@ -1,6 +1,8 @@
 // src/components/technician/layout/TechnicianSidebar.tsx
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { LogOut, Shield } from 'lucide-react'
+import { LogOut, Shield, Bug } from 'lucide-react'
+import { BugReportModal } from '../../shared/BugReportModal'
 import { topLevelItems, navGroups } from './technicianNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -14,6 +16,7 @@ interface TechnicianSidebarProps {
 export function TechnicianSidebar({ currentPath, userName, onSignOut }: TechnicianSidebarProps) {
   const { hasDualRole, setActiveView } = useAuth()
   const navigate = useNavigate()
+  const [showBugModal, setShowBugModal] = useState(false)
 
   const handleSwitchToAdmin = () => {
     setActiveView('admin')
@@ -86,8 +89,15 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
         ))}
       </nav>
 
-      {/* Bottom: Sign out */}
-      <div className="p-3 border-t border-slate-700/50">
+      {/* Bottom: Bug report + Sign out */}
+      <div className="p-3 border-t border-slate-700/50 space-y-1">
+        <button
+          onClick={() => setShowBugModal(true)}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+        >
+          <Bug className="w-4 h-4 flex-shrink-0" />
+          <span className="text-sm">Rapportera bugg</span>
+        </button>
         <button
           onClick={onSignOut}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:text-red-400 hover:bg-red-500/10 focus-visible:ring-2 focus-visible:ring-teal-400 outline-none"
@@ -97,5 +107,7 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
         </button>
       </div>
     </aside>
+
+    <BugReportModal isOpen={showBugModal} onClose={() => setShowBugModal(false)} />
   )
 }

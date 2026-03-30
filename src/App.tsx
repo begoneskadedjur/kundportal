@@ -41,7 +41,8 @@ import ImageBank from './pages/admin/ImageBank';
 import TeamChat from './pages/admin/TeamChat';
 import IncidentsPage from './pages/admin/IncidentsPage';
 import CustomerJourney from './pages/admin/CustomerJourney';
-import ClosedCasesFunnel from './pages/admin/ClosedCasesFunnel';
+import ClosedCasesFunnel from './pages/admin/ClosedCasesFunnel'
+import BugReportsPage from './pages/admin/BugReportsPage';
 
 // Multisite pages
 import AdminOrganizationsPage from './pages/admin/multisite/OrganizationsPage';
@@ -152,6 +153,7 @@ function App() {
               <Route path="oneflow-test" element={<Navigate to="/admin/skapa-avtal" replace />} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="admin"><InternAdministration /></ProtectedRoute>} />
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="admin"><IncidentsPage /></ProtectedRoute>} />
+              <Route path="bug-reports" element={<ProtectedRoute requiredRole="admin"><BugReportsPage /></ProtectedRoute>} />
               <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="admin"><CaseDeletionGuide /></ProtectedRoute>} />
               <Route path="guides/ticket-system" element={<ProtectedRoute requiredRole="admin"><TicketSystemGuide /></ProtectedRoute>} />
               {/* Användarkonton (Kund) - konsoliderad portalhantering */}

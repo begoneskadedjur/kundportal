@@ -1,15 +1,17 @@
 // src/components/coordinator/layout/CoordinatorSidebar.tsx
 import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
   LogOut,
   Search,
   CalendarDays,
-
   HelpCircle,
   Shield,
+  Bug,
 } from 'lucide-react'
+import { BugReportModal } from '../../shared/BugReportModal'
 import { topLevelItems, navGroups } from './coordinatorNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -31,6 +33,7 @@ export function CoordinatorSidebar({
 }: CoordinatorSidebarProps) {
   const { hasDualRole, setActiveView } = useAuth()
   const navigate = useNavigate()
+  const [showBugModal, setShowBugModal] = useState(false)
 
   const handleSwitchToAdmin = () => {
     setActiveView('admin')
@@ -181,6 +184,19 @@ export function CoordinatorSidebar({
           </button>
         )}
 
+        {/* Rapportera bugg */}
+        <button
+          onClick={() => setShowBugModal(true)}
+          className={`
+            w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors
+            ${collapsed ? 'justify-center' : ''}
+          `}
+          title={collapsed ? 'Rapportera bugg' : undefined}
+        >
+          <Bug className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span className="text-sm">Rapportera bugg</span>}
+        </button>
+
         {/* Help center */}
         <Link
           to="/koordinator/larosate"
@@ -213,5 +229,7 @@ export function CoordinatorSidebar({
         </button>
       </div>
     </aside>
+
+    <BugReportModal isOpen={showBugModal} onClose={() => setShowBugModal(false)} />
   )
 }

@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   GitBranch,
   Trash2,
+  Bug,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -86,6 +87,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Användarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
       { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/admin/tillbud-avvikelser' },
+      { label: 'Buggrapporter', icon: Bug, path: '/admin/bug-reports' },
     ]
   },
   {
@@ -163,4 +165,5 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/prislistor': 'Prislistor',
   '/admin/kundgrupper': 'Kundgrupper',
   '/admin/tillbud-avvikelser': 'Tillbud & Avvikelser',
+  '/admin/bug-reports': 'Buggrapporter',
 }

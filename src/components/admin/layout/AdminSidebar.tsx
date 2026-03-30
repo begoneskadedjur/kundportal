@@ -9,7 +9,10 @@ import {
   Star,
   HelpCircle,
   Wrench,
+  Bug,
 } from 'lucide-react'
+import { useState } from 'react'
+import { BugReportModal } from '../../shared/BugReportModal'
 import { topLevelItems, navGroups, favoriteItems } from './adminNavConfig'
 import { SidebarNavGroup } from './SidebarNavGroup'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -31,6 +34,7 @@ export function AdminSidebar({
 }: AdminSidebarProps) {
   const { hasDualRole, setActiveView } = useAuth()
   const navigate = useNavigate()
+  const [showBugModal, setShowBugModal] = useState(false)
 
   const handleSwitchToTechnician = () => {
     setActiveView('technician')
@@ -224,6 +228,19 @@ export function AdminSidebar({
           </button>
         )}
 
+        {/* Rapportera bugg */}
+        <button
+          onClick={() => setShowBugModal(true)}
+          className={`
+            w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors
+            ${collapsed ? 'justify-center' : ''}
+          `}
+          title={collapsed ? 'Rapportera bugg' : undefined}
+        >
+          <Bug className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span className="text-sm">Rapportera bugg</span>}
+        </button>
+
         {/* Help center */}
         <Link
           to="/admin/larosate"
@@ -256,5 +273,7 @@ export function AdminSidebar({
         </button>
       </div>
     </aside>
+
+    <BugReportModal isOpen={showBugModal} onClose={() => setShowBugModal(false)} />
   )
 }
