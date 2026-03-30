@@ -34,6 +34,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Mina ärenden', icon: ClipboardList, path: '/technician/cases' },
       { label: 'Schema', icon: Calendar, path: '/technician/schedule' },
       { label: 'Utrustning', icon: Package, path: '/technician/equipment' },
+      { label: 'Tickets', icon: MessageSquareText, path: '/technician/tickets' },
     ],
   },
   {
@@ -53,7 +54,6 @@ export const navGroups: NavGroup[] = [
       { label: 'AI Assistent', icon: Sparkles, path: '/technician/team-chat' },
       { label: 'Provisioner', icon: DollarSign, path: '/technician/commissions' },
       { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/technician/tillbud-avvikelser' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/technician/tickets' },
     ],
   },
 ]

@@ -34,6 +34,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
       { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
+      { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets' },
     ],
   },
   {
@@ -63,13 +64,6 @@ export const navGroups: NavGroup[] = [
     icon: Receipt,
     items: [
       { label: 'Fakturering', icon: Receipt, path: '/koordinator/fakturering' },
-    ],
-  },
-  {
-    label: 'Organisation',
-    icon: MessageSquareText,
-    items: [
-      { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets' },
     ],
   },
   {
