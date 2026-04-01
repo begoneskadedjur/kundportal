@@ -1483,6 +1483,9 @@ export default function EditContractCaseModal({
                       {customerData.is_multisite && customerData.parent_company_name && (
                         <p className="text-xs text-purple-300 mt-1">Del av: {customerData.parent_company_name}</p>
                       )}
+                      {customerData.assigned_account_manager && (
+                        <p className="text-xs text-slate-400 mt-0.5">AM: {customerData.assigned_account_manager}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-purple-300 mb-1">Organisationsnummer</label>
@@ -1500,17 +1503,6 @@ export default function EditContractCaseModal({
                         <Building2 className="w-3 h-3" />
                         Multisite-organisation
                       </span>
-                    </div>
-                  )}
-                  {customerData.assigned_account_manager && (
-                    <div className="mt-3 pt-3 border-t border-purple-500/20">
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20 w-fit">
-                        <Star size={12} className="text-amber-400 fill-amber-400" />
-                        <span className="text-xs text-slate-400">Account Manager:</span>
-                        <span className="text-xs text-amber-300 font-medium">
-                          {customerData.assigned_account_manager}
-                        </span>
-                      </div>
                     </div>
                   )}
                   {/* Adress - klickbar maps-länk */}
@@ -1581,6 +1573,7 @@ export default function EditContractCaseModal({
                 {/* Tekniker-cirklar */}
                 {!isCustomerView && (
                   <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-xs text-slate-400 mr-0.5">Tekniker</span>
                     {([
                       { key: 'primary_technician_id' as const, label: 'Primär' },
                       { key: 'secondary_technician_id' as const, label: 'Sekundär' },
@@ -1626,7 +1619,7 @@ export default function EditContractCaseModal({
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                  className="flex-1 min-w-[110px] px-2.5 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                  className="w-auto px-2.5 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                   disabled={isCustomerView}
                 >
                   {DROPDOWN_STATUSES.map(status => (
@@ -1637,7 +1630,7 @@ export default function EditContractCaseModal({
                 <select
                   value={formData.pest_type}
                   onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
-                  className="flex-1 min-w-[110px] px-2.5 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                  className="w-auto px-2.5 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                   disabled={isCustomerView}
                 >
                   <option value="">Välj skadedjur</option>
