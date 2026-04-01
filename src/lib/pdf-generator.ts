@@ -288,7 +288,7 @@ const generateWorkReportHTML = (
       background: white;
       border: 1px solid ${beGoneColors.border};
       border-radius: 8px;
-      padding: 14px 16px;
+      padding: 12px 16px;
       page-break-inside: avoid;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
@@ -543,12 +543,10 @@ const generateWorkReportHTML = (
       <div class="kpi-card">
         <div class="kpi-label">Status</div>
         <div class="kpi-value accent">${taskDetails.task_info.status || 'Okänd'}</div>
-        <div class="kpi-subtitle">Aktuell status</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Skadedjur</div>
         <div class="kpi-value">${pestText}</div>
-        <div class="kpi-subtitle">Behandlat skadedjur</div>
       </div>
     </div>
 
@@ -618,7 +616,7 @@ const generateWorkReportHTML = (
 
     <!-- Work Information -->
     <div class="section">
-      <div class="section-header accent">Arbetsinformation</div>
+      <div class="section-header accent">Ärendeinformation</div>
       <div class="card">
         <div class="info-grid">
           <div class="info-group">
@@ -634,7 +632,7 @@ const generateWorkReportHTML = (
             <div class="info-value">${pestText}</div>
           </div>
           <div class="info-group">
-            <div class="info-label">Arbetsstatus</div>
+            <div class="info-label">Ärendestatus</div>
             <div class="info-value">${taskDetails.task_info.status || 'Okänd status'}</div>
           </div>
           ${taskDetails.task_info.description ? `
