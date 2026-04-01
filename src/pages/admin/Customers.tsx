@@ -1,6 +1,6 @@
 // src/pages/admin/Customers.tsx - Success Management Dashboard för kundhantering
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search, Filter, RefreshCw, ChevronDown, ChevronUp, ChevronRight,
@@ -18,6 +18,7 @@ import EditCustomerModal from '../../components/admin/customers/EditCustomerModa
 import RenewalWorkflowModal from '../../components/admin/customers/RenewalWorkflowModal'
 import TerminateContractModal from '../../components/admin/customers/TerminateContractModal'
 import AddContractCustomerModal from '../../components/admin/customers/AddContractCustomerModal'
+import AddXpertContractCustomerModal from '../../components/admin/customers/AddXpertContractCustomerModal'
 import TooltipWrapper from '../../components/ui/TooltipWrapper'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers, type ContactSummary } from '../../hooks/useConsolidatedCustomers'
@@ -258,6 +259,9 @@ export default function Customers() {
   const [terminateModalOpen, setTerminateModalOpen] = useState(false)
   const [terminateOrganization, setTerminateOrganization] = useState<any>(null)
   const [addContractCustomerOpen, setAddContractCustomerOpen] = useState(false)
+  const [addXpertContractCustomerOpen, setAddXpertContractCustomerOpen] = useState(false)
+  const [importDropdownOpen, setImportDropdownOpen] = useState(false)
+  const importDropdownRef = useRef<HTMLDivElement>(null)
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
   const [billingSettingsOrg, setBillingSettingsOrg] = useState<any>(null)
   const [contactsModalOpen, setContactsModalOpen] = useState(false)
@@ -271,6 +275,18 @@ export default function Customers() {
     document.addEventListener('click', handler)
     return () => document.removeEventListener('click', handler)
   }, [mobileOverflowId])
+
+  // Close import dropdown on outside click
+  useEffect(() => {
+    if (!importDropdownOpen) return
+    const handler = (e: MouseEvent) => {
+      if (importDropdownRef.current && !importDropdownRef.current.contains(e.target as Node)) {
+        setImportDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [importDropdownOpen])
 
   // Active customer highlight — tracks which org has an open modal
   const activeCustomerId =
@@ -564,14 +580,44 @@ export default function Customers() {
           <p className="text-sm text-slate-400 mt-1">Hantera kundrelationer och maximera kundvärde</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setAddContractCustomerOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-green-400 hover:bg-green-400/10 transition-colors"
-            title="Lägg till avtalskund från PDF"
-          >
-            <FilePlus className="w-4 h-4" />
-            <span className="hidden md:inline">Lägg till avtalskund</span>
-          </button>
+          <div className="relative" ref={importDropdownRef}>
+            <button
+              onClick={() => setImportDropdownOpen(prev => !prev)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-green-400 hover:bg-green-400/10 transition-colors"
+              title="Lägg till avtalskund från PDF"
+            >
+              <FilePlus className="w-4 h-4" />
+              <span className="hidden md:inline">Lägg till avtalskund</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${importDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {importDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <div className="py-1">
+                  <button
+                    onClick={() => { setImportDropdownOpen(false); setAddContractCustomerOpen(true) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-300 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-colors"
+                  >
+                    <FilePlus className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">Lägg till avtalskund - BeGone</div>
+                      <div className="text-xs text-slate-500 mt-0.5">Importera BeGone-avtal (Oneflow)</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { setImportDropdownOpen(false); setAddXpertContractCustomerOpen(true) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-300 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-colors"
+                  >
+                    <FilePlus className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">Lägg till avtalskund - Xpert</div>
+                      <div className="text-xs text-slate-500 mt-0.5">Importera Xpert Bekämpning-avtal</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="w-px h-6 bg-slate-700" />
           <button
             onClick={() => setEmailCampaignOpen(true)}
@@ -1320,6 +1366,13 @@ export default function Customers() {
       <AddContractCustomerModal
         isOpen={addContractCustomerOpen}
         onClose={() => setAddContractCustomerOpen(false)}
+        onCustomerCreated={refresh}
+      />
+
+      {/* Add Xpert Contract Customer Modal */}
+      <AddXpertContractCustomerModal
+        isOpen={addXpertContractCustomerOpen}
+        onClose={() => setAddXpertContractCustomerOpen(false)}
         onCustomerCreated={refresh}
       />
 
