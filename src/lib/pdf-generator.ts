@@ -80,7 +80,17 @@ const getFieldValue = (taskDetails: TaskDetails, fieldName: string) => {
 const formatDate = (timestamp: string): string => {
   if (!timestamp) return 'Ej angivet'
 
-  // Handle both millisecond timestamps and ISO dates
+  // ISO date-only string (YYYY-MM-DD) – return directly, no conversion needed
+  if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
+    return timestamp
+  }
+
+  // ISO datetime – take only the date part to avoid timezone shifts
+  if (/^\d{4}-\d{2}-\d{2}T/.test(timestamp)) {
+    return timestamp.substring(0, 10)
+  }
+
+  // Millisecond timestamp
   let date: Date
   if (/^\d+$/.test(timestamp)) {
     date = new Date(parseInt(timestamp))
@@ -168,10 +178,8 @@ const generateWorkReportHTML = (
     : 'Ej tilldelad'
   const technicianLabel = taskDetails.assignees.length > 1 ? 'Ansvariga tekniker' : 'Ansvarig tekniker'
 
-  // Case number: use short form if available, otherwise truncate task_id
-  const caseId = taskDetails.task_id.length > 12
-    ? taskDetails.task_id.substring(0, 8) + '...'
-    : taskDetails.task_id
+  // Case number: prefer task_info.name (e.g. "BE-0007475"), fallback to truncated UUID
+  const caseNumber = taskDetails.task_info.name || (taskDetails.task_id.substring(0, 8) + '...')
 
   return `
 <!DOCTYPE html>
@@ -204,7 +212,7 @@ const generateWorkReportHTML = (
     .container {
       max-width: 210mm;
       margin: 0 auto;
-      padding: 20mm;
+      padding: 15mm;
       background: white;
     }
 
@@ -212,8 +220,8 @@ const generateWorkReportHTML = (
     .header {
       background: white;
       border-bottom: 3px solid ${beGoneColors.accent};
-      padding: 24px 0;
-      margin-bottom: 32px;
+      padding: 20px 0;
+      margin-bottom: 24px;
       page-break-inside: avoid;
     }
 
@@ -269,7 +277,7 @@ const generateWorkReportHTML = (
 
     /* Title Section */
     .title-section {
-      margin-bottom: 32px;
+      margin-bottom: 20px;
       page-break-inside: avoid;
     }
 
@@ -285,8 +293,8 @@ const generateWorkReportHTML = (
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 32px;
+      gap: 12px;
+      margin-bottom: 24px;
       page-break-inside: avoid;
     }
 
@@ -294,25 +302,25 @@ const generateWorkReportHTML = (
       background: white;
       border: 1px solid ${beGoneColors.border};
       border-radius: 8px;
-      padding: 20px;
+      padding: 14px 16px;
       page-break-inside: avoid;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
 
     .kpi-label {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       color: ${beGoneColors.mediumGray};
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .kpi-value {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 800;
       color: ${beGoneColors.primary};
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .kpi-value.accent {
@@ -326,16 +334,16 @@ const generateWorkReportHTML = (
 
     /* Section Headers */
     .section {
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       page-break-inside: avoid;
     }
 
     .section-header {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       color: ${beGoneColors.primary};
-      margin-bottom: 16px;
-      padding-bottom: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
       border-bottom: 2px solid ${beGoneColors.divider};
     }
 
@@ -348,8 +356,8 @@ const generateWorkReportHTML = (
       background: white;
       border: 1px solid ${beGoneColors.border};
       border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
       page-break-inside: avoid;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
@@ -358,11 +366,11 @@ const generateWorkReportHTML = (
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      gap: 16px;
     }
 
     .info-group {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
 
     .info-label {
@@ -549,7 +557,7 @@ const generateWorkReportHTML = (
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="kpi-label">Ärende ID</div>
-        <div class="kpi-value">${caseId}</div>
+        <div class="kpi-value" style="font-size: 18px">${caseNumber}</div>
         <div class="kpi-subtitle">Unikt ärende</div>
       </div>
       <div class="kpi-card">
@@ -590,10 +598,6 @@ const generateWorkReportHTML = (
           <div class="info-group">
             <div class="info-label">Email</div>
             <div class="info-value">${emailText}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Ärende ID</div>
-            <div class="info-value">${taskDetails.task_id}</div>
           </div>
         </div>
       </div>
