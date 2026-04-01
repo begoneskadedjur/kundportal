@@ -1390,37 +1390,37 @@ export default function EditContractCaseModal({
 
   // Modal footer
   const modalFooter = (
-    <div className="flex justify-end gap-3 p-6 bg-slate-800/50">
-      <Button
-        onClick={handleClose}
-        variant="secondary"
-        className="bg-slate-700 hover:bg-slate-600"
-      >
-        Stäng
-      </Button>
+    <div className="flex items-center px-4 py-2 bg-slate-800/50">
       {!isCustomerView && (
-        <Button
-          onClick={handleSubmit}
-          loading={loading}
-          disabled={showSaveSuccess}
-          className={`${showSaveSuccess
-            ? 'bg-green-500 hover:bg-green-500'
-            : 'bg-purple-500 hover:bg-purple-600'
-          } transition-colors duration-300`}
+        <button
+          type="button"
+          onClick={() => setShowDeleteDialog(true)}
+          className="flex items-center gap-1.5 text-xs text-red-400/60 hover:text-red-400 transition-colors"
         >
-          {showSaveSuccess ? (
-            <>
-              <Check className="w-4 h-4 mr-2" />
-              Sparat!
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Spara
-            </>
-          )}
-        </Button>
+          <Trash2 className="w-3 h-3" />
+          Radera
+        </button>
       )}
+      <div className="ml-auto flex items-center gap-2">
+        <Button onClick={handleClose} variant="secondary" size="sm">
+          Stäng
+        </Button>
+        {!isCustomerView && (
+          <Button
+            onClick={handleSubmit}
+            size="sm"
+            loading={loading}
+            disabled={showSaveSuccess}
+            className={`${showSaveSuccess ? 'bg-green-500 hover:bg-green-500' : ''} transition-colors duration-300`}
+          >
+            {showSaveSuccess ? (
+              <><Check className="w-4 h-4 mr-1" />Sparat!</>
+            ) : (
+              <><Save className="w-4 h-4 mr-1" />Spara</>
+            )}
+          </Button>
+        )}
+      </div>
     </div>
   )
 
@@ -1710,18 +1710,6 @@ export default function EditContractCaseModal({
                   Grundläggande information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Titel
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
-                  </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">
                       Status
@@ -2258,133 +2246,46 @@ export default function EditContractCaseModal({
               {/* Time tracking */}
               {!isCustomerView && (
                 <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-purple-400" />
-                    Tidtagning
-                  </h3>
-                  <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                    <div className="text-center mb-4">
-                      <div className={`text-3xl font-bold font-mono mb-2 ${isTimerRunning ? 'text-green-400' : 'text-white'}`}>
-                        {formatTime(formData.time_spent_minutes + sessionMinutes)}
-                      </div>
-                      <div className="text-sm text-slate-400">
-                        {isTimerRunning ? (
-                          <span className="text-green-400 flex items-center justify-center gap-2">
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                            Startad kl. {new Date(formData.work_started_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        ) : formData.time_spent_minutes > 0 ? 'Pausad' : 'Ej påbörjad'}
-                      </div>
-                      {isTimerRunning && sessionMinutes > 0 && (
-                        <div className="text-xs text-slate-500 mt-2">
-                          Denna session: {formatTime(sessionMinutes)}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <Clock className={`w-4 h-4 flex-shrink-0 ${isTimerRunning ? 'text-green-400' : 'text-slate-400'}`} />
+                    <span className={`text-lg font-bold font-mono ${isTimerRunning ? 'text-green-400' : 'text-white'}`}>
+                      {formatTime(formData.time_spent_minutes + sessionMinutes)}
+                    </span>
+                    <span className="text-xs text-slate-500">
                       {isTimerRunning ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={handleStopTimer}
-                            className="px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 rounded-lg text-orange-300 transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Pause className="w-4 h-4" />
-                            Pausa
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleStopTimer}
-                            className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 rounded-lg text-green-300 transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Save className="w-4 h-4" />
-                            Slutför
-                          </button>
-                        </div>
+                        <span className="text-green-400 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                          Aktiv
+                        </span>
+                      ) : formData.time_spent_minutes > 0 ? 'Pausad' : 'Ej påbörjad'}
+                    </span>
+                    <div className="ml-auto flex items-center gap-1.5">
+                      {isTimerRunning ? (
+                        <>
+                          <Button type="button" variant="warning" size="sm" onClick={handleStopTimer} className="flex items-center gap-1 text-xs px-2.5 py-1">
+                            <Pause className="w-3 h-3" />Pausa
+                          </Button>
+                          <Button type="button" variant="success" size="sm" onClick={handleStopTimer} className="flex items-center gap-1 text-xs px-2.5 py-1">
+                            <Save className="w-3 h-3" />Slutför
+                          </Button>
+                        </>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={handleStartTimer}
-                          className="w-full px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 rounded-lg text-green-300 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Play className="w-4 h-4" />
-                          {formData.time_spent_minutes > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid'}
-                        </button>
-                      )}
-                      {formData.time_spent_minutes > 0 && !isTimerRunning && (
-                        <button
-                          type="button"
-                          onClick={handleResetTimer}
-                          className="w-full px-3 py-1.5 text-sm text-slate-400 hover:text-red-400 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          Nollställ arbetstid
-                        </button>
+                        <>
+                          <Button type="button" variant="primary" size="sm" onClick={handleStartTimer} className="flex items-center gap-1 text-xs px-2.5 py-1">
+                            <Play className="w-3 h-3" />{formData.time_spent_minutes > 0 ? 'Återuppta' : 'Starta'}
+                          </Button>
+                          {formData.time_spent_minutes > 0 && (
+                            <Button type="button" variant="ghost" size="sm" onClick={handleResetTimer} className="flex items-center gap-1 text-xs px-2 py-1 text-slate-400 hover:text-red-400">
+                              <RotateCcw className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
                 </div>
               )}
-
-              {/* Cost summary */}
-              <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <Star className="w-4 h-4 text-purple-400" />
-                  Kostnad och material
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Materialkostnad (SEK)
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.material_cost}
-                      onChange={(e) => setFormData(prev => ({ ...prev, material_cost: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Totalpris (SEK)
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.price}
-                      onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
-
-              {/* DANGER ZONE - Radera ärende (endast för icke-kundvyer) */}
-              {!isCustomerView && (
-                <div className="mt-8 pt-6 border-t-2 border-red-500/30">
-                  <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-lg">
-                    <div className="flex items-center gap-2 mb-3">
-                      <AlertTriangle className="w-5 h-5 text-red-400" />
-                      <h4 className="text-sm font-medium text-red-400">Farligt område</h4>
-                    </div>
-                    <p className="text-xs text-slate-400 mb-4">
-                      Radering av ärende kan inte ångras. All data, inklusive bilder och kommunikation, kommer att tas bort permanent.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteDialog(true)}
-                      className="flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] px-4 py-2.5 text-sm text-red-400 bg-transparent border border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 rounded-lg transition-all duration-200 active:scale-95"
-                      aria-label="Radera ärende permanent - kan inte ångras"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Radera detta ärende</span>
-                    </button>
-                  </div>
-                </div>
-              )}
           </div>
 
       {/* Följeärende-dialog */}
