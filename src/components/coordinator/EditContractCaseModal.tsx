@@ -1462,17 +1462,17 @@ export default function EditContractCaseModal({
         </div>
       ) : undefined}
     >
-      <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+      <div className="p-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
         {headerActions}
-            <div className="space-y-6">
+            <div className="space-y-3">
               {/* Customer information - visa för avtalskunder */}
               {customerData && (
-                <div className="bg-gradient-to-r from-purple-900/20 to-indigo-900/20 rounded-xl p-6 border border-purple-500/30 mb-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Building className="w-5 h-5 text-purple-400" />
+                <div className="bg-gradient-to-r from-purple-900/20 to-indigo-900/20 rounded-xl p-4 border border-purple-500/30">
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-1.5">
+                    <Building className="w-4 h-4 text-purple-400" />
                     Kundinformation
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-purple-300 mb-1">Företag</label>
                       <p className="text-white font-medium">
@@ -1517,32 +1517,32 @@ export default function EditContractCaseModal({
               )}
 
               {/* Location and pest */}
-              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-purple-400" />
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-purple-400" />
                   Plats och skadedjur
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Adress
                     </label>
                     <input
                       type="text"
                       value={formData.address}
                       onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Skadedjur
                     </label>
                     <select
                       value={formData.pest_type}
                       onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     >
                       <option value="">Välj skadedjur</option>
@@ -1555,45 +1555,45 @@ export default function EditContractCaseModal({
               </div>
 
               {/* Contact information */}
-              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <User className="w-5 h-5 text-purple-400" />
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-purple-400" />
                   Kontaktinformation
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Kontaktperson
                     </label>
                     <input
                       type="text"
                       value={formData.contact_person}
                       onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Telefon
                     </label>
                     <input
                       type="tel"
                       value={formData.contact_phone}
                       onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       E-post
                     </label>
                     <input
                       type="email"
                       value={formData.contact_email}
                       onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     />
                   </div>
@@ -1602,49 +1602,63 @@ export default function EditContractCaseModal({
 
               {/* Technicians */}
               {!isCustomerView && (
-                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-purple-400" />
-                    Tilldelade tekniker
+                <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-orange-400" />
+                    Tekniker
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <TechnicianDropdown
-                      label="Primär tekniker"
-                      value={formData.primary_technician_id}
-                      onChange={(id) => handleTechnicianChange('primary', id)}
-                      technicians={technicians}
-                      variant="primary"
-                    />
-                    <TechnicianDropdown
-                      label="Sekundär tekniker"
-                      value={formData.secondary_technician_id}
-                      onChange={(id) => handleTechnicianChange('secondary', id)}
-                      technicians={technicians}
-                      variant="secondary"
-                    />
-                    <TechnicianDropdown
-                      label="Tertiär tekniker"
-                      value={formData.tertiary_technician_id}
-                      onChange={(id) => handleTechnicianChange('tertiary', id)}
-                      technicians={technicians}
-                      variant="tertiary"
-                    />
+                  <div className="flex items-center gap-2">
+                    {([
+                      { key: 'primary_technician_id' as const, label: 'Primär' },
+                      { key: 'secondary_technician_id' as const, label: 'Sekundär' },
+                      { key: 'tertiary_technician_id' as const, label: 'Tertiär' },
+                    ]).map((slot) => {
+                      const techId = formData[slot.key] || ''
+                      const tech = technicians.find(t => t.id === techId)
+                      const initials = tech ? tech.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : ''
+                      return (
+                        <div key={slot.key} className="relative">
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+                              tech
+                                ? 'bg-[#20c58f]/20 border-2 border-[#20c58f]'
+                                : 'border-2 border-dashed border-slate-600 hover:border-slate-500'
+                            }`}
+                            title={tech ? `${tech.name} (${slot.label})` : `${slot.label} tekniker`}
+                          >
+                            {tech ? (
+                              <span className="text-xs font-bold text-[#20c58f]">{initials}</span>
+                            ) : (
+                              <Plus className="w-3.5 h-3.5 text-slate-500" />
+                            )}
+                          </div>
+                          <select
+                            value={techId}
+                            onChange={(e) => handleTechnicianChange(slot.key.replace('_technician_id', '') as 'primary' | 'secondary' | 'tertiary', e.target.value)}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            title={slot.label}
+                          >
+                            <option value="">Ingen</option>
+                            {technicians.map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
 
               {/* Schemaläggning */}
-              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10 mb-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-blue-400" />
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-blue-400" />
                   Schemaläggning - Ankomsttid
                 </h3>
-                <p className="text-sm text-slate-400 mb-4">
-                  Tekniker anländer till kunden inom detta tidsintervall
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Från tid
                     </label>
                     <DatePicker
@@ -1661,7 +1675,7 @@ export default function EditContractCaseModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Till tid
                     </label>
                     <DatePicker
@@ -1680,9 +1694,9 @@ export default function EditContractCaseModal({
                   </div>
                 </div>
                 {formData.scheduled_start && formData.scheduled_end && (
-                  <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                    <p className="text-sm text-blue-300">
-                      <Clock className="inline w-4 h-4 mr-1" />
+                  <div className="mt-2 p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <p className="text-xs text-blue-300">
+                      <Clock className="inline w-3.5 h-3.5 mr-1" />
                       Tekniker anländer: {formData.scheduled_start.toLocaleDateString('sv-SE')} mellan {formData.scheduled_start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })} - {formData.scheduled_end.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
@@ -1690,32 +1704,32 @@ export default function EditContractCaseModal({
               </div>
 
               {/* Basic information */}
-              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-purple-400" />
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-purple-400" />
                   Grundläggande information
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Titel
                     </label>
                     <input
                       type="text"
                       value={formData.title}
                       onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Status
                     </label>
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     >
                       {DROPDOWN_STATUSES.map(status => (
@@ -1724,14 +1738,14 @@ export default function EditContractCaseModal({
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Beskrivning
                     </label>
                     <textarea
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      rows={3}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      rows={2}
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     />
                   </div>
@@ -1739,17 +1753,17 @@ export default function EditContractCaseModal({
               </div>
 
               {/* Work report */}
-              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-purple-400" />
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-purple-400" />
                   Arbetsrapport
                 </h3>
                 <textarea
                   value={formData.work_report}
                   onChange={(e) => setFormData(prev => ({ ...prev, work_report: e.target.value }))}
-                  rows={6}
+                  rows={4}
                   placeholder="Beskriv utfört arbete..."
-                  className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                   disabled={isCustomerView}
                 />
               </div>
@@ -1782,7 +1796,7 @@ export default function EditContractCaseModal({
 
               {/* Provision sektion */}
               {caseData?.id && !isCustomerView && (
-                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
+                <div className="pt-3 border-t border-slate-700/50">
                   <CommissionSection
                     isEligible={commissionEligible}
                     onEligibleChange={setCommissionEligible}
@@ -1814,14 +1828,11 @@ export default function EditContractCaseModal({
 
               {/* Bilder sektion */}
               {caseData?.id && (
-                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <ImageIcon className="w-5 h-5 text-cyan-400" />
+                <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-cyan-400" />
                     Bilder
                   </h3>
-                  <p className="text-sm text-slate-400 mb-4">
-                    Dokumentera ärendet med bilder. Kategorisera som "Före" (innan behandling), "Efter" (resultat) eller "Övrigt".
-                  </p>
 
                   {/* Bildgalleri med draft-läge - ändringar sparas först när man klickar "Spara" */}
                   <CaseImageGallery
@@ -1839,23 +1850,18 @@ export default function EditContractCaseModal({
                 </div>
               )}
 
-              {/* 🚦 Bedömning & Rekommendationer - Only for contract customers */}
+              {/* Bedömning & Rekommendationer - Only for contract customers */}
               {caseData.customer_id && (
-                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                  <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-lg">
-                      <span className="text-2xl">🚦</span>
-                    </div>
-                    <div>
-                      <span className="text-white">Bedömning & Rekommendationer</span>
-                      <p className="text-sm text-slate-400 font-normal">Trafikljusstatus med åtgärdsförslag</p>
-                    </div>
+                <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    Bedömning &amp; Rekommendationer
                   </h3>
 
                   {!isCustomerView ? (
                     <>  
                       {/* Assessment Grid */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
                         {/* Pest Level Assessment */}
                         <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4">
                           <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
@@ -2251,9 +2257,9 @@ export default function EditContractCaseModal({
 
               {/* Time tracking */}
               {!isCustomerView && (
-                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-purple-400" />
+                <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-purple-400" />
                     Tidtagning
                   </h3>
                   <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
@@ -2322,33 +2328,33 @@ export default function EditContractCaseModal({
               )}
 
               {/* Cost summary */}
-              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Star className="w-5 h-5 text-purple-400" />
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <Star className="w-4 h-4 text-purple-400" />
                   Kostnad och material
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Materialkostnad (SEK)
                     </label>
                     <input
                       type="number"
                       value={formData.material_cost}
                       onChange={(e) => setFormData(prev => ({ ...prev, material_cost: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
                       Totalpris (SEK)
                     </label>
                     <input
                       type="number"
                       value={formData.price}
                       onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     />
                   </div>
