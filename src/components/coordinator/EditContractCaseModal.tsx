@@ -1516,6 +1516,43 @@ export default function EditContractCaseModal({
                 </div>
               )}
 
+              {/* Basic information */}
+              <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-purple-400" />
+                  Ärendeinformation
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      Beskrivning
+                    </label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      rows={2}
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] md:col-span-2"
+                      disabled={isCustomerView}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                      disabled={isCustomerView}
+                    >
+                      {DROPDOWN_STATUSES.map(status => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Location and pest */}
               <div className="space-y-2 pt-3 border-t border-slate-700/50">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
@@ -1550,52 +1587,6 @@ export default function EditContractCaseModal({
                         <option key={pest} value={pest}>{pest}</option>
                       ))}
                     </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact information */}
-              <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <User className="w-4 h-4 text-purple-400" />
-                  Kontaktinformation
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Kontaktperson
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.contact_person}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Telefon
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.contact_phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      E-post
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.contact_email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
                   </div>
                 </div>
               </div>
@@ -1703,42 +1694,94 @@ export default function EditContractCaseModal({
                 )}
               </div>
 
-              {/* Basic information */}
+              {/* Contact information */}
               <div className="space-y-2 pt-3 border-t border-slate-700/50">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-purple-400" />
-                  Grundläggande information
+                  <User className="w-4 h-4 text-purple-400" />
+                  Kontaktinformation
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Status
+                      Kontaktperson
                     </label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    <input
+                      type="text"
+                      value={formData.contact_person}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
-                    >
-                      {DROPDOWN_STATUSES.map(status => (
-                        <option key={status} value={status}>{status}</option>
-                      ))}
-                    </select>
+                    />
                   </div>
-                  <div className="md:col-span-2">
+                  <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Beskrivning
+                      Telefon
                     </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      rows={2}
+                    <input
+                      type="tel"
+                      value={formData.contact_phone}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
+                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                      disabled={isCustomerView}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      E-post
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.contact_email}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
                       className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       disabled={isCustomerView}
                     />
                   </div>
                 </div>
               </div>
+
+              {/* Time tracking */}
+              {!isCustomerView && (
+                <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    <Clock className={`w-4 h-4 flex-shrink-0 ${isTimerRunning ? 'text-green-400' : 'text-slate-400'}`} />
+                    <span className={`text-lg font-bold font-mono ${isTimerRunning ? 'text-green-400' : 'text-white'}`}>
+                      {formatTime(formData.time_spent_minutes + sessionMinutes)}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {isTimerRunning ? (
+                        <span className="text-green-400 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                          Aktiv
+                        </span>
+                      ) : formData.time_spent_minutes > 0 ? 'Pausad' : 'Ej påbörjad'}
+                    </span>
+                    <div className="ml-auto flex items-center gap-1.5">
+                      {isTimerRunning ? (
+                        <>
+                          <Button type="button" variant="warning" size="sm" onClick={handleStopTimer} className="flex items-center gap-1 text-xs px-2.5 py-1">
+                            <Pause className="w-3 h-3" />Pausa
+                          </Button>
+                          <Button type="button" variant="success" size="sm" onClick={handleStopTimer} className="flex items-center gap-1 text-xs px-2.5 py-1">
+                            <Save className="w-3 h-3" />Slutför
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button type="button" variant="primary" size="sm" onClick={handleStartTimer} className="flex items-center gap-1 text-xs px-2.5 py-1">
+                            <Play className="w-3 h-3" />{formData.time_spent_minutes > 0 ? 'Återuppta' : 'Starta'}
+                          </Button>
+                          {formData.time_spent_minutes > 0 && (
+                            <Button type="button" variant="ghost" size="sm" onClick={handleResetTimer} className="flex items-center gap-1 text-xs px-2 py-1 text-slate-400 hover:text-red-400">
+                              <RotateCcw className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Work report */}
               <div className="space-y-2 pt-3 border-t border-slate-700/50">
@@ -2243,48 +2286,6 @@ export default function EditContractCaseModal({
                 </div>
               )}
 
-              {/* Time tracking */}
-              {!isCustomerView && (
-                <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                  <div className="flex items-center gap-3">
-                    <Clock className={`w-4 h-4 flex-shrink-0 ${isTimerRunning ? 'text-green-400' : 'text-slate-400'}`} />
-                    <span className={`text-lg font-bold font-mono ${isTimerRunning ? 'text-green-400' : 'text-white'}`}>
-                      {formatTime(formData.time_spent_minutes + sessionMinutes)}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {isTimerRunning ? (
-                        <span className="text-green-400 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                          Aktiv
-                        </span>
-                      ) : formData.time_spent_minutes > 0 ? 'Pausad' : 'Ej påbörjad'}
-                    </span>
-                    <div className="ml-auto flex items-center gap-1.5">
-                      {isTimerRunning ? (
-                        <>
-                          <Button type="button" variant="warning" size="sm" onClick={handleStopTimer} className="flex items-center gap-1 text-xs px-2.5 py-1">
-                            <Pause className="w-3 h-3" />Pausa
-                          </Button>
-                          <Button type="button" variant="success" size="sm" onClick={handleStopTimer} className="flex items-center gap-1 text-xs px-2.5 py-1">
-                            <Save className="w-3 h-3" />Slutför
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button type="button" variant="primary" size="sm" onClick={handleStartTimer} className="flex items-center gap-1 text-xs px-2.5 py-1">
-                            <Play className="w-3 h-3" />{formData.time_spent_minutes > 0 ? 'Återuppta' : 'Starta'}
-                          </Button>
-                          {formData.time_spent_minutes > 0 && (
-                            <Button type="button" variant="ghost" size="sm" onClick={handleResetTimer} className="flex items-center gap-1 text-xs px-2 py-1 text-slate-400 hover:text-red-400">
-                              <RotateCcw className="w-3 h-3" />
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
