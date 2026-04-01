@@ -1513,6 +1513,51 @@ export default function EditContractCaseModal({
                       </div>
                     </div>
                   )}
+                  {/* Adress - klickbar maps-länk */}
+                  {formData.address && (
+                    <div className="mt-3 pt-3 border-t border-purple-500/20">
+                      <label className="block text-xs font-medium text-purple-300 mb-1">Adress</label>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.address)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm text-white hover:text-[#20c58f] transition-colors"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                        {formData.address}
+                      </a>
+                    </div>
+                  )}
+                  {/* Kontaktinformation */}
+                  <div className="mt-3 pt-3 border-t border-purple-500/20">
+                    <label className="block text-xs font-medium text-purple-300 mb-2">Kontaktperson vid besök</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        value={formData.contact_person}
+                        onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
+                        placeholder="Namn"
+                        className="px-3 py-1.5 bg-slate-800/50 border border-purple-500/30 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                        disabled={isCustomerView}
+                      />
+                      <input
+                        type="tel"
+                        value={formData.contact_phone}
+                        onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
+                        placeholder="Telefon"
+                        className="px-3 py-1.5 bg-slate-800/50 border border-purple-500/30 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                        disabled={isCustomerView}
+                      />
+                      <input
+                        type="email"
+                        value={formData.contact_email}
+                        onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
+                        placeholder="E-post"
+                        className="px-3 py-1.5 bg-slate-800/50 border border-purple-500/30 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                        disabled={isCustomerView}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1522,73 +1567,52 @@ export default function EditContractCaseModal({
                   <FileText className="w-4 h-4 text-purple-400" />
                   Ärendeinformation
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Beskrivning
-                    </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      rows={2}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] md:col-span-2"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Status
-                    </label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    >
-                      {DROPDOWN_STATUSES.map(status => (
-                        <option key={status} value={status}>{status}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">
+                    Beskrivning
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    rows={2}
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    disabled={isCustomerView}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    disabled={isCustomerView}
+                  >
+                    {DROPDOWN_STATUSES.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Location and pest */}
+              {/* Skadedjur */}
               <div className="space-y-2 pt-3 border-t border-slate-700/50">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-purple-400" />
-                  Plats och skadedjur
+                  Skadedjur
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Adress
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.address}
-                      onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Skadedjur
-                    </label>
-                    <select
-                      value={formData.pest_type}
-                      onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    >
-                      <option value="">Välj skadedjur</option>
-                      {PEST_TYPES.map(pest => (
-                        <option key={pest} value={pest}>{pest}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                <select
+                  value={formData.pest_type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                  disabled={isCustomerView}
+                >
+                  <option value="">Välj skadedjur</option>
+                  {PEST_TYPES.map(pest => (
+                    <option key={pest} value={pest}>{pest}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Technicians */}
@@ -1694,52 +1718,6 @@ export default function EditContractCaseModal({
                 )}
               </div>
 
-              {/* Contact information */}
-              <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <User className="w-4 h-4 text-purple-400" />
-                  Kontaktinformation
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Kontaktperson
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.contact_person}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Telefon
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.contact_phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      E-post
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.contact_email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Time tracking */}
               {!isCustomerView && (
                 <div className="space-y-2 pt-3 border-t border-slate-700/50">
@@ -1799,6 +1777,28 @@ export default function EditContractCaseModal({
                 />
               </div>
 
+              {/* Bilder sektion */}
+              {caseData?.id && (
+                <div className="space-y-2 pt-3 border-t border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-cyan-400" />
+                    Bilder
+                  </h3>
+                  <CaseImageGallery
+                    ref={imageGalleryRef}
+                    caseId={caseData.id}
+                    caseType="contract"
+                    canDelete={!isCustomerView}
+                    canEdit={!isCustomerView}
+                    refreshTrigger={imageRefreshTrigger}
+                    showCategories={true}
+                    draftMode={!isCustomerView}
+                    userId={profile?.id}
+                    onPendingChangesUpdate={setHasPendingImageChanges}
+                  />
+                </div>
+              )}
+
               {/* Använda preparat - Visas INTE för Inspektion/kontrollrunda */}
               {caseData?.id && formData.pest_type !== 'Inspektion' && (
                 <CasePreparationsSection
@@ -1853,30 +1853,6 @@ export default function EditContractCaseModal({
                     baseAmount={billingSummary?.subtotal || Number(formData.price) || 0}
                     existingPostCount={existingCommissionPosts}
                     subcontractorDeduction={billingSummary?.subcontractor_total || 0}
-                  />
-                </div>
-              )}
-
-              {/* Bilder sektion */}
-              {caseData?.id && (
-                <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-cyan-400" />
-                    Bilder
-                  </h3>
-
-                  {/* Bildgalleri med draft-läge - ändringar sparas först när man klickar "Spara" */}
-                  <CaseImageGallery
-                    ref={imageGalleryRef}
-                    caseId={caseData.id}
-                    caseType="contract"
-                    canDelete={!isCustomerView}
-                    canEdit={!isCustomerView}
-                    refreshTrigger={imageRefreshTrigger}
-                    showCategories={true}
-                    draftMode={!isCustomerView}
-                    userId={profile?.id}
-                    onPendingChangesUpdate={setHasPendingImageChanges}
                   />
                 </div>
               )}
