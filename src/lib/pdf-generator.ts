@@ -275,20 +275,6 @@ const generateWorkReportHTML = (
       color: ${beGoneColors.mediumGray};
     }
 
-    /* Title Section */
-    .title-section {
-      margin-bottom: 20px;
-      page-break-inside: avoid;
-    }
-
-    .main-title {
-      font-size: 28px;
-      font-weight: 800;
-      color: ${beGoneColors.primary};
-      margin-bottom: 8px;
-      letter-spacing: -0.5px;
-    }
-
     /* KPI Cards */
     .kpi-grid {
       display: grid;
@@ -548,17 +534,11 @@ const generateWorkReportHTML = (
       </div>
     </div>
 
-    <!-- Title Section -->
-    <div class="title-section">
-      <h1 class="main-title">${taskDetails.task_info.name || 'Saneringsrapport'}</h1>
-    </div>
-
     <!-- KPI Cards -->
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="kpi-label">Ärende ID</div>
         <div class="kpi-value" style="font-size: 18px">${caseNumber}</div>
-        <div class="kpi-subtitle">Unikt ärende</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Status</div>
