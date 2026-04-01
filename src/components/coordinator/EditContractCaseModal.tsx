@@ -1561,68 +1561,26 @@ export default function EditContractCaseModal({
                 </div>
               )}
 
-              {/* Basic information */}
-              <div className="space-y-2 pt-3 border-t border-slate-700/50">
+              {/* Ärendeinformation - Beskrivning */}
+              <div className="space-y-1 pt-3 border-t border-slate-700/50">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-purple-400" />
                   Ärendeinformation
                 </h3>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">
-                    Beskrivning
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    rows={2}
-                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                    disabled={isCustomerView}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                    disabled={isCustomerView}
-                  >
-                    {DROPDOWN_STATUSES.map(status => (
-                      <option key={status} value={status}>{status}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Skadedjur */}
-              <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-purple-400" />
-                  Skadedjur
-                </h3>
-                <select
-                  value={formData.pest_type}
-                  onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
-                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                   disabled={isCustomerView}
-                >
-                  <option value="">Välj skadedjur</option>
-                  {PEST_TYPES.map(pest => (
-                    <option key={pest} value={pest}>{pest}</option>
-                  ))}
-                </select>
+                />
               </div>
 
-              {/* Technicians */}
-              {!isCustomerView && (
-                <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-orange-400" />
-                    Tekniker
-                  </h3>
-                  <div className="flex items-center gap-2">
+              {/* Tekniker / Status / Skadedjur - kompakt rad */}
+              <div className="flex items-center gap-2 pt-3 border-t border-slate-700/50 flex-wrap">
+                {/* Tekniker-cirklar */}
+                {!isCustomerView && (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
                     {([
                       { key: 'primary_technician_id' as const, label: 'Primär' },
                       { key: 'secondary_technician_id' as const, label: 'Sekundär' },
@@ -1634,7 +1592,7 @@ export default function EditContractCaseModal({
                       return (
                         <div key={slot.key} className="relative">
                           <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+                            className={`w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all ${
                               tech
                                 ? 'bg-[#20c58f]/20 border-2 border-[#20c58f]'
                                 : 'border-2 border-dashed border-slate-600 hover:border-slate-500'
@@ -1644,7 +1602,7 @@ export default function EditContractCaseModal({
                             {tech ? (
                               <span className="text-xs font-bold text-[#20c58f]">{initials}</span>
                             ) : (
-                              <Plus className="w-3.5 h-3.5 text-slate-500" />
+                              <Plus className="w-3 h-3 text-slate-500" />
                             )}
                           </div>
                           <select
@@ -1662,8 +1620,32 @@ export default function EditContractCaseModal({
                       )
                     })}
                   </div>
-                </div>
-              )}
+                )}
+                {!isCustomerView && <div className="w-px h-8 bg-slate-700/50 flex-shrink-0" />}
+                {/* Status */}
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                  className="flex-1 min-w-[110px] px-2.5 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                  disabled={isCustomerView}
+                >
+                  {DROPDOWN_STATUSES.map(status => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+                {/* Skadedjur */}
+                <select
+                  value={formData.pest_type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
+                  className="flex-1 min-w-[110px] px-2.5 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                  disabled={isCustomerView}
+                >
+                  <option value="">Välj skadedjur</option>
+                  {PEST_TYPES.map(pest => (
+                    <option key={pest} value={pest}>{pest}</option>
+                  ))}
+                </select>
+              </div>
 
               {/* Schemaläggning */}
               <div className="space-y-2 pt-3 border-t border-slate-700/50">
