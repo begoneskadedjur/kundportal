@@ -1,6 +1,6 @@
 // api/generate-work-report.ts - Puppeteer-baserad saneringsrapport generator
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { generateWorkReportBase64, type TaskDetails, type CustomerInfo } from '../src/lib/pdf-generator'
+import { generateWorkReportBase64, type TaskDetails, type CustomerInfo, type PreparationItem, type BillingItem } from '../src/lib/pdf-generator'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
@@ -17,9 +17,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { taskDetails, customerInfo } = req.body as {
+    const { taskDetails, customerInfo, preparations = [], billingItems = [] } = req.body as {
       taskDetails: TaskDetails
       customerInfo: CustomerInfo
+      preparations: PreparationItem[]
+      billingItems: BillingItem[]
     }
 
     if (!taskDetails || !customerInfo) {
@@ -29,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Generating work report PDF for task:', taskDetails.task_id)
 
     // Generate PDF using shared module
-    const result = await generateWorkReportBase64(taskDetails, customerInfo)
+    const result = await generateWorkReportBase64(taskDetails, customerInfo, preparations, billingItems)
     
     res.status(200).json({ 
       success: true, 

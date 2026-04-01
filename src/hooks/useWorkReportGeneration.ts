@@ -103,6 +103,25 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
 
   // Skapa rapport-data från befintlig case-data (ingen ClickUp API-anrop)
   const createReportData = async () => {
+    // Hämta preparat för detta ärende
+    const caseTypeForPrep = caseData.case_type === 'private' ? 'private' : 'business'
+    const { data: preparations } = await supabase
+      .from('case_preparations')
+      .select(`
+        quantity, unit, dosage_notes,
+        preparation:preparations(name, registration_number, category)
+      `)
+      .eq('case_id', caseData.id)
+      .eq('case_type', caseTypeForPrep)
+
+    // Hämta produkter/tjänster (utan priser – priser ska ej visas i rapport)
+    const { data: billingItems } = await supabase
+      .from('case_billing_items')
+      .select('article_name, quantity, article_code')
+      .eq('case_id', caseData.id)
+      .eq('case_type', caseTypeForPrep)
+      .neq('status', 'cancelled')
+
     // Skapa TaskDetails från befintlig case-data
     const taskDetails: TaskDetails = {
       task_id: caseData.id,
@@ -182,9 +201,8 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       ]
     }
 
-    // Lägg till tekniker om tilldelad
+    // Lägg till alla tekniker (primary, secondary, tertiary)
     if (caseData.primary_assignee_id && caseData.primary_assignee_name) {
-      // Hämta tekniker-email om vi behöver det
       try {
         const { data: technician } = await supabase
           .from('technicians')
@@ -192,19 +210,19 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           .eq('id', caseData.primary_assignee_id)
           .single()
 
-        if (technician) {
-          taskDetails.assignees.push({
-            name: caseData.primary_assignee_name,
-            email: technician.email
-          })
-        }
-      } catch (error) {
-        // Fallback utan email
         taskDetails.assignees.push({
           name: caseData.primary_assignee_name,
-          email: ''
+          email: technician?.email || ''
         })
+      } catch {
+        taskDetails.assignees.push({ name: caseData.primary_assignee_name, email: '' })
       }
+    }
+    if (caseData.secondary_assignee_id && caseData.secondary_assignee_name) {
+      taskDetails.assignees.push({ name: caseData.secondary_assignee_name, email: '' })
+    }
+    if (caseData.tertiary_assignee_id && caseData.tertiary_assignee_name) {
+      taskDetails.assignees.push({ name: caseData.tertiary_assignee_name, email: '' })
     }
 
     // Skapa customer info från case-data
@@ -245,7 +263,12 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       }
     }
 
-    return { taskDetails, customerInfo }
+    return {
+      taskDetails,
+      customerInfo,
+      preparations: (preparations || []) as any[],
+      billingItems: (billingItems || []) as any[]
+    }
   }
 
   // Automatisk sparning av rapport till databas och storage - ENDAST för avtalsärenden
@@ -380,9 +403,9 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       }
       
       setIsGenerating(true)
-      
-      const { taskDetails, customerInfo } = await createReportData()
-      
+
+      const { taskDetails, customerInfo, preparations, billingItems } = await createReportData()
+
       // Anropa Puppeteer-baserad PDF-generator
       const response = await fetch('/api/generate-work-report', {
         method: 'POST',
@@ -391,7 +414,9 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
         },
         body: JSON.stringify({
           taskDetails,
-          customerInfo
+          customerInfo,
+          preparations,
+          billingItems
         })
       })
 
