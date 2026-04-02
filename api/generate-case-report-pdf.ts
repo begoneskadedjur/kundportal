@@ -108,9 +108,20 @@ const TAG_LABELS: Record<string, string> = {
   education: 'Utbildning'
 }
 
-const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: string, images: { url: string; description?: string; tags: string[] }[] = []) => {
+const generateSingleCaseHTML = (
+  caseData: any,
+  customerData: any,
+  _reportType: string,
+  images: { url: string; description?: string; tags: string[] }[] = [],
+  preparations: any[] = [],
+  billingItems: any[] = [],
+  mapUrl: string | null = null
+) => {
   const trafficLight = getTrafficLightStatus(caseData.pest_level, caseData.problem_rating)
-  const statusColors = getStatusBadgeColor(caseData.status)
+  const addressStr = typeof caseData.address === 'string'
+    ? caseData.address
+    : (caseData.address?.address || customerData?.contact_address || null)
+  const hasTrafficLight = caseData.pest_level !== null || caseData.problem_rating !== null
 
   return `
 <!DOCTYPE html>
@@ -121,331 +132,171 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
   <title>BeGone Ärenderapport - ${caseData.case_number || caseData.title}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-    
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: ${beGoneColors.darkGray};
       background: white;
       line-height: 1.6;
       font-optical-sizing: auto;
+      font-variant-ligatures: common-ligatures;
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
-    
-    .container {
-      max-width: 210mm;
-      margin: 0 auto;
-      padding: 20mm;
-      background: white;
-    }
-    
-    /* Header */
+
+    .container { max-width: 210mm; margin: 0 auto; padding: 15mm; background: white; }
+
     .header {
       background: white;
       border-bottom: 3px solid ${beGoneColors.accent};
-      padding: 24px 0;
-      margin-bottom: 32px;
+      padding: 20px 0;
+      margin-bottom: 24px;
       page-break-inside: avoid;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
     }
-    
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    
+    .header-content { display: flex; justify-content: space-between; align-items: center; }
+    .logo { display: flex; align-items: center; gap: 16px; }
     .logo-icon {
-      width: 48px;
-      height: 48px;
+      width: 48px; height: 48px;
       background: ${beGoneColors.accent};
       border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      font-weight: 800;
-      color: white;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 800; color: white;
     }
-    
-    .logo-text {
-      font-size: 28px;
-      font-weight: 800;
-      color: ${beGoneColors.primary};
-      letter-spacing: -0.5px;
-    }
-    
-    .header-meta {
-      text-align: right;
-    }
-    
+    .logo-text { font-size: 28px; font-weight: 800; color: ${beGoneColors.primary}; letter-spacing: -0.5px; }
+    .header-meta { text-align: right; }
     .header-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: ${beGoneColors.primary};
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
+      font-size: 14px; font-weight: 700; color: ${beGoneColors.primary};
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;
     }
-    
-    .header-date {
-      font-size: 13px;
-      color: ${beGoneColors.mediumGray};
+    .header-date { font-size: 13px; color: ${beGoneColors.mediumGray}; }
+
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 12px; margin-bottom: 24px; page-break-inside: avoid;
     }
-    
-    /* Title Section */
-    .title-section {
-      margin-bottom: 32px;
-      page-break-inside: avoid;
+    .kpi-card {
+      background: white; border: 1px solid ${beGoneColors.border};
+      border-radius: 8px; padding: 12px 16px;
+      page-break-inside: avoid; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
-    
-    .main-title {
-      font-size: 28px;
-      font-weight: 800;
-      color: ${beGoneColors.primary};
-      margin-bottom: 8px;
-      letter-spacing: -0.5px;
+    .kpi-label {
+      font-size: 10px; font-weight: 600; color: ${beGoneColors.mediumGray};
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
     }
-    
-    .case-subtitle {
-      font-size: 18px;
-      color: ${beGoneColors.mediumGray};
-      margin-bottom: 16px;
-    }
-    
-    .status-row {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-    
-    .status-badge {
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      background: ${statusColors.bg};
-      color: ${statusColors.text};
-    }
-    
-    .traffic-light {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      background: rgba(${trafficLight.color === '#EF4444' ? '239, 68, 68' : trafficLight.color === '#F59E0B' ? '245, 158, 11' : '34, 197, 94'}, 0.1);
-      color: ${trafficLight.color};
-      border: 1px solid ${trafficLight.color};
-    }
-    
-    /* Section Headers */
-    .section {
-      margin-bottom: 24px;
-      page-break-inside: avoid;
-    }
-    
+    .kpi-value { font-size: 20px; font-weight: 800; color: ${beGoneColors.primary}; margin-bottom: 2px; }
+    .kpi-value.accent { color: ${beGoneColors.accent}; }
+    .kpi-subtitle { font-size: 12px; color: ${beGoneColors.mediumGray}; }
+
+    .section { margin-bottom: 20px; page-break-inside: avoid; }
     .section-header {
-      font-size: 18px;
-      font-weight: 700;
-      color: ${beGoneColors.primary};
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding-bottom: 8px;
+      font-size: 15px; font-weight: 700; color: ${beGoneColors.primary};
+      margin-bottom: 12px; padding-bottom: 6px;
       border-bottom: 2px solid ${beGoneColors.divider};
     }
-    
-    .section-icon {
-      font-size: 20px;
-      opacity: 0.8;
-    }
-    
-    /* Cards */
+    .section-header.accent { color: ${beGoneColors.accent}; }
+
     .card {
-      background: white;
-      border: 1px solid ${beGoneColors.border};
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 16px;
-      page-break-inside: avoid;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      background: white; border: 1px solid ${beGoneColors.border};
+      border-radius: 8px; padding: 16px; margin-bottom: 12px;
+      page-break-inside: avoid; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
-    
-    /* Info Grid */
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-    
-    .info-group {
-      margin-bottom: 16px;
-      padding-left: 12px;
-      border-left: 3px solid ${beGoneColors.lightGray};
-    }
-    
+
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .info-group { margin-bottom: 8px; }
     .info-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: ${beGoneColors.mediumGray};
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
+      font-size: 10px; font-weight: 600; color: ${beGoneColors.mediumGray};
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
     }
-    
-    .info-value {
-      font-size: 14px;
-      color: ${beGoneColors.darkGray};
-      font-weight: 500;
-    }
-    
-    /* Report Content */
+    .info-value { font-size: 14px; color: ${beGoneColors.darkGray}; font-weight: 500; }
+
+    .map-container { margin-top: 16px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border}; }
+    .map-image { width: 100%; display: block; }
+
     .report-container {
       background: ${beGoneColors.lightestGray};
-      border-radius: 8px;
-      padding: 24px;
-      margin-bottom: 24px;
-      page-break-inside: avoid;
+      border-radius: 8px; padding: 24px; margin-bottom: 24px; page-break-inside: avoid;
     }
-    
     .report-content {
-      background: white;
-      border: 1px solid ${beGoneColors.border};
-      border-radius: 8px;
-      padding: 20px;
-      min-height: 120px;
+      background: white; border: 1px solid ${beGoneColors.border};
+      border-radius: 8px; padding: 20px; min-height: 80px;
     }
-    
-    .report-text {
-      font-size: 14px;
-      line-height: 1.7;
-      color: ${beGoneColors.darkGray};
-      white-space: pre-wrap;
+    .report-text { font-size: 14px; line-height: 1.7; color: ${beGoneColors.darkGray}; white-space: pre-wrap; }
+
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th {
+      text-align: left; font-size: 10px; font-weight: 600; color: ${beGoneColors.mediumGray};
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 8px 12px; border-bottom: 2px solid ${beGoneColors.divider};
     }
-    
-    .no-content {
-      font-style: italic;
-      color: ${beGoneColors.mediumGray};
-      text-align: center;
-      padding: 20px;
-    }
-    
-    /* Footer */
+    .data-table td { padding: 8px 12px; border-bottom: 1px solid ${beGoneColors.divider}; color: ${beGoneColors.darkGray}; }
+    .data-table tr:last-child td { border-bottom: none; }
+
     .footer {
-      margin-top: 32px;
-      padding-top: 24px;
+      margin-top: 32px; padding-top: 24px;
       border-top: 3px solid ${beGoneColors.accent};
-      text-align: center;
-      page-break-inside: avoid;
-      background: white;
+      text-align: center; page-break-inside: avoid; background: white;
     }
-    
-    .footer-text {
-      font-size: 12px;
-      color: ${beGoneColors.mediumGray};
-      line-height: 1.6;
+    .footer-logo {
+      font-size: 20px; font-weight: 800; color: ${beGoneColors.primary};
+      margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;
     }
-    
-    .footer-contact {
-      margin-top: 12px;
-      font-size: 11px;
-      color: ${beGoneColors.darkGray};
+    .footer-logo-icon {
+      width: 32px; height: 32px; background: ${beGoneColors.accent};
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-size: 16px; color: white; font-weight: 800;
     }
-    
-    .footer-contact a {
-      color: ${beGoneColors.accent};
-      text-decoration: none;
-      font-weight: 600;
-    }
-    
-    /* Print Optimizations */
+    .footer-text { font-size: 12px; color: ${beGoneColors.mediumGray}; margin-bottom: 12px; line-height: 1.6; }
+    .footer-contact { font-size: 11px; color: ${beGoneColors.darkGray}; }
+    .footer-contact a { color: ${beGoneColors.accent}; text-decoration: none; font-weight: 600; }
+
     @media print {
-      body {
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
-      }
-      
-      .container {
-        padding: 12mm;
-        box-shadow: none;
-      }
-      
-      .section {
-        page-break-inside: avoid;
-      }
-      
-      .card {
-        page-break-inside: avoid;
-      }
-      
-      h1, h2, .section-header {
-        page-break-after: avoid;
-      }
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .container { padding: 12mm; }
+      .section { page-break-inside: avoid; }
+      .card { page-break-inside: avoid; }
+      h1, h2, h3 { page-break-after: avoid; }
     }
   </style>
 </head>
 <body>
   <div class="container">
+
     <!-- Header -->
     <div class="header">
-      <div class="logo">
-        <div class="logo-icon">B</div>
-        <div class="logo-text">BeGone</div>
-      </div>
-      <div class="header-meta">
-        <div class="header-title">ÄRENDERAPPORT</div>
-        <div class="header-date">${new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-      </div>
-    </div>
-    
-    <!-- Title Section -->
-    <div class="title-section">
-      <h1 class="main-title">${caseData.case_number || 'Ärenderapport'}</h1>
-      <div class="case-subtitle">${caseData.title || 'Ingen titel'}</div>
-      
-      <!-- Separated Status and Technical Assessment -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 16px;">
-        <!-- Case Status -->
-        <div style="background: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0;">
-          <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-            Ärendestatus
-          </div>
-          <div class="status-badge" style="margin: 0;">${caseData.status}</div>
+      <div class="header-content">
+        <div class="logo">
+          <div class="logo-icon">B</div>
+          <div class="logo-text">BeGone</div>
         </div>
-        
-        <!-- Technical Assessment -->
-        <div style="background: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0;">
-          <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-            Teknisk bedömning
-          </div>
-          <div class="traffic-light" style="margin: 0;">
-            <span style="font-size: 16px;">${trafficLight.emoji}</span>
-            <span>${trafficLight.label}</span>
-          </div>
+        <div class="header-meta">
+          <div class="header-title">ÄRENDERAPPORT</div>
+          <div class="header-date">${new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
         </div>
       </div>
     </div>
-    
-    <!-- Customer Information -->
+
+    <!-- KPI Grid -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Ärende ID</div>
+        <div class="kpi-value" style="font-size: 18px">${caseData.case_number || 'N/A'}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Status</div>
+        <div class="kpi-value accent">${caseData.status || 'Okänd'}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Skadedjur</div>
+        <div class="kpi-value">${caseData.pest_type || 'Ej specificerat'}</div>
+      </div>
+    </div>
+
+    <!-- Kunduppgifter -->
     <div class="section">
-      <div class="section-header">
-        <span class="section-icon">🏢</span>
-        Kunduppgifter
-      </div>
+      <div class="section-header">Kunduppgifter</div>
       <div class="card">
         <div class="info-grid">
           <div class="info-group">
@@ -456,6 +307,12 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
             <div class="info-label">Kontaktperson</div>
             <div class="info-value">${caseData.contact_person || customerData?.contact_person || 'Ej specificerat'}</div>
           </div>
+          ${customerData?.org_number ? `
+          <div class="info-group">
+            <div class="info-label">Org.nr</div>
+            <div class="info-value">${customerData.org_number}</div>
+          </div>
+          ` : ''}
           <div class="info-group">
             <div class="info-label">Telefon</div>
             <div class="info-value">${caseData.contact_phone || customerData?.contact_phone || 'Ej angivet'}</div>
@@ -464,59 +321,83 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
             <div class="info-label">E-post</div>
             <div class="info-value">${caseData.contact_email || customerData?.contact_email || 'Ej angivet'}</div>
           </div>
+          ${addressStr ? `
           <div class="info-group">
             <div class="info-label">Adress</div>
-            <div class="info-value">${caseData.address?.address || customerData?.contact_address || 'Ej angivet'}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Skadedjur</div>
-            <div class="info-value">${caseData.pest_type || 'Ej specificerat'}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Service Information -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-icon">👨‍🔧</span>
-        Serviceinformation
-      </div>
-      <div class="card">
-        <div class="info-grid">
-          <div class="info-group">
-            <div class="info-label">Tekniker</div>
-            <div class="info-value">${caseData.primary_technician_name || 'Ej tilldelad'}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Schemalagd tid</div>
-            <div class="info-value">${formatDate(caseData.scheduled_start)}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Kostnad</div>
-            <div class="info-value">${formatCurrency(caseData.price)}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Ärendet skapat</div>
-            <div class="info-value">${formatDate(caseData.created_at)}</div>
-          </div>
-          ${caseData.time_spent_minutes ? `
-          <div class="info-group">
-            <div class="info-label">Arbetstid</div>
-            <div class="info-value">${Math.floor(caseData.time_spent_minutes / 60)}h ${caseData.time_spent_minutes % 60}min</div>
+            <div class="info-value">${addressStr}</div>
           </div>
           ` : ''}
         </div>
       </div>
     </div>
-    
-    <!-- Description -->
+
+    <!-- Leverantörsuppgifter -->
+    <div class="section">
+      <div class="section-header">Leverantörsuppgifter</div>
+      <div class="card">
+        <div class="info-grid">
+          <div class="info-group">
+            <div class="info-label">Företag</div>
+            <div class="info-value">BeGone Skadedjur &amp; Sanering AB</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">Organisationsnummer</div>
+            <div class="info-value">559378-9208</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">Besöksadress</div>
+            <div class="info-value">Bläcksvampsvägen 17, 141 60 Huddinge</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">Telefon</div>
+            <div class="info-value">010 280 44 10</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">Email</div>
+            <div class="info-value">info@begone.se</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">Ansvarig tekniker</div>
+            <div class="info-value">${caseData.primary_technician_name || 'Ej tilldelad'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ärendeinformation -->
+    <div class="section">
+      <div class="section-header accent">Ärendeinformation</div>
+      <div class="card">
+        <div class="info-grid">
+          <div class="info-group">
+            <div class="info-label">Datum för utförande</div>
+            <div class="info-value">${formatDate(caseData.scheduled_start)}</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">Arbetsplats</div>
+            <div class="info-value">${addressStr || 'Ej angivet'}</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">Ärendet avser</div>
+            <div class="info-value">${caseData.pest_type || 'Ej specificerat'}</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">Ärendestatus</div>
+            <div class="info-value">${caseData.status || 'Okänd status'}</div>
+          </div>
+        </div>
+        ${mapUrl ? `
+        <div class="map-container">
+          <img src="${mapUrl}" class="map-image" alt="Karta över arbetsplatsen" />
+        </div>
+        ` : ''}
+      </div>
+    </div>
+
+    <!-- Ärendebeskrivning -->
     ${caseData.description ? `
     <div class="section">
-      <div class="section-header">
-        <span class="section-icon">📝</span>
-        Ärendebeskrivning
-      </div>
+      <div class="section-header accent">Ärendebeskrivning</div>
       <div class="report-container">
         <div class="report-content">
           <div class="report-text">${caseData.description}</div>
@@ -524,14 +405,11 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
       </div>
     </div>
     ` : ''}
-    
-    <!-- Work Report -->
+
+    <!-- Arbetsrapport -->
     ${caseData.work_report ? `
     <div class="section">
-      <div class="section-header">
-        <span class="section-icon">📋</span>
-        Arbetsrapport
-      </div>
+      <div class="section-header accent">Arbetsrapport</div>
       <div class="report-container">
         <div class="report-content">
           <div class="report-text">${caseData.work_report}</div>
@@ -539,90 +417,52 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
       </div>
     </div>
     ` : ''}
-    
-    <!-- Technical Assessment -->
-    ${(caseData.pest_level !== null || caseData.problem_rating !== null) ? `
+
+    <!-- Teknisk bedömning (trafikljus) -->
+    ${hasTrafficLight ? `
     <div class="section">
-      <div class="section-header">
-        <span class="section-icon">🔍</span>
-        Teknisk bedömning
-      </div>
+      <div class="section-header accent">Teknisk bedömning</div>
       <div class="card" style="background: linear-gradient(135deg, ${trafficLight.color}15 0%, ${trafficLight.color}08 100%); border: 1px solid ${trafficLight.color}30;">
-        <!-- Assessment Header with Large Visual Indicator -->
-        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, ${trafficLight.color}20 0%, ${trafficLight.color}10 100%); border-radius: 12px; border-left: 6px solid ${trafficLight.color};">
-          <div style="font-size: 48px; line-height: 1;">${trafficLight.emoji}</div>
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, ${trafficLight.color}20 0%, ${trafficLight.color}10 100%); border-radius: 10px; border-left: 6px solid ${trafficLight.color};">
+          <div style="font-size: 40px; line-height: 1;">${trafficLight.emoji}</div>
           <div>
-            <div style="font-size: 22px; font-weight: 700; color: #1F2937; margin-bottom: 6px;">
-              ${trafficLight.label}
+            <div style="font-size: 20px; font-weight: 700; color: #1F2937; margin-bottom: 4px;">${trafficLight.label}</div>
+            <div style="font-size: 13px; color: #6B7280;">Baserat på inspektion och expertis har vår tekniker bedömt situationen</div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
+          <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #E5E7EB;">
+            <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Aktivitetsnivå</div>
+            <div style="font-size: 22px; font-weight: 800; color: ${trafficLight.color}; margin-bottom: 4px;">Nivå ${caseData.pest_level || 0} av 3</div>
+            <div style="font-size: 12px; color: #6B7280;">
+              ${(caseData.pest_level >= 3) ? 'Hög nivå - Kräver omedelbar åtgärd' : (caseData.pest_level === 2) ? 'Medium nivå - Bör åtgärdas' : 'Låg nivå - Under kontroll'}
             </div>
-            <div style="font-size: 14px; color: #6B7280; font-weight: 500;">
-              Baserat på inspektion och expertis har vår tekniker bedömt situationen
+          </div>
+          <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #E5E7EB;">
+            <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Situationsbedömning</div>
+            <div style="font-size: 22px; font-weight: 800; color: ${trafficLight.color}; margin-bottom: 4px;">${caseData.problem_rating || 0} av 5</div>
+            <div style="font-size: 12px; color: #6B7280;">
+              ${(caseData.problem_rating >= 4) ? 'Allvarligt - Åtgärd krävs' : (caseData.problem_rating === 3) ? 'Medium - Övervakning rekommenderas' : 'Låg - Situationen är stabil'}
             </div>
           </div>
         </div>
-
-        <!-- Assessment Details Grid -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px;">
-          <!-- Activity Level Card -->
-          <div style="background: #FFFFFF; padding: 20px; border-radius: 10px; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-              <div style="background: ${trafficLight.color}20; padding: 8px; border-radius: 6px;">
-                <span style="font-size: 18px;">⚡</span>
-              </div>
-              <div style="font-size: 16px; font-weight: 600; color: #374151;">Aktivitetsnivå</div>
-            </div>
-            <div style="font-size: 24px; font-weight: 800; color: ${trafficLight.color}; margin-bottom: 4px;">
-              Nivå ${caseData.pest_level || 0} av 3
-            </div>
-            <div style="font-size: 13px; color: #6B7280; font-weight: 500;">
-              ${(caseData.pest_level >= 3) ? 'Hög nivå - Kräver omedelbar åtgärd' : 
-                (caseData.pest_level === 2) ? 'Medium nivå - Bör åtgärdas' : 
-                'Låg nivå - Under kontroll'}
-            </div>
-          </div>
-
-          <!-- Situation Rating Card -->
-          <div style="background: #FFFFFF; padding: 20px; border-radius: 10px; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-              <div style="background: ${trafficLight.color}20; padding: 8px; border-radius: 6px;">
-                <span style="font-size: 18px;">📊</span>
-              </div>
-              <div style="font-size: 16px; font-weight: 600; color: #374151;">Situationsbedömning</div>
-            </div>
-            <div style="font-size: 24px; font-weight: 800; color: ${trafficLight.color}; margin-bottom: 4px;">
-              ${caseData.problem_rating || 0} av 5
-            </div>
-            <div style="font-size: 13px; color: #6B7280; font-weight: 500;">
-              ${(caseData.problem_rating >= 4) ? 'Allvarligt - Åtgärd krävs' : 
-                (caseData.problem_rating === 3) ? 'Medium - Övervakning rekommenderas' : 
-                'Låg - Situationen är stabil'}
-            </div>
-          </div>
-        </div>
-
-        <!-- Professional Footer -->
-        <div style="background: #F9FAFB; padding: 16px; border-radius: 8px; border-top: 1px solid #E5E7EB; margin-top: 8px;">
-          <div style="font-size: 12px; color: #6B7280; text-align: center; font-style: italic;">
-            Bedömning utförd av certifierad BeGone tekniker enligt branschstandard
-          </div>
+        <div style="background: #F9FAFB; padding: 12px; border-radius: 6px; text-align: center;">
+          <div style="font-size: 11px; color: #9CA3AF; font-style: italic;">Bedömning utförd av certifierad BeGone tekniker enligt branschstandard</div>
         </div>
       </div>
     </div>
     ` : ''}
-    
-    <!-- Recommendations -->
+
+    <!-- Rekommendationer -->
     ${caseData.recommendations ? `
     <div class="section">
-      <div class="section-header">
-        <span class="section-icon">💡</span>
-        Rekommendationer
-      </div>
+      <div class="section-header accent">Rekommendationer</div>
       <div class="report-container">
         <div class="report-content">
           <div class="report-text">${caseData.recommendations}</div>
           ${caseData.recommendations_acknowledged ? `
           <div style="margin-top: 16px; padding: 12px; background: #22C55E20; border-radius: 6px; border: 1px solid #22C55E;">
-            <strong style="color: #22C55E;">✓ Bekräftat av kund:</strong> ${formatDate(caseData.recommendations_acknowledged_at)}
+            <strong style="color: #22C55E;">Bekräftat av kund:</strong> ${formatDate(caseData.recommendations_acknowledged_at)}
           </div>
           ` : ''}
         </div>
@@ -630,21 +470,70 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
     </div>
     ` : ''}
 
-    <!-- Images -->
+    <!-- Använda preparat -->
+    ${preparations.length > 0 ? `
+    <div class="section">
+      <div class="section-header accent">Använda preparat</div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Preparat</th>
+              <th>Mängd</th>
+              <th>Reg.nr</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${preparations.map((p: any) => `
+              <tr>
+                <td>${p.preparation?.name || p.name || 'Okänt'}</td>
+                <td>${p.quantity} ${p.unit || ''}</td>
+                <td>${p.preparation?.registration_number || p.registration_number || '–'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Produkter & tjänster -->
+    ${billingItems.length > 0 ? `
+    <div class="section">
+      <div class="section-header accent">Produkter &amp; tjänster</div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Artikel</th>
+              <th>Antal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${billingItems.map((item: any) => `
+              <tr>
+                <td>${item.article_name}</td>
+                <td>${item.quantity}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Bilder -->
     ${images.length > 0 ? `
     <div class="section">
-      <div class="section-header">
-        <span class="section-icon">📷</span>
-        Bilder (${images.length})
-      </div>
+      <div class="section-header">Bilder (${images.length})</div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
         ${images.map(img => `
-          <div style="break-inside: avoid; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden;">
+          <div style="break-inside: avoid; background: #F8FAFC; border: 1px solid ${beGoneColors.border}; border-radius: 8px; overflow: hidden;">
             <img src="${img.url}" style="width: 100%; display: block; max-height: 220px; object-fit: cover;" />
-            <div style="padding: 8px 10px;">
+            <div style="padding: 8px 12px;">
               <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: ${img.description ? '6px' : '0'};">
                 ${img.tags.map((tag: string) => `
-                  <span style="font-size: 10px; padding: 2px 6px; border-radius: 99px; background: #E2E8F0; color: #475569; font-weight: 500;">
+                  <span style="font-size: 10px; padding: 2px 6px; border-radius: 99px; background: ${beGoneColors.divider}; color: #475569; font-weight: 500;">
                     ${TAG_LABELS[tag] || tag}
                   </span>
                 `).join('')}
@@ -659,8 +548,11 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
 
     <!-- Footer -->
     <div class="footer">
+      <div class="footer-logo">
+        <div class="footer-logo-icon">B</div>
+        <span>BeGone</span>
+      </div>
       <div class="footer-text">
-        <strong>BeGone Skadedjur & Sanering AB</strong><br>
         Professionell skadedjursbekämpning sedan 2022<br>
         Vi säkerställer trygga och skadedjursfria miljöer för hem och verksamheter
       </div>
@@ -669,6 +561,7 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
         <a href="https://begone.se">www.begone.se</a>
       </div>
     </div>
+
   </div>
 </body>
 </html>
@@ -1092,11 +985,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let filename: string
 
     if (reportType === 'single' && caseData) {
-      // Hämta bilder för ärendet
       const supabase = createClient(
         process.env.VITE_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       )
+
+      // Hämta bilder
       const { data: rawImages } = await supabase
         .from('case_images')
         .select('id, file_path, file_name, tags, description')
@@ -1104,18 +998,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('case_type', 'contract')
         .order('uploaded_at', { ascending: true })
 
-      // Generera signed URLs för bilderna
       const images: { url: string; description?: string; tags: string[] }[] = []
       for (const img of rawImages ?? []) {
         const { data: signed } = await supabase.storage
           .from('case-images')
           .createSignedUrl(img.file_path, 3600)
         if (signed?.signedUrl) {
-          images.push({ url: signed.signedUrl, description: img.description, tags: img.tags })
+          images.push({ url: signed.signedUrl, description: img.description, tags: img.tags ?? [] })
         }
       }
 
-      html = generateSingleCaseHTML(caseData, customerData, reportType, images)
+      // Hämta preparat
+      const { data: preparations } = await supabase
+        .from('case_preparations')
+        .select('*, preparation:preparations(name, registration_number)')
+        .eq('case_id', caseData.id)
+        .eq('case_type', 'contract')
+
+      // Hämta fakturarader
+      const { data: billingItems } = await supabase
+        .from('case_billing_items')
+        .select('article_name, quantity')
+        .eq('case_id', caseData.id)
+        .eq('case_type', 'contract')
+
+      // Bygg Google Maps URL
+      const googleMapsKey = process.env.GOOGLE_MAPS_API_KEY || ''
+      const addressStr = typeof caseData.address === 'string'
+        ? caseData.address
+        : (caseData.address?.address || customerData?.contact_address || null)
+      let mapUrl: string | null = null
+      if (googleMapsKey && addressStr) {
+        const encodedAddress = encodeURIComponent(addressStr)
+        mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${encodedAddress}&zoom=15&size=560x200&scale=2&maptype=roadmap&markers=color:0x20C58F|${encodedAddress}&key=${googleMapsKey}`
+      }
+
+      html = generateSingleCaseHTML(caseData, customerData, reportType, images, preparations ?? [], billingItems ?? [], mapUrl)
       filename = `BeGone_Arende_${caseData.case_number || 'N/A'}_${new Date().toISOString().split('T')[0]}.pdf`
     } else if (reportType === 'multiple' && cases) {
       html = generateMultipleCasesHTML(cases, customerData, userRole || 'användare', period || 'alla')
