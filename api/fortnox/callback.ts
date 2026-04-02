@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Rensa state-cookie
-  res.setHeader('Set-Cookie', `fortnox_oauth_state=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`)
+  res.setHeader('Set-Cookie', `fortnox_oauth_state=; HttpOnly; Secure; SameSite=None; Max-Age=0; Path=/`)
 
   return res.redirect(302, `/admin/installningar/fortnox?success=true`)
 }

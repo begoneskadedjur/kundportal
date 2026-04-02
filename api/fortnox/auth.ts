@@ -14,18 +14,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const state = crypto.randomBytes(16).toString('hex')
 
-  const scopes = [
-    'article',
-    'companyinformation',
-    'customer',
-    'invoice',
-    'payment',
-    'price',
-    'costcenter',
-    'salary',
-    'developer',
-  ].join('%20')
-
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
@@ -49,7 +37,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const authUrl = `https://apps.fortnox.se/oauth-v1/auth?${params.toString()}`
 
   // Skicka state som cookie så callback kan validera det
-  res.setHeader('Set-Cookie', `fortnox_oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`)
+  res.setHeader('Set-Cookie', `fortnox_oauth_state=${state}; HttpOnly; Secure; SameSite=None; Max-Age=600; Path=/`)
 
   return res.redirect(302, authUrl)
 }

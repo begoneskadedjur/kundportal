@@ -8,12 +8,12 @@ const supabase = createClient(
 
 // Hämtar en giltig access token — refreshar automatiskt om den gått ut
 export async function getValidAccessToken(): Promise<string> {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('fortnox_tokens')
     .select('*')
-    .single()
+    .maybeSingle()
 
-  if (error || !data) {
+  if (!data) {
     throw new Error('Fortnox ej ansluten — ingen token hittades')
   }
 
