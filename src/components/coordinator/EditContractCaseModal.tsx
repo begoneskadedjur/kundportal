@@ -412,8 +412,8 @@ export default function EditContractCaseModal({
   }, [caseData, isOpen])
 
   // Funktion för att hämta uppdaterad data från databasen
-  const refreshCaseData = async () => {
-    if (!localCaseData?.id) return
+  const refreshCaseData = async (): Promise<any | null> => {
+    if (!localCaseData?.id) return null
 
     try {
       const { data, error } = await supabase
@@ -426,28 +426,35 @@ export default function EditContractCaseModal({
 
       if (data) {
         setLocalCaseData(data)
-        // Uppdatera även formData med den nya datan
         setFormData(prev => ({
           ...prev,
           case_number: data.case_number || prev.case_number,
           title: data.title || prev.title,
-          description: data.description || prev.description,
+          description: data.description ?? prev.description,
           status: data.status || prev.status,
+          contact_person: data.contact_person ?? prev.contact_person,
+          contact_phone: data.contact_phone ?? prev.contact_phone,
+          contact_email: data.contact_email ?? prev.contact_email,
+          address: data.address ?? prev.address,
+          pest_type: data.pest_type ?? prev.pest_type,
           scheduled_start: data.scheduled_start ? new Date(data.scheduled_start) : prev.scheduled_start,
           scheduled_end: data.scheduled_end ? new Date(data.scheduled_end) : prev.scheduled_end,
-          work_report: data.work_report || prev.work_report,
-          recommendations: data.recommendations || prev.recommendations,
+          primary_technician_name: data.primary_technician_name ?? prev.primary_technician_name,
+          work_report: data.work_report ?? prev.work_report,
+          recommendations: data.recommendations ?? prev.recommendations,
           time_spent_minutes: data.time_spent_minutes ?? prev.time_spent_minutes,
-          materials_used: data.materials_used || prev.materials_used,
+          materials_used: data.materials_used ?? prev.materials_used,
           material_cost: data.material_cost ?? prev.material_cost,
           price: data.price ?? prev.price,
           pest_level: data.pest_level !== null ? data.pest_level : prev.pest_level,
           problem_rating: data.problem_rating !== null ? data.problem_rating : prev.problem_rating,
         }))
+        return data
       }
     } catch (error) {
       console.error('Error refreshing case data:', error)
     }
+    return null
   }
 
   const fetchTechnicians = async () => {
@@ -1144,9 +1151,9 @@ export default function EditContractCaseModal({
       setShowSaveSuccess(true)
       setTimeout(() => setShowSaveSuccess(false), 2000)
       // Refresha data istället för att stänga - tekniker kan nu boka återbesök direkt
-      await refreshCaseData()
-      // Skicka med uppdaterad data så parent-komponenten vet att det INTE är en radering
-      onSuccess?.(localCaseData)
+      const refreshed = await refreshCaseData()
+      // Skicka ny data till parent så att useEffect inte återställer formData med gammal data
+      onSuccess?.(refreshed || localCaseData)
     } catch (error) {
       console.error('Error updating case:', error)
       toast.error('Kunde inte uppdatera ärendet')
