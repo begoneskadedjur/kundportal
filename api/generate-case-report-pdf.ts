@@ -422,32 +422,29 @@ const generateSingleCaseHTML = (
     ${hasTrafficLight ? `
     <div class="section">
       <div class="section-header accent">Teknisk bedömning</div>
-      <div class="card" style="background: linear-gradient(135deg, ${trafficLight.color}15 0%, ${trafficLight.color}08 100%); border: 1px solid ${trafficLight.color}30;">
-        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, ${trafficLight.color}20 0%, ${trafficLight.color}10 100%); border-radius: 10px; border-left: 6px solid ${trafficLight.color};">
-          <div style="font-size: 40px; line-height: 1;">${trafficLight.emoji}</div>
+      <div class="card" style="border-left: 4px solid ${trafficLight.color};">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="font-size: 24px; line-height: 1;">${trafficLight.emoji}</div>
           <div>
-            <div style="font-size: 20px; font-weight: 700; color: #1F2937; margin-bottom: 4px;">${trafficLight.label}</div>
-            <div style="font-size: 13px; color: #6B7280;">Baserat på inspektion och expertis har vår tekniker bedömt situationen</div>
+            <div style="font-size: 15px; font-weight: 700; color: #1F2937;">${trafficLight.label}</div>
+            <div style="font-size: 12px; color: #6B7280;">Baserat på inspektion och expertis har vår tekniker bedömt situationen</div>
           </div>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
-          <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #E5E7EB;">
-            <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Aktivitetsnivå</div>
-            <div style="font-size: 22px; font-weight: 800; color: ${trafficLight.color}; margin-bottom: 4px;">Nivå ${caseData.pest_level || 0} av 3</div>
-            <div style="font-size: 12px; color: #6B7280;">
+        <div class="info-grid">
+          <div class="info-group">
+            <div class="info-label">Aktivitetsnivå</div>
+            <div class="info-value" style="color: ${trafficLight.color}; font-weight: 700;">Nivå ${caseData.pest_level || 0} av 3</div>
+            <div style="font-size: 12px; color: #6B7280; margin-top: 2px;">
               ${(caseData.pest_level >= 3) ? 'Hög nivå - Kräver omedelbar åtgärd' : (caseData.pest_level === 2) ? 'Medium nivå - Bör åtgärdas' : 'Låg nivå - Under kontroll'}
             </div>
           </div>
-          <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #E5E7EB;">
-            <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Situationsbedömning</div>
-            <div style="font-size: 22px; font-weight: 800; color: ${trafficLight.color}; margin-bottom: 4px;">${caseData.problem_rating || 0} av 5</div>
-            <div style="font-size: 12px; color: #6B7280;">
+          <div class="info-group">
+            <div class="info-label">Situationsbedömning</div>
+            <div class="info-value" style="color: ${trafficLight.color}; font-weight: 700;">${caseData.problem_rating || 0} av 5</div>
+            <div style="font-size: 12px; color: #6B7280; margin-top: 2px;">
               ${(caseData.problem_rating >= 4) ? 'Allvarligt - Åtgärd krävs' : (caseData.problem_rating === 3) ? 'Medium - Övervakning rekommenderas' : 'Låg - Situationen är stabil'}
             </div>
           </div>
-        </div>
-        <div style="background: #F9FAFB; padding: 12px; border-radius: 6px; text-align: center;">
-          <div style="font-size: 11px; color: #9CA3AF; font-style: italic;">Bedömning utförd av certifierad BeGone tekniker enligt branschstandard</div>
         </div>
       </div>
     </div>

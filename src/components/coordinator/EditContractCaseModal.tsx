@@ -279,7 +279,11 @@ export default function EditContractCaseModal({
     skadedjur: formData.pest_type,
     adress: formData.address,
     case_price: formData.price,
-    primary_assignee_name: formData.primary_technician_name
+    primary_assignee_name: formData.primary_technician_name,
+    scheduled_start: formData.scheduled_start ? formData.scheduled_start.toISOString() : null,
+    pest_level: formData.pest_level,
+    problem_rating: formData.problem_rating,
+    recommendations: formData.recommendations,
   }
   
   const {

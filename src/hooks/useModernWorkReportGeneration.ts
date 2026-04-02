@@ -32,6 +32,7 @@ interface TechnicianCase {
   tertiary_assignee_name?: string | null;
   created_date: string;
   start_date?: string;
+  scheduled_start?: string | null;
   rapport?: string;
   case_number?: string;
   // Trafikljussystem
@@ -195,6 +196,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       status: caseData.status,
       created_at: caseData.created_date,
       start_date: caseData.start_date,
+      scheduled_start: caseData.scheduled_start,
       // Kontaktinformation
       contact_person: caseData.kontaktperson,
       contact_email: caseData.e_post_kontaktperson,
