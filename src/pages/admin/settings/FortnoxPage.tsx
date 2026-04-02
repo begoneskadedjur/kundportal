@@ -5,6 +5,25 @@ import { FortnoxService, FortnoxCustomer } from '../../../services/fortnoxServic
 import Button from '../../../components/ui/Button'
 import toast from 'react-hot-toast'
 
+function getCustomerGroup(customerNumber: string): string {
+  const num = parseInt(customerNumber)
+  if (num >= 1 && num <= 499) return 'BRF / Samfällighet'
+  if (num >= 500 && num <= 999) return 'Fastighetsbolag Regional'
+  if (num >= 1000 && num <= 1499) return 'Fastighetsbolag Riks'
+  if (num >= 1500 && num <= 1999) return 'FB Kommersiell Regional'
+  if (num >= 2000 && num <= 2499) return 'FB Kommersiell Riks'
+  if (num >= 2500 && num <= 2999) return 'HORECA Regional'
+  if (num >= 3000 && num <= 3499) return 'HORECA Riks'
+  if (num >= 3500 && num <= 3999) return 'Företag lokalt'
+  if (num >= 4000 && num <= 4499) return 'Företag rikstäckande'
+  if (num >= 4500 && num <= 4999) return 'Företag internationellt'
+  if (num >= 5000 && num <= 5499) return 'LOU Fastighetsbolag'
+  if (num >= 5500 && num <= 5999) return 'LOU Kommunalt mindre'
+  if (num >= 6000 && num <= 6499) return 'LOU Kommunalt större'
+  if (num >= 6500 && num <= 6999) return 'LOU Direktupphandlat'
+  return 'Okänd grupp'
+}
+
 export default function FortnoxPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -59,6 +78,13 @@ export default function FortnoxPage() {
       setCustomersLoading(false)
     }
   }
+
+  const filteredCustomers = customers.filter(c => {
+    const num = parseInt(c.CustomerNumber)
+    return !isNaN(num) && num <= 6999
+  })
+
+  const hiddenCount = customers.length - filteredCustomers.length
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-6xl">
@@ -138,7 +164,8 @@ export default function FortnoxPage() {
               <h2 className="text-sm font-semibold text-white">Kunder i Fortnox</h2>
               {!customersLoading && (
                 <span className="text-xs text-slate-500 ml-1">
-                  ({customers.length} visade)
+                  ({filteredCustomers.length} visade
+                  {hiddenCount > 0 && `, ${hiddenCount} privatpersoner dolda`})
                 </span>
               )}
             </div>
@@ -155,14 +182,14 @@ export default function FortnoxPage() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
             </div>
-          ) : customers.length === 0 ? (
+          ) : filteredCustomers.length === 0 ? (
             <div className="text-center py-8 text-slate-500 text-sm">
               Inga kunder hittades i Fortnox
             </div>
           ) : (
             <>
               <div className="space-y-2">
-                {customers.map((customer) => (
+                {filteredCustomers.map((customer) => (
                   <div
                     key={customer.CustomerNumber}
                     className="px-3 py-2.5 bg-slate-800/40 border border-slate-700/50 rounded-xl flex items-start justify-between gap-4"
@@ -172,6 +199,7 @@ export default function FortnoxPage() {
                         <Building2 className="w-4 h-4 text-slate-500" />
                       </div>
                       <div className="min-w-0">
+                        {/* Rad 1: Namn + badges */}
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-white truncate">
                             {customer.Name}
@@ -181,7 +209,11 @@ export default function FortnoxPage() {
                               Inaktiv
                             </span>
                           )}
+                          <span className="text-xs px-1.5 py-0.5 bg-slate-700/60 text-slate-400 rounded border border-slate-600/50">
+                            {getCustomerGroup(customer.CustomerNumber)}
+                          </span>
                         </div>
+                        {/* Rad 2: Org.nr, e-post, telefon */}
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
                           {customer.OrganisationNumber && (
                             <span className="text-xs text-slate-500">{customer.OrganisationNumber}</span>
@@ -198,13 +230,16 @@ export default function FortnoxPage() {
                               {customer.Phone1}
                             </span>
                           )}
-                          {customer.City && (
-                            <span className="flex items-center gap-1 text-xs text-slate-500">
-                              <MapPin className="w-3 h-3" />
-                              {customer.City}
-                            </span>
-                          )}
                         </div>
+                        {/* Rad 3: Adress */}
+                        {(customer.Address1 || customer.City) && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <MapPin className="w-3 h-3 text-slate-600 shrink-0" />
+                            <span className="text-xs text-slate-500">
+                              {[customer.Address1, customer.ZipCode && customer.City ? `${customer.ZipCode} ${customer.City}` : customer.City].filter(Boolean).join(', ')}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
