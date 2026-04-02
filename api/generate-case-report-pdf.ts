@@ -4,6 +4,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
+import { createClient } from '@supabase/supabase-js'
 
 // BeGone Professional Color Palette
 const beGoneColors = {
@@ -99,7 +100,15 @@ const getTrafficLightStatus = (pest_level: number | null, problem_rating: number
 }
 
 // Generate HTML for single case report
-const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: string) => {
+const TAG_LABELS: Record<string, string> = {
+  before: 'Före',
+  after: 'Efter',
+  general: 'Generell',
+  pr: 'PR',
+  education: 'Utbildning'
+}
+
+const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: string, images: { url: string; description?: string; tags: string[] }[] = []) => {
   const trafficLight = getTrafficLightStatus(caseData.pest_level, caseData.problem_rating)
   const statusColors = getStatusBadgeColor(caseData.status)
 
@@ -620,7 +629,34 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
       </div>
     </div>
     ` : ''}
-    
+
+    <!-- Images -->
+    ${images.length > 0 ? `
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">📷</span>
+        Bilder (${images.length})
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        ${images.map(img => `
+          <div style="break-inside: avoid; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden;">
+            <img src="${img.url}" style="width: 100%; display: block; max-height: 220px; object-fit: cover;" />
+            <div style="padding: 8px 10px;">
+              <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: ${img.description ? '6px' : '0'};">
+                ${img.tags.map((tag: string) => `
+                  <span style="font-size: 10px; padding: 2px 6px; border-radius: 99px; background: #E2E8F0; color: #475569; font-weight: 500;">
+                    ${TAG_LABELS[tag] || tag}
+                  </span>
+                `).join('')}
+              </div>
+              ${img.description ? `<p style="font-size: 11px; color: #475569; margin: 0; font-style: italic; line-height: 1.4;">${img.description}</p>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
+
     <!-- Footer -->
     <div class="footer">
       <div class="footer-text">
@@ -629,7 +665,7 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
         Vi säkerställer trygga och skadedjursfria miljöer för hem och verksamheter
       </div>
       <div class="footer-contact">
-        <strong>Kontakt:</strong> info@begone.se | 010 280 44 10 | 
+        <strong>Kontakt:</strong> info@begone.se | 010 280 44 10 |
         <a href="https://begone.se">www.begone.se</a>
       </div>
     </div>
@@ -1056,7 +1092,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let filename: string
 
     if (reportType === 'single' && caseData) {
-      html = generateSingleCaseHTML(caseData, customerData, reportType)
+      // Hämta bilder för ärendet
+      const supabase = createClient(
+        process.env.VITE_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const { data: rawImages } = await supabase
+        .from('case_images')
+        .select('id, file_path, file_name, tags, description')
+        .eq('case_id', caseData.id)
+        .eq('case_type', 'contract')
+        .order('uploaded_at', { ascending: true })
+
+      // Generera signed URLs för bilderna
+      const images: { url: string; description?: string; tags: string[] }[] = []
+      for (const img of rawImages ?? []) {
+        const { data: signed } = await supabase.storage
+          .from('case-images')
+          .createSignedUrl(img.file_path, 3600)
+        if (signed?.signedUrl) {
+          images.push({ url: signed.signedUrl, description: img.description, tags: img.tags })
+        }
+      }
+
+      html = generateSingleCaseHTML(caseData, customerData, reportType, images)
       filename = `BeGone_Arende_${caseData.case_number || 'N/A'}_${new Date().toISOString().split('T')[0]}.pdf`
     } else if (reportType === 'multiple' && cases) {
       html = generateMultipleCasesHTML(cases, customerData, userRole || 'användare', period || 'alla')

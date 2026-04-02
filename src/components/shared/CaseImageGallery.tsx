@@ -18,7 +18,8 @@ import {
   Plus,
   AlertCircle,
   Megaphone,
-  GraduationCap
+  GraduationCap,
+  MessageSquare
 } from 'lucide-react'
 import { CaseImageService, formatFileSize } from '../../services/caseImageService'
 import type { CaseImageWithUrl } from '../../services/caseImageService'
@@ -34,6 +35,7 @@ export interface PendingImage {
   file: File
   preview: string
   tags: CaseImageTag[]
+  description?: string
 }
 
 // Interface för pending ändringar
@@ -41,6 +43,7 @@ export interface PendingImageChanges {
   toUpload: PendingImage[]
   toDelete: string[] // ID:n på bilder som ska tas bort
   tagChanges: { imageId: string; newTags: CaseImageTag[] }[]
+  descriptionChanges: { imageId: string; description: string }[]
 }
 
 // Interface för ref-methods som parent kan anropa
@@ -93,6 +96,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
   const [pendingUploads, setPendingUploads] = useState<PendingImage[]>([])
   const [pendingDeletes, setPendingDeletes] = useState<string[]>([])
   const [pendingTagChanges, setPendingTagChanges] = useState<Map<string, CaseImageTag[]>>(new Map())
+  const [pendingDescriptionChanges, setPendingDescriptionChanges] = useState<Map<string, string>>(new Map())
   const [isCommitting, setIsCommitting] = useState(false)
 
   // Notifiera parent om pending changes
@@ -100,10 +104,11 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     if (draftMode && onPendingChangesUpdate) {
       const hasPending = pendingUploads.length > 0 ||
                         pendingDeletes.length > 0 ||
-                        pendingTagChanges.size > 0
+                        pendingTagChanges.size > 0 ||
+                        pendingDescriptionChanges.size > 0
       onPendingChangesUpdate(hasPending)
     }
-  }, [draftMode, pendingUploads, pendingDeletes, pendingTagChanges, onPendingChangesUpdate])
+  }, [draftMode, pendingUploads, pendingDeletes, pendingTagChanges, pendingDescriptionChanges, onPendingChangesUpdate])
 
   // Hämta bilder
   const fetchImages = useCallback(async () => {
@@ -132,6 +137,53 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
       return pendingTagChanges.get(image.id)!
     }
     return image.tags
+  }
+
+  // Helper för att få aktuell description (med pending changes)
+  const getDisplayDescription = (image: CaseImageWithUrl | PendingImage): string => {
+    const id = image.id
+    if (draftMode && pendingDescriptionChanges.has(id)) {
+      return pendingDescriptionChanges.get(id)!
+    }
+    if ('description' in image) return image.description || ''
+    return ''
+  }
+
+  // Hantera description-ändring
+  const handleDescriptionChange = (imageId: string, value: string) => {
+    if (draftMode) {
+      // Kolla om pending upload
+      const pendingIndex = pendingUploads.findIndex(p => p.id === imageId)
+      if (pendingIndex !== -1) {
+        setPendingUploads(prev => {
+          const newPending = [...prev]
+          newPending[pendingIndex] = { ...newPending[pendingIndex], description: value }
+          return newPending
+        })
+        return
+      }
+      // Existerande bild
+      setPendingDescriptionChanges(prev => {
+        const newMap = new Map(prev)
+        const original = images.find(img => img.id === imageId)
+        if (original && (original.description || '') === value) {
+          newMap.delete(imageId)
+        } else {
+          newMap.set(imageId, value)
+        }
+        return newMap
+      })
+    } else {
+      // Direkt-läge: spara omedelbart
+      CaseImageService.updateImageDescription(imageId, value).then(result => {
+        if (result.success) {
+          setImages(prev => prev.map(img => img.id === imageId ? { ...img, description: value } : img))
+          onImageUpdated?.()
+        } else {
+          toast.error(result.error || 'Kunde inte uppdatera kommentar')
+        }
+      })
+    }
   }
 
   // Kombinera existerande bilder med pending uploads för visning
@@ -347,7 +399,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
           caseType,
           pending.file,
           pending.tags,
-          undefined,
+          pending.description || undefined,
           userId
         )
         if (!result.success) {
@@ -372,10 +424,19 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
         }
       }
 
+      // 4. Uppdatera descriptions
+      for (const [imageId, description] of pendingDescriptionChanges) {
+        const result = await CaseImageService.updateImageDescription(imageId, description)
+        if (!result.success) {
+          errors.push(`Kunde inte spara kommentar: ${result.error}`)
+        }
+      }
+
       // Rensa pending state
       setPendingUploads([])
       setPendingDeletes([])
       setPendingTagChanges(new Map())
+      setPendingDescriptionChanges(new Map())
 
       // Hämta uppdaterade bilder
       await fetchImages()
@@ -400,6 +461,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     setPendingUploads([])
     setPendingDeletes([])
     setPendingTagChanges(new Map())
+    setPendingDescriptionChanges(new Map())
   }
 
   // Exponera metoder via ref
@@ -410,10 +472,14 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
       tagChanges: Array.from(pendingTagChanges).map(([imageId, newTags]) => ({
         imageId,
         newTags
+      })),
+      descriptionChanges: Array.from(pendingDescriptionChanges).map(([imageId, description]) => ({
+        imageId,
+        description
       }))
     }),
     commitChanges,
-    hasPendingChanges: () => pendingUploads.length > 0 || pendingDeletes.length > 0 || pendingTagChanges.size > 0,
+    hasPendingChanges: () => pendingUploads.length > 0 || pendingDeletes.length > 0 || pendingTagChanges.size > 0 || pendingDescriptionChanges.size > 0,
     resetChanges
   }))
 
@@ -763,6 +829,26 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
                 : 'Ej uppladdad'
               }
             </p>
+            {/* Bildkommentar */}
+            {canEdit && (
+              <div className="mt-2" onClick={e => e.stopPropagation()}>
+                <textarea
+                  placeholder="Lägg till kommentar om bilden..."
+                  value={getDisplayDescription(selectedImage as CaseImageWithUrl | PendingImage)}
+                  onChange={e => handleDescriptionChange(
+                    'id' in selectedImage ? selectedImage.id : (selectedImage as PendingImage).id,
+                    e.target.value
+                  )}
+                  rows={2}
+                  className="w-full px-3 py-1.5 text-xs bg-black/40 border border-white/20 rounded-lg text-white placeholder-white/40 resize-none focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                />
+              </div>
+            )}
+            {!canEdit && getDisplayDescription(selectedImage as CaseImageWithUrl | PendingImage) && (
+              <p className="mt-1.5 text-white/80 text-sm italic">
+                {getDisplayDescription(selectedImage as CaseImageWithUrl | PendingImage)}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1024,6 +1110,19 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
                     )}
                   </div>
                 )}
+
+                {/* Kommentar-indikator */}
+                {!isPending && !isDeleted && (() => {
+                  const img = images.find(i => i.id === imageId)
+                  const hasDesc = (pendingDescriptionChanges.has(imageId)
+                    ? pendingDescriptionChanges.get(imageId)
+                    : img?.description) || ''
+                  return hasDesc ? (
+                    <div className="absolute bottom-2 left-2 p-1 bg-black/60 rounded-full" title={hasDesc}>
+                      <MessageSquare className="w-3 h-3 text-[#20c58f]" />
+                    </div>
+                  ) : null
+                })()}
 
                 {/* Ta bort-knapp */}
                 {canDelete && !isDeleted && (
