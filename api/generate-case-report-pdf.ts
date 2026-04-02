@@ -427,12 +427,9 @@ const generateSingleCaseHTML = (
     <div class="section">
       <div class="section-header accent">Teknisk bedömning</div>
       <div class="card" style="border-left: 4px solid ${trafficLight.color};">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-          <div style="font-size: 24px; line-height: 1;">${trafficLight.emoji}</div>
-          <div>
-            <div style="font-size: 15px; font-weight: 700; color: #1F2937;">${trafficLight.label}</div>
-            <div style="font-size: 12px; color: #6B7280;">Baserat på inspektion och expertis har vår tekniker bedömt situationen</div>
-          </div>
+        <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid ${beGoneColors.divider};">
+          <div style="font-size: 15px; font-weight: 700; color: #1F2937; margin-bottom: 2px;">${trafficLight.label}</div>
+          <div style="font-size: 12px; color: #6B7280;">Baserat på inspektion och expertis har vår tekniker bedömt situationen</div>
         </div>
         <div class="info-grid">
           <div class="info-group">
@@ -531,16 +528,7 @@ const generateSingleCaseHTML = (
         ${images.map(img => `
           <div style="break-inside: avoid; background: #F8FAFC; border: 1px solid ${beGoneColors.border}; border-radius: 8px; overflow: hidden;">
             <img src="${img.url}" style="width: 100%; display: block; max-height: 220px; object-fit: cover;" />
-            <div style="padding: 8px 12px;">
-              <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: ${img.description ? '6px' : '0'};">
-                ${img.tags.map((tag: string) => `
-                  <span style="font-size: 10px; padding: 2px 6px; border-radius: 99px; background: ${beGoneColors.divider}; color: #475569; font-weight: 500;">
-                    ${TAG_LABELS[tag] || tag}
-                  </span>
-                `).join('')}
-              </div>
-              ${img.description ? `<p style="font-size: 11px; color: #475569; margin: 0; font-style: italic; line-height: 1.4;">${img.description}</p>` : ''}
-            </div>
+            ${img.description ? `<div style="padding: 8px 12px;"><p style="font-size: 11px; color: #475569; margin: 0; font-style: italic; line-height: 1.4;">${img.description}</p></div>` : ''}
           </div>
         `).join('')}
       </div>
