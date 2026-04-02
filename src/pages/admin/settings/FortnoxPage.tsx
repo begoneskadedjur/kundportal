@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle, XCircle, Loader2, RefreshCw, ExternalLink, Building2, Hash, Mail, Phone, MapPin } from 'lucide-react'
 import { FortnoxService, FortnoxCustomer } from '../../../services/fortnoxService'
 import Button from '../../../components/ui/Button'
+import FortnoxCustomerModal from '../../../components/admin/fortnox/FortnoxCustomerModal'
 import toast from 'react-hot-toast'
 
 function getCustomerGroup(customerNumber: string): string {
@@ -36,6 +37,7 @@ export default function FortnoxPage() {
   const [customersLoading, setCustomersLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [selectedCustomerNumber, setSelectedCustomerNumber] = useState<string | null>(null)
 
   useEffect(() => {
     document.title = 'Fortnox - BeGone Admin'
@@ -88,6 +90,11 @@ export default function FortnoxPage() {
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-6xl">
+      <FortnoxCustomerModal
+        customerNumber={selectedCustomerNumber}
+        onClose={() => setSelectedCustomerNumber(null)}
+      />
+
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button
@@ -192,7 +199,8 @@ export default function FortnoxPage() {
                 {filteredCustomers.map((customer) => (
                   <div
                     key={customer.CustomerNumber}
-                    className="px-3 py-2.5 bg-slate-800/40 border border-slate-700/50 rounded-xl flex items-start justify-between gap-4"
+                    onClick={() => setSelectedCustomerNumber(customer.CustomerNumber)}
+                    className="px-3 py-2.5 bg-slate-800/40 border border-slate-700/50 rounded-xl flex items-start justify-between gap-4 cursor-pointer hover:bg-slate-800/70 hover:border-slate-600 transition-colors"
                   >
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="mt-0.5">

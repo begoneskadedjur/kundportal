@@ -25,11 +25,39 @@ export interface FortnoxCustomer {
   Name: string
   OrganisationNumber: string
   Email: string
+  EmailInvoice: string
+  EmailInvoiceBCC: string
   Phone1: string
+  Phone2: string
+  Fax: string
+  WWW: string
   Address1: string
+  Address2: string
   ZipCode: string
   City: string
+  Country: string
+  CountryCode: string
+  DeliveryName: string
+  DeliveryAddress1: string
+  DeliveryAddress2: string
+  DeliveryZipCode: string
+  DeliveryCity: string
+  DeliveryCountry: string
+  DeliveryPhone: string
   Active: boolean
+  CustomerType: string
+  Comments: string
+  Currency: string
+  PriceList: string
+  PaymentTerms: string
+  VATType: string
+  OurReference: string
+  YourReference: string
+  CostCenter: string
+  Project: string
+  CreditLimit: number
+  InvoiceDiscount: number
+  GLN: string
 }
 
 export interface FortnoxInvoice {
