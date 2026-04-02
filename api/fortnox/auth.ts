@@ -26,7 +26,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       'payment',
       'price',
       'costcenter',
-      'salary',
       'developer',
     ].join(' '),
     state,
