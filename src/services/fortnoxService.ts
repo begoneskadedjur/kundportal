@@ -6,7 +6,12 @@ async function fortnoxRequest<T>(
   method = 'GET',
   body?: unknown
 ): Promise<T> {
-  const res = await fetch(`/api/fortnox/proxy?path=${encodeURIComponent(path)}`, {
+  // Dela upp path och query-parametrar så de enkodas korrekt var för sig
+  const [basePath, queryString] = path.split('?')
+  const proxyUrl = queryString
+    ? `/api/fortnox/proxy?path=${encodeURIComponent(basePath)}&${queryString}`
+    : `/api/fortnox/proxy?path=${encodeURIComponent(basePath)}`
+  const res = await fetch(proxyUrl, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,

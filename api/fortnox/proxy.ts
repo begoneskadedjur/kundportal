@@ -21,7 +21,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const fortnoxPath = Array.isArray(path) ? path.join('/') : path
-  const url = `${FORTNOX_API}/${fortnoxPath}`
+
+  // Vidarebefordra eventuella extra query-parametrar (allt utom 'path') till Fortnox
+  const extraParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(req.query)) {
+    if (key === 'path') continue
+    if (Array.isArray(value)) {
+      value.forEach(v => extraParams.append(key, v))
+    } else if (value) {
+      extraParams.append(key, value)
+    }
+  }
+  const queryString = extraParams.toString()
+  const url = `${FORTNOX_API}/${fortnoxPath}${queryString ? `?${queryString}` : ''}`
 
   const fortnoxRes = await fetch(url, {
     method: req.method,
