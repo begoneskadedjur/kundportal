@@ -26,14 +26,18 @@ const beGoneColors = {
 }
 
 // Helper functions
-const formatDate = (dateString: string | null) => {
+const formatDate = (dateString: string | null | undefined) => {
   if (!dateString) return 'Ej angivet'
+  // Returnera bara datumdelen (YYYY-MM-DD) utan tidzon-konvertering
+  if (/^\d{4}-\d{2}-\d{2}T/.test(dateString)) {
+    return dateString.substring(0, 10)
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return dateString
+  }
   const date = new Date(dateString)
-  return date.toLocaleDateString('sv-SE', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
+  if (isNaN(date.getTime())) return 'Ej angivet'
+  return date.toISOString().substring(0, 10)
 }
 
 const formatCurrency = (amount: number | null) => {
