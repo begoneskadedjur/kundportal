@@ -273,7 +273,7 @@ export default function FortnoxPage() {
                   </span>
                   <button
                     onClick={() => loadCustomers(currentPage + 1)}
-                    disabled={currentPage >= totalPages}
+                    disabled={currentPage >= totalPages || filteredCustomers.length === 0}
                     className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     Nästa

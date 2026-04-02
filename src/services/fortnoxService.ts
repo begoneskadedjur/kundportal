@@ -95,7 +95,7 @@ export const FortnoxService = {
     const data = await fortnoxRequest<{
       Customers: FortnoxCustomer[]
       MetaInformation: { '@TotalPages': number }
-    }>(`customers?page=${page}&limit=100&customernumberto=6999`)
+    }>(`customers?page=${page}&limit=100`)
     return {
       customers: data.Customers ?? [],
       totalPages: data.MetaInformation?.['@TotalPages'] ?? 1,
