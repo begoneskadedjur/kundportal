@@ -1,12 +1,15 @@
 // api/import-customer-by-orgnr.ts
 // Importerar en kund från Fortnox + Oneflow baserat på org.nummer
+// action=preview: hämtar och returnerar data utan att spara
+// action=confirm: sparar den (eventuellt redigerade) datan
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { getValidAccessToken } from './fortnox/refresh'
 import fetch from 'node-fetch'
 
+// Stöder både SUPABASE_SERVICE_KEY och SUPABASE_SERVICE_ROLE_KEY
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
+const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)!
 const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
 const FORTNOX_API = 'https://api.fortnox.se/3'
 
@@ -18,7 +21,7 @@ function normalizeOrgNr(raw: string): string {
   if (digits.length === 10) {
     return `${digits.slice(0, 6)}-${digits.slice(6)}`
   }
-  return digits // returnera as-is om inte 10 siffror
+  return digits
 }
 
 const setCorsHeaders = (res: VercelResponse) => {
@@ -27,72 +30,46 @@ const setCorsHeaders = (res: VercelResponse) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
-// Hämta kund från Fortnox via org.nummer
+// ─── Fortnox ─────────────────────────────────────────────────────────────────
+
 async function fetchFortnoxCustomerByOrgNr(orgNr: string) {
   const accessToken = await getValidAccessToken()
+  const orgNrDigits = orgNr.replace(/\D/g, '')
 
-  // Fortnox stöder sökning med organisationsnummer
+  // Försök direkt filtrering på organisationsnummer
   const url = `${FORTNOX_API}/customers?organisationnumber=${encodeURIComponent(orgNr)}`
   const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/json',
-    },
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
   })
 
-  if (!res.ok) {
-    console.error('❌ Fortnox sökning misslyckades:', res.status, res.statusText)
-    return null
+  if (res.ok) {
+    const data = await res.json() as { Customers: any[] }
+    const customers = data.Customers ?? []
+    if (customers.length > 0) {
+      return await fetchFortnoxCustomerFull(customers[0].CustomerNumber, accessToken)
+    }
   }
 
-  const data = await res.json() as { Customers: any[] }
-  const customers = data.Customers ?? []
-
-  if (customers.length === 0) {
-    // Fortnox API med organisationnumber-filter kan vara opålitligt – prova med filter=active
-    // Alternativt: hämta lista och matcha manuellt (sista utväg)
-    console.log('⚠️ Ingen kund hittad med org.nr-sökning, provar lista-sökning...')
-    return await fetchFortnoxCustomerByOrgNrFromList(orgNr, accessToken)
-  }
-
-  // Hämta full kunddata med kundnummer
-  const customerNumber = customers[0].CustomerNumber
-  return await fetchFortnoxCustomerFull(customerNumber, accessToken)
-}
-
-// Söker igenom Fortnox-kundlistan och matchar på org.nummer (fallback)
-async function fetchFortnoxCustomerByOrgNrFromList(orgNr: string, accessToken: string) {
-  const orgNrDigits = orgNr.replace(/\D/g, '')
+  // Fallback: iterera sidvis och matcha manuellt
+  console.log('⚠️ Direktfilter gav inget – söker manuellt i kundlista...')
   let page = 1
   let totalPages = 1
 
   while (page <= totalPages) {
-    const url = `${FORTNOX_API}/customers?page=${page}&limit=100`
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/json',
-      },
+    const pageRes = await fetch(`${FORTNOX_API}/customers?page=${page}&limit=100`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
     })
+    if (!pageRes.ok) break
 
-    if (!res.ok) break
-
-    const data = await res.json() as {
+    const pageData = await pageRes.json() as {
       Customers: any[]
       MetaInformation: { '@TotalPages': number }
     }
-    totalPages = data.MetaInformation?.['@TotalPages'] ?? 1
-    const customers = data.Customers ?? []
-
-    const match = customers.find((c: any) => {
-      const cDigits = (c.OrganisationNumber || '').replace(/\D/g, '')
-      return cDigits === orgNrDigits
+    totalPages = pageData.MetaInformation?.['@TotalPages'] ?? 1
+    const match = (pageData.Customers ?? []).find((c: any) => {
+      return (c.OrganisationNumber || '').replace(/\D/g, '') === orgNrDigits
     })
-
-    if (match) {
-      return await fetchFortnoxCustomerFull(match.CustomerNumber, accessToken)
-    }
-
+    if (match) return await fetchFortnoxCustomerFull(match.CustomerNumber, accessToken)
     page++
   }
 
@@ -100,24 +77,27 @@ async function fetchFortnoxCustomerByOrgNrFromList(orgNr: string, accessToken: s
 }
 
 async function fetchFortnoxCustomerFull(customerNumber: string, accessToken: string) {
-  const url = `${FORTNOX_API}/customers/${customerNumber}`
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/json',
-    },
+  const res = await fetch(`${FORTNOX_API}/customers/${customerNumber}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
   })
-
   if (!res.ok) return null
   const data = await res.json() as { Customer: any }
   return data.Customer ?? null
 }
 
-// Hjälpfunktion: hämta fullständig kontraktsdata (inkl. parties) i ett anrop
-async function fetchOneflowContractFull(contractId: number, headers: Record<string, string>) {
+// ─── Oneflow ──────────────────────────────────────────────────────────────────
+
+const oneflowHeaders = () => ({
+  'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+  'x-oneflow-user-email': 'info@begone.se',
+  Accept: 'application/json',
+})
+
+async function fetchOneflowContractFull(contractId: number) {
+  const h = oneflowHeaders()
   const [contractRes, partiesRes] = await Promise.all([
-    fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, { headers }),
-    fetch(`https://api.oneflow.com/v1/contracts/${contractId}/parties`, { headers }),
+    fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, { headers: h }),
+    fetch(`https://api.oneflow.com/v1/contracts/${contractId}/parties`, { headers: h }),
   ])
   if (!contractRes.ok) return null
   const contract = await contractRes.json() as any
@@ -129,64 +109,51 @@ async function fetchOneflowContractFull(contractId: number, headers: Record<stri
   return { contract, parties }
 }
 
-// Hämta senast signerade Oneflow-kontrakt för ett org.nr
-// Strategi: hämta alla kontrakt i ett bulk-anrop (limit 200),
-// kolla inline om org.nr syns i kontraktets _private/_parties-data,
-// annars batch-hämta fullständiga kontrakt parallellt (10 åt gången).
 async function fetchOneflowContractByOrgNr(orgNr: string) {
   const orgNrDigits = orgNr.replace(/\D/g, '')
-  const headers = {
-    'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-    'x-oneflow-user-email': 'info@begone.se',
-    Accept: 'application/json',
-  }
 
-  // Hämta alla kontrakt i ett anrop (Oneflow tillåter max 200 per sida)
-  const listRes = await fetch('https://api.oneflow.com/v1/contracts?limit=200&offset=0', { headers })
+  // Hämta alla kontrakt i ett anrop
+  const listRes = await fetch('https://api.oneflow.com/v1/contracts?limit=200&offset=0', {
+    headers: oneflowHeaders(),
+  })
   if (!listRes.ok) {
     console.error('❌ Oneflow list API-fel:', listRes.status)
     return null
   }
 
-  const listData = await listRes.json() as { data: any[]; count: number }
+  const listData = await listRes.json() as { data: any[] }
   const allContracts: any[] = listData.data ?? []
   console.log(`📋 Oneflow: ${allContracts.length} kontrakt totalt`)
 
-  // Steg 1: försök matcha direkt på data som redan finns i list-svaret
-  // (Oneflow inkluderar ibland identification_number i _private-strukturen)
+  // Steg 1: direktmatch på inline parties i list-svaret
   const quickMatch = allContracts.find((c: any) => {
     const parties: any[] = c.parties?.data ?? c.parties ?? []
     const counterParty = parties.find((p: any) => !p.my_party)
     if (!counterParty) return false
-    const digits = (counterParty.identification_number || '').replace(/\D/g, '')
-    return digits === orgNrDigits
+    return (counterParty.identification_number || '').replace(/\D/g, '') === orgNrDigits
   })
 
   if (quickMatch) {
-    console.log(`✅ Direkt match i list-svar: kontrakt ${quickMatch.id}`)
-    const full = await fetchOneflowContractFull(quickMatch.id, headers)
-    return full
+    console.log(`✅ Direktmatch i list-svar: kontrakt ${quickMatch.id}`)
+    return fetchOneflowContractFull(quickMatch.id)
   }
 
-  // Steg 2: batch-hämta fullständiga kontrakt parallellt (10 åt gången)
-  // Prioritera signed/active kontrakt, hoppa över draft
+  // Steg 2: parallell batch-sökning (10 åt gången), skippa draft
   const candidates = allContracts.filter((c: any) => c.state !== 'draft')
-  console.log(`🔍 Batch-söker bland ${candidates.length} icke-draft kontrakt (10 parallellt)`)
+  console.log(`🔍 Batch-söker bland ${candidates.length} kontrakt (10 parallellt)`)
 
   const BATCH_SIZE = 10
   for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
     const batch = candidates.slice(i, i + BATCH_SIZE)
     const results = await Promise.all(
-      batch.map((c: any) => fetchOneflowContractFull(c.id, headers).catch(() => null))
+      batch.map((c: any) => fetchOneflowContractFull(c.id).catch(() => null))
     )
-
     for (const result of results) {
       if (!result) continue
       const counterParty = result.parties.find((p: any) => !p.my_party)
       if (!counterParty) continue
-      const digits = (counterParty.identification_number || '').replace(/\D/g, '')
-      if (digits === orgNrDigits) {
-        console.log(`✅ Match hittad i batch: kontrakt ${result.contract.id}`)
+      if ((counterParty.identification_number || '').replace(/\D/g, '') === orgNrDigits) {
+        console.log(`✅ Match i batch: kontrakt ${result.contract.id}`)
         return result
       }
     }
@@ -195,41 +162,29 @@ async function fetchOneflowContractByOrgNr(orgNr: string) {
   return null
 }
 
-// Extrahera data från Oneflow-kontrakt
 function extractOneflowData(contractData: { contract: any; parties: any[] }) {
   const { contract, parties } = contractData
   const customerParty = parties.find((p: any) => !p.my_party)
 
-  // Extrahera data_fields
   const dataFields: Record<string, string> = {}
   const fields: any[] = Array.isArray(contract.data_fields) ? contract.data_fields : []
   for (const field of fields) {
     const customId = field.custom_id || field._private_ownerside?.custom_id
-    if (customId && field.value) {
-      dataFields[customId] = field.value
-    }
+    if (customId && field.value) dataFields[customId] = field.value
   }
 
-  // Fältmappning (matchar CONTRACT_FIELD_MAPPING i import-contracts.ts)
-  const contact_person = dataFields['Kontaktperson']
-    || customerParty?.participants?.[0]?.name
-    || null
-
-  const contact_email = dataFields['e-post-kontaktperson']
-    || customerParty?.participants?.[0]?.email
-    || null
-
-  const contact_phone = dataFields['telefonnummer-kontaktperson']
-    || customerParty?.participants?.[0]?.phone
-    || null
-
+  const contact_person =
+    dataFields['Kontaktperson'] || customerParty?.participants?.[0]?.name || null
+  const contact_email =
+    dataFields['e-post-kontaktperson'] || customerParty?.participants?.[0]?.email || null
+  const contact_phone =
+    dataFields['telefonnummer-kontaktperson'] || customerParty?.participants?.[0]?.phone || null
   const contact_address = dataFields['utforande-adress'] || null
-
   const contract_start_date = parseDate(dataFields['begynnelsedag']) || null
   const contract_length = dataFields['avtalslngd'] || null
   const company_name_oneflow = dataFields['foretag'] || customerParty?.name || null
 
-  // Extrahera totalt värde från products
+  // Produktvärde
   let annual_value: number | null = null
   const products: any[] = contract.product_groups
     ? contract.product_groups.flatMap((g: any) => g.products || [])
@@ -238,8 +193,7 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
   if (products.length > 0) {
     annual_value = products.reduce((sum: number, p: any) => {
       const amount = parseFloat(p.total_amount?.amount ?? p.unit_price?.amount ?? '0')
-      const qty = p.quantity ?? 1
-      return sum + amount * qty
+      return sum + amount * (p.quantity ?? 1)
     }, 0)
   }
 
@@ -273,18 +227,58 @@ function parseDate(value: string | undefined): string | null {
   return null
 }
 
-// Huvudfunktion
+// ─── Handler ──────────────────────────────────────────────────────────────────
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res)
-
   if (req.method === 'OPTIONS') return res.status(204).end()
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Endast POST tillåtet' })
-  }
+  if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Endast POST tillåtet' })
 
   try {
-    const { org_nr } = req.body
+    const { action, org_nr, customer_data } = req.body
 
+    // ── CONFIRM: spara redan hämtad+redigerad data ───────────────────────────
+    if (action === 'confirm') {
+      if (!customer_data) {
+        return res.status(400).json({ success: false, error: 'customer_data krävs för confirm' })
+      }
+
+      const normalized = normalizeOrgNr(String(customer_data.organization_number || ''))
+
+      // Dublettkoll igen (säkerhet)
+      const { data: existing } = await supabase
+        .from('customers')
+        .select('id, company_name')
+        .eq('organization_number', normalized)
+        .maybeSingle()
+
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          error: 'Kund finns redan i systemet',
+          existing_customer: existing,
+        })
+      }
+
+      const { data: inserted, error: insertError } = await supabase
+        .from('customers')
+        .insert({ ...customer_data, organization_number: normalized, source_type: 'import' })
+        .select()
+        .single()
+
+      if (insertError || !inserted) {
+        console.error('❌ DB insert fel:', insertError)
+        return res.status(500).json({
+          success: false,
+          error: 'Kunde inte spara kunden',
+          details: insertError?.message,
+        })
+      }
+
+      return res.status(200).json({ success: true, customer: inserted })
+    }
+
+    // ── PREVIEW: hämta data men spara inte ──────────────────────────────────
     if (!org_nr) {
       return res.status(400).json({ success: false, error: 'org_nr krävs' })
     }
@@ -294,28 +288,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ success: false, error: 'Ogiltigt org.nummer – måste vara 10 siffror' })
     }
 
-    console.log('🔍 Importerar kund med org.nr:', normalized)
+    console.log('🔍 Preview för org.nr:', normalized)
 
     // Dublettkoll
     const { data: existing } = await supabase
       .from('customers')
       .select('id, company_name, customer_number')
       .eq('organization_number', normalized)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       return res.status(409).json({
         success: false,
-        error: `Kund finns redan i systemet`,
-        existing_customer: {
-          id: existing.id,
-          company_name: existing.company_name,
-          customer_number: existing.customer_number,
-        },
+        error: 'Kund finns redan i systemet',
+        existing_customer: existing,
       })
     }
 
-    // Hämta från Fortnox
+    // Fortnox
     console.log('📊 Hämtar från Fortnox...')
     const fortnoxCustomer = await fetchFortnoxCustomerByOrgNr(normalized).catch(err => {
       console.error('⚠️ Fortnox-fel:', err.message)
@@ -329,9 +319,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    console.log('✅ Fortnox-kund hittad:', fortnoxCustomer.Name)
+    console.log('✅ Fortnox-kund:', fortnoxCustomer.Name)
 
-    // Hämta från Oneflow
+    // Oneflow
     console.log('📋 Hämtar från Oneflow...')
     const oneflowData = await fetchOneflowContractByOrgNr(normalized).catch(err => {
       console.error('⚠️ Oneflow-fel:', err.message)
@@ -339,32 +329,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     const oneflow = oneflowData ? extractOneflowData(oneflowData) : null
-    if (oneflow) {
-      console.log('✅ Oneflow-kontrakt hittad:', oneflow.oneflow_contract_id)
-    } else {
-      console.log('⚠️ Inget Oneflow-kontrakt hittades – importerar med enbart Fortnox-data')
-    }
+    console.log(oneflow ? `✅ Oneflow-kontrakt: ${oneflow.oneflow_contract_id}` : '⚠️ Inget Oneflow-kontrakt')
 
-    // Bygg billing_address från Fortnox
+    // Bygg förslag på kunddata (ej sparat ännu)
     const billingParts = [
       fortnoxCustomer.Address1,
       fortnoxCustomer.Address2,
       [fortnoxCustomer.ZipCode, fortnoxCustomer.City].filter(Boolean).join(' '),
     ].filter(Boolean)
-    const billing_address = billingParts.length > 0 ? billingParts.join(', ') : null
 
-    // Bygg kundpost
-    const customerInsert: Record<string, any> = {
+    const preview = {
       company_name: fortnoxCustomer.Name,
       organization_number: normalized,
       customer_number: parseInt(fortnoxCustomer.CustomerNumber) || null,
       billing_email: fortnoxCustomer.EmailInvoice || fortnoxCustomer.Email || null,
-      billing_address,
+      billing_address: billingParts.length > 0 ? billingParts.join(', ') : null,
       currency: fortnoxCustomer.Currency || 'SEK',
-      source_type: 'import',
       is_active: fortnoxCustomer.Active !== false,
-
-      // Oneflow-data (om tillgänglig)
       contact_person: oneflow?.contact_person ?? null,
       contact_email: oneflow?.contact_email ?? null,
       contact_phone: oneflow?.contact_phone ?? null,
@@ -376,33 +357,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       oneflow_contract_id: oneflow?.oneflow_contract_id ?? null,
     }
 
-    const { data: inserted, error: insertError } = await supabase
-      .from('customers')
-      .insert(customerInsert)
-      .select()
-      .single()
-
-    if (insertError || !inserted) {
-      console.error('❌ Databasfel vid insert:', insertError)
-      return res.status(500).json({
-        success: false,
-        error: 'Kunde inte spara kunden i databasen',
-        details: insertError?.message,
-      })
-    }
-
-    console.log('✅ Kund importerad:', inserted.id)
-
     return res.status(200).json({
       success: true,
-      customer: inserted,
-      sources: {
-        fortnox: true,
-        oneflow: !!oneflow,
-      },
-      message: oneflow
-        ? `Kund importerad från Fortnox + Oneflow`
-        : `Kund importerad från Fortnox (inget Oneflow-avtal hittades)`,
+      preview,
+      sources: { fortnox: true, oneflow: !!oneflow },
     })
   } catch (err: any) {
     console.error('❌ Import-fel:', err)
