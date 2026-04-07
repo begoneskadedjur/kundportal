@@ -10,7 +10,6 @@ import fetch from 'node-fetch'
 // Stöder både SUPABASE_SERVICE_KEY och SUPABASE_SERVICE_ROLE_KEY
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)!
-const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
 const FORTNOX_API = 'https://api.fortnox.se/3'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -87,14 +86,15 @@ async function fetchFortnoxCustomerFull(customerNumber: string, accessToken: str
 
 // ─── Oneflow ──────────────────────────────────────────────────────────────────
 
-const oneflowHeaders = () => ({
-  'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+// Läs token inuti funktioner (inte på modulnivå) – Vercel sätter env efter modulinitiering
+const getOneflowHeaders = () => ({
+  'x-oneflow-api-token': process.env.ONEFLOW_API_TOKEN!,
   'x-oneflow-user-email': 'info@begone.se',
   Accept: 'application/json',
 })
 
 async function fetchOneflowContractFull(contractId: number) {
-  const h = oneflowHeaders()
+  const h = getOneflowHeaders()
   const [contractRes, partiesRes] = await Promise.all([
     fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, { headers: h }),
     fetch(`https://api.oneflow.com/v1/contracts/${contractId}/parties`, { headers: h }),
@@ -110,56 +110,61 @@ async function fetchOneflowContractFull(contractId: number) {
 }
 
 async function fetchOneflowContractByOrgNr(orgNr: string) {
-  const orgNrDigits = orgNr.replace(/\D/g, '')
+  // Oneflow stöder filter[participant_identification_number] – ett enda anrop, exakt match
+  // Max limit per anrop är 100 enligt API-dokumentation
+  const url = `https://api.oneflow.com/v1/contracts?limit=100&offset=0&filter[participant_identification_number]=${encodeURIComponent(orgNr)}`
+  console.log(`🔍 Oneflow söker på org.nr: ${orgNr}`)
 
-  // Hämta alla kontrakt i ett anrop
-  const listRes = await fetch('https://api.oneflow.com/v1/contracts?limit=200&offset=0', {
-    headers: oneflowHeaders(),
-  })
+  const listRes = await fetch(url, { headers: getOneflowHeaders() })
+
   if (!listRes.ok) {
-    console.error('❌ Oneflow list API-fel:', listRes.status)
+    const body = await listRes.text().catch(() => '')
+    console.error(`❌ Oneflow filter API-fel: ${listRes.status}`, body)
     return null
   }
 
-  const listData = await listRes.json() as { data: any[] }
-  const allContracts: any[] = listData.data ?? []
-  console.log(`📋 Oneflow: ${allContracts.length} kontrakt totalt`)
+  const listData = await listRes.json() as { data: any[]; count: number }
+  const contracts: any[] = listData.data ?? []
+  console.log(`📋 Oneflow: ${contracts.length} träff(ar) för org.nr ${orgNr}`)
 
-  // Steg 1: direktmatch på inline parties i list-svaret
-  const quickMatch = allContracts.find((c: any) => {
-    const parties: any[] = c.parties?.data ?? c.parties ?? []
-    const counterParty = parties.find((p: any) => !p.my_party)
-    if (!counterParty) return false
-    return (counterParty.identification_number || '').replace(/\D/g, '') === orgNrDigits
+  if (contracts.length === 0) return null
+
+  // Välj bästa kontrakt: prioritera signed > active > övriga, senast uppdaterat
+  const ranked = [...contracts].sort((a, b) => {
+    const priority = (c: any) =>
+      c.state === 'signed' ? 0 : c.state === 'active' ? 1 : 2
+    if (priority(a) !== priority(b)) return priority(a) - priority(b)
+    return (b.updated_time ?? '').localeCompare(a.updated_time ?? '')
   })
 
-  if (quickMatch) {
-    console.log(`✅ Direktmatch i list-svar: kontrakt ${quickMatch.id}`)
-    return fetchOneflowContractFull(quickMatch.id)
-  }
+  const best = ranked[0]
+  console.log(`✅ Bäst match: kontrakt ${best.id} (state: ${best.state})`)
 
-  // Steg 2: parallell batch-sökning (10 åt gången), skippa draft
-  const candidates = allContracts.filter((c: any) => c.state !== 'draft')
-  console.log(`🔍 Batch-söker bland ${candidates.length} kontrakt (10 parallellt)`)
+  // Parterna finns redan inline i list-svaret (dokumentationen bekräftar detta)
+  const inlineParties: any[] = Array.isArray(best.parties) ? best.parties : best.parties?.data ?? []
 
-  const BATCH_SIZE = 10
-  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-    const batch = candidates.slice(i, i + BATCH_SIZE)
-    const results = await Promise.all(
-      batch.map((c: any) => fetchOneflowContractFull(c.id).catch(() => null))
+  // Hämta fullständig kontraktsdata (data_fields, products etc)
+  const fullRes = await fetch(
+    `https://api.oneflow.com/v1/contracts/${best.id}`,
+    { headers: getOneflowHeaders() }
+  )
+  if (!fullRes.ok) return null
+  const fullContract = await fullRes.json() as any
+
+  // Hämta parties separat om de inte finns inline
+  let parties = inlineParties
+  if (parties.length === 0) {
+    const partiesRes = await fetch(
+      `https://api.oneflow.com/v1/contracts/${best.id}/parties`,
+      { headers: getOneflowHeaders() }
     )
-    for (const result of results) {
-      if (!result) continue
-      const counterParty = result.parties.find((p: any) => !p.my_party)
-      if (!counterParty) continue
-      if ((counterParty.identification_number || '').replace(/\D/g, '') === orgNrDigits) {
-        console.log(`✅ Match i batch: kontrakt ${result.contract.id}`)
-        return result
-      }
+    if (partiesRes.ok) {
+      const pd = await partiesRes.json() as any
+      parties = Array.isArray(pd) ? pd : pd.data ?? []
     }
   }
 
-  return null
+  return { contract: fullContract, parties }
 }
 
 function extractOneflowData(contractData: { contract: any; parties: any[] }) {
