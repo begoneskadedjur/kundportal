@@ -93,39 +93,32 @@ const getOneflowHeaders = () => ({
   Accept: 'application/json',
 })
 
-async function fetchOneflowContractFull(contractId: number) {
-  const h = getOneflowHeaders()
-  const [contractRes, partiesRes] = await Promise.all([
-    fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, { headers: h }),
-    fetch(`https://api.oneflow.com/v1/contracts/${contractId}/parties`, { headers: h }),
-  ])
-  if (!contractRes.ok) return null
-  const contract = await contractRes.json() as any
-  let parties: any[] = []
-  if (partiesRes.ok) {
-    const pd = await partiesRes.json() as any
-    parties = Array.isArray(pd) ? pd : pd.data ?? []
-  }
-  return { contract, parties }
-}
 
 async function fetchOneflowContractByOrgNr(orgNr: string) {
-  // Oneflow stöder filter[participant_identification_number] – ett enda anrop, exakt match
-  // Max limit per anrop är 100 enligt API-dokumentation
-  const url = `https://api.oneflow.com/v1/contracts?limit=100&offset=0&filter[participant_identification_number]=${encodeURIComponent(orgNr)}`
-  console.log(`🔍 Oneflow söker på org.nr: ${orgNr}`)
+  // Org.numret lagras som ett data_field med custom_id "org-nr" i Oneflow-kontrakten
+  // Använd filter[data_field_match]=org-nr:<värde> för direkt match
+  // Prova både med och utan bindestreck (714800-2590 och 7148002590)
+  const variants = [orgNr, orgNr.replace(/\D/g, '')]
+  const uniqueVariants = [...new Set(variants)]
 
-  const listRes = await fetch(url, { headers: getOneflowHeaders() })
+  let contracts: any[] = []
 
-  if (!listRes.ok) {
-    const body = await listRes.text().catch(() => '')
-    console.error(`❌ Oneflow filter API-fel: ${listRes.status}`, body)
-    return null
+  for (const variant of uniqueVariants) {
+    const url = `https://api.oneflow.com/v1/contracts?limit=100&offset=0&filter[data_field_match]=${encodeURIComponent(`org-nr:${variant}`)}`
+    console.log(`🔍 Oneflow söker data_field_match org-nr: ${variant}`)
+
+    const listRes = await fetch(url, { headers: getOneflowHeaders() })
+    if (!listRes.ok) {
+      const body = await listRes.text().catch(() => '')
+      console.error(`❌ Oneflow filter API-fel: ${listRes.status}`, body)
+      continue
+    }
+
+    const listData = await listRes.json() as { data: any[]; count: number }
+    contracts = listData.data ?? []
+    console.log(`📋 Oneflow: ${contracts.length} träff(ar) för org.nr ${variant}`)
+    if (contracts.length > 0) break
   }
-
-  const listData = await listRes.json() as { data: any[]; count: number }
-  const contracts: any[] = listData.data ?? []
-  console.log(`📋 Oneflow: ${contracts.length} träff(ar) för org.nr ${orgNr}`)
 
   if (contracts.length === 0) return null
 
