@@ -113,89 +113,86 @@ async function fetchFortnoxCustomerFull(customerNumber: string, accessToken: str
   return data.Customer ?? null
 }
 
+// Hjälpfunktion: hämta fullständig kontraktsdata (inkl. parties) i ett anrop
+async function fetchOneflowContractFull(contractId: number, headers: Record<string, string>) {
+  const [contractRes, partiesRes] = await Promise.all([
+    fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, { headers }),
+    fetch(`https://api.oneflow.com/v1/contracts/${contractId}/parties`, { headers }),
+  ])
+  if (!contractRes.ok) return null
+  const contract = await contractRes.json() as any
+  let parties: any[] = []
+  if (partiesRes.ok) {
+    const pd = await partiesRes.json() as any
+    parties = Array.isArray(pd) ? pd : pd.data ?? []
+  }
+  return { contract, parties }
+}
+
 // Hämta senast signerade Oneflow-kontrakt för ett org.nr
+// Strategi: hämta alla kontrakt i ett bulk-anrop (limit 200),
+// kolla inline om org.nr syns i kontraktets _private/_parties-data,
+// annars batch-hämta fullständiga kontrakt parallellt (10 åt gången).
 async function fetchOneflowContractByOrgNr(orgNr: string) {
   const orgNrDigits = orgNr.replace(/\D/g, '')
-
-  // Hämta kontrakt från Oneflow (paginerat)
-  let offset = 0
-  const limit = 50
-  let bestMatch: any = null
-
-  while (true) {
-    const url = `https://api.oneflow.com/v1/contracts?limit=${limit}&offset=${offset}`
-    const res = await fetch(url, {
-      headers: {
-        'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-        'x-oneflow-user-email': 'info@begone.se',
-        Accept: 'application/json',
-      },
-    })
-
-    if (!res.ok) {
-      console.error('❌ Oneflow list API-fel:', res.status)
-      break
-    }
-
-    const data = await res.json() as { data: any[]; count: number; _links?: { next?: any } }
-    const contracts = data.data ?? []
-
-    for (const contract of contracts) {
-      // Hämta parties för att kolla org.nr
-      const partiesRes = await fetch(
-        `https://api.oneflow.com/v1/contracts/${contract.id}/parties`,
-        {
-          headers: {
-            'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-            'x-oneflow-user-email': 'info@begone.se',
-            Accept: 'application/json',
-          },
-        }
-      )
-
-      if (!partiesRes.ok) continue
-
-      const partiesData = await partiesRes.json() as { data?: any[] } | any[]
-      const parties: any[] = Array.isArray(partiesData) ? partiesData : partiesData.data ?? []
-
-      const customerParty = parties.find((p: any) => !p.my_party)
-      if (!customerParty) continue
-
-      const partyOrgNr = (customerParty.identification_number || '').replace(/\D/g, '')
-      if (partyOrgNr && partyOrgNr === orgNrDigits) {
-        // Prioritera signerade kontrakt
-        if (!bestMatch || contract.state === 'signed' || contract.state === 'active') {
-          bestMatch = { contract, parties }
-        }
-        if (contract.state === 'signed' || contract.state === 'active') {
-          break // Bästa möjliga match funnen
-        }
-      }
-    }
-
-    if (bestMatch && (bestMatch.contract.state === 'signed' || bestMatch.contract.state === 'active')) {
-      break
-    }
-
-    if (!data._links?.next || contracts.length < limit) break
-    offset += limit
+  const headers = {
+    'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+    'x-oneflow-user-email': 'info@begone.se',
+    Accept: 'application/json',
   }
 
-  if (!bestMatch) return null
+  // Hämta alla kontrakt i ett anrop (Oneflow tillåter max 200 per sida)
+  const listRes = await fetch('https://api.oneflow.com/v1/contracts?limit=200&offset=0', { headers })
+  if (!listRes.ok) {
+    console.error('❌ Oneflow list API-fel:', listRes.status)
+    return null
+  }
 
-  // Hämta fullständig kontraktsdata
-  const contractId = bestMatch.contract.id
-  const fullRes = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, {
-    headers: {
-      'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-      'x-oneflow-user-email': 'info@begone.se',
-      Accept: 'application/json',
-    },
+  const listData = await listRes.json() as { data: any[]; count: number }
+  const allContracts: any[] = listData.data ?? []
+  console.log(`📋 Oneflow: ${allContracts.length} kontrakt totalt`)
+
+  // Steg 1: försök matcha direkt på data som redan finns i list-svaret
+  // (Oneflow inkluderar ibland identification_number i _private-strukturen)
+  const quickMatch = allContracts.find((c: any) => {
+    const parties: any[] = c.parties?.data ?? c.parties ?? []
+    const counterParty = parties.find((p: any) => !p.my_party)
+    if (!counterParty) return false
+    const digits = (counterParty.identification_number || '').replace(/\D/g, '')
+    return digits === orgNrDigits
   })
 
-  const full = fullRes.ok ? await fullRes.json() as any : bestMatch.contract
+  if (quickMatch) {
+    console.log(`✅ Direkt match i list-svar: kontrakt ${quickMatch.id}`)
+    const full = await fetchOneflowContractFull(quickMatch.id, headers)
+    return full
+  }
 
-  return { contract: full, parties: bestMatch.parties }
+  // Steg 2: batch-hämta fullständiga kontrakt parallellt (10 åt gången)
+  // Prioritera signed/active kontrakt, hoppa över draft
+  const candidates = allContracts.filter((c: any) => c.state !== 'draft')
+  console.log(`🔍 Batch-söker bland ${candidates.length} icke-draft kontrakt (10 parallellt)`)
+
+  const BATCH_SIZE = 10
+  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+    const batch = candidates.slice(i, i + BATCH_SIZE)
+    const results = await Promise.all(
+      batch.map((c: any) => fetchOneflowContractFull(c.id, headers).catch(() => null))
+    )
+
+    for (const result of results) {
+      if (!result) continue
+      const counterParty = result.parties.find((p: any) => !p.my_party)
+      if (!counterParty) continue
+      const digits = (counterParty.identification_number || '').replace(/\D/g, '')
+      if (digits === orgNrDigits) {
+        console.log(`✅ Match hittad i batch: kontrakt ${result.contract.id}`)
+        return result
+      }
+    }
+  }
+
+  return null
 }
 
 // Extrahera data från Oneflow-kontrakt
