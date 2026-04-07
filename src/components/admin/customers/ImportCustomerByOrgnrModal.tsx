@@ -1,11 +1,22 @@
 // src/components/admin/customers/ImportCustomerByOrgnrModal.tsx
 import { useState } from 'react'
 import {
-  Building2, Search, CheckCircle, AlertCircle, Loader2, ExternalLink, Edit3, Save
+  Building2, Search, CheckCircle, AlertCircle, Loader2, ExternalLink, Edit3, Save, Receipt
 } from 'lucide-react'
+import { BILLING_FREQUENCY_CONFIG, type BillingFrequency } from '../../../types/contractBilling'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
+
+interface FortnoxInvoice {
+  DocumentNumber: string
+  Total: number
+  Balance: number
+  DueDate: string
+  InvoiceDate: string
+  FinalPayDate: string | null
+  Sent: boolean
+}
 
 interface PreviewData {
   company_name: string
@@ -24,6 +35,7 @@ interface PreviewData {
   annual_value: number | null
   products: any[] | null
   oneflow_contract_id: string | null
+  billing_frequency: BillingFrequency
 }
 
 interface ImportCustomerByOrgnrModalProps {
@@ -72,6 +84,7 @@ export default function ImportCustomerByOrgnrModal({
   const [searching, setSearching] = useState(false)
   const [sources, setSources] = useState<{ fortnox: boolean; oneflow: boolean } | null>(null)
   const [preview, setPreview] = useState<PreviewData | null>(null)
+  const [invoices, setInvoices] = useState<FortnoxInvoice[]>([])
   const [error, setError] = useState<{ message: string; existingId?: string; existingName?: string } | null>(null)
   const [savedCustomer, setSavedCustomer] = useState<{ id: string; company_name: string } | null>(null)
 
@@ -79,6 +92,7 @@ export default function ImportCustomerByOrgnrModal({
     setStep('search')
     setOrgNr('')
     setPreview(null)
+    setInvoices([])
     setError(null)
     setSources(null)
     setSavedCustomer(null)
@@ -112,7 +126,8 @@ export default function ImportCustomerByOrgnrModal({
         return
       }
 
-      setPreview(data.preview)
+      setPreview({ ...data.preview, billing_frequency: data.preview.billing_frequency ?? 'monthly' })
+      setInvoices(data.invoices ?? [])
       setSources(data.sources)
       setStep('preview')
     } catch {
@@ -293,7 +308,9 @@ export default function ImportCustomerByOrgnrModal({
 
             {/* Sektion: Avtal */}
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
-              <h4 className="text-sm font-semibold text-slate-300">Avtal</h4>
+              <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+                <Receipt className="w-4 h-4 text-slate-400" />Avtal &amp; fakturering
+              </h4>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Avtalsstart" value={preview.contract_start_date ?? ''} onChange={update('contract_start_date')} placeholder="ÅÅÅÅ-MM-DD" />
                 <Field label="Avtalslängd" value={preview.contract_length ?? ''} onChange={update('contract_length')} placeholder="t.ex. 3 år" />
@@ -305,8 +322,45 @@ export default function ImportCustomerByOrgnrModal({
                   type="number"
                 />
                 <Field label="Oneflow kontrakt-ID" value={preview.oneflow_contract_id ?? ''} onChange={update('oneflow_contract_id')} placeholder="Ej hämtat" />
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-slate-400 mb-1 block">Faktureringsfrekvens</label>
+                  <select
+                    value={preview.billing_frequency}
+                    onChange={e => setPreview(prev => prev ? { ...prev, billing_frequency: e.target.value as BillingFrequency } : prev)}
+                    className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+                  >
+                    {Object.entries(BILLING_FREQUENCY_CONFIG).map(([key, cfg]) => (
+                      <option key={key} value={key}>{cfg.label} – {cfg.description}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
+
+            {/* Sektion: Historiska fakturor */}
+            {invoices.length > 0 && (
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-2">
+                <h4 className="text-sm font-semibold text-slate-300">Historiska fakturor (Fortnox)</h4>
+                <p className="text-xs text-slate-500">Senaste {invoices.length} fakturorna – använd för att se när kunden senast debiterades.</p>
+                <div className="space-y-1">
+                  {invoices.map(inv => {
+                    const paid = inv.FinalPayDate || inv.Balance === 0
+                    return (
+                      <div key={inv.DocumentNumber} className="flex items-center justify-between px-2 py-1.5 bg-slate-800/40 rounded-lg text-xs">
+                        <span className="text-slate-400 w-20 shrink-0">{inv.InvoiceDate}</span>
+                        <span className="text-slate-300 flex-1">#{inv.DocumentNumber}</span>
+                        <span className="text-slate-300 w-24 text-right">
+                          {new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(inv.Total)}
+                        </span>
+                        <span className={`ml-2 w-16 text-right ${paid ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {paid ? 'Betald' : 'Obetald'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </>
         )}
 

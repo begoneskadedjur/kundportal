@@ -225,6 +225,18 @@ function parseDate(value: string | undefined): string | null {
   return null
 }
 
+// ─── Fortnox fakturor ─────────────────────────────────────────────────────────
+
+async function fetchFortnoxInvoices(customerNumber: string, accessToken: string) {
+  const url = `${FORTNOX_API}/invoices?customernumber=${encodeURIComponent(customerNumber)}&limit=20&sortby=invoicedate&sortorder=descending`
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  })
+  if (!res.ok) return []
+  const data = await res.json() as { Invoices: any[] }
+  return data.Invoices ?? []
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -319,6 +331,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('✅ Fortnox-kund:', fortnoxCustomer.Name)
 
+    // Fortnox fakturor
+    const accessToken = await getValidAccessToken()
+    const fortnoxInvoices = await fetchFortnoxInvoices(fortnoxCustomer.CustomerNumber, accessToken).catch(err => {
+      console.error('⚠️ Fortnox fakturor-fel:', err.message)
+      return []
+    })
+    console.log(`📄 Fortnox: ${fortnoxInvoices.length} fakturor hämtade`)
+
     // Oneflow
     console.log('📋 Hämtar från Oneflow...')
     const oneflowData = await fetchOneflowContractByOrgNr(normalized).catch(err => {
@@ -358,6 +378,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       success: true,
       preview,
+      invoices: fortnoxInvoices,
       sources: { fortnox: true, oneflow: !!oneflow },
     })
   } catch (err: any) {
