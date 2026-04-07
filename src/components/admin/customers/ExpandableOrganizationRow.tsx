@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Building2, ExternalLink, Edit3, TrendingUp, 
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 import TooltipWrapper from '../../ui/TooltipWrapper'
+import CustomerContractButton from './CustomerContractButton'
 
 interface ExpandableOrganizationRowProps {
   organization: ConsolidatedCustomer
@@ -448,6 +449,17 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               </button>
             </TooltipWrapper>
           )}
+
+          {/* Avtal — visas om kunden har oneflow_contract_id */}
+          {(() => {
+            const contractId = organization.sites?.[0]?.oneflow_contract_id
+            return contractId ? (
+              <CustomerContractButton
+                oneflowContractId={contractId}
+                customerName={organization.company_name}
+              />
+            ) : null
+          })()}
 
           {/* Overflow menu */}
           <div className="relative" ref={overflowRef}>

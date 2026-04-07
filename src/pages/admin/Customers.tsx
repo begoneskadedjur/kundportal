@@ -19,6 +19,7 @@ import RenewalWorkflowModal from '../../components/admin/customers/RenewalWorkfl
 import TerminateContractModal from '../../components/admin/customers/TerminateContractModal'
 import AddContractCustomerModal from '../../components/admin/customers/AddContractCustomerModal'
 import AddXpertContractCustomerModal from '../../components/admin/customers/AddXpertContractCustomerModal'
+import ImportCustomerByOrgnrModal from '../../components/admin/customers/ImportCustomerByOrgnrModal'
 import TooltipWrapper from '../../components/ui/TooltipWrapper'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers, type ContactSummary } from '../../hooks/useConsolidatedCustomers'
@@ -260,6 +261,7 @@ export default function Customers() {
   const [terminateOrganization, setTerminateOrganization] = useState<any>(null)
   const [addContractCustomerOpen, setAddContractCustomerOpen] = useState(false)
   const [addXpertContractCustomerOpen, setAddXpertContractCustomerOpen] = useState(false)
+  const [importByOrgnrOpen, setImportByOrgnrOpen] = useState(false)
   const [importDropdownOpen, setImportDropdownOpen] = useState(false)
   const importDropdownRef = useRef<HTMLDivElement>(null)
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
@@ -594,6 +596,17 @@ export default function Customers() {
             {importDropdownOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                 <div className="py-1">
+                  <button
+                    onClick={() => { setImportDropdownOpen(false); setImportByOrgnrOpen(true) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-300 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-colors"
+                  >
+                    <Building2 className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">Importera via org.nummer</div>
+                      <div className="text-xs text-slate-500 mt-0.5">Hämtar från Fortnox + Oneflow automatiskt</div>
+                    </div>
+                  </button>
+                  <div className="mx-4 my-1 border-t border-slate-700/50" />
                   <button
                     onClick={() => { setImportDropdownOpen(false); setAddContractCustomerOpen(true) }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-300 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-colors"
@@ -1360,6 +1373,16 @@ export default function Customers() {
           setTerminateOrganization(null)
         }}
         onTerminated={refresh}
+      />
+
+      {/* Import Customer by Org.nr Modal */}
+      <ImportCustomerByOrgnrModal
+        isOpen={importByOrgnrOpen}
+        onClose={() => setImportByOrgnrOpen(false)}
+        onImported={(customerId) => {
+          refresh()
+          navigate(`/admin/befintliga-kunder/${customerId}`)
+        }}
       />
 
       {/* Add Contract Customer Modal */}
