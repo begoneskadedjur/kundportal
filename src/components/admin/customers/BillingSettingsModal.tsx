@@ -1,9 +1,10 @@
 // src/components/admin/customers/BillingSettingsModal.tsx
-// Faktureringsinställningar per kund – välj avtalsartiklar, antal, fast pris, premiejustering
+// Faktureringsinställningar per kund – artiklar, antal, fast avtalsvärde, premiejustering
 
 import { useState, useEffect, useId } from 'react'
 import {
-  Receipt, Save, Building2, Copy, TrendingUp, Plus, Trash2, AlertCircle
+  Receipt, Save, Building2, Copy, TrendingUp, Plus, Minus,
+  Trash2, AlertCircle, Search, Package, ChevronDown, ChevronRight, Clock
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -11,18 +12,32 @@ import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { PriceListService } from '../../../services/priceListService'
 import { CustomerContractArticleService } from '../../../services/customerContractArticleService'
-import type { PriceList, PriceListItemWithArticle } from '../../../types/articles'
-import { BillingFrequency, BILLING_FREQUENCY_CONFIG } from '../../../types/contractBilling'
+import type { PriceListItemWithArticle } from '../../../types/articles'
+import {
+  ARTICLE_UNIT_CONFIG,
+  ARTICLE_CATEGORY_CONFIG,
+  type PriceList,
+  type ArticleCategory,
+} from '../../../types/articles'
+import { type BillingFrequency, BILLING_FREQUENCY_CONFIG } from '../../../types/contractBilling'
 import toast from 'react-hot-toast'
 
 interface ContractRow {
   tempId: string
   article_id: string
   article_name: string
+  article_code: string
   article_unit: string
+  article_category: string
   list_price: number
-  quantity: string
-  fixed_price: string   // tom sträng = använd list_price
+  quantity: number
+}
+
+interface SiteBillingData {
+  id: string
+  site_name: string
+  billing_email: string
+  billing_address: string
 }
 
 interface BillingSettingsModalProps {
@@ -51,22 +66,8 @@ interface BillingSettingsModalProps {
   onSave: () => void
 }
 
-interface SiteBillingData {
-  id: string
-  site_name: string
-  billing_email: string
-  billing_address: string
-}
-
 const fmt = (n: number) =>
   new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(n)
-
-function calcRowTotal(row: ContractRow): number {
-  const qty = parseFloat(row.quantity) || 0
-  const fp = row.fixed_price !== '' ? parseFloat(row.fixed_price) : null
-  if (fp != null) return fp
-  return row.list_price * qty
-}
 
 export default function BillingSettingsModal({
   customerId,
@@ -93,8 +94,13 @@ export default function BillingSettingsModal({
   const [catalogItems, setCatalogItems] = useState<PriceListItemWithArticle[]>([])
   const [loadingCatalog, setLoadingCatalog] = useState(false)
   const [contractRows, setContractRows] = useState<ContractRow[]>([])
-  const [showArticlePicker, setShowArticlePicker] = useState(false)
-  const [pickerSearch, setPickerSearch] = useState('')
+  const [showArticleList, setShowArticleList] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<ArticleCategory | 'all'>('all')
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+
+  // "Fast avtalsvärde" – override för hela årsbeloppet
+  const [fixedContractValue, setFixedContractValue] = useState('')
 
   // Billing form state
   const [billingFrequency, setBillingFrequency] = useState<BillingFrequency>('monthly')
@@ -149,22 +155,35 @@ export default function BillingSettingsModal({
       .finally(() => setLoadingCatalog(false))
   }, [priceListId])
 
-  // Load existing contract articles for this customer
+  // Load existing contract articles
   useEffect(() => {
     if (!isOpen || !customerId) return
+    setFixedContractValue('')
     CustomerContractArticleService.getArticles(customerId)
       .then(articles => {
+        // fixed_price på första raden = totalt fast avtalsvärde (lagras på kund, inte per artikel)
+        // Vi hämtar det från kunden istället
         setContractRows(
           articles.map((ca, i) => ({
             tempId: `existing-${i}-${ca.article_id}`,
             article_id: ca.article_id,
             article_name: ca.article?.name || '',
+            article_code: (ca.article as any)?.code || '',
             article_unit: (ca.article as any)?.unit || 'st',
+            article_category: (ca.article as any)?.category || 'Övrigt',
             list_price: ca.list_price,
-            quantity: String(ca.quantity),
-            fixed_price: ca.fixed_price != null ? String(ca.fixed_price) : '',
+            quantity: ca.quantity,
           }))
         )
+        // Hämta fast avtalsvärde från kunden
+        if (customerId) {
+          supabase.from('customers').select('annual_value').eq('id', customerId).single()
+            .then(({ data }) => {
+              if (data && (data as any).annual_value) {
+                setFixedContractValue(String((data as any).annual_value))
+              }
+            })
+        }
       })
       .catch(console.error)
   }, [isOpen, customerId])
@@ -172,42 +191,69 @@ export default function BillingSettingsModal({
   // Summering
   const adjustPct = priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) || 0 : 0
   const hasAdjustment = adjustPct !== 0
-  const baseTotal = contractRows.reduce((s, r) => s + calcRowTotal(r), 0)
+  const calculatedTotal = contractRows.reduce((s, r) => s + r.list_price * r.quantity, 0)
+  const fixedVal = fixedContractValue !== '' ? parseFloat(fixedContractValue) || 0 : null
+  const baseTotal = fixedVal != null ? fixedVal : calculatedTotal
   const adjustedTotal = hasAdjustment ? Math.round(baseTotal * (1 + adjustPct / 100)) : baseTotal
   const freqMonths = BILLING_FREQUENCY_CONFIG[billingFrequency]?.months ?? 1
-  const perPeriodBase = freqMonths > 0 && freqMonths !== 12 ? Math.round(baseTotal * freqMonths / 12) : baseTotal
   const perPeriodAdj = freqMonths > 0 && freqMonths !== 12 ? Math.round(adjustedTotal * freqMonths / 12) : adjustedTotal
 
-  // Artiklar som inte redan lagts till
+  // Katalog: gruppera per kategori
   const usedArticleIds = new Set(contractRows.map(r => r.article_id))
-  const availableArticles = catalogItems.filter(i => !usedArticleIds.has(i.article_id))
-  const filteredAvailable = pickerSearch
-    ? availableArticles.filter(i => i.article?.name?.toLowerCase().includes(pickerSearch.toLowerCase()))
-    : availableArticles
+  const filteredCatalog = catalogItems.filter(item => {
+    const matchSearch = !searchTerm ||
+      item.article?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.article as any)?.code?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchCat = categoryFilter === 'all' || item.article?.category === categoryFilter
+    return matchSearch && matchCat
+  })
+  const articlesByCategory = filteredCatalog.reduce((acc, item) => {
+    const cat = (item.article?.category || 'Övrigt') as ArticleCategory
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push(item)
+    return acc
+  }, {} as Record<ArticleCategory, PriceListItemWithArticle[]>)
+
+  const toggleCategory = (cat: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev)
+      next.has(cat) ? next.delete(cat) : next.add(cat)
+      return next
+    })
+  }
 
   const addArticle = (item: PriceListItemWithArticle) => {
+    if (usedArticleIds.has(item.article_id)) return
     setContractRows(prev => [
       ...prev,
       {
         tempId: `new-${Date.now()}-${item.article_id}`,
         article_id: item.article_id,
         article_name: item.article?.name || '',
+        article_code: (item.article as any)?.code || '',
         article_unit: item.article?.unit || 'st',
+        article_category: item.article?.category || 'Övrigt',
         list_price: item.custom_price,
-        quantity: '1',
-        fixed_price: '',
+        quantity: 1,
       },
     ])
-    setShowArticlePicker(false)
-    setPickerSearch('')
   }
 
   const removeRow = (tempId: string) => {
     setContractRows(prev => prev.filter(r => r.tempId !== tempId))
   }
 
-  const updateRow = (tempId: string, field: 'quantity' | 'fixed_price', value: string) => {
-    setContractRows(prev => prev.map(r => r.tempId === tempId ? { ...r, [field]: value } : r))
+  const updateQty = (tempId: string, delta: number) => {
+    setContractRows(prev => prev.map(r => {
+      if (r.tempId !== tempId) return r
+      const newQty = Math.max(1, r.quantity + delta)
+      return { ...r, quantity: newQty }
+    }))
+  }
+
+  const setQtyDirect = (tempId: string, val: string) => {
+    const n = parseInt(val) || 1
+    setContractRows(prev => prev.map(r => r.tempId === tempId ? { ...r, quantity: Math.max(1, n) } : r))
   }
 
   const handleSiteBillingChange = (siteId: string, field: 'billing_email' | 'billing_address', value: string) => {
@@ -222,19 +268,19 @@ export default function BillingSettingsModal({
     if (!customerId) return
     setSaving(true)
     try {
-      // 1. Spara avtalsartiklar
+      // 1. Spara avtalsartiklar (fixed_price=null, avtalsvärde lagras separat på kunden)
       await CustomerContractArticleService.saveArticles(
         customerId,
         contractRows.map((r, i) => ({
           customer_id: customerId,
           article_id: r.article_id,
-          quantity: parseFloat(r.quantity) || 1,
-          fixed_price: r.fixed_price !== '' ? parseFloat(r.fixed_price) : null,
+          quantity: r.quantity,
+          fixed_price: null,
           sort_order: i,
         }))
       )
 
-      // 2. Beräkna värden
+      // 2. Beräkna annual_value: fast avtalsvärde om satt, annars beräknat från artiklar
       const annualValue = adjustedTotal > 0 ? adjustedTotal : null
       const monthlyValue = annualValue ? Math.round(annualValue / 12) : null
 
@@ -259,12 +305,16 @@ export default function BillingSettingsModal({
 
       if (error) throw error
 
-      // 4. Per-site uppdatering
+      // 4. Per-site
       if (isMultisite && billingType === 'per_site') {
         for (const site of siteBilling) {
           const { error: se } = await supabase
             .from('customers')
-            .update({ billing_email: site.billing_email || null, billing_address: site.billing_address || null, updated_at: new Date().toISOString() })
+            .update({
+              billing_email: site.billing_email || null,
+              billing_address: site.billing_address || null,
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', site.id)
           if (se) throw se
         }
@@ -284,6 +334,7 @@ export default function BillingSettingsModal({
   if (!isOpen || !customerId) return null
 
   const sel = 'w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none'
+  const allCategories = Object.keys(articlesByCategory) as ArticleCategory[]
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999] p-4">
@@ -345,107 +396,191 @@ export default function BillingSettingsModal({
             </div>
           </div>
 
-          {/* ── Avtalsartiklar ── */}
+          {/* ── Avtalsinnehåll ── */}
           <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-300">Avtalsinnehåll</h3>
+              <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+                <Package className="w-4 h-4 text-[#20c58f]" />
+                Produkter &amp; tjänster
+                {contractRows.length > 0 && (
+                  <span className="px-1.5 py-0.5 text-xs rounded-full bg-[#20c58f]/20 text-[#20c58f]">{contractRows.length}</span>
+                )}
+              </h3>
               {priceListId && (
                 <button
-                  onClick={() => { setShowArticlePicker(v => !v); setPickerSearch('') }}
-                  className="flex items-center gap-1 text-xs text-[#20c58f] hover:text-[#20c58f]/80 transition-colors"
+                  onClick={() => { setShowArticleList(v => !v); setSearchTerm(''); setCategoryFilter('all') }}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-[#20c58f] hover:bg-[#1bb07e] text-white rounded-lg transition-colors"
                 >
-                  <Plus className="w-3.5 h-3.5" />Lägg till artikel
+                  {showArticleList ? <ChevronDown className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                  {showArticleList ? 'Stäng' : 'Lägg till'}
                 </button>
               )}
             </div>
 
-            {!priceListId && (
-              <p className="text-xs text-slate-500">Välj en artikelkatalog ovan för att lägga till artiklar.</p>
-            )}
+            {/* Artikel-picker */}
+            {showArticleList && priceListId && (
+              <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Sök artikel (namn, kod)..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                  />
+                </div>
 
-            {/* Artikel-picker dropdown */}
-            {showArticlePicker && (
-              <div className="p-2 bg-slate-800/60 border border-slate-600 rounded-xl space-y-2">
-                <input
-                  autoFocus
-                  type="text"
-                  value={pickerSearch}
-                  onChange={e => setPickerSearch(e.target.value)}
-                  placeholder="Sök artikel..."
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-                />
-                {loadingCatalog ? (
-                  <div className="flex items-center gap-2 text-xs text-slate-500 py-1"><LoadingSpinner size="sm" />Laddar...</div>
-                ) : filteredAvailable.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-1">
-                    {availableArticles.length === 0 ? 'Alla artiklar har lagts till.' : 'Inga träffar.'}
-                  </p>
-                ) : (
-                  <div className="max-h-44 overflow-y-auto space-y-0.5">
-                    {filteredAvailable.map(item => (
-                      <button
-                        key={item.article_id}
-                        onClick={() => addArticle(item)}
-                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-left rounded-lg hover:bg-slate-700/60 transition-colors"
-                      >
-                        <span className="text-xs text-slate-300 truncate flex-1">{item.article?.name}</span>
-                        <span className="text-xs text-slate-400 ml-2 shrink-0">{fmt(item.custom_price)}/{item.article?.unit}</span>
+                {/* Kategorifilter */}
+                <div className="flex flex-wrap gap-1">
+                  <button onClick={() => setCategoryFilter('all')}
+                    className={`px-2 py-0.5 text-xs rounded-md transition-colors ${categoryFilter === 'all' ? 'bg-[#20c58f] text-white' : 'bg-slate-700/50 text-slate-400 hover:text-white'}`}>
+                    Alla
+                  </button>
+                  {(Object.keys(articlesByCategory) as ArticleCategory[]).map(cat => {
+                    const cfg = ARTICLE_CATEGORY_CONFIG[cat]
+                    return (
+                      <button key={cat} onClick={() => setCategoryFilter(cat)}
+                        className={`px-2 py-0.5 text-xs rounded-md transition-colors ${categoryFilter === cat ? 'bg-[#20c58f] text-white' : 'bg-slate-700/50 text-slate-400 hover:text-white'}`}>
+                        {cfg?.label ?? cat}
                       </button>
-                    ))}
+                    )
+                  })}
+                </div>
+
+                {loadingCatalog ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-500 py-2"><LoadingSpinner />Laddar...</div>
+                ) : allCategories.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-2 text-center">Inga artiklar matchar sökningen</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {allCategories.map(cat => {
+                      const items = articlesByCategory[cat]
+                      if (!items?.length) return null
+                      const cfg = ARTICLE_CATEGORY_CONFIG[cat]
+                      const isExp = expandedCategories.has(cat)
+                      return (
+                        <div key={cat} className="border border-slate-700/50 rounded-lg overflow-hidden">
+                          <button onClick={() => toggleCategory(cat)}
+                            className="w-full flex items-center justify-between px-3 py-2 bg-slate-800/30 hover:bg-slate-800/50 transition-colors">
+                            <div className="flex items-center gap-2">
+                              {isExp ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                              <span className={`px-1.5 py-0.5 text-xs rounded ${cfg?.bgColor ?? ''} ${cfg?.color ?? ''}`}>{cfg?.label ?? cat}</span>
+                              <span className="text-xs text-slate-500">{items.length} artiklar</span>
+                            </div>
+                          </button>
+                          {isExp && (
+                            <div className="divide-y divide-slate-700/30">
+                              {items.map(item => {
+                                const unit = ARTICLE_UNIT_CONFIG[item.article?.unit as keyof typeof ARTICLE_UNIT_CONFIG]
+                                const isAdded = usedArticleIds.has(item.article_id)
+                                return (
+                                  <div key={item.article_id}
+                                    className={`flex items-center justify-between px-3 py-2 transition-colors ${isAdded ? 'bg-[#20c58f]/5 border-l-2 border-[#20c58f]/40' : 'hover:bg-slate-800/20'}`}>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        {item.article?.unit === 'timme' && <Clock className="w-3.5 h-3.5 text-orange-400 shrink-0" />}
+                                        <span className="text-sm text-white font-medium truncate">{item.article?.name}</span>
+                                        <span className="text-[10px] text-slate-500 font-mono">{(item.article as any)?.code}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1 mt-0.5">
+                                        <span className="text-[#20c58f] text-sm font-medium">{fmt(item.custom_price)}</span>
+                                        <span className="text-[10px] text-slate-500">/ {unit?.shortLabel ?? item.article?.unit}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 ml-2 shrink-0">
+                                      {isAdded && <span className="text-[10px] text-[#20c58f] font-medium">Tillagd</span>}
+                                      <button onClick={() => addArticle(item)} disabled={isAdded}
+                                        className="p-1.5 text-[#20c58f] hover:bg-[#20c58f]/20 rounded-lg transition-colors disabled:opacity-30">
+                                        <Plus className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
             )}
 
-            {/* Artikel-rader */}
-            {contractRows.length > 0 ? (
-              <div className="space-y-1.5">
-                {/* Header */}
-                <div className="grid gap-2 px-1 text-xs text-slate-500" style={{ gridTemplateColumns: '1fr 70px 90px 90px 70px 24px' }}>
-                  <span>Artikel</span>
-                  <span className="text-right">Antal</span>
-                  <span className="text-right">Listpris</span>
-                  <span className="text-right">Fast pris</span>
-                  <span className="text-right">Rad</span>
-                  <span />
-                </div>
-
+            {/* Valda artiklar */}
+            {contractRows.length === 0 ? (
+              <div className="text-center py-4">
+                <Package className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+                <p className="text-sm text-slate-500">Inga artiklar tillagda</p>
+                {priceListId && <p className="text-xs text-slate-600 mt-0.5">Klicka "Lägg till" för att välja produkter &amp; tjänster</p>}
+                {!priceListId && <p className="text-xs text-slate-600 mt-0.5">Välj en artikelkatalog ovan</p>}
+              </div>
+            ) : (
+              <div className="space-y-2">
                 {contractRows.map(row => {
-                  const lineTotal = calcRowTotal(row)
-                  const hasFixed = row.fixed_price !== ''
+                  const unit = ARTICLE_UNIT_CONFIG[row.article_unit as keyof typeof ARTICLE_UNIT_CONFIG]
+                  const isTime = row.article_unit === 'timme'
+                  const lineTotal = row.list_price * row.quantity
                   return (
-                    <div key={row.tempId} className="grid gap-2 items-center px-1" style={{ gridTemplateColumns: '1fr 70px 90px 90px 70px 24px' }}>
-                      <div className="min-w-0">
-                        <p className="text-xs text-slate-300 truncate">{row.article_name}</p>
-                        <p className="text-xs text-slate-500">{row.article_unit}</p>
+                    <div key={row.tempId} className="px-3 py-2 rounded-xl border border-slate-700/50 bg-slate-800/20">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          {/* Artikelnamn */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {isTime && <Clock className="w-3.5 h-3.5 text-orange-400 shrink-0" />}
+                            <span className="text-sm text-white font-medium">{row.article_name}</span>
+                            {row.article_code && <span className="text-[10px] text-slate-500 font-mono">{row.article_code}</span>}
+                          </div>
+                          {/* Kontroller */}
+                          <div className="flex items-center gap-3 mt-1.5 text-sm flex-wrap">
+                            {/* Antal +/- */}
+                            <div className="flex items-center gap-0.5">
+                              <button onClick={() => updateQty(row.tempId, -1)} disabled={row.quantity <= 1}
+                                className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50 transition-colors">
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <input type="number" min="1" value={row.quantity}
+                                onChange={e => setQtyDirect(row.tempId, e.target.value)}
+                                className="w-12 px-1.5 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-white text-center focus:outline-none focus:ring-1 focus:ring-[#20c58f]" />
+                              <button onClick={() => updateQty(row.tempId, 1)}
+                                className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="text-xs text-slate-500 ml-0.5">{unit?.shortLabel ?? row.article_unit}</span>
+                            </div>
+                            <span className="text-slate-600">×</span>
+                            <span className="text-[#20c58f] font-medium">{fmt(row.list_price)}</span>
+                          </div>
+                        </div>
+                        {/* Radtotal + ta bort */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-white font-semibold text-sm">{fmt(lineTotal)}</span>
+                          <button onClick={() => removeRow(row.tempId)}
+                            className="p-1 text-slate-600 hover:text-red-400 transition-colors rounded">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <input
-                        type="number"
-                        value={row.quantity}
-                        onChange={e => updateRow(row.tempId, 'quantity', e.target.value)}
-                        min="0"
-                        step="1"
-                        className="px-2 py-1 text-xs text-right bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f] w-full"
-                      />
-                      <span className="text-xs text-slate-400 text-right">{fmt(row.list_price)}</span>
-                      <input
-                        type="number"
-                        value={row.fixed_price}
-                        onChange={e => updateRow(row.tempId, 'fixed_price', e.target.value)}
-                        placeholder="–"
-                        min="0"
-                        className={`px-2 py-1 text-xs text-right bg-slate-800 border rounded-lg text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[#20c58f] w-full ${hasFixed ? 'border-amber-500/50' : 'border-slate-600'}`}
-                      />
-                      <span className="text-xs text-white text-right font-medium">{fmt(lineTotal)}</span>
-                      <button onClick={() => removeRow(row.tempId)} className="text-slate-600 hover:text-red-400 transition-colors flex items-center justify-center">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   )
                 })}
 
                 {/* Summering */}
                 <div className="pt-2 border-t border-slate-700/50 space-y-1">
+                  {fixedVal == null && (
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Beräknat årsbelopp</span>
+                      <span className="text-white font-semibold">{fmt(calculatedTotal)}</span>
+                    </div>
+                  )}
+                  {fixedVal != null && (
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Beräknat årsbelopp</span>
+                      <span className="line-through text-slate-500">{fmt(calculatedTotal)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-xs text-slate-400">
                     <span>Årsbelopp (exkl. moms)</span>
                     <div className="flex items-center gap-2">
@@ -456,27 +591,34 @@ export default function BillingSettingsModal({
                   {freqMonths > 0 && freqMonths !== 12 && (
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Per faktura ({BILLING_FREQUENCY_CONFIG[billingFrequency]?.label.toLowerCase()})</span>
-                      <div className="flex items-center gap-2">
-                        {hasAdjustment && <span className="line-through text-slate-500">{fmt(perPeriodBase)}</span>}
-                        <span className={`font-semibold ${hasAdjustment ? 'text-emerald-400' : 'text-white'}`}>{fmt(perPeriodAdj)}</span>
-                      </div>
+                      <span className={`font-semibold ${hasAdjustment ? 'text-emerald-400' : 'text-white'}`}>{fmt(perPeriodAdj)}</span>
                     </div>
                   )}
                 </div>
               </div>
-            ) : priceListId ? (
-              <p className="text-xs text-slate-500 py-1">Inga artiklar tillagda. Klicka "+ Lägg till artikel" för att börja.</p>
-            ) : null}
+            )}
           </div>
 
-          {/* ── Premiejustering ── */}
+          {/* ── Fast avtalsvärde + premiejustering ── */}
           <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
             <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-slate-400" />Årlig premiejustering
+              <TrendingUp className="w-4 h-4 text-slate-400" />Prissättning
             </h3>
-            <div className="grid grid-cols-2 gap-3 items-end">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Justeringsprocent (%)</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Fast avtalsvärde/år (kr)</label>
+                <input
+                  type="number"
+                  value={fixedContractValue}
+                  onChange={e => setFixedContractValue(e.target.value)}
+                  placeholder={calculatedTotal > 0 ? String(calculatedTotal) : '0'}
+                  min="0"
+                  className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none placeholder-slate-500"
+                />
+                <p className="text-xs text-slate-500 mt-1">Lämna tomt = beräknas från artiklar ovan</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Årlig premiejustering (%)</label>
                 <input
                   type="number"
                   value={priceAdjustmentPercent}
@@ -486,17 +628,17 @@ export default function BillingSettingsModal({
                   className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none placeholder-slate-500"
                 />
               </div>
-              {hasAdjustment && baseTotal > 0 && (
-                <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                  <p className="text-xs text-emerald-400 font-medium">{fmt(baseTotal)} → {fmt(adjustedTotal)}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">+{fmt(adjustedTotal - baseTotal)}/år ({adjustPct > 0 ? '+' : ''}{adjustPct}%)</p>
-                </div>
-              )}
             </div>
             {hasAdjustment && baseTotal > 0 && (
+              <div className="flex items-start gap-2 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                <span className="text-xs text-emerald-400 font-medium">{fmt(baseTotal)} → {fmt(adjustedTotal)}</span>
+                <span className="text-xs text-slate-400">(+{fmt(adjustedTotal - baseTotal)}/år, {adjustPct > 0 ? '+' : ''}{adjustPct}%)</span>
+              </div>
+            )}
+            {hasAdjustment && (
               <div className="flex items-start gap-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-amber-300">Justeringen appliceras vid nästa fakturering. För ackumulering – uppdatera priserna efter varje år.</p>
+                <p className="text-xs text-amber-300">Justeringen appliceras vid nästa fakturering. Uppdatera avtalsvärdet efter varje år för ackumulering.</p>
               </div>
             )}
           </div>
@@ -526,7 +668,7 @@ export default function BillingSettingsModal({
             </div>
           )}
 
-          {/* ── Per-site (multisite) ── */}
+          {/* ── Per-site ── */}
           {isMultisite && billingType === 'per_site' && siteBilling.length > 0 && (
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-2">
               <h3 className="text-sm font-semibold text-slate-300 mb-2">Enheternas fakturainställningar</h3>
@@ -565,7 +707,7 @@ export default function BillingSettingsModal({
         <div className="px-4 py-2.5 border-t border-slate-700/50 flex items-center justify-end gap-3 shrink-0">
           <Button variant="secondary" onClick={onClose} disabled={saving}>Avbryt</Button>
           <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
-            {saving ? <LoadingSpinner size="sm" /> : <Save className="w-4 h-4" />}
+            {saving ? <LoadingSpinner /> : <Save className="w-4 h-4" />}
             Spara
           </Button>
         </div>
