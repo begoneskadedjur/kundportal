@@ -104,6 +104,9 @@ export type Database = {
           // Kundgrupp & kundnummer
           customer_group_id: string | null
           customer_number: number | null
+
+          // 📈 Prisindexjustering
+          price_adjustment_percent: number | null
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'

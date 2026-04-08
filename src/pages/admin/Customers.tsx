@@ -1414,6 +1414,7 @@ export default function Customers() {
           currentBillingReference={billingSettingsOrg.sites[0]?.billing_reference || null}
           currentCostCenter={billingSettingsOrg.sites[0]?.cost_center || null}
           currentBillingRecipient={billingSettingsOrg.sites[0]?.billing_recipient || null}
+          currentPriceAdjustmentPercent={billingSettingsOrg.sites[0]?.price_adjustment_percent ?? null}
           sites={billingSettingsOrg.sites || []}
           isOpen={billingSettingsOpen}
           onClose={() => {

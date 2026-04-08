@@ -96,25 +96,56 @@ export class ContractBillingService {
     periodEnd: string,
     batchId?: string
   ): Promise<ContractBillingItem[]> {
-    const priceListItems = await this.getCustomerPriceListItems(customerId)
+    // Hämta kund inkl. prisjustering
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select('price_list_id, price_adjustment_percent')
+      .eq('id', customerId)
+      .single()
 
-    if (priceListItems.length === 0) {
-      return []
-    }
+    if (customerError) throw new Error(`Kunde inte hämta kund: ${customerError.message}`)
+    if (!customer?.price_list_id) return []
 
-    const billingItems: CreateBillingItemInput[] = priceListItems.map(item => ({
-      customer_id: customerId,
-      billing_period_start: periodStart,
-      billing_period_end: periodEnd,
-      article_id: item.article?.id || null,
-      article_code: item.article?.code || null,
-      article_name: item.article?.name || 'Okänd artikel',
-      quantity: 1,
-      unit_price: item.custom_price,
-      total_price: item.custom_price,
-      vat_rate: item.article?.vat_rate || 25,
-      batch_id: batchId || null
-    }))
+    const { data: rawItems, error: itemsError } = await supabase
+      .from('price_list_items')
+      .select(`
+        id,
+        custom_price,
+        article:articles(
+          id, code, name, default_price, vat_rate, unit, category, is_active
+        )
+      `)
+      .eq('price_list_id', customer.price_list_id)
+
+    if (itemsError) throw new Error(`Kunde inte hämta artikelpriser: ${itemsError.message}`)
+
+    const priceListItems = (rawItems || []).filter((item: any) => item.article?.is_active)
+    if (priceListItems.length === 0) return []
+
+    const adjustmentPercent = customer.price_adjustment_percent ?? 0
+    const hasAdjustment = adjustmentPercent !== 0
+
+    const billingItems: CreateBillingItemInput[] = priceListItems.map((item: any) => {
+      const basePrice: number = item.custom_price
+      const adjustedPrice = hasAdjustment
+        ? Math.round(basePrice * (1 + adjustmentPercent / 100))
+        : basePrice
+
+      return {
+        customer_id: customerId,
+        billing_period_start: periodStart,
+        billing_period_end: periodEnd,
+        article_id: item.article?.id || null,
+        article_code: item.article?.code || null,
+        article_name: item.article?.name || 'Okänd artikel',
+        quantity: 1,
+        unit_price: adjustedPrice,
+        total_price: adjustedPrice,
+        vat_rate: item.article?.vat_rate || 25,
+        batch_id: batchId || null,
+        original_price: hasAdjustment ? basePrice : null,
+      }
+    })
 
     const { data, error } = await supabase
       .from('contract_billing_items')
