@@ -261,6 +261,10 @@ export interface ContractInvoiceCustomer {
   billing_email: string | null
   billing_address: string | null
   contact_address: string | null
+  billing_reference: string | null
+  cost_center: string | null
+  billing_recipient: string | null
+  customer_number: number | null
 }
 
 /**

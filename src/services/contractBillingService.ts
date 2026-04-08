@@ -199,7 +199,7 @@ export class ContractBillingService {
       .from('contract_billing_items')
       .select(`
         *,
-        customer:customers(id, company_name, organization_number, billing_email, billing_address, contact_address),
+        customer:customers(id, company_name, organization_number, billing_email, billing_address, contact_address, billing_reference, cost_center, billing_recipient, customer_number),
         article:articles(id, code, name)
       `)
       .order('created_at', { ascending: false })

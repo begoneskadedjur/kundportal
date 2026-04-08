@@ -509,13 +509,11 @@ export function MonthlyBillingPipeline() {
                               isSelected={selectedKeys.has(getEntryKey(entry, month.month_key))}
                               onToggleSelection={() => toggleSelection(getEntryKey(entry, month.month_key))}
                               onClick={() => {
-                                if (entry.items.length > 0) {
-                                  setModalTarget({
-                                    customerId: entry.customer.id,
-                                    periodStart: month.period_start,
-                                    periodEnd: month.period_end,
-                                  })
-                                }
+                                setModalTarget({
+                                  customerId: entry.customer.id,
+                                  periodStart: month.period_start,
+                                  periodEnd: month.period_end,
+                                })
                               }}
                             />
                           ))}

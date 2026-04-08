@@ -467,17 +467,16 @@ export default function BillingSettingsModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Avtalets startdatum</label>
-                <input type="date" value={contractStartDate} onChange={e => {
+                <input type="text" value={contractStartDate} placeholder="ÅÅÅÅ-MM-DD" pattern="\d{4}-\d{2}-\d{2}" onChange={e => {
                   setContractStartDate(e.target.value)
-                  // Auto-sätt ankarmånad från startdatum om ingen är vald
-                  if (e.target.value && billingAnchorMonth === null) {
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value) && billingAnchorMonth === null) {
                     setBillingAnchorMonth(new Date(e.target.value).getMonth() + 1)
                   }
                 }} className={sel} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Avtalets slutdatum</label>
-                <input type="date" value={contractEndDate} onChange={e => setContractEndDate(e.target.value)} className={sel} />
+                <input type="text" value={contractEndDate} placeholder="ÅÅÅÅ-MM-DD" pattern="\d{4}-\d{2}-\d{2}" onChange={e => setContractEndDate(e.target.value)} className={sel} />
               </div>
             </div>
             <div>
