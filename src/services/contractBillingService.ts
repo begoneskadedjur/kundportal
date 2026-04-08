@@ -23,6 +23,7 @@ import {
   MonthlyPipelineSummary,
 } from '../types/contractBilling'
 import { CaseBillingService } from './caseBillingService'
+import { CustomerContractArticleService } from './customerContractArticleService'
 
 export class ContractBillingService {
   /**
@@ -104,48 +105,82 @@ export class ContractBillingService {
       .single()
 
     if (customerError) throw new Error(`Kunde inte hämta kund: ${customerError.message}`)
-    if (!customer?.price_list_id) return []
 
-    const { data: rawItems, error: itemsError } = await supabase
-      .from('price_list_items')
-      .select(`
-        id,
-        custom_price,
-        article:articles(
-          id, code, name, default_price, vat_rate, unit, category, is_active
-        )
-      `)
-      .eq('price_list_id', customer.price_list_id)
-
-    if (itemsError) throw new Error(`Kunde inte hämta artikelpriser: ${itemsError.message}`)
-
-    const priceListItems = (rawItems || []).filter((item: any) => item.article?.is_active)
-    if (priceListItems.length === 0) return []
-
-    const adjustmentPercent = customer.price_adjustment_percent ?? 0
+    const adjustmentPercent = customer?.price_adjustment_percent ?? 0
     const hasAdjustment = adjustmentPercent !== 0
 
-    const billingItems: CreateBillingItemInput[] = priceListItems.map((item: any) => {
-      const basePrice: number = item.custom_price
-      const adjustedPrice = hasAdjustment
-        ? Math.round(basePrice * (1 + adjustmentPercent / 100))
-        : basePrice
+    let billingItems: CreateBillingItemInput[] = []
 
-      return {
-        customer_id: customerId,
-        billing_period_start: periodStart,
-        billing_period_end: periodEnd,
-        article_id: item.article?.id || null,
-        article_code: item.article?.code || null,
-        article_name: item.article?.name || 'Okänd artikel',
-        quantity: 1,
-        unit_price: adjustedPrice,
-        total_price: adjustedPrice,
-        vat_rate: item.article?.vat_rate || 25,
-        batch_id: batchId || null,
-        original_price: hasAdjustment ? basePrice : null,
-      }
-    })
+    // Prioritera kundspecifika avtalsartiklar om de finns
+    const contractArticles = await CustomerContractArticleService.getArticles(customerId)
+
+    if (contractArticles.length > 0) {
+      billingItems = contractArticles.map(ca => {
+        const unitPrice = ca.fixed_price != null ? ca.fixed_price : ca.list_price
+        const lineTotal = unitPrice * ca.quantity
+        const adjustedTotal = hasAdjustment
+          ? Math.round(lineTotal * (1 + adjustmentPercent / 100))
+          : Math.round(lineTotal)
+
+        return {
+          customer_id: customerId,
+          billing_period_start: periodStart,
+          billing_period_end: periodEnd,
+          article_id: ca.article_id,
+          article_code: (ca.article as any)?.code || null,
+          article_name: ca.article?.name || 'Okänd artikel',
+          quantity: ca.quantity,
+          unit_price: unitPrice,
+          total_price: adjustedTotal,
+          vat_rate: (ca.article as any)?.vat_rate || 25,
+          batch_id: batchId || null,
+          original_price: hasAdjustment ? Math.round(lineTotal) : null,
+        }
+      })
+    } else {
+      // Fallback: price_list_items (bakåtkompatibilitet)
+      if (!customer?.price_list_id) return []
+
+      const { data: rawItems, error: itemsError } = await supabase
+        .from('price_list_items')
+        .select(`
+          id,
+          custom_price,
+          article:articles(
+            id, code, name, default_price, vat_rate, unit, category, is_active
+          )
+        `)
+        .eq('price_list_id', customer.price_list_id)
+
+      if (itemsError) throw new Error(`Kunde inte hämta artikelpriser: ${itemsError.message}`)
+
+      const priceListItems = (rawItems || []).filter((item: any) => item.article?.is_active)
+      if (priceListItems.length === 0) return []
+
+      billingItems = priceListItems.map((item: any) => {
+        const basePrice: number = item.custom_price
+        const adjustedPrice = hasAdjustment
+          ? Math.round(basePrice * (1 + adjustmentPercent / 100))
+          : basePrice
+
+        return {
+          customer_id: customerId,
+          billing_period_start: periodStart,
+          billing_period_end: periodEnd,
+          article_id: item.article?.id || null,
+          article_code: item.article?.code || null,
+          article_name: item.article?.name || 'Okänd artikel',
+          quantity: 1,
+          unit_price: adjustedPrice,
+          total_price: adjustedPrice,
+          vat_rate: item.article?.vat_rate || 25,
+          batch_id: batchId || null,
+          original_price: hasAdjustment ? basePrice : null,
+        }
+      })
+    }
+
+    if (billingItems.length === 0) return []
 
     const { data, error } = await supabase
       .from('contract_billing_items')

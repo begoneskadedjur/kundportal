@@ -233,6 +233,25 @@ export interface UpsertPriceListItemInput {
 }
 
 /**
+ * Avtalsartikel per kund – vilka artiklar som faktiskt ingår i avtalet
+ */
+export interface CustomerContractArticle {
+  id: string
+  customer_id: string
+  article_id: string
+  quantity: number
+  fixed_price: number | null  // null = använd priset från kundens prislista
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerContractArticleWithArticle extends CustomerContractArticle {
+  article: Article
+  list_price: number  // priset från kundens prislista (eller article.default_price som fallback)
+}
+
+/**
  * Konfiguration för artikelenheter
  */
 export const ARTICLE_UNIT_CONFIG: Record<ArticleUnit, {
