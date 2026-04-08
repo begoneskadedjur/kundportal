@@ -30,6 +30,7 @@ interface Customer {
   cost_center?: string | null
   billing_recipient?: string | null
   price_adjustment_percent?: number | null
+  billing_anchor_month?: number | null
   is_active: boolean | null
   created_at: string | null
   updated_at: string | null

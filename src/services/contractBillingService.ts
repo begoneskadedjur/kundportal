@@ -863,6 +863,7 @@ export class ContractBillingService {
         contract_status,
         effective_end_date,
         monthly_value,
+        billing_anchor_month,
         price_list:price_lists(id, name)
       `)
       .eq('is_active', true)
@@ -883,6 +884,7 @@ export class ContractBillingService {
       contract_status: c.contract_status,
       effective_end_date: c.effective_end_date,
       monthly_value: c.monthly_value,
+      billing_anchor_month: c.billing_anchor_month,
     }))
   }
 
@@ -958,6 +960,18 @@ export class ContractBillingService {
           customer.effective_end_date < monthStart
         ) {
           continue
+        }
+
+        // Filtrera per ankarmånad om den är satt
+        // Kunder utan ankarmånad visas fortfarande i alla månader (bakåtkompatibilitet)
+        if (customer.billing_anchor_month != null && customer.billing_frequency && customer.billing_frequency !== 'on_demand') {
+          const freqMonths = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }[customer.billing_frequency] ?? 1
+          const anchorMonth = customer.billing_anchor_month // 1–12
+          // Kontrollera om denna månads nummer (1–12) är en fakturamånad för kunden
+          const currentMonthNum = month // redan 1-indexed i loopen
+          // Beräkna om (currentMonth - anchorMonth) är jämnt delbart med frekvens
+          const diff = ((currentMonthNum - anchorMonth) % freqMonths + freqMonths) % freqMonths
+          if (diff !== 0) continue  // Inte en fakturamånad för denna kund
         }
 
         const key = `${customer.id}::${monthKey}`

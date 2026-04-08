@@ -107,6 +107,9 @@ export type Database = {
 
           // 📈 Prisindexjustering
           price_adjustment_percent: number | null
+
+          // 📅 Faktureringsskema
+          billing_anchor_month: number | null  // 1–12, ankarmånad för fakturaschema
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
