@@ -31,6 +31,7 @@ interface Customer {
   billing_recipient?: string | null
   price_adjustment_percent?: number | null
   billing_anchor_month?: number | null
+  billing_active?: boolean
   is_active: boolean | null
   created_at: string | null
   updated_at: string | null

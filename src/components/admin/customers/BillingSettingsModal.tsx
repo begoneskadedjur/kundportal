@@ -4,7 +4,7 @@
 import { useState, useEffect, useId } from 'react'
 import {
   Receipt, Save, Building2, Copy, TrendingUp, Plus, Minus,
-  Trash2, AlertCircle, Search, Package, ChevronDown, ChevronRight, Clock,
+  Trash2, Search, Package, ChevronDown, ChevronRight, Clock,
   CalendarDays, FileSignature
 } from 'lucide-react'
 import Button from '../../ui/Button'
@@ -55,6 +55,7 @@ interface BillingSettingsModalProps {
   currentCostCenter: string | null
   currentBillingRecipient: string | null
   currentPriceAdjustmentPercent?: number | null
+  currentBillingActive?: boolean
   currentContractStartDate?: string | null
   currentContractEndDate?: string | null
   currentBillingAnchorMonth?: number | null
@@ -87,6 +88,7 @@ export default function BillingSettingsModal({
   currentCostCenter,
   currentBillingRecipient,
   currentPriceAdjustmentPercent,
+  currentBillingActive,
   currentContractStartDate,
   currentContractEndDate,
   currentBillingAnchorMonth,
@@ -110,9 +112,14 @@ export default function BillingSettingsModal({
   const [fixedContractValue, setFixedContractValue] = useState('')
 
   // Avtalsinfo
+  const [billingActive, setBillingActive] = useState(false)
   const [contractStartDate, setContractStartDate] = useState('')
   const [contractEndDate, setContractEndDate] = useState('')
   const [billingAnchorMonth, setBillingAnchorMonth] = useState<number | null>(null)
+
+  // Premiejusteringshistorik
+  const [priceAdjustments, setPriceAdjustments] = useState<Array<{ year: number; adjustment_percent: number; note: string }>>([])
+  const [loadingAdjustments, setLoadingAdjustments] = useState(false)
 
   // Billing form state
   const [billingFrequency, setBillingFrequency] = useState<BillingFrequency>('monthly')
@@ -138,6 +145,7 @@ export default function BillingSettingsModal({
     setCostCenter(currentCostCenter || '')
     setBillingRecipient(currentBillingRecipient || '')
     setPriceAdjustmentPercent(currentPriceAdjustmentPercent != null ? String(currentPriceAdjustmentPercent) : '')
+    setBillingActive(currentBillingActive ?? false)
     setContractStartDate(currentContractStartDate || '')
     setContractEndDate(currentContractEndDate || '')
     // Ankarmånad: använd sparad, eller härled från avtalsstartdatum, eller nuvarande månad
@@ -166,6 +174,25 @@ export default function BillingSettingsModal({
   useEffect(() => {
     PriceListService.getActivePriceLists().then(setPriceLists).catch(console.error)
   }, [])
+
+  // Load premiejusteringshistorik
+  useEffect(() => {
+    if (!isOpen || !customerId) return
+    setLoadingAdjustments(true)
+    Promise.resolve(
+      supabase
+        .from('customer_price_adjustments')
+        .select('year, adjustment_percent, note')
+        .eq('customer_id', customerId)
+        .order('year', { ascending: false })
+    ).then(({ data }) => {
+      setPriceAdjustments((data || []).map(r => ({
+        year: r.year,
+        adjustment_percent: r.adjustment_percent,
+        note: r.note || '',
+      })))
+    }).finally(() => setLoadingAdjustments(false))
+  }, [isOpen, customerId])
 
   // Load catalog articles from selected price list
   useEffect(() => {
@@ -349,13 +376,28 @@ export default function BillingSettingsModal({
           contract_start_date: contractStartDate || null,
           contract_end_date: contractEndDate || null,
           billing_anchor_month: billingAnchorMonth,
+          billing_active: billingActive,
           updated_at: new Date().toISOString(),
         })
         .eq('id', customerId)
 
       if (error) throw error
 
-      // 4. Per-site
+      // 4. Spara premiejusteringshistorik (upsert per år)
+      if (priceAdjustments.length > 0) {
+        const rows = priceAdjustments.map(a => ({
+          customer_id: customerId,
+          year: a.year,
+          adjustment_percent: a.adjustment_percent,
+          note: a.note || null,
+        }))
+        const { error: adjError } = await supabase
+          .from('customer_price_adjustments')
+          .upsert(rows, { onConflict: 'customer_id,year' })
+        if (adjError) throw adjError
+      }
+
+      // 5. Per-site
       if (isMultisite && billingType === 'per_site') {
         for (const site of siteBilling) {
           const { error: se } = await supabase
@@ -408,12 +450,23 @@ export default function BillingSettingsModal({
 
           {/* ── Avtal ── */}
           <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
-            <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
-              <FileSignature className="w-4 h-4 text-[#20c58f]" />Avtal
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+                <FileSignature className="w-4 h-4 text-[#20c58f]" />Avtal
+              </h3>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={billingActive}
+                  onChange={e => setBillingActive(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
+                />
+                <span className="text-xs font-medium text-slate-300">Ska faktureras</span>
+              </label>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Avtalsdatum</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Avtalets startdatum</label>
                 <input type="date" value={contractStartDate} onChange={e => {
                   setContractStartDate(e.target.value)
                   // Auto-sätt ankarmånad från startdatum om ingen är vald
@@ -714,46 +767,94 @@ export default function BillingSettingsModal({
             )}
           </div>
 
-          {/* ── Fast avtalsvärde + premiejustering ── */}
+          {/* ── Prissättning ── */}
           <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
             <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
               <TrendingUp className="w-4 h-4 text-slate-400" />Prissättning
             </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Fast avtalsvärde/år (kr)</label>
-                <input
-                  type="number"
-                  value={fixedContractValue}
-                  onChange={e => setFixedContractValue(e.target.value)}
-                  placeholder={calculatedTotal > 0 ? String(calculatedTotal) : '0'}
-                  min="0"
-                  className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none placeholder-slate-500"
-                />
-                <p className="text-xs text-slate-500 mt-1">Lämna tomt = beräknas från artiklar ovan</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Årlig premiejustering (%)</label>
-                <input
-                  type="number"
-                  value={priceAdjustmentPercent}
-                  onChange={e => setPriceAdjustmentPercent(e.target.value)}
-                  placeholder="0.0"
-                  step="0.01"
-                  className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none placeholder-slate-500"
-                />
-              </div>
+
+            {/* Fast avtalsvärde */}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Fast avtalsvärde/år (kr)</label>
+              <input
+                type="number"
+                value={fixedContractValue}
+                onChange={e => setFixedContractValue(e.target.value)}
+                placeholder={calculatedTotal > 0 ? String(calculatedTotal) : '0'}
+                min="0"
+                className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none placeholder-slate-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">Lämna tomt = beräknas från artiklar ovan</p>
             </div>
-            {hasAdjustment && baseTotal > 0 && (
-              <div className="flex items-start gap-2 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                <span className="text-xs text-emerald-400 font-medium">{fmt(baseTotal)} → {fmt(adjustedTotal)}</span>
-                <span className="text-xs text-slate-400">(+{fmt(adjustedTotal - baseTotal)}/år, {adjustPct > 0 ? '+' : ''}{adjustPct}%)</span>
+
+            {/* Premiejusteringshistorik */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-medium text-slate-400">Premiejusteringar per år</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentYear = new Date().getFullYear()
+                    const exists = priceAdjustments.some(a => a.year === currentYear)
+                    if (!exists) {
+                      setPriceAdjustments(prev => [{ year: currentYear, adjustment_percent: 0, note: '' }, ...prev])
+                    }
+                  }}
+                  className="flex items-center gap-1 text-xs text-[#20c58f] hover:text-[#1bb07e] transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />Lägg till år
+                </button>
               </div>
-            )}
-            {hasAdjustment && (
-              <div className="flex items-start gap-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-amber-300">Justeringen appliceras vid nästa fakturering. Uppdatera avtalsvärdet efter varje år för ackumulering.</p>
+
+              {loadingAdjustments ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500 py-2"><LoadingSpinner />Laddar...</div>
+              ) : priceAdjustments.length === 0 ? (
+                <p className="text-xs text-slate-600 py-1">Ingen historik ännu – lägg till ett år ovan.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {priceAdjustments.map((adj, i) => (
+                    <div key={adj.year} className="flex items-center gap-2 p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg">
+                      <span className="text-xs font-mono text-slate-300 w-10 shrink-0">{adj.year}</span>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={adj.adjustment_percent}
+                          step="0.01"
+                          onChange={e => setPriceAdjustments(prev => prev.map((a, j) => j === i ? { ...a, adjustment_percent: parseFloat(e.target.value) || 0 } : a))}
+                          className="w-16 px-1.5 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-white text-center focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                        />
+                        <span className="text-xs text-slate-500">%</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={adj.note}
+                        placeholder="Anteckning (valfritt)"
+                        onChange={e => setPriceAdjustments(prev => prev.map((a, j) => j === i ? { ...a, note: e.target.value } : a))}
+                        className="flex-1 px-2 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                      />
+                      {adj.adjustment_percent !== 0 && baseTotal > 0 && (
+                        <span className="text-xs text-emerald-400 shrink-0">
+                          {fmt(Math.round(baseTotal * (1 + adj.adjustment_percent / 100)))}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setPriceAdjustments(prev => prev.filter((_, j) => j !== i))}
+                        className="p-0.5 text-slate-600 hover:text-red-400 transition-colors shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Aktuell justering (används vid fakturering) */}
+            {hasAdjustment && baseTotal > 0 && (
+              <div className="flex items-center gap-2 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                <span className="text-xs text-emerald-400 font-medium">{fmt(baseTotal)} → {fmt(adjustedTotal)}</span>
+                <span className="text-xs text-slate-400">(aktuell justering: {adjustPct > 0 ? '+' : ''}{adjustPct}%)</span>
               </div>
             )}
           </div>

@@ -110,11 +110,25 @@ export type Database = {
 
           // 📅 Faktureringsskema
           billing_anchor_month: number | null  // 1–12, ankarmånad för fakturaschema
+          billing_active: boolean              // Ska kunden faktureras?
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
         }
         Update: Partial<Database['public']['Tables']['customers']['Insert']>
+      }
+      customer_price_adjustments: {
+        Row: {
+          id: string
+          customer_id: string
+          year: number
+          adjustment_percent: number
+          note: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['customer_price_adjustments']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['customer_price_adjustments']['Insert']>
       }
       customer_contract_articles: {
         Row: {

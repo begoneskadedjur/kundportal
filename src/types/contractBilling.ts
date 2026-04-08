@@ -347,6 +347,7 @@ export interface PipelineCustomer {
   effective_end_date: string | null
   monthly_value: number | null
   billing_anchor_month: number | null  // 1–12, null = visas alla månader (bakåtkompatibilitet)
+  billing_active: boolean
 }
 
 export interface MonthlyCustomerEntry {

@@ -864,10 +864,11 @@ export class ContractBillingService {
         effective_end_date,
         monthly_value,
         billing_anchor_month,
+        billing_active,
         price_list:price_lists(id, name)
       `)
       .eq('is_active', true)
-      .in('contract_status', ['signed', 'active'])
+      .eq('billing_active', true)
       .not('billing_frequency', 'is', null)
       .order('company_name', { ascending: true })
 
@@ -885,6 +886,7 @@ export class ContractBillingService {
       effective_end_date: c.effective_end_date,
       monthly_value: c.monthly_value,
       billing_anchor_month: c.billing_anchor_month,
+      billing_active: c.billing_active,
     }))
   }
 

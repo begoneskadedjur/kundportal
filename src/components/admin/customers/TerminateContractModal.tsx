@@ -73,7 +73,8 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
           terminated_at: new Date().toISOString(),
           termination_reason: reason || null,
           effective_end_date: effectiveDateStr,
-          contract_status: 'terminated'
+          contract_status: 'terminated',
+          billing_active: false
         })
         .in('id', siteIds)
 
