@@ -9,8 +9,8 @@ import {
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
 import { supabase } from '../../../lib/supabase'
-import type { ContractInvoice, ContractBillingItemStatus } from '../../../types/contractBilling'
-import { BILLING_ITEM_STATUS_CONFIG, formatBillingAmount, formatBillingPeriod } from '../../../types/contractBilling'
+import type { ContractInvoice, ContractBillingItemStatus, BillingFrequency } from '../../../types/contractBilling'
+import { BILLING_ITEM_STATUS_CONFIG, BILLING_FREQUENCY_CONFIG, formatBillingAmount, formatBillingPeriod } from '../../../types/contractBilling'
 
 interface ContractInvoiceModalProps {
   isOpen: boolean
@@ -37,6 +37,22 @@ const addDays = (s: string, days: number) => {
   const d = new Date(s)
   d.setDate(d.getDate() + days)
   return d.toLocaleDateString('sv-SE')
+}
+
+// Bygger förklarande avtalstext för fakturan (visas ej för årsavtal)
+function buildRemarksText(
+  subtotal: number,
+  billingFrequency: string | null | undefined
+): string | null {
+  if (!billingFrequency || billingFrequency === 'annual' || billingFrequency === 'on_demand') {
+    return null
+  }
+  const config = BILLING_FREQUENCY_CONFIG[billingFrequency as BillingFrequency]
+  if (!config) return null
+  const annualValue = Math.round(subtotal * config.months)
+  const fraction = `1/${config.months}`
+  const freqLabel = config.label.toLowerCase()
+  return `Avtalstjänster – betalning av årsavtal\nÅrsavgäld: ${formatBillingAmount(annualValue)} exkl. moms | Faktureras ${freqLabel} (${fraction} per faktura)`
 }
 
 // Momsspecifikation per skattesats
@@ -390,6 +406,17 @@ export function ContractInvoiceModal({
                   </tbody>
                 </table>
               </div>
+
+              {/* Avtalsinfo-not */}
+              {(() => {
+                const remarksText = buildRemarksText(invoice.subtotal, billingFrequency)
+                return remarksText ? (
+                  <div className="px-3 py-2.5 bg-slate-800/20 border border-slate-700/30 rounded-xl">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide font-medium mb-1">Avtalsinfo</p>
+                    <p className="text-xs text-slate-400 whitespace-pre-line">{remarksText}</p>
+                  </div>
+                ) : null
+              })()}
 
               {/* Summering */}
               <div className="flex justify-end">
