@@ -229,17 +229,19 @@ export function calculateBillingPeriod(frequency: BillingFrequency, referenceDat
 
 // Hjälpfunktion för att formatera period
 export function formatBillingPeriod(start: string, end: string): string {
-  const startDate = new Date(start)
-  const endDate = new Date(end)
+  // Parsa som lokaltid (inte UTC) för att undvika timezone-shift i CET
+  const [sy, sm] = start.split('-').map(Number)
+  const [, em] = end.split('-').map(Number)
+  const startDate = new Date(sy, sm - 1, 1)
+  const endDate = new Date(sy, em - 1, 1)
 
   const startMonth = startDate.toLocaleDateString('sv-SE', { month: 'short' })
   const endMonth = endDate.toLocaleDateString('sv-SE', { month: 'short' })
-  const year = startDate.getFullYear()
 
-  if (startMonth === endMonth) {
-    return `${startMonth} ${year}`
+  if (sm === em) {
+    return `${startMonth} ${sy}`
   }
-  return `${startMonth} - ${endMonth} ${year}`
+  return `${startMonth} - ${endMonth} ${sy}`
 }
 
 // Hjälpfunktion för att formatera belopp

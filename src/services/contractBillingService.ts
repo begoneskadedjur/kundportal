@@ -95,7 +95,8 @@ export class ContractBillingService {
     customerId: string,
     periodStart: string,
     periodEnd: string,
-    batchId?: string
+    batchId?: string,
+    billingFrequency?: BillingFrequency
   ): Promise<ContractBillingItem[]> {
     // Hämta kund inkl. prisjustering
     const { data: customer, error: customerError } = await supabase
@@ -109,6 +110,12 @@ export class ContractBillingService {
     const adjustmentPercent = customer?.price_adjustment_percent ?? 0
     const hasAdjustment = adjustmentPercent !== 0
 
+    // Artiklar lagras med årsbelopp — skala till rätt period
+    const FREQ_DIVISOR: Record<BillingFrequency, number> = {
+      monthly: 12, quarterly: 4, semi_annual: 2, annual: 1, on_demand: 1
+    }
+    const divisor = FREQ_DIVISOR[billingFrequency ?? 'annual']
+
     let billingItems: CreateBillingItemInput[] = []
 
     // Prioritera kundspecifika avtalsartiklar om de finns
@@ -117,10 +124,11 @@ export class ContractBillingService {
     if (contractArticles.length > 0) {
       billingItems = contractArticles.map(ca => {
         const unitPrice = ca.fixed_price != null ? ca.fixed_price : ca.list_price
-        const lineTotal = unitPrice * ca.quantity
+        const annualTotal = unitPrice * ca.quantity
+        const scaledTotal = Math.round(annualTotal / divisor)
         const adjustedTotal = hasAdjustment
-          ? Math.round(lineTotal * (1 + adjustmentPercent / 100))
-          : Math.round(lineTotal)
+          ? Math.round(scaledTotal * (1 + adjustmentPercent / 100))
+          : scaledTotal
 
         return {
           customer_id: customerId,
@@ -134,7 +142,7 @@ export class ContractBillingService {
           total_price: adjustedTotal,
           vat_rate: (ca.article as any)?.vat_rate || 25,
           batch_id: batchId || null,
-          original_price: hasAdjustment ? Math.round(lineTotal) : null,
+          original_price: hasAdjustment ? scaledTotal : null,
         }
       })
     } else {
@@ -158,10 +166,11 @@ export class ContractBillingService {
       if (priceListItems.length === 0) return []
 
       billingItems = priceListItems.map((item: any) => {
-        const basePrice: number = item.custom_price
+        const annualPrice: number = item.custom_price
+        const scaledBase = Math.round(annualPrice / divisor)
         const adjustedPrice = hasAdjustment
-          ? Math.round(basePrice * (1 + adjustmentPercent / 100))
-          : basePrice
+          ? Math.round(scaledBase * (1 + adjustmentPercent / 100))
+          : scaledBase
 
         return {
           customer_id: customerId,
@@ -175,7 +184,7 @@ export class ContractBillingService {
           total_price: adjustedPrice,
           vat_rate: item.article?.vat_rate || 25,
           batch_id: batchId || null,
-          original_price: hasAdjustment ? basePrice : null,
+          original_price: hasAdjustment ? scaledBase : null,
         }
       })
     }
@@ -625,7 +634,8 @@ export class ContractBillingService {
         customer.id,
         periodStart,
         periodEnd,
-        batch.id
+        batch.id,
+        frequency
       )
       totalItems += items.length
       totalAmount += items.reduce((sum, item) => sum + (item.total_price || 0), 0)
