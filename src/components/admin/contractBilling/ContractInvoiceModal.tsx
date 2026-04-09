@@ -18,6 +18,7 @@ interface ContractInvoiceModalProps {
   customerId: string | null
   periodStart: string | null
   periodEnd: string | null
+  billingFrequency?: string | null
   onStatusChange: () => void
 }
 
@@ -64,7 +65,7 @@ function VatBreakdown({ items }: { items: ContractInvoice['items'] }) {
 }
 
 export function ContractInvoiceModal({
-  isOpen, onClose, customerId, periodStart, periodEnd, onStatusChange
+  isOpen, onClose, customerId, periodStart, periodEnd, billingFrequency, onStatusChange
 }: ContractInvoiceModalProps) {
   const [invoice, setInvoice] = useState<ContractInvoice | null>(null)
   const [customerName, setCustomerName] = useState<string>('')
@@ -108,7 +109,7 @@ export function ContractInvoiceModal({
     if (!customerId || !periodStart || !periodEnd) return
     setGenerating(true)
     try {
-      await ContractBillingService.generateBillingItems(customerId, periodStart, periodEnd)
+      await ContractBillingService.generateBillingItems(customerId, periodStart, periodEnd, undefined, billingFrequency as any)
       toast.success('Fakturarader genererade')
       await loadInvoice()
       onStatusChange()

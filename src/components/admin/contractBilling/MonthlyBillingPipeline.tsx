@@ -60,6 +60,7 @@ export function MonthlyBillingPipeline() {
     customerId: string
     periodStart: string
     periodEnd: string
+    billingFrequency: string | null
   } | null>(null)
 
   // Berakna start/slut baserat pa offset
@@ -513,6 +514,7 @@ export function MonthlyBillingPipeline() {
                                   customerId: entry.customer.id,
                                   periodStart: month.period_start,
                                   periodEnd: month.period_end,
+                                  billingFrequency: entry.customer.billing_frequency ?? null,
                                 })
                               }}
                             />
@@ -556,6 +558,7 @@ export function MonthlyBillingPipeline() {
         customerId={modalTarget?.customerId ?? null}
         periodStart={modalTarget?.periodStart ?? null}
         periodEnd={modalTarget?.periodEnd ?? null}
+        billingFrequency={modalTarget?.billingFrequency ?? null}
         onStatusChange={loadData}
       />
     </div>
