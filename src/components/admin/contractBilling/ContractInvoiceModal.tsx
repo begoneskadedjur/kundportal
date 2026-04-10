@@ -42,17 +42,20 @@ const addDays = (s: string, days: number) => {
 // Bygger förklarande avtalstext för fakturan (visas ej för årsavtal)
 function buildRemarksText(
   subtotal: number,
-  billingFrequency: string | null | undefined
+  billingFrequency: string | null | undefined,
+  contractType: string | null | undefined
 ): string | null {
   if (!billingFrequency || billingFrequency === 'annual' || billingFrequency === 'on_demand') {
     return null
   }
   const config = BILLING_FREQUENCY_CONFIG[billingFrequency as BillingFrequency]
   if (!config) return null
-  const annualValue = Math.round(subtotal * config.months)
-  const fraction = `1/${config.months}`
+  const periodsPerYear = Math.round(12 / config.months)  // 12 för monthly, 4 för quarterly etc.
+  const annualValue = Math.round(subtotal * periodsPerYear)
+  const fraction = `1/${periodsPerYear}`
   const freqLabel = config.label.toLowerCase()
-  return `Avtalstjänster – betalning av årsavtal\nÅrsavgäld: ${formatBillingAmount(annualValue)} exkl. moms | Faktureras ${freqLabel} (${fraction} per faktura)`
+  const avtalNamn = contractType || 'Avtalstjänster'
+  return `${avtalNamn} – betalning av årsavtal\nÅrsavgäld: ${formatBillingAmount(annualValue)} exkl. moms | Faktureras ${freqLabel} (${fraction} per faktura)`
 }
 
 // Momsspecifikation per skattesats
@@ -85,6 +88,7 @@ export function ContractInvoiceModal({
 }: ContractInvoiceModalProps) {
   const [invoice, setInvoice] = useState<ContractInvoice | null>(null)
   const [customerName, setCustomerName] = useState<string>('')
+  const [contractType, setContractType] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [updating, setUpdating] = useState(false)
@@ -104,13 +108,14 @@ export function ContractInvoiceModal({
     try {
       const data = await ContractBillingService.getCustomerInvoice(customerId, periodStart, periodEnd)
       setInvoice(data)
+      // Hämta contract_type oavsett om faktura finns (behövs för remarkstext)
+      const { data: c } = await supabase
+        .from('customers')
+        .select('company_name, contract_type')
+        .eq('id', customerId)
+        .single()
+      setContractType((c as any)?.contract_type || null)
       if (!data) {
-        // Hämta kundnamn för tomvy
-        const { data: c } = await supabase
-          .from('customers')
-          .select('company_name')
-          .eq('id', customerId)
-          .single()
         setCustomerName((c as any)?.company_name || '')
       }
     } catch (err) {
@@ -409,7 +414,7 @@ export function ContractInvoiceModal({
 
               {/* Avtalsinfo-not */}
               {(() => {
-                const remarksText = buildRemarksText(invoice.subtotal, billingFrequency)
+                const remarksText = buildRemarksText(invoice.subtotal, billingFrequency, contractType)
                 return remarksText ? (
                   <div className="px-3 py-2.5 bg-slate-800/20 border border-slate-700/30 rounded-xl">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wide font-medium mb-1">Avtalsinfo</p>
