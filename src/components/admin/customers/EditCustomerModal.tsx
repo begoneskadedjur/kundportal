@@ -277,12 +277,6 @@ export default function EditCustomerModal({
                 <option value="Avtal Indikationsfällor">Avtal Indikationsfällor</option>
               </select>
             </div>
-            <Input
-              label="Bransch"
-              value={formData.industry_category || ''}
-              onChange={(e) => handleInputChange('industry_category', e.target.value)}
-              placeholder="T.ex. Restaurang, Kontor"
-            />
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Kundstorlek</label>
               <select

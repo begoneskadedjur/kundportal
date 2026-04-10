@@ -510,20 +510,13 @@ export default function SingleCustomerDetailModal({
                     </div>
 
                     {/* Additional customer info */}
-                    {(customer.industry_category || customer.business_type || customer.customer_size || customerGroupName) && (
+                    {(customer.business_type || customer.contract_type || customer.customer_size || customerGroupName) && (
                       <div className="pt-3 border-t border-slate-700/50">
                         <div className="grid grid-cols-1 gap-3">
                           {customerGroupName && (
                             <div>
                               <div className="text-sm text-slate-400">Kundgrupp</div>
                               <div className="text-white">{customerGroupName}</div>
-                            </div>
-                          )}
-
-                          {customer.industry_category && (
-                            <div>
-                              <div className="text-sm text-slate-400">Bransch</div>
-                              <div className="text-white capitalize">{customer.industry_category}</div>
                             </div>
                           )}
 
