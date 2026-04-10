@@ -22,6 +22,7 @@ interface Customer {
   billing_email?: string | null
   billing_address?: string | null
   business_type?: string | null
+  contract_type?: string | null
   industry_category?: string | null
   customer_size?: 'small' | 'medium' | 'large' | null
   contract_start_date?: string | null
@@ -93,6 +94,7 @@ export default function EditCustomerModal({
         contact_phone: customer.contact_phone || '',
         contact_address: customer.contact_address || '',
         business_type: customer.business_type || '',
+        contract_type: customer.contract_type || '',
         industry_category: customer.industry_category || '',
         customer_size: customer.customer_size || null,
         assigned_account_manager: customer.assigned_account_manager || '',
@@ -139,6 +141,7 @@ export default function EditCustomerModal({
         company_name: formData.company_name,
         organization_number: formData.organization_number,
         business_type: formData.business_type,
+        contract_type: formData.contract_type || null,
         industry_category: formData.industry_category,
         customer_size: formData.customer_size,
         contact_person: formData.contact_person,
@@ -257,6 +260,21 @@ export default function EditCustomerModal({
                 <option value="private">Privatperson</option>
                 <option value="business">Företag</option>
                 <option value="organization">Organisation</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Avtalstyp</label>
+              <select
+                value={formData.contract_type || ''}
+                onChange={(e) => handleInputChange('contract_type', e.target.value)}
+                className={selectStyles}
+              >
+                <option value="">Välj avtalstyp</option>
+                <option value="Skadedjursavtal">Skadedjursavtal</option>
+                <option value="Avtal Betesstationer">Avtal Betesstationer</option>
+                <option value="Avtal Betongstationer">Avtal Betongstationer</option>
+                <option value="Avtal Mekaniska fällor">Avtal Mekaniska fällor</option>
+                <option value="Avtal Indikationsfällor">Avtal Indikationsfällor</option>
               </select>
             </div>
             <Input

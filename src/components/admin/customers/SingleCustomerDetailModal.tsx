@@ -534,6 +534,13 @@ export default function SingleCustomerDetailModal({
                             </div>
                           )}
 
+                          {customer.contract_type && (
+                            <div>
+                              <div className="text-sm text-slate-400">Avtalstyp</div>
+                              <div className="text-white">{customer.contract_type}</div>
+                            </div>
+                          )}
+
                           {customer.customer_size && (
                             <div>
                               <div className="text-sm text-slate-400">Företagsstorlek</div>
