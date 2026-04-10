@@ -189,6 +189,7 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
   const contact_phone =
     dataFields['telefonnummer-kontaktperson'] || customerParty?.participants?.[0]?.phone || null
   const contact_address = dataFields['utforande-adress'] || null
+  const agreement_text = dataFields['avtalsobjekt'] || null
   const contract_start_date = parseDate(dataFields['begynnelsedag']) || null
   const contract_length = dataFields['avtalslngd'] || null
   const company_name_oneflow = dataFields['foretag'] || customerParty?.name || null
@@ -225,6 +226,7 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     products: selectedProducts.length > 0 ? selectedProducts : null,
     oneflow_contract_id: String(contract.id),
     contract_type,
+    agreement_text,
   }
 }
 
@@ -386,6 +388,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       products: oneflow?.products ?? null,
       oneflow_contract_id: oneflow?.oneflow_contract_id ?? null,
       contract_type: oneflow?.contract_type ?? null,
+      agreement_text: oneflow?.agreement_text ?? null,
     }
 
     return res.status(200).json({
