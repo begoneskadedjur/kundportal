@@ -140,6 +140,7 @@ export default function ImportCustomerByOrgnrModal({
   const [invoices, setInvoices] = useState<FortnoxInvoice[]>([])
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set())
   const [selectedForImport, setSelectedForImport] = useState<Set<string>>(new Set())
+  const [invoiceTypes, setInvoiceTypes] = useState<Record<string, 'contract' | 'ad_hoc'>>({})
   const [error, setError] = useState<{ message: string; existingId?: string; existingName?: string } | null>(null)
   const [savedCustomer, setSavedCustomer] = useState<{ id: string; company_name: string } | null>(null)
 
@@ -150,6 +151,7 @@ export default function ImportCustomerByOrgnrModal({
     setInvoices([])
     setExpandedInvoices(new Set())
     setSelectedForImport(new Set())
+    setInvoiceTypes({})
     setError(null)
     setSources(null)
     setSavedCustomer(null)
@@ -198,8 +200,9 @@ export default function ImportCustomerByOrgnrModal({
 
       const fetchedInvoices: FortnoxInvoice[] = data.invoices ?? []
       setInvoices(fetchedInvoices)
-      // Default: alla markerade för import
+      // Default: alla markerade för import som 'contract'
       setSelectedForImport(new Set(fetchedInvoices.map((inv: FortnoxInvoice) => inv.DocumentNumber)))
+      setInvoiceTypes(Object.fromEntries(fetchedInvoices.map((inv: FortnoxInvoice) => [inv.DocumentNumber, 'contract' as const])))
       setSources(data.sources)
       setStep('preview')
     } catch {
@@ -240,8 +243,10 @@ export default function ImportCustomerByOrgnrModal({
 
       const customerId = data.customer.id
 
-      // Importera valda historiska fakturor
-      const toImport = invoices.filter(inv => selectedForImport.has(inv.DocumentNumber))
+      // Importera valda historiska fakturor med rätt typ
+      const toImport = invoices
+        .filter(inv => selectedForImport.has(inv.DocumentNumber))
+        .map(inv => ({ ...inv, importType: invoiceTypes[inv.DocumentNumber] ?? 'contract' as const }))
       if (toImport.length > 0) {
         try {
           await ContractBillingService.importHistoricalItems(customerId, toImport)
@@ -262,6 +267,10 @@ export default function ImportCustomerByOrgnrModal({
 
   const update = (field: keyof PreviewData) => (value: string) => {
     setPreview(prev => prev ? { ...prev, [field]: value || null } : prev)
+  }
+
+  const setInvoiceType = (docNr: string, type: 'contract' | 'ad_hoc') => {
+    setInvoiceTypes(prev => ({ ...prev, [docNr]: type }))
   }
 
   const toggleExpand = (docNr: string) => {
@@ -545,7 +554,9 @@ export default function ImportCustomerByOrgnrModal({
                     const expanded = expandedInvoices.has(inv.DocumentNumber)
                     const checked = selectedForImport.has(inv.DocumentNumber)
                     const invoiceMonth = new Date(inv.InvoiceDate + 'T00:00:00').getMonth() + 1
-                    const isAnchor = preview.billing_anchor_month === invoiceMonth
+                    const invType = invoiceTypes[inv.DocumentNumber] ?? 'contract'
+                    const isContract = invType === 'contract'
+                    const isAnchor = isContract && preview.billing_anchor_month === invoiceMonth
 
                     return (
                       <div key={inv.DocumentNumber} className={`rounded-lg border transition-colors ${isAnchor ? 'border-[#20c58f]/40 bg-[#20c58f]/5' : 'border-slate-700/50 bg-slate-800/40'}`}>
@@ -560,11 +571,13 @@ export default function ImportCustomerByOrgnrModal({
                             onClick={e => e.stopPropagation()}
                           />
 
-                          {/* Klickbar rad → sätt ankarmånad */}
+                          {/* Klickbar rad → sätt ankarmånad (bara för avtalsfakturor) */}
                           <button
-                            className="flex items-center gap-2 flex-1 text-left hover:opacity-80"
-                            onClick={() => setPreview(prev => prev ? { ...prev, billing_anchor_month: invoiceMonth } : prev)}
-                            title="Klicka för att använda denna månaden som ankarmånad"
+                            className={`flex items-center gap-2 flex-1 text-left ${isContract ? 'hover:opacity-80' : 'cursor-default'}`}
+                            onClick={() => {
+                              if (isContract) setPreview(prev => prev ? { ...prev, billing_anchor_month: invoiceMonth } : prev)
+                            }}
+                            title={isContract ? 'Klicka för att använda denna månaden som ankarmånad' : undefined}
                           >
                             <span className="text-slate-400 w-24 shrink-0">{inv.InvoiceDate}</span>
                             <span className="text-slate-300 w-20 shrink-0">#{inv.DocumentNumber}</span>
@@ -577,10 +590,21 @@ export default function ImportCustomerByOrgnrModal({
                             )}
                           </button>
 
+                          {/* Typ-dropdown: Avtal / Engång */}
+                          <select
+                            value={invType}
+                            onChange={e => setInvoiceType(inv.DocumentNumber, e.target.value as 'contract' | 'ad_hoc')}
+                            onClick={e => e.stopPropagation()}
+                            className="shrink-0 text-xs bg-slate-700 border border-slate-600 rounded px-1.5 py-0.5 text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                          >
+                            <option value="contract">Avtal</option>
+                            <option value="ad_hoc">Engång</option>
+                          </select>
+
                           {/* Expand-knapp */}
                           <button
                             onClick={() => toggleExpand(inv.DocumentNumber)}
-                            className="text-slate-500 hover:text-slate-300 shrink-0 ml-1"
+                            className="text-slate-500 hover:text-slate-300 shrink-0"
                             title={expanded ? 'Dölj rader' : 'Visa rader'}
                           >
                             {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}

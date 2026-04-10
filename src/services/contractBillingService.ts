@@ -1105,6 +1105,7 @@ export class ContractBillingService {
       InvoiceDate: string
       FinalPayDate: string | null
       Sent: boolean
+      importType: 'contract' | 'ad_hoc'
     }>
   ): Promise<void> {
     const items = invoices.map(inv => {
@@ -1115,9 +1116,9 @@ export class ContractBillingService {
 
       return {
         customer_id: customerId,
-        item_type: 'contract' as const,
+        item_type: inv.importType,
         source: 'manual' as const,
-        article_name: 'Historisk avtalsfaktura',
+        article_name: inv.importType === 'contract' ? 'Historisk avtalsfaktura' : 'Historisk engångsfaktura',
         quantity: 1,
         unit_price: inv.Total,
         total_price: inv.Total,
