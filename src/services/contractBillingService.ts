@@ -1094,6 +1094,47 @@ export class ContractBillingService {
   }
 
   /**
+   * Importera historiska fakturor från Fortnox som contract_billing_items
+   */
+  static async importHistoricalItems(
+    customerId: string,
+    invoices: Array<{
+      DocumentNumber: string
+      Total: number
+      Balance: number
+      InvoiceDate: string
+      FinalPayDate: string | null
+      Sent: boolean
+    }>
+  ): Promise<void> {
+    const items = invoices.map(inv => {
+      const paid = !!inv.FinalPayDate || inv.Balance === 0
+      const [year, month] = inv.InvoiceDate.split('-').map(Number)
+      const periodStart = new Date(year, month - 1, 1).toISOString().split('T')[0]
+      const periodEnd = new Date(year, month, 0).toISOString().split('T')[0]
+
+      return {
+        customer_id: customerId,
+        item_type: 'contract' as const,
+        source: 'manual' as const,
+        article_name: 'Historisk avtalsfaktura',
+        quantity: 1,
+        unit_price: inv.Total,
+        total_price: inv.Total,
+        status: paid ? 'paid' : (inv.Sent ? 'invoiced' : 'pending'),
+        billing_period_start: periodStart,
+        billing_period_end: periodEnd,
+        invoice_number: inv.DocumentNumber,
+        invoiced_at: inv.InvoiceDate,
+        paid_at: inv.FinalPayDate ?? null,
+      }
+    })
+
+    const { error } = await supabase.from('contract_billing_items').insert(items)
+    if (error) throw new Error(`Kunde inte importera historiska fakturor: ${error.message}`)
+  }
+
+  /**
    * Exportera grupperade fakturor till Fortnox CSV
    */
   static exportInvoicesForFortnox(invoices: ContractInvoice[]): string {

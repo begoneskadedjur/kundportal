@@ -251,6 +251,15 @@ async function fetchFortnoxInvoices(customerNumber: string, accessToken: string)
   return data.Invoices ?? []
 }
 
+async function fetchFortnoxInvoiceFull(docNr: string, accessToken: string) {
+  const res = await fetch(`${FORTNOX_API}/invoices/${docNr}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  })
+  if (!res.ok) return null
+  const data = await res.json() as { Invoice: any }
+  return data.Invoice ?? null
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -353,6 +362,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
     console.log(`📄 Fortnox: ${fortnoxInvoices.length} fakturor hämtade`)
 
+    // Hämta fakturarader parallellt för alla fakturor
+    const invoicesWithRows = await Promise.all(
+      fortnoxInvoices.map(async (inv: any) => {
+        const full = await fetchFortnoxInvoiceFull(inv.DocumentNumber, accessToken).catch(() => null)
+        return { ...inv, InvoiceRows: full?.InvoiceRows ?? [] }
+      })
+    )
+    console.log(`📄 Fortnox: raddetaljer hämtade för ${invoicesWithRows.length} fakturor`)
+
     // Oneflow
     console.log('📋 Hämtar från Oneflow...')
     const oneflowData = await fetchOneflowContractByOrgNr(normalized).catch(err => {
@@ -394,7 +412,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       success: true,
       preview,
-      invoices: fortnoxInvoices,
+      invoices: invoicesWithRows,
       sources: { fortnox: true, oneflow: !!oneflow },
     })
   } catch (err: any) {

@@ -1,12 +1,36 @@
 // src/components/admin/customers/ImportCustomerByOrgnrModal.tsx
 import { useState } from 'react'
 import {
-  Building2, Search, CheckCircle, AlertCircle, Loader2, ExternalLink, Edit3, Save, Receipt
+  Building2, Search, CheckCircle, AlertCircle, Loader2, ExternalLink, Edit3, Save, Receipt,
+  ChevronDown, ChevronRight, CalendarDays
 } from 'lucide-react'
 import { BILLING_FREQUENCY_CONFIG, type BillingFrequency } from '../../../types/contractBilling'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
+import { ContractBillingService } from '../../../services/contractBillingService'
+
+const MONTHS_SV = [
+  'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
+  'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
+]
+
+const CONTRACT_TYPE_OPTIONS = [
+  { value: '', label: 'Välj avtalstyp' },
+  { value: 'Skadedjursavtal', label: 'Skadedjursavtal' },
+  { value: 'Avtal Mekaniska fällor', label: 'Avtal Mekaniska fällor' },
+  { value: 'Avtal Betesstationer', label: 'Avtal Betesstationer' },
+  { value: 'Avtal Betongstationer', label: 'Avtal Betongstationer' },
+  { value: 'Avtal Indikationsfällor', label: 'Avtal Indikationsfällor' },
+]
+
+interface FortnoxInvoiceRow {
+  ArticleNumber?: string
+  Description: string
+  DeliveredQuantity: number
+  Price: number
+  Total?: number
+}
 
 interface FortnoxInvoice {
   DocumentNumber: string
@@ -16,6 +40,7 @@ interface FortnoxInvoice {
   InvoiceDate: string
   FinalPayDate: string | null
   Sent: boolean
+  InvoiceRows: FortnoxInvoiceRow[]
 }
 
 interface PreviewData {
@@ -35,7 +60,10 @@ interface PreviewData {
   annual_value: number | null
   products: any[] | null
   oneflow_contract_id: string | null
+  contract_type: string | null
+  agreement_text: string | null
   billing_frequency: BillingFrequency
+  billing_anchor_month: number
 }
 
 interface ImportCustomerByOrgnrModalProps {
@@ -46,7 +74,6 @@ interface ImportCustomerByOrgnrModalProps {
 
 type Step = 'search' | 'preview' | 'saving' | 'done'
 
-// Enkelt textfält med label
 function Field({
   label, value, onChange, placeholder, type = 'text', readOnly = false
 }: {
@@ -76,6 +103,32 @@ function Field({
   )
 }
 
+/** Beräkna nästa N fakturadatum baserat på ankarmånad och frekvens */
+function getNextBillingDates(anchorMonth: number, frequency: BillingFrequency, count: number): string[] {
+  const config = BILLING_FREQUENCY_CONFIG[frequency]
+  if (!config || frequency === 'on_demand') return []
+  const intervalMonths = config.months
+  const today = new Date()
+  const dates: string[] = []
+  let year = today.getFullYear()
+  let month = anchorMonth
+
+  // Hitta nästa ankarmånad som är >= idag
+  while (dates.length < count) {
+    const d = new Date(year, month - 1, 1)
+    if (d >= today) {
+      dates.push(d.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' }))
+    }
+    month += intervalMonths
+    if (month > 12) { month -= 12; year++ }
+    if (year > today.getFullYear() + 3) break
+  }
+  return dates.slice(0, count)
+}
+
+const formatAmount = (n: number) =>
+  new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(n)
+
 export default function ImportCustomerByOrgnrModal({
   isOpen, onClose, onImported,
 }: ImportCustomerByOrgnrModalProps) {
@@ -85,6 +138,8 @@ export default function ImportCustomerByOrgnrModal({
   const [sources, setSources] = useState<{ fortnox: boolean; oneflow: boolean } | null>(null)
   const [preview, setPreview] = useState<PreviewData | null>(null)
   const [invoices, setInvoices] = useState<FortnoxInvoice[]>([])
+  const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set())
+  const [selectedForImport, setSelectedForImport] = useState<Set<string>>(new Set())
   const [error, setError] = useState<{ message: string; existingId?: string; existingName?: string } | null>(null)
   const [savedCustomer, setSavedCustomer] = useState<{ id: string; company_name: string } | null>(null)
 
@@ -93,6 +148,8 @@ export default function ImportCustomerByOrgnrModal({
     setOrgNr('')
     setPreview(null)
     setInvoices([])
+    setExpandedInvoices(new Set())
+    setSelectedForImport(new Set())
     setError(null)
     setSources(null)
     setSavedCustomer(null)
@@ -126,8 +183,23 @@ export default function ImportCustomerByOrgnrModal({
         return
       }
 
-      setPreview({ ...data.preview, billing_frequency: data.preview.billing_frequency ?? 'monthly' })
-      setInvoices(data.invoices ?? [])
+      const contractStart = data.preview.contract_start_date
+      const anchorMonth = contractStart
+        ? new Date(contractStart + 'T00:00:00').getMonth() + 1
+        : new Date().getMonth() + 1
+
+      setPreview({
+        ...data.preview,
+        billing_frequency: data.preview.billing_frequency ?? 'monthly',
+        billing_anchor_month: anchorMonth,
+        contract_type: data.preview.contract_type ?? null,
+        agreement_text: data.preview.agreement_text ?? null,
+      })
+
+      const fetchedInvoices: FortnoxInvoice[] = data.invoices ?? []
+      setInvoices(fetchedInvoices)
+      // Default: alla markerade för import
+      setSelectedForImport(new Set(fetchedInvoices.map((inv: FortnoxInvoice) => inv.DocumentNumber)))
       setSources(data.sources)
       setStep('preview')
     } catch {
@@ -142,10 +214,16 @@ export default function ImportCustomerByOrgnrModal({
     setStep('saving')
 
     try {
+      // Skicka med fakturainställningar
+      const customerPayload = {
+        ...preview,
+        billing_active: true,
+      }
+
       const res = await fetch('/api/import-customer-by-orgnr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'confirm', customer_data: preview }),
+        body: JSON.stringify({ action: 'confirm', customer_data: customerPayload }),
       })
       const data = await res.json()
 
@@ -160,6 +238,19 @@ export default function ImportCustomerByOrgnrModal({
         return
       }
 
+      const customerId = data.customer.id
+
+      // Importera valda historiska fakturor
+      const toImport = invoices.filter(inv => selectedForImport.has(inv.DocumentNumber))
+      if (toImport.length > 0) {
+        try {
+          await ContractBillingService.importHistoricalItems(customerId, toImport)
+          toast.success(`${toImport.length} historiska faktura(or) importerade till pipeline`)
+        } catch (e: any) {
+          toast.error(`Kund skapades men historikimport misslyckades: ${e.message}`)
+        }
+      }
+
       setSavedCustomer(data.customer)
       setStep('done')
       toast.success(`${data.customer.company_name} importerad!`)
@@ -172,6 +263,26 @@ export default function ImportCustomerByOrgnrModal({
   const update = (field: keyof PreviewData) => (value: string) => {
     setPreview(prev => prev ? { ...prev, [field]: value || null } : prev)
   }
+
+  const toggleExpand = (docNr: string) => {
+    setExpandedInvoices(prev => {
+      const next = new Set(prev)
+      if (next.has(docNr)) next.delete(docNr); else next.add(docNr)
+      return next
+    })
+  }
+
+  const toggleImport = (docNr: string) => {
+    setSelectedForImport(prev => {
+      const next = new Set(prev)
+      if (next.has(docNr)) next.delete(docNr); else next.add(docNr)
+      return next
+    })
+  }
+
+  const nextBillingDates = preview
+    ? getNextBillingDates(preview.billing_anchor_month, preview.billing_frequency, 4)
+    : []
 
   return (
     <Modal
@@ -306,12 +417,26 @@ export default function ImportCustomerByOrgnrModal({
               </div>
             </div>
 
-            {/* Sektion: Avtal */}
+            {/* Sektion: Avtal & fakturering */}
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
               <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
                 <Receipt className="w-4 h-4 text-slate-400" />Avtal &amp; fakturering
               </h4>
               <div className="grid grid-cols-2 gap-3">
+                {/* Avtalstyp */}
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-slate-400 mb-1 block">Avtalstyp</label>
+                  <select
+                    value={preview.contract_type ?? ''}
+                    onChange={e => setPreview(prev => prev ? { ...prev, contract_type: e.target.value || null } : prev)}
+                    className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+                  >
+                    {CONTRACT_TYPE_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <Field label="Avtalsstart" value={preview.contract_start_date ?? ''} onChange={update('contract_start_date')} placeholder="ÅÅÅÅ-MM-DD" />
                 <Field label="Avtalslängd" value={preview.contract_length ?? ''} onChange={update('contract_length')} placeholder="t.ex. 3 år" />
                 <Field
@@ -322,6 +447,22 @@ export default function ImportCustomerByOrgnrModal({
                   type="number"
                 />
                 <Field label="Oneflow kontrakt-ID" value={preview.oneflow_contract_id ?? ''} onChange={update('oneflow_contract_id')} placeholder="Ej hämtat" />
+
+                {/* Avtalsobjekt */}
+                {(preview.agreement_text !== null || sources?.oneflow) && (
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-slate-400 mb-1 block">Avtalsobjekt</label>
+                    <textarea
+                      value={preview.agreement_text ?? ''}
+                      onChange={e => setPreview(prev => prev ? { ...prev, agreement_text: e.target.value || null } : prev)}
+                      rows={2}
+                      placeholder="Ej hämtat"
+                      className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent resize-none"
+                    />
+                  </div>
+                )}
+
+                {/* Faktureringsfrekvens */}
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-slate-400 mb-1 block">Faktureringsfrekvens</label>
                   <select
@@ -337,24 +478,132 @@ export default function ImportCustomerByOrgnrModal({
               </div>
             </div>
 
+            {/* Sektion: Fakturainställningar */}
+            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+              <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+                <CalendarDays className="w-4 h-4 text-slate-400" />Fakturainställningar
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Ankarmånad */}
+                <div>
+                  <label className="text-xs font-medium text-slate-400 mb-1 block">
+                    Ankarmånad
+                    {preview.contract_start_date && (
+                      <span className="ml-1 text-slate-500">(härledd från avtalsstart)</span>
+                    )}
+                  </label>
+                  <select
+                    value={preview.billing_anchor_month}
+                    onChange={e => setPreview(prev => prev ? { ...prev, billing_anchor_month: parseInt(e.target.value) } : prev)}
+                    className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+                  >
+                    {MONTHS_SV.map((name, i) => (
+                      <option key={i + 1} value={i + 1}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Nästa fakturadatum */}
+                <div>
+                  <label className="text-xs font-medium text-slate-400 mb-1 block">Kommande faktureringar</label>
+                  {nextBillingDates.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {nextBillingDates.map((d, i) => (
+                        <span key={i} className="text-xs px-2 py-0.5 bg-[#20c58f]/10 border border-[#20c58f]/30 text-[#20c58f] rounded-full">{d}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">—</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Sektion: Historiska fakturor */}
             {invoices.length > 0 && (
               <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-2">
-                <h4 className="text-sm font-semibold text-slate-300">Historiska fakturor (Fortnox)</h4>
-                <p className="text-xs text-slate-500">Senaste {invoices.length} fakturorna – använd för att se när kunden senast debiterades.</p>
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="text-sm font-semibold text-slate-300">Historiska fakturor (Fortnox)</h4>
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span>{selectedForImport.size}/{invoices.length} markerade för import</span>
+                    <button
+                      onClick={() => setSelectedForImport(
+                        selectedForImport.size === invoices.length
+                          ? new Set()
+                          : new Set(invoices.map(inv => inv.DocumentNumber))
+                      )}
+                      className="text-[#20c58f] hover:text-[#20c58f]/80"
+                    >
+                      {selectedForImport.size === invoices.length ? 'Avmarkera alla' : 'Markera alla'}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Klicka på en faktura för att sätta den månaden som ankarmånad. Bocka i för att importera till fakturapipelinen.</p>
                 <div className="space-y-1">
                   {invoices.map(inv => {
-                    const paid = inv.FinalPayDate || inv.Balance === 0
+                    const paid = !!inv.FinalPayDate || inv.Balance === 0
+                    const expanded = expandedInvoices.has(inv.DocumentNumber)
+                    const checked = selectedForImport.has(inv.DocumentNumber)
+                    const invoiceMonth = new Date(inv.InvoiceDate + 'T00:00:00').getMonth() + 1
+                    const isAnchor = preview.billing_anchor_month === invoiceMonth
+
                     return (
-                      <div key={inv.DocumentNumber} className="flex items-center justify-between px-2 py-1.5 bg-slate-800/40 rounded-lg text-xs">
-                        <span className="text-slate-400 w-20 shrink-0">{inv.InvoiceDate}</span>
-                        <span className="text-slate-300 flex-1">#{inv.DocumentNumber}</span>
-                        <span className="text-slate-300 w-24 text-right">
-                          {new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(inv.Total)}
-                        </span>
-                        <span className={`ml-2 w-16 text-right ${paid ? 'text-emerald-400' : 'text-amber-400'}`}>
-                          {paid ? 'Betald' : 'Obetald'}
-                        </span>
+                      <div key={inv.DocumentNumber} className={`rounded-lg border transition-colors ${isAnchor ? 'border-[#20c58f]/40 bg-[#20c58f]/5' : 'border-slate-700/50 bg-slate-800/40'}`}>
+                        {/* Faktura-rad */}
+                        <div className="flex items-center gap-2 px-2 py-1.5 text-xs">
+                          {/* Import-checkbox */}
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleImport(inv.DocumentNumber)}
+                            className="rounded border-slate-600 text-[#20c58f] focus:ring-[#20c58f] shrink-0"
+                            onClick={e => e.stopPropagation()}
+                          />
+
+                          {/* Klickbar rad → sätt ankarmånad */}
+                          <button
+                            className="flex items-center gap-2 flex-1 text-left hover:opacity-80"
+                            onClick={() => setPreview(prev => prev ? { ...prev, billing_anchor_month: invoiceMonth } : prev)}
+                            title="Klicka för att använda denna månaden som ankarmånad"
+                          >
+                            <span className="text-slate-400 w-24 shrink-0">{inv.InvoiceDate}</span>
+                            <span className="text-slate-300 w-20 shrink-0">#{inv.DocumentNumber}</span>
+                            <span className="text-slate-300 flex-1 text-right pr-2">{formatAmount(inv.Total)}</span>
+                            <span className={`w-16 text-right shrink-0 ${paid ? 'text-emerald-400' : 'text-amber-400'}`}>
+                              {paid ? 'Betald' : 'Obetald'}
+                            </span>
+                            {isAnchor && (
+                              <span className="ml-1 text-[#20c58f] text-[10px] font-medium shrink-0">● Ankarmånad</span>
+                            )}
+                          </button>
+
+                          {/* Expand-knapp */}
+                          <button
+                            onClick={() => toggleExpand(inv.DocumentNumber)}
+                            className="text-slate-500 hover:text-slate-300 shrink-0 ml-1"
+                            title={expanded ? 'Dölj rader' : 'Visa rader'}
+                          >
+                            {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+
+                        {/* Expanderade fakturarader */}
+                        {expanded && inv.InvoiceRows.length > 0 && (
+                          <div className="border-t border-slate-700/50 px-3 py-2 space-y-1">
+                            {inv.InvoiceRows.map((row, ri) => (
+                              <div key={ri} className="flex items-center justify-between text-xs text-slate-400">
+                                <span className="flex-1 truncate">{row.Description || '—'}</span>
+                                <span className="ml-2 shrink-0 text-slate-500">{row.DeliveredQuantity} st</span>
+                                <span className="ml-3 shrink-0 text-slate-300">{formatAmount(row.Price)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {expanded && inv.InvoiceRows.length === 0 && (
+                          <div className="border-t border-slate-700/50 px-3 py-2 text-xs text-slate-500">
+                            Inga raddetaljer tillgängliga
+                          </div>
+                        )}
                       </div>
                     )
                   })}
