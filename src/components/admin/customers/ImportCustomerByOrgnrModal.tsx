@@ -1,5 +1,5 @@
 // src/components/admin/customers/ImportCustomerByOrgnrModal.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Building2, Search, CheckCircle, AlertCircle, Loader2, ExternalLink, Edit3, Save, Receipt,
   ChevronDown, ChevronRight, CalendarDays
@@ -9,6 +9,8 @@ import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
+import { CustomerGroupService } from '../../../services/customerGroupService'
+import type { CustomerGroup } from '../../../types/customerGroups'
 
 const MONTHS_SV = [
   'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
@@ -56,12 +58,16 @@ interface PreviewData {
   contact_phone: string | null
   contact_address: string | null
   contract_start_date: string | null
+  contract_end_date: string | null
   contract_length: string | null
   annual_value: number | null
   products: any[] | null
   oneflow_contract_id: string | null
   contract_type: string | null
   agreement_text: string | null
+  sales_person: string | null
+  sales_person_email: string | null
+  customer_group_id: string | null
   billing_frequency: BillingFrequency
   billing_anchor_month: number
 }
@@ -133,6 +139,11 @@ export default function ImportCustomerByOrgnrModal({
   isOpen, onClose, onImported,
 }: ImportCustomerByOrgnrModalProps) {
   const [step, setStep] = useState<Step>('search')
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+
+  useEffect(() => {
+    CustomerGroupService.getAllGroups().then(setCustomerGroups).catch(() => {})
+  }, [])
   const [orgNr, setOrgNr] = useState('')
   const [searching, setSearching] = useState(false)
   const [sources, setSources] = useState<{ fortnox: boolean; oneflow: boolean } | null>(null)
@@ -196,6 +207,10 @@ export default function ImportCustomerByOrgnrModal({
         billing_anchor_month: anchorMonth,
         contract_type: data.preview.contract_type ?? null,
         agreement_text: data.preview.agreement_text ?? null,
+        sales_person: data.preview.sales_person ?? null,
+        sales_person_email: data.preview.sales_person_email ?? null,
+        contract_end_date: data.preview.contract_end_date ?? null,
+        customer_group_id: data.preview.customer_group_id ?? null,
       })
 
       const fetchedInvoices: FortnoxInvoice[] = data.invoices ?? []
@@ -401,6 +416,23 @@ export default function ImportCustomerByOrgnrModal({
                 <Field label="Org.nummer" value={preview.organization_number ?? ''} readOnly />
                 <Field label="Kundnummer (Fortnox)" value={preview.customer_number?.toString() ?? ''} readOnly />
                 <Field label="Valuta" value={preview.currency ?? 'SEK'} onChange={update('currency')} />
+                {/* Kundgrupp */}
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-slate-400 mb-1 block">
+                    Kundgrupp
+                    {preview.customer_group_id && <span className="ml-1 text-[#20c58f]">(auto-matchad)</span>}
+                  </label>
+                  <select
+                    value={preview.customer_group_id ?? ''}
+                    onChange={e => setPreview(prev => prev ? { ...prev, customer_group_id: e.target.value || null } : prev)}
+                    className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+                  >
+                    <option value="">Välj kundgrupp</option>
+                    {customerGroups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name} ({g.series_start}–{g.series_end})</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -447,6 +479,7 @@ export default function ImportCustomerByOrgnrModal({
                 </div>
 
                 <Field label="Avtalsstart" value={preview.contract_start_date ?? ''} onChange={update('contract_start_date')} placeholder="ÅÅÅÅ-MM-DD" />
+                <Field label="Kontraktsslut" value={preview.contract_end_date ?? ''} onChange={update('contract_end_date')} placeholder="ÅÅÅÅ-MM-DD" />
                 <Field label="Avtalslängd" value={preview.contract_length ?? ''} onChange={update('contract_length')} placeholder="t.ex. 3 år" />
                 <Field
                   label="Årsvärde (kr)"
@@ -455,6 +488,8 @@ export default function ImportCustomerByOrgnrModal({
                   placeholder="0"
                   type="number"
                 />
+                <Field label="Säljare" value={preview.sales_person ?? ''} onChange={update('sales_person')} placeholder="Ej hämtat" />
+                <Field label="Säljare e-post" value={preview.sales_person_email ?? ''} onChange={update('sales_person_email')} placeholder="Ej hämtat" />
                 <Field label="Oneflow kontrakt-ID" value={preview.oneflow_contract_id ?? ''} onChange={update('oneflow_contract_id')} placeholder="Ej hämtat" />
 
                 {/* Avtalsobjekt */}

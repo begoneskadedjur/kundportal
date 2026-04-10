@@ -239,14 +239,16 @@ export function useConsolidatedCustomers() {
         multisiteRolesResult,
         casesResult,
         invitationsResult,
-        contactsResult
+        contactsResult,
+        adHocResult
       ] = await Promise.all([
         supabase.from('customers').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('customer_id, role').eq('role', 'customer'),
         supabase.from('multisite_user_roles').select('organization_id, user_id, is_active, role_type, site_ids').eq('is_active', true),
         supabase.from('cases').select('id, customer_id, title, description, price, billing_status, created_at'),
         supabase.from('user_invitations').select('customer_id, accepted_at, expires_at'),
-        supabase.from('customer_contacts').select('customer_id, name, title, responsibility_area, phone, email')
+        supabase.from('customer_contacts').select('customer_id, name, title, responsibility_area, phone, email'),
+        supabase.from('contract_billing_items').select('customer_id, total_price').eq('item_type', 'ad_hoc').neq('status', 'cancelled')
       ])
 
       const { data: customersData, error: customersError } = customersResult
@@ -257,6 +259,13 @@ export function useConsolidatedCustomers() {
       const { data: casesData, error: casesError } = casesResult
       const { data: invitationsData, error: invitationsError } = invitationsResult
       const { data: contactsData } = contactsResult
+      const { data: adHocData } = adHocResult
+
+      // Bygg ad_hoc-map: customer_id → summerad totalbelopp
+      const adHocMap = new Map<string, number>()
+      adHocData?.forEach((item: any) => {
+        adHocMap.set(item.customer_id, (adHocMap.get(item.customer_id) ?? 0) + (item.total_price ?? 0))
+      })
 
       // Customer contacts map for search (customer_id -> searchable strings)
       const contactsSearchMap = new Map<string, string[]>()
@@ -408,7 +417,8 @@ export function useConsolidatedCustomers() {
         
         // Hämta cases för denna kund
         const customerCases = casesMap.get(customer.id) || []
-        const casesValue = customerCases.reduce((sum, c) => sum + c.price, 0)
+        // casesValue = summan av ad_hoc contract_billing_items (ClickUp fasas ut)
+        const casesValue = adHocMap.get(customer.id) ?? 0
         const casesBillingBreakdown = {
           pending: customerCases.filter(c => c.billing_status === 'pending').length,
           sent: customerCases.filter(c => c.billing_status === 'sent').length,

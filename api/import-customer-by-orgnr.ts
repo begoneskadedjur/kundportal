@@ -168,9 +168,18 @@ const CONTRACT_TYPE_MAP: Record<string, string> = {
   '8732196': 'Avtal Indikationsfällor',
 }
 
+function parseContractLengthMonths(text: string | null): number {
+  if (!text) return 36
+  const match = text.match(/(\d+)\s*(år|year|months?|månader?)/i)
+  if (!match) return 36
+  const n = parseInt(match[1])
+  return /år|year/i.test(match[2]) ? n * 12 : n
+}
+
 function extractOneflowData(contractData: { contract: any; parties: any[] }) {
   const { contract, parties } = contractData
   const customerParty = parties.find((p: any) => !p.my_party)
+  const begoneParty = parties.find((p: any) => p.my_party)
 
   const templateId = String(contract.template?.id ?? contract.template_id ?? '')
   const contract_type = CONTRACT_TYPE_MAP[templateId] || null
@@ -193,6 +202,20 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
   const contract_start_date = parseDate(dataFields['begynnelsedag']) || null
   const contract_length = dataFields['avtalslngd'] || null
   const company_name_oneflow = dataFields['foretag'] || customerParty?.name || null
+
+  // Säljare — BeGone-parten (my_party)
+  const begoneParticipant = begoneParty?.participants?.[0]
+  const sales_person = begoneParticipant?.name || null
+  const sales_person_email = begoneParticipant?.email || null
+
+  // Kontraktsslut — beräknat från start + längd
+  let contract_end_date: string | null = null
+  if (contract_start_date) {
+    const months = parseContractLengthMonths(contract_length)
+    const start = new Date(contract_start_date)
+    start.setMonth(start.getMonth() + months)
+    contract_end_date = start.toISOString().split('T')[0]
+  }
 
   // Produktvärde
   let annual_value: number | null = null
@@ -220,6 +243,7 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     contact_phone,
     contact_address,
     contract_start_date,
+    contract_end_date,
     contract_length,
     company_name_oneflow,
     annual_value: annual_value && annual_value > 0 ? annual_value : null,
@@ -227,6 +251,8 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     oneflow_contract_id: String(contract.id),
     contract_type,
     agreement_text,
+    sales_person,
+    sales_person_email,
   }
 }
 
@@ -371,15 +397,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     )
     console.log(`📄 Fortnox: raddetaljer hämtade för ${invoicesWithRows.length} fakturor`)
 
-    // Oneflow
-    console.log('📋 Hämtar från Oneflow...')
-    const oneflowData = await fetchOneflowContractByOrgNr(normalized).catch(err => {
-      console.error('⚠️ Oneflow-fel:', err.message)
-      return null
-    })
+    // Oneflow + kundgrupp parallellt
+    console.log('📋 Hämtar från Oneflow + kundgrupper...')
+    const customerNumber = parseInt(fortnoxCustomer.CustomerNumber) || null
+
+    const [oneflowData, customerGroupResult] = await Promise.all([
+      fetchOneflowContractByOrgNr(normalized).catch(err => {
+        console.error('⚠️ Oneflow-fel:', err.message)
+        return null
+      }),
+      customerNumber
+        ? supabase
+            .from('customer_groups')
+            .select('id, name')
+            .lte('series_start', customerNumber)
+            .gte('series_end', customerNumber)
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ])
 
     const oneflow = oneflowData ? extractOneflowData(oneflowData) : null
+    const suggestedGroup = (customerGroupResult as any)?.data ?? null
     console.log(oneflow ? `✅ Oneflow-kontrakt: ${oneflow.oneflow_contract_id}` : '⚠️ Inget Oneflow-kontrakt')
+    console.log(suggestedGroup ? `👥 Kundgrupp: ${suggestedGroup.name}` : '⚠️ Ingen kundgrupp matchad')
 
     // Bygg förslag på kunddata (ej sparat ännu)
     const billingParts = [
@@ -391,7 +432,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const preview = {
       company_name: fortnoxCustomer.Name,
       organization_number: normalized,
-      customer_number: parseInt(fortnoxCustomer.CustomerNumber) || null,
+      customer_number: customerNumber,
       billing_email: fortnoxCustomer.EmailInvoice || fortnoxCustomer.Email || null,
       billing_address: billingParts.length > 0 ? billingParts.join(', ') : null,
       currency: fortnoxCustomer.Currency || 'SEK',
@@ -401,12 +442,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       contact_phone: oneflow?.contact_phone ?? null,
       contact_address: oneflow?.contact_address ?? null,
       contract_start_date: oneflow?.contract_start_date ?? null,
+      contract_end_date: oneflow?.contract_end_date ?? null,
       contract_length: oneflow?.contract_length ?? null,
       annual_value: oneflow?.annual_value ?? null,
       products: oneflow?.products ?? null,
       oneflow_contract_id: oneflow?.oneflow_contract_id ?? null,
       contract_type: oneflow?.contract_type ?? null,
       agreement_text: oneflow?.agreement_text ?? null,
+      sales_person: oneflow?.sales_person ?? null,
+      sales_person_email: oneflow?.sales_person_email ?? null,
+      customer_group_id: suggestedGroup?.id ?? null,
     }
 
     return res.status(200).json({
@@ -414,6 +459,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       preview,
       invoices: invoicesWithRows,
       sources: { fortnox: true, oneflow: !!oneflow },
+      suggested_group: suggestedGroup,
     })
   } catch (err: any) {
     console.error('❌ Import-fel:', err)
