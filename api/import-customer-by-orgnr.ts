@@ -160,9 +160,20 @@ async function fetchOneflowContractByOrgNr(orgNr: string) {
   return { contract: fullContract, parties }
 }
 
+const CONTRACT_TYPE_MAP: Record<string, string> = {
+  '8486368': 'Skadedjursavtal',
+  '8462854': 'Avtal Mekaniska fällor',
+  '9324573': 'Avtal Betesstationer',
+  '8465556': 'Avtal Betongstationer',
+  '8732196': 'Avtal Indikationsfällor',
+}
+
 function extractOneflowData(contractData: { contract: any; parties: any[] }) {
   const { contract, parties } = contractData
   const customerParty = parties.find((p: any) => !p.my_party)
+
+  const templateId = String(contract.template?.id ?? contract.template_id ?? '')
+  const contract_type = CONTRACT_TYPE_MAP[templateId] || null
 
   const dataFields: Record<string, string> = {}
   const fields: any[] = Array.isArray(contract.data_fields) ? contract.data_fields : []
@@ -213,6 +224,7 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     annual_value: annual_value && annual_value > 0 ? annual_value : null,
     products: selectedProducts.length > 0 ? selectedProducts : null,
     oneflow_contract_id: String(contract.id),
+    contract_type,
   }
 }
 
@@ -373,6 +385,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       annual_value: oneflow?.annual_value ?? null,
       products: oneflow?.products ?? null,
       oneflow_contract_id: oneflow?.oneflow_contract_id ?? null,
+      contract_type: oneflow?.contract_type ?? null,
     }
 
     return res.status(200).json({

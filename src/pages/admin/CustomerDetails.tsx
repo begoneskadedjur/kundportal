@@ -308,10 +308,20 @@ export default function CustomerDetails() {
                   placeholder="Välj verksamhetstyp"
                 />
                 
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Avtalstyp</label>
-                  <p className="text-white">{customer.contract_type || '-'}</p>
-                </div>
+                <EditableCustomerField
+                  label="Avtalstyp"
+                  value={customer.contract_type}
+                  onSave={(value) => handleFieldUpdate('contract_type', value)}
+                  type="select"
+                  placeholder="Välj avtalstyp"
+                  options={[
+                    { value: 'Skadedjursavtal', label: 'Skadedjursavtal' },
+                    { value: 'Avtal Betesstationer', label: 'Avtal Betesstationer' },
+                    { value: 'Avtal Betongstationer', label: 'Avtal Betongstationer' },
+                    { value: 'Avtal Mekaniska fällor', label: 'Avtal Mekaniska fällor' },
+                    { value: 'Avtal Indikationsfällor', label: 'Avtal Indikationsfällor' },
+                  ]}
+                />
                 
                 <EditableCustomerField
                   label="Adress"
