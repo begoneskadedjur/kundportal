@@ -193,9 +193,15 @@ export function ContractInvoiceModal({
     if (!invoice || !customerId) return
     setSendingToFortnox(true)
     try {
+      // Validera att kunden har kundnummer
+      if (!invoice.customer.customer_number) {
+        toast.error('Kunden saknar kundnummer — tilldela ett kundnummer på kundkortet innan du skapar utkast i Fortnox')
+        return
+      }
+
       // 1. Hämta eller skapa kund i Fortnox
       const fortnoxCustomerNumber = await FortnoxService.findOrCreateCustomer({
-        customer_number: invoice.customer.customer_number!,
+        customer_number: invoice.customer.customer_number,
         company_name: invoice.customer.company_name,
         organization_number: invoice.customer.organization_number,
         billing_email: invoice.customer.billing_email,
