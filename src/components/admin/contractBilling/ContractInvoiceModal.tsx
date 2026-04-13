@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
 import { FortnoxService } from '../../../services/fortnoxService'
 import { supabase } from '../../../lib/supabase'
-import type { ContractInvoice, ContractBillingItemStatus, BillingFrequency } from '../../../types/contractBilling'
+import type { ContractInvoice, BillingFrequency } from '../../../types/contractBilling'
 import { BILLING_ITEM_STATUS_CONFIG, BILLING_FREQUENCY_CONFIG, formatBillingAmount, formatBillingPeriod } from '../../../types/contractBilling'
 
 interface ContractInvoiceModalProps {
@@ -145,19 +145,51 @@ export function ContractInvoiceModal({
     }
   }
 
-  const handleStatusChange = async (newStatus: ContractBillingItemStatus) => {
+
+  const handleCancelInvoice = async () => {
     if (!invoice) return
     setUpdating(true)
     try {
+      // Makulera i Fortnox om utkast finns
+      if (invoice.fortnox_document_number) {
+        try {
+          await FortnoxService.cancelInvoice(invoice.fortnox_document_number)
+        } catch (err: any) {
+          // Ignorera om redan makulerad i Fortnox
+          console.warn('Fortnox makulering:', err.message)
+        }
+      }
+      // Sätt cancelled i vårt system
       await ContractBillingService.updateInvoiceStatus(
-        invoice.customer_id, invoice.period_start, invoice.period_end, newStatus
+        invoice.customer_id, invoice.period_start, invoice.period_end, 'cancelled'
       )
-      toast.success('Status uppdaterad')
+      toast.success('Faktura makulerad')
       await new Promise(r => setTimeout(r, 400))
       await loadInvoice()
       onStatusChange()
     } catch (err) {
-      toast.error('Kunde inte uppdatera status')
+      toast.error('Kunde inte makulera faktura')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleResetForNewInvoice = async () => {
+    if (!invoice) return
+    setUpdating(true)
+    try {
+      // Rensa fortnox_document_number och återställ till pending
+      const itemIds = invoice.items.map(i => i.id)
+      await supabase
+        .from('contract_billing_items')
+        .update({ fortnox_document_number: null, status: 'pending' })
+        .in('id', itemIds)
+      toast.success('Redo för ny faktura')
+      await new Promise(r => setTimeout(r, 400))
+      await loadInvoice()
+      onStatusChange()
+    } catch (err) {
+      toast.error('Kunde inte återställa faktura')
     } finally {
       setUpdating(false)
     }
@@ -621,9 +653,19 @@ export function ContractInvoiceModal({
                   {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast'}
                 </button>
               )}
+              {invoice.derived_status === 'cancelled' && (
+                <button
+                  onClick={handleResetForNewInvoice}
+                  disabled={updating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#20c58f] hover:bg-[#1bb07e] text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Skapa ny faktura
+                </button>
+              )}
               {invoice.derived_status !== 'paid' && invoice.derived_status !== 'cancelled' && (
                 <button
-                  onClick={() => handleStatusChange('cancelled')}
+                  onClick={handleCancelInvoice}
                   disabled={updating}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-lg transition-colors disabled:opacity-50"
                 >

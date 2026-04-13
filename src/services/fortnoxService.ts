@@ -149,6 +149,10 @@ export const FortnoxService = {
     return data.Invoice
   },
 
+  async cancelInvoice(documentNumber: string): Promise<void> {
+    await fortnoxRequest(`invoices/${documentNumber}/cancel`, 'PUT')
+  },
+
   // Hämta eller skapa kund i Fortnox baserat på vårt customer_number
   async findOrCreateCustomer(customer: {
     customer_number: number
