@@ -232,7 +232,7 @@ export function MonthlyBillingPipeline() {
     color: string
   }[] = [
     { key: 'awaiting_generation', label: 'Ej genererade', count: totalStats.awaiting_generation, icon: Calendar, color: 'amber' },
-    { key: 'pending',             label: 'Väntar',        count: totalStats.pending,             icon: Clock,          color: 'yellow' },
+    { key: 'pending',             label: 'Redo att skickas', count: totalStats.pending,          icon: Clock,          color: 'yellow' },
     { key: 'draft',               label: 'I Fortnox',     count: totalStats.draft,               icon: FileText,       color: 'orange' },
     { key: 'sent',                label: 'Skickade',      count: totalStats.sent,                icon: Send,           color: 'blue' },
     { key: 'overdue',             label: 'Förfallna',     count: totalStats.overdue,             icon: AlertTriangle,  color: 'red' },

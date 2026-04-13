@@ -145,7 +145,7 @@ export const BILLING_ITEM_STATUS_CONFIG: Record<ContractBillingItemStatus, {
   borderColor: string
 }> = {
   pending: {
-    label: 'Väntar',
+    label: 'Redo att skickas',
     color: 'text-yellow-400',
     bgColor: 'bg-yellow-500/10',
     borderColor: 'border-yellow-500/30'
@@ -418,7 +418,7 @@ export const PIPELINE_STATUS_CONFIG: Record<MonthlyCustomerStatus, {
 }> = {
   not_billable:        { label: 'Saknar prislista',  color: 'text-slate-400',   bgColor: 'bg-slate-500/10' },
   awaiting_generation: { label: 'Ej genererad',      color: 'text-amber-400',   bgColor: 'bg-amber-500/10' },
-  pending:             { label: 'Väntar',             color: 'text-yellow-400',  bgColor: 'bg-yellow-500/10' },
+  pending:             { label: 'Redo att skickas',   color: 'text-yellow-400',  bgColor: 'bg-yellow-500/10' },
   approved:            { label: 'Godkänd',            color: 'text-blue-400',    bgColor: 'bg-blue-500/10' },
   draft:               { label: 'Utkast i Fortnox',  color: 'text-orange-400',  bgColor: 'bg-orange-500/10' },
   sent:                { label: 'Skickad',            color: 'text-blue-400',    bgColor: 'bg-blue-500/10' },

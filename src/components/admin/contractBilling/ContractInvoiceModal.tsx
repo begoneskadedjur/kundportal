@@ -609,8 +609,17 @@ export function ContractInvoiceModal({
                   events.push({ date: first.sent_at, label: `Utkast skapat i Fortnox${invoice.fortnox_document_number ? ` (nr ${invoice.fortnox_document_number})` : ''}`, color: 'text-orange-400', dot: 'bg-orange-500' })
                 if (first.fortnox_sent_at)
                   events.push({ date: first.fortnox_sent_at, label: 'Skickad till kund', color: 'text-blue-400', dot: 'bg-blue-500' })
-                if (first.overdue_at)
-                  events.push({ date: first.overdue_at, label: `Förfallen${first.due_date ? ` (förföll ${fmtDate(first.due_date)})` : ''}`, color: 'text-red-400', dot: 'bg-red-500' })
+                if (first.overdue_at) {
+                  const daysSinceDue = first.due_date
+                    ? Math.max(0, Math.floor((Date.now() - new Date(first.due_date).getTime()) / (1000 * 60 * 60 * 24)))
+                    : null
+                  events.push({
+                    date: first.overdue_at,
+                    label: `Förfallen — förföll ${first.due_date ? fmtDate(first.due_date) : '–'}${daysSinceDue !== null ? ` (${daysSinceDue} dagar sedan)` : ''}`,
+                    color: 'text-red-400',
+                    dot: 'bg-red-500'
+                  })
+                }
                 if (first.cancelled_at)
                   events.push({ date: first.cancelled_at, label: `Makulerad${first.fortnox_cancelled_document_number ? ` (Fortnox nr ${first.fortnox_cancelled_document_number})` : ''}`, color: 'text-red-400', dot: 'bg-red-500' })
                 if (first.paid_at)
