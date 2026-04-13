@@ -964,7 +964,7 @@ export default function InvoiceDetailModal({
                   {sendingToFortnox
                     ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     : <Zap className="w-3.5 h-3.5" />}
-                  {sendingToFortnox ? 'Skickar...' : 'Skicka till Fortnox'}
+                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast i Fortnox'}
                 </button>
               )}
               {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (

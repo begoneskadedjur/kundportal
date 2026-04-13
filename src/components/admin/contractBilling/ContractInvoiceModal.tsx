@@ -3,8 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import {
-  X, FileText, CheckCircle, Send, XCircle, Download,
-  RefreshCw, AlertCircle, DollarSign, Zap, Building2, ExternalLink
+  X, FileText, CheckCircle, XCircle, Download,
+  RefreshCw, AlertCircle, Zap, Building2, ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
@@ -151,6 +151,7 @@ export function ContractInvoiceModal({
         invoice.customer_id, invoice.period_start, invoice.period_end, newStatus
       )
       toast.success('Status uppdaterad')
+      await new Promise(r => setTimeout(r, 400))
       await loadInvoice()
       onStatusChange()
     } catch (err) {
@@ -602,7 +603,7 @@ export function ContractInvoiceModal({
                   {sendingToFortnox
                     ? <RefreshCw className="w-4 h-4 animate-spin" />
                     : <Zap className="w-4 h-4" />}
-                  {sendingToFortnox ? 'Skickar...' : 'Skicka till Fortnox'}
+                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast i Fortnox'}
                 </button>
               )}
               {invoice.derived_status !== 'paid' && invoice.derived_status !== 'cancelled' && (
