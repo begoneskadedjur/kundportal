@@ -56,7 +56,7 @@ function buildRemarksText(
   const fraction = `1/${periodsPerYear}`
   const freqLabel = config.label.toLowerCase()
   const avtalNamn = contractType || 'Avtalstjänster'
-  return `${avtalNamn} – betalning av årsavtal\nÅrsavgäld: ${formatBillingAmount(annualValue)} exkl. moms | Faktureras ${freqLabel} (${fraction} per faktura)`
+  return `${avtalNamn} - betalning av årsavtal. Årsavgäld: ${formatBillingAmount(annualValue)} exkl. moms. Faktureras ${freqLabel} (${fraction} per faktura)`
 }
 
 // Momsspecifikation per skattesats
