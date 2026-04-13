@@ -945,17 +945,7 @@ export default function InvoiceDetailModal({
             </div>
 
             <div className="flex gap-2">
-              {invoice.status === 'pending_approval' && (
-                <button
-                  onClick={() => handleStatusChange('ready')}
-                  disabled={updating}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  Godkänn
-                </button>
-              )}
-              {invoice.status === 'ready' && (
+              {(invoice.status === 'draft' || invoice.status === 'pending_approval' || invoice.status === 'ready') && (
                 <button
                   onClick={handleSendToFortnox}
                   disabled={sendingToFortnox}
@@ -964,7 +954,7 @@ export default function InvoiceDetailModal({
                   {sendingToFortnox
                     ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     : <Zap className="w-3.5 h-3.5" />}
-                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast i Fortnox'}
+                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast'}
                 </button>
               )}
               {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (

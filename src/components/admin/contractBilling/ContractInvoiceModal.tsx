@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import {
-  X, FileText, CheckCircle, XCircle, Download,
+  X, FileText, XCircle, Download,
   RefreshCw, AlertCircle, Zap, Building2, ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -584,17 +584,7 @@ export function ContractInvoiceModal({
 
             {/* Höger: statusknappar */}
             <div className="flex items-center gap-2">
-              {invoice.derived_status === 'pending' && (
-                <button
-                  onClick={() => handleStatusChange('approved')}
-                  disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Godkänn
-                </button>
-              )}
-              {invoice.derived_status === 'approved' && (
+              {(invoice.derived_status === 'pending' || invoice.derived_status === 'approved') && (
                 <button
                   onClick={handleSendToFortnox}
                   disabled={sendingToFortnox}
@@ -603,7 +593,7 @@ export function ContractInvoiceModal({
                   {sendingToFortnox
                     ? <RefreshCw className="w-4 h-4 animate-spin" />
                     : <Zap className="w-4 h-4" />}
-                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast i Fortnox'}
+                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast'}
                 </button>
               )}
               {invoice.derived_status !== 'paid' && invoice.derived_status !== 'cancelled' && (
