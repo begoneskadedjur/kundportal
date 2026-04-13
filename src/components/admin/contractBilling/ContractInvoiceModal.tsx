@@ -2,6 +2,7 @@
 // Fakturavy – komplett layout för Fortnox-kompatibel faktura
 
 import { useState, useEffect } from 'react'
+import { useAuth } from '../../../contexts/AuthContext'
 import {
   X, FileText, XCircle, Download,
   RefreshCw, AlertCircle, Zap, Building2, ExternalLink
@@ -87,6 +88,7 @@ function VatBreakdown({ items }: { items: ContractInvoice['items'] }) {
 export function ContractInvoiceModal({
   isOpen, onClose, customerId, periodStart, periodEnd, billingFrequency, onStatusChange
 }: ContractInvoiceModalProps) {
+  const { user, profile } = useAuth()
   const [invoice, setInvoice] = useState<ContractInvoice | null>(null)
   const [customerName, setCustomerName] = useState<string>('')
   const [contractType, setContractType] = useState<string | null>(null)
@@ -209,6 +211,9 @@ export function ContractInvoiceModal({
       })
 
       // 2. Säkerställ att artiklar finns i Fortnox, bygg sedan fakturarader
+      // För månadsavtal: skicka qty=1 och price=total_price (månadsbeloppet)
+      // så att Fortnox-fakturan visar rätt belopp, inte årsbeloppet
+      const isPeriodicBilling = billingFrequency && billingFrequency !== 'annual' && billingFrequency !== 'on_demand'
       const activeItems = invoice.items.filter(item => item.status !== 'cancelled')
       const invoiceRows = await Promise.all(activeItems.map(async item => {
         let articleNumber: string | undefined
@@ -219,13 +224,15 @@ export function ContractInvoiceModal({
             vat_rate: item.vat_rate,
           })
         }
+        const qty = isPeriodicBilling ? '1' : String(item.quantity)
+        const price = isPeriodicBilling ? Number(item.total_price) : Number(item.unit_price)
         return {
           ...(articleNumber ? { ArticleNumber: articleNumber } : {}),
           Description: item.article_name,
-          DeliveredQuantity: String(item.quantity),
-          Price: Number(item.unit_price),
+          DeliveredQuantity: qty,
+          Price: price,
           VAT: Math.round(Number(item.vat_rate)),
-          ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' } : {}),
+          ...(item.discount_percent > 0 && !isPeriodicBilling ? { Discount: item.discount_percent, DiscountType: 'PERCENT' } : {}),
         }
       }))
 
@@ -245,6 +252,9 @@ export function ContractInvoiceModal({
         YourOrderNumber: periodLabel,
         ...(remarks ? { Remarks: remarks } : {}),
         ...(invoice.customer.billing_reference ? { YourReference: invoice.customer.billing_reference } : {}),
+        ...(profile?.display_name || user?.email ? {
+          OurReference: [profile?.display_name, user?.email].filter(Boolean).join(', ')
+        } : {}),
         InvoiceRows: invoiceRows,
       })
 
