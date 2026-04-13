@@ -176,4 +176,34 @@ export const FortnoxService = {
     })
     return newCustomer.Customer.CustomerNumber
   },
+
+  // Hämta eller skapa artikel i Fortnox baserat på vårt article_code
+  async findOrCreateArticle(article: {
+    code: string
+    name: string
+    unit?: string | null
+    vat_rate?: number | null
+  }): Promise<string> {
+    // Försök hämta befintlig artikel
+    try {
+      const existing = await fortnoxRequest<{ Article: { ArticleNumber: string } }>(
+        `articles/${encodeURIComponent(article.code)}`
+      )
+      if (existing?.Article?.ArticleNumber) {
+        return existing.Article.ArticleNumber
+      }
+    } catch {
+      // Artikel finns inte — skapa ny
+    }
+
+    const newArticle = await fortnoxRequest<{ Article: { ArticleNumber: string } }>('articles', 'POST', {
+      Article: {
+        ArticleNumber: article.code,
+        Description: article.name,
+        ...(article.unit ? { Unit: article.unit } : {}),
+        ...(article.vat_rate != null ? { VAT: article.vat_rate } : {}),
+      },
+    })
+    return newArticle.Article.ArticleNumber
+  },
 }

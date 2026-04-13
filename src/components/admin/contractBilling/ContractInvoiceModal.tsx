@@ -208,16 +208,26 @@ export function ContractInvoiceModal({
         billing_address: invoice.customer.billing_address,
       })
 
-      // 2. Bygg fakturarader (ArticleNumber utelämnas — Fortnox kräver att artikeln finns i systemet)
-      const invoiceRows = invoice.items
-        .filter(item => item.status !== 'cancelled')
-        .map(item => ({
+      // 2. Säkerställ att artiklar finns i Fortnox, bygg sedan fakturarader
+      const activeItems = invoice.items.filter(item => item.status !== 'cancelled')
+      const invoiceRows = await Promise.all(activeItems.map(async item => {
+        let articleNumber: string | undefined
+        if (item.article_code) {
+          articleNumber = await FortnoxService.findOrCreateArticle({
+            code: item.article_code,
+            name: item.article_name,
+            vat_rate: item.vat_rate,
+          })
+        }
+        return {
+          ...(articleNumber ? { ArticleNumber: articleNumber } : {}),
           Description: item.article_name,
           DeliveredQuantity: item.quantity,
           Price: item.unit_price,
           VAT: item.vat_rate,
           ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' } : {}),
-        }))
+        }
+      }))
 
       // 3. Bygg remarkstext (avtalsinfo)
       const subtotal = invoice.items
