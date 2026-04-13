@@ -88,7 +88,7 @@ function VatBreakdown({ items }: { items: ContractInvoice['items'] }) {
 export function ContractInvoiceModal({
   isOpen, onClose, customerId, periodStart, periodEnd, billingFrequency, onStatusChange
 }: ContractInvoiceModalProps) {
-  const { user, profile } = useAuth()
+  const { profile } = useAuth()
   const [invoice, setInvoice] = useState<ContractInvoice | null>(null)
   const [customerName, setCustomerName] = useState<string>('')
   const [contractType, setContractType] = useState<string | null>(null)
@@ -258,7 +258,6 @@ export function ContractInvoiceModal({
       // 2. Säkerställ att artiklar finns i Fortnox, bygg sedan fakturarader
       // För månadsavtal: skicka qty=1 och price=total_price (månadsbeloppet)
       // så att Fortnox-fakturan visar rätt belopp, inte årsbeloppet
-      const isPeriodicBilling = billingFrequency && billingFrequency !== 'annual' && billingFrequency !== 'on_demand'
       const activeItems = invoice.items.filter(item => item.status !== 'cancelled')
       const invoiceRows = await Promise.all(activeItems.map(async item => {
         let articleNumber: string | undefined
@@ -297,9 +296,7 @@ export function ContractInvoiceModal({
         YourOrderNumber: periodLabel,
         ...(remarks ? { Remarks: remarks } : {}),
         ...(invoice.customer.billing_reference ? { YourReference: invoice.customer.billing_reference } : {}),
-        ...(profile?.display_name || user?.email ? {
-          OurReference: [profile?.display_name, user?.email].filter(Boolean).join(', ')
-        } : {}),
+        ...(profile?.display_name ? { OurReference: profile.display_name } : {}),
         InvoiceRows: invoiceRows,
       })
 
@@ -338,6 +335,7 @@ export function ContractInvoiceModal({
 
   if (!isOpen) return null
 
+  const isPeriodicBilling = billingFrequency && billingFrequency !== 'annual' && billingFrequency !== 'on_demand'
   const statusConfig = invoice ? BILLING_ITEM_STATUS_CONFIG[invoice.derived_status] : null
   const today = new Date().toISOString().split('T')[0]
   const invoiceDate = invoice?.items[0]?.invoiced_at
@@ -536,8 +534,12 @@ export function ContractInvoiceModal({
                             {item.item_type === 'contract' ? 'Löpande' : 'Tillägg'}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 text-right text-slate-300">{item.quantity}</td>
-                        <td className="px-3 py-2.5 text-right text-slate-300">{formatBillingAmount(item.unit_price)}</td>
+                        <td className="px-3 py-2.5 text-right text-slate-300">
+                          {isPeriodicBilling ? 1 : item.quantity}
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-slate-300">
+                          {formatBillingAmount(isPeriodicBilling ? item.total_price : item.unit_price)}
+                        </td>
                         <td className="px-3 py-2.5 text-right">
                           {item.discount_percent > 0
                             ? <span className="text-orange-400">-{item.discount_percent}%</span>
