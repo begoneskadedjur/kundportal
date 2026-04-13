@@ -222,9 +222,9 @@ export function ContractInvoiceModal({
         return {
           ...(articleNumber ? { ArticleNumber: articleNumber } : {}),
           Description: item.article_name,
-          DeliveredQuantity: item.quantity,
-          Price: item.unit_price,
-          VAT: item.vat_rate,
+          DeliveredQuantity: String(item.quantity),
+          Price: Number(item.unit_price),
+          VAT: Math.round(Number(item.vat_rate)),
           ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' } : {}),
         }
       }))

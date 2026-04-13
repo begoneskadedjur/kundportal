@@ -18,8 +18,15 @@ async function fortnoxRequest<T>(
   })
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || `Fortnox API-fel: ${res.status}`)
+    const errBody = await res.json().catch(() => ({ error: res.statusText }))
+    // Fortnox felstruktur: { ErrorInformation: { message, code } } eller { error: string }
+    const message =
+      errBody?.ErrorInformation?.message ||
+      errBody?.error ||
+      `Fortnox API-fel: ${res.status}`
+    const err = new Error(message) as Error & { status: number }
+    err.status = res.status
+    throw err
   }
 
   return res.json()
@@ -182,9 +189,9 @@ export const FortnoxService = {
     code: string
     name: string
     unit?: string | null
-    vat_rate?: number | null
+    vat_rate?: number | string | null
   }): Promise<string> {
-    // Försök hämta befintlig artikel
+    // Försök hämta befintlig artikel — ignorera bara 404
     try {
       const existing = await fortnoxRequest<{ Article: { ArticleNumber: string } }>(
         `articles/${encodeURIComponent(article.code)}`
@@ -192,16 +199,21 @@ export const FortnoxService = {
       if (existing?.Article?.ArticleNumber) {
         return existing.Article.ArticleNumber
       }
-    } catch {
-      // Artikel finns inte — skapa ny
+    } catch (err) {
+      // Kasta vidare om det inte är 404
+      if ((err as any)?.status !== 404) throw err
     }
+
+    // Fortnox kräver VAT som heltal (25, inte "25.00")
+    const vatNum = article.vat_rate != null ? Math.round(Number(article.vat_rate)) : null
 
     const newArticle = await fortnoxRequest<{ Article: { ArticleNumber: string } }>('articles', 'POST', {
       Article: {
         ArticleNumber: article.code,
         Description: article.name,
+        Type: 'SERVICE',
         ...(article.unit ? { Unit: article.unit } : {}),
-        ...(article.vat_rate != null ? { VAT: article.vat_rate } : {}),
+        ...(vatNum != null ? { VAT: vatNum } : {}),
       },
     })
     return newArticle.Article.ArticleNumber
