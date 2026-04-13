@@ -62,30 +62,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString()
 
-  // Spara/uppdatera tokens i Supabase (upsert — bara en rad)
-  const { error: dbError } = await supabase
+  // Kolla om det redan finns en rad i tabellen
+  const { data: existing } = await supabase
     .from(tokenTable)
-    .upsert(
-      {
+    .select('id')
+    .maybeSingle()
+
+  let saveError
+  if (existing?.id) {
+    // Uppdatera befintlig rad
+    const { error } = await supabase
+      .from(tokenTable)
+      .update({
         access_token,
         refresh_token,
         expires_at: expiresAt,
         updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'id' }
-    )
-
-  if (dbError) {
-    // Om tabellen är tom: insert istället
-    const { error: insertError } = await supabase.from(tokenTable).insert({
+      })
+      .eq('id', existing.id)
+    saveError = error
+  } else {
+    // Ingen rad finns — insert
+    const { error } = await supabase.from(tokenTable).insert({
       access_token,
       refresh_token,
       expires_at: expiresAt,
     })
-    if (insertError) {
-      console.error('DB insert error:', insertError)
-      return res.redirect(302, `/admin/installningar/fortnox?error=db_error`)
-    }
+    saveError = error
+  }
+
+  if (saveError) {
+    console.error('DB save error:', saveError)
+    return res.redirect(302, `/admin/installningar/fortnox?error=db_error`)
   }
 
   // Rensa state-cookie
