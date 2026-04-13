@@ -16,6 +16,7 @@ import {
   DollarSign,
   Clock,
   AlertTriangle,
+  Send,
   X
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -200,6 +201,9 @@ export function MonthlyBillingPipeline() {
     const stats = {
       pending: 0,
       approved: 0,
+      draft: 0,
+      sent: 0,
+      overdue: 0,
       invoiced: 0,
       paid: 0,
       awaiting_generation: 0,
@@ -208,6 +212,9 @@ export function MonthlyBillingPipeline() {
     for (const month of months) {
       stats.pending += month.status_breakdown.pending || 0
       stats.approved += month.status_breakdown.approved || 0
+      stats.draft += month.status_breakdown.draft || 0
+      stats.sent += month.status_breakdown.sent || 0
+      stats.overdue += month.status_breakdown.overdue || 0
       stats.invoiced += month.status_breakdown.invoiced || 0
       stats.paid += month.status_breakdown.paid || 0
       stats.awaiting_generation += month.status_breakdown.awaiting_generation || 0
@@ -225,18 +232,21 @@ export function MonthlyBillingPipeline() {
     color: string
   }[] = [
     { key: 'awaiting_generation', label: 'Ej genererade', count: totalStats.awaiting_generation, icon: Calendar, color: 'amber' },
-    { key: 'pending', label: 'Väntar', count: totalStats.pending, icon: Clock, color: 'yellow' },
-    { key: 'approved', label: 'Godkända', count: totalStats.approved, icon: CheckCircle, color: 'blue' },
-    { key: 'invoiced', label: 'Fakturerade', count: totalStats.invoiced, icon: FileText, color: 'purple' },
-    { key: 'paid', label: 'Betalda', count: totalStats.paid, icon: DollarSign, color: 'emerald' },
+    { key: 'pending',             label: 'Väntar',        count: totalStats.pending,             icon: Clock,          color: 'yellow' },
+    { key: 'draft',               label: 'I Fortnox',     count: totalStats.draft,               icon: FileText,       color: 'orange' },
+    { key: 'sent',                label: 'Skickade',      count: totalStats.sent,                icon: Send,           color: 'blue' },
+    { key: 'overdue',             label: 'Förfallna',     count: totalStats.overdue,             icon: AlertTriangle,  color: 'red' },
+    { key: 'paid',                label: 'Betalda',       count: totalStats.paid,                icon: DollarSign,     color: 'emerald' },
   ]
 
   const getFilterColor = (color: string, isActive: boolean) => {
     const colors: Record<string, { active: string; inactive: string }> = {
-      amber: { active: 'bg-amber-500/20 text-amber-400 border-amber-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-amber-500/50' },
-      yellow: { active: 'bg-yellow-500/20 text-yellow-400 border-yellow-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-yellow-500/50' },
-      blue: { active: 'bg-blue-500/20 text-blue-400 border-blue-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-blue-500/50' },
-      purple: { active: 'bg-purple-500/20 text-purple-400 border-purple-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-purple-500/50' },
+      amber:   { active: 'bg-amber-500/20 text-amber-400 border-amber-500',     inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-amber-500/50' },
+      yellow:  { active: 'bg-yellow-500/20 text-yellow-400 border-yellow-500',  inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-yellow-500/50' },
+      orange:  { active: 'bg-orange-500/20 text-orange-400 border-orange-500',  inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-orange-500/50' },
+      blue:    { active: 'bg-blue-500/20 text-blue-400 border-blue-500',        inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-blue-500/50' },
+      red:     { active: 'bg-red-500/20 text-red-400 border-red-500',          inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-red-500/50' },
+      purple:  { active: 'bg-purple-500/20 text-purple-400 border-purple-500',  inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-purple-500/50' },
       emerald: { active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-emerald-500/50' },
     }
     return colors[color]?.[isActive ? 'active' : 'inactive'] || colors.blue.inactive

@@ -18,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { Type, Action, EntityId } = req.body || {}
+  const { Type, EntityId } = req.body || {}
 
   // Vi bryr oss bara om faktura-händelser
   if (Type !== 'INVOICE') {
@@ -52,47 +52,80 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const documentNumber = String(EntityId)
+    const now = new Date().toISOString()
+
+    // Bestäm ny status baserat på Fortnox-fakturans tillstånd
     const isPaid = invoice.Balance === 0 && invoice.FinalPayDate != null
+    const isSent = invoice.Sent === true
+    const dueDate = invoice.DueDate ? new Date(invoice.DueDate) : null
+    const isOverdue = isSent && !isPaid && dueDate != null && dueDate < new Date()
 
-    if (!isPaid) {
-      // Fakturan är inte betald än — inget att göra
-      return res.status(200).json({ ok: true, skipped: true })
-    }
-
-    const paidAt = new Date(invoice.FinalPayDate).toISOString()
-
-    // Uppdatera contract_billing_items
-    const { data: contractItems } = await supabase
-      .from('contract_billing_items')
-      .select('id')
-      .eq('fortnox_document_number', documentNumber)
-      .neq('status', 'paid')
-
-    if (contractItems && contractItems.length > 0) {
-      const ids = contractItems.map((i: { id: string }) => i.id)
-      await supabase
+    if (isPaid) {
+      // Fakturan betald — uppdatera contract_billing_items
+      const { data: contractItems } = await supabase
         .from('contract_billing_items')
-        .update({ status: 'paid', paid_at: paidAt, updated_at: new Date().toISOString() })
-        .in('id', ids)
+        .select('id')
+        .eq('fortnox_document_number', documentNumber)
+        .neq('status', 'paid')
 
-      console.log(`Webhook: ${ids.length} contract_billing_items markerade betalda (Fortnox nr ${documentNumber})`)
-    }
+      if (contractItems && contractItems.length > 0) {
+        const ids = contractItems.map((i: { id: string }) => i.id)
+        await supabase
+          .from('contract_billing_items')
+          .update({ status: 'paid', paid_at: new Date(invoice.FinalPayDate).toISOString(), updated_at: now })
+          .in('id', ids)
+        console.log(`Webhook: ${ids.length} contract_billing_items → paid (Fortnox nr ${documentNumber})`)
+      }
 
-    // Uppdatera invoices
-    const { data: invoiceRows } = await supabase
-      .from('invoices')
-      .select('id')
-      .eq('fortnox_document_number', documentNumber)
-      .neq('status', 'paid')
-
-    if (invoiceRows && invoiceRows.length > 0) {
-      const ids = invoiceRows.map((i: { id: string }) => i.id)
-      await supabase
+      // Uppdatera invoices-tabellen
+      const { data: invoiceRows } = await supabase
         .from('invoices')
-        .update({ status: 'paid', paid_at: paidAt })
-        .in('id', ids)
+        .select('id')
+        .eq('fortnox_document_number', documentNumber)
+        .neq('status', 'paid')
 
-      console.log(`Webhook: ${ids.length} invoices markerade betalda (Fortnox nr ${documentNumber})`)
+      if (invoiceRows && invoiceRows.length > 0) {
+        const ids = invoiceRows.map((i: { id: string }) => i.id)
+        await supabase
+          .from('invoices')
+          .update({ status: 'paid', paid_at: new Date(invoice.FinalPayDate).toISOString() })
+          .in('id', ids)
+        console.log(`Webhook: ${ids.length} invoices → paid (Fortnox nr ${documentNumber})`)
+      }
+
+    } else if (isOverdue) {
+      // Förfallen — skickad men ej betald och förfallodatum har passerat
+      const { data: contractItems } = await supabase
+        .from('contract_billing_items')
+        .select('id')
+        .eq('fortnox_document_number', documentNumber)
+        .not('status', 'in', '("paid","cancelled","overdue")')
+
+      if (contractItems && contractItems.length > 0) {
+        const ids = contractItems.map((i: { id: string }) => i.id)
+        await supabase
+          .from('contract_billing_items')
+          .update({ status: 'overdue', overdue_at: now, updated_at: now })
+          .in('id', ids)
+        console.log(`Webhook: ${ids.length} contract_billing_items → overdue (Fortnox nr ${documentNumber})`)
+      }
+
+    } else if (isSent) {
+      // Skickad till kund men ej betald än
+      const { data: contractItems } = await supabase
+        .from('contract_billing_items')
+        .select('id')
+        .eq('fortnox_document_number', documentNumber)
+        .not('status', 'in', '("paid","cancelled","sent","overdue")')
+
+      if (contractItems && contractItems.length > 0) {
+        const ids = contractItems.map((i: { id: string }) => i.id)
+        await supabase
+          .from('contract_billing_items')
+          .update({ status: 'sent', fortnox_sent_at: now, updated_at: now })
+          .in('id', ids)
+        console.log(`Webhook: ${ids.length} contract_billing_items → sent (Fortnox nr ${documentNumber})`)
+      }
     }
 
     return res.status(200).json({ ok: true })

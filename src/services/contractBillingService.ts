@@ -957,6 +957,9 @@ export class ContractBillingService {
         awaiting_generation: 0,
         pending: 0,
         approved: 0,
+        draft: 0,
+        sent: 0,
+        overdue: 0,
         invoiced: 0,
         paid: 0,
         mixed: 0,
@@ -1057,13 +1060,16 @@ export class ContractBillingService {
 
       // Sortera: kunder som behöver åtgärd först
       const statusPriority: Record<MonthlyCustomerStatus, number> = {
-        mixed: 0,
-        pending: 1,
-        awaiting_generation: 2,
-        approved: 3,
-        invoiced: 4,
-        paid: 5,
-        not_billable: 6,
+        overdue: 0,
+        mixed: 1,
+        pending: 2,
+        awaiting_generation: 3,
+        approved: 4,
+        draft: 5,
+        sent: 6,
+        invoiced: 7,
+        paid: 8,
+        not_billable: 9,
       }
       customerEntries.sort((a, b) => {
         const pa = statusPriority[a.status] ?? 9

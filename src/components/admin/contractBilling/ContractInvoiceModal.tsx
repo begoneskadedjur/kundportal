@@ -303,22 +303,26 @@ export function ContractInvoiceModal({
         InvoiceRows: invoiceRows,
       })
 
-      // 5. Spara fortnox_document_number på alla items i perioden
+      // 5. Spara fortnox_document_number, sent_at, due_date på alla items i perioden
       const itemIds = invoice.items
         .filter(i => i.status !== 'cancelled')
         .map(i => i.id)
+
+      const dueDate30 = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0]
 
       await supabase
         .from('contract_billing_items')
         .update({
           fortnox_document_number: fortnoxInvoice.DocumentNumber,
           sent_at: new Date().toISOString(),
+          due_date: dueDate30,
         })
         .in('id', itemIds)
 
-      // 6. Uppdatera status till invoiced
+      // 6. Uppdatera status till draft (utkast skapat i Fortnox, ej skickat till kund ännu)
       await ContractBillingService.updateInvoiceStatus(
-        invoice.customer_id, invoice.period_start, invoice.period_end, 'invoiced'
+        invoice.customer_id, invoice.period_start, invoice.period_end, 'draft'
       )
 
       toast.success(`Faktura skapad i Fortnox (nr ${fortnoxInvoice.DocumentNumber})`)
@@ -601,16 +605,21 @@ export function ContractInvoiceModal({
                 const events: { date: string; label: string; color: string; dot: string }[] = []
                 if (first.created_at)
                   events.push({ date: first.created_at, label: 'Skapad', color: 'text-slate-500', dot: 'bg-slate-600' })
-                if (first.approved_at)
-                  events.push({ date: first.approved_at, label: 'Godkänd', color: 'text-blue-400', dot: 'bg-blue-500' })
                 if (first.sent_at)
-                  events.push({ date: first.sent_at, label: `Skickat till Fortnox${invoice.fortnox_document_number ? ` (nr ${invoice.fortnox_document_number})` : ''}`, color: 'text-purple-400', dot: 'bg-purple-500' })
-                if (first.invoiced_at)
-                  events.push({ date: first.invoiced_at, label: 'Fakturerad', color: 'text-purple-400', dot: 'bg-purple-500' })
+                  events.push({ date: first.sent_at, label: `Utkast skapat i Fortnox${invoice.fortnox_document_number ? ` (nr ${invoice.fortnox_document_number})` : ''}`, color: 'text-orange-400', dot: 'bg-orange-500' })
+                if (first.fortnox_sent_at)
+                  events.push({ date: first.fortnox_sent_at, label: 'Skickad till kund', color: 'text-blue-400', dot: 'bg-blue-500' })
+                if (first.overdue_at)
+                  events.push({ date: first.overdue_at, label: `Förfallen${first.due_date ? ` (förföll ${fmtDate(first.due_date)})` : ''}`, color: 'text-red-400', dot: 'bg-red-500' })
                 if (first.cancelled_at)
                   events.push({ date: first.cancelled_at, label: `Makulerad${first.fortnox_cancelled_document_number ? ` (Fortnox nr ${first.fortnox_cancelled_document_number})` : ''}`, color: 'text-red-400', dot: 'bg-red-500' })
                 if (first.paid_at)
                   events.push({ date: first.paid_at, label: 'Betald', color: 'text-[#20c58f]', dot: 'bg-[#20c58f]' })
+
+                // Förfallodatum som fast info-rad (visas om due_date finns och ej betald/makulerad)
+                const showDueDate = first.due_date && invoice.derived_status !== 'paid' && invoice.derived_status !== 'cancelled'
+                const isOverdueStatus = invoice.derived_status === 'overdue'
+
                 return (
                   <div className="p-3 bg-slate-800/20 border border-slate-700/30 rounded-xl">
                     <p className="text-xs font-medium text-slate-400 mb-2">Historik</p>
@@ -621,6 +630,13 @@ export function ContractInvoiceModal({
                           {fmtDate(e.date)} – {e.label}
                         </div>
                       ))}
+                      {showDueDate && (
+                        <div className={`flex items-center gap-2 mt-1 pt-1 border-t border-slate-700/30 ${isOverdueStatus ? 'text-red-400' : 'text-slate-400'}`}>
+                          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOverdueStatus ? 'bg-red-500' : 'bg-slate-500'}`} />
+                          Förfallodatum: {fmtDate(first.due_date)}
+                          {isOverdueStatus && ' (förfallen)'}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -656,7 +672,7 @@ export function ContractInvoiceModal({
 
             {/* Höger: statusknappar */}
             <div className="flex items-center gap-2">
-              {(invoice.derived_status === 'pending' || invoice.derived_status === 'approved') && (
+                      {(invoice.derived_status === 'pending' || invoice.derived_status === 'approved' || invoice.derived_status === 'draft') && (
                 <button
                   onClick={handleSendToFortnox}
                   disabled={sendingToFortnox}
@@ -665,7 +681,7 @@ export function ContractInvoiceModal({
                   {sendingToFortnox
                     ? <RefreshCw className="w-4 h-4 animate-spin" />
                     : <Zap className="w-4 h-4" />}
-                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast'}
+                  {sendingToFortnox ? 'Skapar utkast...' : invoice.derived_status === 'draft' ? 'Skapa nytt utkast' : 'Skapa utkast'}
                 </button>
               )}
               {invoice.derived_status === 'cancelled' && (

@@ -1,7 +1,7 @@
 // src/components/admin/contractBilling/CustomerPipelineRow.tsx
 // Kundrad i den månatliga pipeline-vyn
 
-import { AlertCircle, Eye } from 'lucide-react'
+import { AlertCircle, Eye, Clock } from 'lucide-react'
 import type { MonthlyCustomerEntry } from '../../../types/contractBilling'
 import { PIPELINE_STATUS_CONFIG, formatBillingAmount } from '../../../types/contractBilling'
 
@@ -23,6 +23,14 @@ export function CustomerPipelineRow({
   const hasContract = entry.items.some(i => i.item_type === 'contract')
   const hasAdHoc = entry.items.some(i => i.item_type === 'ad_hoc')
   const isNotBillable = entry.status === 'not_billable'
+
+  // Beräkna hur många dagar sen fakturan förföll
+  const overdueItem = entry.status === 'overdue'
+    ? entry.items.find(i => i.overdue_at)
+    : null
+  const overdueDays = overdueItem?.overdue_at
+    ? Math.floor((Date.now() - new Date(overdueItem.overdue_at).getTime()) / (1000 * 60 * 60 * 24))
+    : null
 
   return (
     <div
@@ -93,6 +101,14 @@ export function CustomerPipelineRow({
       <span className={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${statusConfig.bgColor} ${statusConfig.color}`}>
         {statusConfig.label}
       </span>
+
+      {/* Förfallen-varning */}
+      {overdueDays !== null && (
+        <span className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-red-500/20 text-red-400 flex-shrink-0" title={`Förföll för ${overdueDays} dagar sedan`}>
+          <Clock className="w-3 h-3" />
+          {overdueDays}d
+        </span>
+      )}
 
       {/* Varningsikon */}
       {entry.has_items_requiring_approval && (
