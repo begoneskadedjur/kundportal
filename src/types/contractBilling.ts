@@ -46,6 +46,9 @@ export interface ContractBillingItem {
   discount_percent: number
   original_price: number | null
   fortnox_document_number: string | null
+  sent_at: string | null
+  cancelled_at: string | null
+  fortnox_cancelled_document_number: string | null
 }
 
 export interface ContractBillingItemWithRelations extends ContractBillingItem {

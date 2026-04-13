@@ -150,19 +150,26 @@ export function ContractInvoiceModal({
     if (!invoice) return
     setUpdating(true)
     try {
+      const docNr = invoice.fortnox_document_number
       // Makulera i Fortnox om utkast finns
-      if (invoice.fortnox_document_number) {
+      if (docNr) {
         try {
-          await FortnoxService.cancelInvoice(invoice.fortnox_document_number)
+          await FortnoxService.cancelInvoice(docNr)
         } catch (err: any) {
-          // Ignorera om redan makulerad i Fortnox
           console.warn('Fortnox makulering:', err.message)
         }
       }
-      // Sätt cancelled i vårt system
-      await ContractBillingService.updateInvoiceStatus(
-        invoice.customer_id, invoice.period_start, invoice.period_end, 'cancelled'
-      )
+      // Spara cancelled_at + fortnox_cancelled_document_number + sätt status
+      const now = new Date().toISOString()
+      const itemIds = invoice.items.filter(i => i.status !== 'cancelled').map(i => i.id)
+      await supabase
+        .from('contract_billing_items')
+        .update({
+          status: 'cancelled',
+          cancelled_at: now,
+          ...(docNr ? { fortnox_cancelled_document_number: docNr } : {}),
+        })
+        .in('id', itemIds)
       toast.success('Faktura makulerad')
       await new Promise(r => setTimeout(r, 400))
       await loadInvoice()
@@ -178,11 +185,17 @@ export function ContractInvoiceModal({
     if (!invoice) return
     setUpdating(true)
     try {
-      // Rensa fortnox_document_number och återställ till pending
+      // Återställ till pending — cancelled_at och fortnox_cancelled_document_number behålls som historik
       const itemIds = invoice.items.map(i => i.id)
       await supabase
         .from('contract_billing_items')
-        .update({ fortnox_document_number: null, status: 'pending' })
+        .update({
+          status: 'pending',
+          fortnox_document_number: null,
+          sent_at: null,
+          invoiced_at: null,
+          approved_at: null,
+        })
         .in('id', itemIds)
       toast.success('Redo för ny faktura')
       await new Promise(r => setTimeout(r, 400))
@@ -297,7 +310,10 @@ export function ContractInvoiceModal({
 
       await supabase
         .from('contract_billing_items')
-        .update({ fortnox_document_number: fortnoxInvoice.DocumentNumber })
+        .update({
+          fortnox_document_number: fortnoxInvoice.DocumentNumber,
+          sent_at: new Date().toISOString(),
+        })
         .in('id', itemIds)
 
       // 6. Uppdatera status till invoiced
@@ -578,38 +594,37 @@ export function ContractInvoiceModal({
                 </div>
               </div>
 
-              {/* Historik */}
-              {invoice.items.some(i => i.approved_at || i.invoiced_at || i.paid_at) && (
-                <div className="p-3 bg-slate-800/20 border border-slate-700/30 rounded-xl">
-                  <p className="text-xs font-medium text-slate-400 mb-2">Historik</p>
-                  <div className="space-y-1 text-xs">
-                    {invoice.items[0]?.created_at && (
-                      <div className="flex items-center gap-2 text-slate-500">
-                        <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                        {fmtDate(invoice.items[0].created_at)} – Skapad
-                      </div>
-                    )}
-                    {invoice.items[0]?.approved_at && (
-                      <div className="flex items-center gap-2 text-blue-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                        {fmtDate(invoice.items[0].approved_at)} – Godkänd
-                      </div>
-                    )}
-                    {invoice.items[0]?.invoiced_at && (
-                      <div className="flex items-center gap-2 text-purple-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                        {fmtDate(invoice.items[0].invoiced_at)} – Fakturerad
-                      </div>
-                    )}
-                    {invoice.items[0]?.paid_at && (
-                      <div className="flex items-center gap-2 text-[#20c58f]">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#20c58f]" />
-                        {fmtDate(invoice.items[0].paid_at)} – Betald
-                      </div>
-                    )}
+              {/* Historik — visas alltid */}
+              {(() => {
+                const first = invoice.items[0]
+                if (!first) return null
+                const events: { date: string; label: string; color: string; dot: string }[] = []
+                if (first.created_at)
+                  events.push({ date: first.created_at, label: 'Skapad', color: 'text-slate-500', dot: 'bg-slate-600' })
+                if (first.approved_at)
+                  events.push({ date: first.approved_at, label: 'Godkänd', color: 'text-blue-400', dot: 'bg-blue-500' })
+                if (first.sent_at)
+                  events.push({ date: first.sent_at, label: `Skickat till Fortnox${invoice.fortnox_document_number ? ` (nr ${invoice.fortnox_document_number})` : ''}`, color: 'text-purple-400', dot: 'bg-purple-500' })
+                if (first.invoiced_at)
+                  events.push({ date: first.invoiced_at, label: 'Fakturerad', color: 'text-purple-400', dot: 'bg-purple-500' })
+                if (first.cancelled_at)
+                  events.push({ date: first.cancelled_at, label: `Makulerad${first.fortnox_cancelled_document_number ? ` (Fortnox nr ${first.fortnox_cancelled_document_number})` : ''}`, color: 'text-red-400', dot: 'bg-red-500' })
+                if (first.paid_at)
+                  events.push({ date: first.paid_at, label: 'Betald', color: 'text-[#20c58f]', dot: 'bg-[#20c58f]' })
+                return (
+                  <div className="p-3 bg-slate-800/20 border border-slate-700/30 rounded-xl">
+                    <p className="text-xs font-medium text-slate-400 mb-2">Historik</p>
+                    <div className="space-y-1 text-xs">
+                      {events.map((e, i) => (
+                        <div key={i} className={`flex items-center gap-2 ${e.color}`}>
+                          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${e.dot}`} />
+                          {fmtDate(e.date)} – {e.label}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           )}
         </div>
