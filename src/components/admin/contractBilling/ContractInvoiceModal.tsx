@@ -208,11 +208,10 @@ export function ContractInvoiceModal({
         billing_address: invoice.customer.billing_address,
       })
 
-      // 2. Bygg fakturarader
+      // 2. Bygg fakturarader (ArticleNumber utelämnas — Fortnox kräver att artikeln finns i systemet)
       const invoiceRows = invoice.items
         .filter(item => item.status !== 'cancelled')
         .map(item => ({
-          ArticleNumber: item.article_code || undefined,
           Description: item.article_name,
           DeliveredQuantity: item.quantity,
           Price: item.unit_price,
