@@ -141,4 +141,39 @@ export const FortnoxService = {
     })
     return data.Invoice
   },
+
+  // Hämta eller skapa kund i Fortnox baserat på vårt customer_number
+  async findOrCreateCustomer(customer: {
+    customer_number: number
+    company_name: string
+    organization_number?: string | null
+    billing_email?: string | null
+    billing_address?: string | null
+  }): Promise<string> {
+    const customerNumberStr = String(customer.customer_number)
+
+    // Försök hämta befintlig kund
+    try {
+      const existing = await fortnoxRequest<{ Customer: FortnoxCustomer }>(
+        `customers/${customerNumberStr}`
+      )
+      if (existing?.Customer?.CustomerNumber) {
+        return existing.Customer.CustomerNumber
+      }
+    } catch {
+      // Kund finns inte — skapa ny
+    }
+
+    // Skapa ny kund i Fortnox med vårt kundnummer
+    const newCustomer = await fortnoxRequest<{ Customer: FortnoxCustomer }>('customers', 'POST', {
+      Customer: {
+        CustomerNumber: customerNumberStr,
+        Name: customer.company_name,
+        ...(customer.organization_number ? { OrganisationNumber: customer.organization_number } : {}),
+        ...(customer.billing_email ? { EmailInvoice: customer.billing_email } : {}),
+        ...(customer.billing_address ? { Address1: customer.billing_address } : {}),
+      },
+    })
+    return newCustomer.Customer.CustomerNumber
+  },
 }

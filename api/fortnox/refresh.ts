@@ -6,10 +6,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Returnerar rätt credentials och token-tabell beroende på FORTNOX_USE_TEST
+export function getFortnoxConfig() {
+  const useTest = process.env.FORTNOX_USE_TEST === 'true'
+  return {
+    clientId: useTest ? process.env.FORTNOX_TEST_CLIENT_ID! : process.env.FORTNOX_CLIENT_ID!,
+    clientSecret: useTest ? process.env.FORTNOX_TEST_CLIENT_SECRET! : process.env.FORTNOX_CLIENT_SECRET!,
+    tokenTable: useTest ? 'fortnox_test_tokens' : 'fortnox_tokens',
+  }
+}
+
 // Hämtar en giltig access token — refreshar automatiskt om den gått ut
 export async function getValidAccessToken(): Promise<string> {
+  const { clientId, clientSecret, tokenTable } = getFortnoxConfig()
+
   const { data } = await supabase
-    .from('fortnox_tokens')
+    .from(tokenTable)
     .select('*')
     .maybeSingle()
 
@@ -24,8 +36,6 @@ export async function getValidAccessToken(): Promise<string> {
   }
 
   // Token gick ut — refresha
-  const clientId = process.env.FORTNOX_CLIENT_ID!
-  const clientSecret = process.env.FORTNOX_CLIENT_SECRET!
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
 
   const tokenRes = await fetch('https://apps.fortnox.se/oauth-v1/token', {
@@ -50,7 +60,7 @@ export async function getValidAccessToken(): Promise<string> {
   const expiresAtNew = new Date(Date.now() + expires_in * 1000).toISOString()
 
   await supabase
-    .from('fortnox_tokens')
+    .from(tokenTable)
     .update({
       access_token,
       refresh_token,

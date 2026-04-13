@@ -745,6 +745,7 @@ export class ContractBillingService {
         ),
         has_discount: groupItems.some(i => i.discount_percent > 0),
         batch_id: sharedBatchId,
+        fortnox_document_number: groupItems.find(i => i.fortnox_document_number)?.fortnox_document_number ?? null,
       })
     }
 

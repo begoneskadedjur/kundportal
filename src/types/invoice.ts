@@ -46,6 +46,8 @@ export interface Invoice {
   // ROT/RUT (aggregerat från items)
   rot_rut_type: RotRutType | null
   fastighetsbeteckning: string | null
+
+  fortnox_document_number: string | null
 }
 
 /**

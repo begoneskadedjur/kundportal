@@ -45,6 +45,7 @@ export interface ContractBillingItem {
   requires_approval: boolean
   discount_percent: number
   original_price: number | null
+  fortnox_document_number: string | null
 }
 
 export interface ContractBillingItemWithRelations extends ContractBillingItem {
@@ -287,6 +288,7 @@ export interface ContractInvoice {
   has_items_requiring_approval: boolean
   has_discount: boolean
   batch_id: string | null
+  fortnox_document_number: string | null
 }
 
 /**

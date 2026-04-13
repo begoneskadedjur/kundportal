@@ -4,10 +4,11 @@
 import { useState, useEffect } from 'react'
 import {
   X, FileText, CheckCircle, Send, XCircle, Download,
-  RefreshCw, AlertCircle, DollarSign, Zap, Building2
+  RefreshCw, AlertCircle, DollarSign, Zap, Building2, ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
+import { FortnoxService } from '../../../services/fortnoxService'
 import { supabase } from '../../../lib/supabase'
 import type { ContractInvoice, ContractBillingItemStatus, BillingFrequency } from '../../../types/contractBilling'
 import { BILLING_ITEM_STATUS_CONFIG, BILLING_FREQUENCY_CONFIG, formatBillingAmount, formatBillingPeriod } from '../../../types/contractBilling'
@@ -92,6 +93,7 @@ export function ContractInvoiceModal({
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [sendingToFortnox, setSendingToFortnox] = useState(false)
 
   useEffect(() => {
     if (isOpen && customerId && periodStart && periodEnd) {
@@ -183,6 +185,76 @@ export function ContractInvoiceModal({
       toast.success('Faktura exporterad')
     } catch {
       toast.error('Kunde inte exportera faktura')
+    }
+  }
+
+  const handleSendToFortnox = async () => {
+    if (!invoice || !customerId) return
+    setSendingToFortnox(true)
+    try {
+      // 1. Hämta eller skapa kund i Fortnox
+      const fortnoxCustomerNumber = await FortnoxService.findOrCreateCustomer({
+        customer_number: invoice.customer.customer_number!,
+        company_name: invoice.customer.company_name,
+        organization_number: invoice.customer.organization_number,
+        billing_email: invoice.customer.billing_email,
+        billing_address: invoice.customer.billing_address,
+      })
+
+      // 2. Bygg fakturarader
+      const invoiceRows = invoice.items
+        .filter(item => item.status !== 'cancelled')
+        .map(item => ({
+          ArticleNumber: item.article_code || undefined,
+          Description: item.article_name,
+          DeliveredQuantity: item.quantity,
+          Price: item.unit_price,
+          VAT: item.vat_rate,
+          ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' } : {}),
+        }))
+
+      // 3. Bygg remarkstext (avtalsinfo)
+      const subtotal = invoice.items
+        .filter(i => i.status !== 'cancelled')
+        .reduce((sum, i) => sum + i.total_price, 0)
+      const remarks = buildRemarksText(subtotal, billingFrequency, contractType)
+
+      // 4. Skapa fakturaobjekt
+      const periodLabel = formatBillingPeriod(invoice.period_start, invoice.period_end)
+      const fortnoxInvoice = await FortnoxService.createInvoice({
+        CustomerNumber: fortnoxCustomerNumber,
+        InvoiceDate: today,
+        DueDate: new Date(new Date(today).getTime() + 30 * 24 * 60 * 60 * 1000)
+          .toISOString().split('T')[0],
+        YourOrderNumber: periodLabel,
+        ...(remarks ? { Remarks: remarks } : {}),
+        ...(invoice.customer.billing_reference ? { YourReference: invoice.customer.billing_reference } : {}),
+        InvoiceRows: invoiceRows,
+      })
+
+      // 5. Spara fortnox_document_number på alla items i perioden
+      const itemIds = invoice.items
+        .filter(i => i.status !== 'cancelled')
+        .map(i => i.id)
+
+      await supabase
+        .from('contract_billing_items')
+        .update({ fortnox_document_number: fortnoxInvoice.DocumentNumber })
+        .in('id', itemIds)
+
+      // 6. Uppdatera status till invoiced
+      await ContractBillingService.updateInvoiceStatus(
+        invoice.customer_id, invoice.period_start, invoice.period_end, 'invoiced'
+      )
+
+      toast.success(`Faktura skapad i Fortnox (nr ${fortnoxInvoice.DocumentNumber})`)
+      await loadInvoice()
+      onStatusChange()
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Kunde inte skicka till Fortnox: ' + (err.message || 'Okänt fel'))
+    } finally {
+      setSendingToFortnox(false)
     }
   }
 
@@ -487,7 +559,7 @@ export function ContractInvoiceModal({
         {/* Footer – åtgärder */}
         {invoice && (
           <div className="px-5 py-3 border-t border-slate-700 bg-slate-800/50 flex items-center justify-between gap-2 shrink-0">
-            {/* Vänster: export + Fortnox */}
+            {/* Vänster: export + Fortnox-länk */}
             <div className="flex items-center gap-2">
               <button
                 onClick={handleExport}
@@ -496,18 +568,17 @@ export function ContractInvoiceModal({
                 <Download className="w-4 h-4" />
                 Exportera CSV
               </button>
-              <div className="relative group">
-                <button
-                  disabled
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-800 text-slate-500 border border-slate-700 rounded-lg cursor-not-allowed"
+              {invoice.fortnox_document_number && (
+                <a
+                  href={`https://app.fortnox.se/f/faktura/fakturalista/${invoice.fortnox_document_number}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-[#20c58f] rounded-lg transition-colors"
                 >
-                  <Zap className="w-4 h-4" />
-                  Skicka till Fortnox
-                </button>
-                <div className="absolute bottom-full left-0 mb-1.5 px-2 py-1 bg-slate-700 text-xs text-slate-300 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                  API-integration kommer snart
-                </div>
-              </div>
+                  <ExternalLink className="w-4 h-4" />
+                  Öppna i Fortnox (nr {invoice.fortnox_document_number})
+                </a>
+              )}
             </div>
 
             {/* Höger: statusknappar */}
@@ -524,22 +595,14 @@ export function ContractInvoiceModal({
               )}
               {invoice.derived_status === 'approved' && (
                 <button
-                  onClick={() => handleStatusChange('invoiced')}
-                  disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4" />
-                  Markera fakturerad
-                </button>
-              )}
-              {invoice.derived_status === 'invoiced' && (
-                <button
-                  onClick={() => handleStatusChange('paid')}
-                  disabled={updating}
+                  onClick={handleSendToFortnox}
+                  disabled={sendingToFortnox}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#20c58f] hover:bg-[#1bb07e] text-white rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <DollarSign className="w-4 h-4" />
-                  Markera betald
+                  {sendingToFortnox
+                    ? <RefreshCw className="w-4 h-4 animate-spin" />
+                    : <Zap className="w-4 h-4" />}
+                  {sendingToFortnox ? 'Skickar...' : 'Skicka till Fortnox'}
                 </button>
               )}
               {invoice.derived_status !== 'paid' && invoice.derived_status !== 'cancelled' && (

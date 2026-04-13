@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { getFortnoxConfig } from './refresh'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
@@ -31,8 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Ogiltig state-parameter (möjlig CSRF)' })
   }
 
-  const clientId = process.env.FORTNOX_CLIENT_ID!
-  const clientSecret = process.env.FORTNOX_CLIENT_SECRET!
+  const { clientId, clientSecret, tokenTable } = getFortnoxConfig()
   const redirectUri = process.env.FORTNOX_REDIRECT_URI!
 
   // Byt code mot tokens
@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Spara/uppdatera tokens i Supabase (upsert — bara en rad)
   const { error: dbError } = await supabase
-    .from('fortnox_tokens')
+    .from(tokenTable)
     .upsert(
       {
         access_token,
@@ -77,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (dbError) {
     // Om tabellen är tom: insert istället
-    const { error: insertError } = await supabase.from('fortnox_tokens').insert({
+    const { error: insertError } = await supabase.from(tokenTable).insert({
       access_token,
       refresh_token,
       expires_at: expiresAt,

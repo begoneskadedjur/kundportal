@@ -29,11 +29,14 @@ import {
   Timer,
   Home,
   RotateCcw,
-  Trash2
+  Trash2,
+  Zap,
+  ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
 import { InvoiceService } from '../../../services/invoiceService'
+import { FortnoxService } from '../../../services/fortnoxService'
 import type { InvoiceWithItems, InvoiceStatus } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import { calculateRotRutDeduction, ROT_RUT_PERCENT } from '../../../types/caseBilling'
@@ -74,6 +77,7 @@ export default function InvoiceDetailModal({
   const [invoice, setInvoice] = useState<InvoiceWithItems | null>(null)
   const [loading, setLoading] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [sendingToFortnox, setSendingToFortnox] = useState(false)
   const [contextExpanded, setContextExpanded] = useState(false)
   const [preparations, setPreparations] = useState<CasePreparationWithDetails[]>([])
   const [staleInfo, setStaleInfo] = useState<{ stale: boolean; reason?: string } | null>(null)
@@ -202,6 +206,107 @@ export default function InvoiceDetailModal({
       toast.error('Kunde inte radera fakturan')
     } finally {
       setUpdating(false)
+    }
+  }
+
+  const handleSendToFortnox = async () => {
+    if (!invoice) return
+    setSendingToFortnox(true)
+    try {
+      // 1. Hämta kundnummer via org.nr
+      let customerNumber: number | null = null
+      if (invoice.organization_number) {
+        const { data: customerData } = await supabase
+          .from('customers')
+          .select('customer_number')
+          .eq('organization_number', invoice.organization_number)
+          .maybeSingle()
+        customerNumber = (customerData as any)?.customer_number ?? null
+      }
+
+      if (!customerNumber) {
+        toast.error('Kunden saknar kundnummer — lägg till det på kundkortet innan du skickar till Fortnox')
+        return
+      }
+
+      // 2. Hämta eller skapa kund i Fortnox
+      const fortnoxCustomerNumber = await FortnoxService.findOrCreateCustomer({
+        customer_number: customerNumber,
+        company_name: invoice.customer_name,
+        organization_number: invoice.organization_number,
+        billing_email: invoice.customer_email,
+        billing_address: invoice.customer_address,
+      })
+
+      // 3. Bygg fakturarader
+      const invoiceRows = invoice.items.map(item => ({
+        ArticleNumber: item.article_code || undefined,
+        Description: item.article_name,
+        DeliveredQuantity: item.quantity,
+        Price: item.unit_price,
+        VAT: item.vat_rate,
+        ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' } : {}),
+      }))
+
+      // 4. Skapa faktura i Fortnox
+      const today = new Date().toISOString().split('T')[0]
+      const dueDate = invoice.due_date || new Date(new Date(today).getTime() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0]
+
+      const fortnoxPayload: Record<string, unknown> = {
+        CustomerNumber: fortnoxCustomerNumber,
+        InvoiceDate: today,
+        DueDate: dueDate,
+        InvoiceRows: invoiceRows,
+      }
+
+      if (invoice.invoice_marking) fortnoxPayload.YourReference = invoice.invoice_marking
+      if (invoice.notes) fortnoxPayload.Remarks = invoice.notes
+
+      // ROT/RUT
+      if (invoice.rot_rut_type && invoice.fastighetsbeteckning) {
+        fortnoxPayload.HouseWork = true
+        fortnoxPayload.HouseWorkType = invoice.rot_rut_type.toUpperCase()
+        fortnoxPayload.Housework = {
+          HouseWorkType: invoice.rot_rut_type.toUpperCase(),
+          HouseWorkAmount: Math.round(invoice.subtotal * ROT_RUT_PERCENT),
+        }
+      }
+
+      const fortnoxInvoice = await FortnoxService.createInvoice(fortnoxPayload)
+
+      // 5. Spara DocumentNumber på fakturan
+      await supabase
+        .from('invoices')
+        .update({ fortnox_document_number: fortnoxInvoice.DocumentNumber })
+        .eq('id', invoice.id)
+
+      // 6. Uppdatera status till sent + logga
+      await InvoiceService.updateInvoiceStatus(invoice.id, 'sent')
+      if (user && invoice.case_id) {
+        const authorName = profile?.display_name || profile?.email || 'Okänd'
+        try {
+          await createSystemComment(
+            invoice.case_id,
+            invoice.case_type as CaseType,
+            'status_change',
+            `Faktura skickad till Fortnox (nr ${fortnoxInvoice.DocumentNumber}) — ${invoice.invoice_number}`,
+            user.id,
+            authorName
+          )
+        } catch {
+          // Logga tyst
+        }
+      }
+
+      toast.success(`Faktura skapad i Fortnox (nr ${fortnoxInvoice.DocumentNumber})`)
+      await loadInvoice()
+      onStatusChange?.()
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Kunde inte skicka till Fortnox: ' + (err.message || 'Okänt fel'))
+    } finally {
+      setSendingToFortnox(false)
     }
   }
 
@@ -818,13 +923,26 @@ export default function InvoiceDetailModal({
         {/* Footer med åtgärder */}
         {invoice && (
           <div className="flex-shrink-0 px-4 py-2.5 border-t border-slate-700 bg-slate-800/50 flex justify-between items-center">
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-sm text-white rounded-lg transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Exportera
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-sm text-white rounded-lg transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exportera
+              </button>
+              {invoice.fortnox_document_number && (
+                <a
+                  href={`https://app.fortnox.se/f/faktura/fakturalista/${invoice.fortnox_document_number}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-sm text-[#20c58f] rounded-lg transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Fortnox (nr {invoice.fortnox_document_number})
+                </a>
+              )}
+            </div>
 
             <div className="flex gap-2">
               {invoice.status === 'pending_approval' && (
@@ -839,22 +957,14 @@ export default function InvoiceDetailModal({
               )}
               {invoice.status === 'ready' && (
                 <button
-                  onClick={() => handleStatusChange('sent')}
-                  disabled={updating}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
+                  onClick={handleSendToFortnox}
+                  disabled={sendingToFortnox}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-sm text-white rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  Markera skickad
-                </button>
-              )}
-              {invoice.status === 'sent' && (
-                <button
-                  onClick={() => handleStatusChange('paid')}
-                  disabled={updating}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <DollarSign className="w-3.5 h-3.5" />
-                  Markera betald
+                  {sendingToFortnox
+                    ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    : <Zap className="w-3.5 h-3.5" />}
+                  {sendingToFortnox ? 'Skickar...' : 'Skicka till Fortnox'}
                 </button>
               )}
               {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (

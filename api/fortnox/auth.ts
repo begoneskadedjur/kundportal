@@ -1,8 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import crypto from 'crypto'
+import { getFortnoxConfig } from './refresh'
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
-  const clientId = process.env.FORTNOX_CLIENT_ID
+  const { clientId } = getFortnoxConfig()
   if (!clientId) {
     return res.status(500).json({ error: 'FORTNOX_CLIENT_ID saknas' })
   }
