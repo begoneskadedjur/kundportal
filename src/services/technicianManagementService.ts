@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { PestType } from '../utils/clickupFieldMapper' 
 
 // --- TYPDEFINITIONER ---
 
@@ -113,7 +112,7 @@ export const technicianManagementService = {
   /**
    * Hämta en persons specifika kompetenser.
    */
-  async getCompetencies(staffId: string): Promise<PestType[]> {
+  async getCompetencies(staffId: string): Promise<string[]> {
     try {
       const { data, error } = await supabase
         .from('staff_competencies')
@@ -122,7 +121,7 @@ export const technicianManagementService = {
       
       if (error) throw error;
       
-      return data.map(item => item.pest_type as PestType);
+      return data.map(item => item.pest_type as string);
     } catch (error) {
       console.error('Error fetching competencies:', error);
       toast.error('Kunde inte hämta kompetenser.');
@@ -133,7 +132,7 @@ export const technicianManagementService = {
   /**
    * Uppdatera en persons hela kompetenslista.
    */
-  async updateCompetencies(staffId: string, competencies: PestType[]): Promise<void> {
+  async updateCompetencies(staffId: string, competencies: string[]): Promise<void> {
     try {
       await supabase.from('staff_competencies').delete().eq('staff_id', staffId);
 

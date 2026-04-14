@@ -23,6 +23,7 @@ export interface Service {
   unit: string
   sort_order: number
   is_active: boolean
+  show_in_booking: boolean
   created_at: string
   updated_at: string
 }
@@ -66,6 +67,7 @@ export interface UpdateServiceInput {
   unit?: string
   sort_order?: number
   is_active?: boolean
+  show_in_booking?: boolean
 }
 
 export const SERVICE_UNITS = ['st', 'timme', 'dag', 'km', 'm2', 'fp'] as const

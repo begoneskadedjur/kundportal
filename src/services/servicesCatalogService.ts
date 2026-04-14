@@ -114,6 +114,29 @@ export class ServiceCatalogService {
     return data || []
   }
 
+  static async getBookingServicesByGroup(groupId: string): Promise<Service[]> {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*')
+      .eq('group_id', groupId)
+      .eq('is_active', true)
+      .eq('show_in_booking', true)
+      .order('sort_order').order('name')
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return data || []
+  }
+
+  static async getAllBookingServices(): Promise<ServiceWithGroup[]> {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*, group:service_groups!group_id(*)')
+      .eq('is_active', true)
+      .eq('show_in_booking', true)
+      .order('sort_order').order('name')
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return data || []
+  }
+
   static async getServiceById(id: string): Promise<ServiceWithGroup | null> {
     const { data, error } = await supabase
       .from('services')

@@ -2,7 +2,7 @@
 // Admin-sida för att hantera Tjänsteutbud (services + service_groups)
 
 import { useState, useEffect, useMemo } from 'react'
-import { Package, Plus, Pencil, Trash2, Search, RefreshCw, ChevronDown, ChevronRight, Eye, EyeOff, Settings } from 'lucide-react'
+import { Package, Plus, Pencil, Trash2, Search, RefreshCw, ChevronDown, ChevronRight, Eye, EyeOff, Settings, CalendarCheck, CalendarOff } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import Button from '../../ui/Button'
@@ -90,6 +90,15 @@ export default function ServiceCatalogSettings() {
     try {
       await ServiceCatalogService.toggleServiceActive(s.id, !s.is_active)
       setServices((prev) => prev.map((x) => x.id === s.id ? { ...x, is_active: !x.is_active } : x))
+    } catch (err: any) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleToggleShowInBooking = async (s: ServiceWithGroup) => {
+    try {
+      await ServiceCatalogService.updateService(s.id, { show_in_booking: !s.show_in_booking })
+      setServices((prev) => prev.map((x) => x.id === s.id ? { ...x, show_in_booking: !x.show_in_booking } : x))
     } catch (err: any) {
       toast.error(err.message)
     }
@@ -267,6 +276,17 @@ export default function ServiceCatalogSettings() {
                           <span className="flex-1 text-sm text-white">{svc.name}</span>
                           <span className="text-xs text-slate-500">{svc.unit}</span>
                           <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => handleToggleShowInBooking(svc)}
+                              className={`p-1 rounded transition-colors ${
+                                svc.show_in_booking
+                                  ? 'text-blue-400 hover:text-slate-400'
+                                  : 'text-slate-600 hover:text-blue-400'
+                              }`}
+                              title={svc.show_in_booking ? 'Dölj vid bokning' : 'Visa vid bokning'}
+                            >
+                              {svc.show_in_booking ? <CalendarCheck className="w-3.5 h-3.5" /> : <CalendarOff className="w-3.5 h-3.5" />}
+                            </button>
                             <button
                               onClick={() => handleToggleActive(svc)}
                               className={`p-1 rounded transition-colors ${

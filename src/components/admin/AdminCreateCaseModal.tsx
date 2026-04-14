@@ -53,11 +53,6 @@ export default function AdminCreateCaseModal({
     { value: 'urgent', label: 'Akut', color: 'text-red-400' }
   ]
 
-  const pestTypes = [
-    'Myror', 'Råttor', 'Möss', 'Kackerlackor', 'Flugor', 'Getingar', 
-    'Spindlar', 'Kvalster', 'Skalbaggar', 'Termiter', 'Annat'
-  ]
-
   const caseTypes = [
     'Besprutning', 'Servicebesök', 'Utredning', 'Konsultation', 
     'Uppföljning', 'Akutinsats', 'Avtalskontroll', 'Annat'
@@ -279,6 +274,7 @@ export default function AdminCreateCaseModal({
                   serviceId={serviceId}
                   onGroupChange={(gid) => { setServiceGroupId(gid); setServiceId(null) }}
                   onServiceChange={(sid) => setServiceId(sid)}
+                  bookingOnly
                 />
               </div>
             </div>

@@ -7,9 +7,10 @@ import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } fr
 import { Case } from '../../../types/cases';
 import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus, ShoppingCart } from 'lucide-react';
 import CaseArticleSelector from '../../shared/CaseArticleSelector';
+import ServiceArticleSelector from '../../shared/ServiceArticleSelector';
 import { CaseBillingService } from '../../../services/caseBillingService';
 import type { CaseBillingItemWithRelations } from '../../../types/caseBilling';
-import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
+import type { Service } from '../../../types/services';
 import SiteSelector from '../../shared/SiteSelector';
 import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
 import { CaseImageService, CaseImageWithUrl } from '../../../services/caseImageService';
@@ -59,6 +60,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
   const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
+  const [serviceGroupId, setServiceGroupId] = useState<string | null>(null);
+  const [serviceId, setServiceId] = useState<string | null>(null);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [contractCustomers, setContractCustomers] = useState<any[]>([]);
   const [customersWithStations, setCustomersWithStations] = useState<Set<string>>(new Set());
   const [selectedContractCustomer, setSelectedContractCustomer] = useState<string | null>(null);
@@ -536,7 +540,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const handleSuggestTime = async () => {
     // För stationskontroll, hämta adressen från vald kund
     let searchAddress = formData.adress;
-    let searchPestType = formData.skadedjur;
+    let searchPestType = selectedService?.name || null;
 
     if (caseType === 'inspection') {
       // Hämta kundens adress för stationskontroll
@@ -548,14 +552,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         return toast.error('Välj en kund först.');
       }
       searchAddress = customer.contact_address || customer.service_address || '';
-      searchPestType = 'Skadedjursavtal'; // Använd existerande kompetens för avtalskunder
+      searchPestType = selectedService?.name || null;
 
       if (!searchAddress) {
         return toast.error('Kunden saknar adress. Ange adress manuellt.');
       }
     } else {
-      if (!formData.adress || !formData.skadedjur) {
-        return toast.error('Adress och Skadedjur måste vara ifyllda.');
+      if (!formData.adress || !serviceId) {
+        return toast.error('Adress och Tjänst måste vara ifyllda.');
       }
     }
 
@@ -783,7 +787,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           status: 'Bokad', // Korrekt svensk status som används i systemet
           priority: formData.priority || 'normal',
           service_type: 'routine' as const,
-          pest_type: formData.skadedjur || null, // Använd skadedjur från formData
+          pest_type: selectedService?.name || formData.skadedjur || null,
+          service_id: serviceId || null,
           scheduled_start: formData.start_date,
           scheduled_end: formData.due_date,
           primary_technician_id: formData.primary_assignee_id,
@@ -903,7 +908,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             fornamn: nameParts[0] || '',
             efternamn: nameParts.slice(1).join(' ') || '',
             adress: formData.adress || '',
-            skadedjur: formData.skadedjur || '',
+            skadedjur: selectedService?.name || formData.skadedjur || '',
             tekniker: primaryTech?.name || '',
           }
           if (startDate) {
@@ -1581,11 +1586,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Skadedjur *</label>
-                      <select name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} required className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
-                          <option value="" disabled>Välj typ...</option>
-                          {PEST_TYPES.map(pest => <option key={pest} value={pest}>{pest}</option>)}
-                      </select>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Tjänst *</label>
+                      <ServiceArticleSelector
+                        groupId={serviceGroupId}
+                        serviceId={serviceId}
+                        onGroupChange={(gid) => { setServiceGroupId(gid); setServiceId(null); setSelectedService(null); }}
+                        onServiceChange={(sid, svc) => { setServiceId(sid); setSelectedService(svc); }}
+                        bookingOnly
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-400 mb-1">Tidsåtgång</label>

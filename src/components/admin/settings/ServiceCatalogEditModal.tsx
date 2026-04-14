@@ -34,6 +34,7 @@ export default function ServiceCatalogEditModal({
   const [unit, setUnit] = useState<string>('st')
   const [sortOrder, setSortOrder] = useState<number>(0)
   const [isActive, setIsActive] = useState(true)
+  const [showInBooking, setShowInBooking] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function ServiceCatalogEditModal({
       setUnit(service.unit)
       setSortOrder(service.sort_order)
       setIsActive(service.is_active)
+      setShowInBooking(service.show_in_booking)
     } else {
       setCode('')
       setName('')
@@ -54,6 +56,7 @@ export default function ServiceCatalogEditModal({
       setUnit('st')
       setSortOrder(0)
       setIsActive(true)
+      setShowInBooking(true)
     }
   }, [isOpen, service, groups])
 
@@ -72,6 +75,7 @@ export default function ServiceCatalogEditModal({
           unit,
           sort_order: sortOrder,
           is_active: isActive,
+          show_in_booking: showInBooking,
         }
         await ServiceCatalogService.createService(input)
         toast.success('Tjänst skapad')
@@ -83,6 +87,7 @@ export default function ServiceCatalogEditModal({
           unit,
           sort_order: sortOrder,
           is_active: isActive,
+          show_in_booking: showInBooking,
         }
         await ServiceCatalogService.updateService(service!.id, input)
         toast.success('Tjänst uppdaterad')
@@ -189,7 +194,7 @@ export default function ServiceCatalogEditModal({
                     className={selectClass}
                   />
                 </div>
-                <div className="flex items-end pb-1.5">
+                <div className="flex flex-col gap-2 justify-end pb-1.5">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -198,6 +203,15 @@ export default function ServiceCatalogEditModal({
                       className="w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-700 border-slate-600"
                     />
                     <span className="text-sm text-slate-300">Aktiv</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showInBooking}
+                      onChange={(e) => setShowInBooking(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-700 border-slate-600"
+                    />
+                    <span className="text-sm text-slate-300">Visas vid bokning</span>
                   </label>
                 </div>
               </div>

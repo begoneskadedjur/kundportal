@@ -12,6 +12,7 @@ interface ServiceArticleSelectorProps {
   onGroupChange: (groupId: string | null) => void
   onServiceChange: (serviceId: string | null, service: Service | null) => void
   disabled?: boolean
+  bookingOnly?: boolean
 }
 
 export default function ServiceArticleSelector({
@@ -20,6 +21,7 @@ export default function ServiceArticleSelector({
   onGroupChange,
   onServiceChange,
   disabled = false,
+  bookingOnly = false,
 }: ServiceArticleSelectorProps) {
   const [groups, setGroups] = useState<ServiceGroup[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -48,11 +50,14 @@ export default function ServiceArticleSelector({
   useEffect(() => {
     if (!groupId) { setServices([]); return }
     setLoadingServices(true)
-    ServiceCatalogService.getActiveServicesByGroup(groupId)
+    const fetchFn = bookingOnly
+      ? ServiceCatalogService.getBookingServicesByGroup(groupId)
+      : ServiceCatalogService.getActiveServicesByGroup(groupId)
+    fetchFn
       .then(setServices)
       .catch(() => setError('Kunde inte hämta tjänster'))
       .finally(() => setLoadingServices(false))
-  }, [groupId])
+  }, [groupId, bookingOnly])
 
   const selectClass =
     'w-full px-2.5 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors'

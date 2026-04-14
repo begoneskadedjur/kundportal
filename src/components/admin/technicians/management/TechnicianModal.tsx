@@ -9,7 +9,8 @@ import Input from '../../../ui/Input'
 import LoadingSpinner from '../../../shared/LoadingSpinner'
 import { technicianManagementService, type Technician, type TechnicianFormData } from '../../../../services/technicianManagementService'
 import toast from 'react-hot-toast'
-import { PEST_TYPES, PestType } from '../../../../utils/clickupFieldMapper' // ✅ Importerar från den korrekta källan
+import { ServiceCatalogService } from '../../../../services/servicesCatalogService'
+import type { ServiceWithGroup } from '../../../../types/services'
 
 type TechnicianModalProps = {
   isOpen: boolean
@@ -28,7 +29,8 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
   const [loading, setLoading] = useState(false)
   const [password, setPassword] = useState('')
   const [formData, setFormData] = useState<Partial<TechnicianFormData>>({})
-  const [selectedCompetencies, setSelectedCompetencies] = useState<Set<PestType>>(new Set())
+  const [selectedCompetencies, setSelectedCompetencies] = useState<Set<string>>(new Set())
+  const [bookingServices, setBookingServices] = useState<ServiceWithGroup[]>([])
   const [alsoAdmin, setAlsoAdmin] = useState(false)
   const [incidentRecipient, setIncidentRecipient] = useState(false)
 
@@ -62,10 +64,11 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
 
     if (isOpen) {
       loadData();
+      ServiceCatalogService.getAllBookingServices().then(setBookingServices).catch(() => {});
     }
   }, [technician, isOpen]);
 
-  const handleCompetencyChange = (pest: PestType, isChecked: boolean) => {
+  const handleCompetencyChange = (pest: string, isChecked: boolean) => {
     setSelectedCompetencies(prev => {
         const newSet = new Set(prev);
         if (isChecked) {
@@ -206,17 +209,45 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
             <textarea name="address" value={formData.address || ''} onChange={handleChange} rows={2} className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white" placeholder="Fullständig adress"/>
           </div>
 
-          {/* ✅ NY SEKTION: Kompetenser */}
+          {/* Kompetenser */}
           <div className="pt-4 border-t border-slate-700 space-y-3">
             <h3 className="text-md font-medium text-slate-300 flex items-center gap-2"><Wrench className="w-4 h-4 text-green-400"/>Kompetenser</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2">
-                {PEST_TYPES.map(pest => (
-                    <label key={pest} className="flex items-center space-x-2 cursor-pointer">
-                        <input type="checkbox" className="h-4 w-4 rounded bg-slate-700 border-slate-500 text-green-500 focus:ring-green-500" checked={selectedCompetencies.has(pest)} onChange={(e) => handleCompetencyChange(pest, e.target.checked)} />
-                        <span className="text-slate-300 text-sm">{pest}</span>
-                    </label>
-                ))}
-            </div>
+            {bookingServices.length === 0 ? (
+              <p className="text-slate-500 text-sm">Laddar tjänster...</p>
+            ) : (
+              (() => {
+                // Gruppera per service_group
+                const byGroup: Record<string, { groupName: string; services: ServiceWithGroup[] }> = {}
+                bookingServices.forEach((svc) => {
+                  const gid = svc.group_id || '__none__'
+                  const gname = svc.group?.name || 'Övrigt'
+                  if (!byGroup[gid]) byGroup[gid] = { groupName: gname, services: [] }
+                  byGroup[gid].services.push(svc)
+                })
+                return (
+                  <div className="space-y-3">
+                    {Object.entries(byGroup).map(([gid, { groupName, services }]) => (
+                      <div key={gid}>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{groupName}</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1.5">
+                          {services.map((svc) => (
+                            <label key={svc.id} className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded bg-slate-700 border-slate-500 text-[#20c58f] focus:ring-[#20c58f]"
+                                checked={selectedCompetencies.has(svc.name)}
+                                onChange={(e) => handleCompetencyChange(svc.name, e.target.checked)}
+                              />
+                              <span className="text-slate-300 text-sm">{svc.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()
+            )}
           </div>
 
           {/* System & Integrationer */}
