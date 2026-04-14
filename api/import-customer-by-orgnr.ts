@@ -208,6 +208,10 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
   const sales_person = begoneParticipant?.name || null
   const sales_person_email = begoneParticipant?.email || null
 
+  // Account Manager — Oneflow-fält "Anställd" / "E-post anställd"
+  const assigned_account_manager = dataFields['anstalld'] || null
+  const account_manager_email = dataFields['e-post-anstlld'] || null
+
   // Kontraktsslut — beräknat från start + längd
   let contract_end_date: string | null = null
   if (contract_start_date) {
@@ -253,6 +257,8 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     agreement_text,
     sales_person,
     sales_person_email,
+    assigned_account_manager,
+    account_manager_email,
   }
 }
 
@@ -451,6 +457,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       agreement_text: oneflow?.agreement_text ?? null,
       sales_person: oneflow?.sales_person ?? null,
       sales_person_email: oneflow?.sales_person_email ?? null,
+      assigned_account_manager: oneflow?.assigned_account_manager ?? null,
+      account_manager_email: oneflow?.account_manager_email ?? null,
       customer_group_id: suggestedGroup?.id ?? null,
     }
 

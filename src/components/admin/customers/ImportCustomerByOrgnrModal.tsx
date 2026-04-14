@@ -67,6 +67,8 @@ interface PreviewData {
   agreement_text: string | null
   sales_person: string | null
   sales_person_email: string | null
+  assigned_account_manager: string | null
+  account_manager_email: string | null
   customer_group_id: string | null
   billing_frequency: BillingFrequency
   billing_anchor_month: number
@@ -209,6 +211,8 @@ export default function ImportCustomerByOrgnrModal({
         agreement_text: data.preview.agreement_text ?? null,
         sales_person: data.preview.sales_person ?? null,
         sales_person_email: data.preview.sales_person_email ?? null,
+        assigned_account_manager: data.preview.assigned_account_manager ?? null,
+        account_manager_email: data.preview.account_manager_email ?? null,
         contract_end_date: data.preview.contract_end_date ?? null,
         customer_group_id: data.preview.customer_group_id ?? null,
       })
@@ -488,6 +492,8 @@ export default function ImportCustomerByOrgnrModal({
                   placeholder="0"
                   type="number"
                 />
+                <Field label="Account Manager" value={preview.assigned_account_manager ?? ''} onChange={update('assigned_account_manager')} placeholder="Ej hämtat" />
+                <Field label="Account Manager e-post" value={preview.account_manager_email ?? ''} onChange={update('account_manager_email')} placeholder="Ej hämtat" />
                 <Field label="Säljare" value={preview.sales_person ?? ''} onChange={update('sales_person')} placeholder="Ej hämtat" />
                 <Field label="Säljare e-post" value={preview.sales_person_email ?? ''} onChange={update('sales_person_email')} placeholder="Ej hämtat" />
                 <Field label="Oneflow kontrakt-ID" value={preview.oneflow_contract_id ?? ''} onChange={update('oneflow_contract_id')} placeholder="Ej hämtat" />
