@@ -358,6 +358,7 @@ export default function TechnicianManagement() {
           setShowEditModal(false)
         }}
         technician={editingTechnician}
+        allTechnicians={technicians}
       />
 
       {authTechnician && (

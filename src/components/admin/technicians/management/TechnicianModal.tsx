@@ -6,7 +6,7 @@ import { User, Key, Car, Wrench, AlertCircle, Shield, AlertTriangle } from 'luci
 import { supabase } from '../../../../lib/supabase'
 import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
-import LoadingSpinner from '../../../shared/LoadingSpinner'
+
 import { technicianManagementService, type Technician, type TechnicianFormData } from '../../../../services/technicianManagementService'
 import toast from 'react-hot-toast'
 import { ServiceCatalogService } from '../../../../services/servicesCatalogService'
@@ -17,6 +17,7 @@ type TechnicianModalProps = {
   onClose: () => void
   onSuccess: () => void
   technician?: Technician
+  allTechnicians?: Technician[]
 }
 
 const STAFF_ROLES = [
@@ -25,12 +26,13 @@ const STAFF_ROLES = [
   'Admin',
 ] as const
 
-export default function TechnicianModal({ isOpen, onClose, onSuccess, technician }: TechnicianModalProps) {
+export default function TechnicianModal({ isOpen, onClose, onSuccess, technician, allTechnicians = [] }: TechnicianModalProps) {
   const [loading, setLoading] = useState(false)
   const [password, setPassword] = useState('')
   const [formData, setFormData] = useState<Partial<TechnicianFormData>>({})
   const [selectedCompetencies, setSelectedCompetencies] = useState<Set<string>>(new Set())
   const [bookingServices, setBookingServices] = useState<ServiceWithGroup[]>([])
+  const [copyFromId, setCopyFromId] = useState<string>('')
   const [alsoAdmin, setAlsoAdmin] = useState(false)
   const [incidentRecipient, setIncidentRecipient] = useState(false)
 
@@ -67,6 +69,13 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
       ServiceCatalogService.getAllBookingServices().then(setBookingServices).catch(() => {});
     }
   }, [technician, isOpen]);
+
+  const handleCopyFrom = async (fromTechnicianId: string) => {
+    if (!fromTechnicianId) return
+    const competencies = await technicianManagementService.getCompetencies(fromTechnicianId)
+    setSelectedCompetencies(prev => new Set([...prev, ...competencies]))
+    setCopyFromId('')
+  }
 
   const handleCompetencyChange = (pest: string, isChecked: boolean) => {
     setSelectedCompetencies(prev => {
@@ -211,7 +220,24 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
 
           {/* Kompetenser */}
           <div className="pt-4 border-t border-slate-700 space-y-3">
-            <h3 className="text-md font-medium text-slate-300 flex items-center gap-2"><Wrench className="w-4 h-4 text-green-400"/>Kompetenser</h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-md font-medium text-slate-300 flex items-center gap-2"><Wrench className="w-4 h-4 text-green-400"/>Kompetenser</h3>
+              {allTechnicians.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={copyFromId}
+                    onChange={(e) => { setCopyFromId(e.target.value); handleCopyFrom(e.target.value) }}
+                    className="text-xs px-2 py-1 bg-slate-800 border border-slate-600 rounded-lg text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                  >
+                    <option value="">Kopiera från...</option>
+                    {allTechnicians
+                      .filter(t => t.id !== technician?.id)
+                      .map(t => <option key={t.id} value={t.id}>{t.name}</option>)
+                    }
+                  </select>
+                </div>
+              )}
+            </div>
             {bookingServices.length === 0 ? (
               <p className="text-slate-500 text-sm">Laddar tjänster...</p>
             ) : (
@@ -273,7 +299,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
           {/* Knappar */}
           <div className="flex gap-3 pt-4 border-t border-slate-700">
             <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="flex-1">Avbryt</Button>
-            <Button type="submit" loading={loading} disabled={loading} className="flex-1">{loading ? (<><LoadingSpinner className="w-4 h-4 mr-2" />{technician ? 'Uppdaterar...' : 'Skapar...'}</>) : (technician ? 'Uppdatera Personal' : 'Skapa Personal')}</Button>
+            <Button type="submit" loading={loading} disabled={loading} className="flex-1">{technician ? 'Uppdatera Personal' : 'Skapa Personal'}</Button>
           </div>
 
           {/* BEVARAD Debug info */}
