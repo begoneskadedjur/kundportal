@@ -57,7 +57,7 @@ const Leads: React.FC = () => {
     if (activeView === 'technician') {
       return {
         search: '',
-        status: 'all',
+        status: [],
         priority: 'all',
         assignedTo: 'me',
         createdBy: 'all',
@@ -76,14 +76,19 @@ const Leads: React.FC = () => {
     const saved = localStorage.getItem('leadFilters')
     if (saved) {
       try {
-        return JSON.parse(saved)
+        const parsed = JSON.parse(saved)
+        // Migrate old single-value status to array format
+        if (typeof parsed.status === 'string') {
+          parsed.status = parsed.status === 'all' ? [] : [parsed.status]
+        }
+        return parsed
       } catch (e) {
         console.warn('Failed to parse saved filters:', e)
       }
     }
     return {
       search: '',
-      status: 'all',
+      status: [],
       priority: 'all',
       assignedTo: 'all',
       createdBy: 'all',
@@ -203,8 +208,8 @@ const Leads: React.FC = () => {
     }
 
     // Status filter
-    if (filters.status !== 'all') {
-      filtered = filtered.filter(lead => lead.status === filters.status)
+    if (filters.status.length > 0) {
+      filtered = filtered.filter(lead => filters.status.includes(lead.status))
     }
 
     // Priority filter

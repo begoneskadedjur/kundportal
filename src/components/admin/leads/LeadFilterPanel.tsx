@@ -1,26 +1,24 @@
 // src/components/admin/leads/LeadFilterPanel.tsx - Advanced filtering component for leads
 
-import React, { useState, useEffect } from 'react'
-import { 
-  Filter, 
-  X, 
-  User, 
-  Calendar, 
-  DollarSign, 
-  Building, 
-  Phone, 
-  Mail, 
-  MapPin, 
+import React, { useState, useEffect, useRef } from 'react'
+import {
+  Filter,
+  X,
+  User,
+  Calendar,
+  Building,
   Target,
-  RefreshCw
+  RefreshCw,
+  ChevronDown,
+  TrendingUp
 } from 'lucide-react'
 import Button from '../../ui/Button'
-import { LeadStatus, LeadPriority } from '../../../types/database'
+import { LeadStatus, LeadPriority, LEAD_STATUS_DISPLAY } from '../../../types/database'
 import { useAuth } from '../../../contexts/AuthContext'
 
 export interface LeadFilters {
   search: string
-  status: LeadStatus | 'all'
+  status: LeadStatus[]
   priority: LeadPriority | 'all'
   assignedTo: string | 'all' | 'me' | 'unassigned'
   createdBy: string | 'all' | 'me'
@@ -35,6 +33,14 @@ export interface LeadFilters {
   followUpToday: boolean
   hasEstimatedValue: boolean | 'all'
 }
+
+const STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
+  { value: 'red_lost', label: 'Förlorad' },
+  { value: 'blue_cold', label: 'Kall' },
+  { value: 'yellow_warm', label: 'Varm' },
+  { value: 'orange_hot', label: 'Het' },
+  { value: 'green_deal', label: 'Affär' },
+]
 
 interface LeadFilterPanelProps {
   filters: LeadFilters
@@ -59,6 +65,18 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
 }) => {
   const { user } = useAuth()
   const [localFilters, setLocalFilters] = useState<LeadFilters>(filters)
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
+  const statusDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
+        setStatusDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     setLocalFilters(filters)
@@ -73,7 +91,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
   const getActiveFilterCount = () => {
     let count = 0
     if (filters.search) count++
-    if (filters.status !== 'all') count++
+    if (filters.status.length > 0) count++
     if (filters.priority !== 'all') count++
     if (filters.assignedTo !== 'all') count++
     if (filters.createdBy !== 'all') count++
@@ -119,10 +137,10 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
       action: () => handleQuickFilter('assignedTo', filters.assignedTo === 'me' ? 'all' : 'me', true), 
       active: filters.assignedTo === 'me' 
     },
-    { 
-      label: 'Heta leads', 
-      action: () => handleQuickFilter('status', filters.status === 'orange_hot' ? 'all' : 'orange_hot', true), 
-      active: filters.status === 'orange_hot' 
+    {
+      label: 'Heta leads',
+      action: () => handleQuickFilter('status', filters.status.includes('orange_hot') ? [] : ['orange_hot'], true),
+      active: filters.status.includes('orange_hot')
     },
     { 
       label: 'Uppföljning idag', 
@@ -223,23 +241,50 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           />
         </div>
 
-        {/* Status */}
-        <div>
+        {/* Status – multi-select */}
+        <div ref={statusDropdownRef} className="relative">
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Status
           </label>
-          <select
-            value={localFilters.status}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
+          <button
+            type="button"
+            onClick={() => setStatusDropdownOpen(prev => !prev)}
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50 flex items-center justify-between"
           >
-            <option value="all">Alla statusar</option>
-            <option value="red_lost">🔴 Förlorad</option>
-            <option value="blue_cold">🔵 Kall</option>
-            <option value="yellow_warm">🟡 Varm</option>
-            <option value="orange_hot">🟠 Het</option>
-            <option value="green_deal">🟢 Affär</option>
-          </select>
+            <span className="truncate text-sm">
+              {localFilters.status.length === 0
+                ? 'Alla statusar'
+                : localFilters.status.map(s => LEAD_STATUS_DISPLAY[s].label).join(', ')}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 flex-shrink-0 ml-2 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {statusDropdownOpen && (
+            <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-slate-600/50 rounded-lg shadow-xl overflow-hidden">
+              {STATUS_OPTIONS.map(opt => {
+                const selected = localFilters.status.includes(opt.value)
+                return (
+                  <label
+                    key={opt.value}
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-700/50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => {
+                        const next = selected
+                          ? localFilters.status.filter(s => s !== opt.value)
+                          : [...localFilters.status, opt.value]
+                        handleFilterChange('status', next)
+                      }}
+                      className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]/50"
+                    />
+                    <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${LEAD_STATUS_DISPLAY[opt.value].dotClass}`} />
+                    <span className="text-sm text-white">{opt.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Prioritet */}
@@ -253,10 +298,10 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           >
             <option value="all">Alla prioriteter</option>
-            <option value="urgent">🔥 Brådskande</option>
-            <option value="high">⭐ Hög</option>
-            <option value="medium">🕐 Medel</option>
-            <option value="low">✅ Låg</option>
+            <option value="urgent">Brådskande</option>
+            <option value="high">Hög</option>
+            <option value="medium">Medel</option>
+            <option value="low">Låg</option>
           </select>
         </div>
 
@@ -322,9 +367,9 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           >
             <option value="all">Alla metoder</option>
-            <option value="mail">📧 Email</option>
-            <option value="phone">📞 Telefon</option>
-            <option value="visit">🏢 Besök</option>
+            <option value="mail">Email</option>
+            <option value="phone">Telefon</option>
+            <option value="visit">Besök</option>
           </select>
         </div>
 
@@ -345,7 +390,6 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
         {/* Uppskattat värde - min */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
-            <DollarSign className="w-4 h-4 inline mr-1" />
             Värde från (SEK)
           </label>
           <input
@@ -411,7 +455,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             onChange={(e) => handleFilterChange('hasEstimatedValue', e.target.checked)}
             className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]/50"
           />
-          <DollarSign className="w-4 h-4" />
+          <TrendingUp className="w-4 h-4" />
           Har uppskattat värde
         </label>
       </div>
