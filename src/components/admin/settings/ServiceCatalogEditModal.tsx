@@ -129,12 +129,12 @@ export default function ServiceCatalogEditModal({
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Kod *</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Art.nr *</label>
                   <input
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     disabled={!isCreating}
-                    placeholder="SVC-001"
+                    placeholder="1"
                     className={`${selectClass} ${!isCreating ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
                 </div>

@@ -263,7 +263,7 @@ export default function ServiceCatalogSettings() {
                           key={svc.id}
                           className={`flex items-center gap-3 px-4 py-2 hover:bg-slate-700/20 transition-colors ${!svc.is_active ? 'opacity-50' : ''}`}
                         >
-                          <span className="text-xs font-mono text-slate-500 w-16 shrink-0">{svc.code}</span>
+                          <span className="text-xs font-mono text-slate-500 w-8 shrink-0">{svc.code}</span>
                           <span className="flex-1 text-sm text-white">{svc.name}</span>
                           <span className="text-xs text-slate-500">{svc.unit}</span>
                           <div className="flex items-center gap-1 shrink-0">
