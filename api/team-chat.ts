@@ -1356,7 +1356,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       imageBase64,
       imageMimeType,
       generateImage = false,
-      imagePrompt
+      imagePrompt,
+      referenceImageBase64,
+      referenceImageMimeType
     } = req.body;
 
     if (!process.env.GOOGLE_AI_API_KEY) {
@@ -1366,9 +1368,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Bildgenerering
+    // Bildgenerering (med eller utan referensbild)
     if (generateImage && imagePrompt) {
-      return handleImageGeneration(imagePrompt, res);
+      return handleImageGeneration(imagePrompt, referenceImageBase64, referenceImageMimeType, res);
     }
 
     // Chat (med eller utan bildanalys)
@@ -1667,16 +1669,35 @@ OBS: Varje ärende kan ha upp till 3 tekniker som arbetar tillsammans - alla des
   }
 }
 
-async function handleImageGeneration(prompt: string, res: VercelResponse) {
+async function handleImageGeneration(
+  prompt: string,
+  referenceImageBase64: string | undefined,
+  referenceImageMimeType: string | undefined,
+  res: VercelResponse
+) {
   try {
-    // Nano Banana Pro - Geminis högkvalitativa bildgenerering med nya SDK:t
+    // Bygg contents: med referensbild (multimodal) eller bara text
+    const contents: any = referenceImageBase64
+      ? [
+          {
+            inlineData: {
+              mimeType: referenceImageMimeType || 'image/jpeg',
+              data: referenceImageBase64
+            }
+          },
+          {
+            text: `Edit or use this image as reference. ${prompt}. The result should be professional and suitable for a pest control company's marketing or documentation.`
+          }
+        ]
+      : `Generate a professional, high-quality image: ${prompt}. The image should be suitable for a pest control company's marketing or documentation.`;
+
     const result = await ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
-      contents: `Generate a professional, high-quality image: ${prompt}. The image should be suitable for a pest control company's marketing or documentation.`,
+      contents,
       config: {
         responseModalities: ['Text', 'Image'],
-        // Kan använda Google Search för att få aktuell info för bilden
-        tools: [{ googleSearch: {} }],
+        // Google Search stöds ej tillsammans med bildindata
+        ...(referenceImageBase64 ? {} : { tools: [{ googleSearch: {} }] }),
       } as any,
     });
 

@@ -549,15 +549,21 @@ export default function TeamChat() {
     }
 
     const prompt = inputMessage;
+    const referenceImage = selectedImage?.mimeType?.startsWith('image/') ? selectedImage : null;
 
     // Lägg till användarens meddelande
     const userMessage: TeamChatMessage = {
       role: 'user',
-      content: `🎨 Generera bild: ${prompt}`
+      content: referenceImage
+        ? `Generera bild med referens: ${prompt}`
+        : `Generera bild: ${prompt}`,
+      image_urls: referenceImage ? ['uploaded_file'] : undefined,
+      file_type: referenceImage?.mimeType
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
+    setSelectedImage(null);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -567,8 +573,8 @@ export default function TeamChat() {
       // Spara användarens meddelande
       await saveMessage(convId, 'user', userMessage.content, user?.id);
 
-      // Anropa bildgenerering
-      const response = await generateImage(prompt);
+      // Anropa bildgenerering (med referensbild om uppladdad)
+      const response = await generateImage(prompt, referenceImage?.base64, referenceImage?.mimeType);
 
       if (response.success) {
         if (response.image) {
@@ -938,7 +944,9 @@ export default function TeamChat() {
                 </button>
               </div>
               <span className="text-xs text-slate-400">
-                {selectedImage.mimeType === 'application/pdf' ? 'PDF-dokument kommer att analyseras av AI' : 'Fil kommer att analyseras av AI'}
+                {selectedImage.mimeType === 'application/pdf'
+                ? 'PDF-dokument kommer att analyseras av AI'
+                : 'Bild vald som referens — generera ny bild eller analysera'}
               </span>
             </div>
           </div>
@@ -976,7 +984,7 @@ export default function TeamChat() {
                   handleSendMessage();
                 }
               }}
-              placeholder="Fråga om kunder, ärenden, tekniker..."
+              placeholder={selectedImage?.mimeType?.startsWith('image/') ? 'Beskriv ändringen eller den nya bilden...' : 'Fråga om kunder, ärenden, tekniker...'}
               rows={1}
               className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
             />
@@ -984,7 +992,7 @@ export default function TeamChat() {
               onClick={handleGenerateImage}
               disabled={isGeneratingImage || isLoading || !inputMessage.trim()}
               className="p-2 text-purple-400 hover:text-purple-300 hover:bg-slate-700 disabled:text-slate-600 disabled:cursor-not-allowed rounded transition-colors"
-              title="Generera bild från beskrivning"
+              title={selectedImage?.mimeType?.startsWith('image/') ? 'Generera bild med bifogad bild som referens' : 'Generera bild från beskrivning'}
             >
               {isGeneratingImage ? (
                 <Loader2 className="w-5 h-5 animate-spin" />

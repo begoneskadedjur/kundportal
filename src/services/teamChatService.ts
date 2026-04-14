@@ -93,15 +93,21 @@ export async function sendTeamChatMessage(
   }
 }
 
-// Generera bild
-export async function generateImage(prompt: string): Promise<ChatResponse> {
+// Generera bild (med valfri referensbild för redigering/inspiration)
+export async function generateImage(
+  prompt: string,
+  referenceImageBase64?: string,
+  referenceImageMimeType?: string
+): Promise<ChatResponse> {
   try {
     const response = await fetch('/api/team-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         generateImage: true,
-        imagePrompt: prompt
+        imagePrompt: prompt,
+        referenceImageBase64,
+        referenceImageMimeType
       })
     });
 
