@@ -33,7 +33,7 @@ export default function AdminCreateCaseModal({
   const [error, setError] = useState<string | null>(null)
   
   const [serviceGroupId, setServiceGroupId] = useState<string | null>(null)
-  const [serviceArticleId, setServiceArticleId] = useState<string | null>(null)
+  const [serviceId, setServiceId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -77,7 +77,7 @@ export default function AdminCreateCaseModal({
         body: JSON.stringify({
           customer_id: customer.id,
           ...formData,
-          service_article_id: serviceArticleId
+          service_id: serviceId
         })
       })
 
@@ -276,9 +276,9 @@ export default function AdminCreateCaseModal({
                 </label>
                 <ServiceArticleSelector
                   groupId={serviceGroupId}
-                  articleId={serviceArticleId}
-                  onGroupChange={(gid) => { setServiceGroupId(gid); setServiceArticleId(null) }}
-                  onArticleChange={(aid) => setServiceArticleId(aid)}
+                  serviceId={serviceId}
+                  onGroupChange={(gid) => { setServiceGroupId(gid); setServiceId(null) }}
+                  onServiceChange={(sid) => setServiceId(sid)}
                 />
               </div>
             </div>

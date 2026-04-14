@@ -32,7 +32,7 @@ import CasePreparationsSection from '../../shared/CasePreparationsSection'
 
 // Tjänsteutbud-väljare
 import ServiceArticleSelector from '../../shared/ServiceArticleSelector'
-import type { Article } from '../../../types/articles'
+import type { Service } from '../../../types/services'
 
 // Artikelväljare för fakturering
 import CaseArticleSelector from '../../shared/CaseArticleSelector'
@@ -113,7 +113,7 @@ interface TechnicianCase {
   // Provision
   is_commission_eligible?: boolean;
   // Tjänsteutbud
-  service_article_id?: string | null;
+  service_id?: string | null;
   service_group_id?: string | null; // transient, sparas ej i DB
 }
 
@@ -410,7 +410,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
 
   // Vald tjänsteartikel (för CasePreparationsSection)
-  const [serviceArticle, setServiceArticle] = useState<Article | null>(null)
+  const [serviceArticle, setServiceArticle] = useState<Service | null>(null)
 
   // Auto-sätt avdrag från underleverantörsartiklar
   useEffect(() => {
@@ -731,7 +731,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           e_post_kontaktperson: caseData.e_post_kontaktperson || '',
           case_price: caseData.case_price || 0,
           skadedjur: caseData.skadedjur || '',
-          service_article_id: caseData.service_article_id || null,
+          service_id: caseData.service_id || null,
           service_group_id: null,
           org_nr: caseData.org_nr || '',
           personnummer: caseData.personnummer || '',
@@ -839,7 +839,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         updateData.telefon_kontaktperson = formData.telefon_kontaktperson;
         updateData.e_post_kontaktperson = formData.e_post_kontaktperson;
         updateData.skadedjur = formData.skadedjur;
-        updateData.service_article_id = formData.service_article_id ?? null;
+        updateData.service_id = formData.service_id ?? null;
         updateData.pris = formData.case_price === "" ? null : formData.case_price;
         updateData.start_date = formData.start_date;
         updateData.due_date = formData.due_date;
@@ -1496,14 +1496,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   <label className="block text-xs font-medium text-slate-400 mb-1">Tjänst</label>
                   <ServiceArticleSelector
                     groupId={formData.service_group_id ?? null}
-                    articleId={formData.service_article_id ?? null}
-                    onGroupChange={(gid) => setFormData(prev => ({ ...prev, service_group_id: gid, service_article_id: null }))}
-                    onArticleChange={(aid, art) => {
-                      setFormData(prev => ({ ...prev, service_article_id: aid }))
-                      setServiceArticle(art)
+                    serviceId={formData.service_id ?? null}
+                    onGroupChange={(gid) => setFormData(prev => ({ ...prev, service_group_id: gid, service_id: null }))}
+                    onServiceChange={(sid, svc) => {
+                      setFormData(prev => ({ ...prev, service_id: sid }))
+                      setServiceArticle(svc)
                     }}
                   />
-                  {!formData.service_article_id && formData.skadedjur && (
+                  {!formData.service_id && formData.skadedjur && (
                     <p className="mt-1 text-xs text-slate-500">Befintlig: {formData.skadedjur}</p>
                   )}
                 </div>

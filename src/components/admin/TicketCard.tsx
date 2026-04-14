@@ -204,10 +204,10 @@ export default function TicketCard({
 
               {/* Adress och skadedjur */}
               <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                {((ticket as any).service_article?.name || ticket.skadedjur) && (
+                {((ticket as any).service?.name || ticket.skadedjur) && (
                   <span className="flex items-center gap-1">
                     <Bug className="w-3 h-3 text-red-400" />
-                    {(ticket as any).service_article?.name || ticket.skadedjur}
+                    {(ticket as any).service?.name || ticket.skadedjur}
                   </span>
                 )}
                 {ticket.adress && (

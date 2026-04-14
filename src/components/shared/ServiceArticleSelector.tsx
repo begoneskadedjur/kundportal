@@ -1,61 +1,57 @@
 // src/components/shared/ServiceArticleSelector.tsx
-// Tvånivå-väljare för Tjänsteutbud: Grupp → Artikel
+// Tvånivå-väljare för Tjänsteutbud: Grupp → Tjänst
 
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { ArticleGroupService } from '../../services/articleGroupService'
-import { ArticleService } from '../../services/articleService'
-import type { Article, ArticleGroup } from '../../types/articles'
+import { ServiceGroupService, ServiceCatalogService } from '../../services/servicesCatalogService'
+import type { Service, ServiceGroup } from '../../types/services'
 
 interface ServiceArticleSelectorProps {
   groupId: string | null
-  articleId: string | null
+  serviceId: string | null
   onGroupChange: (groupId: string | null) => void
-  onArticleChange: (articleId: string | null, article: Article | null) => void
+  onServiceChange: (serviceId: string | null, service: Service | null) => void
   disabled?: boolean
 }
 
 export default function ServiceArticleSelector({
   groupId,
-  articleId,
+  serviceId,
   onGroupChange,
-  onArticleChange,
+  onServiceChange,
   disabled = false,
 }: ServiceArticleSelectorProps) {
-  const [groups, setGroups] = useState<ArticleGroup[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
+  const [groups, setGroups] = useState<ServiceGroup[]>([])
+  const [services, setServices] = useState<Service[]>([])
   const [loadingGroups, setLoadingGroups] = useState(true)
-  const [loadingArticles, setLoadingArticles] = useState(false)
+  const [loadingServices, setLoadingServices] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Hämta grupper vid mount
   useEffect(() => {
-    ArticleGroupService.getActiveGroups()
+    ServiceGroupService.getActiveGroups()
       .then(setGroups)
       .catch(() => setError('Kunde inte hämta tjänstegrupper'))
       .finally(() => setLoadingGroups(false))
   }, [])
 
-  // Om articleId är satt men groupId saknas, försök härleda gruppen
+  // Om serviceId är satt men groupId saknas, härledd gruppen
   useEffect(() => {
-    if (articleId && !groupId) {
-      ArticleGroupService.getArticleGroupIds(articleId).then((ids) => {
-        if (ids.length > 0) onGroupChange(ids[0])
+    if (serviceId && !groupId) {
+      ServiceCatalogService.getServiceById(serviceId).then((svc) => {
+        if (svc?.group_id) onGroupChange(svc.group_id)
       })
     }
-  }, [articleId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [serviceId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Hämta artiklar när grupp väljs
+  // Hämta tjänster när grupp väljs
   useEffect(() => {
-    if (!groupId) {
-      setArticles([])
-      return
-    }
-    setLoadingArticles(true)
-    ArticleService.getActiveArticlesByGroup(groupId)
-      .then(setArticles)
+    if (!groupId) { setServices([]); return }
+    setLoadingServices(true)
+    ServiceCatalogService.getActiveServicesByGroup(groupId)
+      .then(setServices)
       .catch(() => setError('Kunde inte hämta tjänster'))
-      .finally(() => setLoadingArticles(false))
+      .finally(() => setLoadingServices(false))
   }, [groupId])
 
   const selectClass =
@@ -80,45 +76,37 @@ export default function ServiceArticleSelector({
         onChange={(e) => {
           const val = e.target.value || null
           onGroupChange(val)
-          onArticleChange(null, null)
+          onServiceChange(null, null)
         }}
         disabled={disabled}
         className={selectClass}
       >
         <option value="">Välj tjänstegrupp</option>
         {groups.map((g) => (
-          <option key={g.id} value={g.id}>
-            {g.name}
-          </option>
+          <option key={g.id} value={g.id}>{g.name}</option>
         ))}
       </select>
 
-      {/* Artikel-väljare */}
+      {/* Tjänst-väljare */}
       <div className="relative">
         <select
-          value={articleId ?? ''}
+          value={serviceId ?? ''}
           onChange={(e) => {
             const val = e.target.value || null
-            const found = articles.find((a) => a.id === val) ?? null
-            onArticleChange(val, found)
+            const found = services.find((s) => s.id === val) ?? null
+            onServiceChange(val, found)
           }}
-          disabled={disabled || !groupId || loadingArticles}
+          disabled={disabled || !groupId || loadingServices}
           className={selectClass}
         >
           <option value="">
-            {!groupId
-              ? 'Välj grupp först'
-              : loadingArticles
-              ? 'Laddar...'
-              : 'Välj tjänst'}
+            {!groupId ? 'Välj grupp först' : loadingServices ? 'Laddar...' : 'Välj tjänst'}
           </option>
-          {articles.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
+          {services.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
-        {loadingArticles && (
+        {loadingServices && (
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-slate-400 pointer-events-none" />
         )}
       </div>

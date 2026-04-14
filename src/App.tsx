@@ -31,6 +31,7 @@ import StationTypesPage from './pages/admin/settings/StationTypesPage';
 import PreparationsPage from './pages/admin/settings/PreparationsPage';
 import ArticlesPage from './pages/admin/settings/ArticlesPage';
 import PriceListsPage from './pages/admin/settings/PriceListsPage';
+import ServiceCatalogPage from './pages/admin/settings/ServiceCatalogPage';
 import CustomerGroupsPage from './pages/admin/settings/CustomerGroupsPage';
 import FortnoxPage from './pages/admin/settings/FortnoxPage';
 import SmsTemplatesPage from './pages/admin/settings/SmsTemplatesPage';
@@ -140,6 +141,7 @@ function App() {
               <Route path="preparat" element={<ProtectedRoute requiredRole="admin"><PreparationsPage /></ProtectedRoute>} />
               <Route path="artiklar" element={<ProtectedRoute requiredRole="admin"><ArticlesPage /></ProtectedRoute>} />
               <Route path="prislistor" element={<ProtectedRoute requiredRole="admin"><PriceListsPage /></ProtectedRoute>} />
+              <Route path="tjansteutbud" element={<ProtectedRoute requiredRole="admin"><ServiceCatalogPage /></ProtectedRoute>} />
               <Route path="fakturering" element={<ProtectedRoute requiredRole="admin"><InvoicingPage /></ProtectedRoute>} />
               <Route path="fakturering/*" element={<ProtectedRoute requiredRole="admin"><InvoicingPage /></ProtectedRoute>} />
               <Route path="skapa-avtal" element={<ProtectedRoute requiredRole="admin"><OneflowContractCreator /></ProtectedRoute>} />

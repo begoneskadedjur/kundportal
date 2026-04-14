@@ -102,10 +102,11 @@ export const navGroups: NavGroup[] = [
     label: 'Produkter & Priser',
     icon: Package,
     items: [
+      { label: 'Tjänsteutbud', icon: Bug, path: '/admin/tjansteutbud' },
+      { label: 'Artiklar (Inköp)', icon: Package, path: '/admin/artiklar' },
+      { label: 'Prislistor', icon: Receipt, path: '/admin/prislistor' },
       { label: 'Stationer & Fällor', icon: Target, path: '/admin/stationer-fallor' },
       { label: 'Preparat', icon: Beaker, path: '/admin/preparat' },
-      { label: 'Prislistor', icon: Receipt, path: '/admin/prislistor' },
-      { label: 'Artiklar', icon: Package, path: '/admin/artiklar' },
     ]
   },
   {
@@ -160,9 +161,10 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/skapa-avtal': 'Skapa avtal',
   '/admin/avtalsdiagnostik': 'Avtalsdiagnostik',
   '/admin/webhook-config': 'Webhook-config',
+  '/admin/tjansteutbud': 'Tjänsteutbud',
   '/admin/stationer-fallor': 'Stationer & Fällor',
   '/admin/preparat': 'Preparat',
-  '/admin/artiklar': 'Artiklar',
+  '/admin/artiklar': 'Artiklar (Inköp)',
   '/admin/prislistor': 'Prislistor',
   '/admin/kundgrupper': 'Kundgrupper',
   '/admin/installningar/fortnox': 'Fortnox',

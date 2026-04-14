@@ -21,7 +21,7 @@ import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { DROPDOWN_STATUSES } from '../../types/database'
 import ServiceArticleSelector from '../shared/ServiceArticleSelector'
-import type { Article } from '../../types/articles'
+import type { Service } from '../../types/services'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
@@ -99,7 +99,7 @@ export default function EditContractCaseModal({
     address: '',
     pest_type: '',
     other_pest_type: '',
-    service_article_id: null as string | null,
+    service_id: null as string | null,
     service_group_id: null as string | null, // transient
     
     // Schemaläggning
@@ -184,7 +184,7 @@ export default function EditContractCaseModal({
   }, [billingSummary?.subcontractor_total, existingCommissionPosts])
 
   // Vald tjänsteartikel (för CasePreparationsSection)
-  const [serviceArticle, setServiceArticle] = useState<Article | null>(null)
+  const [serviceArticle, setServiceArticle] = useState<Service | null>(null)
 
   // Följeärende-states (follow-up cases)
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
@@ -323,7 +323,7 @@ export default function EditContractCaseModal({
         address: caseData.address?.formatted_address || caseData.address || caseData.adress || '',
         pest_type: caseData.pest_type || caseData.skadedjur || '',
         other_pest_type: caseData.other_pest_type || caseData.annat_skadedjur || '',
-        service_article_id: caseData.service_article_id || null,
+        service_id: caseData.service_id || null,
         service_group_id: null,
         scheduled_start: caseData.scheduled_start ? new Date(caseData.scheduled_start) : null,
         scheduled_end: caseData.scheduled_end ? new Date(caseData.scheduled_end) : null,
@@ -1652,15 +1652,15 @@ export default function EditContractCaseModal({
                 <label className="block text-xs font-medium text-slate-400 mb-1">Tjänst</label>
                 <ServiceArticleSelector
                   groupId={formData.service_group_id ?? null}
-                  articleId={formData.service_article_id ?? null}
-                  onGroupChange={(gid) => setFormData(prev => ({ ...prev, service_group_id: gid, service_article_id: null }))}
-                  onArticleChange={(aid, art) => {
-                    setFormData(prev => ({ ...prev, service_article_id: aid }))
-                    setServiceArticle(art)
+                  serviceId={formData.service_id ?? null}
+                  onGroupChange={(gid) => setFormData(prev => ({ ...prev, service_group_id: gid, service_id: null }))}
+                  onServiceChange={(sid, svc) => {
+                    setFormData(prev => ({ ...prev, service_id: sid }))
+                    setServiceArticle(svc)
                   }}
                   disabled={isCustomerView}
                 />
-                {!formData.service_article_id && formData.pest_type && (
+                {!formData.service_id && formData.pest_type && (
                   <p className="mt-1 text-xs text-slate-500">Befintlig: {formData.pest_type}</p>
                 )}
               </div>
