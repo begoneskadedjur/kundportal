@@ -5,6 +5,7 @@ import Button from '../ui/Button'
 import Input from '../ui/Input'
 import Modal from '../ui/Modal'
 import TechnicianDropdown from './TechnicianDropdown'
+import ServiceArticleSelector from '../shared/ServiceArticleSelector'
 
 interface Customer {
   id: string
@@ -31,6 +32,9 @@ export default function AdminCreateCaseModal({
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
+  const [serviceGroupId, setServiceGroupId] = useState<string | null>(null)
+  const [serviceArticleId, setServiceArticleId] = useState<string | null>(null)
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -72,7 +76,8 @@ export default function AdminCreateCaseModal({
         },
         body: JSON.stringify({
           customer_id: customer.id,
-          ...formData
+          ...formData,
+          service_article_id: serviceArticleId
         })
       })
 
@@ -267,19 +272,14 @@ export default function AdminCreateCaseModal({
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Skadedjurstyp
+                  Tjänst
                 </label>
-                <select
-                  name="pest_type"
-                  value={formData.pest_type}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">Välj skadedjur (om känt)</option>
-                  {pestTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
+                <ServiceArticleSelector
+                  groupId={serviceGroupId}
+                  articleId={serviceArticleId}
+                  onGroupChange={(gid) => { setServiceGroupId(gid); setServiceArticleId(null) }}
+                  onArticleChange={(aid) => setServiceArticleId(aid)}
+                />
               </div>
             </div>
 

@@ -248,9 +248,9 @@ export default function CaseCard({
         <div className="flex-1 min-w-0">
           {/* Row 1: pest + title + age */}
           <div className="flex items-center gap-2">
-            {case_.skadedjur && (
+            {((case_ as any).service_article?.name || case_.skadedjur) && (
               <span className="shrink-0 flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300">
-                <Bug className="w-3 h-3" />{case_.skadedjur}
+                <Bug className="w-3 h-3" />{(case_ as any).service_article?.name || case_.skadedjur}
               </span>
             )}
             <span className="font-medium text-white truncate">{case_.title}</span>

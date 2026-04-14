@@ -74,6 +74,23 @@ export class ArticleService {
   }
 
   /**
+   * Hämta aktiva artiklar för en specifik grupp (via junction-tabell)
+   */
+  static async getActiveArticlesByGroup(groupId: string): Promise<Article[]> {
+    const { data, error } = await supabase
+      .from('article_group_memberships')
+      .select('article:articles!article_id(*)')
+      .eq('group_id', groupId)
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+
+    return (data || [])
+      .map((row: any) => row.article)
+      .filter((a: Article | null) => a && a.is_active)
+      .sort((a: Article, b: Article) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, 'sv'))
+  }
+
+  /**
    * Hämta artikel via ID
    */
   static async getArticleById(id: string): Promise<Article | null> {

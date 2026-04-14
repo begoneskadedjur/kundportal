@@ -53,10 +53,10 @@ export function EventHoverCard({ caseData }: EventHoverCardProps) {
             <span className="break-words">{address}</span>
           </div>
         )}
-        {caseData.skadedjur && (
+        {((caseData as any).service_article?.name || caseData.skadedjur) && (
           <div className="flex items-center gap-1.5">
             <Bug className="w-3 h-3 text-slate-500 shrink-0" />
-            <span>{caseData.skadedjur}</span>
+            <span>{(caseData as any).service_article?.name || caseData.skadedjur}</span>
           </div>
         )}
         {technicians.length > 0 && (

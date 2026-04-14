@@ -165,7 +165,8 @@ export default function CoordinatorSchedule() {
           r_arbetskostnad, r_material_utrustning, r_servicebil,
           reklamation, vaggloss_angade_rum, case_number,
           material_cost, time_spent_minutes, work_started_at,
-          parent_case_id, created_by_technician_id, created_by_technician_name
+          parent_case_id, created_by_technician_id, created_by_technician_name,
+          service_article_id, service_article:articles!service_article_id(name)
         `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('business_cases').select(`
           id, title, status, priority, start_date, due_date, created_at, updated_at,
@@ -177,7 +178,8 @@ export default function CoordinatorSchedule() {
           tertiary_assignee_id, tertiary_assignee_name, tertiary_assignee_email,
           description, rapport, reklamation, vaggloss_angade_rum, case_number,
           material_cost, time_spent_minutes, work_started_at,
-          parent_case_id, created_by_technician_id, created_by_technician_name
+          parent_case_id, created_by_technician_id, created_by_technician_name,
+          service_article_id, service_article:articles!service_article_id(name)
         `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('cases').select(`
           *, customer:customers(

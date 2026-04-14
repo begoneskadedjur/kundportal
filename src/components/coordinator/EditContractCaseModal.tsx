@@ -19,8 +19,9 @@ import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
-import { PEST_TYPES } from '../../utils/clickupFieldMapper'
 import { DROPDOWN_STATUSES } from '../../types/database'
+import ServiceArticleSelector from '../shared/ServiceArticleSelector'
+import type { Article } from '../../types/articles'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
@@ -94,10 +95,12 @@ export default function EditContractCaseModal({
     alternative_contact_phone: '',
     alternative_contact_email: '',
     
-    // Adress och skadedjur
+    // Adress och tjänst
     address: '',
     pest_type: '',
     other_pest_type: '',
+    service_article_id: null as string | null,
+    service_group_id: null as string | null, // transient
     
     // Schemaläggning
     scheduled_start: null as Date | null,
@@ -179,6 +182,9 @@ export default function EditContractCaseModal({
       setCommissionDeductions(billingSummary.subcontractor_total)
     }
   }, [billingSummary?.subcontractor_total, existingCommissionPosts])
+
+  // Vald tjänsteartikel (för CasePreparationsSection)
+  const [serviceArticle, setServiceArticle] = useState<Article | null>(null)
 
   // Följeärende-states (follow-up cases)
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
@@ -317,6 +323,8 @@ export default function EditContractCaseModal({
         address: caseData.address?.formatted_address || caseData.address || caseData.adress || '',
         pest_type: caseData.pest_type || caseData.skadedjur || '',
         other_pest_type: caseData.other_pest_type || caseData.annat_skadedjur || '',
+        service_article_id: caseData.service_article_id || null,
+        service_group_id: null,
         scheduled_start: caseData.scheduled_start ? new Date(caseData.scheduled_start) : null,
         scheduled_end: caseData.scheduled_end ? new Date(caseData.scheduled_end) : null,
         primary_technician_id: caseData.primary_technician_id || '',
@@ -1001,6 +1009,7 @@ export default function EditContractCaseModal({
 
       // Remove fields that don't exist in database
       delete cleanedFormData.reports
+      delete (cleanedFormData as any).service_group_id  // transient fält
 
       // Provision-flagga
       ;(cleanedFormData as any).is_commission_eligible = commissionEligible
@@ -1637,18 +1646,23 @@ export default function EditContractCaseModal({
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
-                {/* Skadedjur */}
-                <select
-                  value={formData.pest_type}
-                  onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
-                  className="w-auto px-2.5 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+              </div>
+              {/* Tjänst */}
+              <div className="mt-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">Tjänst</label>
+                <ServiceArticleSelector
+                  groupId={formData.service_group_id ?? null}
+                  articleId={formData.service_article_id ?? null}
+                  onGroupChange={(gid) => setFormData(prev => ({ ...prev, service_group_id: gid, service_article_id: null }))}
+                  onArticleChange={(aid, art) => {
+                    setFormData(prev => ({ ...prev, service_article_id: aid }))
+                    setServiceArticle(art)
+                  }}
                   disabled={isCustomerView}
-                >
-                  <option value="">Välj skadedjur</option>
-                  {PEST_TYPES.map(pest => (
-                    <option key={pest} value={pest}>{pest}</option>
-                  ))}
-                </select>
+                />
+                {!formData.service_article_id && formData.pest_type && (
+                  <p className="mt-1 text-xs text-slate-500">Befintlig: {formData.pest_type}</p>
+                )}
               </div>
 
               {/* Schemaläggning */}
@@ -1786,11 +1800,11 @@ export default function EditContractCaseModal({
               )}
 
               {/* Använda preparat - Visas INTE för Inspektion/kontrollrunda */}
-              {caseData?.id && formData.pest_type !== 'Inspektion' && (
+              {caseData?.id && serviceArticle?.name !== 'Inspektion' && formData.pest_type !== 'Inspektion' && (
                 <CasePreparationsSection
                   caseId={caseData.id}
                   caseType="contract"
-                  pestType={formData.pest_type || null}
+                  pestType={serviceArticle?.name || formData.pest_type || null}
                   technicianId={formData.primary_technician_id || null}
                   technicianName={formData.primary_technician_name || null}
                   isReadOnly={isCustomerView}

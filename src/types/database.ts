@@ -230,6 +230,8 @@ export type Database = {
           billing_updated_by_id: string | null
           // Provision
           is_commission_eligible: boolean
+          // Tjänsteutbud
+          service_article_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>
@@ -305,6 +307,9 @@ export type Database = {
           deleted_at: string | null
           deleted_by_technician_id: string | null
           deleted_by_technician_name: string | null
+
+          // Tjänsteutbud
+          service_article_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['private_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['private_cases']['Insert']>
@@ -379,6 +384,9 @@ export type Database = {
           deleted_at: string | null
           deleted_by_technician_id: string | null
           deleted_by_technician_name: string | null
+
+          // Tjänsteutbud
+          service_article_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['business_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['business_cases']['Insert']>

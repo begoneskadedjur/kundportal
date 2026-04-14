@@ -30,6 +30,10 @@ import CaseImageGallery, { CaseImageGalleryRef } from '../../shared/CaseImageGal
 // Preparatanvändning
 import CasePreparationsSection from '../../shared/CasePreparationsSection'
 
+// Tjänsteutbud-väljare
+import ServiceArticleSelector from '../../shared/ServiceArticleSelector'
+import type { Article } from '../../../types/articles'
+
 // Artikelväljare för fakturering
 import CaseArticleSelector from '../../shared/CaseArticleSelector'
 
@@ -108,6 +112,9 @@ interface TechnicianCase {
   created_by_technician_name?: string | null;
   // Provision
   is_commission_eligible?: boolean;
+  // Tjänsteutbud
+  service_article_id?: string | null;
+  service_group_id?: string | null; // transient, sparas ej i DB
 }
 
 interface EditCaseModalProps {
@@ -401,6 +408,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [commissionDeductions, setCommissionDeductions] = useState(0)
   const [commissionNotes, setCommissionNotes] = useState('')
   const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
+
+  // Vald tjänsteartikel (för CasePreparationsSection)
+  const [serviceArticle, setServiceArticle] = useState<Article | null>(null)
 
   // Auto-sätt avdrag från underleverantörsartiklar
   useEffect(() => {
@@ -721,6 +731,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           e_post_kontaktperson: caseData.e_post_kontaktperson || '',
           case_price: caseData.case_price || 0,
           skadedjur: caseData.skadedjur || '',
+          service_article_id: caseData.service_article_id || null,
+          service_group_id: null,
           org_nr: caseData.org_nr || '',
           personnummer: caseData.personnummer || '',
           // Tekniker-tilldelningar
@@ -827,6 +839,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         updateData.telefon_kontaktperson = formData.telefon_kontaktperson;
         updateData.e_post_kontaktperson = formData.e_post_kontaktperson;
         updateData.skadedjur = formData.skadedjur;
+        updateData.service_article_id = formData.service_article_id ?? null;
         updateData.pris = formData.case_price === "" ? null : formData.case_price;
         updateData.start_date = formData.start_date;
         updateData.due_date = formData.due_date;
@@ -1479,7 +1492,21 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 </select>
               </div>
               {showTimeTracking && (
-                <Input label="Skadedjur" name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} placeholder="T.ex. Råttor, Kackerlackor..." />
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Tjänst</label>
+                  <ServiceArticleSelector
+                    groupId={formData.service_group_id ?? null}
+                    articleId={formData.service_article_id ?? null}
+                    onGroupChange={(gid) => setFormData(prev => ({ ...prev, service_group_id: gid, service_article_id: null }))}
+                    onArticleChange={(aid, art) => {
+                      setFormData(prev => ({ ...prev, service_article_id: aid }))
+                      setServiceArticle(art)
+                    }}
+                  />
+                  {!formData.service_article_id && formData.skadedjur && (
+                    <p className="mt-1 text-xs text-slate-500">Befintlig: {formData.skadedjur}</p>
+                  )}
+                </div>
               )}
             </div>
 
@@ -1691,12 +1718,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             )}
 
             {/* Använda preparat - Visas INTE för Inspektion */}
-            {currentCase && formData.skadedjur !== 'Inspektion' && (
+            {currentCase && serviceArticle?.name !== 'Inspektion' && formData.skadedjur !== 'Inspektion' && (
               <div className="pt-3 border-t border-slate-700/50">
                 <CasePreparationsSection
                   caseId={currentCase.id}
                   caseType={currentCase.case_type === 'private' ? 'private' : 'business'}
-                  pestType={formData.skadedjur || null}
+                  pestType={serviceArticle?.name || formData.skadedjur || null}
                   technicianId={currentCase.primary_assignee_id || null}
                   technicianName={currentCase.primary_assignee_name || null}
                   isReadOnly={false}
