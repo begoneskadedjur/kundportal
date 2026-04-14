@@ -946,7 +946,7 @@ export default function TeamChat() {
               <span className="text-xs text-slate-400">
                 {selectedImage.mimeType === 'application/pdf'
                 ? 'PDF-dokument kommer att analyseras av AI'
-                : 'Bild vald som referens — generera ny bild eller analysera'}
+                : 'Bild vald som referens'}
               </span>
             </div>
           </div>
