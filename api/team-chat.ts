@@ -166,7 +166,7 @@ const PRICING = {
   'gemini-2.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
   'gemini-3-flash-preview': { input: 0.50 / 1_000_000, output: 3.00 / 1_000_000 },
   'gemini-2.5-flash-image': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000, outputImage: 0.02 },
-  'gemini-3-pro-image-preview': { input: 1.25 / 1_000_000, output: 10.00 / 1_000_000, outputImage: 0.04 },
+  'gemini-3.1-flash-image-preview': { input: 1.25 / 1_000_000, output: 10.00 / 1_000_000, outputImage: 0.04 },
   'gemini-embedding-001': { input: 0.00 / 1_000_000, output: 0.00 / 1_000_000 }, // Gratis under 1500 req/min
 };
 
@@ -1678,24 +1678,26 @@ async function handleImageGeneration(
   try {
     // Bygg contents: med referensbild (multimodal) eller bara text
     const contents: any = referenceImageBase64
-      ? [
-          {
-            inlineData: {
-              mimeType: referenceImageMimeType || 'image/jpeg',
-              data: referenceImageBase64
+      ? [{
+          parts: [
+            {
+              inlineData: {
+                mimeType: referenceImageMimeType || 'image/jpeg',
+                data: referenceImageBase64
+              }
+            },
+            {
+              text: `Edit or use this image as reference. ${prompt}. The result should be professional and suitable for a pest control company's marketing or documentation.`
             }
-          },
-          {
-            text: `Edit or use this image as reference. ${prompt}. The result should be professional and suitable for a pest control company's marketing or documentation.`
-          }
-        ]
+          ]
+        }]
       : `Generate a professional, high-quality image: ${prompt}. The image should be suitable for a pest control company's marketing or documentation.`;
 
     const result = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
+      model: 'gemini-3.1-flash-image-preview',
       contents,
       config: {
-        responseModalities: ['Text', 'Image'],
+        responseModalities: ['TEXT', 'IMAGE'],
         // Google Search stöds ej tillsammans med bildindata
         ...(referenceImageBase64 ? {} : { tools: [{ googleSearch: {} }] }),
       } as any,
@@ -1711,7 +1713,7 @@ async function handleImageGeneration(
             mimeType: part.inlineData.mimeType
           },
           usage: {
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-3.1-flash-image-preview',
             images_generated: 1,
             estimated_cost_usd: 0.04
           },
@@ -1726,7 +1728,7 @@ async function handleImageGeneration(
       success: true,
       response: textResponse || 'Bildgenerering kunde inte genomföras. Försök med en annan beskrivning.',
       usage: {
-        model: 'gemini-3-pro-image-preview',
+        model: 'gemini-3.1-flash-image-preview',
         images_generated: 0,
         estimated_cost_usd: 0
       },
@@ -1741,7 +1743,7 @@ async function handleImageGeneration(
       success: true,
       response: `⚠️ Bildgenerering kunde inte utföras: ${errorMessage}`,
       usage: {
-        model: 'gemini-3-pro-image-preview',
+        model: 'gemini-3.1-flash-image-preview',
         images_generated: 0,
         estimated_cost_usd: 0
       },
