@@ -111,11 +111,18 @@ export async function generateImage(
       })
     });
 
-    const data = await response.json();
+    if (response.status === 413) {
+      throw new Error('Bilden är för stor för att skickas. Använd en mindre bild (under 3 MB).');
+    }
 
     if (!response.ok) {
-      throw new Error(data.error || 'Fel vid bildgenerering');
+      const text = await response.text();
+      let errMsg = 'Fel vid bildgenerering';
+      try { errMsg = JSON.parse(text).error || errMsg; } catch { /* text/plain */ }
+      throw new Error(errMsg);
     }
+
+    const data = await response.json();
 
     return data;
   } catch (error) {

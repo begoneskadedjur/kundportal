@@ -660,6 +660,11 @@ export default function TeamChat() {
         canvas.height = height;
         canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
         const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+        // base64 är ~33% större än binär — kontrollera att den komprimerade bilden inte överstiger ~3 MB
+        if (base64.length > 3 * 1024 * 1024) {
+          toast.error('Bilden är för stor även efter komprimering. Använd en annan bild.');
+          return;
+        }
         setSelectedImage({ base64, mimeType: 'image/jpeg' });
       };
       img.src = objectUrl;
