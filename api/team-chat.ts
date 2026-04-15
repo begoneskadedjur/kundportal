@@ -8,9 +8,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 
-// Vercel serverless config — explicit timeout
+// Vercel serverless config — Pro plan tillåter upp till 300s
 export const config = {
-  maxDuration: 60,
+  maxDuration: 300,
 };
 
 // Ny SDK-klient
