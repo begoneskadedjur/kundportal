@@ -673,8 +673,9 @@ export default function CaseServiceSelector({
                       {!readOnly && (
                         <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
                 <div className="flex justify-between text-xs text-slate-400 px-1">
