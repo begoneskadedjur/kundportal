@@ -17,11 +17,9 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
-  TrendingUp,
   AlertTriangle,
   CheckCircle,
-  Calculator,
-  Percent
+  Calculator
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
@@ -32,7 +30,6 @@ import type {
   ArticleWithEffectivePrice,
   BillableCaseType,
   CaseBillingSummary,
-  CaseServiceSummary
 } from '../../types/caseBilling'
 import {
   calculateDiscountedPrice,
@@ -378,8 +375,6 @@ export default function CaseServiceSelector({
     || s.code.toLowerCase().includes(searchAddon.toLowerCase())
   )
 
-  const selectClass = 'w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f]'
-
   if (loading) {
     return (
       <div className={`flex items-center justify-center py-8 ${className}`}>
@@ -411,6 +406,7 @@ export default function CaseServiceSelector({
             {/* Prisguide-knapp */}
             {!readOnly && (
               <button
+                type="button"
                 onClick={() => setShowCalculatorPanel(true)}
                 className="flex items-center gap-1 px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg transition-colors"
               >
@@ -442,11 +438,11 @@ export default function CaseServiceSelector({
                   {/* Antal */}
                   {!readOnly && (
                     <div className="flex items-center gap-1">
-                      <button onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                      <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
-                      <button onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                      <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
@@ -473,7 +469,7 @@ export default function CaseServiceSelector({
                     </div>
                   )}
                   {!readOnly && (
-                    <button onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                    <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -503,6 +499,7 @@ export default function CaseServiceSelector({
                     <p className="text-xs text-slate-500 text-center py-2">Inga tilläggstjänster hittades</p>
                   ) : filteredAddons.map(svc => (
                     <button
+                      type="button"
                       key={svc.id}
                       onClick={() => handleAddAddon(svc)}
                       disabled={saving}
@@ -521,6 +518,7 @@ export default function CaseServiceSelector({
                   ))}
                 </div>
                 <button
+                  type="button"
                   onClick={() => { setShowAddonPicker(false); setSearchAddon('') }}
                   className="text-xs text-slate-400 hover:text-white transition-colors"
                 >
@@ -529,6 +527,7 @@ export default function CaseServiceSelector({
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => setShowAddonPicker(true)}
                 className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#20c58f] transition-colors"
               >
@@ -551,6 +550,7 @@ export default function CaseServiceSelector({
       {/* ── B: ARTIKEL-KALKYLATOR (intern) ── */}
       <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
         <button
+          type="button"
           onClick={() => setShowArticleList(!showArticleList)}
           className="flex items-center justify-between w-full"
         >
@@ -593,11 +593,11 @@ export default function CaseServiceSelector({
                     </div>
                     {!readOnly && (
                       <div className="flex items-center gap-1">
-                        <button onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                        <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
-                        <button onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                        <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
@@ -606,7 +606,7 @@ export default function CaseServiceSelector({
                       {formatPrice(item.total_price)}
                     </span>
                     {!readOnly && (
-                      <button onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                      <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
@@ -639,6 +639,7 @@ export default function CaseServiceSelector({
                     return (
                       <div key={cat}>
                         <button
+                          type="button"
                           onClick={() => toggleCategory(cat)}
                           className="flex items-center gap-1.5 w-full px-2 py-1 text-xs font-medium text-slate-400 hover:text-white"
                         >
@@ -649,6 +650,7 @@ export default function CaseServiceSelector({
                           <div className="space-y-0.5 ml-2">
                             {catArticles.map(item => (
                               <button
+                                type="button"
                                 key={item.article.id}
                                 onClick={() => handleAddArticle(item)}
                                 disabled={saving}
