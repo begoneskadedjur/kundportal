@@ -84,7 +84,7 @@ export default function TeamChat() {
   const [newTitle, setNewTitle] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState<{ data: string; mimeType: string } | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ data?: string; mimeType?: string; url?: string; expiresAt?: string } | null>(null);
 
   // State för ärende-modal
   const [selectedCase, setSelectedCase] = useState<{
@@ -588,8 +588,12 @@ export default function TeamChat() {
               mimeType: response.image.mimeType
             }
           };
-          setMessages(prev => [...prev, aiMessage]);
-          await saveMessage(convId, 'assistant', `[Genererad bild] ${prompt}`);
+          setMessages(prev => [...prev, {
+            ...aiMessage,
+            generated_image_url: response.imageUrl,
+            generated_image_expires_at: response.imageExpiresAt
+          }]);
+          await saveMessage(convId, 'assistant', `[Genererad bild] ${prompt}`, undefined, undefined, response.imageUrl, response.imageExpiresAt);
           toast.success('Bild genererad!');
         } else if (response.response) {
           // Bara text (t.ex. om bildgenerering misslyckades)
@@ -895,33 +899,55 @@ export default function TeamChat() {
                       <div className="prose prose-invert prose-base max-w-none">
                         {renderMarkdownWithCaseLinks(msg.content)}
                       </div>
-                      {/* Visa genererad bild om den finns */}
-                      {msg.generated_image && (
-                        <div className="mt-3">
-                          <img
-                            src={`data:${msg.generated_image.mimeType};base64,${msg.generated_image.data}`}
-                            alt="Genererad bild"
-                            className="max-w-full max-h-96 rounded-lg border border-slate-600 shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => setLightboxImage(msg.generated_image!)}
-                          />
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              onClick={() => copyImageToClipboard(msg.generated_image!)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
-                            >
-                              <Copy className="w-4 h-4" />
-                              Kopiera
-                            </button>
-                            <button
-                              onClick={() => downloadImage(msg.generated_image!)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
-                            >
-                              <Download className="w-4 h-4" />
-                              Ladda ner
-                            </button>
+                      {/* Visa genererad bild om den finns — från state (nyss genererad) eller URL (laddad från DB) */}
+                      {(msg.generated_image || msg.generated_image_url) && (() => {
+                        const imgSrc = msg.generated_image
+                          ? `data:${msg.generated_image.mimeType};base64,${msg.generated_image.data}`
+                          : msg.generated_image_url!;
+                        const lightboxData = msg.generated_image
+                          ? { data: msg.generated_image.data, mimeType: msg.generated_image.mimeType, url: msg.generated_image_url, expiresAt: msg.generated_image_expires_at }
+                          : { url: msg.generated_image_url, expiresAt: msg.generated_image_expires_at };
+                        return (
+                          <div className="mt-3">
+                            <img
+                              src={imgSrc}
+                              alt="Genererad bild"
+                              className="max-w-full max-h-96 rounded-lg border border-slate-600 shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => setLightboxImage(lightboxData)}
+                            />
+                            <div className="flex gap-2 mt-2">
+                              {msg.generated_image && (
+                                <>
+                                  <button
+                                    onClick={() => copyImageToClipboard(msg.generated_image!)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                    Kopiera
+                                  </button>
+                                  <button
+                                    onClick={() => downloadImage(msg.generated_image!)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                    Ladda ner
+                                  </button>
+                                </>
+                              )}
+                              {msg.generated_image_url && (
+                                <a
+                                  href={msg.generated_image_url}
+                                  download
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Ladda ner
+                                </a>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -1104,23 +1130,38 @@ export default function TeamChat() {
         >
           <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <img
-              src={`data:${lightboxImage.mimeType};base64,${lightboxImage.data}`}
+              src={lightboxImage.data && lightboxImage.mimeType
+                ? `data:${lightboxImage.mimeType};base64,${lightboxImage.data}`
+                : lightboxImage.url!}
               alt="Genererad bild"
               className="max-w-full max-h-[85vh] rounded-xl shadow-2xl object-contain"
             />
             <div className="absolute top-3 right-3 flex gap-2">
-              <button
-                onClick={() => copyImageToClipboard(lightboxImage)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors"
-              >
-                <Copy className="w-4 h-4" /> Kopiera
-              </button>
-              <button
-                onClick={() => downloadImage(lightboxImage)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors"
-              >
-                <Download className="w-4 h-4" /> Ladda ner
-              </button>
+              {lightboxImage.data && lightboxImage.mimeType && (
+                <>
+                  <button
+                    onClick={() => copyImageToClipboard(lightboxImage as { data: string; mimeType: string })}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors"
+                  >
+                    <Copy className="w-4 h-4" /> Kopiera
+                  </button>
+                  <button
+                    onClick={() => downloadImage(lightboxImage as { data: string; mimeType: string })}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors"
+                  >
+                    <Download className="w-4 h-4" /> Ladda ner
+                  </button>
+                </>
+              )}
+              {lightboxImage.url && !lightboxImage.data && (
+                <a
+                  href={lightboxImage.url}
+                  download
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors"
+                >
+                  <Download className="w-4 h-4" /> Ladda ner
+                </a>
+              )}
               <button
                 onClick={() => setLightboxImage(null)}
                 className="p-1.5 bg-slate-800/90 hover:bg-slate-700 rounded-lg text-slate-200 transition-colors"
@@ -1128,6 +1169,11 @@ export default function TeamChat() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+            {lightboxImage.expiresAt && (
+              <p className="absolute bottom-3 left-0 right-0 text-center text-xs text-slate-400">
+                Bilden sparas i {Math.max(0, Math.ceil((new Date(lightboxImage.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} dagar till
+              </p>
+            )}
           </div>
         </div>
       )}

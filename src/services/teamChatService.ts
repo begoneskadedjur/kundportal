@@ -16,6 +16,8 @@ export interface TeamChatMessage {
     data: string;
     mimeType: string;
   };
+  generated_image_url?: string;
+  generated_image_expires_at?: string;
 }
 
 export interface TeamChatConversation {
@@ -44,6 +46,8 @@ export interface ChatResponse {
     data: string;
     mimeType: string;
   };
+  imageUrl?: string;
+  imageExpiresAt?: string;
   usage?: {
     model: string;
     input_tokens: number;
@@ -222,7 +226,9 @@ export async function saveMessage(
   role: 'user' | 'assistant',
   content: string,
   userId?: string,
-  imageUrls?: string[]
+  imageUrls?: string[],
+  generatedImageUrl?: string,
+  generatedImageExpiresAt?: string
 ): Promise<TeamChatMessage | null> {
   try {
     const { data, error } = await supabase
@@ -232,7 +238,9 @@ export async function saveMessage(
         role,
         content,
         user_id: userId,
-        image_urls: imageUrls
+        image_urls: imageUrls,
+        ...(generatedImageUrl ? { generated_image_url: generatedImageUrl } : {}),
+        ...(generatedImageExpiresAt ? { generated_image_expires_at: generatedImageExpiresAt } : {})
       })
       .select()
       .single();

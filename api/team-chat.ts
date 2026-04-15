@@ -1706,12 +1706,39 @@ async function handleImageGeneration(
     // Kolla om det finns genererad bild
     for (const part of result.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
+        const imageData = part.inlineData.data as string;
+        const imageMimeType = part.inlineData.mimeType || 'image/jpeg';
+
+        // Ladda upp till Supabase Storage för persistens (15 dagars TTL)
+        let imageUrl: string | undefined;
+        let imageExpiresAt: string | undefined;
+        try {
+          const supabaseAdmin = createClient(
+            process.env.SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+          );
+          const ext = imageMimeType === 'image/png' ? 'png' : imageMimeType === 'image/webp' ? 'webp' : 'jpg';
+          const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+          const imageBytes = Buffer.from(imageData, 'base64');
+          const { error: uploadError } = await supabaseAdmin.storage
+            .from('ai-generated-images')
+            .upload(filename, imageBytes, { contentType: imageMimeType });
+          if (!uploadError) {
+            const { data: urlData } = supabaseAdmin.storage
+              .from('ai-generated-images')
+              .getPublicUrl(filename);
+            imageUrl = urlData.publicUrl;
+            imageExpiresAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
+          }
+        } catch (storageError) {
+          console.error('Storage upload error (non-fatal):', storageError);
+        }
+
         return res.status(200).json({
           success: true,
-          image: {
-            data: part.inlineData.data,
-            mimeType: part.inlineData.mimeType
-          },
+          image: { data: imageData, mimeType: imageMimeType },
+          imageUrl,
+          imageExpiresAt,
           usage: {
             model: 'gemini-3.1-flash-image-preview',
             images_generated: 1,
