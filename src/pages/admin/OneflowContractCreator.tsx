@@ -469,8 +469,11 @@ export default function OneflowContractCreator() {
       return true
     }
 
-    // Produkter
-    if (currentStep === productsStep) return wizardData.selectedPriceListId !== null
+    // Produkter – om prefill finns behövs ingen prislista
+    if (currentStep === productsStep) {
+      if (wizardData.prefillServices && wizardData.prefillServices.length > 0) return true
+      return wizardData.selectedPriceListId !== null
+    }
     // Avtalsobjekt
     if (currentStep === agreementStep) return wizardData.agreementText.length > 0
     // Granskning
@@ -1121,64 +1124,102 @@ export default function OneflowContractCreator() {
           </div>
         )
 
-      case 6:
+      case 6: {
+        const hasPrefill = wizardData.prefillServices && wizardData.prefillServices.length > 0
+        const fmtSEK = (n: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
         return (
-          <div className="space-y-6 max-w-6xl mx-auto">
-            <div className="text-center mb-8">
+          <div className="space-y-4 max-w-2xl mx-auto">
+            <div className="text-center mb-6">
               <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
                 <ShoppingCart className="w-6 h-6 text-green-400" />
-                Prislista & Artiklar
+                Produkter
               </h3>
               <p className="text-slate-400">
-                Välj prislista och artiklar som ska ingå i {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}
+                {hasPrefill
+                  ? 'Tjänster och interna kostnader från ärendet'
+                  : `Välj prislista och artiklar som ska ingå i ${wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}`}
               </p>
             </div>
 
-            {wizardData.prefillServices && wizardData.prefillServices.length > 0 && (
-              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl mb-2">
-                <p className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wide">
-                  Tjänster från ärende
-                </p>
-                {wizardData.prefillServices.map(s => (
-                  <div key={s.id} className="flex justify-between items-center text-sm py-1 border-b border-slate-700/30 last:border-0">
-                    <span className="text-white">
-                      {s.service_code && <span className="text-xs text-slate-400 mr-1">{s.service_code}</span>}
-                      {s.service_name}
-                      {s.quantity > 1 && <span className="text-xs text-slate-500 ml-1">×{s.quantity}</span>}
-                    </span>
-                    <span className="text-slate-300 whitespace-nowrap ml-4">
-                      {new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(s.total_price)}
+            {hasPrefill ? (
+              <div className="space-y-3">
+                {/* Faktureringstjänster */}
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <p className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wide">
+                    Faktureringstjänster (ingår i offerten)
+                  </p>
+                  {wizardData.prefillServices!.map(s => (
+                    <div key={s.id} className="flex justify-between items-center py-1.5 border-b border-slate-700/30 last:border-0">
+                      <span className="text-sm text-white">
+                        {s.service_code && <span className="text-xs text-slate-400 mr-1">{s.service_code}</span>}
+                        {s.service_name}
+                        {s.quantity > 1 && <span className="text-xs text-slate-500 ml-1">×{s.quantity}</span>}
+                      </span>
+                      <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-4">
+                        {fmtSEK(s.total_price)}
+                      </span>
+                    </div>
+                  ))}
+                  {/* Totalsumma tjänster */}
+                  <div className="flex justify-between items-center pt-2 mt-1">
+                    <span className="text-xs text-slate-400">Totalt exkl. moms</span>
+                    <span className="text-sm font-bold text-white">
+                      {fmtSEK(wizardData.prefillServices!.reduce((s, i) => s + i.total_price, 0))}
                     </span>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <PriceListArticleSelector
-                  selectedPriceListId={wizardData.selectedPriceListId}
-                  onPriceListChange={(id) => updateWizardData('selectedPriceListId', id)}
-                  selectedArticles={wizardData.selectedArticles}
-                  onSelectionChange={handleArticleSelectionChange}
-                  customerType={wizardData.partyType as CustomerType}
-                  readOnly={!!wizardData.case_id && !!wizardData.customTotalPrice && wizardData.customTotalPrice > 0}
-                />
+                {/* Interna kostnadsartiklar (stöd för teknikern) */}
+                {wizardData.selectedArticles.length > 0 && (
+                  <div className="p-3 bg-slate-800/10 border border-slate-700/40 rounded-xl">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Interna kostnader
+                      </p>
+                      <span className="text-xs text-slate-600">(ingår ej i offerten)</span>
+                    </div>
+                    {wizardData.selectedArticles.map(item => (
+                      <div key={item.article.id} className="flex justify-between items-center py-1 border-b border-slate-700/20 last:border-0">
+                        <span className="text-sm text-slate-400">
+                          {item.article.code && <span className="text-xs text-slate-600 mr-1">{item.article.code}</span>}
+                          {item.article.name}
+                          {item.quantity > 1 && <span className="text-xs text-slate-600 ml-1">×{item.quantity}</span>}
+                        </span>
+                        <span className="text-sm text-slate-500 whitespace-nowrap ml-4">
+                          {fmtSEK(item.effectivePrice * item.quantity)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-
-              <div className="lg:col-span-1">
-                <div className="sticky top-4">
-                  <ArticleSummary
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2">
+                  <PriceListArticleSelector
+                    selectedPriceListId={wizardData.selectedPriceListId}
+                    onPriceListChange={(id) => updateWizardData('selectedPriceListId', id)}
                     selectedArticles={wizardData.selectedArticles}
+                    onSelectionChange={handleArticleSelectionChange}
                     customerType={wizardData.partyType as CustomerType}
-                    deductionType={wizardData.deductionType}
-                    customTotalPrice={wizardData.customTotalPrice}
+                    readOnly={!!wizardData.case_id && !!wizardData.customTotalPrice && wizardData.customTotalPrice > 0}
                   />
                 </div>
+                <div className="lg:col-span-1">
+                  <div className="sticky top-4">
+                    <ArticleSummary
+                      selectedArticles={wizardData.selectedArticles}
+                      customerType={wizardData.partyType as CustomerType}
+                      deductionType={wizardData.deductionType}
+                      customTotalPrice={wizardData.customTotalPrice}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )
+      }
 
       case 7:
         return (
