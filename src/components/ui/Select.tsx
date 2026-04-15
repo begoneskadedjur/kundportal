@@ -95,18 +95,12 @@ export default function Select({
     setOpen(false)
   }
 
-  // Rendera i #modal-root om det finns (för modaler med Portal), annars document.body
-  const portalTarget =
-    typeof document !== 'undefined'
-      ? (document.getElementById('modal-root') ?? document.body)
-      : null
-
-  const menu = open && portalTarget
+  const menu = open
     ? createPortal(
         <ul
           ref={menuRef}
           role="listbox"
-          style={menuStyle}
+          style={{ ...menuStyle, pointerEvents: 'auto' }}
           className="bg-slate-800 border border-slate-700 rounded-lg shadow-2xl overflow-y-auto py-1 max-h-64"
           onMouseDown={e => e.preventDefault()} // förhindra blur på knappen
         >
@@ -134,7 +128,7 @@ export default function Select({
             )
           })}
         </ul>,
-        portalTarget
+        document.getElementById('modal-root') ?? document.body
       )
     : null
 
