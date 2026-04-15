@@ -633,17 +633,37 @@ export default function TeamChat() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = (event.target?.result as string)?.split(',')[1];
-      if (base64) {
-        setSelectedImage({
-          base64,
-          mimeType: file.type
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+    const COMPRESS_THRESHOLD = 3 * 1024 * 1024; // 3 MB
+
+    if (file.size <= COMPRESS_THRESHOLD) {
+      // Liten bild — läs direkt utan komprimering
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = (event.target?.result as string)?.split(',')[1];
+        if (base64) setSelectedImage({ base64, mimeType: file.type });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // Stor bild — skala ner och komprimera via canvas för att hålla payload under Vercels 4.5 MB-gräns
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const MAX_DIM = 1024;
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM; }
+          else { width = Math.round(width * MAX_DIM / height); height = MAX_DIM; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+        const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+        setSelectedImage({ base64, mimeType: 'image/jpeg' });
+      };
+      img.src = objectUrl;
+    }
   };
 
   const handleDeleteConversation = async (convId: string) => {
