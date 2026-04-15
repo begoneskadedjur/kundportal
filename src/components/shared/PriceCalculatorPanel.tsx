@@ -55,7 +55,11 @@ export default function PriceCalculatorPanel({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -75,7 +79,7 @@ export default function PriceCalculatorPanel({
                 <Calculator className="w-4 h-4 text-[#20c58f]" />
                 <h2 className="text-base font-semibold text-white">Prisguide</h2>
               </div>
-              <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+              <button type="button" onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -161,8 +165,9 @@ export default function PriceCalculatorPanel({
 
             {/* Footer */}
             <div className="flex justify-end gap-2 px-4 py-2.5 border-t border-slate-700/50">
-              <Button variant="ghost" size="sm" onClick={onClose}>Avbryt</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={onClose}>Avbryt</Button>
               <Button
+                type="button"
                 variant="primary"
                 size="sm"
                 onClick={() => { onApplyPrice(Math.round(suggestedPrice)); onClose() }}
