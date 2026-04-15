@@ -200,8 +200,6 @@ function App() {
 
             </Route>
 
-            {/* OneflowContractCreator - bakåtkompatibilitet (redirect till layout-route) */}
-            <Route path="/technician/oneflow-contract-creator" element={<Navigate to="/technician/oneflow" replace />} />
 
             {/* Koordinator routes — nested under CoordinatorLayout med persistent sidebar */}
             <Route path="/koordinator" element={<CoordinatorLayout />}>
@@ -269,6 +267,7 @@ function App() {
               <Route path="inspection/:caseId" element={<ProtectedRoute requiredRole="technician"><StationInspectionModule /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole="technician"><Leads /></ProtectedRoute>} />
               <Route path="oneflow" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
+              <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="offer-follow-up" element={<ProtectedRoute requiredRole="technician"><OfferFollowUp /></ProtectedRoute>} />
               <Route path="min-kundresa" element={<ProtectedRoute requiredRole="technician"><TechnicianCustomerJourney /></ProtectedRoute>} />
               <Route path="equipment" element={<ProtectedRoute requiredRole="technician"><TechnicianEquipment /></ProtectedRoute>} />

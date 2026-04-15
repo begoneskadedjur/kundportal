@@ -52,6 +52,14 @@ interface WizardData {
   deductionType: 'rot' | 'rut' | 'none' | null
   customTotalPrice: number | null
   selectedProducts: SelectedProduct[]
+  prefillServices?: Array<{
+    id: string
+    service_name: string | null
+    service_code: string | null
+    unit_price: number
+    quantity: number
+    total_price: number
+  }>
   
   // Steg 7 - Avtalsobjekt
   agreementText: string
@@ -196,6 +204,8 @@ export default function OneflowContractCreator() {
             deductionType: customerData.deductionType || prev.deductionType,
             // Anpassat pris från ärendet (exkl moms)
             customTotalPrice: customerData.customTotalPrice ?? prev.customTotalPrice,
+            // Faktureringstjänster från ärendet (visas i steg 6)
+            prefillServices: customerData.prefillServices || prev.prefillServices,
           }))
           
           // Debug-logging för att spåra prefill-processen
@@ -1123,6 +1133,26 @@ export default function OneflowContractCreator() {
                 Välj prislista och artiklar som ska ingå i {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}
               </p>
             </div>
+
+            {wizardData.prefillServices && wizardData.prefillServices.length > 0 && (
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl mb-2">
+                <p className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wide">
+                  Tjänster från ärende
+                </p>
+                {wizardData.prefillServices.map(s => (
+                  <div key={s.id} className="flex justify-between items-center text-sm py-1 border-b border-slate-700/30 last:border-0">
+                    <span className="text-white">
+                      {s.service_code && <span className="text-xs text-slate-400 mr-1">{s.service_code}</span>}
+                      {s.service_name}
+                      {s.quantity > 1 && <span className="text-xs text-slate-500 ml-1">×{s.quantity}</span>}
+                    </span>
+                    <span className="text-slate-300 whitespace-nowrap ml-4">
+                      {new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(s.total_price)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">

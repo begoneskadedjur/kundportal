@@ -561,6 +561,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
     // Hämta ärendets artiklar för förifyllning
     let prefillArticles: any[] = []
+    let prefillServices: any[] = []
     let billingItems: any[] = []
     try {
       const caseType = currentCase.case_type === 'private' ? 'private' : 'business'
@@ -574,6 +575,16 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           quantity: item.quantity,
           notes: item.notes || undefined,
           caseBillingItemId: item.id
+        }))
+      prefillServices = billingItems
+        .filter(item => item.item_type === 'service')
+        .map(item => ({
+          id: item.id,
+          service_name: item.service_name,
+          service_code: item.service_code,
+          unit_price: item.unit_price,
+          quantity: item.quantity,
+          total_price: item.total_price,
         }))
     } catch (err) {
       console.warn('Kunde inte hämta ärendets artiklar:', err)
@@ -613,6 +624,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       selectedTemplate,
       selectedPriceListId,
       prefillArticles,
+      prefillServices,
       deductionType,
       customTotalPrice
     }));
