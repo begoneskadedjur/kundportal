@@ -36,8 +36,45 @@
   }
   
   /* Form elements bör ha ljus text */
-  input, textarea, select {
+  input, textarea {
     @apply text-white placeholder-slate-400;
+  }
+
+  /* Global select-styling – snygg chevron + konsekvent dark-tema */
+  select {
+    @apply text-white;
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: rgb(30 41 59); /* slate-800 */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1rem;
+    border: 1px solid rgb(51 65 85); /* slate-700 */
+    border-radius: 0.5rem;
+    padding: 0.375rem 2.25rem 0.375rem 0.75rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  select:hover:not(:disabled) {
+    border-color: rgb(71 85 105); /* slate-600 */
+  }
+
+  select:focus {
+    outline: none;
+    border-color: #20c58f;
+    box-shadow: 0 0 0 2px rgb(32 197 143 / 0.25);
+  }
+
+  select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Opt-out för selects som har sin egna custom-styling */
+  select.select-unstyled {
+    all: revert;
   }
 
   /* Ta bort pilknappar på number inputs */
