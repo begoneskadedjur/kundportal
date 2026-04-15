@@ -40,6 +40,7 @@ export default function Select({
   const [open, setOpen] = useState(false)
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({})
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLUListElement>(null)
 
   const selectedLabel = options.find(o => o.value === value)?.label ?? ''
 
@@ -53,11 +54,11 @@ export default function Select({
 
     setMenuStyle({
       position: 'fixed',
-      left: rect.left + window.scrollX,
+      left: rect.left,
       width: rect.width,
       ...(openUp
-        ? { bottom: window.innerHeight - rect.top - window.scrollY, top: 'auto' }
-        : { top: rect.bottom + window.scrollY + 4, bottom: 'auto' }),
+        ? { bottom: window.innerHeight - rect.top, top: 'auto' }
+        : { top: rect.bottom + 4, bottom: 'auto' }),
       zIndex: 9999,
     })
     setOpen(true)
@@ -67,7 +68,10 @@ export default function Select({
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
+      if (
+        buttonRef.current && !buttonRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) {
         setOpen(false)
       }
     }
@@ -94,6 +98,7 @@ export default function Select({
   const menu = open
     ? createPortal(
         <ul
+          ref={menuRef}
           role="listbox"
           style={menuStyle}
           className="bg-slate-800 border border-slate-700 rounded-lg shadow-2xl overflow-y-auto py-1 max-h-64"
