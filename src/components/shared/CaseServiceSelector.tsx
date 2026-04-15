@@ -126,8 +126,21 @@ export default function CaseServiceSelector({
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
+      // Lös upp artikelgrupp-ID från tjänsten om det inte skickats in
+      let resolvedArticleGroupId = articleGroupId ?? null
+      if (!resolvedArticleGroupId && primaryServiceId) {
+        const { data: svcRow } = await supabase.from('services').select('group_id').eq('id', primaryServiceId).single()
+        if (svcRow?.group_id) {
+          const { data: sgRow } = await supabase.from('service_groups').select('name').eq('id', svcRow.group_id).single()
+          if (sgRow?.name) {
+            const { data: agRow } = await supabase.from('article_groups').select('id').eq('name', sgRow.name).maybeSingle()
+            resolvedArticleGroupId = agRow?.id ?? null
+          }
+        }
+      }
+
       const [articlesData, itemsData, allServicesData, settingsData] = await Promise.all([
-        CaseBillingService.getArticlesWithPrices(customerId, articleGroupId),
+        CaseBillingService.getArticlesWithPrices(customerId, resolvedArticleGroupId),
         caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
         ServiceCatalogService.getAllActiveServices(),
         PricingSettingsService.get(),
