@@ -17,6 +17,7 @@ import {
   Building2
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import Select from '../ui/Select'
 
 export type MultisitePortalView = 'dashboard' | 'stations' | 'inspections' | 'cases' | 'reports' | 'quotes'
 
@@ -306,16 +307,15 @@ export default function MultisitePortalLayout({
         <div className="flex items-center gap-2">
           {/* Mobile site selector */}
           {showSiteSelector && (
-            <select
+            <Select
               value={selectedSiteId}
-              onChange={(e) => onSiteChange(e.target.value as string | 'all')}
-              className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white max-w-[120px]"
-            >
-              <option value="all">Alla enheter</option>
-              {sites.map(site => (
-                <option key={site.id} value={site.id}>{site.site_name}</option>
-              ))}
-            </select>
+              onChange={(v) => onSiteChange(v as string | 'all')}
+              options={[
+                { value: 'all', label: 'Alla enheter' },
+                ...sites.map(site => ({ value: site.id, label: site.site_name })),
+              ]}
+              className="w-36"
+            />
           )}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

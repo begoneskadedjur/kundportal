@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { Users, Plus, Edit3, Trash2, Save, X, Building2 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import type { CustomerContact } from '../../../types/database'
@@ -253,17 +254,11 @@ export default function CustomerContactsModal({
                 {isMultisite && (
                   <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">Kopplad till enhet</label>
-                    <select
+                    <Select
                       value={formData.customer_id}
-                      onChange={(e) => setFormData(prev => ({ ...prev, customer_id: e.target.value }))}
-                      className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f]"
-                    >
-                      {sites.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.site_name || s.company_name || 'Okänd enhet'}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setFormData(prev => ({ ...prev, customer_id: v }))}
+                      options={sites.map(s => ({ value: s.id, label: s.site_name || s.company_name || 'Okänd enhet' }))}
+                    />
                   </div>
                 )}
               </div>

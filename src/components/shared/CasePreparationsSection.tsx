@@ -21,6 +21,7 @@ import {
 } from '../../types/casePreparations'
 import { PREPARATION_CATEGORY_CONFIG } from '../../types/preparations'
 import Button from '../ui/Button'
+import Select from '../ui/Select'
 
 interface CasePreparationsSectionProps {
   caseId: string | null
@@ -175,18 +176,15 @@ export default function CasePreparationsSection({
                           Preparat{' '}
                           {pestType && pestType !== 'Övrigt' && `(filtrerat på ${pestType})`}
                         </label>
-                        <select
+                        <Select
                           value={selectedPreparationId}
-                          onChange={(e) => setSelectedPreparationId(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
-                        >
-                          <option value="">Välj preparat...</option>
-                          {availablePreparations.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} {p.registration_number ? `(${p.registration_number})` : ''}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setSelectedPreparationId}
+                          placeholder="Välj preparat..."
+                          options={availablePreparations.map(p => ({
+                            value: p.id,
+                            label: `${p.name}${p.registration_number ? ` (${p.registration_number})` : ''}`,
+                          }))}
+                        />
                         {availablePreparations.length === 0 && (
                           <p className="text-xs text-amber-400 mt-1">
                             Inga preparat hittades för{' '}
@@ -236,17 +234,14 @@ export default function CasePreparationsSection({
                           <label className="block text-xs font-medium text-slate-400 mb-1">
                             Enhet
                           </label>
-                          <select
+                          <Select
                             value={unit}
-                            onChange={(e) => setUnit(e.target.value as PreparationUnit)}
-                            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
-                          >
-                            {Object.entries(PREPARATION_UNIT_CONFIG).map(([key, config]) => (
-                              <option key={key} value={key}>
-                                {config.label}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(v) => setUnit(v as PreparationUnit)}
+                            options={Object.entries(PREPARATION_UNIT_CONFIG).map(([key, config]) => ({
+                              value: key,
+                              label: config.label,
+                            }))}
+                          />
                         </div>
                       </div>
 

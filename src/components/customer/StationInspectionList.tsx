@@ -23,6 +23,7 @@ import type { OutdoorInspectionWithRelations } from '../../types/inspectionSessi
 import type { IndoorStationInspectionWithRelations, InspectionStatus } from '../../types/indoor'
 import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
 import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
+import Select from '../ui/Select'
 
 type InspectionItem = {
   id: string
@@ -280,28 +281,28 @@ export function StationInspectionList({
             <Filter className="w-4 h-4 text-slate-400 hidden md:block" />
 
             {/* Statusfilter */}
-            <select
+            <Select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as InspectionStatus | 'all')}
-              className="px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            >
-              <option value="all">Alla statusar ({stats.total})</option>
-              <option value="ok">OK ({stats.ok})</option>
-              <option value="activity">Aktivitet ({stats.activity})</option>
-              <option value="needs_service">Service ({stats.needsService})</option>
-              <option value="replaced">Utbytt ({stats.replaced})</option>
-            </select>
+              onChange={(v) => setFilterStatus(v as InspectionStatus | 'all')}
+              options={[
+                { value: 'all', label: `Alla statusar (${stats.total})` },
+                { value: 'ok', label: `OK (${stats.ok})` },
+                { value: 'activity', label: `Aktivitet (${stats.activity})` },
+                { value: 'needs_service', label: `Service (${stats.needsService})` },
+                { value: 'replaced', label: `Utbytt (${stats.replaced})` },
+              ]}
+            />
 
             {/* Platsfilter */}
-            <select
+            <Select
               value={filterLocation}
-              onChange={(e) => setFilterLocation(e.target.value as 'all' | 'outdoor' | 'indoor')}
-              className="px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            >
-              <option value="all">Alla platser</option>
-              <option value="outdoor">Utomhus ({stats.outdoor})</option>
-              <option value="indoor">Inomhus ({stats.indoor})</option>
-            </select>
+              onChange={(v) => setFilterLocation(v as 'all' | 'outdoor' | 'indoor')}
+              options={[
+                { value: 'all', label: 'Alla platser' },
+                { value: 'outdoor', label: `Utomhus (${stats.outdoor})` },
+                { value: 'indoor', label: `Inomhus (${stats.indoor})` },
+              ]}
+            />
           </div>
         </div>
 

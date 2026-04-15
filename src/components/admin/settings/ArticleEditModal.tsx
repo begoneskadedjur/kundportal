@@ -11,6 +11,7 @@ import {
   FileText,
   Check
 } from 'lucide-react'
+import Select from '../../ui/Select'
 import { ArticleService } from '../../../services/articleService'
 import { PriceListService } from '../../../services/priceListService'
 import { ArticleGroupService } from '../../../services/articleGroupService'
@@ -466,20 +467,16 @@ export function ArticleEditModal({
               <label className="block text-sm font-medium text-white mb-1">
                 Momssats <span className="text-red-400">*</span>
               </label>
-              <div className="relative">
-                <select
-                  value={vatRate}
-                  onChange={(e) => setVatRate(e.target.value)}
-                  className={`w-full px-4 py-2 bg-slate-900 border rounded-lg text-white focus:outline-none focus:ring-2 ${
-                    errors.vatRate ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-blue-500'
-                  }`}
-                >
-                  <option value="25">25%</option>
-                  <option value="12">12%</option>
-                  <option value="6">6%</option>
-                  <option value="0">0%</option>
-                </select>
-              </div>
+              <Select
+                value={vatRate}
+                onChange={setVatRate}
+                options={[
+                  { value: '25', label: '25%' },
+                  { value: '12', label: '12%' },
+                  { value: '6', label: '6%' },
+                  { value: '0', label: '0%' },
+                ]}
+              />
               {errors.vatRate && <p className="text-red-400 text-xs mt-1">{errors.vatRate}</p>}
             </div>
           </div>
@@ -576,15 +573,11 @@ export function ArticleEditModal({
                       <label className="block text-sm font-medium text-white mb-1">
                         Doseringsenhet
                       </label>
-                      <select
+                      <Select
                         value={dosageUnit}
-                        onChange={(e) => setDosageUnit(e.target.value as DosageUnit)}
-                        className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      >
-                        {(Object.keys(DOSAGE_UNIT_CONFIG) as DosageUnit[]).map(u => (
-                          <option key={u} value={u}>{DOSAGE_UNIT_CONFIG[u].label} ({u})</option>
-                        ))}
-                      </select>
+                        onChange={(v) => setDosageUnit(v as DosageUnit)}
+                        options={(Object.keys(DOSAGE_UNIT_CONFIG) as DosageUnit[]).map(u => ({ value: u, label: `${DOSAGE_UNIT_CONFIG[u].label} (${u})` }))}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-white mb-1">

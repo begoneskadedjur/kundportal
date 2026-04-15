@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
+import Select from '../ui/Select'
 import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
@@ -439,20 +440,15 @@ export default function InspectionCaseModal({
                   <label className="block text-xs font-medium text-slate-400 mb-2">
                     Vem ska motta offerten?
                   </label>
-                  <select
+                  <Select
                     value={selectedRecipient ? selectedRecipient.role : ''}
-                    onChange={(e) => {
-                      const role = e.target.value as 'platsansvarig' | 'regionchef' | 'verksamhetschef'
-                      const option = getRecipientOptions().find(opt => opt.role === role)
-                      setSelectedRecipient(option || null)
+                    onChange={(role) => {
+                      const option = getRecipientOptions().find(opt => opt.role === role) ?? null
+                      setSelectedRecipient(option)
                     }}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                  >
-                    <option value="">Välj mottagare...</option>
-                    {getRecipientOptions().map((option, index) => (
-                      <option key={index} value={option.role}>{option.label}</option>
-                    ))}
-                  </select>
+                    placeholder="Välj mottagare..."
+                    options={getRecipientOptions().map(opt => ({ value: opt.role, label: opt.label }))}
+                  />
                 </div>
               )}
 
@@ -760,17 +756,12 @@ export default function InspectionCaseModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
-                  <select
-                    name="status"
+                  <Select
                     value={formData.status}
-                    onChange={handleChange}
+                    onChange={(v) => setFormData(prev => ({ ...prev, status: v }))}
                     disabled={isCustomerView}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white disabled:opacity-60"
-                  >
-                    {DROPDOWN_STATUSES.map(status => (
-                      <option key={status} value={status}>{status}</option>
-                    ))}
-                  </select>
+                    options={DROPDOWN_STATUSES.map(s => ({ value: s, label: s }))}
+                  />
                 </div>
               </div>
               <div>

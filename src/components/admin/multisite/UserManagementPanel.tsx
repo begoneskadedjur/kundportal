@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 import toast from 'react-hot-toast'
 
 interface UserManagementPanelProps {
@@ -500,15 +501,15 @@ export default function UserManagementPanel({
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Roll *
                 </label>
-                <select
+                <Select
                   value={newUser.role}
-                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as MultisiteUserRoleType, selectedSites: [] })}
-                  className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="verksamhetschef">Verksamhetschef</option>
-                  <option value="regionchef">Regionchef</option>
-                  <option value="platsansvarig">Platsansvarig</option>
-                </select>
+                  onChange={(v) => setNewUser({ ...newUser, role: v as MultisiteUserRoleType, selectedSites: [] })}
+                  options={[
+                    { value: 'verksamhetschef', label: 'Verksamhetschef' },
+                    { value: 'regionchef', label: 'Regionchef' },
+                    { value: 'platsansvarig', label: 'Platsansvarig' },
+                  ]}
+                />
               </div>
 
               {/* Enhetsväljare för Regionchef och Platsansvarig */}

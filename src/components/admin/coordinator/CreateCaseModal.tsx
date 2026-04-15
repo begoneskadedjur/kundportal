@@ -20,6 +20,7 @@ import { CaseNumberService } from '../../../services/caseNumberService';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
 import Input from '../../ui/Input';
+import Select from '../../ui/Select';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 
@@ -1255,17 +1256,17 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Tidsåtgång</label>
-                        <select
-                          value={timeSlotDuration}
-                          onChange={e => setTimeSlotDuration(Number(e.target.value))}
-                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
-                        >
-                          <option value={60}>1 timme</option>
-                          <option value={90}>1.5 timmar</option>
-                          <option value={120}>2 timmar</option>
-                          <option value={180}>3 timmar</option>
-                          <option value={240}>4 timmar</option>
-                        </select>
+                        <Select
+                          value={String(timeSlotDuration)}
+                          onChange={(v) => setTimeSlotDuration(Number(v))}
+                          options={[
+                            { value: '60', label: '1 timme' },
+                            { value: '90', label: '1.5 timmar' },
+                            { value: '120', label: '2 timmar' },
+                            { value: '180', label: '3 timmar' },
+                            { value: '240', label: '4 timmar' },
+                          ]}
+                        />
                       </div>
                     </div>
 
@@ -1433,46 +1434,36 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Ansvarig tekniker *</label>
-                        <select
-                          name="primary_assignee_id"
+                        <Select
                           value={formData.primary_assignee_id || ''}
-                          onChange={handleChange}
-                          required
-                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
-                        >
-                          <option value="" disabled>Välj tekniker...</option>
-                          {technicians.map(t => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                        </select>
+                          onChange={(v) => setFormData(prev => ({ ...prev, primary_assignee_id: v }))}
+                          placeholder="Välj tekniker..."
+                          options={technicians.map(t => ({ value: t.id, label: t.name }))}
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Extra tekniker (valfri)</label>
-                        <select
-                          name="secondary_assignee_id"
+                        <Select
                           value={formData.secondary_assignee_id || ''}
-                          onChange={handleChange}
-                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
-                        >
-                          <option value="">Ingen vald</option>
-                          {technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.tertiary_assignee_id).map(t => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                        </select>
+                          onChange={(v) => setFormData(prev => ({ ...prev, secondary_assignee_id: v }))}
+                          placeholder="Ingen vald"
+                          options={[
+                            { value: '', label: 'Ingen vald' },
+                            ...technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.tertiary_assignee_id).map(t => ({ value: t.id, label: t.name })),
+                          ]}
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Extra tekniker 2 (valfri)</label>
-                        <select
-                          name="tertiary_assignee_id"
+                        <Select
                           value={formData.tertiary_assignee_id || ''}
-                          onChange={handleChange}
-                          className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white"
-                        >
-                          <option value="">Ingen vald</option>
-                          {technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.secondary_assignee_id).map(t => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                        </select>
+                          onChange={(v) => setFormData(prev => ({ ...prev, tertiary_assignee_id: v }))}
+                          placeholder="Ingen vald"
+                          options={[
+                            { value: '', label: 'Ingen vald' },
+                            ...technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.secondary_assignee_id).map(t => ({ value: t.id, label: t.name })),
+                          ]}
+                        />
                       </div>
                     </div>
 
@@ -1597,20 +1588,31 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-400 mb-1">Tidsåtgång</label>
-                      <select value={timeSlotDuration} onChange={e => setTimeSlotDuration(Number(e.target.value))} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
-                          <option value={60}>1 timme</option><option value={90}>1.5 timmar</option><option value={120}>2 timmar</option><option value={180}>3 timmar</option>
-                      </select>
+                      <Select
+                        value={String(timeSlotDuration)}
+                        onChange={(v) => setTimeSlotDuration(Number(v))}
+                        options={[
+                          { value: '60', label: '1 timme' },
+                          { value: '90', label: '1.5 timmar' },
+                          { value: '120', label: '2 timmar' },
+                          { value: '180', label: '3 timmar' },
+                        ]}
+                      />
                     </div>
                   </div>
 
                   <div className="pt-3 border-t border-slate-700 space-y-3">
                     <div>
                       <label className="block text-xs font-medium text-slate-400 mb-1">Antal tekniker som krävs</label>
-                      <select value={numberOfTechnicians} onChange={e => setNumberOfTechnicians(Number(e.target.value))} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white">
-                          <option value={1}>1 tekniker (Hitta bästa individ)</option>
-                          <option value={2}>2 tekniker (Hitta bästa team)</option>
-                          <option value={3}>3 tekniker (Hitta bästa team)</option>
-                      </select>
+                      <Select
+                        value={String(numberOfTechnicians)}
+                        onChange={(v) => setNumberOfTechnicians(Number(v))}
+                        options={[
+                          { value: '1', label: '1 tekniker (Hitta bästa individ)' },
+                          { value: '2', label: '2 tekniker (Hitta bästa team)' },
+                          { value: '3', label: '3 tekniker (Hitta bästa team)' },
+                        ]}
+                      />
                     </div>
 
                     {/* Checkbox för att välja tekniker (endast för single booking) */}

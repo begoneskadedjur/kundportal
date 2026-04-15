@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 import { ServiceCatalogService } from '../../../services/servicesCatalogService'
 import type { Service, ServiceWithGroup, ServiceGroup, CreateServiceInput, UpdateServiceInput } from '../../../types/services'
 import { SERVICE_UNITS } from '../../../types/services'
@@ -166,11 +167,11 @@ export default function ServiceCatalogEditModal({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Enhet</label>
-                  <select value={unit} onChange={(e) => setUnit(e.target.value)} className={selectClass}>
-                    {SERVICE_UNITS.map((u) => (
-                      <option key={u} value={u}>{u}</option>
-                    ))}
-                  </select>
+                  <Select
+                    value={unit}
+                    onChange={setUnit}
+                    options={SERVICE_UNITS.map(u => ({ value: u, label: u }))}
+                  />
                 </div>
               </div>
 
@@ -186,12 +187,15 @@ export default function ServiceCatalogEditModal({
 
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Grupp</label>
-                <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={selectClass}>
-                  <option value="">Ingen grupp</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>{g.name}</option>
-                  ))}
-                </select>
+                <Select
+                  value={groupId}
+                  onChange={setGroupId}
+                  placeholder="Ingen grupp"
+                  options={[
+                    { value: '', label: 'Ingen grupp' },
+                    ...groups.map(g => ({ value: g.id, label: g.name }))
+                  ]}
+                />
               </div>
 
               <div>

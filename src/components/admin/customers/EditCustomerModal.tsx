@@ -5,6 +5,7 @@ import { Building2, Save, AlertCircle, Hash } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { CustomerGroupService } from '../../../services/customerGroupService'
@@ -251,44 +252,44 @@ export default function EditCustomerModal({
             />
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Företagstyp</label>
-              <select
+              <Select
                 value={formData.business_type || ''}
-                onChange={(e) => handleInputChange('business_type', e.target.value)}
-                className={selectStyles}
-              >
-                <option value="">Välj typ</option>
-                <option value="private">Privatperson</option>
-                <option value="business">Företag</option>
-                <option value="organization">Organisation</option>
-              </select>
+                onChange={(v) => handleInputChange('business_type', v)}
+                placeholder="Välj typ"
+                options={[
+                  { value: 'private', label: 'Privatperson' },
+                  { value: 'business', label: 'Företag' },
+                  { value: 'organization', label: 'Organisation' },
+                ]}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Avtalstyp</label>
-              <select
+              <Select
                 value={formData.contract_type || ''}
-                onChange={(e) => handleInputChange('contract_type', e.target.value)}
-                className={selectStyles}
-              >
-                <option value="">Välj avtalstyp</option>
-                <option value="Skadedjursavtal">Skadedjursavtal</option>
-                <option value="Avtal Betesstationer">Avtal Betesstationer</option>
-                <option value="Avtal Betongstationer">Avtal Betongstationer</option>
-                <option value="Avtal Mekaniska fällor">Avtal Mekaniska fällor</option>
-                <option value="Avtal Indikationsfällor">Avtal Indikationsfällor</option>
-              </select>
+                onChange={(v) => handleInputChange('contract_type', v)}
+                placeholder="Välj avtalstyp"
+                options={[
+                  { value: 'Skadedjursavtal', label: 'Skadedjursavtal' },
+                  { value: 'Avtal Betesstationer', label: 'Avtal Betesstationer' },
+                  { value: 'Avtal Betongstationer', label: 'Avtal Betongstationer' },
+                  { value: 'Avtal Mekaniska fällor', label: 'Avtal Mekaniska fällor' },
+                  { value: 'Avtal Indikationsfällor', label: 'Avtal Indikationsfällor' },
+                ]}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Kundstorlek</label>
-              <select
+              <Select
                 value={formData.customer_size || ''}
-                onChange={(e) => handleInputChange('customer_size', e.target.value || null)}
-                className={selectStyles}
-              >
-                <option value="">Välj storlek</option>
-                <option value="small">Liten</option>
-                <option value="medium">Medel</option>
-                <option value="large">Stor</option>
-              </select>
+                onChange={(v) => handleInputChange('customer_size', v || null)}
+                placeholder="Välj storlek"
+                options={[
+                  { value: 'small', label: 'Liten' },
+                  { value: 'medium', label: 'Medel' },
+                  { value: 'large', label: 'Stor' },
+                ]}
+              />
             </div>
           </div>
         </div>
@@ -302,16 +303,12 @@ export default function EditCustomerModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Kundgrupp</label>
-              <select
+              <Select
                 value={formData.customer_group_id as string || ''}
-                onChange={(e) => handleInputChange('customer_group_id', e.target.value || null)}
-                className={selectStyles}
-              >
-                <option value="">Välj kundgrupp</option>
-                {customerGroups.map(g => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
+                onChange={(v) => handleInputChange('customer_group_id', v || null)}
+                placeholder="Välj kundgrupp"
+                options={customerGroups.map(g => ({ value: g.id, label: g.name }))}
+              />
             </div>
             <Input
               label="Kundnummer"

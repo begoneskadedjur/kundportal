@@ -13,6 +13,7 @@ import {
   TrendingUp
 } from 'lucide-react'
 import Button from '../../ui/Button'
+import Select from '../../ui/Select'
 import { LeadStatus, LeadPriority, LEAD_STATUS_DISPLAY } from '../../../types/database'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -292,17 +293,17 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Prioritet
           </label>
-          <select
+          <Select
             value={localFilters.priority}
-            onChange={(e) => handleFilterChange('priority', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
-          >
-            <option value="all">Alla prioriteter</option>
-            <option value="urgent">Brådskande</option>
-            <option value="high">Hög</option>
-            <option value="medium">Medel</option>
-            <option value="low">Låg</option>
-          </select>
+            onChange={(v) => handleFilterChange('priority', v)}
+            options={[
+              { value: 'all', label: 'Alla prioriteter' },
+              { value: 'urgent', label: 'Brådskande' },
+              { value: 'high', label: 'Hög' },
+              { value: 'medium', label: 'Medel' },
+              { value: 'low', label: 'Låg' },
+            ]}
+          />
         </div>
 
         {/* Tilldelad till */}
@@ -311,15 +312,15 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             <User className="w-4 h-4 inline mr-1" />
             Tilldelad till
           </label>
-          <select
+          <Select
             value={localFilters.assignedTo}
-            onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
-          >
-            <option value="all">Alla användare</option>
-            <option value="me">Mina leads</option>
-            <option value="unassigned">Ej tilldelade</option>
-          </select>
+            onChange={(v) => handleFilterChange('assignedTo', v)}
+            options={[
+              { value: 'all', label: 'Alla användare' },
+              { value: 'me', label: 'Mina leads' },
+              { value: 'unassigned', label: 'Ej tilldelade' },
+            ]}
+          />
         </div>
 
         {/* Skapad av */}
@@ -327,14 +328,14 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Skapad av
           </label>
-          <select
+          <Select
             value={localFilters.createdBy}
-            onChange={(e) => handleFilterChange('createdBy', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
-          >
-            <option value="all">Alla användare</option>
-            <option value="me">Skapade av mig</option>
-          </select>
+            onChange={(v) => handleFilterChange('createdBy', v)}
+            options={[
+              { value: 'all', label: 'Alla användare' },
+              { value: 'me', label: 'Skapade av mig' },
+            ]}
+          />
         </div>
 
         {/* Företagsstorlek */}
@@ -343,17 +344,17 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             <Building className="w-4 h-4 inline mr-1" />
             Företagsstorlek
           </label>
-          <select
+          <Select
             value={localFilters.companySize}
-            onChange={(e) => handleFilterChange('companySize', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
-          >
-            <option value="all">Alla storlekar</option>
-            <option value="small">Litet</option>
-            <option value="medium">Medelstort</option>
-            <option value="large">Stort</option>
-            <option value="enterprise">Koncern</option>
-          </select>
+            onChange={(v) => handleFilterChange('companySize', v)}
+            options={[
+              { value: 'all', label: 'Alla storlekar' },
+              { value: 'small', label: 'Litet' },
+              { value: 'medium', label: 'Medelstort' },
+              { value: 'large', label: 'Stort' },
+              { value: 'enterprise', label: 'Koncern' },
+            ]}
+          />
         </div>
 
         {/* Kontaktmetod */}
@@ -361,16 +362,16 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Kontaktmetod
           </label>
-          <select
+          <Select
             value={localFilters.contactMethod}
-            onChange={(e) => handleFilterChange('contactMethod', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
-          >
-            <option value="all">Alla metoder</option>
-            <option value="mail">Email</option>
-            <option value="phone">Telefon</option>
-            <option value="visit">Besök</option>
-          </select>
+            onChange={(v) => handleFilterChange('contactMethod', v)}
+            options={[
+              { value: 'all', label: 'Alla metoder' },
+              { value: 'mail', label: 'Email' },
+              { value: 'phone', label: 'Telefon' },
+              { value: 'visit', label: 'Besök' },
+            ]}
+          />
         </div>
 
         {/* Källa */}
@@ -421,17 +422,17 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             <Calendar className="w-4 h-4 inline mr-1" />
             Skapad
           </label>
-          <select
+          <Select
             value={localFilters.dateRange}
-            onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
-          >
-            <option value="all">Alla datum</option>
-            <option value="today">Idag</option>
-            <option value="week">Denna vecka</option>
-            <option value="month">Denna månad</option>
-            <option value="custom">Anpassat</option>
-          </select>
+            onChange={(v) => handleFilterChange('dateRange', v)}
+            options={[
+              { value: 'all', label: 'Alla datum' },
+              { value: 'today', label: 'Idag' },
+              { value: 'week', label: 'Denna vecka' },
+              { value: 'month', label: 'Denna månad' },
+              { value: 'custom', label: 'Anpassat' },
+            ]}
+          />
         </div>
       </div>
 

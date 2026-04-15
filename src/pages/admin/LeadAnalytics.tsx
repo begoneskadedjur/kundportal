@@ -11,6 +11,7 @@ import {
 import { toast } from 'react-hot-toast'
 
 import Button from '../../components/ui/Button'
+import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 
 // Analytics components (to be implemented)
@@ -274,17 +275,17 @@ const LeadAnalytics: React.FC = () => {
           <p className="text-sm text-slate-400 mt-1">Analyser och insikter från lead-pipelinen</p>
         </div>
         <div className="flex items-center gap-2">
-          <select
+          <Select
             value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as any)}
-            className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-          >
-            <option value="all">Alla leads</option>
-            <option value="7d">Senaste 7 dagarna</option>
-            <option value="30d">Senaste 30 dagarna</option>
-            <option value="90d">Senaste 90 dagarna</option>
-            <option value="1y">Senaste året</option>
-          </select>
+            onChange={(v) => setDateRange(v as any)}
+            options={[
+              { value: 'all', label: 'Alla leads' },
+              { value: '7d', label: 'Senaste 7 dagarna' },
+              { value: '30d', label: 'Senaste 30 dagarna' },
+              { value: '90d', label: 'Senaste 90 dagarna' },
+              { value: '1y', label: 'Senaste året' },
+            ]}
+          />
           <button
             onClick={handleRefresh}
             disabled={refreshing}

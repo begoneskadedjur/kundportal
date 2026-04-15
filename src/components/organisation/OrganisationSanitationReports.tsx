@@ -6,6 +6,7 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
+import Select from '../ui/Select'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 
@@ -317,35 +318,34 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
             {uniqueSitesWithReports.size > 1 && (
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-slate-400" />
-                <select
+                <Select
                   value={selectedSite}
-                  onChange={(e) => setSelectedSite(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-sm text-white"
-                >
-                  <option value="all">Alla enheter</option>
-                  {Array.from(uniqueSitesWithReports).map(siteId => (
-                    <option key={siteId} value={siteId}>
-                      {getSiteName(siteId)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedSite}
+                  options={[
+                    { value: 'all', label: 'Alla enheter' },
+                    ...Array.from(uniqueSitesWithReports).map(siteId => ({
+                      value: siteId ?? '',
+                      label: getSiteName(siteId),
+                    })),
+                  ]}
+                />
               </div>
             )}
 
             {/* Date filter */}
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-slate-400" />
-              <select
+              <Select
                 value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value as any)}
-                className="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-sm text-white"
-              >
-                <option value="all">Alla perioder</option>
-                <option value="30d">Senaste 30 dagar</option>
-                <option value="3m">Senaste 3 månader</option>
-                <option value="6m">Senaste 6 månader</option>
-                <option value="1y">Senaste året</option>
-              </select>
+                onChange={(v) => setDateFilter(v as any)}
+                options={[
+                  { value: 'all', label: 'Alla perioder' },
+                  { value: '30d', label: 'Senaste 30 dagar' },
+                  { value: '3m', label: 'Senaste 3 månader' },
+                  { value: '6m', label: 'Senaste 6 månader' },
+                  { value: '1y', label: 'Senaste året' },
+                ]}
+              />
             </div>
 
             {/* Search */}

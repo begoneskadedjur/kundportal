@@ -14,6 +14,7 @@ import { OFFER_STATUS_CONFIG } from '../../../types/casePipeline'
 import { CommentThread } from './CommentThread'
 import CommentSection from '../../communication/CommentSection'
 import type { FollowUpOffer, FollowUpSortBy, FollowUpStatusFilter } from '../../../services/offerFollowUpService'
+import Select from '../../ui/Select'
 
 interface FollowUpTableProps {
   offers: FollowUpOffer[]
@@ -541,15 +542,12 @@ export function FollowUpTable({
         <div className="flex-1" />
 
         {/* Sortering */}
-        <select
+        <Select
           value={sortBy}
-          onChange={e => onSortChange(e.target.value as FollowUpSortBy)}
-          className="px-2.5 py-1 bg-slate-800/50 border border-slate-700 rounded-lg text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-        >
-          {SORT_OPTIONS.map(s => (
-            <option key={s.key} value={s.key}>{s.label}</option>
-          ))}
-        </select>
+          onChange={v => onSortChange(v as FollowUpSortBy)}
+          options={SORT_OPTIONS.map(s => ({ value: s.key, label: s.label }))}
+          className="w-36"
+        />
 
         <span className="text-xs text-slate-500">{sorted.length} st</span>
 

@@ -6,6 +6,7 @@ import { AlertTriangle, Search, RefreshCw, Calendar, Lock, Plus, X, Clock, User,
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
+import Select from '../../components/ui/Select'
 import type { CaseIncident, IncidentType } from '../../types/caseIncidents'
 import { INCIDENT_TYPE_CONFIG } from '../../types/caseIncidents'
 import DatePicker from 'react-datepicker'
@@ -401,16 +402,16 @@ export default function IncidentsPage() {
             </div>
             {availableEmployees.length > 0 && (
               <div className="flex gap-2">
-                <select
+                <Select
                   value={addEmployeeId}
-                  onChange={(e) => setAddEmployeeId(e.target.value)}
-                  className="flex-1 px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f]"
-                >
-                  <option value="">Lägg till anställd...</option>
-                  {availableEmployees.map(e => (
-                    <option key={e.id} value={e.id}>{e.name}</option>
-                  ))}
-                </select>
+                  onChange={setAddEmployeeId}
+                  placeholder="Lägg till anställd..."
+                  options={[
+                    { value: '', label: 'Lägg till anställd...' },
+                    ...availableEmployees.map(e => ({ value: e.id, label: e.name }))
+                  ]}
+                  className="flex-1"
+                />
                 <button
                   type="button"
                   onClick={addEmployee}

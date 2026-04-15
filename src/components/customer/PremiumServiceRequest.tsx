@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react'
 import { X, AlertCircle, Calendar, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Trash2 } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
+import Select from '../ui/Select'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -294,21 +295,17 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Typ av skadedjur (om känt)
               </label>
-              <select
+              <Select
                 value={pestType}
-                onChange={(e) => {
-                  setPestType(e.target.value)
-                  if (e.target.value !== 'Övrigt') {
+                onChange={(v) => {
+                  setPestType(v)
+                  if (v !== 'Övrigt') {
                     setOtherPestType('')
                   }
                 }}
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                <option value="">Välj skadedjur...</option>
-                {pestTypes.map(pest => (
-                  <option key={pest} value={pest}>{pest}</option>
-                ))}
-              </select>
+                placeholder="Välj skadedjur..."
+                options={pestTypes.map(p => ({ value: p, label: p }))}
+              />
               
               {pestType === 'Övrigt' && (
                 <Input

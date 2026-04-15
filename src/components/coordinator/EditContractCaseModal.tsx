@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
+import Select from '../ui/Select'
 import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
@@ -1338,28 +1339,16 @@ export default function EditContractCaseModal({
                       Laddar mottagare...
                     </div>
                   ) : (
-                    <select
-                      value={selectedRecipient ? `${selectedRecipient.role}` : ''}
-                      onChange={(e) => {
-                        const role = e.target.value as 'platsansvarig' | 'regionchef' | 'verksamhetschef'
-                        const option = getRecipientOptions().find(opt => opt.role === role)
-                        setSelectedRecipient(option || null)
+                    <Select
+                      value={selectedRecipient?.role ?? ''}
+                      onChange={(role) => {
+                        const option = getRecipientOptions().find(opt => opt.role === role) ?? null
+                        setSelectedRecipient(option)
                       }}
                       disabled={getRecipientOptions().length === 0}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <option value="">
-                        {getRecipientOptions().length === 0 
-                          ? 'Inga mottagare tillgängliga...' 
-                          : 'Välj mottagare...'
-                        }
-                      </option>
-                      {getRecipientOptions().map((option, index) => (
-                        <option key={index} value={option.role}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder={getRecipientOptions().length === 0 ? 'Inga mottagare tillgängliga...' : 'Välj mottagare...'}
+                      options={getRecipientOptions().map(opt => ({ value: opt.role, label: opt.label }))}
+                    />
                   )}
                   {selectedRecipient && selectedRecipient.role === 'regionchef' && (
                     <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-300">
@@ -1655,16 +1644,13 @@ export default function EditContractCaseModal({
                 )}
                 {!isCustomerView && <div className="w-px h-8 bg-slate-700/50 flex-shrink-0" />}
                 {/* Status */}
-                <select
+                <Select
                   value={formData.status}
-                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                  className="w-auto px-2.5 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                  onChange={(v) => setFormData(prev => ({ ...prev, status: v }))}
                   disabled={isCustomerView}
-                >
-                  {DROPDOWN_STATUSES.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
+                  options={DROPDOWN_STATUSES.map(s => ({ value: s, label: s }))}
+                  className="w-auto"
+                />
               </div>
               {/* Tjänst */}
               <div className="mt-2">
@@ -2325,16 +2311,12 @@ export default function EditContractCaseModal({
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Skadedjurstyp för följeärendet *
               </label>
-              <select
+              <Select
                 value={followUpPestType}
-                onChange={(e) => setFollowUpPestType(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-              >
-                <option value="">Välj skadedjurstyp...</option>
-                {PEST_TYPES.map(pest => (
-                  <option key={pest} value={pest}>{pest}</option>
-                ))}
-              </select>
+                onChange={setFollowUpPestType}
+                placeholder="Välj skadedjurstyp..."
+                options={PEST_TYPES.map(p => ({ value: p, label: p }))}
+              />
             </div>
 
             {/* Knappar - MOBILANPASSADE */}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { MessageSquare, Plus, Edit3, Trash2, Clock, User, AlertCircle, StickyNote, Phone, Calendar, Users, Mail } from 'lucide-react'
 import Button from '../../ui/Button'
+import Select from '../../ui/Select'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -282,17 +283,11 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
               <label className="block text-xs font-medium text-slate-400 mb-1">
                 Typ av kommentar
               </label>
-              <select
+              <Select
                 value={formData.comment_type}
-                onChange={(e) => handleInputChange('comment_type', e.target.value as CommentType)}
-                className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-              >
-                {Object.entries(COMMENT_TYPE_DISPLAY).map(([value, config]) => (
-                  <option key={value} value={value}>
-                    {config.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => handleInputChange('comment_type', v as CommentType)}
+                options={Object.entries(COMMENT_TYPE_DISPLAY).map(([value, config]) => ({ value, label: config.label }))}
+              />
             </div>
 
             <div>

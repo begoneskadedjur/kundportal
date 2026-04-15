@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '../../ui/Button'
+import Select from '../../ui/Select'
 import Input from '../../ui/Input'
 import Card from '../../ui/Card'
 import ProductSelector from '../ProductSelector'
@@ -990,33 +991,31 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Avtalstyp *
                   </label>
-                  <select
+                  <Select
                     value={contractData.contract_type}
-                    onChange={(e) => setContractData({ ...contractData, contract_type: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    required
-                  >
-                    <option value="">Välj avtalstyp...</option>
-                    {contractTypes.map(type => (
-                      <option key={type.id} value={type.name}>{type.name}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setContractData({ ...contractData, contract_type: v })}
+                    placeholder="Välj avtalstyp..."
+                    options={[
+                      { value: '', label: 'Välj avtalstyp...' },
+                      ...contractTypes.map(type => ({ value: type.name, label: type.name }))
+                    ]}
+                  />
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Avtalslängd *
                   </label>
-                  <select
+                  <Select
                     value={contractData.contract_length}
-                    onChange={(e) => setContractData({ ...contractData, contract_length: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="12">1 år</option>
-                    <option value="24">2 år</option>
-                    <option value="36">3 år</option>
-                    <option value="60">5 år</option>
-                  </select>
+                    onChange={(v) => setContractData({ ...contractData, contract_length: v })}
+                    options={[
+                      { value: '12', label: '1 år' },
+                      { value: '24', label: '2 år' },
+                      { value: '36', label: '3 år' },
+                      { value: '60', label: '5 år' },
+                    ]}
+                  />
                 </div>
                 
                 <div>
@@ -1087,52 +1086,44 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Account Manager *
                   </label>
-                  <select
+                  <Select
                     value={contractData.account_manager_email || ''}
-                    onChange={(e) => {
-                      const employee = employees.find(emp => emp.email === e.target.value)
-                      setContractData({ 
-                        ...contractData, 
+                    onChange={(v) => {
+                      const employee = employees.find(emp => emp.email === v)
+                      setContractData({
+                        ...contractData,
                         assigned_account_manager: employee?.display_name || employee?.email || '',
                         account_manager_email: employee?.email || ''
                       })
                     }}
-                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    required
-                  >
-                    <option value="">Välj account manager...</option>
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.email}>
-                        {emp.display_name || emp.email}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Välj account manager..."
+                    options={[
+                      { value: '', label: 'Välj account manager...' },
+                      ...employees.map(emp => ({ value: emp.email, label: emp.display_name || emp.email }))
+                    ]}
+                  />
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Säljare *
                   </label>
-                  <select
+                  <Select
                     value={contractData.sales_person_email || ''}
-                    onChange={(e) => {
-                      const employee = employees.find(emp => emp.email === e.target.value)
-                      setContractData({ 
-                        ...contractData, 
+                    onChange={(v) => {
+                      const employee = employees.find(emp => emp.email === v)
+                      setContractData({
+                        ...contractData,
                         sales_person: employee?.display_name || employee?.email || '',
                         sales_person_email: employee?.email || ''
                       })
                     }}
-                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    required
-                  >
-                    <option value="">Välj säljare...</option>
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.email}>
-                        {emp.display_name || emp.email}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Välj säljare..."
+                    options={[
+                      { value: '', label: 'Välj säljare...' },
+                      ...employees.map(emp => ({ value: emp.email, label: emp.display_name || emp.email }))
+                    ]}
+                  />
                 </div>
               </div>
               
@@ -1516,21 +1507,22 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                         </div>
                         
                         <div className="text-right">
-                          <select
+                          <Select
                             value={currentRole || ''}
-                            onChange={(e) => {
-                              const role = e.target.value as MultisiteUserRoleType
+                            onChange={(v) => {
+                              const role = v as MultisiteUserRoleType
                               if (role) {
                                 handleRoleAssignment(user.id, role)
                               }
                             }}
-                            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
-                          >
-                            <option value="">Välj roll...</option>
-                            <option value="verksamhetschef">Verksamhetschef</option>
-                            <option value="regionchef">Regionchef</option>
-                            <option value="platsansvarig">Platsansvarig</option>
-                          </select>
+                            placeholder="Välj roll..."
+                            options={[
+                              { value: '', label: 'Välj roll...' },
+                              { value: 'verksamhetschef', label: 'Verksamhetschef' },
+                              { value: 'regionchef', label: 'Regionchef' },
+                              { value: 'platsansvarig', label: 'Platsansvarig' },
+                            ]}
+                          />
                         </div>
                       </div>
                       

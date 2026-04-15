@@ -22,6 +22,7 @@ import {
 } from 'recharts'
 
 import Button from '../../../ui/Button'
+import Select from '../../../ui/Select'
 
 interface AnalyticsData {
   leads: any[]
@@ -217,15 +218,15 @@ const LeadGeographicDistribution: React.FC<LeadGeographicDistributionProps> = ({
             </Button>
           </div>
           
-          <select
+          <Select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'leads' | 'conversion' | 'value')}
-            className="bg-slate-800 border border-slate-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-          >
-            <option value="leads">Sortera efter antal leads</option>
-            <option value="conversion">Sortera efter konvertering</option>
-            <option value="value">Sortera efter värde</option>
-          </select>
+            onChange={(v) => setSortBy(v as 'leads' | 'conversion' | 'value')}
+            options={[
+              { value: 'leads', label: 'Sortera efter antal leads' },
+              { value: 'conversion', label: 'Sortera efter konvertering' },
+              { value: 'value', label: 'Sortera efter värde' },
+            ]}
+          />
         </div>
       </div>
 

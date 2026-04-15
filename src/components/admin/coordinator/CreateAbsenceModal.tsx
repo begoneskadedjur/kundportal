@@ -9,6 +9,7 @@ import { CalendarOff, CheckCircle, AlertCircle } from 'lucide-react';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
 import Input from '../../ui/Input';
+import Select from '../../ui/Select';
 import toast from 'react-hot-toast';
 
 import DatePicker from 'react-datepicker';
@@ -227,17 +228,13 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
         {/* Single Technician Selection */}
         {selectionMode === 'single' && (
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Tekniker *</label>
-            <select 
-              name="technician_id" 
-              value={formData.technician_id} 
-              onChange={handleChange} 
-              required 
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
-            >
-              <option value="" disabled>Välj tekniker...</option>
-              {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <label className="block text-xs font-medium text-slate-400 mb-1">Tekniker *</label>
+            <Select
+              value={formData.technician_id}
+              onChange={(v) => setFormData(prev => ({ ...prev, technician_id: v }))}
+              placeholder="Välj tekniker..."
+              options={technicians.map(t => ({ value: t.id, label: t.name }))}
+            />
           </div>
         )}
 
@@ -319,16 +316,12 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Anledning *</label>
-          <select 
-            name="reason" 
-            value={formData.reason} 
-            onChange={handleChange} 
-            required 
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
-          >
-            {ABSENCE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Anledning *</label>
+          <Select
+            value={formData.reason}
+            onChange={(v) => setFormData(prev => ({ ...prev, reason: v }))}
+            options={ABSENCE_REASONS.map(r => ({ value: r, label: r }))}
+          />
         </div>
         
         <div>

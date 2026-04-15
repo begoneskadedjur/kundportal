@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Select from '../../components/ui/Select'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
 import ContractFilesModal from '../../components/admin/contracts/ContractFilesModal'
 import ContractImportModal from '../../components/admin/contracts/ContractImportModal'
@@ -829,15 +830,15 @@ export default function ContractsOverview() {
                 />
               </div>
 
-              <select
+              <Select
                 value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
-              >
-                <option value="all">📄 Alla typer</option>
-                <option value="contract">📋 Endast Avtal</option>
-                <option value="offer">💼 Endast Offerter</option>
-              </select>
+                onChange={setTypeFilter}
+                options={[
+                  { value: 'all', label: '📄 Alla typer' },
+                  { value: 'contract', label: '📋 Endast Avtal' },
+                  { value: 'offer', label: '💼 Endast Offerter' },
+                ]}
+              />
 
               {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
                 <Button

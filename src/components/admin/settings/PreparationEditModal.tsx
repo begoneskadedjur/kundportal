@@ -15,6 +15,7 @@ import {
 } from '../../../types/preparations'
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper'
 import Button from '../../ui/Button'
+import Select from '../../ui/Select'
 import toast from 'react-hot-toast'
 
 interface PreparationEditModalProps {
@@ -194,17 +195,11 @@ export function PreparationEditModal({
               <label className="block text-sm font-medium text-slate-300 mb-1.5">
                 Kategori
               </label>
-              <select
+              <Select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as PreparationCategory)}
-                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
-              >
-                {Object.entries(PREPARATION_CATEGORY_CONFIG).map(([key, config]) => (
-                  <option key={key} value={key}>
-                    {config.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setCategory(v as PreparationCategory)}
+                options={Object.entries(PREPARATION_CATEGORY_CONFIG).map(([key, config]) => ({ value: key, label: config.label }))}
+              />
             </div>
 
             <div>

@@ -3,6 +3,7 @@
 
 import { useState, useMemo } from 'react'
 import { Search, SortAsc, Building2, MapPin, Home } from 'lucide-react'
+import Select from '../ui/Select'
 import { CustomerStationCard, CustomerStationCardSkeleton, CustomerStationSummary } from './CustomerStationCard'
 import { HealthStatus } from '../shared/StationHealthBadge'
 
@@ -130,25 +131,12 @@ export function CustomerStationsList({
         </div>
 
         {/* Sorteringsval */}
-        <div className="relative">
-          <SortAsc className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="appearance-none pl-10 pr-8 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
-          >
-            {SORT_OPTIONS.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        </div>
+        <Select
+          value={sortBy}
+          onChange={(v) => setSortBy(v as SortOption)}
+          options={SORT_OPTIONS}
+          className="w-48"
+        />
       </div>
 
       {/* Resultaträknare */}

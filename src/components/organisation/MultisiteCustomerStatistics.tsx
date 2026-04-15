@@ -37,6 +37,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { isCompletedStatus, getCustomerStatusDisplay } from '../../types/database'
 import { formatCurrency } from '../../utils/formatters'
+import Select from '../ui/Select'
 import { 
   exportStatisticsToPDF, 
   exportStatisticsToCSV 
@@ -635,17 +636,11 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
       <div className="flex items-center gap-4">
         <Filter className="w-4 h-4 text-slate-400" />
         <label className="text-slate-300">Tidsperiod:</label>
-        <select
+        <Select
           value={selectedPeriod}
-          onChange={(e) => setSelectedPeriod(e.target.value as TimePeriod)}
-          className="bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-        >
-          {periodOptions.map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setSelectedPeriod(v as TimePeriod)}
+          options={periodOptions.map(o => ({ value: o.value, label: o.label }))}
+        />
       </div>
 
       {/* Statistics Cards */}

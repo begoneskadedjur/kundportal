@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Users, Plus, X, Star, Clock, AlertCircle } from 'lucide-react'
 import Button from '../../ui/Button'
+import Select from '../../ui/Select'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -320,18 +321,15 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                 <label className="block text-xs font-medium text-slate-400 mb-1">
                   Välj kollega ({unassignedTechnicians.length} tillgängliga)
                 </label>
-                <select
+                <Select
                   value={selectedTechnicianId}
-                  onChange={(e) => setSelectedTechnicianId(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="">Välj kollega...</option>
-                  {unassignedTechnicians.map(tech => (
-                    <option key={tech.id} value={tech.id}>
-                      {tech.name} ({tech.email})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedTechnicianId}
+                  placeholder="Välj kollega..."
+                  options={[
+                    { value: '', label: 'Välj kollega...' },
+                    ...unassignedTechnicians.map(tech => ({ value: tech.id, label: `${tech.name} (${tech.email})` }))
+                  ]}
+                />
               </div>
 
             <div>

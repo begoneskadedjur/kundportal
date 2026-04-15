@@ -19,6 +19,7 @@ import {
   ChevronUp
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import Select from '../../../components/ui/Select'
 import { InvoiceService } from '../../../services/invoiceService'
 import type { Invoice, InvoiceStatus, InvoiceStats } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
@@ -156,15 +157,16 @@ export default function PrivateBusinessInvoicing() {
         </div>
 
         {/* Kundtyp */}
-        <select
+        <Select
           value={caseTypeFilter}
-          onChange={(e) => setCaseTypeFilter(e.target.value as any)}
-          className="px-2.5 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
-        >
-          <option value="all">Alla</option>
-          <option value="private">Privat</option>
-          <option value="business">Företag</option>
-        </select>
+          onChange={(v) => setCaseTypeFilter(v as any)}
+          options={[
+            { value: 'all', label: 'Alla' },
+            { value: 'private', label: 'Privat' },
+            { value: 'business', label: 'Företag' },
+          ]}
+          className="w-32"
+        />
 
         {/* Divider */}
         <div className="w-px h-6 bg-slate-700" />

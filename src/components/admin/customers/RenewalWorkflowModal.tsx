@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { X, Calendar, DollarSign, FileText, Clock, AlertTriangle, Activity } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
+import Select from '../../ui/Select'
 import toast from 'react-hot-toast'
 
 interface RenewalWorkflowModalProps {
@@ -156,16 +157,16 @@ export default function RenewalWorkflowModal({ organization, isOpen, onClose }: 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-slate-400 mb-1">Kontraktslängd</label>
-              <select
+              <Select
                 value={contractLength}
-                onChange={(e) => setContractLength(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-green-500/50"
-              >
-                <option value="6">6 månader</option>
-                <option value="12">12 månader</option>
-                <option value="24">24 månader</option>
-                <option value="36">36 månader</option>
-              </select>
+                onChange={setContractLength}
+                options={[
+                  { value: '6', label: '6 månader' },
+                  { value: '12', label: '12 månader' },
+                  { value: '24', label: '24 månader' },
+                  { value: '36', label: '36 månader' },
+                ]}
+              />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Startdatum</label>

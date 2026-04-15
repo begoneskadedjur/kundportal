@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import Select from '../../components/ui/Select'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 
 import TechnicianCard from '../../components/admin/technicians/management/TechnicianCard'
@@ -251,28 +252,26 @@ export default function TechnicianManagement() {
             />
           </div>
 
-          <select
+          <Select
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-          >
-            <option value="all">Alla roller</option>
-            {STAFF_ROLES.map(role => (
-              <option key={role} value={role}>{role}</option>
-            ))}
-          </select>
+            onChange={setRoleFilter}
+            options={[
+              { value: 'all', label: 'Alla roller' },
+              ...STAFF_ROLES.map(r => ({ value: r, label: r })),
+            ]}
+          />
 
-          <select
+          <Select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-          >
-            <option value="all">Alla status</option>
-            <option value="active">Aktiva</option>
-            <option value="inactive">Inaktiva</option>
-            <option value="with_login">Med inloggning</option>
-            <option value="without_login">Utan inloggning</option>
-          </select>
+            onChange={(v) => setStatusFilter(v as any)}
+            options={[
+              { value: 'all', label: 'Alla status' },
+              { value: 'active', label: 'Aktiva' },
+              { value: 'inactive', label: 'Inaktiva' },
+              { value: 'with_login', label: 'Med inloggning' },
+              { value: 'without_login', label: 'Utan inloggning' },
+            ]}
+          />
 
           <div className="flex items-center text-slate-400 text-xs">
             {filteredTechnicians.length} av {technicians.length} personer

@@ -12,6 +12,7 @@ import { COMMISSION_STATUS_CONFIG, type CommissionStatus, type CommissionPost } 
 import type { MonthlyProvisionSummary, TechnicianPayoutEntry } from '../../types/provision'
 import ProvisionSettingsPanel from '../../components/admin/provisions/ProvisionSettingsPanel'
 import toast from 'react-hot-toast'
+import Select from '../../components/ui/Select'
 
 const formatCurrency = (n: number) =>
   n.toLocaleString('sv-SE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' kr'
@@ -249,18 +250,15 @@ const TechnicianCommissions: React.FC = () => {
           </div>
 
           {/* Månadsväljare */}
-          <select
+          <Select
             value={selectedMonth.value}
-            onChange={e => {
-              const opt = monthOptions.find(m => m.value === e.target.value)
+            onChange={(v) => {
+              const opt = monthOptions.find(m => m.value === v)
               if (opt) goToMonth(opt)
             }}
-            className="px-2.5 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
-          >
-            {monthOptions.map(m => (
-              <option key={m.value} value={m.value}>{m.display}</option>
-            ))}
-          </select>
+            options={monthOptions.map(m => ({ value: m.value, label: m.display }))}
+            className="w-40"
+          />
 
           <div className="w-px h-6 bg-slate-700" />
 

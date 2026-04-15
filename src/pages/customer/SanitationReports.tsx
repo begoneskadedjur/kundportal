@@ -6,6 +6,7 @@ import { generateInspectionPDF, generateInspectionExcel } from '../../services/i
 import type { InspectionSessionWithRelations } from '../../types/inspectionSession'
 import { useAuth } from '../../contexts/AuthContext'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
+import Select from '../../components/ui/Select'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -670,17 +671,17 @@ const SanitationReports: React.FC<SanitationReportsProps> = ({ customerId: exter
                 {/* Filter Selector */}
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-slate-400" />
-                  <select
+                  <Select
                     value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value as any)}
-                    className="bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
-                  >
-                    <option value="all">Alla rapporter</option>
-                    <option value="30d">Senaste 30 dagarna</option>
-                    <option value="3m">Senaste 3 månaderna</option>
-                    <option value="6m">Senaste 6 månaderna</option>
-                    <option value="1y">Senaste året</option>
-                  </select>
+                    onChange={(v) => setDateFilter(v as any)}
+                    options={[
+                      { value: 'all', label: 'Alla rapporter' },
+                      { value: '30d', label: 'Senaste 30 dagarna' },
+                      { value: '3m', label: 'Senaste 3 månaderna' },
+                      { value: '6m', label: 'Senaste 6 månaderna' },
+                      { value: '1y', label: 'Senaste året' },
+                    ]}
+                  />
                 </div>
               </div>
             )}

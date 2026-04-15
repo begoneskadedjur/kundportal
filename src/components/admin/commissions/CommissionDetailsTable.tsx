@@ -1,5 +1,6 @@
 // 📁 src/components/admin/commissions/CommissionDetailsTable.tsx - Tabell med ärenden som grund för provision, sorterbara kolumner + COLLAPSIBLE GROUPS
 import React, { useState, useMemo } from 'react'
+import Select from '../../ui/Select'
 import { 
   ChevronUp, 
   ChevronDown, 
@@ -206,17 +207,16 @@ const CommissionDetailsTable: React.FC<CommissionDetailsTableProps> = ({
           </div>
 
           {/* Typfilter */}
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <select
+          <div>
+            <Select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as any)}
-              className="pl-10 pr-8 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none appearance-none cursor-pointer"
-            >
-              <option value="all">Alla typer</option>
-              <option value="private">Privatperson</option>
-              <option value="business">Företag</option>
-            </select>
+              onChange={(v) => setTypeFilter(v as any)}
+              options={[
+                { value: 'all', label: 'Alla typer' },
+                { value: 'private', label: 'Privatperson' },
+                { value: 'business', label: 'Företag' },
+              ]}
+            />
           </div>
         </div>
       </div>

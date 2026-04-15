@@ -5,6 +5,7 @@ import { Plus, Building2, AlertCircle, Save, Target, Star } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import SNIBranchManager from './SNIBranchManager'
 import { supabase } from '../../../lib/supabase'
@@ -451,17 +452,14 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 <label className="block text-xs font-medium text-slate-400 mb-1">
                   Status
                 </label>
-                <select
+                <Select
                   value={formData.status || 'blue_cold'}
-                  onChange={(e) => handleInputChange('status', e.target.value as LeadStatus)}
-                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-                >
-                  {Object.entries(LEAD_STATUS_DISPLAY).map(([value, config]) => (
-                    <option key={value} value={value}>
-                      {config.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => handleInputChange('status', v as LeadStatus)}
+                  options={Object.entries(LEAD_STATUS_DISPLAY).map(([value, config]) => ({
+                    value,
+                    label: config.label,
+                  }))}
+                />
               </div>
             </div>
           </div>
@@ -503,18 +501,15 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 <label className="block text-xs font-medium text-slate-400 mb-1">
                   Företagsstorlek
                 </label>
-                <select
+                <Select
                   value={formData.company_size || ''}
-                  onChange={(e) => handleInputChange('company_size', e.target.value as CompanySize || null)}
-                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="">Välj storlek</option>
-                  {Object.entries(COMPANY_SIZE_DISPLAY).map(([value, config]) => (
-                    <option key={value} value={value}>
-                      {config.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => handleInputChange('company_size', v as CompanySize || null)}
+                  placeholder="Välj storlek"
+                  options={Object.entries(COMPANY_SIZE_DISPLAY).map(([value, config]) => ({
+                    value,
+                    label: config.label,
+                  }))}
+                />
               </div>
 
               <div>
@@ -593,18 +588,15 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 <label className="block text-xs font-medium text-slate-400 mb-1">
                   Prioritet
                 </label>
-                <select
+                <Select
                   value={formData.priority || ''}
-                  onChange={(e) => handleInputChange('priority', e.target.value as LeadPriority || null)}
-                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="">Välj prioritet</option>
-                  {Object.entries(LEAD_PRIORITY_DISPLAY).map(([value, config]) => (
-                    <option key={value} value={value}>
-                      {config.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => handleInputChange('priority', v as LeadPriority || null)}
+                  placeholder="Välj prioritet"
+                  options={Object.entries(LEAD_PRIORITY_DISPLAY).map(([value, config]) => ({
+                    value,
+                    label: config.label,
+                  }))}
+                />
               </div>
 
               <div>

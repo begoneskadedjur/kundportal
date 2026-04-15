@@ -6,6 +6,7 @@ import { User, Key, Car, Wrench, AlertCircle, Shield, AlertTriangle } from 'luci
 import { supabase } from '../../../../lib/supabase'
 import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
+import Select from '../../../ui/Select'
 
 import { technicianManagementService, type Technician, type TechnicianFormData } from '../../../../services/technicianManagementService'
 import toast from 'react-hot-toast'
@@ -166,10 +167,12 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Namn *" name="name" value={formData.name || ''} onChange={handleChange} required placeholder="För- och efternamn" className="bg-slate-800/50 border-slate-600"/>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Roll *</label>
-              <select name="role" value={formData.role || 'Skadedjurstekniker'} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white">
-                {STAFF_ROLES.map(role => (<option key={role} value={role}>{role}</option>))}
-              </select>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Roll *</label>
+              <Select
+                value={formData.role || 'Skadedjurstekniker'}
+                onChange={(v) => setFormData(prev => ({ ...prev, role: v }))}
+                options={STAFF_ROLES.map(role => ({ value: role, label: role }))}
+              />
             </div>
           </div>
           {/* Admin-behörighet checkbox - visas om personen har inloggning och primär roll inte redan är Admin */}
@@ -224,17 +227,15 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
               <h3 className="text-md font-medium text-slate-300 flex items-center gap-2"><Wrench className="w-4 h-4 text-green-400"/>Kompetenser</h3>
               {allTechnicians.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <select
+                  <Select
                     value={copyFromId}
-                    onChange={(e) => { setCopyFromId(e.target.value); handleCopyFrom(e.target.value) }}
-                    className="text-xs px-2 py-1 bg-slate-800 border border-slate-600 rounded-lg text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-                  >
-                    <option value="">Kopiera från...</option>
-                    {allTechnicians
+                    onChange={(v) => { setCopyFromId(v); handleCopyFrom(v) }}
+                    placeholder="Kopiera från..."
+                    options={allTechnicians
                       .filter(t => t.id !== technician?.id)
-                      .map(t => <option key={t.id} value={t.id}>{t.name}</option>)
-                    }
-                  </select>
+                      .map(t => ({ value: t.id, label: t.name }))}
+                    className="w-48"
+                  />
                 </div>
               )}
             </div>

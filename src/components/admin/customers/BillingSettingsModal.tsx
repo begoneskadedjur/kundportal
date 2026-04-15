@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { PriceListService } from '../../../services/priceListService'
@@ -481,12 +482,18 @@ export default function BillingSettingsModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">Fakturamånad (ankarmånad)</label>
-              <select value={billingAnchorMonth ?? ''} onChange={e => setBillingAnchorMonth(e.target.value ? parseInt(e.target.value) : null)} className={sel}>
-                <option value="">Ej angiven</option>
-                {MONTHS_SV.map((m, i) => (
-                  <option key={i + 1} value={i + 1}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
-                ))}
-              </select>
+              <Select
+                value={billingAnchorMonth != null ? String(billingAnchorMonth) : ''}
+                onChange={(v) => setBillingAnchorMonth(v ? parseInt(v) : null)}
+                placeholder="Ej angiven"
+                options={[
+                  { value: '', label: 'Ej angiven' },
+                  ...MONTHS_SV.map((m, i) => ({
+                    value: String(i + 1),
+                    label: m.charAt(0).toUpperCase() + m.slice(1),
+                  })),
+                ]}
+              />
               <p className="text-xs text-slate-500 mt-1">Månaden avtalet ingicks – fakturor läggs i denna månad + intervall</p>
             </div>
 
@@ -531,20 +538,29 @@ export default function BillingSettingsModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Faktureringsfrekvens</label>
-                <select value={billingFrequency} onChange={e => setBillingFrequency(e.target.value as BillingFrequency)} className={sel}>
-                  {Object.entries(BILLING_FREQUENCY_CONFIG).map(([k, c]) => (
-                    <option key={k} value={k}>{c.label}</option>
-                  ))}
-                </select>
+                <Select
+                  value={billingFrequency}
+                  onChange={(v) => setBillingFrequency(v as BillingFrequency)}
+                  options={Object.entries(BILLING_FREQUENCY_CONFIG).map(([k, c]) => ({
+                    value: k,
+                    label: c.label,
+                  }))}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Artikelkatalog (prislista)</label>
-                <select value={priceListId || ''} onChange={e => setPriceListId(e.target.value || null)} className={sel}>
-                  <option value="">Ingen prislista</option>
-                  {priceLists.map(pl => (
-                    <option key={pl.id} value={pl.id}>{pl.name} {pl.is_default && '(Standard)'}</option>
-                  ))}
-                </select>
+                <Select
+                  value={priceListId || ''}
+                  onChange={(v) => setPriceListId(v || null)}
+                  placeholder="Ingen prislista"
+                  options={[
+                    { value: '', label: 'Ingen prislista' },
+                    ...priceLists.map(pl => ({
+                      value: pl.id,
+                      label: `${pl.name}${pl.is_default ? ' (Standard)' : ''}`,
+                    })),
+                  ]}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

@@ -27,6 +27,7 @@ import ExpandableOrganizationRow from '../../components/admin/customers/Expandab
 import ColumnSelector, { useColumnVisibility } from '../../components/admin/customers/ColumnSelector'
 import SiteDetailRow from '../../components/admin/customers/SiteDetailRow'
 import MultisiteExpandedTabs from '../../components/admin/customers/MultisiteExpandedTabs'
+import Select from '../../components/ui/Select'
 import MultiSiteCustomerDetailModal from '../../components/admin/customers/MultiSiteCustomerDetailModal'
 import SingleCustomerDetailModal from '../../components/admin/customers/SingleCustomerDetailModal'
 import BillingSettingsModal from '../../components/admin/customers/BillingSettingsModal'
@@ -749,62 +750,60 @@ export default function Customers() {
             {/* Collapsible filter dropdowns */}
             {filtersExpanded && (
               <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-slate-700">
-                <select
+                <Select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="all">Alla status</option>
-                  <option value="active">Aktiva</option>
-                  <option value="inactive">Inaktiva</option>
-                  <option value="expiring">Löper ut snart</option>
-                  <option value="terminated">Uppsagda</option>
-                </select>
+                  onChange={(v) => setStatusFilter(v as any)}
+                  options={[
+                    { value: 'all', label: 'Alla status' },
+                    { value: 'active', label: 'Aktiva' },
+                    { value: 'inactive', label: 'Inaktiva' },
+                    { value: 'expiring', label: 'Löper ut snart' },
+                    { value: 'terminated', label: 'Uppsagda' },
+                  ]}
+                />
 
-                <select
+                <Select
                   value={healthFilter}
-                  onChange={(e) => setHealthFilter(e.target.value as any)}
-                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="all">Alla hälsonivåer</option>
-                  <option value="excellent">Utmärkt (80+)</option>
-                  <option value="good">Bra (60-79)</option>
-                  <option value="fair">Acceptabel (40-59)</option>
-                  <option value="poor">Risk (0-39)</option>
-                </select>
+                  onChange={(v) => setHealthFilter(v as any)}
+                  options={[
+                    { value: 'all', label: 'Alla hälsonivåer' },
+                    { value: 'excellent', label: 'Utmärkt (80+)' },
+                    { value: 'good', label: 'Bra (60-79)' },
+                    { value: 'fair', label: 'Acceptabel (40-59)' },
+                    { value: 'poor', label: 'Risk (0-39)' },
+                  ]}
+                />
 
-                <select
+                <Select
                   value={portalFilter}
-                  onChange={(e) => setPortalFilter(e.target.value as any)}
-                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="all">Portaltillgång</option>
-                  <option value="full">Full tillgång</option>
-                  <option value="partial">Delvis tillgång</option>
-                  <option value="none">Ingen tillgång</option>
-                </select>
+                  onChange={(v) => setPortalFilter(v as any)}
+                  options={[
+                    { value: 'all', label: 'Portaltillgång' },
+                    { value: 'full', label: 'Full tillgång' },
+                    { value: 'partial', label: 'Delvis tillgång' },
+                    { value: 'none', label: 'Ingen tillgång' },
+                  ]}
+                />
 
-                <select
+                <Select
                   value={organizationTypeFilter}
-                  onChange={(e) => setOrganizationTypeFilter(e.target.value as any)}
-                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="all">Alla typer</option>
-                  <option value="multisite">Multisite</option>
-                  <option value="single">Enkelsites</option>
-                </select>
+                  onChange={(v) => setOrganizationTypeFilter(v as any)}
+                  options={[
+                    { value: 'all', label: 'Alla typer' },
+                    { value: 'multisite', label: 'Multisite' },
+                    { value: 'single', label: 'Enkelsites' },
+                  ]}
+                />
 
                 {uniqueManagers.length > 0 && (
-                  <select
+                  <Select
                     value={managerFilter}
-                    onChange={(e) => setManagerFilter(e.target.value)}
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="all">Alla säljare</option>
-                    {uniqueManagers.map(manager => (
-                      <option key={manager} value={manager}>{manager}</option>
-                    ))}
-                  </select>
+                    onChange={setManagerFilter}
+                    options={[
+                      { value: 'all', label: 'Alla säljare' },
+                      ...uniqueManagers.map(m => ({ value: m, label: m })),
+                    ]}
+                  />
                 )}
 
                 {activeFilterCount > 0 && (

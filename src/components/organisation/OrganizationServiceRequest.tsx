@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { X, AlertCircle, Calendar, MessageSquare, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Building2, Trash2 } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
+import Select from '../ui/Select'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -277,19 +278,12 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
                   <Building2 className="w-4 h-4" />
                   Vilken enhet gäller ärendet? <span className="text-red-400">*</span>
                 </label>
-                <select
+                <Select
                   value={chosenSiteId}
-                  onChange={(e) => setChosenSiteId(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Välj enhet...</option>
-                  {sites.map(site => (
-                    <option key={site.id} value={site.id}>
-                      {site.site_name} - {site.region}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setChosenSiteId}
+                  placeholder="Välj enhet..."
+                  options={sites.map(site => ({ value: site.id, label: `${site.site_name} - ${site.region}` }))}
+                />
               </div>
             )}
 
@@ -385,21 +379,17 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Typ av skadedjur (om känt)
               </label>
-              <select
+              <Select
                 value={pestType}
-                onChange={(e) => {
-                  setPestType(e.target.value)
-                  if (e.target.value !== 'Övrigt') {
+                onChange={(v) => {
+                  setPestType(v)
+                  if (v !== 'Övrigt') {
                     setOtherPestType('')
                   }
                 }}
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                <option value="">Välj skadedjur...</option>
-                {PEST_TYPES.map(pest => (
-                  <option key={pest} value={pest}>{pest}</option>
-                ))}
-              </select>
+                placeholder="Välj skadedjur..."
+                options={PEST_TYPES.map(p => ({ value: p, label: p }))}
+              />
               
               {pestType === 'Övrigt' && (
                 <Input

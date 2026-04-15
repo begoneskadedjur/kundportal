@@ -11,6 +11,7 @@ import ServiceRequestStatus from '../customer/ServiceRequestStatus'
 import { ClickUpStatus } from '../../types/database'
 import TrafficLightBadge from './TrafficLightBadge'
 import toast from 'react-hot-toast'
+import Select from '../ui/Select'
 
 interface OrganisationActiveCasesListProps {
   customerId?: string
@@ -238,16 +239,16 @@ const OrganisationActiveCasesList: React.FC<OrganisationActiveCasesListProps> = 
             {/* Trafikljusfilter */}
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-400" />
-              <select
+              <Select
                 value={trafficLightFilter}
-                onChange={(e) => setTrafficLightFilter(e.target.value as any)}
-                className="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg px-3 py-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-              >
-                <option value="all">Alla bedömningar</option>
-                <option value="critical">🔴 Kritiska</option>
-                <option value="warning">🟡 Varningar</option>
-                <option value="ok">🟢 OK</option>
-              </select>
+                onChange={(v) => setTrafficLightFilter(v as any)}
+                options={[
+                  { value: 'all', label: 'Alla bedömningar' },
+                  { value: 'critical', label: '🔴 Kritiska' },
+                  { value: 'warning', label: '🟡 Varningar' },
+                  { value: 'ok', label: '🟢 OK' },
+                ]}
+              />
             </div>
           </div>
 

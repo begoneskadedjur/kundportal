@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Download, Upload, RefreshCw, CheckCircle, AlertCircle, ExternalLink, Filter } from 'lucide-react'
 import Button from '../../ui/Button'
+import Select from '../../ui/Select'
 import toast from 'react-hot-toast'
 
 interface OneFlowContract {
@@ -292,25 +293,25 @@ export default function ContractImportModal({
               <span className="text-xs text-slate-400">Filter:</span>
             </div>
             
-            <select
+            <Select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as any)}
-              className="px-2.5 py-1 bg-slate-800/50 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-            >
-              <option value="all">Alla typer</option>
-              <option value="contract">Avtal</option>
-              <option value="offer">Offerter</option>
-            </select>
-            
-            <select
+              onChange={(v) => setTypeFilter(v as any)}
+              options={[
+                { value: 'all', label: 'Alla typer' },
+                { value: 'contract', label: 'Avtal' },
+                { value: 'offer', label: 'Offerter' },
+              ]}
+            />
+
+            <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="px-2.5 py-1 bg-slate-800/50 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-            >
-              <option value="all">Alla status</option>
-              <option value="not_imported">Inte importerade</option>
-              <option value="imported">Importerade</option>
-            </select>
+              onChange={(v) => setStatusFilter(v as any)}
+              options={[
+                { value: 'all', label: 'Alla status' },
+                { value: 'not_imported', label: 'Inte importerade' },
+                { value: 'imported', label: 'Importerade' },
+              ]}
+            />
 
             <div className="flex-1" />
 

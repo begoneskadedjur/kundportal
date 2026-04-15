@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Select from '../../components/ui/Select'
 
 // Import multisite components
 import MultisitePortalNavigation from '../../components/multisite/MultisitePortalNavigation'
@@ -169,21 +170,18 @@ const MultisitePortal: React.FC = () => {
                 <div className="flex items-center gap-4">
                   <Building2 className="w-5 h-5 text-purple-400" />
                   <label className="text-sm font-medium text-slate-300">Välj enhet:</label>
-                  <select
+                  <Select
                     value={currentSite?.id || ''}
-                    onChange={(e) => {
-                      const site = accessibleSites.find(s => s.id === e.target.value)
+                    onChange={(v) => {
+                      const site = accessibleSites.find(s => s.id === v)
                       setCurrentSite(site || null)
                     }}
-                    className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Välj en enhet...</option>
-                    {accessibleSites.map(site => (
-                      <option key={site.id} value={site.id}>
-                        {site.site_name} {site.region ? `(${site.region})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Välj en enhet..."
+                    options={[
+                      { value: '', label: 'Välj en enhet...' },
+                      ...accessibleSites.map(site => ({ value: site.id, label: `${site.site_name}${site.region ? ` (${site.region})` : ''}` }))
+                    ]}
+                  />
                 </div>
                 {currentSite && (
                   <div className="text-sm text-slate-400">

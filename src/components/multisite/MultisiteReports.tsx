@@ -5,6 +5,7 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import { supabase } from '../../lib/supabase'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
+import Select from '../ui/Select'
 import LoadingSpinner from '../shared/LoadingSpinner'
 
 interface Report {
@@ -209,33 +210,29 @@ const MultisiteReports: React.FC = () => {
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-slate-400" />
-              <select
+              <Select
                 value={selectedSite}
-                onChange={(e) => setSelectedSite(e.target.value)}
-                className="bg-slate-800/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="all">Alla enheter</option>
-                {accessibleSites.map(site => (
-                  <option key={site.id} value={site.id}>
-                    {site.site_name} ({site.region})
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedSite}
+                options={[
+                  { value: 'all', label: 'Alla enheter' },
+                  ...accessibleSites.map(site => ({ value: site.id, label: `${site.site_name} (${site.region})` }))
+                ]}
+              />
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-400" />
-              <select
+              <Select
                 value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="bg-slate-800/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="all">Alla typer</option>
-                <option value="sanitation">Sanering</option>
-                <option value="inspection">Inspektion</option>
-                <option value="treatment">Behandling</option>
-                <option value="compliance">Efterlevnad</option>
-              </select>
+                onChange={setSelectedType}
+                options={[
+                  { value: 'all', label: 'Alla typer' },
+                  { value: 'sanitation', label: 'Sanering' },
+                  { value: 'inspection', label: 'Inspektion' },
+                  { value: 'treatment', label: 'Behandling' },
+                  { value: 'compliance', label: 'Efterlevnad' },
+                ]}
+              />
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 // 📁 src/components/admin/commissions/CommissionMonthSelector.tsx - Månadsnavigation med pilar (← Juni 2025 | Juli 2025 | Augusti 2025 →)
 import React from 'react'
+import Select from '../../ui/Select'
 import { ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react'
 import type { MonthSelection } from '../../../types/commission'
 
@@ -109,31 +110,16 @@ const CommissionMonthSelector: React.FC<CommissionMonthSelectorProps> = ({
 
         {/* Dropdown för alla månader */}
         <div className="relative">
-          <select
+          <Select
             value={selectedMonth.value}
-            onChange={(e) => {
-              const month = monthOptions.find(m => m.value === e.target.value)
+            onChange={(v) => {
+              const month = monthOptions.find(m => m.value === v)
               if (month) onMonthChange(month)
             }}
             disabled={loading}
-            className={`
-              appearance-none bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-sm text-white
-              focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none
-              hover:border-slate-500 transition-colors duration-200
-              ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-            `}
-          >
-            {monthOptions.map((month) => (
-              <option key={month.value} value={month.value} className="bg-slate-800 text-white">
-                {month.display}
-              </option>
-            ))}
-          </select>
-          
-          {/* Custom dropdown arrow */}
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <ChevronRight className="w-4 h-4 text-slate-400 rotate-90" />
-          </div>
+            options={monthOptions.map(month => ({ value: month.value, label: month.display }))}
+          />
+
         </div>
       </div>
     </div>

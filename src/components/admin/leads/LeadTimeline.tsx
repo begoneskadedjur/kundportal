@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { formatSwedishDateTime, formatSwedishRelativeTime } from '../../../utils/swedishDateFormat'
 import Button from '../../ui/Button'
+import Select from '../../ui/Select'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -264,17 +265,11 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
               <label className="block text-xs font-medium text-slate-400 mb-1">
                 Händelsetyp
               </label>
-              <select
+              <Select
                 value={formData.event_type}
-                onChange={(e) => handleInputChange('event_type', e.target.value as EventType)}
-                className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-              >
-                {Object.entries(EVENT_TYPE_DISPLAY).map(([value, config]) => (
-                  <option key={value} value={value}>
-                    {config.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => handleInputChange('event_type', v as EventType)}
+                options={Object.entries(EVENT_TYPE_DISPLAY).map(([value, config]) => ({ value, label: config.label }))}
+              />
             </div>
 
             <div>

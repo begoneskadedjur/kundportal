@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 import Modal from '../../ui/Modal'
 import toast from 'react-hot-toast'
 
@@ -224,14 +225,14 @@ export default function OrganizationEditModal({
 
             <div>
               <label className="text-xs font-medium text-slate-400 mb-1 block">Åtkomstnivå</label>
-              <select
+              <Select
                 value={formData.portal_access_level}
-                onChange={(e) => setFormData({ ...formData, portal_access_level: e.target.value })}
-                className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
-              >
-                <option value="full">Full åtkomst</option>
-                <option value="read_only">Endast läsning</option>
-              </select>
+                onChange={(v) => setFormData({ ...formData, portal_access_level: v })}
+                options={[
+                  { value: 'full', label: 'Full åtkomst' },
+                  { value: 'read_only', label: 'Endast läsning' },
+                ]}
+              />
             </div>
 
             <label className="flex items-center gap-3 cursor-pointer">

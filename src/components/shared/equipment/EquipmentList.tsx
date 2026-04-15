@@ -27,6 +27,7 @@ import {
   Image as ImageIcon,
   MessageSquare
 } from 'lucide-react'
+import Select from '../../ui/Select'
 
 interface EquipmentListProps {
   equipment: EquipmentPlacementWithRelations[]
@@ -119,32 +120,30 @@ export function EquipmentList({
 
           <div className="grid grid-cols-2 gap-3">
             {/* Typfilter */}
-            <select
+            <Select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value as EquipmentType | 'all')}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Alla typer</option>
-              {Object.entries(EQUIPMENT_TYPE_CONFIG).map(([type, config]) => (
-                <option key={type} value={type}>
-                  {config.label} ({stats.byType[type as EquipmentType]})
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setFilterType(v as EquipmentType | 'all')}
+              options={[
+                { value: 'all', label: 'Alla typer' },
+                ...Object.entries(EQUIPMENT_TYPE_CONFIG).map(([type, config]) => ({
+                  value: type,
+                  label: `${config.label} (${stats.byType[type as EquipmentType] ?? 0})`,
+                })),
+              ]}
+            />
 
             {/* Statusfilter */}
-            <select
+            <Select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as EquipmentStatus | 'all')}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Alla statusar</option>
-              {Object.entries(EQUIPMENT_STATUS_CONFIG).map(([status, config]) => (
-                <option key={status} value={status}>
-                  {config.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setFilterStatus(v as EquipmentStatus | 'all')}
+              options={[
+                { value: 'all', label: 'Alla statusar' },
+                ...Object.entries(EQUIPMENT_STATUS_CONFIG).map(([status, config]) => ({
+                  value: status,
+                  label: config.label,
+                })),
+              ]}
+            />
           </div>
 
           {/* Snabbstatistik */}

@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Paus
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
+import Select from '../../ui/Select'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -1423,18 +1424,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 <label className="block text-xs font-medium text-slate-400 mb-1">
                   Skadedjurstyp för det nya ärendet *
                 </label>
-                <select
+                <Select
                   value={followUpPestType}
-                  onChange={(e) => setFollowUpPestType(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all duration-200"
-                >
-                  <option value="">Välj skadedjurstyp...</option>
-                  {PEST_TYPE_OPTIONS.map((pest) => (
-                    <option key={pest.id} value={pest.name}>
-                      {pest.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFollowUpPestType}
+                  placeholder="Välj skadedjurstyp..."
+                  options={PEST_TYPE_OPTIONS.map(pest => ({ value: pest.name, label: pest.name }))}
+                />
               </div>
 
               <div className="flex gap-3">
@@ -1504,22 +1499,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Status</label>
-                <select 
-                  name="status" 
-                  value={formData.status || ''} 
-                  onChange={handleChange} 
-                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 appearance-none cursor-pointer"
-                  style={{ 
-                    maxHeight: '200px',
-                    overflowY: 'auto' as const
-                  }}
-                >
-                  {statusOrder.map(s => (
-                    <option key={s} value={s} className="py-2 px-3 bg-slate-800 text-white hover:bg-slate-700">
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  value={formData.status || ''}
+                  onChange={(v) => setFormData(prev => ({ ...prev, status: v }))}
+                  options={statusOrder.map(s => ({ value: s, label: s }))}
+                />
               </div>
               {showTimeTracking && (
                 <div>

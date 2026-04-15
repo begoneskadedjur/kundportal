@@ -9,6 +9,7 @@ import {
   X, Repeat, Clock, CalendarDays, Loader2, Check, AlertTriangle, ChevronLeft, Trash2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import Select from '../ui/Select'
 import {
   getRecurringSchedule,
   getFutureSessionsForSchedule,
@@ -419,15 +420,11 @@ function EditStep({
         </div>
         <div>
           <label className="text-xs font-medium text-slate-400 mb-1 block">Varaktighet</label>
-          <select
-            value={durationMinutes}
-            onChange={e => setDurationMinutes(parseInt(e.target.value))}
-            className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
-          >
-            {DURATION_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+          <Select
+            value={String(durationMinutes)}
+            onChange={(v) => setDurationMinutes(parseInt(v))}
+            options={DURATION_OPTIONS.map(opt => ({ value: String(opt.value), label: opt.label }))}
+          />
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -491,17 +492,17 @@ export default function AddXpertContractCustomerModal({
                   placeholder="XXXXXX-XXXX"
                 />
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Företagstyp</label>
-                  <select
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Företagstyp</label>
+                  <Select
                     value={formData.business_type || ''}
-                    onChange={(e) => handleInputChange('business_type', e.target.value)}
-                    className={selectStyles}
-                  >
-                    <option value="">Välj typ</option>
-                    <option value="private">Privatperson</option>
-                    <option value="business">Företag</option>
-                    <option value="organization">Organisation</option>
-                  </select>
+                    onChange={(v) => handleInputChange('business_type', v)}
+                    placeholder="Välj typ"
+                    options={[
+                      { value: 'private', label: 'Privatperson' },
+                      { value: 'business', label: 'Företag' },
+                      { value: 'organization', label: 'Organisation' },
+                    ]}
+                  />
                 </div>
                 <Input
                   label="Bransch"

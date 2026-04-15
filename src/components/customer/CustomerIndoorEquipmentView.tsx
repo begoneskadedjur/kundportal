@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Home, Building2, RefreshCw, FileDown, Filter } from 'lucide-react'
+import Select from '../ui/Select'
 import toast from 'react-hot-toast'
 
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
@@ -237,32 +238,30 @@ export function CustomerIndoorEquipmentView({
             </div>
 
             {/* Type filter */}
-            <select
+            <Select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value as IndoorStationType | 'all')}
-              className="px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            >
-              <option value="all">Alla typer</option>
-              {Object.entries(INDOOR_STATION_TYPE_CONFIG).map(([type, config]) => (
-                <option key={type} value={type}>
-                  {config.label} ({stats.byType[type as IndoorStationType]})
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setFilterType(v as IndoorStationType | 'all')}
+              options={[
+                { value: 'all', label: 'Alla typer' },
+                ...Object.entries(INDOOR_STATION_TYPE_CONFIG).map(([type, config]) => ({
+                  value: type,
+                  label: `${config.label} (${stats.byType[type as IndoorStationType] ?? 0})`,
+                })),
+              ]}
+            />
 
             {/* Status filter */}
-            <select
+            <Select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as IndoorStationStatus | 'all')}
-              className="px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            >
-              <option value="all">Alla statusar</option>
-              {Object.entries(INDOOR_STATION_STATUS_CONFIG).map(([status, config]) => (
-                <option key={status} value={status}>
-                  {config.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setFilterStatus(v as IndoorStationStatus | 'all')}
+              options={[
+                { value: 'all', label: 'Alla statusar' },
+                ...Object.entries(INDOOR_STATION_STATUS_CONFIG).map(([status, config]) => ({
+                  value: status,
+                  label: config.label,
+                })),
+              ]}
+            />
 
             {/* Refresh button */}
             <button

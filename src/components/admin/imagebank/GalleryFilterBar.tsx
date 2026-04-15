@@ -1,4 +1,5 @@
 import { Search, Filter, X, Calendar } from 'lucide-react'
+import Select from '../../ui/Select'
 import { useState } from 'react'
 import type { CaseImageTag } from '../../../types/database'
 import { CASE_IMAGE_TAG_DISPLAY } from '../../../types/database'
@@ -65,32 +66,26 @@ export default function GalleryFilterBar({
         </div>
 
         {/* Pest type */}
-        <select
+        <Select
           value={filters.pestType}
-          onChange={(e) => onFilterChange('pestType', e.target.value)}
-          className="px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl
-                     text-sm text-white min-w-[140px]
-                     focus:ring-2 focus:ring-[#20c58f]/40"
-        >
-          <option value="all">Alla skadedjur</option>
-          {filterOptions.pestTypes.map(type => (
-            <option key={type} value={type}>{type}</option>
-          ))}
-        </select>
+          onChange={(v) => onFilterChange('pestType', v)}
+          options={[
+            { value: 'all', label: 'Alla skadedjur' },
+            ...filterOptions.pestTypes.map(t => ({ value: t, label: t })),
+          ]}
+          className="min-w-[140px]"
+        />
 
         {/* Technician */}
-        <select
+        <Select
           value={filters.technician}
-          onChange={(e) => onFilterChange('technician', e.target.value)}
-          className="px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl
-                     text-sm text-white min-w-[140px]
-                     focus:ring-2 focus:ring-[#20c58f]/40"
-        >
-          <option value="all">Alla tekniker</option>
-          {filterOptions.technicians.map(tech => (
-            <option key={tech} value={tech}>{tech}</option>
-          ))}
-        </select>
+          onChange={(v) => onFilterChange('technician', v)}
+          options={[
+            { value: 'all', label: 'Alla tekniker' },
+            ...filterOptions.technicians.map(t => ({ value: t, label: t })),
+          ]}
+          className="min-w-[140px]"
+        />
 
         {/* Extra filters toggle */}
         <button
@@ -114,32 +109,29 @@ export default function GalleryFilterBar({
       {showExtraFilters && (
         <div className="flex items-center gap-3 flex-wrap">
           {/* Status */}
-          <select
+          <Select
             value={filters.status}
-            onChange={(e) => onFilterChange('status', e.target.value)}
-            className="px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl
-                       text-sm text-white min-w-[130px]
-                       focus:ring-2 focus:ring-[#20c58f]/40"
-          >
-            <option value="all">Alla status</option>
-            {filterOptions.statuses.map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
+            onChange={(v) => onFilterChange('status', v)}
+            options={[
+              { value: 'all', label: 'Alla status' },
+              ...filterOptions.statuses.map(s => ({ value: s, label: s })),
+            ]}
+            className="min-w-[130px]"
+          />
 
           {/* Tag */}
-          <select
+          <Select
             value={filters.tag}
-            onChange={(e) => onFilterChange('tag', e.target.value as CaseImageTag | 'all')}
-            className="px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl
-                       text-sm text-white min-w-[130px]
-                       focus:ring-2 focus:ring-[#20c58f]/40"
-          >
-            <option value="all">Alla taggar</option>
-            {(Object.keys(CASE_IMAGE_TAG_DISPLAY) as CaseImageTag[]).map(tag => (
-              <option key={tag} value={tag}>{CASE_IMAGE_TAG_DISPLAY[tag].label}</option>
-            ))}
-          </select>
+            onChange={(v) => onFilterChange('tag', v as CaseImageTag | 'all')}
+            options={[
+              { value: 'all', label: 'Alla taggar' },
+              ...(Object.keys(CASE_IMAGE_TAG_DISPLAY) as CaseImageTag[]).map(tag => ({
+                value: tag,
+                label: CASE_IMAGE_TAG_DISPLAY[tag].label,
+              })),
+            ]}
+            className="min-w-[130px]"
+          />
 
           {/* Date range */}
           <div className="flex items-center gap-2">

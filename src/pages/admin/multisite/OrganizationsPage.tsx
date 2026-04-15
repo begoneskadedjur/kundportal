@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import Button from '../../../components/ui/Button'
+import Select from '../../../components/ui/Select'
 import toast from 'react-hot-toast'
 import {
   Building2,
@@ -1064,35 +1065,35 @@ export default function OrganizationsPage() {
           </div>
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-slate-500" />
-            <select
+            <Select
               value={customerTypeFilter}
-              onChange={(e) => { setCustomerTypeFilter(e.target.value as any); setActiveQuickFilter(null) }}
-              className="bg-slate-800/50 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-            >
-              <option value="all">Alla kundtyper</option>
-              <option value="multisite">Multisite</option>
-              <option value="single">Vanlig kund</option>
-            </select>
-            <select
+              onChange={(v) => { setCustomerTypeFilter(v as any); setActiveQuickFilter(null) }}
+              options={[
+                { value: 'all', label: 'Alla kundtyper' },
+                { value: 'multisite', label: 'Multisite' },
+                { value: 'single', label: 'Vanlig kund' },
+              ]}
+            />
+            <Select
               value={portalStatusFilter}
-              onChange={(e) => { setPortalStatusFilter(e.target.value as any); setActiveQuickFilter(null) }}
-              className="bg-slate-800/50 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-            >
-              <option value="all">Alla portalstatus</option>
-              <option value="active">Aktiv</option>
-              <option value="invited">Inbjuden</option>
-              <option value="not_invited">Ingen portal</option>
-              <option value="inactive">Inaktiv</option>
-            </select>
-            <select
+              onChange={(v) => { setPortalStatusFilter(v as any); setActiveQuickFilter(null) }}
+              options={[
+                { value: 'all', label: 'Alla portalstatus' },
+                { value: 'active', label: 'Aktiv' },
+                { value: 'invited', label: 'Inbjuden' },
+                { value: 'not_invited', label: 'Ingen portal' },
+                { value: 'inactive', label: 'Inaktiv' },
+              ]}
+            />
+            <Select
               value={loginStatusFilter}
-              onChange={(e) => { setLoginStatusFilter(e.target.value as any); setActiveQuickFilter(null) }}
-              className="bg-slate-800/50 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-            >
-              <option value="all">Alla loginstatus</option>
-              <option value="logged_in">Har loggat in</option>
-              <option value="never_logged_in">Aldrig loggat in</option>
-            </select>
+              onChange={(v) => { setLoginStatusFilter(v as any); setActiveQuickFilter(null) }}
+              options={[
+                { value: 'all', label: 'Alla loginstatus' },
+                { value: 'logged_in', label: 'Har loggat in' },
+                { value: 'never_logged_in', label: 'Aldrig loggat in' },
+              ]}
+            />
           </div>
         </div>
 

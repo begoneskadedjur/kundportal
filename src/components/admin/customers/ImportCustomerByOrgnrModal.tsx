@@ -7,6 +7,7 @@ import {
 import { BILLING_FREQUENCY_CONFIG, type BillingFrequency } from '../../../types/contractBilling'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
+import Select from '../../ui/Select'
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
 import { CustomerGroupService } from '../../../services/customerGroupService'
@@ -426,16 +427,15 @@ export default function ImportCustomerByOrgnrModal({
                     Kundgrupp
                     {preview.customer_group_id && <span className="ml-1 text-[#20c58f]">(auto-matchad)</span>}
                   </label>
-                  <select
+                  <Select
                     value={preview.customer_group_id ?? ''}
-                    onChange={e => setPreview(prev => prev ? { ...prev, customer_group_id: e.target.value || null } : prev)}
-                    className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-                  >
-                    <option value="">Välj kundgrupp</option>
-                    {customerGroups.map(g => (
-                      <option key={g.id} value={g.id}>{g.name} ({g.series_start}–{g.series_end})</option>
-                    ))}
-                  </select>
+                    onChange={v => setPreview(prev => prev ? { ...prev, customer_group_id: v || null } : prev)}
+                    placeholder="Välj kundgrupp"
+                    options={[
+                      { value: '', label: 'Välj kundgrupp' },
+                      ...customerGroups.map(g => ({ value: g.id, label: `${g.name} (${g.series_start}–${g.series_end})` }))
+                    ]}
+                  />
                 </div>
               </div>
             </div>
@@ -471,15 +471,11 @@ export default function ImportCustomerByOrgnrModal({
                 {/* Avtalstyp */}
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-slate-400 mb-1 block">Avtalstyp</label>
-                  <select
+                  <Select
                     value={preview.contract_type ?? ''}
-                    onChange={e => setPreview(prev => prev ? { ...prev, contract_type: e.target.value || null } : prev)}
-                    className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-                  >
-                    {CONTRACT_TYPE_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
+                    onChange={v => setPreview(prev => prev ? { ...prev, contract_type: v || null } : prev)}
+                    options={CONTRACT_TYPE_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                  />
                 </div>
 
                 <Field label="Avtalsstart" value={preview.contract_start_date ?? ''} onChange={update('contract_start_date')} placeholder="ÅÅÅÅ-MM-DD" />
@@ -515,15 +511,11 @@ export default function ImportCustomerByOrgnrModal({
                 {/* Faktureringsfrekvens */}
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-slate-400 mb-1 block">Faktureringsfrekvens</label>
-                  <select
+                  <Select
                     value={preview.billing_frequency}
-                    onChange={e => setPreview(prev => prev ? { ...prev, billing_frequency: e.target.value as BillingFrequency } : prev)}
-                    className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-                  >
-                    {Object.entries(BILLING_FREQUENCY_CONFIG).map(([key, cfg]) => (
-                      <option key={key} value={key}>{cfg.label} – {cfg.description}</option>
-                    ))}
-                  </select>
+                    onChange={v => setPreview(prev => prev ? { ...prev, billing_frequency: v as BillingFrequency } : prev)}
+                    options={Object.entries(BILLING_FREQUENCY_CONFIG).map(([key, cfg]) => ({ value: key, label: `${cfg.label} – ${cfg.description}` }))}
+                  />
                 </div>
               </div>
             </div>
@@ -542,15 +534,11 @@ export default function ImportCustomerByOrgnrModal({
                       <span className="ml-1 text-slate-500">(härledd från avtalsstart)</span>
                     )}
                   </label>
-                  <select
-                    value={preview.billing_anchor_month}
-                    onChange={e => setPreview(prev => prev ? { ...prev, billing_anchor_month: parseInt(e.target.value) } : prev)}
-                    className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-                  >
-                    {MONTHS_SV.map((name, i) => (
-                      <option key={i + 1} value={i + 1}>{name}</option>
-                    ))}
-                  </select>
+                  <Select
+                    value={String(preview.billing_anchor_month)}
+                    onChange={v => setPreview(prev => prev ? { ...prev, billing_anchor_month: parseInt(v) } : prev)}
+                    options={MONTHS_SV.map((name, i) => ({ value: String(i + 1), label: name }))}
+                  />
                 </div>
 
                 {/* Nästa fakturadatum */}

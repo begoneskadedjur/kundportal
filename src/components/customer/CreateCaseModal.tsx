@@ -4,6 +4,7 @@ import { X, AlertCircle, CheckCircle, Bug, MapPin, Phone, FileText } from 'lucid
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import Card from '../ui/Card'
+import Select from '../ui/Select'
 
 interface CreateCaseModalProps {
   isOpen: boolean
@@ -171,17 +172,16 @@ export default function CreateCaseModal({
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Prioritet
                 </label>
-                <select
-                  name="priority"
+                <Select
                   value={formData.priority}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-green-500"
-                >
-                  <option value="low">Låg</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">Hög</option>
-                  <option value="urgent">Akut</option>
-                </select>
+                  onChange={(v) => setFormData(prev => ({ ...prev, priority: v }))}
+                  options={[
+                    { value: 'low', label: 'Låg' },
+                    { value: 'normal', label: 'Normal' },
+                    { value: 'high', label: 'Hög' },
+                    { value: 'urgent', label: 'Akut' },
+                  ]}
+                />
               </div>
 
               <Input

@@ -29,6 +29,7 @@ import {
 import { PageHeader } from '../../../components/shared'
 import Card from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
+import Select from '../../../components/ui/Select'
 import Input from '../../../components/ui/Input'
 import MultisiteRegistrationWizard from '../../../components/admin/multisite/MultisiteRegistrationWizard'
 import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
@@ -416,38 +417,35 @@ export default function OrganizationManagement() {
             
             {/* Filter Controls */}
             <div className="flex items-center gap-3">
-              {/* Kundtyp Filter */}
-              <select
+              <Select
                 value={customerTypeFilter}
-                onChange={(e) => setCustomerTypeFilter(e.target.value as 'all' | 'multisite' | 'single')}
-                className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:border-purple-500 focus:outline-none"
-              >
-                <option value="all">Alla kundtyper</option>
-                <option value="multisite">Multisite</option>
-                <option value="single">Vanlig kund</option>
-              </select>
-              
-              {/* Portal-status Filter */}
-              <select
+                onChange={(v) => setCustomerTypeFilter(v as 'all' | 'multisite' | 'single')}
+                options={[
+                  { value: 'all', label: 'Alla kundtyper' },
+                  { value: 'multisite', label: 'Multisite' },
+                  { value: 'single', label: 'Vanlig kund' },
+                ]}
+              />
+
+              <Select
                 value={portalStatusFilter}
-                onChange={(e) => setPortalStatusFilter(e.target.value as 'all' | 'has_access' | 'no_access')}
-                className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:border-purple-500 focus:outline-none"
-              >
-                <option value="all">Alla portal-status</option>
-                <option value="has_access">Har tillgång</option>
-                <option value="no_access">Ingen tillgång</option>
-              </select>
-              
-              {/* Inloggnings-status Filter */}
-              <select
+                onChange={(v) => setPortalStatusFilter(v as 'all' | 'has_access' | 'no_access')}
+                options={[
+                  { value: 'all', label: 'Alla portal-status' },
+                  { value: 'has_access', label: 'Har tillgång' },
+                  { value: 'no_access', label: 'Ingen tillgång' },
+                ]}
+              />
+
+              <Select
                 value={loginStatusFilter}
-                onChange={(e) => setLoginStatusFilter(e.target.value as 'all' | 'logged_in' | 'never_logged_in')}
-                className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:border-purple-500 focus:outline-none"
-              >
-                <option value="all">Alla login-status</option>
-                <option value="logged_in">Har loggat in</option>
-                <option value="never_logged_in">Aldrig loggat in</option>
-              </select>
+                onChange={(v) => setLoginStatusFilter(v as 'all' | 'logged_in' | 'never_logged_in')}
+                options={[
+                  { value: 'all', label: 'Alla login-status' },
+                  { value: 'logged_in', label: 'Har loggat in' },
+                  { value: 'never_logged_in', label: 'Aldrig loggat in' },
+                ]}
+              />
             </div>
           </div>
           <Button

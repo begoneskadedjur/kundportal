@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Calendar, DollarSign, Users, Filter } from 'lucide-react'
 import Card from '../../ui/Card'
+import Select from '../../ui/Select'
 import { useCustomerContracts } from '../../../hooks/useEconomicsDashboard'
 import type { CustomerContract } from '../../../services/economicsService'
 
@@ -176,29 +177,25 @@ const CustomerContractTable: React.FC = () => {
         </div>
 
         {/* Status filter */}
-        <select
+        <Select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
-          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">Alla avtal</option>
-          <option value="expiring">Utgår inom 6 mån</option>
-          <option value="active">Aktiva längre</option>
-        </select>
+          onChange={(v) => setStatusFilter(v as any)}
+          options={[
+            { value: 'all', label: 'Alla avtal' },
+            { value: 'expiring', label: 'Utgår inom 6 mån' },
+            { value: 'active', label: 'Aktiva längre' },
+          ]}
+        />
 
         {/* Verksamhetstyp filter */}
-        <select
+        <Select
           value={businessTypeFilter}
-          onChange={(e) => setBusinessTypeFilter(e.target.value)}
-          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">Alla verksamheter</option>
-          {businessTypes.map(type => (
-            <option key={type} value={type}>
-              {getBusinessTypeIcon(type)} {type}
-            </option>
-          ))}
-        </select>
+          onChange={setBusinessTypeFilter}
+          options={[
+            { value: 'all', label: 'Alla verksamheter' },
+            ...businessTypes.map(type => ({ value: type, label: type })),
+          ]}
+        />
       </div>
 
       {/* Snabb statistik */}

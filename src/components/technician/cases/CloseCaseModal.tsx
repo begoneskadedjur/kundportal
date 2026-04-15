@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
+import Select from '../../ui/Select'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 import type { TechnicianCase } from '../../../pages/technician/TechnicianCases'
@@ -135,16 +136,12 @@ export default function CloseCaseModal({
           <label className="text-xs font-medium text-slate-400 mb-1 block">
             Anledning <span className="text-red-400">*</span>
           </label>
-          <select
+          <Select
             value={reason}
-            onChange={e => setReason(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-          >
-            <option value="">Välj anledning...</option>
-            {CLOSE_REASONS.map(r => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
+            onChange={setReason}
+            placeholder="Välj anledning..."
+            options={CLOSE_REASONS.map(r => ({ value: r.value, label: r.label }))}
+          />
         </div>
 
         {needsNotes && (

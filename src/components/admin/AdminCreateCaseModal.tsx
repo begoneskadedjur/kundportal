@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle, Bug, MapPin, Phone, FileText, User } from 'lu
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import Modal from '../ui/Modal'
+import Select from '../ui/Select'
 import TechnicianDropdown from './TechnicianDropdown'
 import ServiceArticleSelector from '../shared/ServiceArticleSelector'
 
@@ -251,18 +252,11 @@ export default function AdminCreateCaseModal({
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Prioritet
                 </label>
-                <select
-                  name="priority"
+                <Select
                   value={formData.priority}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  {priorityOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setFormData(prev => ({ ...prev, priority: v }))}
+                  options={priorityOptions.map(o => ({ value: o.value, label: o.label }))}
+                />
               </div>
 
               <div>
@@ -284,17 +278,12 @@ export default function AdminCreateCaseModal({
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Typ av ärende
                 </label>
-                <select
-                  name="case_type"
+                <Select
                   value={formData.case_type}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">Välj ärendetyp (om känt)</option>
-                  {caseTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
+                  onChange={(v) => setFormData(prev => ({ ...prev, case_type: v }))}
+                  placeholder="Välj ärendetyp (om känt)"
+                  options={caseTypes.map(t => ({ value: t, label: t }))}
+                />
               </div>
 
               {/* NY: Tekniker-tilldelning */}
