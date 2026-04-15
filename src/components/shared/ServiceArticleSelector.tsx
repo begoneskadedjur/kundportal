@@ -37,7 +37,7 @@ export default function ServiceArticleSelector({
       .finally(() => setLoadingGroups(false))
   }, [])
 
-  // Om serviceId är satt men groupId saknas, härledd gruppen
+  // Om serviceId är satt men groupId saknas, härledd gruppen automatiskt
   useEffect(() => {
     if (serviceId && !groupId) {
       ServiceCatalogService.getServiceById(serviceId).then((svc) => {
@@ -81,7 +81,7 @@ export default function ServiceArticleSelector({
         onChange={(e) => {
           const val = e.target.value || null
           onGroupChange(val)
-          onServiceChange(null, null)
+          onServiceChange(null, null) // Rensa tjänstval vid aktivt gruppbyte av användaren
         }}
         disabled={disabled}
         className={selectClass}

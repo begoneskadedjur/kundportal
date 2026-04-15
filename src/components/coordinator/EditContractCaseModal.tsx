@@ -1673,8 +1673,10 @@ export default function EditContractCaseModal({
                   groupId={formData.service_group_id ?? null}
                   serviceId={formData.service_id ?? null}
                   onGroupChange={async (gid) => {
-                    const isUserChange = gid !== formData.service_group_id
-                    setFormData(prev => ({ ...prev, service_group_id: gid, ...(isUserChange ? { service_id: null } : {}) }))
+                    // Sätt bara service_group_id – rensa ALDRIG service_id här.
+                    // service_id rensas av ServiceArticleSelector internt via onServiceChange
+                    // när användaren aktivt byter grupp i dropdownen.
+                    setFormData(prev => ({ ...prev, service_group_id: gid }))
                     if (gid) {
                       const { data: sg } = await supabase.from('service_groups').select('name').eq('id', gid).single()
                       if (sg?.name) {
