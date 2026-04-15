@@ -1,0 +1,693 @@
+// src/components/shared/CaseServiceSelector.tsx
+// Ny prissättningskalkylator: Tjänster (fakturarader) + Artiklar (intern kalkyl)
+//
+// Flöde:
+//   Sektion A: Tjänsterader (faktura) – välj från tjänsteutbud, sätt pris manuellt
+//   Sektion B: Artikel-kalkylator (intern) – inköpspriser för marginalberäkning
+//   Marginalindikator baserad på tjänstpris vs inköpskostnad
+
+import { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  ShoppingCart,
+  Package,
+  Search,
+  Plus,
+  Minus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
+  Calculator,
+  Percent
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+import { supabase } from '../../lib/supabase'
+import { CaseBillingService } from '../../services/caseBillingService'
+import { ServiceCatalogService } from '../../services/servicesCatalogService'
+import type {
+  CaseBillingItemWithRelations,
+  ArticleWithEffectivePrice,
+  BillableCaseType,
+  CaseBillingSummary,
+  CaseServiceSummary
+} from '../../types/caseBilling'
+import {
+  calculateDiscountedPrice,
+  calculateTotalPrice,
+  calculateMarginPercent,
+  itemRequiresApproval
+} from '../../types/caseBilling'
+import type { ServiceWithGroup } from '../../types/services'
+import { ARTICLE_CATEGORIES } from '../../types/articles'
+import type { ArticleCategory } from '../../types/articles'
+import { ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
+import PriceCalculatorPanel from './PriceCalculatorPanel'
+
+interface CaseServiceSelectorProps {
+  caseId?: string
+  caseType: BillableCaseType
+  customerId?: string | null
+  technicianId?: string | null
+  technicianName?: string | null
+  /** Tjänst som ärendet gäller (från case.service_id) – om null kan man välja */
+  primaryServiceId?: string | null
+  onChange?: (items: CaseBillingItemWithRelations[], summary: CaseBillingSummary) => void
+  readOnly?: boolean
+  className?: string
+}
+
+const formatPrice = (price: number) =>
+  new Intl.NumberFormat('sv-SE', {
+    style: 'currency',
+    currency: 'SEK',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(price)
+
+// Beräkna CaseBillingSummary lokalt (för service-items)
+function buildBillingSummary(items: CaseBillingItemWithRelations[]): CaseBillingSummary {
+  const serviceItems = items.filter(i => i.item_type === 'service')
+  const subtotal = serviceItems.reduce((s, i) => s + i.total_price, 0)
+  const vatAmount = serviceItems.reduce((s, i) => s + i.total_price * (i.vat_rate / 100), 0)
+  return {
+    item_count: serviceItems.length,
+    subtotal,
+    total_discount: 0,
+    vat_amount: vatAmount,
+    total_amount: subtotal + vatAmount,
+    requires_approval: serviceItems.some(i => i.requires_approval),
+    rot_rut_deduction: 0,
+    subcontractor_total: 0,
+    custom_total_price: null,
+  }
+}
+
+export default function CaseServiceSelector({
+  caseId,
+  caseType,
+  customerId,
+  technicianId,
+  technicianName,
+  primaryServiceId,
+  onChange,
+  readOnly = false,
+  className = '',
+}: CaseServiceSelectorProps) {
+  // All data
+  const [allItems, setAllItems] = useState<CaseBillingItemWithRelations[]>([])
+  const [articles, setArticles] = useState<ArticleWithEffectivePrice[]>([])
+  const [addonServices, setAddonServices] = useState<ServiceWithGroup[]>([])
+  const [primaryService, setPrimaryService] = useState<ServiceWithGroup | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // UI state
+  const [showArticleList, setShowArticleList] = useState(false)
+  const [showAddonPicker, setShowAddonPicker] = useState(false)
+  const [searchArticle, setSearchArticle] = useState('')
+  const [searchAddon, setSearchAddon] = useState('')
+  const [expandedCategories, setExpandedCategories] = useState<Set<ArticleCategory>>(new Set(ARTICLE_CATEGORIES))
+  const [showCalculatorPanel, setShowCalculatorPanel] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Inline price editing (service item id → input string)
+  const [editingPrice, setEditingPrice] = useState<Record<string, string>>({})
+
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [articlesData, itemsData, addonsData] = await Promise.all([
+        CaseBillingService.getArticlesWithPrices(customerId),
+        caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
+        ServiceCatalogService.getActiveAddonServices(),
+      ])
+      setArticles(articlesData)
+      setAllItems(itemsData)
+      setAddonServices(addonsData)
+
+      // Hämta primär tjänst
+      if (primaryServiceId) {
+        const svc = await ServiceCatalogService.getServiceById(primaryServiceId)
+        setPrimaryService(svc)
+      }
+
+      const summary = buildBillingSummary(itemsData)
+      onChangeRef.current?.(itemsData, summary)
+    } catch (err) {
+      console.error(err)
+      toast.error('Kunde inte ladda data')
+    } finally {
+      setLoading(false)
+    }
+  }, [caseId, caseType, customerId, primaryServiceId])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const serviceItems = allItems.filter(i => i.item_type === 'service')
+  const articleItems = allItems.filter(i => i.item_type === 'article')
+
+  // Marginalberäkning
+  const serviceCost = serviceItems.reduce((s, i) => s + i.total_price, 0)
+  const purchaseCost = articleItems.reduce((s, i) => s + i.total_price, 0)
+  const marginPercent = serviceCost > 0 ? calculateMarginPercent(serviceCost, purchaseCost) : null
+  const minMargin = primaryService?.min_margin_percent ?? 20
+  const marginOk = marginPercent === null || marginPercent >= minMargin
+
+  const getMarginColor = () => {
+    if (marginPercent === null) return 'text-slate-400'
+    if (marginPercent >= minMargin + 10) return 'text-emerald-400'
+    if (marginPercent >= minMargin) return 'text-yellow-400'
+    return 'text-red-400'
+  }
+
+  const notifyChange = (items: CaseBillingItemWithRelations[]) => {
+    const summary = buildBillingSummary(items)
+    onChangeRef.current?.(items, summary)
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Lägg till TILLÄGGSTJÄNST
+  // ──────────────────────────────────────────────────────────────
+  const handleAddAddon = async (svc: ServiceWithGroup) => {
+    if (!caseId || saving) return
+    setSaving(true)
+    try {
+      const price = svc.base_price ?? 0
+      await CaseBillingService.addServiceToCase({
+        case_id: caseId,
+        case_type: caseType,
+        customer_id: customerId,
+        service_id: svc.id,
+        service_code: svc.code,
+        service_name: svc.name,
+        quantity: 1,
+        unit_price: price,
+        vat_rate: 25,
+        added_by_technician_id: technicianId || undefined,
+        added_by_technician_name: technicianName || undefined,
+      })
+      await reloadItems()
+      setShowAddonPicker(false)
+      toast.success(`${svc.name} tillagd`)
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Lägg till ARTIKEL (intern kalkyl)
+  // ──────────────────────────────────────────────────────────────
+  const handleAddArticle = async (item: ArticleWithEffectivePrice) => {
+    if (!caseId || saving) return
+    setSaving(true)
+    try {
+      await CaseBillingService.addArticleToCase({
+        case_id: caseId,
+        case_type: caseType,
+        customer_id: customerId,
+        article_id: item.article.id,
+        article_code: item.article.code,
+        article_name: item.article.name,
+        quantity: 1,
+        unit_price: item.effective_price,
+        vat_rate: item.article.vat_rate,
+        price_source: item.price_source,
+        added_by_technician_id: technicianId || undefined,
+        added_by_technician_name: technicianName || undefined,
+      })
+      await reloadItems()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Uppdatera antal
+  // ──────────────────────────────────────────────────────────────
+  const handleQuantityChange = async (id: string, delta: number) => {
+    if (!caseId || saving) return
+    const item = allItems.find(i => i.id === id)
+    if (!item) return
+    const newQty = Math.max(1, item.quantity + delta)
+    setSaving(true)
+    try {
+      await CaseBillingService.updateCaseArticle(id, { quantity: newQty })
+      await reloadItems()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Uppdatera pris inline (för tjänsterader)
+  // ──────────────────────────────────────────────────────────────
+  const handleServicePriceBlur = async (id: string) => {
+    if (!caseId) return
+    const raw = editingPrice[id]
+    if (raw === undefined) return
+    const newPrice = parseFloat(raw.replace(',', '.'))
+    if (isNaN(newPrice) || newPrice < 0) {
+      setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
+      return
+    }
+    setSaving(true)
+    try {
+      const item = allItems.find(i => i.id === id)
+      if (!item) return
+      const discounted = calculateDiscountedPrice(newPrice, item.discount_percent)
+      const total = calculateTotalPrice(discounted, item.quantity)
+      // Uppdatera direkt i DB via raw update (caseBillingService uppdaterar quantity/discount, men vi behöver unit_price)
+      // supabase imported at top
+      await supabase
+        .from('case_billing_items')
+        .update({
+          unit_price: newPrice,
+          discounted_price: discounted,
+          total_price: total,
+          requires_approval: itemRequiresApproval(item.discount_percent),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+      setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
+      await reloadItems()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Ta bort item
+  // ──────────────────────────────────────────────────────────────
+  const handleRemove = async (id: string) => {
+    if (!caseId || saving) return
+    setSaving(true)
+    try {
+      await CaseBillingService.removeCaseArticle(id)
+      const updated = allItems.filter(i => i.id !== id)
+      setAllItems(updated)
+      notifyChange(updated)
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const reloadItems = async () => {
+    if (!caseId) return
+    const items = await CaseBillingService.getCaseBillingItems(caseId, caseType)
+    setAllItems(items)
+    notifyChange(items)
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Prisguide: applicera föreslagen pris på alla tjänsterader
+  // ──────────────────────────────────────────────────────────────
+  const handleApplyGuidePrice = async (price: number) => {
+    if (!caseId || serviceItems.length === 0) return
+    // Om det finns exakt en tjänsterad – applicera på den
+    // Om flera – fördelat jämnt (enklast: bara visa toast att man ska editera manuellt)
+    if (serviceItems.length === 1) {
+      const id = serviceItems[0].id
+      setEditingPrice(prev => ({ ...prev, [id]: String(price) }))
+      // Applicera direkt
+      setSaving(true)
+      try {
+        const item = serviceItems[0]
+        const discounted = calculateDiscountedPrice(price, item.discount_percent)
+        const total = calculateTotalPrice(discounted, item.quantity)
+        // supabase imported at top
+        await supabase
+          .from('case_billing_items')
+          .update({
+            unit_price: price,
+            discounted_price: discounted,
+            total_price: total,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+        setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
+        await reloadItems()
+        toast.success('Prisguide applicerat')
+      } catch (err: any) {
+        toast.error(err.message)
+      } finally {
+        setSaving(false)
+      }
+    } else {
+      toast.success(`Föreslagen totalpris: ${formatPrice(price)} – justera priserna manuellt`)
+    }
+  }
+
+  const toggleCategory = (cat: ArticleCategory) => {
+    const next = new Set(expandedCategories)
+    if (next.has(cat)) next.delete(cat)
+    else next.add(cat)
+    setExpandedCategories(next)
+  }
+
+  const filteredArticles = articles.filter(item => {
+    const s = searchArticle.toLowerCase()
+    return !s
+      || item.article.name.toLowerCase().includes(s)
+      || item.article.code.toLowerCase().includes(s)
+  })
+  const articlesByCategory = filteredArticles.reduce((acc, item) => {
+    const cat = item.article.category
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push(item)
+    return acc
+  }, {} as Partial<Record<ArticleCategory, ArticleWithEffectivePrice[]>>)
+
+  const filteredAddons = addonServices.filter(s =>
+    !searchAddon
+    || s.name.toLowerCase().includes(searchAddon.toLowerCase())
+    || s.code.toLowerCase().includes(searchAddon.toLowerCase())
+  )
+
+  const selectClass = 'w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f]'
+
+  if (loading) {
+    return (
+      <div className={`flex items-center justify-center py-8 ${className}`}>
+        <Loader2 className="w-5 h-5 animate-spin text-[#20c58f]" />
+        <span className="ml-2 text-sm text-slate-400">Laddar...</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`space-y-3 ${className}`}>
+      {/* ── A: TJÄNSTERADER (faktura) ── */}
+      <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <ShoppingCart className="w-4 h-4 text-[#20c58f]" />
+            <span className="text-sm font-semibold text-white">Tjänster & fakturarader</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Marginalindikator */}
+            {marginPercent !== null && (
+              <div className={`flex items-center gap-1 text-xs font-medium ${getMarginColor()}`}>
+                {marginOk
+                  ? <CheckCircle className="w-3.5 h-3.5" />
+                  : <AlertTriangle className="w-3.5 h-3.5" />}
+                {marginPercent.toFixed(0)}% marginal
+              </div>
+            )}
+            {/* Prisguide-knapp */}
+            {!readOnly && (
+              <button
+                onClick={() => setShowCalculatorPanel(true)}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg transition-colors"
+              >
+                <Calculator className="w-3.5 h-3.5" />
+                Prisguide
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Befintliga tjänsterader */}
+        {serviceItems.length === 0 ? (
+          <p className="text-xs text-slate-500 py-2 text-center">Inga tjänster tillagda än</p>
+        ) : (
+          <div className="space-y-2 mb-2">
+            {serviceItems.map(item => {
+              const isEditing = editingPrice[item.id] !== undefined
+              const displayPrice = isEditing ? editingPrice[item.id] : String(item.unit_price)
+              return (
+                <div key={item.id} className="flex items-center gap-2 p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white truncate">
+                      {item.service_code && (
+                        <span className="text-xs text-slate-400 mr-1">{item.service_code}</span>
+                      )}
+                      {item.service_name || item.article_name}
+                    </div>
+                  </div>
+                  {/* Antal */}
+                  {!readOnly && (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
+                      <button onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  {/* Pris */}
+                  {readOnly ? (
+                    <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap">
+                      {formatPrice(item.total_price)}
+                    </span>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={displayPrice}
+                        onChange={e => setEditingPrice(prev => ({ ...prev, [item.id]: e.target.value }))}
+                        onFocus={() => {
+                          if (editingPrice[item.id] === undefined)
+                            setEditingPrice(prev => ({ ...prev, [item.id]: String(item.unit_price) }))
+                        }}
+                        onBlur={() => handleServicePriceBlur(item.id)}
+                        className="w-24 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                      />
+                      <span className="text-xs text-slate-400">kr/{item.quantity > 1 ? `${item.quantity} st` : 'st'}</span>
+                    </div>
+                  )}
+                  {!readOnly && (
+                    <button onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Lägg till tilläggstjänst */}
+        {!readOnly && (
+          <div className="mt-2">
+            {showAddonPicker ? (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    autoFocus
+                    value={searchAddon}
+                    onChange={e => setSearchAddon(e.target.value)}
+                    placeholder="Sök tilläggstjänst..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {filteredAddons.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-2">Inga tilläggstjänster hittades</p>
+                  ) : filteredAddons.map(svc => (
+                    <button
+                      key={svc.id}
+                      onClick={() => handleAddAddon(svc)}
+                      disabled={saving}
+                      className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <div>
+                        <span className="text-xs text-slate-400 mr-1">{svc.code}</span>
+                        <span className="text-sm text-white">{svc.name}</span>
+                      </div>
+                      {svc.base_price != null && (
+                        <span className="text-xs text-[#20c58f] whitespace-nowrap ml-2">
+                          {formatPrice(svc.base_price)}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => { setShowAddonPicker(false); setSearchAddon('') }}
+                  className="text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  Stäng
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAddonPicker(true)}
+                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#20c58f] transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Lägg till tilläggstjänst
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Summa tjänster */}
+        {serviceItems.length > 0 && (
+          <div className="border-t border-slate-700/50 mt-3 pt-2 flex justify-between text-sm">
+            <span className="text-slate-400">Exkl. moms</span>
+            <span className="font-semibold text-white">{formatPrice(serviceCost)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── B: ARTIKEL-KALKYLATOR (intern) ── */}
+      <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
+        <button
+          onClick={() => setShowArticleList(!showArticleList)}
+          className="flex items-center justify-between w-full"
+        >
+          <div className="flex items-center gap-1.5">
+            <Package className="w-4 h-4 text-slate-400" />
+            <span className="text-sm font-semibold text-slate-300">Inköpsartikel-kalkyl (intern)</span>
+            {articleItems.length > 0 && (
+              <span className="px-1.5 py-0.5 text-xs bg-slate-700 text-slate-300 rounded-full">
+                {articleItems.length}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {purchaseCost > 0 && (
+              <span className="text-xs text-slate-400">{formatPrice(purchaseCost)} ink.</span>
+            )}
+            {showArticleList
+              ? <ChevronDown className="w-4 h-4 text-slate-400" />
+              : <ChevronRight className="w-4 h-4 text-slate-400" />}
+          </div>
+        </button>
+
+        {showArticleList && (
+          <div className="mt-3 space-y-3">
+            <p className="text-xs text-slate-500">
+              Artiklar här är <strong>inte</strong> synliga på fakturan – de används bara för att beräkna inköpskostnad och marginal.
+            </p>
+
+            {/* Befintliga artikelrader */}
+            {articleItems.length > 0 && (
+              <div className="space-y-1.5">
+                {articleItems.map(item => (
+                  <div key={item.id} className="flex items-center gap-2 px-3 py-2 bg-slate-800/40 border border-slate-700/30 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-white truncate">
+                        <span className="text-xs text-slate-500 mr-1">{item.article_code}</span>
+                        {item.article_name}
+                      </div>
+                      <div className="text-xs text-slate-500">{item.unit_price} kr/st</div>
+                    </div>
+                    {!readOnly && (
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
+                        <button onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    <span className="text-sm text-slate-300 whitespace-nowrap">
+                      {formatPrice(item.total_price)}
+                    </span>
+                    {!readOnly && (
+                      <button onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div className="flex justify-between text-xs text-slate-400 px-1">
+                  <span>Total inköpskostnad</span>
+                  <span className="font-medium text-slate-300">{formatPrice(purchaseCost)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Artikelsökning + lägg till */}
+            {!readOnly && (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    value={searchArticle}
+                    onChange={e => setSearchArticle(e.target.value)}
+                    placeholder="Sök artikel..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                  />
+                </div>
+                <div className="max-h-64 overflow-y-auto space-y-1">
+                  {ARTICLE_CATEGORIES.filter(cat => articlesByCategory[cat]?.length).map(cat => {
+                    const config = ARTICLE_CATEGORY_CONFIG[cat]
+                    const catArticles = articlesByCategory[cat] || []
+                    const expanded = expandedCategories.has(cat)
+                    return (
+                      <div key={cat}>
+                        <button
+                          onClick={() => toggleCategory(cat)}
+                          className="flex items-center gap-1.5 w-full px-2 py-1 text-xs font-medium text-slate-400 hover:text-white"
+                        >
+                          {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          {config?.label ?? cat} ({catArticles.length})
+                        </button>
+                        {expanded && (
+                          <div className="space-y-0.5 ml-2">
+                            {catArticles.map(item => (
+                              <button
+                                key={item.article.id}
+                                onClick={() => handleAddArticle(item)}
+                                disabled={saving}
+                                className="w-full flex items-center justify-between px-2 py-1.5 rounded text-left hover:bg-slate-800/60 transition-colors"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-xs text-slate-500 mr-1">{item.article.code}</span>
+                                  <span className="text-sm text-slate-200 truncate">{item.article.name}</span>
+                                </div>
+                                <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
+                                  {formatPrice(item.effective_price)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Prisguide-panel */}
+      <PriceCalculatorPanel
+        isOpen={showCalculatorPanel}
+        onClose={() => setShowCalculatorPanel(false)}
+        articleItems={articleItems.map(i => ({
+          article: i.article || { id: '', name: i.article_name, code: i.article_code || '' } as any,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+        }))}
+        recommendedMarkupPercent={primaryService?.recommended_markup_percent ?? 40}
+        minMarginPercent={primaryService?.min_margin_percent ?? 20}
+        onApplyPrice={handleApplyGuidePrice}
+      />
+    </div>
+  )
+}

@@ -150,6 +150,27 @@ export class ServiceCatalogService {
     return data
   }
 
+  static async getActiveAddonServices(): Promise<ServiceWithGroup[]> {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*, group:service_groups!group_id(*)')
+      .eq('is_active', true)
+      .eq('is_addon_service', true)
+      .order('sort_order').order('name')
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return data || []
+  }
+
+  static async getAllActiveServices(): Promise<ServiceWithGroup[]> {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*, group:service_groups!group_id(*)')
+      .eq('is_active', true)
+      .order('sort_order').order('name')
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return data || []
+  }
+
   static async createService(input: CreateServiceInput): Promise<Service> {
     const { data, error } = await supabase
       .from('services')
@@ -161,6 +182,10 @@ export class ServiceCatalogService {
         unit: input.unit || 'st',
         sort_order: input.sort_order ?? 0,
         is_active: input.is_active ?? true,
+        base_price: input.base_price ?? null,
+        min_margin_percent: input.min_margin_percent ?? 20,
+        recommended_markup_percent: input.recommended_markup_percent ?? 40,
+        is_addon_service: input.is_addon_service ?? false,
       })
       .select().single()
     if (error) {

@@ -53,10 +53,14 @@ export class InvoiceService {
     }
   ): Promise<InvoiceWithItems> {
     // Hämta billing items för ärendet
-    const billingItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
+    const allBillingItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
+
+    // Filtrera: fakturarader = item_type='service', eller alla om inga tjänsterader finns (bakåtkompatibilitet)
+    const serviceItems = allBillingItems.filter(i => i.item_type === 'service')
+    const billingItems = serviceItems.length > 0 ? serviceItems : allBillingItems.filter(i => i.item_type === 'article' || !i.item_type)
 
     if (billingItems.length === 0) {
-      throw new Error('Inga fakturerbara artiklar på ärendet')
+      throw new Error('Inga fakturerbara tjänster på ärendet')
     }
 
     // Kolla om anpassat pris finns
@@ -177,16 +181,24 @@ export class InvoiceService {
       if (customItemError) throw new Error(`Databasfel: ${customItemError.message}`)
       invoiceItems.push(customItem)
     } else {
-      // Utan anpassat pris: standard — alla artiklar med sina priser
+      // Utan anpassat pris: standard — bara service-rader (eller artikel-rader för gamla ärenden)
       for (const item of billingItems) {
+        // Välj rätt namn/kod beroende på om det är en tjänstrad eller artikelrad
+        const displayName = item.item_type === 'service'
+          ? (item.service_name || item.article_name)
+          : item.article_name
+        const displayCode = item.item_type === 'service'
+          ? (item.service_code || item.article_code)
+          : item.article_code
+
         const { data: invoiceItem, error: itemError } = await supabase
           .from('invoice_items')
           .insert({
             invoice_id: invoice.id,
             case_billing_item_id: item.id,
-            article_id: item.article_id,
-            article_code: item.article_code,
-            article_name: item.article_name,
+            article_id: item.item_type === 'service' ? null : item.article_id,
+            article_code: displayCode,
+            article_name: displayName,
             quantity: item.quantity,
             unit_price: item.unit_price,
             discount_percent: item.discount_percent,
@@ -484,11 +496,13 @@ export class InvoiceService {
     // Bara relevant för icke-skickade/betalda fakturor
     if (['sent', 'paid', 'cancelled'].includes(invoice.status)) return { stale: false }
 
-    // Hämta aktuella case_billing_items
-    const caseItems = await CaseBillingService.getCaseBillingItems(
+    // Hämta aktuella case_billing_items (bara fakturarader)
+    const allCaseItems = await CaseBillingService.getCaseBillingItems(
       invoice.case_id,
       invoice.case_type
     )
+    const serviceItems2 = allCaseItems.filter(i => i.item_type === 'service')
+    const caseItems = serviceItems2.length > 0 ? serviceItems2 : allCaseItems.filter(i => i.item_type === 'article' || !i.item_type)
 
     // Jämför antal (exkludera "Anpassat pris"-raden som har case_billing_item_id = null)
     const invoiceLinkedItems = invoice.items.filter(i => i.case_billing_item_id != null).length
@@ -531,9 +545,11 @@ export class InvoiceService {
       throw new Error('Kan inte uppdatera en skickad/betald/avbruten faktura')
     }
 
-    // Hämta aktuella billing items + custom price
-    const billingItems = await CaseBillingService.getCaseBillingItems(invoice.case_id, invoice.case_type)
-    if (billingItems.length === 0) throw new Error('Inga fakturerbara artiklar på ärendet')
+    // Hämta aktuella billing items + custom price (bara fakturarader)
+    const allBillingItemsRegen = await CaseBillingService.getCaseBillingItems(invoice.case_id, invoice.case_type)
+    const serviceItemsRegen = allBillingItemsRegen.filter(i => i.item_type === 'service')
+    const billingItems = serviceItemsRegen.length > 0 ? serviceItemsRegen : allBillingItemsRegen.filter(i => i.item_type === 'article' || !i.item_type)
+    if (billingItems.length === 0) throw new Error('Inga fakturerbara tjänster på ärendet')
 
     const customPrice = await CaseBillingService.getCustomPrice(invoice.case_id, invoice.case_type)
 

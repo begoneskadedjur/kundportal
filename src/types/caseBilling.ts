@@ -1,7 +1,8 @@
 // src/types/caseBilling.ts
-// Typer för ärendebaserad fakturering (artiklar tekniker väljer per ärende)
+// Typer för ärendebaserad fakturering (artiklar/tjänster tekniker väljer per ärende)
 
 import type { Article, ArticleCategory } from './articles'
+import type { Service } from './services'
 
 /**
  * Ärendetyper som kan faktureras
@@ -24,6 +25,11 @@ export type CaseBillingItemStatus = 'pending' | 'approved' | 'billed' | 'cancell
 export type RotRutType = 'ROT' | 'RUT'
 
 /**
+ * Item-typ - artikel (intern kalkyl) eller tjänst (fakturarad)
+ */
+export type CaseBillingItemType = 'article' | 'service'
+
+/**
  * Case billing item från databasen
  */
 export interface CaseBillingItem {
@@ -31,9 +37,16 @@ export interface CaseBillingItem {
   case_id: string
   case_type: BillableCaseType
   customer_id: string | null
+  // Artikel-fält (intern kalkyl)
   article_id: string | null
   article_code: string | null
   article_name: string
+  // Tjänst-fält (fakturarad)
+  service_id: string | null
+  service_code: string | null
+  service_name: string | null
+  // Gemensamma fält
+  item_type: CaseBillingItemType
   quantity: number
   unit_price: number
   discount_percent: number
@@ -58,6 +71,7 @@ export interface CaseBillingItem {
  */
 export interface CaseBillingItemWithRelations extends CaseBillingItem {
   article?: Article | null
+  service?: Service | null
   technician?: {
     id: string
     name: string
@@ -79,6 +93,25 @@ export interface AddCaseArticleInput {
   discount_percent?: number
   vat_rate?: number
   price_source?: PriceSource
+  added_by_technician_id?: string
+  added_by_technician_name?: string
+  notes?: string
+}
+
+/**
+ * Input för att lägga till tjänst till ärende (fakturarad)
+ */
+export interface AddCaseServiceInput {
+  case_id: string
+  case_type: BillableCaseType
+  customer_id?: string | null
+  service_id: string
+  service_code?: string
+  service_name: string
+  quantity?: number
+  unit_price: number
+  discount_percent?: number
+  vat_rate?: number
   added_by_technician_id?: string
   added_by_technician_name?: string
   notes?: string
@@ -237,4 +270,53 @@ export const calculateRotRutDeduction = (
 ): number => {
   if (!rotRutType) return 0
   return totalPrice * (ROT_RUT_PERCENT[rotRutType] / 100)
+}
+
+/**
+ * Beräkna marginalprocent: (försäljningspris - inköpspris) / försäljningspris * 100
+ */
+export const calculateMarginPercent = (
+  sellingPrice: number,
+  purchaseCost: number
+): number => {
+  if (sellingPrice <= 0) return 0
+  return ((sellingPrice - purchaseCost) / sellingPrice) * 100
+}
+
+/**
+ * Beräkna föreslagen försäljningspris baserat på påslag
+ */
+export const calculateSuggestedPrice = (
+  purchaseCost: number,
+  markupPercent: number
+): number => {
+  return purchaseCost * (1 + markupPercent / 100)
+}
+
+/**
+ * Summering av tjänsterader (fakturarader)
+ */
+export interface ServiceItemsSummary {
+  service_count: number
+  subtotal: number
+  vat_amount: number
+  total_amount: number
+}
+
+/**
+ * Summering av artikelrader (intern kalkyl)
+ */
+export interface ArticleItemsSummary {
+  article_count: number
+  total_purchase_cost: number
+}
+
+/**
+ * Kombinerad summering för CaseServiceSelector
+ */
+export interface CaseServiceSummary {
+  services: ServiceItemsSummary
+  articles: ArticleItemsSummary
+  margin_percent: number | null   // null om inga tjänster
+  margin_ok: boolean
 }

@@ -24,6 +24,11 @@ export interface Service {
   sort_order: number
   is_active: boolean
   show_in_booking: boolean
+  // Prisguide-inställningar
+  base_price: number | null
+  min_margin_percent: number
+  recommended_markup_percent: number
+  is_addon_service: boolean
   created_at: string
   updated_at: string
 }
@@ -58,6 +63,10 @@ export interface CreateServiceInput {
   unit?: string
   sort_order?: number
   is_active?: boolean
+  base_price?: number | null
+  min_margin_percent?: number
+  recommended_markup_percent?: number
+  is_addon_service?: boolean
 }
 
 export interface UpdateServiceInput {
@@ -68,6 +77,10 @@ export interface UpdateServiceInput {
   sort_order?: number
   is_active?: boolean
   show_in_booking?: boolean
+  base_price?: number | null
+  min_margin_percent?: number
+  recommended_markup_percent?: number
+  is_addon_service?: boolean
 }
 
 export const SERVICE_UNITS = ['st', 'timme', 'dag', 'km', 'm2', 'fp'] as const

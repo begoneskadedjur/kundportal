@@ -1,5 +1,5 @@
 // src/services/caseBillingService.ts
-// Service för hantering av ärendebaserad fakturering (artiklar tekniker väljer per ärende)
+// Service för hantering av ärendebaserad fakturering (artiklar/tjänster tekniker väljer per ärende)
 
 import { supabase } from '../lib/supabase'
 import type { Article } from '../types/articles'
@@ -7,10 +7,12 @@ import type {
   CaseBillingItem,
   CaseBillingItemWithRelations,
   AddCaseArticleInput,
+  AddCaseServiceInput,
   UpdateCaseArticleInput,
   ArticleWithEffectivePrice,
   ArticlesByCategory,
   CaseBillingSummary,
+  CaseServiceSummary,
   BillableCaseType,
   PriceSource,
   CaseBillingItemStatus
@@ -20,6 +22,7 @@ import {
   calculateTotalPrice,
   calculateVatAmount,
   calculateRotRutDeduction,
+  calculateMarginPercent,
   itemRequiresApproval
 } from '../types/caseBilling'
 import { PriceListService } from './priceListService'
@@ -301,6 +304,51 @@ export class CaseBillingService {
   }
 
   /**
+   * Lägg till tjänst (fakturarad) till ärende
+   */
+  static async addServiceToCase(input: AddCaseServiceInput): Promise<CaseBillingItem> {
+    const quantity = input.quantity ?? 1
+    const discountPercent = input.discount_percent ?? 0
+    const vatRate = input.vat_rate ?? 25
+
+    const discountedPrice = calculateDiscountedPrice(input.unit_price, discountPercent)
+    const totalPrice = calculateTotalPrice(discountedPrice, quantity)
+
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .insert({
+        case_id: input.case_id,
+        case_type: input.case_type,
+        customer_id: input.customer_id || null,
+        item_type: 'service',
+        service_id: input.service_id,
+        service_code: input.service_code || null,
+        service_name: input.service_name,
+        // article-fält lämnas null för tjänstrader
+        article_id: null,
+        article_code: null,
+        article_name: input.service_name, // används för bakåtkompatibilitet
+        quantity,
+        unit_price: input.unit_price,
+        discount_percent: discountPercent,
+        discounted_price: discountedPrice,
+        total_price: totalPrice,
+        vat_rate: vatRate,
+        price_source: 'standard',
+        added_by_technician_id: input.added_by_technician_id || null,
+        added_by_technician_name: input.added_by_technician_name || null,
+        status: 'pending',
+        requires_approval: itemRequiresApproval(discountPercent),
+        notes: input.notes || null
+      })
+      .select()
+      .single()
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return data
+  }
+
+  /**
    * Hämta alla billing items för ett ärende
    */
   static async getCaseBillingItems(
@@ -311,7 +359,8 @@ export class CaseBillingService {
       .from('case_billing_items')
       .select(`
         *,
-        article:articles(*)
+        article:articles(*),
+        service:services(*)
       `)
       .eq('case_id', caseId)
       .eq('case_type', caseType)
@@ -319,6 +368,43 @@ export class CaseBillingService {
 
     if (error) throw new Error(`Databasfel: ${error.message}`)
     return (data || []) as CaseBillingItemWithRelations[]
+  }
+
+  /**
+   * Hämta summering uppdelad per tjänster (fakturarader) och artiklar (kalkyl)
+   */
+  static async getCaseServiceSummary(
+    caseId: string,
+    caseType: BillableCaseType,
+    minMarginPercent: number = 20
+  ): Promise<CaseServiceSummary> {
+    const items = await this.getCaseBillingItems(caseId, caseType)
+
+    const serviceItems = items.filter(i => i.item_type === 'service')
+    const articleItems = items.filter(i => i.item_type === 'article')
+
+    const serviceSubtotal = serviceItems.reduce((sum, i) => sum + i.total_price, 0)
+    const serviceVat = serviceItems.reduce((sum, i) => sum + calculateVatAmount(i.total_price, i.vat_rate), 0)
+    const purchaseCost = articleItems.reduce((sum, i) => sum + i.total_price, 0)
+
+    const marginPercent = serviceSubtotal > 0
+      ? calculateMarginPercent(serviceSubtotal, purchaseCost)
+      : null
+
+    return {
+      services: {
+        service_count: serviceItems.length,
+        subtotal: serviceSubtotal,
+        vat_amount: serviceVat,
+        total_amount: serviceSubtotal + serviceVat,
+      },
+      articles: {
+        article_count: articleItems.length,
+        total_purchase_cost: purchaseCost,
+      },
+      margin_percent: marginPercent,
+      margin_ok: marginPercent === null || marginPercent >= minMarginPercent,
+    }
   }
 
   /**

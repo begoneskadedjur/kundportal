@@ -34,8 +34,8 @@ import CasePreparationsSection from '../../shared/CasePreparationsSection'
 import ServiceArticleSelector from '../../shared/ServiceArticleSelector'
 import type { Service } from '../../../types/services'
 
-// Artikelväljare för fakturering
-import CaseArticleSelector from '../../shared/CaseArticleSelector'
+// Tjänste- och artikelväljare för fakturering
+import CaseServiceSelector from '../../shared/CaseServiceSelector'
 
 // Fakturering - auto-generera vid ärendeavslut
 import { InvoiceService } from '../../../services/invoiceService'
@@ -1735,12 +1735,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             {/* Utförda tjänster/artiklar för fakturering */}
             {currentCase && (
               <div className="pt-3 border-t border-slate-700/50">
-                <CaseArticleSelector
+                <CaseServiceSelector
                   caseId={currentCase.id}
                   caseType={currentCase.case_type === 'private' ? 'private' : 'business'}
                   customerId={currentCase.customer_id}
                   technicianId={currentCase.primary_assignee_id || undefined}
                   technicianName={currentCase.primary_assignee_name || undefined}
+                  primaryServiceId={formData.service_id}
                   onChange={handleBillingSummaryChange}
                 />
               </div>

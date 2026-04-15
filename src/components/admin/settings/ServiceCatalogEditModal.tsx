@@ -35,6 +35,11 @@ export default function ServiceCatalogEditModal({
   const [sortOrder, setSortOrder] = useState<number>(0)
   const [isActive, setIsActive] = useState(true)
   const [showInBooking, setShowInBooking] = useState(true)
+  // Prisguide-inställningar
+  const [basePrice, setBasePrice] = useState<string>('')
+  const [minMarginPercent, setMinMarginPercent] = useState<number>(20)
+  const [recommendedMarkupPercent, setRecommendedMarkupPercent] = useState<number>(40)
+  const [isAddonService, setIsAddonService] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -48,6 +53,10 @@ export default function ServiceCatalogEditModal({
       setSortOrder(service.sort_order)
       setIsActive(service.is_active)
       setShowInBooking(service.show_in_booking)
+      setBasePrice(service.base_price != null ? String(service.base_price) : '')
+      setMinMarginPercent(service.min_margin_percent ?? 20)
+      setRecommendedMarkupPercent(service.recommended_markup_percent ?? 40)
+      setIsAddonService(service.is_addon_service ?? false)
     } else {
       setCode('')
       setName('')
@@ -57,6 +66,10 @@ export default function ServiceCatalogEditModal({
       setSortOrder(0)
       setIsActive(true)
       setShowInBooking(true)
+      setBasePrice('')
+      setMinMarginPercent(20)
+      setRecommendedMarkupPercent(40)
+      setIsAddonService(false)
     }
   }, [isOpen, service, groups])
 
@@ -66,6 +79,7 @@ export default function ServiceCatalogEditModal({
 
     setSaving(true)
     try {
+      const basePriceNum = basePrice.trim() ? parseFloat(basePrice.trim()) : null
       if (isCreating) {
         const input: CreateServiceInput = {
           code: code.trim(),
@@ -75,7 +89,10 @@ export default function ServiceCatalogEditModal({
           unit,
           sort_order: sortOrder,
           is_active: isActive,
-          show_in_booking: showInBooking,
+          base_price: basePriceNum,
+          min_margin_percent: minMarginPercent,
+          recommended_markup_percent: recommendedMarkupPercent,
+          is_addon_service: isAddonService,
         }
         await ServiceCatalogService.createService(input)
         toast.success('Tjänst skapad')
@@ -88,6 +105,10 @@ export default function ServiceCatalogEditModal({
           sort_order: sortOrder,
           is_active: isActive,
           show_in_booking: showInBooking,
+          base_price: basePriceNum,
+          min_margin_percent: minMarginPercent,
+          recommended_markup_percent: recommendedMarkupPercent,
+          is_addon_service: isAddonService,
         }
         await ServiceCatalogService.updateService(service!.id, input)
         toast.success('Tjänst uppdaterad')
@@ -213,6 +234,56 @@ export default function ServiceCatalogEditModal({
                     />
                     <span className="text-sm text-slate-300">Visas vid bokning</span>
                   </label>
+                </div>
+              </div>
+
+              {/* Prisguide-inställningar */}
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold text-slate-300">Prisguide</span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isAddonService}
+                      onChange={(e) => setIsAddonService(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-700 border-slate-600"
+                    />
+                    <span className="text-xs text-slate-400">Tilläggstjänst</span>
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Fast grundpris (kr, exkl. moms)</label>
+                  <input
+                    type="number"
+                    value={basePrice}
+                    onChange={(e) => setBasePrice(e.target.value)}
+                    placeholder="Lämna tomt för kalkylatorstyrt pris"
+                    min={0}
+                    className={selectClass}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Min. marginal %</label>
+                    <input
+                      type="number"
+                      value={minMarginPercent}
+                      onChange={(e) => setMinMarginPercent(parseFloat(e.target.value) || 0)}
+                      min={0}
+                      max={100}
+                      className={selectClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Rek. påslag %</label>
+                    <input
+                      type="number"
+                      value={recommendedMarkupPercent}
+                      onChange={(e) => setRecommendedMarkupPercent(parseFloat(e.target.value) || 0)}
+                      min={0}
+                      className={selectClass}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
