@@ -1169,12 +1169,12 @@ export default function TeamChat() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            {lightboxImage.expiresAt && (
-              <p className="absolute bottom-3 left-0 right-0 text-center text-xs text-slate-400">
-                Bilden sparas i {Math.max(0, Math.ceil((new Date(lightboxImage.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} dagar till
-              </p>
-            )}
           </div>
+          {lightboxImage.expiresAt && (
+            <p className="mt-2 text-center text-xs text-slate-400">
+              Bilden sparas i {Math.max(0, Math.ceil((new Date(lightboxImage.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} dagar till
+            </p>
+          )}
         </div>
       )}
     </div>
