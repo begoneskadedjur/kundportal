@@ -54,6 +54,8 @@ interface CaseServiceSelectorProps {
   technicianName?: string | null
   /** Tjänst som ärendet gäller (från case.service_id) – om null kan man välja */
   primaryServiceId?: string | null
+  /** Artikelgrupp att filtrera interna kostnader på (Arbetstid + Övrigt visas alltid) */
+  articleGroupId?: string | null
   onChange?: (items: CaseBillingItemWithRelations[], summary: CaseBillingSummary) => void
   readOnly?: boolean
   className?: string
@@ -92,6 +94,7 @@ export default function CaseServiceSelector({
   technicianId,
   technicianName,
   primaryServiceId,
+  articleGroupId,
   onChange,
   readOnly = false,
   className = '',
@@ -124,7 +127,7 @@ export default function CaseServiceSelector({
     setLoading(true)
     try {
       const [articlesData, itemsData, allServicesData, settingsData] = await Promise.all([
-        CaseBillingService.getArticlesWithPrices(customerId),
+        CaseBillingService.getArticlesWithPrices(customerId, articleGroupId),
         caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
         ServiceCatalogService.getAllActiveServices(),
         PricingSettingsService.get(),
@@ -167,7 +170,7 @@ export default function CaseServiceSelector({
     } finally {
       setLoading(false)
     }
-  }, [caseId, caseType, customerId, primaryServiceId, technicianId, technicianName])
+  }, [caseId, caseType, customerId, primaryServiceId, articleGroupId, technicianId, technicianName])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -585,7 +588,7 @@ export default function CaseServiceSelector({
         >
           <div className="flex items-center gap-1.5">
             <Package className="w-4 h-4 text-slate-400" />
-            <span className="text-sm font-semibold text-slate-300">Inköpsartikel-kalkyl (intern)</span>
+            <span className="text-sm font-semibold text-slate-300">Interna kostnader</span>
             {articleItems.length > 0 && (
               <span className="px-1.5 py-0.5 text-xs bg-slate-700 text-slate-300 rounded-full">
                 {articleItems.length}
@@ -605,7 +608,7 @@ export default function CaseServiceSelector({
         {showArticleList && (
           <div className="mt-3 space-y-3">
             <p className="text-xs text-slate-500">
-              Artiklar här är <strong>inte</strong> synliga på fakturan – de används bara för att beräkna inköpskostnad och marginal.
+              Interna kostnader visas <strong>inte</strong> på fakturan – de används bara för att beräkna inköpskostnad och marginal.
             </p>
 
             {/* Befintliga artikelrader */}

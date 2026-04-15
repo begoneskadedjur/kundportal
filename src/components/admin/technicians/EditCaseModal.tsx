@@ -412,6 +412,22 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // Vald tjänsteartikel (för CasePreparationsSection)
   const [serviceArticle, setServiceArticle] = useState<Service | null>(null)
 
+  // Artikelgrupp-ID för filtrering av interna kostnader
+  const [articleGroupId, setArticleGroupId] = useState<string | null>(null)
+
+  // Hämta artikelgrupp-ID baserat på ärendets tjänstegrupp vid laddning
+  useEffect(() => {
+    if (!caseData?.service_id) { setArticleGroupId(null); return }
+    ;(async () => {
+      const { data: svc } = await supabase.from('services').select('group_id').eq('id', caseData.service_id).single()
+      if (!svc?.group_id) { setArticleGroupId(null); return }
+      const { data: sg } = await supabase.from('service_groups').select('name').eq('id', svc.group_id).single()
+      if (!sg?.name) { setArticleGroupId(null); return }
+      const { data: ag } = await supabase.from('article_groups').select('id').eq('name', sg.name).maybeSingle()
+      setArticleGroupId(ag?.id ?? null)
+    })()
+  }, [caseData?.service_id])
+
   // Auto-sätt avdrag från underleverantörsartiklar
   useEffect(() => {
     if (billingSummary && existingCommissionPosts === 0) {
@@ -1167,7 +1183,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   )
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true} className="scroll-smooth"
+    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="xl" footer={footer} preventClose={true} allowBackdropClose={!loading && !timeTrackingLoading} usePortal={true} className="scroll-smooth"
       headerActions={showCommunication ? (
         <button
           type="button"
@@ -1497,7 +1513,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   <ServiceArticleSelector
                     groupId={formData.service_group_id ?? null}
                     serviceId={formData.service_id ?? null}
-                    onGroupChange={(gid) => setFormData(prev => ({ ...prev, service_group_id: gid, service_id: null }))}
+                    onGroupChange={async (gid) => {
+                      setFormData(prev => ({ ...prev, service_group_id: gid, service_id: null }))
+                      if (gid) {
+                        // Hämta tjänstegrupp-namn och matcha mot artikelgrupp
+                        const { data: sg } = await supabase.from('service_groups').select('name').eq('id', gid).single()
+                        if (sg?.name) {
+                          const { data: ag } = await supabase.from('article_groups').select('id').eq('name', sg.name).maybeSingle()
+                          setArticleGroupId(ag?.id ?? null)
+                        }
+                      } else {
+                        setArticleGroupId(null)
+                      }
+                    }}
                     onServiceChange={(sid, svc) => {
                       setFormData(prev => ({ ...prev, service_id: sid }))
                       setServiceArticle(svc)
@@ -1742,6 +1770,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   technicianId={currentCase.primary_assignee_id || undefined}
                   technicianName={currentCase.primary_assignee_name || undefined}
                   primaryServiceId={formData.service_id}
+                  articleGroupId={articleGroupId}
                   onChange={handleBillingSummaryChange}
                 />
               </div>

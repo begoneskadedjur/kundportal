@@ -35,7 +35,36 @@ export class CaseBillingService {
    * 2. Standardprislistan (om artikeln finns där)
    * 3. Artikelns default_price
    */
-  static async getArticlesWithPrices(customerId?: string | null): Promise<ArticleWithEffectivePrice[]> {
+  static async getArticlesWithPrices(customerId?: string | null, articleGroupId?: string | null): Promise<ArticleWithEffectivePrice[]> {
+    // Om articleGroupId anges: hämta artiklar från den gruppen + alltid Arbetstid och Övrigt
+    let allowedArticleIds: Set<string> | null = null
+    if (articleGroupId) {
+      const { data: memberships } = await supabase
+        .from('article_group_memberships')
+        .select('article_id, group:article_groups!group_id(name)')
+        .eq('group_id', articleGroupId)
+      const groupArticleIds = (memberships || []).map((m: any) => m.article_id)
+
+      // Hämta artiklar ur Arbetstid och Övrigt (alltid med)
+      const { data: alwaysGroups } = await supabase
+        .from('article_groups')
+        .select('id')
+        .in('name', ['Arbetstid', 'Övrigt'])
+      const alwaysGroupIds = (alwaysGroups || []).map((g: any) => g.id)
+
+      let alwaysArticleIds: string[] = []
+      if (alwaysGroupIds.length > 0) {
+        const { data: alwaysMemberships } = await supabase
+          .from('article_group_memberships')
+          .select('article_id')
+          .in('group_id', alwaysGroupIds)
+        alwaysArticleIds = (alwaysMemberships || []).map((m: any) => m.article_id)
+      }
+
+      allowedArticleIds = new Set([...groupArticleIds, ...alwaysArticleIds])
+      if (allowedArticleIds.size === 0) return []
+    }
+
     // Hämta alla aktiva artiklar
     const { data: articles, error } = await supabase
       .from('articles')
@@ -83,9 +112,14 @@ export class CaseBillingService {
       }, {} as Record<string, number>)
     }
 
+    // Filtrera artiklar per tillåtna IDs (om grupp angavs)
+    const filteredArticles = allowedArticleIds
+      ? articles.filter((a: Article) => allowedArticleIds!.has(a.id))
+      : articles
+
     // Bygg resultatet med fallback-kedja:
     // 1. Kundpris → 2. Standardpris → 3. Artikelns default_price
-    return articles.map((article: Article) => {
+    return filteredArticles.map((article: Article) => {
       // Kolla om artikeln finns i kundens prislista
       if (customerPriceListId && customerPriceItems[article.id] !== undefined) {
         return {

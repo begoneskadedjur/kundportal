@@ -167,6 +167,22 @@ export default function EditContractCaseModal({
   // Radering state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
+  // Artikelgrupp-ID för filtrering av interna kostnader
+  const [articleGroupId, setArticleGroupId] = useState<string | null>(null)
+
+  // Hämta artikelgrupp-ID baserat på ärendets tjänst vid laddning
+  useEffect(() => {
+    if (!caseData?.service_id) { setArticleGroupId(null); return }
+    ;(async () => {
+      const { data: svc } = await supabase.from('services').select('group_id').eq('id', caseData.service_id).single()
+      if (!svc?.group_id) { setArticleGroupId(null); return }
+      const { data: sg } = await supabase.from('service_groups').select('name').eq('id', svc.group_id).single()
+      if (!sg?.name) { setArticleGroupId(null); return }
+      const { data: ag } = await supabase.from('article_groups').select('id').eq('name', sg.name).maybeSingle()
+      setArticleGroupId(ag?.id ?? null)
+    })()
+  }, [caseData?.service_id])
+
   // Provision state
   const [commissionEligible, setCommissionEligible] = useState(false)
   const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)
@@ -1455,6 +1471,8 @@ export default function EditContractCaseModal({
       title={modalTitle}
       size="xl"
       footer={modalFooter}
+      preventClose={true}
+      allowBackdropClose={!loading}
       usePortal={true}
       className="scroll-smooth"
       headerActions={!isCustomerView ? (
@@ -1653,7 +1671,18 @@ export default function EditContractCaseModal({
                 <ServiceArticleSelector
                   groupId={formData.service_group_id ?? null}
                   serviceId={formData.service_id ?? null}
-                  onGroupChange={(gid) => setFormData(prev => ({ ...prev, service_group_id: gid, service_id: null }))}
+                  onGroupChange={async (gid) => {
+                    setFormData(prev => ({ ...prev, service_group_id: gid, service_id: null }))
+                    if (gid) {
+                      const { data: sg } = await supabase.from('service_groups').select('name').eq('id', gid).single()
+                      if (sg?.name) {
+                        const { data: ag } = await supabase.from('article_groups').select('id').eq('name', sg.name).maybeSingle()
+                        setArticleGroupId(ag?.id ?? null)
+                      }
+                    } else {
+                      setArticleGroupId(null)
+                    }
+                  }}
                   onServiceChange={(sid, svc) => {
                     setFormData(prev => ({ ...prev, service_id: sid }))
                     setServiceArticle(svc)
@@ -1822,6 +1851,7 @@ export default function EditContractCaseModal({
                     technicianId={formData.primary_technician_id || undefined}
                     technicianName={formData.primary_technician_name || undefined}
                     primaryServiceId={formData.service_id}
+                    articleGroupId={articleGroupId}
                     onChange={handleBillingSummaryChange}
                   />
                 </div>

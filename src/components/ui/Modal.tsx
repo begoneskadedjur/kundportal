@@ -13,6 +13,7 @@ interface ModalProps {
   children: React.ReactNode
   footer?: React.ReactNode
   preventClose?: boolean
+  allowBackdropClose?: boolean // Tillåt stängning via bakgrundsklick även när preventClose=true
   zIndex?: number
   usePortal?: boolean
   headerActions?: React.ReactNode // Extra actions to show in header between title and close button
@@ -28,6 +29,7 @@ export default function Modal({
   children,
   footer,
   preventClose = false,
+  allowBackdropClose = false,
   zIndex = 100,
   usePortal = false,
   headerActions,
@@ -78,7 +80,7 @@ export default function Modal({
   }
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !preventClose) {
+    if (e.target === e.currentTarget && (!preventClose || allowBackdropClose)) {
       onClose()
     }
   }
