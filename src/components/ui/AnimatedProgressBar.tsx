@@ -14,6 +14,7 @@ interface AnimatedProgressBarProps {
   steps: Step[]
   currentStep: number
   onStepClick: (stepId: number) => void
+  maxReachedStep?: number
   documentType: string
   selectedTemplate: string
   className?: string
@@ -23,6 +24,7 @@ export default function AnimatedProgressBar({
   steps,
   currentStep,
   onStepClick,
+  maxReachedStep,
   documentType,
   selectedTemplate,
   className = ''
@@ -43,7 +45,7 @@ export default function AnimatedProgressBar({
     const Icon = step.icon
     const isActive = currentStep === step.id
     const isCompleted = currentStep > step.id
-    const isClickable = currentStep > step.id || currentStep === step.id
+    const isClickable = maxReachedStep !== undefined ? step.id <= maxReachedStep : step.id <= currentStep
 
     return (
       <motion.div
@@ -182,7 +184,7 @@ export default function AnimatedProgressBar({
               const Icon = step.icon
               const isActive = currentStep === step.id
               const isCompleted = currentStep > step.id
-              const isClickable = currentStep > step.id || currentStep === step.id
+              const isClickable = maxReachedStep !== undefined ? step.id <= maxReachedStep : step.id <= currentStep
 
               return (
                 <div

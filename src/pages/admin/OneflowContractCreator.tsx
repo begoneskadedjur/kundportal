@@ -114,6 +114,7 @@ export default function OneflowContractCreator() {
     }
   }, [profile?.role]);
   const [currentStep, setCurrentStep] = useState(1)
+  const [maxReachedStep, setMaxReachedStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
   const [creationStep, setCreationStep] = useState('')
   const [createdContract, setCreatedContract] = useState<any>(null)
@@ -229,13 +230,16 @@ export default function OneflowContractCreator() {
               const targetStep = docType === 'contract' ? 8 : 7
               console.log('Auto-selecting template and jumping to step:', targetStep)
               setCurrentStep(targetStep)
+              setMaxReachedStep(targetStep)
             } else if (customerData.autoSelectTemplate && customerData.selectedTemplate) {
               // Om vi har template men inte all kontaktdata, gå till steg 2 med förvald mall
               console.log('Auto-selecting template at step 2:', customerData.selectedTemplate)
               setCurrentStep(2)
+              setMaxReachedStep(2)
             } else if (customerData.targetStep && customerData.targetStep >= 1 && customerData.targetStep <= STEPS.length) {
               // Använd specificerat steg
               setCurrentStep(customerData.targetStep)
+              setMaxReachedStep(customerData.targetStep)
             } else {
               // Börja från steg 1
               setCurrentStep(1)
@@ -425,6 +429,7 @@ export default function OneflowContractCreator() {
       }
 
       setCurrentStep(nextStepNumber)
+      setMaxReachedStep(prev => Math.max(prev, nextStepNumber))
     }
   }
 
@@ -1179,15 +1184,22 @@ export default function OneflowContractCreator() {
                       <span className="text-xs text-slate-600">(ingår ej i offerten)</span>
                     </div>
                     {wizardData.selectedArticles.map(item => (
-                      <div key={item.article.id} className="flex justify-between items-center py-1 border-b border-slate-700/20 last:border-0">
-                        <span className="text-sm text-slate-400">
-                          {item.article.code && <span className="text-xs text-slate-600 mr-1">{item.article.code}</span>}
-                          {item.article.name}
-                          {item.quantity > 1 && <span className="text-xs text-slate-600 ml-1">×{item.quantity}</span>}
-                        </span>
-                        <span className="text-sm text-slate-500 whitespace-nowrap ml-4">
-                          {fmtSEK(item.effectivePrice * item.quantity)}
-                        </span>
+                      <div key={item.article.id} className="py-1.5 border-b border-slate-700/20 last:border-0">
+                        <div className="flex justify-between items-start">
+                          <span className="text-sm text-slate-400">
+                            {item.article.code && <span className="text-xs text-slate-600 mr-1">{item.article.code}</span>}
+                            {item.article.name}
+                            {item.quantity > 1 && <span className="text-xs text-slate-600 ml-1">×{item.quantity}</span>}
+                          </span>
+                          <span className="text-sm text-slate-500 whitespace-nowrap ml-4 shrink-0">
+                            {fmtSEK(item.effectivePrice * item.quantity)}
+                          </span>
+                        </div>
+                        {item.article.description && (
+                          <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                            {item.article.description}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1606,6 +1618,7 @@ export default function OneflowContractCreator() {
         steps={STEPS}
         currentStep={currentStep}
         onStepClick={setCurrentStep}
+        maxReachedStep={maxReachedStep}
         documentType={wizardData.documentType}
         selectedTemplate={wizardData.selectedTemplate}
       />
