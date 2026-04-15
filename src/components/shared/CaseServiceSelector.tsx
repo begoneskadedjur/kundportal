@@ -118,30 +118,50 @@ export default function CaseServiceSelector({
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [articlesData, itemsData, addonsData] = await Promise.all([
+      const [articlesData, itemsData, allServicesData] = await Promise.all([
         CaseBillingService.getArticlesWithPrices(customerId),
         caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
-        ServiceCatalogService.getActiveAddonServices(),
+        ServiceCatalogService.getAllActiveServices(),
       ])
       setArticles(articlesData)
-      setAllItems(itemsData)
-      setAddonServices(addonsData)
+      setAddonServices(allServicesData)
 
       // Hämta primär tjänst
+      let svc: ServiceWithGroup | null = null
       if (primaryServiceId) {
-        const svc = await ServiceCatalogService.getServiceById(primaryServiceId)
+        svc = allServicesData.find(s => s.id === primaryServiceId) ?? null
         setPrimaryService(svc)
       }
 
-      const summary = buildBillingSummary(itemsData)
-      onChangeRef.current?.(itemsData, summary)
+      // Auto-skapa fakturarad för primärtjänsten om den saknas
+      let finalItems = itemsData
+      if (caseId && svc && !itemsData.some(i => i.item_type === 'service' && i.service_id === primaryServiceId)) {
+        await CaseBillingService.addServiceToCase({
+          case_id: caseId,
+          case_type: caseType,
+          customer_id: customerId,
+          service_id: svc.id,
+          service_code: svc.code,
+          service_name: svc.name,
+          quantity: 1,
+          unit_price: svc.base_price ?? 0,
+          vat_rate: 25,
+          added_by_technician_id: technicianId || undefined,
+          added_by_technician_name: technicianName || undefined,
+        })
+        finalItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
+      }
+
+      setAllItems(finalItems)
+      const summary = buildBillingSummary(finalItems)
+      onChangeRef.current?.(finalItems, summary)
     } catch (err) {
       console.error(err)
       toast.error('Kunde inte ladda data')
     } finally {
       setLoading(false)
     }
-  }, [caseId, caseType, customerId, primaryServiceId])
+  }, [caseId, caseType, customerId, primaryServiceId, technicianId, technicianName])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -369,11 +389,15 @@ export default function CaseServiceSelector({
     return acc
   }, {} as Partial<Record<ArticleCategory, ArticleWithEffectivePrice[]>>)
 
-  const filteredAddons = addonServices.filter(s =>
-    !searchAddon
-    || s.name.toLowerCase().includes(searchAddon.toLowerCase())
-    || s.code.toLowerCase().includes(searchAddon.toLowerCase())
-  )
+  // Tilläggstjänster = alla aktiva tjänster utom de som redan lagts till som fakturarad
+  const addedServiceIds = new Set(serviceItems.map(i => i.service_id).filter(Boolean))
+  const filteredAddons = addonServices.filter(s => {
+    if (addedServiceIds.has(s.id)) return false // redan tillagd
+    const search = searchAddon.toLowerCase()
+    return !search
+      || s.name.toLowerCase().includes(search)
+      || s.code.toLowerCase().includes(search)
+  })
 
   if (loading) {
     return (
