@@ -415,12 +415,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // Artikelgrupp-ID för filtrering av interna kostnader
   const [articleGroupId, setArticleGroupId] = useState<string | null>(null)
 
-  // Hämta artikelgrupp-ID baserat på ärendets tjänstegrupp vid laddning
+  // Hämta service_group_id + artikelgrupp-ID vid laddning (utan att rensa service_id)
   useEffect(() => {
     if (!caseData?.service_id) { setArticleGroupId(null); return }
     ;(async () => {
       const { data: svc } = await supabase.from('services').select('group_id').eq('id', caseData.service_id).single()
       if (!svc?.group_id) { setArticleGroupId(null); return }
+      // Sätt service_group_id i formData utan att rensa service_id
+      setFormData(prev => ({ ...prev, service_group_id: svc.group_id }))
       const { data: sg } = await supabase.from('service_groups').select('name').eq('id', svc.group_id).single()
       if (!sg?.name) { setArticleGroupId(null); return }
       const { data: ag } = await supabase.from('article_groups').select('id').eq('name', sg.name).maybeSingle()
@@ -1514,9 +1516,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     groupId={formData.service_group_id ?? null}
                     serviceId={formData.service_id ?? null}
                     onGroupChange={async (gid) => {
-                      setFormData(prev => ({ ...prev, service_group_id: gid, service_id: null }))
+                      // Rensa service_id bara om användaren faktiskt bytte grupp
+                      const isUserChange = gid !== formData.service_group_id
+                      setFormData(prev => ({ ...prev, service_group_id: gid, ...(isUserChange ? { service_id: null } : {}) }))
                       if (gid) {
-                        // Hämta tjänstegrupp-namn och matcha mot artikelgrupp
                         const { data: sg } = await supabase.from('service_groups').select('name').eq('id', gid).single()
                         if (sg?.name) {
                           const { data: ag } = await supabase.from('article_groups').select('id').eq('name', sg.name).maybeSingle()
