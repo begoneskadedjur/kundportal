@@ -1687,11 +1687,11 @@ async function handleImageGeneration(
               }
             },
             {
-              text: `Edit or use this image as reference. ${prompt}. The result should be professional and suitable for a pest control company's marketing or documentation.`
+              text: `Edit or use this image as reference. ${prompt}. Do not add any text, watermarks, or overlays to the image unless explicitly requested. The result should be professional and suitable for a pest control company's marketing or documentation.`
             }
           ]
         }]
-      : `Generate a professional, high-quality image: ${prompt}. The image should be suitable for a pest control company's marketing or documentation.`;
+      : `Generate a professional, high-quality image: ${prompt}. Do not add any text, watermarks, or overlays to the image unless explicitly requested. The image should be suitable for a pest control company's marketing or documentation.`;
 
     const result = await ai.models.generateContent({
       model: 'gemini-3.1-flash-image-preview',

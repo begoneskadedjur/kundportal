@@ -84,6 +84,7 @@ export default function TeamChat() {
   const [newTitle, setNewTitle] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<{ data: string; mimeType: string } | null>(null);
 
   // State för ärende-modal
   const [selectedCase, setSelectedCase] = useState<{
@@ -900,7 +901,8 @@ export default function TeamChat() {
                           <img
                             src={`data:${msg.generated_image.mimeType};base64,${msg.generated_image.data}`}
                             alt="Genererad bild"
-                            className="max-w-full max-h-96 rounded-lg border border-slate-600 shadow-lg"
+                            className="max-w-full max-h-96 rounded-lg border border-slate-600 shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setLightboxImage(msg.generated_image!)}
                           />
                           <div className="flex gap-2 mt-2">
                             <button
@@ -1093,6 +1095,41 @@ export default function TeamChat() {
           onClose={() => setSelectedCase(null)}
           fallbackData={selectedCase.fallbackData}
         />
+      )}
+
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <img
+              src={`data:${lightboxImage.mimeType};base64,${lightboxImage.data}`}
+              alt="Genererad bild"
+              className="max-w-full max-h-[85vh] rounded-xl shadow-2xl object-contain"
+            />
+            <div className="absolute top-3 right-3 flex gap-2">
+              <button
+                onClick={() => copyImageToClipboard(lightboxImage)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors"
+              >
+                <Copy className="w-4 h-4" /> Kopiera
+              </button>
+              <button
+                onClick={() => downloadImage(lightboxImage)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors"
+              >
+                <Download className="w-4 h-4" /> Ladda ner
+              </button>
+              <button
+                onClick={() => setLightboxImage(null)}
+                className="p-1.5 bg-slate-800/90 hover:bg-slate-700 rounded-lg text-slate-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
