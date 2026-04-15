@@ -1,9 +1,10 @@
 // src/components/shared/PriceCalculatorPanel.tsx
 // Prisguide 2.0: tilldela interna kostnader till fakturarader, sätt påslag per rad, applicera
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { X, Calculator, TrendingUp, AlertTriangle, CheckCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
 import Button from '../ui/Button'
 import { PricingSettingsService } from '../../services/pricingSettingsService'
 import type { PricingSettings } from '../../types/pricingSettings'
@@ -33,6 +34,11 @@ interface PriceCalculatorPanelProps {
   onClose: () => void
   articleItems: ArticleItem[]
   serviceItems: ServiceItem[]
+  // Lyfta till föräldra-state så tilldelningar överlever öppna/stäng
+  assignments: Record<string, string>
+  markups: Record<string, number>
+  onAssignmentsChange: (a: Record<string, string>) => void
+  onMarkupsChange: (m: Record<string, number>) => void
   onApplyPrices: (prices: Record<string, number>) => Promise<void>
 }
 
@@ -44,41 +50,41 @@ export default function PriceCalculatorPanel({
   onClose,
   articleItems,
   serviceItems,
+  assignments,
+  markups,
+  onAssignmentsChange,
+  onMarkupsChange,
   onApplyPrices,
 }: PriceCalculatorPanelProps) {
   const [settings, setSettings] = useState<PricingSettings>({ id: '', ...DEFAULT_PRICING_SETTINGS, updated_at: '' })
   const [loadingSettings, setLoadingSettings] = useState(true)
   const [applying, setApplying] = useState(false)
-
-  // articleId → serviceItemId (eller '' = ej tilldelad)
-  const [assignments, setAssignments] = useState<Record<string, string>>({})
-  // serviceItemId → påslagsprocent
-  const [markups, setMarkups] = useState<Record<string, number>>({})
-  // Visa påslagssektion
   const [showPricing, setShowPricing] = useState(false)
 
+  // Ladda inställningar vid första öppning; initiera markup för nya servicerader
   useEffect(() => {
     if (!isOpen) return
     setLoadingSettings(true)
-    setAssignments({})
-    setShowPricing(false)
     PricingSettingsService.get()
       .then(s => {
         setSettings(s)
-        // Initiera påslag för alla servicerader med rekommenderat värde
-        const initial: Record<string, number> = {}
-        serviceItems.forEach(si => { initial[si.id] = s.recommended_markup_percent })
-        setMarkups(initial)
+        // Initiera markup bara för rader som saknas (nya rader) — rör ej befintliga
+        onMarkupsChange(
+          Object.fromEntries(
+            serviceItems.map(si => [si.id, markups[si.id] ?? s.recommended_markup_percent])
+          )
+        )
       })
       .catch(() => {
-        const initial: Record<string, number> = {}
-        serviceItems.forEach(si => { initial[si.id] = DEFAULT_PRICING_SETTINGS.recommended_markup_percent })
-        setMarkups(initial)
+        onMarkupsChange(
+          Object.fromEntries(
+            serviceItems.map(si => [si.id, markups[si.id] ?? DEFAULT_PRICING_SETTINGS.recommended_markup_percent])
+          )
+        )
       })
       .finally(() => setLoadingSettings(false))
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Beräkna inköpskostnad per serviceItem baserat på tilldelningar
   const purchaseCostByService = (serviceId: string) =>
     articleItems
       .filter(a => assignments[a.id] === serviceId)
@@ -98,13 +104,33 @@ export default function PriceCalculatorPanel({
   const handleApply = async () => {
     setApplying(true)
     try {
+      const rec = settings.recommended_markup_percent
+
+      // Beräkna råpriser per rad
+      const entries = serviceItems
+        .map(si => ({
+          id: si.id,
+          cost: purchaseCostByService(si.id),
+          markup: markups[si.id] ?? rec,
+        }))
+        .filter(e => e.cost > 0)
+
+      const rawPrices = entries.map(e => ({
+        ...e,
+        price: calculateSuggestedPrice(e.cost, e.markup),
+      }))
+
+      // min_charge_amount gäller HELA ärendet, inte per rad
+      const rawTotal = rawPrices.reduce((s, e) => s + e.price, 0)
+      if (rawTotal < settings.min_charge_amount && rawPrices.length > 0) {
+        const diff = settings.min_charge_amount - rawTotal
+        const maxIdx = rawPrices.reduce((best, e, i) => e.cost > rawPrices[best].cost ? i : best, 0)
+        rawPrices[maxIdx].price += diff
+      }
+
       const prices: Record<string, number> = {}
-      serviceItems.forEach(si => {
-        const cost = purchaseCostByService(si.id)
-        if (cost === 0) return // ej tilldelad → rör ej
-        const raw = calculateSuggestedPrice(cost, markups[si.id] ?? settings.recommended_markup_percent)
-        prices[si.id] = Math.round(Math.max(raw, settings.min_charge_amount))
-      })
+      rawPrices.forEach(e => { prices[e.id] = Math.round(e.price) })
+
       await onApplyPrices(prices)
       onClose()
     } finally {
@@ -169,23 +195,22 @@ export default function PriceCalculatorPanel({
                       <div className="space-y-3">
                         {articleItems.map(a => (
                           <div key={a.id} className="p-3 bg-slate-800/40 border border-slate-700/50 rounded-xl">
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <div className="min-w-0">
-                                <span className="text-sm text-white font-medium leading-tight">
-                                  {a.article_code && <span className="text-xs text-slate-500 mr-1">{a.article_code}</span>}
-                                  {a.article_name}
-                                </span>
+                            {/* Namn på egen rad – fullt utrymme på mobil */}
+                            <div className="mb-2">
+                              <div className="text-sm text-white font-medium leading-snug">
+                                {a.article_code && (
+                                  <span className="text-xs text-slate-500 mr-1">{a.article_code}</span>
+                                )}
+                                {a.article_name}
                                 {a.quantity > 1 && (
                                   <span className="text-xs text-slate-500 ml-1">×{a.quantity}</span>
                                 )}
                               </div>
-                              <span className="text-sm font-medium text-slate-300 whitespace-nowrap shrink-0">
-                                {fmt(a.total_price)}
-                              </span>
+                              <div className="text-xs text-slate-400 mt-0.5">{fmt(a.total_price)}</div>
                             </div>
                             <select
                               value={assignments[a.id] ?? ''}
-                              onChange={e => setAssignments(prev => ({ ...prev, [a.id]: e.target.value }))}
+                              onChange={e => onAssignmentsChange({ ...assignments, [a.id]: e.target.value })}
                               className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-[#20c58f]"
                             >
                               <option value="">— Ej tilldelad —</option>
@@ -219,24 +244,26 @@ export default function PriceCalculatorPanel({
                             const cost = purchaseCostByService(si.id)
                             const markup = markups[si.id] ?? settings.recommended_markup_percent
                             const raw = calculateSuggestedPrice(cost, markup)
-                            const price = Math.max(raw, cost > 0 ? settings.min_charge_amount : 0)
+                            const price = cost > 0 ? raw : 0
                             const margin = price > 0 ? calculateMarginPercent(price, cost) : 0
                             const hasArticles = cost > 0
 
                             return (
                               <div key={si.id} className={`p-3 rounded-xl border ${hasArticles ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-800/10 border-slate-700/30'}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm font-medium text-white truncate mr-2">
-                                    {si.service_code && <span className="text-xs text-slate-400 mr-1">{si.service_code}</span>}
+                                {/* Tjänstnamn på egen rad */}
+                                <div className="mb-2">
+                                  <div className="text-sm font-medium text-white leading-snug">
+                                    {si.service_code && (
+                                      <span className="text-xs text-slate-400 mr-1">{si.service_code}</span>
+                                    )}
                                     {si.service_name || 'Okänd tjänst'}
-                                  </span>
-                                  {hasArticles
-                                    ? <div className={`flex items-center gap-1 text-xs font-medium ${getMarginColor(margin)}`}>
-                                        {getMarginIcon(margin)}
-                                        {margin.toFixed(0)}%
-                                      </div>
-                                    : <span className="text-xs text-slate-500">behåll nuv. pris</span>
-                                  }
+                                  </div>
+                                  {hasArticles && (
+                                    <div className={`flex items-center gap-1 text-xs font-medium mt-0.5 ${getMarginColor(margin)}`}>
+                                      {getMarginIcon(margin)}
+                                      {margin.toFixed(0)}% marginal
+                                    </div>
+                                  )}
                                 </div>
 
                                 {hasArticles ? (
@@ -256,7 +283,7 @@ export default function PriceCalculatorPanel({
                                         max={300}
                                         step={5}
                                         value={markup}
-                                        onChange={e => setMarkups(prev => ({ ...prev, [si.id]: parseFloat(e.target.value) }))}
+                                        onChange={e => onMarkupsChange({ ...markups, [si.id]: parseFloat(e.target.value) })}
                                         className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-[#20c58f]"
                                       />
                                       <div className="flex justify-between text-xs text-slate-600">
@@ -268,7 +295,7 @@ export default function PriceCalculatorPanel({
                                   </>
                                 ) : (
                                   <p className="text-xs text-slate-500">
-                                    Nuvarande pris: {fmt(si.unit_price * si.quantity)}
+                                    Nuvarande pris: {fmt(si.unit_price * si.quantity)} – berörs ej
                                   </p>
                                 )}
                               </div>

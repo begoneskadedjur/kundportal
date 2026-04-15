@@ -119,6 +119,10 @@ export default function CaseServiceSelector({
   const [showCalculatorPanel, setShowCalculatorPanel] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // Prisguide-state som överlever öppna/stäng-cykler
+  const [priceAssignments, setPriceAssignments] = useState<Record<string, string>>({})
+  const [priceMarkups, setPriceMarkups] = useState<Record<string, number>>({})
+
 
   // Inline price editing (service item id → input string)
   const [editingPrice, setEditingPrice] = useState<Record<string, string>>({})
@@ -484,53 +488,55 @@ export default function CaseServiceSelector({
               const isEditing = editingPrice[item.id] !== undefined
               const displayPrice = isEditing ? editingPrice[item.id] : String(item.unit_price)
               return (
-                <div key={item.id} className="flex items-center gap-2 p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">
-                      {item.service_code && (
-                        <span className="text-xs text-slate-400 mr-1">{item.service_code}</span>
-                      )}
-                      {item.service_name || item.article_name}
-                    </div>
+                <div key={item.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg">
+                  {/* Namn – alltid full bredd */}
+                  <div className="text-sm font-medium text-white mb-1.5">
+                    {item.service_code && (
+                      <span className="text-xs text-slate-400 mr-1">{item.service_code}</span>
+                    )}
+                    {item.service_name || item.article_name}
                   </div>
-                  {/* Antal */}
-                  {!readOnly && (
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
-                        <Minus className="w-3 h-3" />
+                  {/* Kontroller på rad 2 */}
+                  <div className="flex items-center gap-2">
+                    {/* Antal */}
+                    {!readOnly && (
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
+                        <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Pris */}
+                    {readOnly ? (
+                      <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-auto">
+                        {formatPrice(item.total_price)}
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1 ml-auto">
+                        <input
+                          type="number"
+                          value={displayPrice}
+                          onChange={e => setEditingPrice(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          onFocus={() => {
+                            if (editingPrice[item.id] === undefined)
+                              setEditingPrice(prev => ({ ...prev, [item.id]: String(item.unit_price) }))
+                          }}
+                          onBlur={() => handleServicePriceBlur(item.id)}
+                          className="w-24 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                        />
+                        <span className="text-xs text-slate-400">kr/st</span>
+                      </div>
+                    )}
+                    {!readOnly && (
+                      <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                      <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
-                      <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-                  {/* Pris */}
-                  {readOnly ? (
-                    <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap">
-                      {formatPrice(item.total_price)}
-                    </span>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        value={displayPrice}
-                        onChange={e => setEditingPrice(prev => ({ ...prev, [item.id]: e.target.value }))}
-                        onFocus={() => {
-                          if (editingPrice[item.id] === undefined)
-                            setEditingPrice(prev => ({ ...prev, [item.id]: String(item.unit_price) }))
-                        }}
-                        onBlur={() => handleServicePriceBlur(item.id)}
-                        className="w-24 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-                      />
-                      <span className="text-xs text-slate-400">kr/{item.quantity > 1 ? `${item.quantity} st` : 'st'}</span>
-                    </div>
-                  )}
-                  {!readOnly && (
-                    <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
               )
             })}
@@ -641,31 +647,32 @@ export default function CaseServiceSelector({
             {articleItems.length > 0 && (
               <div className="space-y-1.5">
                 {articleItems.map(item => (
-                  <div key={item.id} className="flex items-center gap-2 px-3 py-2 bg-slate-800/40 border border-slate-700/30 rounded-lg">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-white truncate">
-                        <span className="text-xs text-slate-500 mr-1">{item.article_code}</span>
-                        {item.article_name}
-                      </div>
-                      <div className="text-xs text-slate-500">{item.unit_price} kr/st</div>
+                  <div key={item.id} className="px-3 py-2 bg-slate-800/40 border border-slate-700/30 rounded-lg">
+                    {/* Namn – alltid full bredd */}
+                    <div className="text-sm text-white mb-1.5">
+                      {item.article_code && <span className="text-xs text-slate-500 mr-1">{item.article_code}</span>}
+                      {item.article_name}
                     </div>
-                    {!readOnly && (
-                      <div className="flex items-center gap-1">
-                        <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
-                        <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                    <span className="text-sm text-slate-300 whitespace-nowrap">
-                      {formatPrice(item.total_price)}
-                    </span>
-                    {!readOnly && (
-                      <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
+                    {/* Kontroller på rad 2 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">{item.unit_price} kr/st</span>
+                      {!readOnly && (
+                        <div className="flex items-center gap-1 ml-auto">
+                          <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
+                          <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <span className="text-sm text-slate-300 whitespace-nowrap">
+                        {formatPrice(item.total_price)}
+                      </span>
+                      {!readOnly && (
+                        <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
@@ -755,6 +762,10 @@ export default function CaseServiceSelector({
           quantity: i.quantity,
           discount_percent: i.discount_percent,
         }))}
+        assignments={priceAssignments}
+        markups={priceMarkups}
+        onAssignmentsChange={setPriceAssignments}
+        onMarkupsChange={setPriceMarkups}
         onApplyPrices={handleApplyPrices}
       />
     </div>
