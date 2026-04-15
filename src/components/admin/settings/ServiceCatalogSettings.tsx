@@ -10,6 +10,7 @@ import { ServiceCatalogService, ServiceGroupService } from '../../../services/se
 import type { ServiceWithGroup, ServiceGroup } from '../../../types/services'
 import ServiceCatalogEditModal from './ServiceCatalogEditModal'
 import ServiceGroupEditModal from './ServiceGroupEditModal'
+import PricingSettingsModal from './PricingSettingsModal'
 
 export default function ServiceCatalogSettings() {
   const [services, setServices] = useState<ServiceWithGroup[]>([])
@@ -25,6 +26,7 @@ export default function ServiceCatalogSettings() {
   const [editingService, setEditingService] = useState<ServiceWithGroup | null | undefined>(undefined)
   const [editingGroup, setEditingGroup] = useState<ServiceGroup | null | undefined>(undefined)
   const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null)
+  const [pricingSettingsOpen, setPricingSettingsOpen] = useState(false)
 
   const loadData = async () => {
     try {
@@ -141,8 +143,12 @@ export default function ServiceCatalogSettings() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setEditingGroup(null)}>
+          <Button variant="ghost" size="sm" onClick={() => setPricingSettingsOpen(true)}>
             <Settings className="w-4 h-4 mr-1" />
+            Inställningar
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setEditingGroup(null)}>
+            <Plus className="w-4 h-4 mr-1" />
             Ny grupp
           </Button>
           <Button variant="primary" size="sm" onClick={() => setEditingService(null)}>
@@ -340,6 +346,12 @@ export default function ServiceCatalogSettings() {
         onClose={() => setEditingGroup(undefined)}
         onSaved={loadData}
         group={editingGroup ?? null}
+      />
+
+      {/* Kalkylatorinställningar */}
+      <PricingSettingsModal
+        isOpen={pricingSettingsOpen}
+        onClose={() => setPricingSettingsOpen(false)}
       />
     </div>
   )

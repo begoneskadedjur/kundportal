@@ -25,6 +25,9 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { CaseBillingService } from '../../services/caseBillingService'
 import { ServiceCatalogService } from '../../services/servicesCatalogService'
+import { PricingSettingsService } from '../../services/pricingSettingsService'
+import type { PricingSettings } from '../../types/pricingSettings'
+import { DEFAULT_PRICING_SETTINGS } from '../../types/pricingSettings'
 import type {
   CaseBillingItemWithRelations,
   ArticleWithEffectivePrice,
@@ -97,7 +100,9 @@ export default function CaseServiceSelector({
   const [allItems, setAllItems] = useState<CaseBillingItemWithRelations[]>([])
   const [articles, setArticles] = useState<ArticleWithEffectivePrice[]>([])
   const [addonServices, setAddonServices] = useState<ServiceWithGroup[]>([])
-  const [primaryService, setPrimaryService] = useState<ServiceWithGroup | null>(null)
+  const [pricingSettings, setPricingSettings] = useState<PricingSettings>({
+    id: '', ...DEFAULT_PRICING_SETTINGS, updated_at: ''
+  })
   const [loading, setLoading] = useState(true)
 
   // UI state
@@ -118,11 +123,13 @@ export default function CaseServiceSelector({
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [articlesData, itemsData, allServicesData] = await Promise.all([
+      const [articlesData, itemsData, allServicesData, settingsData] = await Promise.all([
         CaseBillingService.getArticlesWithPrices(customerId),
         caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
         ServiceCatalogService.getAllActiveServices(),
+        PricingSettingsService.get(),
       ])
+      setPricingSettings(settingsData)
       setArticles(articlesData)
       setAddonServices(allServicesData)
 
@@ -130,7 +137,6 @@ export default function CaseServiceSelector({
       let svc: ServiceWithGroup | null = null
       if (primaryServiceId) {
         svc = allServicesData.find(s => s.id === primaryServiceId) ?? null
-        setPrimaryService(svc)
       }
 
       // Auto-skapa fakturarad för primärtjänsten om den saknas
@@ -168,17 +174,16 @@ export default function CaseServiceSelector({
   const serviceItems = allItems.filter(i => i.item_type === 'service')
   const articleItems = allItems.filter(i => i.item_type === 'article')
 
-  // Marginalberäkning
+  // Marginalberäkning (globala inställningar)
   const serviceCost = serviceItems.reduce((s, i) => s + i.total_price, 0)
   const purchaseCost = articleItems.reduce((s, i) => s + i.total_price, 0)
   const marginPercent = serviceCost > 0 ? calculateMarginPercent(serviceCost, purchaseCost) : null
-  const minMargin = primaryService?.min_margin_percent ?? 20
-  const marginOk = marginPercent === null || marginPercent >= minMargin
+  const marginOk = marginPercent === null || marginPercent >= pricingSettings.min_margin_percent
 
   const getMarginColor = () => {
     if (marginPercent === null) return 'text-slate-400'
-    if (marginPercent >= minMargin + 10) return 'text-emerald-400'
-    if (marginPercent >= minMargin) return 'text-yellow-400'
+    if (marginPercent >= pricingSettings.target_margin_percent) return 'text-emerald-400'
+    if (marginPercent >= pricingSettings.min_margin_percent) return 'text-yellow-400'
     return 'text-red-400'
   }
 
@@ -710,8 +715,6 @@ export default function CaseServiceSelector({
           quantity: i.quantity,
           unit_price: i.unit_price,
         }))}
-        recommendedMarkupPercent={primaryService?.recommended_markup_percent ?? 40}
-        minMarginPercent={primaryService?.min_margin_percent ?? 20}
         onApplyPrice={handleApplyGuidePrice}
       />
     </div>
