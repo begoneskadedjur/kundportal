@@ -103,6 +103,8 @@ export default function CaseServiceSelector({
   const [allItems, setAllItems] = useState<CaseBillingItemWithRelations[]>([])
   const [articles, setArticles] = useState<ArticleWithEffectivePrice[]>([])
   const [addonServices, setAddonServices] = useState<ServiceWithGroup[]>([])
+  const [resolvedServiceGroupId, setResolvedServiceGroupId] = useState<string | null>(null)
+  const [ovrigtServiceGroupId, setOvrigtServiceGroupId] = useState<string | null>(null)
   const [pricingSettings, setPricingSettings] = useState<PricingSettings>({
     id: '', ...DEFAULT_PRICING_SETTINGS, updated_at: ''
   })
@@ -126,18 +128,28 @@ export default function CaseServiceSelector({
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      // Lös upp artikelgrupp-ID från tjänsten om det inte skickats in
+      // Lös upp service_group_id + artikelgrupp-ID från tjänsten
       let resolvedArticleGroupId = articleGroupId ?? null
-      if (!resolvedArticleGroupId && primaryServiceId) {
+      let serviceGroupId: string | null = null
+      if (primaryServiceId) {
         const { data: svcRow } = await supabase.from('services').select('group_id').eq('id', primaryServiceId).single()
         if (svcRow?.group_id) {
-          const { data: sgRow } = await supabase.from('service_groups').select('name').eq('id', svcRow.group_id).single()
-          if (sgRow?.name) {
-            const { data: agRow } = await supabase.from('article_groups').select('id').eq('name', sgRow.name).maybeSingle()
-            resolvedArticleGroupId = agRow?.id ?? null
+          serviceGroupId = svcRow.group_id
+          if (!resolvedArticleGroupId) {
+            const { data: sgRow } = await supabase.from('service_groups').select('name').eq('id', svcRow.group_id).single()
+            if (sgRow?.name) {
+              const { data: agRow } = await supabase.from('article_groups').select('id').eq('name', sgRow.name).maybeSingle()
+              resolvedArticleGroupId = agRow?.id ?? null
+            }
           }
         }
       }
+      setResolvedServiceGroupId(serviceGroupId)
+
+      // Hämta Övrigt-gruppens ID för att alltid inkludera den i tilläggstjänster
+      const { data: ovrigtSgRow } = await supabase
+        .from('service_groups').select('id').eq('name', 'Övrigt').maybeSingle()
+      setOvrigtServiceGroupId(ovrigtSgRow?.id ?? null)
 
       const [articlesData, itemsData, allServicesData, settingsData] = await Promise.all([
         CaseBillingService.getArticlesWithPrices(customerId, resolvedArticleGroupId),
@@ -410,10 +422,16 @@ export default function CaseServiceSelector({
     return acc
   }, {} as Partial<Record<ArticleCategory, ArticleWithEffectivePrice[]>>)
 
-  // Tilläggstjänster = alla aktiva tjänster utom de som redan lagts till som fakturarad
+  // Tilläggstjänster = tjänster från samma servicegrupp + Övrigt-gruppen
   const addedServiceIds = new Set(serviceItems.map(i => i.service_id).filter(Boolean))
   const filteredAddons = addonServices.filter(s => {
     if (addedServiceIds.has(s.id)) return false // redan tillagd
+    // Filtrera på servicegrupp: samma grupp som primärtjänsten ELLER Övrigt-gruppen
+    if (resolvedServiceGroupId) {
+      const inSameGroup = s.group_id === resolvedServiceGroupId
+      const inOvrigt = ovrigtServiceGroupId ? s.group_id === ovrigtServiceGroupId : s.group?.name === 'Övrigt'
+      if (!inSameGroup && !inOvrigt) return false
+    }
     const search = searchAddon.toLowerCase()
     return !search
       || s.name.toLowerCase().includes(search)
