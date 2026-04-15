@@ -19,7 +19,8 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle,
-  Calculator
+  Calculator,
+  Link2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
@@ -118,6 +119,13 @@ export default function CaseServiceSelector({
   const [expandedCategories, setExpandedCategories] = useState<Set<ArticleCategory>>(new Set(ARTICLE_CATEGORIES))
   const [showCalculatorPanel, setShowCalculatorPanel] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Per-rad koppling: service_item_id → article_item_ids[]
+  const [articleLinks, setArticleLinks] = useState<Record<string, string[]>>({})
+  // Vilken fakturarad har öppen kopplings-picker
+  const [expandedLinkServiceId, setExpandedLinkServiceId] = useState<string | null>(null)
+  // Vilken fakturarad har öppen per-rad prisguide
+  const [priceGuideForService, setPriceGuideForService] = useState<string | null>(null)
 
   // Inline price editing (service item id → input string)
   const [editingPrice, setEditingPrice] = useState<Record<string, string>>({})
@@ -364,41 +372,37 @@ export default function CaseServiceSelector({
   }
 
   // ──────────────────────────────────────────────────────────────
-  // Prisguide: applicera föreslagen pris på alla tjänsterader
+  // Prisguide: applicera föreslagen pris på en specifik (eller enda) tjänsterad
   // ──────────────────────────────────────────────────────────────
-  const handleApplyGuidePrice = async (price: number) => {
+  const handleApplyGuidePrice = async (price: number, serviceItemId?: string | null) => {
     if (!caseId || serviceItems.length === 0) return
-    // Om det finns exakt en tjänsterad – applicera på den
-    // Om flera – fördelat jämnt (enklast: bara visa toast att man ska editera manuellt)
-    if (serviceItems.length === 1) {
-      const id = serviceItems[0].id
-      setEditingPrice(prev => ({ ...prev, [id]: String(price) }))
-      // Applicera direkt
-      setSaving(true)
-      try {
-        const item = serviceItems[0]
-        const discounted = calculateDiscountedPrice(price, item.discount_percent)
-        const total = calculateTotalPrice(discounted, item.quantity)
-        // supabase imported at top
-        await supabase
-          .from('case_billing_items')
-          .update({
-            unit_price: price,
-            discounted_price: discounted,
-            total_price: total,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', id)
-        setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
-        await reloadItems()
-        toast.success('Prisguide applicerat')
-      } catch (err: any) {
-        toast.error(err.message)
-      } finally {
-        setSaving(false)
-      }
-    } else {
+    const targetId = serviceItemId ?? (serviceItems.length === 1 ? serviceItems[0].id : null)
+    if (!targetId) {
       toast.success(`Föreslagen totalpris: ${formatPrice(price)} – justera priserna manuellt`)
+      return
+    }
+    setSaving(true)
+    try {
+      const item = allItems.find(i => i.id === targetId)
+      if (!item) return
+      const discounted = calculateDiscountedPrice(price, item.discount_percent)
+      const total = calculateTotalPrice(discounted, item.quantity)
+      await supabase
+        .from('case_billing_items')
+        .update({
+          unit_price: price,
+          discounted_price: discounted,
+          total_price: total,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', targetId)
+      setEditingPrice(prev => { const n = { ...prev }; delete n[targetId]; return n })
+      await reloadItems()
+      toast.success('Prisguide applicerat')
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -488,53 +492,152 @@ export default function CaseServiceSelector({
             {serviceItems.map(item => {
               const isEditing = editingPrice[item.id] !== undefined
               const displayPrice = isEditing ? editingPrice[item.id] : String(item.unit_price)
+              const isLinkExpanded = expandedLinkServiceId === item.id
+              const linkedArticleIds = articleLinks[item.id] ?? []
+              const linkedCount = linkedArticleIds.length
+              // Artiklar kopplade till just denna rad (för prisguide)
+              const linkedArticleItems = articleItems
+                .filter(a => linkedArticleIds.includes(a.id))
+                .map(a => ({
+                  article: a.article || { id: a.article_id!, name: a.article_name, code: a.article_code || '' } as any,
+                  quantity: a.quantity,
+                  unit_price: a.unit_price,
+                }))
               return (
-                <div key={item.id} className="flex items-center gap-2 p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">
-                      {item.service_code && (
-                        <span className="text-xs text-slate-400 mr-1">{item.service_code}</span>
-                      )}
-                      {item.service_name || item.article_name}
+                <div key={item.id} className="bg-slate-800/40 border border-slate-700/50 rounded-lg overflow-hidden">
+                  {/* Huvud-rad */}
+                  <div className="flex items-center gap-2 p-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-white truncate">
+                        {item.service_code && (
+                          <span className="text-xs text-slate-400 mr-1">{item.service_code}</span>
+                        )}
+                        {item.service_name || item.article_name}
+                      </div>
                     </div>
+                    {/* Antal */}
+                    {!readOnly && (
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
+                        <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Pris */}
+                    {readOnly ? (
+                      <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap">
+                        {formatPrice(item.total_price)}
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={displayPrice}
+                          onChange={e => setEditingPrice(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          onFocus={() => {
+                            if (editingPrice[item.id] === undefined)
+                              setEditingPrice(prev => ({ ...prev, [item.id]: String(item.unit_price) }))
+                          }}
+                          onBlur={() => handleServicePriceBlur(item.id)}
+                          className="w-24 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                        />
+                        <span className="text-xs text-slate-400">kr/{item.quantity > 1 ? `${item.quantity} st` : 'st'}</span>
+                      </div>
+                    )}
+                    {!readOnly && (
+                      <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
-                  {/* Antal */}
-                  {!readOnly && (
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
-                        <Minus className="w-3 h-3" />
+
+                  {/* Koppla-artiklar-sektion (bara i editläge och om det finns artiklar) */}
+                  {!readOnly && articleItems.length > 0 && (
+                    <div className="border-t border-slate-700/30">
+                      {/* Toggle-knapp */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedLinkServiceId(isLinkExpanded ? null : item.id)}
+                        className="flex items-center gap-1.5 w-full px-3 py-2 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                      >
+                        <Link2 className="w-3 h-3" />
+                        <span>Koppla interna kostnader</span>
+                        {linkedCount > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f] font-medium">
+                            {linkedCount}
+                          </span>
+                        )}
+                        {isLinkExpanded
+                          ? <ChevronDown className="w-3 h-3 ml-auto" />
+                          : <ChevronRight className="w-3 h-3 ml-auto" />}
                       </button>
-                      <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
-                      <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-5 h-5 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
-                        <Plus className="w-3 h-3" />
-                      </button>
+
+                      {/* Expanderad lista */}
+                      {isLinkExpanded && (
+                        <div className="px-3 pb-2 space-y-1">
+                          {articleItems.map(a => {
+                            const isLinked = linkedArticleIds.includes(a.id)
+                            return (
+                              <label
+                                key={a.id}
+                                className="flex items-center gap-2.5 py-2.5 cursor-pointer group"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isLinked}
+                                  onChange={() => {
+                                    setArticleLinks(prev => {
+                                      const current = prev[item.id] ?? []
+                                      const next = isLinked
+                                        ? current.filter(id => id !== a.id)
+                                        : [...current, a.id]
+                                      return { ...prev, [item.id]: next }
+                                    })
+                                  }}
+                                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f] focus:ring-offset-0 shrink-0"
+                                />
+                                <span className="flex-1 text-sm text-slate-300 group-hover:text-white truncate">
+                                  {a.article_code && <span className="text-xs text-slate-500 mr-1">{a.article_code}</span>}
+                                  {a.article_name}
+                                </span>
+                                <span className="text-xs text-slate-400 whitespace-nowrap">
+                                  {formatPrice(a.total_price)}
+                                </span>
+                              </label>
+                            )
+                          })}
+
+                          {/* Prisguide-knapp för denna rad */}
+                          {linkedCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setPriceGuideForService(item.id)}
+                              className="flex items-center gap-1.5 mt-1 px-2 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-[#20c58f] rounded-lg transition-colors w-full justify-center"
+                            >
+                              <Calculator className="w-3.5 h-3.5" />
+                              Prisguide för denna rad
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
-                  {/* Pris */}
-                  {readOnly ? (
-                    <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap">
-                      {formatPrice(item.total_price)}
-                    </span>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        value={displayPrice}
-                        onChange={e => setEditingPrice(prev => ({ ...prev, [item.id]: e.target.value }))}
-                        onFocus={() => {
-                          if (editingPrice[item.id] === undefined)
-                            setEditingPrice(prev => ({ ...prev, [item.id]: String(item.unit_price) }))
-                        }}
-                        onBlur={() => handleServicePriceBlur(item.id)}
-                        className="w-24 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-                      />
-                      <span className="text-xs text-slate-400">kr/{item.quantity > 1 ? `${item.quantity} st` : 'st'}</span>
-                    </div>
-                  )}
-                  {!readOnly && (
-                    <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                  {/* Per-rad PriceCalculatorPanel */}
+                  {priceGuideForService === item.id && (
+                    <PriceCalculatorPanel
+                      isOpen={true}
+                      onClose={() => setPriceGuideForService(null)}
+                      articleItems={linkedArticleItems}
+                      onApplyPrice={(price) => {
+                        setPriceGuideForService(null)
+                        handleApplyGuidePrice(price, item.id)
+                      }}
+                    />
                   )}
                 </div>
               )
@@ -740,7 +843,7 @@ export default function CaseServiceSelector({
         )}
       </div>
 
-      {/* Prisguide-panel */}
+      {/* Global prisguide-panel (header-knappen – alla artiklar, applicerar på enda rad) */}
       <PriceCalculatorPanel
         isOpen={showCalculatorPanel}
         onClose={() => setShowCalculatorPanel(false)}
@@ -749,7 +852,7 @@ export default function CaseServiceSelector({
           quantity: i.quantity,
           unit_price: i.unit_price,
         }))}
-        onApplyPrice={handleApplyGuidePrice}
+        onApplyPrice={(price) => handleApplyGuidePrice(price)}
       />
     </div>
   )
