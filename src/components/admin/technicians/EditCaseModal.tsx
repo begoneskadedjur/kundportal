@@ -1502,6 +1502,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                       setFormData(prev => ({ ...prev, service_id: sid }))
                       setServiceArticle(svc)
                     }}
+                    bookingOnly
                   />
                   {!formData.service_id && formData.skadedjur && (
                     <p className="mt-1 text-xs text-slate-500">Befintlig: {formData.skadedjur}</p>
