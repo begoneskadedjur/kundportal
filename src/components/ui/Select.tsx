@@ -95,7 +95,13 @@ export default function Select({
     setOpen(false)
   }
 
-  const menu = open
+  // Rendera i #modal-root om det finns (för modaler med Portal), annars document.body
+  const portalTarget =
+    typeof document !== 'undefined'
+      ? (document.getElementById('modal-root') ?? document.body)
+      : null
+
+  const menu = open && portalTarget
     ? createPortal(
         <ul
           ref={menuRef}
@@ -128,7 +134,7 @@ export default function Select({
             )
           })}
         </ul>,
-        document.body
+        portalTarget
       )
     : null
 
