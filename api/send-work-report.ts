@@ -126,9 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const safeCustomerName = customerDisplayName.replace(/[^\w\s-åäöÅÄÖ]/g, '').replace(/\s+/g, '_').substring(0, 25)
     const fileName = pdfFilename || `Saneringsrapport_${caseNumber}_${safeCustomerName}_${reportDate}.pdf`
 
-    const subject = recipientType === 'technician'
-      ? `BeGone Saneringsrapport: ${caseNumber}`
-      : `BeGone Saneringsrapport: ${caseNumber}`
+    const subject = `Saneringsrapport avseende ärende: ${caseNumber} (${reportDate})`
 
     const emailHtml = recipientType === 'technician'
       ? getTechnicianEmailTemplate(recipientName || techName || 'Tekniker', caseNumber, contactPersonName, customerDisplayName, addressText, status)
