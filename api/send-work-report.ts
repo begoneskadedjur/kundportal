@@ -329,7 +329,7 @@ function getContactEmailTemplate(
           <!-- Success box -->
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;margin-bottom:24px;">
             <tr><td style="padding:16px 20px;">
-              <p style="margin:0 0 4px 0;font-size:13px;font-weight:700;color:#166534;">✅ Arbetet har dokumenterats</p>
+              <p style="margin:0 0 4px 0;font-size:13px;font-weight:700;color:#166534;">Arbetet har dokumenterats</p>
               <p style="margin:0;font-size:13px;color:#15803d;line-height:1.5;">Den bifogade PDF-rapporten innehåller fullständig dokumentation av det utförda arbetet.</p>
             </td></tr>
           </table>
