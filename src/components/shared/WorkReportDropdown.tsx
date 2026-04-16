@@ -96,12 +96,10 @@ export default function WorkReportDropdown({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled || loading !== null}
         className={`
-          flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200
+          flex items-center gap-1.5 h-9 px-3 rounded-lg border text-sm font-medium transition-all duration-200 active:scale-95
           ${disabled || loading !== null
-            ? 'bg-slate-700/50 border-slate-600 text-slate-500 cursor-not-allowed'
-            : hasRecentReport
-              ? 'bg-slate-800/50 border-amber-500/50 text-amber-400 hover:bg-slate-700/50 hover:border-amber-500 hover:text-amber-300'
-              : 'bg-slate-800/50 border-slate-600 text-blue-400 hover:bg-slate-700/50 hover:border-slate-500 hover:text-blue-300'
+            ? 'bg-slate-700/50 border-slate-600/50 text-slate-500 cursor-not-allowed'
+            : 'bg-slate-700/60 border-slate-600 text-slate-200 hover:bg-slate-700 hover:border-slate-500'
           }
         `}
         title={hasRecentReport 
@@ -110,22 +108,18 @@ export default function WorkReportDropdown({
         }
       >
         {loading !== null ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : hasRecentReport ? (
-          <AlertCircle className="h-4 w-4" />
+          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
         ) : (
-          <FileCheck className="h-4 w-4" />
+          <FileCheck className="h-4 w-4 shrink-0" />
         )}
-        
-        <span className="text-sm font-medium hidden sm:inline">
+        <span>
           {loading === 'download' && 'Laddar ner...'}
           {loading === 'technician' && 'Skickar...'}
           {loading === 'contact' && 'Skickar...'}
           {loading === null && `Rapport${totalReports > 0 ? ` (${totalReports})` : ''}`}
         </span>
-        
         {!disabled && loading === null && (
-          <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
         )}
       </button>
 

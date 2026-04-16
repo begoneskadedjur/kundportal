@@ -1236,24 +1236,24 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               <button
                 type="button"
                 onClick={handleCreateContract}
-                className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 rounded-lg text-purple-300 hover:text-purple-200 text-xs sm:text-sm font-medium transition-all duration-200 active:scale-95"
+                className="flex items-center justify-center gap-1.5 h-9 px-3 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 hover:border-violet-500/50 rounded-lg text-violet-300 hover:text-violet-200 text-sm font-medium transition-all duration-200 active:scale-95"
                 title="Skapa serviceavtal för denna kund"
               >
                 <FileSignature className="w-4 h-4 shrink-0" />
                 <span>Avtal</span>
-                <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
+                <ChevronRight className="w-3 h-3 shrink-0 opacity-50" />
               </button>
 
               {/* Offert */}
               <button
                 type="button"
                 onClick={handleCreateOffer}
-                className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 rounded-lg text-green-300 hover:text-green-200 text-xs sm:text-sm font-medium transition-all duration-200 active:scale-95"
+                className="flex items-center justify-center gap-1.5 h-9 px-3 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 hover:border-emerald-500/50 rounded-lg text-emerald-300 hover:text-emerald-200 text-sm font-medium transition-all duration-200 active:scale-95"
                 title="Skapa offertförslag för denna kund"
               >
                 <DollarSign className="w-4 h-4 shrink-0" />
                 <span>Offert</span>
-                <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
+                <ChevronRight className="w-3 h-3 shrink-0 opacity-50" />
               </button>
 
               {/* Rapport */}
@@ -1271,9 +1271,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   getTimeSinceReport={reportGeneration.getTimeSinceReport}
                 />
               ) : (
-                <div className="flex items-center gap-1.5 text-slate-500 px-3 py-2.5 border border-slate-700/50 rounded-lg text-xs">
+                <div className="flex items-center gap-1.5 h-9 px-3 bg-slate-700/30 border border-slate-700/50 rounded-lg text-slate-500 text-sm font-medium cursor-not-allowed">
                   <FileCheck className="w-4 h-4 shrink-0" />
-                  <span>Rapport ej tillgänglig</span>
+                  <span>Rapport</span>
                 </div>
               )}
             </div>

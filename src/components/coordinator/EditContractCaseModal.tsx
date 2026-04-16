@@ -1318,11 +1318,11 @@ export default function EditContractCaseModal({
         <div className="relative">
           <button
             onClick={() => setShowQuoteDropdown(!showQuoteDropdown)}
-            className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-300 transition-colors active:scale-95"
+            className="flex items-center justify-center gap-1.5 h-9 px-3 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 hover:border-emerald-500/50 rounded-lg text-emerald-300 hover:text-emerald-200 text-sm font-medium transition-all duration-200 active:scale-95"
           >
-            <FileSignature className="w-4 h-4" />
-            <span className="text-xs sm:text-sm font-medium">Offert</span>
-            <ChevronDown className="w-3 h-3 hidden sm:block" />
+            <FileSignature className="w-4 h-4 shrink-0" />
+            <span>Offert</span>
+            <ChevronDown className="w-3 h-3 shrink-0 opacity-50" />
           </button>
 
           {showQuoteDropdown && (
