@@ -28,6 +28,7 @@ export default function TechnicianAuthModal({
   const [formData, setFormData] = useState({ display_name: technician.name })
   const [customPassword, setCustomPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [sendWelcomeEmail, setSendWelcomeEmail] = useState(true)
   const [loading, setLoading] = useState(false)
   const { user } = useAuth()
 
@@ -209,15 +210,35 @@ export default function TechnicianAuthModal({
                 </p>
               </div>
 
+              {/* Skicka välkomstmail */}
+              <label className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer hover:border-slate-600 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={sendWelcomeEmail}
+                  onChange={(e) => setSendWelcomeEmail(e.target.checked)}
+                  className="h-4 w-4 rounded bg-slate-700 border-slate-500 text-[#20c58f] focus:ring-[#20c58f]"
+                />
+                <div>
+                  <span className="text-sm font-medium text-slate-300">Skicka välkomstmail</span>
+                  <p className="text-xs text-slate-500">Avmarkera för att skapa kontot tyst, utan att skicka inloggningsuppgifter</p>
+                </div>
+              </label>
+
               {/* Inbjudningsinformation */}
               <div className="bg-teal-500/10 border border-teal-500/20 rounded-lg p-4">
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-3 mb-2">
                   <Send className="w-5 h-5 text-teal-400" />
                   <span className="text-white font-medium">Inbjudan via e-post</span>
                 </div>
-                <p className="text-sm text-slate-300 mb-2">
-                  Ett välkomstmail skickas till <span className="font-medium text-teal-400">{technician.email}</span> med inloggningsuppgifter.
-                </p>
+                {sendWelcomeEmail ? (
+                  <p className="text-sm text-slate-300">
+                    Ett välkomstmail skickas till <span className="font-medium text-teal-400">{technician.email}</span> med inloggningsuppgifter.
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-400">
+                    Inget mail skickas. Du kan själv dela inloggningsuppgifterna med personen.
+                  </p>
+                )}
               </div>
 
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
