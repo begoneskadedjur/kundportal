@@ -56,13 +56,18 @@ export default function WorkReportDropdown({
   const openMenu = () => {
     const rect = buttonRef.current?.getBoundingClientRect()
     if (!rect) return
+    const menuWidth = Math.max(rect.width, 288)
     const menuHeight = 240
     const spaceBelow = window.innerHeight - rect.bottom
     const openUp = spaceBelow < menuHeight + 8 && rect.top > menuHeight + 8
+    const rightFromEdge = window.innerWidth - rect.right
+    const overflowsLeft = rightFromEdge + menuWidth > window.innerWidth - 8
     setMenuStyle({
       position: 'fixed',
-      right: window.innerWidth - rect.right,
-      width: Math.max(rect.width, 288),
+      ...(overflowsLeft
+        ? { left: Math.max(8, rect.left) }
+        : { right: rightFromEdge }),
+      width: menuWidth,
       ...(openUp
         ? { bottom: window.innerHeight - rect.top, top: 'auto' }
         : { top: rect.bottom + 4, bottom: 'auto' }),
