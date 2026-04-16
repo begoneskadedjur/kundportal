@@ -5,6 +5,8 @@ import Button from '../ui/Button'
 import Input from '../ui/Input'
 import Modal from '../ui/Modal'
 import Select from '../ui/Select'
+import AddressAutocomplete from '../ui/AddressAutocomplete'
+import type { GeocodeResult } from '../../services/geocoding'
 import TechnicianDropdown from './TechnicianDropdown'
 import ServiceArticleSelector from '../shared/ServiceArticleSelector'
 
@@ -305,13 +307,16 @@ export default function AdminCreateCaseModal({
               Platsinformation
             </h3>
             
-            <Input
+            <AddressAutocomplete
               label="Specifik adress"
-              name="address"
               value={formData.address}
-              onChange={handleChange}
+              onChange={(val) =>
+                setFormData(prev => ({
+                  ...prev,
+                  address: typeof val === 'string' ? val : (val as GeocodeResult).formatted_address
+                }))
+              }
               placeholder="Om annan adress än företagsadress"
-              className="text-white"
             />
 
             <Input

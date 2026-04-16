@@ -20,7 +20,9 @@ import { CaseNumberService } from '../../../services/caseNumberService';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
 import Input from '../../ui/Input';
-import Select from '../../ui/Select';
+import Select from '../../ui/Select'
+import AddressAutocomplete from '../../ui/AddressAutocomplete'
+import type { GeocodeResult } from '../../../services/geocoding';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 
@@ -499,6 +501,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddressChange = (val: string | GeocodeResult) => {
+    setFormData(prev => ({
+      ...prev,
+      adress: typeof val === 'string' ? val : val.formatted_address
+    }));
   };
 
   const handleTechnicianSelectionChange = (technicianId: string) => {
@@ -1223,12 +1232,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     </h3>
 
                     {/* Adress (hämtas från kund) */}
-                    <Input
+                    <AddressAutocomplete
                       label="Adress"
-                      name="adress"
-                      placeholder="Fullständig adress..."
                       value={typeof formData.adress === 'string' ? formData.adress : ''}
-                      onChange={handleChange}
+                      onChange={handleAddressChange}
+                      placeholder="Fullständig adress..."
                     />
 
                     {/* Account Manager-info */}
@@ -1561,7 +1569,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3 flex flex-col">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Zap className="w-4 h-4 text-blue-400"/>Intelligent Bokning</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={typeof formData.adress === 'string' ? formData.adress : ''} onChange={handleChange} required />
+                    <AddressAutocomplete label="Adress *" value={typeof formData.adress === 'string' ? formData.adress : ''} onChange={handleAddressChange} placeholder="Fullständig adress..." required />
                     <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Hitta tider från:</label>
                         <DatePicker selected={searchStartDate} onChange={(date) => handleDateChange(date, 'searchStartDate')} locale="sv" dateFormat="yyyy-MM-dd" placeholderText="Välj startdatum..." isClearable className="w-full" />

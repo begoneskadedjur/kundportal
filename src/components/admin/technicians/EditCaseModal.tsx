@@ -8,6 +8,8 @@ import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
 import Select from '../../ui/Select'
+import AddressAutocomplete from '../../ui/AddressAutocomplete'
+import type { GeocodeResult } from '../../../services/geocoding'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -1648,23 +1650,26 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   <Input name="telefon_kontaktperson" placeholder="Telefon" value={formData.telefon_kontaktperson || ''} onChange={handleChange} />
                   <Input name="e_post_kontaktperson" placeholder="E-post" type="email" value={formData.e_post_kontaktperson || ''} onChange={handleChange} />
                 </div>
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="adress"
+                <div className="space-y-1">
+                  <AddressAutocomplete
                     value={formatAddress(formData.adress)}
-                    onChange={handleAddressChange}
+                    onChange={(val) => {
+                      if (typeof val === 'string') {
+                        handleAddressChange({ target: { value: val } } as React.ChangeEvent<HTMLInputElement>)
+                      } else {
+                        setFormData(prev => ({ ...prev, adress: val as GeocodeResult }))
+                      }
+                    }}
                     placeholder="Adress..."
-                    className="w-full px-3 py-1.5 pr-10 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                   />
                   {formatAddress(formData.adress) && (
                     <button
                       type="button"
                       onClick={() => openInMaps(formData.adress)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-teal-400 hover:text-teal-300 transition-colors rounded-md hover:bg-slate-700/50"
-                      title="Öppna i Maps"
+                      className="flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
                     >
-                      <MapPin className="w-4 h-4" />
+                      <MapPin className="w-3 h-3" />
+                      Öppna i Maps
                     </button>
                   )}
                 </div>
