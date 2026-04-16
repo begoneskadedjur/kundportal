@@ -50,6 +50,15 @@ const formatCurrency = (amount: number | null) => {
   }).format(amount)
 }
 
+const nl2br = (text: string | null | undefined): string => {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>')
+}
+
 const getStatusBadgeColor = (status: string) => {
   if (status === 'Slutförd' || status === 'Stängd') return { bg: '#22C55E', text: '#FFFFFF' }
   if (status === 'Bokad' || status === 'Bokat' || status.startsWith('Återbesök')) return { bg: '#F59E0B', text: '#FFFFFF' }
@@ -214,7 +223,7 @@ const generateSingleCaseHTML = (
       font-size: 10px; font-weight: 600; color: ${beGoneColors.mediumGray};
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
     }
-    .info-value { font-size: 14px; color: ${beGoneColors.darkGray}; font-weight: 500; overflow-wrap: break-word; word-break: break-word; min-width: 0; white-space: pre-wrap; }
+    .info-value { font-size: 14px; color: ${beGoneColors.darkGray}; font-weight: 500; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
 
     .map-container { margin-top: 16px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border}; }
     .map-image { width: 100%; display: block; }
@@ -227,7 +236,7 @@ const generateSingleCaseHTML = (
       background: white; border: 1px solid ${beGoneColors.border};
       border-radius: 8px; padding: 20px; min-height: 80px; overflow: hidden; max-width: 100%;
     }
-    .report-text { font-size: 14px; line-height: 1.7; color: ${beGoneColors.darkGray}; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; max-width: 100%; }
+    .report-text { font-size: 14px; line-height: 1.7; color: ${beGoneColors.darkGray}; overflow-wrap: break-word; word-break: break-word; max-width: 100%; }
 
     .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .data-table th {
@@ -404,7 +413,7 @@ const generateSingleCaseHTML = (
       <div class="section-header accent">Ärendebeskrivning</div>
       <div class="report-container">
         <div class="report-content">
-          <div class="report-text">${caseData.description}</div>
+          <div class="report-text">${nl2br(caseData.description)}</div>
         </div>
       </div>
     </div>
@@ -416,7 +425,7 @@ const generateSingleCaseHTML = (
       <div class="section-header accent">Arbetsrapport</div>
       <div class="report-container">
         <div class="report-content">
-          <div class="report-text">${caseData.work_report}</div>
+          <div class="report-text">${nl2br(caseData.work_report)}</div>
         </div>
       </div>
     </div>
@@ -457,7 +466,7 @@ const generateSingleCaseHTML = (
       <div class="section-header accent">Rekommendationer</div>
       <div class="report-container">
         <div class="report-content">
-          <div class="report-text">${caseData.recommendations}</div>
+          <div class="report-text">${nl2br(caseData.recommendations)}</div>
           ${caseData.recommendations_acknowledged ? `
           <div style="margin-top: 16px; padding: 12px; background: #22C55E20; border-radius: 6px; border: 1px solid #22C55E;">
             <strong style="color: #22C55E;">Bekräftat av kund:</strong> ${formatDate(caseData.recommendations_acknowledged_at)}
