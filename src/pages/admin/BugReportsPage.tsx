@@ -7,10 +7,8 @@ import { BugReportService } from '../../services/bugReportService'
 import { BUG_STATUS_CONFIG } from '../../types/bugReport'
 import type { BugReport, BugReportStatus } from '../../types/bugReport'
 
-const ADMIN_EMAIL = 'christian.k@begone.se'
-
 export default function BugReportsPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const adminId = user?.id ?? ''
   const [reports, setReports] = useState<BugReport[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,7 +16,7 @@ export default function BugReportsPage() {
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
-  const isAuthorized = user?.email === ADMIN_EMAIL
+  const isAuthorized = profile?.role === 'admin'
 
   useEffect(() => {
     if (!isAuthorized) { setLoading(false); return }
