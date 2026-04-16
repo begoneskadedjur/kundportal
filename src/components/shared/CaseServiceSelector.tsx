@@ -59,6 +59,8 @@ interface CaseServiceSelectorProps {
   onChange?: (items: CaseBillingItemWithRelations[], summary: CaseBillingSummary) => void
   readOnly?: boolean
   className?: string
+  /** Draft-läge: items sparas i lokal state istället för DB (används när inget caseId finns) */
+  draftMode?: boolean
 }
 
 const formatPrice = (price: number) =>
@@ -98,6 +100,7 @@ export default function CaseServiceSelector({
   onChange,
   readOnly = false,
   className = '',
+  draftMode = false,
 }: CaseServiceSelectorProps) {
   // All data
   const [allItems, setAllItems] = useState<CaseBillingItemWithRelations[]>([])
@@ -226,10 +229,68 @@ export default function CaseServiceSelector({
   }
 
   // ──────────────────────────────────────────────────────────────
+  // Draft-helpers: uppdatera lokal state utan DB-anrop
+  // ──────────────────────────────────────────────────────────────
+  const updateDraftItem = (id: string, updates: Partial<CaseBillingItemWithRelations>) => {
+    const updated = allItems.map(i => {
+      if (i.id !== id) return i
+      const merged = { ...i, ...updates }
+      merged.discounted_price = calculateDiscountedPrice(merged.unit_price, merged.discount_percent)
+      merged.total_price = calculateTotalPrice(merged.discounted_price, merged.quantity)
+      return merged
+    })
+    setAllItems(updated)
+    notifyChange(updated)
+  }
+
+  // ──────────────────────────────────────────────────────────────
   // Lägg till TILLÄGGSTJÄNST
   // ──────────────────────────────────────────────────────────────
   const handleAddAddon = async (svc: ServiceWithGroup) => {
-    if (!caseId || saving) return
+    if (saving) return
+    if (draftMode && !caseId) {
+      const price = svc.base_price ?? 0
+      const discounted = calculateDiscountedPrice(price, 0)
+      const total = calculateTotalPrice(discounted, 1)
+      const draftItem: CaseBillingItemWithRelations = {
+        id: crypto.randomUUID(),
+        case_id: '',
+        case_type: caseType,
+        customer_id: customerId ?? null,
+        article_id: null,
+        article_code: null,
+        article_name: svc.name,
+        service_id: svc.id,
+        service_code: svc.code ?? null,
+        service_name: svc.name,
+        item_type: 'service',
+        quantity: 1,
+        unit_price: price,
+        discount_percent: 0,
+        discounted_price: discounted,
+        total_price: total,
+        vat_rate: 25,
+        price_source: 'standard',
+        added_by_technician_id: technicianId ?? null,
+        added_by_technician_name: technicianName ?? null,
+        status: 'pending',
+        requires_approval: false,
+        notes: null,
+        rot_rut_type: null,
+        fastighetsbeteckning: null,
+        min_quantity: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        service: svc,
+      }
+      const updated = [...allItems, draftItem]
+      setAllItems(updated)
+      notifyChange(updated)
+      setShowAddonPicker(false)
+      toast.success(`${svc.name} tillagd`)
+      return
+    }
+    if (!caseId) return
     setSaving(true)
     try {
       const price = svc.base_price ?? 0
@@ -260,7 +321,47 @@ export default function CaseServiceSelector({
   // Lägg till ARTIKEL (intern kalkyl)
   // ──────────────────────────────────────────────────────────────
   const handleAddArticle = async (item: ArticleWithEffectivePrice) => {
-    if (!caseId || saving) return
+    if (saving) return
+    if (draftMode && !caseId) {
+      const discounted = calculateDiscountedPrice(item.effective_price, 0)
+      const total = calculateTotalPrice(discounted, 1)
+      const draftItem: CaseBillingItemWithRelations = {
+        id: crypto.randomUUID(),
+        case_id: '',
+        case_type: caseType,
+        customer_id: customerId ?? null,
+        article_id: item.article.id,
+        article_code: item.article.code ?? null,
+        article_name: item.article.name,
+        service_id: null,
+        service_code: null,
+        service_name: null,
+        item_type: 'article',
+        quantity: 1,
+        unit_price: item.effective_price,
+        discount_percent: 0,
+        discounted_price: discounted,
+        total_price: total,
+        vat_rate: item.article.vat_rate,
+        price_source: item.price_source,
+        added_by_technician_id: technicianId ?? null,
+        added_by_technician_name: technicianName ?? null,
+        status: 'pending',
+        requires_approval: false,
+        notes: null,
+        rot_rut_type: null,
+        fastighetsbeteckning: null,
+        min_quantity: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        article: item.article,
+      }
+      const updated = [...allItems, draftItem]
+      setAllItems(updated)
+      notifyChange(updated)
+      return
+    }
+    if (!caseId) return
     setSaving(true)
     try {
       await CaseBillingService.addArticleToCase({
@@ -289,10 +390,15 @@ export default function CaseServiceSelector({
   // Uppdatera antal
   // ──────────────────────────────────────────────────────────────
   const handleQuantityChange = async (id: string, delta: number) => {
-    if (!caseId || saving) return
+    if (saving) return
     const item = allItems.find(i => i.id === id)
     if (!item) return
     const newQty = Math.max(1, item.quantity + delta)
+    if (draftMode && !caseId) {
+      updateDraftItem(id, { quantity: newQty })
+      return
+    }
+    if (!caseId) return
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(id, { quantity: newQty })
@@ -308,7 +414,7 @@ export default function CaseServiceSelector({
   // Uppdatera pris inline (för tjänsterader)
   // ──────────────────────────────────────────────────────────────
   const handleServicePriceBlur = async (id: string) => {
-    if (!caseId) return
+    if (!caseId && !draftMode) return
     const raw = editingPrice[id]
     if (raw === undefined) return
     const newPrice = parseFloat(raw.replace(',', '.'))
@@ -316,14 +422,18 @@ export default function CaseServiceSelector({
       setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
       return
     }
+    const item = allItems.find(i => i.id === id)
+    if (!item) return
+    const discounted = calculateDiscountedPrice(newPrice, item.discount_percent)
+    const total = calculateTotalPrice(discounted, item.quantity)
+    if (draftMode && !caseId) {
+      setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
+      updateDraftItem(id, { unit_price: newPrice, discounted_price: discounted, total_price: total })
+      return
+    }
     setSaving(true)
     try {
-      const item = allItems.find(i => i.id === id)
-      if (!item) return
-      const discounted = calculateDiscountedPrice(newPrice, item.discount_percent)
-      const total = calculateTotalPrice(discounted, item.quantity)
       // Uppdatera direkt i DB via raw update (caseBillingService uppdaterar quantity/discount, men vi behöver unit_price)
-      // supabase imported at top
       await supabase
         .from('case_billing_items')
         .update({
@@ -347,7 +457,14 @@ export default function CaseServiceSelector({
   // Ta bort item
   // ──────────────────────────────────────────────────────────────
   const handleRemove = async (id: string) => {
-    if (!caseId || saving) return
+    if (saving) return
+    if (draftMode && !caseId) {
+      const updated = allItems.filter(i => i.id !== id)
+      setAllItems(updated)
+      notifyChange(updated)
+      return
+    }
+    if (!caseId) return
     setSaving(true)
     try {
       await CaseBillingService.removeCaseArticle(id)
@@ -372,7 +489,22 @@ export default function CaseServiceSelector({
   // Prisguide: applicera priser per fakturarad
   // ──────────────────────────────────────────────────────────────
   const handleApplyPrices = async (prices: Record<string, number>) => {
-    if (!caseId) return
+    if (!caseId && !draftMode) return
+    if (draftMode && !caseId) {
+      let updated = [...allItems]
+      Object.entries(prices).forEach(([itemId, price]) => {
+        updated = updated.map(i => {
+          if (i.id !== itemId) return i
+          const discounted = calculateDiscountedPrice(price, i.discount_percent)
+          const total = calculateTotalPrice(discounted, i.quantity)
+          return { ...i, unit_price: price, discounted_price: discounted, total_price: total }
+        })
+      })
+      setAllItems(updated)
+      notifyChange(updated)
+      toast.success('Priser uppdaterade')
+      return
+    }
     setSaving(true)
     try {
       await Promise.all(

@@ -6,7 +6,7 @@ import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
 import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus, ShoppingCart } from 'lucide-react';
-import CaseArticleSelector from '../../shared/CaseArticleSelector';
+import CaseServiceSelector from '../../shared/CaseServiceSelector';
 import ServiceArticleSelector from '../../shared/ServiceArticleSelector';
 import { CaseBillingService } from '../../../services/caseBillingService';
 import type { CaseBillingItemWithRelations } from '../../../types/caseBilling';
@@ -874,27 +874,42 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         finalCaseType = caseType === 'business' ? 'business' : 'private';
       }
 
-      // Spara valda artiklar om det finns några
-      if (draftBillingItems.length > 0 && finalCaseId) {
+      // Spara draft-items för nya ärenden (ej befintliga ärenden – deras items är redan sparade live)
+      if (draftBillingItems.length > 0 && finalCaseId && !initialCaseData?.id) {
         try {
           for (const item of draftBillingItems) {
-            await CaseBillingService.addArticleToCase({
-              case_id: finalCaseId,
-              case_type: finalCaseType,
-              customer_id: actualCustomerId || undefined,
-              article_id: item.article_id || '',
-              article_code: item.article_code || undefined,
-              article_name: item.article_name,
-              quantity: item.quantity,
-              unit_price: item.unit_price,
-              discount_percent: item.discount_percent || 0,
-              vat_rate: item.vat_rate || 25,
-              price_source: item.price_source,
-            })
+            if (item.item_type === 'service' && item.service_id) {
+              await CaseBillingService.addServiceToCase({
+                case_id: finalCaseId,
+                case_type: finalCaseType,
+                customer_id: actualCustomerId || undefined,
+                service_id: item.service_id,
+                service_code: item.service_code || undefined,
+                service_name: item.service_name || item.article_name,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                discount_percent: item.discount_percent || 0,
+                vat_rate: item.vat_rate || 25,
+              })
+            } else if (item.article_id) {
+              await CaseBillingService.addArticleToCase({
+                case_id: finalCaseId,
+                case_type: finalCaseType,
+                customer_id: actualCustomerId || undefined,
+                article_id: item.article_id,
+                article_code: item.article_code || undefined,
+                article_name: item.article_name,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                discount_percent: item.discount_percent || 0,
+                vat_rate: item.vat_rate || 25,
+                price_source: item.price_source,
+              })
+            }
           }
-          toast.success(`${draftBillingItems.length} artikel${draftBillingItems.length > 1 ? 'ar' : ''} tillagda`)
+          toast.success(`${draftBillingItems.length} rad${draftBillingItems.length > 1 ? 'er' : ''} tillagda`)
         } catch {
-          toast.error('Kunde inte spara artiklar')
+          toast.error('Kunde inte spara tjänster/artiklar')
         }
       }
 
@@ -1496,7 +1511,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       </div>
                     </div>
 
-                    {/* Artiklar (valfritt) */}
+                    {/* Tjänster & fakturarader (valfritt) */}
                     <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <button
                         type="button"
@@ -1504,7 +1519,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         className="w-full flex items-center justify-between"
                       >
                         <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                          <ShoppingCart size={14} /> Artiklar & Prissättning
+                          <ShoppingCart size={14} /> Tjänster & fakturarader
                           <span className="text-xs font-normal text-slate-500">(valfritt)</span>
                           {draftBillingItems.length > 0 && (
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f]">
@@ -1515,11 +1530,19 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <ChevronDown size={16} className={`text-slate-400 transition-transform ${showArticles ? 'rotate-180' : ''}`} />
                       </button>
                       {showArticles && (
-                        <CaseArticleSelector
-                          draftMode
-                          caseType={caseType === 'business' ? 'business' : 'private'}
-                          onChange={handleDraftArticlesChange}
-                        />
+                        initialCaseData?.id
+                          ? <CaseServiceSelector
+                              caseId={initialCaseData.id}
+                              caseType={caseType === 'business' ? 'business' : 'private'}
+                              customerId={(initialCaseData as any).customer_id || undefined}
+                              primaryServiceId={initialCaseData.service_id || undefined}
+                              onChange={handleDraftArticlesChange}
+                            />
+                          : <CaseServiceSelector
+                              draftMode
+                              caseType={caseType === 'business' ? 'business' : 'private'}
+                              onChange={handleDraftArticlesChange}
+                            />
                       )}
                     </div>
 
@@ -1821,7 +1844,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                        <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Briefcase size={14}/> Ärendeinformation</h4>
                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={2} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" placeholder="Kort om ärendet, portkod, etc."/></div>
                   </div>
-                  {/* Artiklar (valfritt) */}
+                  {/* Tjänster & fakturarader (valfritt) */}
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <button
                         type="button"
@@ -1829,7 +1852,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         className="w-full flex items-center justify-between"
                       >
                         <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                          <ShoppingCart size={14} /> Artiklar & Prissättning
+                          <ShoppingCart size={14} /> Tjänster & fakturarader
                           <span className="text-xs font-normal text-slate-500">(valfritt)</span>
                           {draftBillingItems.length > 0 && (
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f]">
@@ -1840,11 +1863,19 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <ChevronDown size={16} className={`text-slate-400 transition-transform ${showArticles ? 'rotate-180' : ''}`} />
                       </button>
                       {showArticles && (
-                        <CaseArticleSelector
-                          draftMode
-                          caseType={caseType === 'business' ? 'business' : 'private'}
-                          onChange={handleDraftArticlesChange}
-                        />
+                        initialCaseData?.id
+                          ? <CaseServiceSelector
+                              caseId={initialCaseData.id}
+                              caseType={caseType === 'business' ? 'business' : 'private'}
+                              customerId={(initialCaseData as any).customer_id || undefined}
+                              primaryServiceId={initialCaseData.service_id || undefined}
+                              onChange={handleDraftArticlesChange}
+                            />
+                          : <CaseServiceSelector
+                              draftMode
+                              caseType={caseType === 'business' ? 'business' : 'private'}
+                              onChange={handleDraftArticlesChange}
+                            />
                       )}
                   </div>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
