@@ -219,11 +219,26 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
   useEffect(() => {
     if (isOpen && initialCaseData) {
-      const type = initialCaseData.case_type === 'private' ? 'private' : 
+      const type = initialCaseData.case_type === 'private' ? 'private' :
                    initialCaseData.case_type === 'business' ? 'business' : 'contract';
       setCaseType(type);
       const formattedAddress = formatCaseAddress(initialCaseData.adress);
-      
+
+      // Förvälja tjänst om service_id finns (ServiceArticleSelector härleder gruppen automatiskt)
+      if (initialCaseData.service_id) {
+        setServiceId(initialCaseData.service_id);
+      }
+
+      // Förvälja tekniker från ärendet
+      const assignedTechIds = [
+        initialCaseData.primary_assignee_id,
+        initialCaseData.secondary_assignee_id,
+        initialCaseData.tertiary_assignee_id,
+      ].filter(Boolean) as string[];
+      if (assignedTechIds.length > 0) {
+        setSelectedTechnicianIds(assignedTechIds);
+      }
+
       // För contract cases, sätt bara grundläggande ärendedata
       // Låt nästa useEffect hantera kund-identifiering
       if (type === 'contract' && initialCaseData.customer_id) {
@@ -245,9 +260,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         };
         setFormData(mappedData);
       }
-      
+
       setStep('form');
-      const assignedCount = [initialCaseData.primary_assignee_id, initialCaseData.secondary_assignee_id, initialCaseData.tertiary_assignee_id].filter(Boolean).length;
+      const assignedCount = assignedTechIds.length;
       setNumberOfTechnicians(assignedCount > 0 ? assignedCount : 1);
     } else if (isOpen && initialCaseType) {
       // Dropdown-val: hoppa direkt till formuläret med vald typ
@@ -315,6 +330,35 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
         if (!error && data) {
           setOfferDetails(data);
+
+          // Bygg ärendebeskrivning från offertens avtalstext + produkter
+          const parts: string[] = [];
+
+          if (data.selected_products && data.selected_products.length > 0) {
+            const productLines: string[] = [];
+            data.selected_products.forEach((group: any) => {
+              (group.products || [group]).forEach((product: any) => {
+                if (!product.name) return;
+                const qty = product.quantity?.amount;
+                const price = product.price_2?.amount?.amount || product.price_1?.amount?.amount;
+                let line = product.name;
+                if (qty && qty > 1) line = `${qty}× ${line}`;
+                if (price) line += ` – ${parseFloat(price).toLocaleString('sv-SE')} kr`;
+                productLines.push(line);
+              });
+            });
+            if (productLines.length > 0) {
+              parts.push('Produkter / Tjänster:\n' + productLines.map(l => `- ${l}`).join('\n'));
+            }
+          }
+
+          if (data.agreement_text) {
+            parts.push(data.agreement_text);
+          }
+
+          if (parts.length > 0) {
+            setFormData(prev => ({ ...prev, description: parts.join('\n\n') }));
+          }
         }
       } catch (err) {
         console.error('Kunde inte hämta offertinnehåll:', err);
