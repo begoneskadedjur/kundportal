@@ -345,7 +345,7 @@ export default function TechnicianSchedule() {
     }
   };
   
-  const handleDateClick = (clickInfo: DateClickArg) => { setSelectedDate(clickInfo.dateStr); if (window.innerWidth < 1024) setMobileView('agenda'); };
+  const handleDateClick = (clickInfo: DateClickArg) => { setSelectedDate(clickInfo.dateStr); };
   const handleDayChange = (offset: number) => { const currentDate = new Date(selectedDate); currentDate.setUTCHours(12); currentDate.setDate(currentDate.getDate() + offset); setSelectedDate(toDateString(currentDate)); };
   
   // Förbättrad indikering för månadsvyn baserat på antal ärenden
@@ -425,7 +425,13 @@ export default function TechnicianSchedule() {
                   </header>
                   <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-12 h-12 text-slate-600 mb-2" /><h3 className="text-lg font-semibold text-slate-300">Inga ärenden</h3><p className="text-slate-500">Du har inga schemalagda ärenden för denna dag.</p></motion.div>)}</AnimatePresence></div>
                 </div>
-                <div className={(mobileView === 'month' && window.innerWidth < 1024) ? 'block' : 'hidden'}><Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card></div>
+                <div className={(mobileView === 'month' && window.innerWidth < 1024) ? 'block' : 'hidden'}>
+                  <Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card>
+                  <div className="mt-4">
+                    <h2 className="text-base font-semibold text-white mb-3">{selectedDateObject.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
+                    <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-8 h-8 text-slate-600 mb-2" /><p className="text-slate-500 text-sm">Inga ärenden denna dag.</p></motion.div>)}</AnimatePresence></div>
+                  </div>
+                </div>
               </motion.div></AnimatePresence>
           </main>
         </div>
