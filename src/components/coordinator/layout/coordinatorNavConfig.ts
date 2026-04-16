@@ -25,8 +25,7 @@ import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
 export const topLevelItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/koordinator/dashboard' },
-  { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
-  { label: 'Avtal & Offerter', icon: FilePen, path: '/koordinator/oneflow-contract-creator' },
+  { label: 'Skapa Avtal & Offerter', icon: FilePen, path: '/koordinator/oneflow-contract-creator' },
 ]
 
 export const navGroups: NavGroup[] = [
