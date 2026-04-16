@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints, Receipt } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -1251,7 +1251,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 className="flex items-center justify-center gap-1.5 h-9 px-3 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 hover:border-emerald-500/50 rounded-lg text-emerald-300 hover:text-emerald-200 text-sm font-medium transition-all duration-200 active:scale-95"
                 title="Skapa offertförslag för denna kund"
               >
-                <DollarSign className="w-4 h-4 shrink-0" />
+                <Receipt className="w-4 h-4 shrink-0" />
                 <span>Offert</span>
                 <ChevronRight className="w-3 h-3 shrink-0 opacity-50" />
               </button>

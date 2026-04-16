@@ -176,12 +176,7 @@ export default function WorkReportDropdown({
             })}
           </div>
           
-          {/* Footer info */}
-          <div className="border-t border-slate-700 px-4 py-2 bg-slate-900/50">
-            <p className="text-xs text-slate-400">
-              Genererar professionell saneringsrapport för försäkring/chef
-            </p>
-          </div>
+          {/* Footer info removed */}
         </div>
       )}
     </div>

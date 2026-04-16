@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import {
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save, Check,
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
-  FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign, Lightbulb,
+  FileSignature, ChevronDown, Download, Send, ChevronRight, Receipt, Lightbulb,
   Building, Building2, Image as ImageIcon, Trash2, Plus, AlertTriangle, MessageSquare,
   Footprints
 } from 'lucide-react'
@@ -1380,7 +1380,7 @@ export default function EditContractCaseModal({
                 disabled={isMultisiteCustomer && !selectedRecipient}
                 className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <DollarSign className="w-4 h-4" />
+                <Receipt className="w-4 h-4" />
                 Skapa offert via Oneflow
                 <ChevronRight className="w-3 h-3 ml-auto opacity-60" />
               </button>
