@@ -304,7 +304,7 @@ const generateSingleCaseHTML = (
         <div class="kpi-value accent">${caseData.status || 'Okänd'}</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Skadedjur</div>
+        <div class="kpi-label">Tjänst</div>
         <div class="kpi-value">${caseData.pest_type || 'Ej specificerat'}</div>
       </div>
     </div>
@@ -393,7 +393,7 @@ const generateSingleCaseHTML = (
             <div class="info-value">${addressStr || 'Ej angivet'}</div>
           </div>
           <div class="info-group">
-            <div class="info-label">Ärendet avser</div>
+            <div class="info-label">Tjänst</div>
             <div class="info-value">${caseData.pest_type || 'Ej specificerat'}</div>
           </div>
           <div class="info-group">

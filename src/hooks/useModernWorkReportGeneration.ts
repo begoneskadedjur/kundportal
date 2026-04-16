@@ -16,6 +16,7 @@ interface TechnicianCase {
   telefon_kontaktperson?: string;
   e_post_kontaktperson?: string;
   skadedjur?: string;
+  service_id?: string | null;
   org_nr?: string;
   personnummer?: string;
   adress?: any;
@@ -208,8 +209,14 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       // Tekniker
       primary_technician_name: caseData.primary_assignee_name || caseData.assignee_name,
       assignee_name: caseData.assignee_name,
-      // Skadedjur och pris
-      pest_type: caseData.skadedjur,
+      // Tjänst (service_id-undervalet, annars skadedjur/pest_type som fallback)
+      pest_type: await (async () => {
+        if (caseData.service_id) {
+          const { data } = await supabase.from('services').select('name').eq('id', caseData.service_id).single()
+          if (data?.name) return data.name
+        }
+        return caseData.skadedjur || ''
+      })(),
       price: caseData.case_price,
       // Trafikljussystem - VIKTIGT för den nya rapporten!
       pest_level: caseData.pest_level,

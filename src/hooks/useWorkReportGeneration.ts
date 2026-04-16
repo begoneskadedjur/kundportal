@@ -16,6 +16,7 @@ interface TechnicianCase {
   telefon_kontaktperson?: string;
   e_post_kontaktperson?: string;
   skadedjur?: string;
+  service_id?: string | null;
   org_nr?: string;
   personnummer?: string;
   adress?: any;
@@ -123,6 +124,17 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       .eq('item_type', 'service')
       .neq('status', 'cancelled')
 
+    // Hämta tjänstenamn från service_id (undervalet i tjänsteutbud)
+    let serviceName = caseData.skadedjur || ''
+    if (caseData.service_id) {
+      const { data: service } = await supabase
+        .from('services')
+        .select('name')
+        .eq('id', caseData.service_id)
+        .single()
+      if (service?.name) serviceName = service.name
+    }
+
     // Skapa TaskDetails från befintlig case-data
     const taskDetails: TaskDetails = {
       task_id: caseData.id,
@@ -143,13 +155,13 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           value: caseData.rapport || '',
           has_value: !!(caseData.rapport)
         },
-        // Skadedjur-fält
+        // Tjänst-fält (service_id-undervalet, annars pest_type/skadedjur som fallback)
         {
           id: 'skadedjur',
           name: 'skadedjur',
           type: 'text',
-          value: caseData.skadedjur || '',
-          has_value: !!(caseData.skadedjur)
+          value: serviceName,
+          has_value: !!(serviceName)
         },
         // Adress-fält - säkerställ att vi passar rätt adressdata
         {

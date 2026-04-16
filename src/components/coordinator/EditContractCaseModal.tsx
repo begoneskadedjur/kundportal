@@ -301,6 +301,7 @@ export default function EditContractCaseModal({
     telefon_kontaktperson: formData.contact_phone,
     e_post_kontaktperson: formData.contact_email,
     skadedjur: formData.pest_type,
+    service_id: formData.service_id,
     adress: formData.address,
     case_price: formData.price,
     primary_assignee_name: formData.primary_technician_name,

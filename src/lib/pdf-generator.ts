@@ -545,7 +545,7 @@ const generateWorkReportHTML = (
         <div class="kpi-value accent">${taskDetails.task_info.status || 'Okänd'}</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Skadedjur</div>
+        <div class="kpi-label">Tjänst</div>
         <div class="kpi-value">${pestText}</div>
       </div>
     </div>
@@ -628,7 +628,7 @@ const generateWorkReportHTML = (
             <div class="info-value">${addressText}</div>
           </div>
           <div class="info-group">
-            <div class="info-label">Ärendet avser</div>
+            <div class="info-label">Tjänst</div>
             <div class="info-value">${pestText}</div>
           </div>
           <div class="info-group">
