@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 type Profile = {
   id: string; email: string; is_admin: boolean; is_active: boolean;
   customer_id: string | null; user_id: string; technician_id?: string | null;
-  role?: 'admin' | 'customer' | 'technician' | 'koordinator'; display_name?: string | null;
+  role?: 'admin' | 'customer' | 'technician' | 'koordinator' | 'säljare'; display_name?: string | null;
   technicians?: { name: string; role: string; email: string; } | null;
 };
 
@@ -24,6 +24,7 @@ type AuthContextType = {
   isCustomer: boolean;
   isTechnician: boolean;
   isKoordinator: boolean;
+  isSäljare: boolean;
   hasDualRole: boolean;
   activeView: ActiveView;
   setActiveView: (view: ActiveView) => void;
@@ -198,6 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isTechnician = profile?.role === 'technician';
   const isCustomer = profile?.role === 'customer';
   const isKoordinator = profile?.role === 'koordinator';
+  const isSäljare = profile?.role === 'säljare';
   const hasDualRole = profile?.role === 'technician' && profile?.is_admin === true;
 
   const setActiveView = (view: ActiveView) => {
@@ -215,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isCustomer,
     isTechnician,
     isKoordinator,
+    isSäljare,
     hasDualRole,
     activeView,
     setActiveView,

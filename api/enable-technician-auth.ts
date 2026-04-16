@@ -46,7 +46,8 @@ export default async function handler(req: any, res: any) {
     const roleMapping: { [key: string]: string } = {
       'Admin': 'admin',
       'Koordinator': 'koordinator',
-      'Skadedjurstekniker': 'technician'
+      'Skadedjurstekniker': 'technician',
+      'Säljare': 'säljare'
     }
     const correctRole = roleMapping[technician.role] || 'technician'
 

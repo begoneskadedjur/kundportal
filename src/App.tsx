@@ -20,6 +20,8 @@ import DashboardDemo from './pages/admin/DashboardDemo';
 import { AdminLayout } from './components/admin/layout';
 import { CoordinatorLayout } from './components/coordinator/layout';
 import TechnicianLayout from './components/technician/layout';
+import SäljareLayout from './components/säljare/layout/SäljareLayout';
+import SäljareDashboard from './pages/säljare/SäljareDashboard';
 import Customers from './pages/admin/Customers';
 import CustomerDetails from './pages/admin/CustomerDetails';
 import Economics from './pages/admin/Economics';
@@ -256,6 +258,31 @@ function App() {
 
             {/* Redirect gammal engelsk URL */}
             <Route path="/coordinator/leads" element={<Navigate to="/koordinator/leads" replace />} />
+
+            {/* --- SÄLJARE ROUTES — nested under SäljareLayout med persistent sidebar --- */}
+            <Route path="/säljare" element={<SäljareLayout />}>
+              <Route index element={<Navigate to="/säljare/dashboard" replace />} />
+              <Route path="dashboard" element={<ProtectedRoute requiredRole="säljare"><SäljareDashboard /></ProtectedRoute>} />
+
+              {/* Kunder & Avtal */}
+              <Route path="befintliga-kunder" element={<ProtectedRoute requiredRole="säljare"><Customers /></ProtectedRoute>} />
+              <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="säljare"><CustomerDetails /></ProtectedRoute>} />
+              <Route path="trafikljusoversikt" element={<ProtectedRoute requiredRole="säljare"><TrafficLightOverview /></ProtectedRoute>} />
+              <Route path="kundprognos" element={<ProtectedRoute requiredRole="säljare"><CustomerAnalytics /></ProtectedRoute>} />
+              <Route path="anvandarkonton-kund" element={<ProtectedRoute requiredRole="säljare"><CoordinatorOrganizationsPage /></ProtectedRoute>} />
+
+              {/* Försäljning */}
+              <Route path="forsaljningspipeline" element={<ProtectedRoute requiredRole="säljare"><ContractsOverview /></ProtectedRoute>} />
+              <Route path="forsaljningsmojligheter" element={<ProtectedRoute requiredRole="säljare"><SalesOpportunities /></ProtectedRoute>} />
+              <Route path="leads" element={<ProtectedRoute requiredRole="säljare"><Leads /></ProtectedRoute>} />
+              <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="säljare"><LeadAnalytics /></ProtectedRoute>} />
+              <Route path="offerthantering" element={<ProtectedRoute requiredRole="säljare"><CasePipeline /></ProtectedRoute>} />
+              <Route path="kundresa" element={<ProtectedRoute requiredRole="säljare"><CustomerJourney /></ProtectedRoute>} />
+              <Route path="avslutade-arenden" element={<ProtectedRoute requiredRole="säljare"><ClosedCasesFunnel /></ProtectedRoute>} />
+
+              {/* Verktyg */}
+              <Route path="ai-assistent" element={<ProtectedRoute requiredRole="säljare"><TeamChat /></ProtectedRoute>} />
+            </Route>
 
             {/* --- TEKNIKER ROUTES — nested under TechnicianLayout med persistent sidebar --- */}
             <Route path="/technician" element={<TechnicianLayout />}>

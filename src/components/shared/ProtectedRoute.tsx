@@ -6,7 +6,7 @@ import LoadingSpinner from './LoadingSpinner';
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'customer' | 'technician' | 'koordinator'; // ✅ NYTT: Lägg till koordinator
+  requiredRole?: 'admin' | 'customer' | 'technician' | 'koordinator' | 'säljare';
 };
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
@@ -82,6 +82,13 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         }
         break;
 
+      case 'säljare':
+        // Säljare har endast tillgång till säljare-sidor
+        if (requiredRole === 'säljare') {
+          hasAccess = true;
+        }
+        break;
+
       default:
         // Om rollen är okänd, nekas alltid tillträde
         hasAccess = false;
@@ -113,6 +120,9 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         } else {
           redirectPath = '/customer';
         }
+        break;
+      case 'säljare':
+        redirectPath = '/säljare/dashboard';
         break;
     }
     

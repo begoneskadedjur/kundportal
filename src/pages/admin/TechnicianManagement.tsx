@@ -18,7 +18,8 @@ import { technicianManagementService, type Technician, type TechnicianStats } fr
 const STAFF_ROLES = [
   'Skadedjurstekniker',
   'Koordinator',
-  'Admin'
+  'Admin',
+  'Säljare'
 ] as const
 
 export default function TechnicianManagement() {

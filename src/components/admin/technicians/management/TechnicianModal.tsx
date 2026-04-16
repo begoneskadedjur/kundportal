@@ -25,6 +25,7 @@ const STAFF_ROLES = [
   'Skadedjurstekniker',
   'Koordinator',
   'Admin',
+  'Säljare',
 ] as const
 
 export default function TechnicianModal({ isOpen, onClose, onSuccess, technician, allTechnicians = [] }: TechnicianModalProps) {
@@ -175,8 +176,8 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
               />
             </div>
           </div>
-          {/* Admin-behörighet checkbox - visas om personen har inloggning och primär roll inte redan är Admin */}
-          {technician?.has_login && formData.role !== 'Admin' && (
+          {/* Admin-behörighet checkbox - visas om personen har inloggning, primär roll inte redan är Admin, och inte Säljare */}
+          {technician?.has_login && formData.role !== 'Admin' && formData.role !== 'Säljare' && (
             <label className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer hover:border-slate-600 transition-colors">
               <input
                 type="checkbox"
@@ -221,8 +222,8 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
             <textarea name="address" value={formData.address || ''} onChange={handleChange} rows={2} className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white" placeholder="Fullständig adress"/>
           </div>
 
-          {/* Kompetenser */}
-          <div className="pt-4 border-t border-slate-700 space-y-3">
+          {/* Kompetenser - döljs för Säljare */}
+          {formData.role !== 'Säljare' && <div className="pt-4 border-t border-slate-700 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-md font-medium text-slate-300 flex items-center gap-2"><Wrench className="w-4 h-4 text-green-400"/>Kompetenser</h3>
               {allTechnicians.length > 0 && (
@@ -275,7 +276,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
                 )
               })()
             )}
-          </div>
+          </div>}
 
           {/* System & Integrationer */}
           <div className="pt-4 border-t border-slate-700 space-y-4">
@@ -283,7 +284,10 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
             {technician?.has_login && (
               <Input label="Visningsnamn" name="display_name" value={formData.display_name || ''} onChange={handleChange} icon={<User className="w-4 h-4 text-slate-400"/>} placeholder="Namn som visas i systemet" className="bg-slate-800/50 border-slate-600"/>
             )}
-            <Input label="Abax Vehicle ID" name="abax_vehicle_id" value={formData.abax_vehicle_id || ''} onChange={handleChange} icon={<Car className="w-4 h-4 text-slate-400"/>} placeholder="ID från Abax för ruttplanering" className="bg-slate-800/50 border-slate-600"/>
+            {/* Abax döljs för Säljare */}
+            {formData.role !== 'Säljare' && (
+              <Input label="Abax Vehicle ID" name="abax_vehicle_id" value={formData.abax_vehicle_id || ''} onChange={handleChange} icon={<Car className="w-4 h-4 text-slate-400"/>} placeholder="ID från Abax för ruttplanering" className="bg-slate-800/50 border-slate-600"/>
+            )}
             {technician?.has_login && (<Input label="Ändra lösenord" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Lämna tomt för att inte ändra" icon={<Key className="w-4 h-4 text-slate-400"/>} className="bg-slate-800/50 border-slate-600"/>)}
           </div>
 
