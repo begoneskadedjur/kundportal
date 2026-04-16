@@ -19,11 +19,14 @@ import {
   Image as ImageIcon,
   FileSearch,
   ClipboardList,
+  FilePen,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
 export const topLevelItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/koordinator/dashboard' },
+  { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
+  { label: 'Avtal & Offerter', icon: FilePen, path: '/koordinator/oneflow-contract-creator' },
 ]
 
 export const navGroups: NavGroup[] = [
@@ -32,7 +35,6 @@ export const navGroups: NavGroup[] = [
     icon: CalendarDays,
     pinned: true,
     items: [
-      { label: 'Schema & Planering', icon: CalendarDays, path: '/koordinator/schema' },
       { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
       { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets' },
     ],
@@ -80,7 +82,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Offerthantering', icon: ClipboardList, path: '/koordinator/offerthantering' },
       { label: 'Sök Ärenden', icon: FileSearch, path: '/koordinator/sok-arenden' },
-      { label: 'Avtal & Offerter', icon: FileSignature, path: '/koordinator/oneflow-contract-creator' },
     ],
   },
 ]
