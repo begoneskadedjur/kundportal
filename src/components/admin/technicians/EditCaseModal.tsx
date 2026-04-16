@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -1201,23 +1201,37 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="xl" footer={footer} preventClose={true} allowBackdropClose={!loading && !timeTrackingLoading} usePortal={true} className="scroll-smooth"
-      headerActions={showCommunication ? (
-        <button
-          type="button"
-          onClick={() => setShowCommunicationPanel(true)}
-          className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all duration-200"
-          title="Öppna kommunikation"
-        >
-          <MessageSquare className="w-5 h-5" />
-        </button>
-      ) : undefined}
+      headerActions={
+        <div className="flex items-center gap-1">
+          {canCreateFollowUp && (
+            <button
+              type="button"
+              onClick={() => setShowActionDialog(true)}
+              className="p-2 text-slate-400 hover:text-teal-400 hover:bg-teal-500/20 rounded-lg transition-all duration-200"
+              title="Boka återbesök eller skapa nytt ärende"
+            >
+              <Footprints className="w-5 h-5" />
+            </button>
+          )}
+          {showCommunication && (
+            <button
+              type="button"
+              onClick={() => setShowCommunicationPanel(true)}
+              className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all duration-200"
+              title="Öppna kommunikation"
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+      }
     >
       <div className="flex flex-col h-full">
 
         {/* Action header — flex-shrink-0 så dropdown aldrig klipps av scroll */}
         {currentCase && (
           <div className="flex-shrink-0 px-4 sm:px-5 py-3 bg-slate-800/30 border-b border-slate-700">
-            <div className="grid grid-cols-3 sm:flex sm:items-center sm:justify-end gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2 sm:gap-3">
               {/* Avtal */}
               <button
                 type="button"
@@ -1241,21 +1255,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 <span>Offert</span>
                 <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
               </button>
-
-              {/* Återbesök */}
-              {canCreateFollowUp ? (
-                <button
-                  type="button"
-                  onClick={() => setShowActionDialog(true)}
-                  className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 rounded-lg text-teal-300 hover:text-teal-200 text-xs sm:text-sm font-medium transition-all duration-200 active:scale-95"
-                  title="Boka återbesök eller skapa nytt ärende"
-                >
-                  <CalendarIcon className="w-4 h-4 shrink-0" />
-                  <span>Återbesök</span>
-                </button>
-              ) : (
-                <div className="sm:hidden" />
-              )}
 
               {/* Rapport */}
               {reportGeneration.canGenerateReport ? (
@@ -1302,120 +1301,64 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         {/* Scrollbart innehåll */}
         <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
 
-        {/* Val-dialog: Återbesök eller Nytt ärende */}
+        {/* Val-dialog: Återbesök eller Nytt ärende — fixed overlay */}
         {showActionDialog && (
-          <div className="mb-6 p-4 bg-teal-500/10 border border-teal-500/30 rounded-lg">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h4 className="text-lg font-medium text-teal-300 flex items-center gap-2">
-                  <CalendarIcon className="w-5 h-5" />
-                  Återbesök / Nytt ärende
-                </h4>
-                <p className="text-sm text-slate-400 mt-1">
-                  Vad vill du göra?
-                </p>
-              </div>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+            <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md border border-slate-700 shadow-2xl">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-teal-400" />
+                Vad vill du göra?
+              </h3>
               <button
                 type="button"
-                onClick={() => setShowActionDialog(false)}
-                className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
+                onClick={() => { setShowRevisitModal(true); setShowActionDialog(false) }}
+                className="w-full p-4 mb-3 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 rounded-lg text-left transition-colors"
               >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {/* Alternativ 1: Boka återbesök */}
-              <button
-                type="button"
-                onClick={() => {
-                  setShowActionDialog(false)
-                  setShowRevisitModal(true)
-                }}
-                className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-teal-500/50 rounded-lg text-left transition-all group"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-teal-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-teal-500/30 transition-colors">
-                    <CalendarIcon className="w-5 h-5 text-teal-400" />
-                  </div>
+                <div className="flex items-center gap-3">
+                  <RotateCcw className="w-5 h-5 text-teal-400 shrink-0" />
                   <div>
-                    <h5 className="text-white font-medium group-hover:text-teal-300 transition-colors">
-                      Boka återbesök
-                    </h5>
-                    <p className="text-sm text-slate-400 mt-0.5">
-                      Flytta ärendet till ett framtida datum för uppföljning av skadedjursstatus
-                    </p>
+                    <p className="text-white font-medium">Boka återbesök</p>
+                    <p className="text-sm text-slate-400">Flytta ärendet till ett framtida datum för uppföljning av skadedjursstatus</p>
                   </div>
                 </div>
               </button>
-
-              {/* Alternativ 2: Skapa nytt ärende */}
               <button
                 type="button"
-                onClick={() => {
-                  setShowActionDialog(false)
-                  setShowFollowUpDialog(true)
-                }}
-                className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/50 rounded-lg text-left transition-all group"
+                onClick={() => { setShowFollowUpDialog(true); setShowActionDialog(false) }}
+                className="w-full p-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-left transition-colors"
               >
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-amber-500/30 transition-colors">
-                    <Plus className="w-5 h-5 text-amber-400" />
-                  </div>
+                <div className="flex items-center gap-3">
+                  <Plus className="w-5 h-5 text-amber-400 shrink-0" />
                   <div>
-                    <h5 className="text-white font-medium group-hover:text-amber-300 transition-colors">
-                      Skapa nytt ärende
-                    </h5>
-                    <p className="text-sm text-slate-400 mt-0.5">
-                      Nytt problem hos samma kund (annat skadedjur)
-                    </p>
+                    <p className="text-white font-medium">Skapa nytt ärende</p>
+                    <p className="text-sm text-slate-400">Nytt problem hos samma kund (annat skadedjur)</p>
                   </div>
                 </div>
               </button>
-
-              {/* Avbryt */}
-              <Button
+              <button
                 type="button"
-                variant="secondary"
                 onClick={() => setShowActionDialog(false)}
-                className="w-full mt-2"
+                className="w-full mt-4 py-2 text-slate-400 hover:text-white transition-colors text-sm"
               >
                 Avbryt
-              </Button>
+              </button>
             </div>
           </div>
         )}
 
-        {/* Följeärende-dialog (Nytt ärende) */}
+        {/* Följeärende-dialog — fixed overlay */}
         {showFollowUpDialog && (
-          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h4 className="text-lg font-medium text-amber-300 flex items-center gap-2">
-                  <Plus className="w-5 h-5" />
-                  Skapa nytt ärende
-                </h4>
-                <p className="text-sm text-slate-400 mt-1">
-                  Välj skadedjurstyp för det nya ärendet. Kundinformation, adress och schemaläggning kopieras automatiskt.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFollowUpDialog(false);
-                  setFollowUpPestType('');
-                }}
-                className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">
-                  Skadedjurstyp för det nya ärendet *
-                </label>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+            <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md border border-slate-700 shadow-2xl">
+              <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-amber-400" />
+                Skapa nytt ärende
+              </h3>
+              <p className="text-sm text-slate-400 mb-4">
+                Välj skadedjurstyp. Kundinformation, adress och schemaläggning kopieras automatiskt.
+              </p>
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-slate-400 mb-1">Skadedjurstyp *</label>
                 <Select
                   value={followUpPestType}
                   onChange={setFollowUpPestType}
@@ -1423,15 +1366,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   options={PEST_TYPE_OPTIONS.map(pest => ({ value: pest.name, label: pest.name }))}
                 />
               </div>
-
               <div className="flex gap-3">
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => {
-                    setShowFollowUpDialog(false);
-                    setFollowUpPestType('');
-                  }}
+                  onClick={() => { setShowFollowUpDialog(false); setFollowUpPestType('') }}
                   disabled={followUpLoading}
                   className="flex-1"
                 >
@@ -1439,7 +1378,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 </Button>
                 <Button
                   type="button"
-                  variant="warning"
+                  variant="primary"
                   onClick={handleCreateFollowUpCase}
                   loading={followUpLoading}
                   disabled={!followUpPestType || followUpLoading}
