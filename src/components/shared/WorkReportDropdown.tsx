@@ -1,6 +1,7 @@
 // src/components/shared/WorkReportDropdown.tsx - Professional report dropdown för EditCaseModal
 import { useState, useRef, useEffect } from 'react'
-import { FileCheck, Download, Send, Mail, ChevronDown, Loader2, AlertCircle, Clock } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { FileCheck, Download, Send, Mail, ChevronDown, Loader2, Clock } from 'lucide-react'
 import type { SanitationReport } from '../../services/sanitationReportService'
 
 interface WorkReportDropdownProps {
@@ -33,19 +34,42 @@ export default function WorkReportDropdown({
 }: WorkReportDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState<ActionType | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({})
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   // Stäng dropdown när man klickar utanför
   useEffect(() => {
+    if (!isOpen) return
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        buttonRef.current && !buttonRef.current.contains(event.target as Node) &&
+        menuRef.current && !menuRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false)
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [isOpen])
+
+  const openMenu = () => {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const menuHeight = 240
+    const spaceBelow = window.innerHeight - rect.bottom
+    const openUp = spaceBelow < menuHeight + 8 && rect.top > menuHeight + 8
+    setMenuStyle({
+      position: 'fixed',
+      right: window.innerWidth - rect.right,
+      width: Math.max(rect.width, 288),
+      ...(openUp
+        ? { bottom: window.innerHeight - rect.top, top: 'auto' }
+        : { top: rect.bottom + 4, bottom: 'auto' }),
+      zIndex: 9999,
+    })
+    setIsOpen(true)
+  }
 
   const handleAction = async (action: ActionType, handler: () => Promise<void>) => {
     try {
@@ -89,11 +113,66 @@ export default function WorkReportDropdown({
     }
   ]
 
+  const menu = isOpen && !disabled ? createPortal(
+    <div
+      ref={menuRef}
+      style={{ ...menuStyle, pointerEvents: 'auto' }}
+      className="bg-slate-800 border border-slate-600 rounded-lg shadow-2xl overflow-hidden"
+      onMouseDown={e => e.preventDefault()}
+    >
+      {/* Varning om befintlig rapport */}
+      {hasRecentReport && currentReport && getTimeSinceReport && (
+        <div className="p-3 bg-amber-500/10 border-b border-amber-500/20">
+          <div className="flex items-start gap-2">
+            <Clock className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="text-xs font-medium text-amber-400">
+                Rapport genererad {getTimeSinceReport(currentReport)}
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                Version {currentReport.version} av {totalReports}
+                {currentReport.sent_to_customer && (
+                  <span className="ml-1 text-green-400">• Skickad till kund</span>
+                )}
+                {currentReport.sent_to_technician && (
+                  <span className="ml-1 text-orange-400">• Skickad till tekniker</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="py-1">
+        {dropdownItems.map((item) => {
+          const Icon = item.icon
+          return (
+            <button
+              key={item.key}
+              onClick={item.action}
+              className={`
+                w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-200
+                ${item.color} ${item.bgColor}
+                border-l-4 border-transparent hover:border-current
+              `}
+            >
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">{item.label}</div>
+                <div className="text-xs text-slate-400 mt-0.5 truncate">{item.description}</div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>,
+    document.getElementById('modal-root') ?? document.body
+  ) : null
+
   return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Main Report Button */}
+    <div className="relative">
       <button
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        ref={buttonRef}
+        onClick={() => !disabled && (isOpen ? setIsOpen(false) : openMenu())}
         disabled={disabled || loading !== null}
         className={`
           flex items-center gap-1.5 h-9 px-3 rounded-lg border text-sm font-medium transition-all duration-200 active:scale-95
@@ -102,10 +181,6 @@ export default function WorkReportDropdown({
             : 'bg-slate-700/60 border-slate-600 text-slate-200 hover:bg-slate-700 hover:border-slate-500'
           }
         `}
-        title={hasRecentReport 
-          ? `Rapport genererad nyligen - Version ${currentReport?.version || 1} av ${totalReports}`
-          : 'Generera och skicka saneringsrapport'
-        }
       >
         {loading !== null ? (
           <Loader2 className="h-4 w-4 animate-spin shrink-0" />
@@ -122,63 +197,7 @@ export default function WorkReportDropdown({
           <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
         )}
       </button>
-
-      {/* Dropdown Menu */}
-      {isOpen && !disabled && (
-        <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 overflow-hidden">
-          {/* Varning om befintlig rapport */}
-          {hasRecentReport && currentReport && getTimeSinceReport && (
-            <div className="p-3 bg-amber-500/10 border-b border-amber-500/20">
-              <div className="flex items-start gap-2">
-                <Clock className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-amber-400">
-                    Rapport genererad {getTimeSinceReport(currentReport)}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Version {currentReport.version} av {totalReports}
-                    {currentReport.sent_to_customer && (
-                      <span className="ml-1 text-green-400">• Skickad till kund</span>
-                    )}
-                    {currentReport.sent_to_technician && (
-                      <span className="ml-1 text-orange-400">• Skickad till tekniker</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div className="py-2">
-            {dropdownItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <button
-                  key={item.key}
-                  onClick={item.action}
-                  className={`
-                    w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-200
-                    ${item.color} ${item.bgColor}
-                    border-l-4 border-transparent hover:border-current
-                  `}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">
-                      {item.label}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-0.5 truncate">
-                      {item.description}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-          
-          {/* Footer info removed */}
-        </div>
-      )}
+      {menu}
     </div>
   )
 }
