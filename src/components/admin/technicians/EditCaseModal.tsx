@@ -1212,105 +1212,95 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         </button>
       ) : undefined}
     >
-      <div className="p-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-        {/* Enhanced header with report, contract, and offer functionality */}
+      <div className="flex flex-col h-full">
+
+        {/* Action header — flex-shrink-0 så dropdown aldrig klipps av scroll */}
         {currentCase && (
-          <div className="mb-4 -mt-4 -mx-4 px-4 py-3 bg-slate-800/30 border-b border-slate-700">
-            {/* Snabbåtgärder - Mobil-responsiv layout */}
-            <div className="flex flex-col gap-3">
-              {/* Rad 1: Produktiva åtgärder - grid på mobil, flex på desktop */}
-              <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-3">
-                {/* Avtal Button */}
+          <div className="flex-shrink-0 px-4 sm:px-5 py-3 bg-slate-800/30 border-b border-slate-700">
+            <div className="grid grid-cols-3 sm:flex sm:items-center sm:justify-end gap-2 sm:gap-3">
+              {/* Avtal */}
+              <button
+                type="button"
+                onClick={handleCreateContract}
+                className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 rounded-lg text-purple-300 hover:text-purple-200 text-xs sm:text-sm font-medium transition-all duration-200 active:scale-95"
+                title="Skapa serviceavtal för denna kund"
+              >
+                <FileSignature className="w-4 h-4 shrink-0" />
+                <span>Avtal</span>
+                <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
+              </button>
+
+              {/* Offert */}
+              <button
+                type="button"
+                onClick={handleCreateOffer}
+                className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 rounded-lg text-green-300 hover:text-green-200 text-xs sm:text-sm font-medium transition-all duration-200 active:scale-95"
+                title="Skapa offertförslag för denna kund"
+              >
+                <DollarSign className="w-4 h-4 shrink-0" />
+                <span>Offert</span>
+                <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
+              </button>
+
+              {/* Återbesök */}
+              {canCreateFollowUp ? (
                 <button
                   type="button"
-                  onClick={handleCreateContract}
-                  className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 rounded-lg text-purple-300 hover:text-purple-200 text-sm font-medium transition-all duration-200 active:scale-95"
-                  title="Skapa serviceavtal för denna kund"
+                  onClick={() => setShowActionDialog(true)}
+                  className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 rounded-lg text-teal-300 hover:text-teal-200 text-xs sm:text-sm font-medium transition-all duration-200 active:scale-95"
+                  title="Boka återbesök eller skapa nytt ärende"
                 >
-                  <FileSignature className="w-4 h-4" />
-                  <span className="sm:inline text-xs sm:text-sm">Avtal</span>
-                  <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
+                  <CalendarIcon className="w-4 h-4 shrink-0" />
+                  <span>Återbesök</span>
                 </button>
+              ) : (
+                <div className="sm:hidden" />
+              )}
 
-                {/* Offert Button */}
-                <button
-                  type="button"
-                  onClick={handleCreateOffer}
-                  className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 rounded-lg text-green-300 hover:text-green-200 text-sm font-medium transition-all duration-200 active:scale-95"
-                  title="Skapa offertförslag för denna kund"
-                >
-                  <DollarSign className="w-4 h-4" />
-                  <span className="sm:inline text-xs sm:text-sm">Offert</span>
-                  <ChevronRight className="w-3 h-3 opacity-60 hidden sm:block" />
-                </button>
-
-                {/* Återbesök / Nytt ärende Button - endast för private/business och inte redan ett följeärende */}
-                {canCreateFollowUp ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowActionDialog(true)}
-                    className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 min-h-[44px] px-3 py-2.5 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 rounded-lg text-teal-300 hover:text-teal-200 text-sm font-medium transition-all duration-200 active:scale-95"
-                    title="Boka återbesök eller skapa nytt ärende"
-                  >
-                    <CalendarIcon className="w-4 h-4" />
-                    <span className="sm:inline text-xs sm:text-sm">Återbesök</span>
-                  </button>
-                ) : (
-                  // Placeholder för att behålla grid-layouten
-                  <div className="sm:hidden" />
-                )}
-              </div>
-
-              {/* Rad 2: Rapport dropdown - full bredd på mobil */}
-              <div className="flex items-center justify-between sm:justify-start gap-3">
-                {reportGeneration.canGenerateReport ? (
-                  <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                    <span className="text-xs text-slate-400">Rapport:</span>
-                    <WorkReportDropdown
-                      onDownload={reportGeneration.downloadReport}
-                      onSendToTechnician={reportGeneration.sendToTechnician}
-                      onSendToContact={reportGeneration.sendToContact}
-                      disabled={!reportGeneration.canGenerateReport || reportGeneration.isGenerating}
-                      technicianName={reportGeneration.technicianName}
-                      contactName={reportGeneration.contactName}
-                      totalReports={reportGeneration.totalReports}
-                      hasRecentReport={reportGeneration.hasRecentReport}
-                      currentReport={reportGeneration.currentReport}
-                      getTimeSinceReport={reportGeneration.getTimeSinceReport}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <FileCheck className="w-4 h-4" />
-                    <span className="text-xs">Rapport ej tillgänglig</span>
-                  </div>
-                )}
-              </div>
+              {/* Rapport */}
+              {reportGeneration.canGenerateReport ? (
+                <WorkReportDropdown
+                  onDownload={reportGeneration.downloadReport}
+                  onSendToTechnician={reportGeneration.sendToTechnician}
+                  onSendToContact={reportGeneration.sendToContact}
+                  disabled={!reportGeneration.canGenerateReport || reportGeneration.isGenerating}
+                  technicianName={reportGeneration.technicianName}
+                  contactName={reportGeneration.contactName}
+                  totalReports={reportGeneration.totalReports}
+                  hasRecentReport={reportGeneration.hasRecentReport}
+                  currentReport={reportGeneration.currentReport}
+                  getTimeSinceReport={reportGeneration.getTimeSinceReport}
+                />
+              ) : (
+                <div className="flex items-center gap-1.5 text-slate-500 px-3 py-2.5 border border-slate-700/50 rounded-lg text-xs">
+                  <FileCheck className="w-4 h-4 shrink-0" />
+                  <span>Rapport ej tillgänglig</span>
+                </div>
+              )}
             </div>
 
-            {/* Warnings and status messages */}
+            {/* Varningar */}
             {(reportGeneration.canGenerateReport && (!reportGeneration.hasTechnicianEmail || !reportGeneration.hasContactEmail)) && (
-              <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2">
+              <div className="mt-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2">
                 {!reportGeneration.hasTechnicianEmail && '⚠️ Ingen tekniker-email tillgänglig. '}
                 {!reportGeneration.hasContactEmail && '⚠️ Ingen kontaktperson-email tillgänglig.'}
               </div>
             )}
-            
-            {/* Missing customer info warning */}
             {(!currentCase.kontaktperson || !currentCase.e_post_kontaktperson) && (
-              <div className="text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded px-3 py-2">
+              <div className="mt-2 text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded px-3 py-2">
                 ⚠️ Komplettera kontaktuppgifter för bästa avtal/offert-skapning
               </div>
             )}
-
-            {/* Info om detta är ett följeärende */}
             {currentCase.parent_case_id && (
-              <div className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded px-3 py-2 mt-2">
+              <div className="mt-2 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded px-3 py-2">
                 ℹ️ Detta är ett följeärende
               </div>
             )}
           </div>
         )}
+
+        {/* Scrollbart innehåll */}
+        <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
 
         {/* Val-dialog: Återbesök eller Nytt ärende */}
         {showActionDialog && (
@@ -1841,6 +1831,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
           </div>
         </form>
+      </div>
       </div>
 
       {/* Kommunikations-panel (slide-in från höger) */}
