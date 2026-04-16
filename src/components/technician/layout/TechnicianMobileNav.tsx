@@ -1,7 +1,8 @@
 // src/components/technician/layout/TechnicianMobileNav.tsx
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Bell, Menu, X, LogOut, Shield } from 'lucide-react'
+import { Bell, Menu, X, LogOut, Shield, Bug } from 'lucide-react'
+import { BugReportModal } from '../../shared/BugReportModal'
 import { topLevelItems, navGroups, mobileBottomItems } from './technicianNavConfig'
 import { MobileNavGroup } from '../../admin/layout/MobileNavGroup'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -14,6 +15,7 @@ interface TechnicianMobileNavProps {
 
 export function TechnicianMobileNav({ currentPath, onSignOut }: TechnicianMobileNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showBugModal, setShowBugModal] = useState(false)
   const { profile, hasDualRole, setActiveView } = useAuth()
   const navigate = useNavigate()
   const [ticketCount, setTicketCount] = useState(0)
@@ -108,6 +110,13 @@ export function TechnicianMobileNav({ currentPath, onSignOut }: TechnicianMobile
             </button>
           )}
           <button
+            onClick={() => { setShowBugModal(true); setMobileMenuOpen(false) }}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
+          >
+            <Bug className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm font-medium">Rapportera bugg</span>
+          </button>
+          <button
             onClick={onSignOut}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
           >
@@ -116,6 +125,8 @@ export function TechnicianMobileNav({ currentPath, onSignOut }: TechnicianMobile
           </button>
         </nav>
       </div>
+
+      <BugReportModal isOpen={showBugModal} onClose={() => setShowBugModal(false)} />
 
       {/* Mobile Bottom Nav */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 z-40 px-2 pb-safe flex items-center justify-around">
