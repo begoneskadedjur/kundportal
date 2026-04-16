@@ -26,7 +26,6 @@ import OfferPipelineSnapshot from '../../components/coordinator/dashboard/OfferP
 
 // Hooks (all real data)
 import { usePendingCases } from '../../hooks/usePendingCases'
-import { useTechnicianUtilization } from '../../hooks/useCoordinatorAnalytics'
 import { useOfferStats } from '../../hooks/useOfferStats'
 
 // Services
@@ -121,7 +120,7 @@ export default function CoordinatorDashboard() {
 
   // --- New hooks (all real data) ---
   const { urgentCount, oldRequestsCount } = usePendingCases()
-  const { data: utilizationData, loading: utilizationLoading } = useTechnicianUtilization()
+  // utilizationData hanteras nu internt i TechnicianUtilizationCard
   const { stats: offerStats, loading: offerLoading } = useOfferStats()
 
   // Expiring contracts state
@@ -520,7 +519,7 @@ export default function CoordinatorDashboard() {
         </motion.div>
 
         {/* E2: Technician Utilization */}
-        <TechnicianUtilizationCard data={utilizationData} loading={utilizationLoading} />
+        <TechnicianUtilizationCard />
       </div>
 
       {/* === F. Main Content (Map + Offer Pipeline) === */}
