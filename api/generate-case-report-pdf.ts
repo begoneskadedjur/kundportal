@@ -214,7 +214,7 @@ const generateSingleCaseHTML = (
       font-size: 10px; font-weight: 600; color: ${beGoneColors.mediumGray};
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
     }
-    .info-value { font-size: 14px; color: ${beGoneColors.darkGray}; font-weight: 500; }
+    .info-value { font-size: 14px; color: ${beGoneColors.darkGray}; font-weight: 500; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
 
     .map-container { margin-top: 16px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border}; }
     .map-image { width: 100%; display: block; }
@@ -225,9 +225,9 @@ const generateSingleCaseHTML = (
     }
     .report-content {
       background: white; border: 1px solid ${beGoneColors.border};
-      border-radius: 8px; padding: 20px; min-height: 80px;
+      border-radius: 8px; padding: 20px; min-height: 80px; overflow: hidden; max-width: 100%;
     }
-    .report-text { font-size: 14px; line-height: 1.7; color: ${beGoneColors.darkGray}; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; }
+    .report-text { font-size: 14px; line-height: 1.7; color: ${beGoneColors.darkGray}; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; max-width: 100%; }
 
     .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .data-table th {
