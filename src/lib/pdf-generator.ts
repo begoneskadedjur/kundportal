@@ -638,7 +638,7 @@ const generateWorkReportHTML = (
           ${taskDetails.task_info.description ? `
           <div class="info-group" style="grid-column: 1 / -1">
             <div class="info-label">Ärendebeskrivning</div>
-            <div class="info-value">${taskDetails.task_info.description}</div>
+            <div class="info-value" style="white-space: pre-wrap;">${taskDetails.task_info.description}</div>
           </div>
           ` : ''}
         </div>
