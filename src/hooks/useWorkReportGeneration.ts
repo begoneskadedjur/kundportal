@@ -120,6 +120,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       .select('article_name, quantity, article_code')
       .eq('case_id', caseData.id)
       .eq('case_type', caseTypeForPrep)
+      .eq('item_type', 'service')
       .neq('status', 'cancelled')
 
     // Skapa TaskDetails från befintlig case-data
