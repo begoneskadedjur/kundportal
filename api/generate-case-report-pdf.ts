@@ -214,7 +214,7 @@ const generateSingleCaseHTML = (
       font-size: 10px; font-weight: 600; color: ${beGoneColors.mediumGray};
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
     }
-    .info-value { font-size: 14px; color: ${beGoneColors.darkGray}; font-weight: 500; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
+    .info-value { font-size: 14px; color: ${beGoneColors.darkGray}; font-weight: 500; overflow-wrap: break-word; word-break: break-word; min-width: 0; white-space: pre-wrap; }
 
     .map-container { margin-top: 16px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border}; }
     .map-image { width: 100%; display: block; }
