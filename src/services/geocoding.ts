@@ -159,7 +159,7 @@ export async function searchAddresses(query: string, maxResults = 5): Promise<{
     }
 
     const encodedQuery = encodeURIComponent(query)
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedQuery}&key=${apiKey}&language=sv&region=se`
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedQuery}&key=${apiKey}&language=sv&region=se&components=country:SE`
 
     const response = await fetch(url)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
