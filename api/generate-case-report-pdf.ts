@@ -227,7 +227,7 @@ const generateSingleCaseHTML = (
       background: white; border: 1px solid ${beGoneColors.border};
       border-radius: 8px; padding: 20px; min-height: 80px;
     }
-    .report-text { font-size: 14px; line-height: 1.7; color: ${beGoneColors.darkGray}; white-space: pre-wrap; }
+    .report-text { font-size: 14px; line-height: 1.7; color: ${beGoneColors.darkGray}; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; }
 
     .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .data-table th {
