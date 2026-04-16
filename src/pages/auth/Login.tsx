@@ -44,6 +44,9 @@ export default function Login() {
       case 'customer':
         targetPath = '/customer';
         break;
+      case 'säljare':
+        targetPath = '/saljare/dashboard';
+        break;
     }
     
     // Omdirigera omedelbart för att bryta loopen
