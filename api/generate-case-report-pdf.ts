@@ -56,6 +56,8 @@ const nl2br = (text: string | null | undefined): string => {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
     .replace(/\n/g, '<br>')
 }
 
