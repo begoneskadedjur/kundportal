@@ -1,4 +1,4 @@
-// src/pages/säljare/SäljareDashboard.tsx
+// src/pages/saljare/SäljareDashboard.tsx
 // Startsida för säljare — fokuserad på leads och försäljningspipeline
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
@@ -84,10 +84,6 @@ export default function SäljareDashboard() {
       const myActive = allLeads.filter(
         l => l.assigned_to === profile?.user_id && activeStatuses.includes(l.status as LeadStatus)
       ).length
-      const thisWeekLeads = allLeads.filter(l => {
-        // uses updated_at — approximate for "this week"
-        return true
-      }).length
 
       // Leads skapade denna vecka
       const { count: weekCount } = await supabase
@@ -192,7 +188,7 @@ export default function SäljareDashboard() {
               Senaste leads
             </h2>
             <Link
-              to="/säljare/leads"
+              to="/saljare/leads"
               className="text-xs text-teal-400 hover:text-teal-300 flex items-center gap-1 transition-colors"
             >
               Visa alla <ChevronRight className="w-3 h-3" />
@@ -290,7 +286,7 @@ export default function SäljareDashboard() {
             )}
             {followUps.length > 0 && (
               <Link
-                to="/säljare/leads"
+                to="/saljare/leads"
                 className="mt-3 flex items-center justify-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
               >
                 Visa alla leads <ChevronRight className="w-3 h-3" />

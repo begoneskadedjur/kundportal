@@ -20,8 +20,8 @@ import DashboardDemo from './pages/admin/DashboardDemo';
 import { AdminLayout } from './components/admin/layout';
 import { CoordinatorLayout } from './components/coordinator/layout';
 import TechnicianLayout from './components/technician/layout';
-import SäljareLayout from './components/säljare/layout/SäljareLayout';
-import SäljareDashboard from './pages/säljare/SäljareDashboard';
+import SäljareLayout from './components/saljare/layout/SäljareLayout';
+import SäljareDashboard from './pages/saljare/SäljareDashboard';
 import Customers from './pages/admin/Customers';
 import CustomerDetails from './pages/admin/CustomerDetails';
 import Economics from './pages/admin/Economics';
@@ -260,8 +260,8 @@ function App() {
             <Route path="/coordinator/leads" element={<Navigate to="/koordinator/leads" replace />} />
 
             {/* --- SÄLJARE ROUTES — nested under SäljareLayout med persistent sidebar --- */}
-            <Route path="/säljare" element={<SäljareLayout />}>
-              <Route index element={<Navigate to="/säljare/dashboard" replace />} />
+            <Route path="/saljare" element={<SäljareLayout />}>
+              <Route index element={<Navigate to="/saljare/dashboard" replace />} />
               <Route path="dashboard" element={<ProtectedRoute requiredRole="säljare"><SäljareDashboard /></ProtectedRoute>} />
 
               {/* Kunder & Avtal */}

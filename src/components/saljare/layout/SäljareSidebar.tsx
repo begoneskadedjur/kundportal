@@ -1,4 +1,4 @@
-// src/components/säljare/layout/SäljareSidebar.tsx
+// src/components/saljare/layout/SäljareSidebar.tsx
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import {
@@ -11,7 +11,7 @@ import {
   Bug,
 } from 'lucide-react'
 import { BugReportModal } from '../../shared/BugReportModal'
-import { topLevelItems, navGroups } from './säljareNavConfig'
+import { topLevelItems, navGroups } from './saljareNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
 
 interface SäljareSidebarProps {
@@ -74,7 +74,7 @@ export function SäljareSidebar({
       <div className="px-3 pt-3">
         {collapsed ? (
           <Link
-            to="/säljare/leads"
+            to="/saljare/leads"
             className="w-full flex items-center justify-center p-2.5 bg-teal-500 hover:bg-teal-400 rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
             title="Ny Lead"
           >
@@ -82,7 +82,7 @@ export function SäljareSidebar({
           </Link>
         ) : (
           <Link
-            to="/säljare/leads"
+            to="/saljare/leads"
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white font-semibold rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
           >
             <Target className="w-4 h-4" />
@@ -167,7 +167,7 @@ export function SäljareSidebar({
 
         {/* Help center */}
         <Link
-          to="/säljare/larosate"
+          to="/saljare/larosate"
           className={`
             w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors
             focus-visible:ring-2 focus-visible:ring-teal-400 outline-none

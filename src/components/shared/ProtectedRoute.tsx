@@ -122,7 +122,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         }
         break;
       case 'säljare':
-        redirectPath = '/säljare/dashboard';
+        redirectPath = '/saljare/dashboard';
         break;
     }
     

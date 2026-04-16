@@ -1,8 +1,8 @@
-// src/components/säljare/layout/SäljareMobileNav.tsx
+// src/components/saljare/layout/SäljareMobileNav.tsx
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Menu, X, LogOut } from 'lucide-react'
-import { topLevelItems, navGroups, mobileBottomItems } from './säljareNavConfig'
+import { topLevelItems, navGroups, mobileBottomItems } from './saljareNavConfig'
 import { MobileNavGroup } from '../../admin/layout/MobileNavGroup'
 
 interface SäljareMobileNavProps {

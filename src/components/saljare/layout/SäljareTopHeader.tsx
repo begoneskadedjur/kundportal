@@ -1,7 +1,7 @@
-// src/components/säljare/layout/SäljareTopHeader.tsx
+// src/components/saljare/layout/SäljareTopHeader.tsx
 import { useLocation } from 'react-router-dom'
 import { ChevronRight, Search, RefreshCw } from 'lucide-react'
-import { breadcrumbMap } from './säljareNavConfig'
+import { breadcrumbMap } from './saljareNavConfig'
 
 interface SäljareTopHeaderProps {
   sidebarCollapsed: boolean

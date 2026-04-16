@@ -1,4 +1,4 @@
-// src/components/säljare/layout/SäljareLayout.tsx
+// src/components/saljare/layout/SäljareLayout.tsx
 // Orkestrator-komponent som wrappar alla säljare-routes med sidebar + top header
 import { useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
