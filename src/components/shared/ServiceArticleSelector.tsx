@@ -46,6 +46,14 @@ export default function ServiceArticleSelector({
     }
   }, [serviceId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // När services laddats och serviceId finns men selectedService saknas – anropa onServiceChange
+  useEffect(() => {
+    if (serviceId && services.length > 0) {
+      const found = services.find((s) => s.id === serviceId) ?? null
+      if (found) onServiceChange(serviceId, found)
+    }
+  }, [services]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Hämta tjänster när grupp väljs
   useEffect(() => {
     if (!groupId) { setServices([]); return }

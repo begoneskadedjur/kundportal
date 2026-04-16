@@ -1548,7 +1548,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           name="description"
                           value={formData.description || ''}
                           onChange={handleChange}
-                          rows={2}
+                          rows={Math.max(3, (formData.description || '').split('\n').length + 1)}
                           className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
                           placeholder="T.ex. portkod, speciella instruktioner..."
                         />
@@ -1886,7 +1886,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   </div>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                        <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Briefcase size={14}/> Ärendeinformation</h4>
-                       <div><label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={2} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" placeholder="Kort om ärendet, portkod, etc."/></div>
+                       <div><label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={Math.max(3, (formData.description || '').split('\n').length + 1)} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" placeholder="Kort om ärendet, portkod, etc."/></div>
                   </div>
                   {/* Tjänster & fakturarader (valfritt) */}
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
