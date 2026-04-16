@@ -302,7 +302,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               sni_code: sniCode.sni_code.trim(),
               sni_description: sniCode.sni_description?.trim() || '',
               is_primary: sniCode.is_primary,
-              created_by: profile?.id || user.id
+              created_by: user.id
             }))
 
           if (sniCodeInserts.length > 0) {
@@ -338,7 +338,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
       // Step 3: Log comprehensive events for lead update
       try {
         const updatedFields = Object.keys(updateData).filter(key => key !== 'updated_by')
-        const userId = profile?.id || user.id
+        const userId = user!.id
         
         // Track which fields had events logged to avoid duplicate general events
         let fieldsWithSpecificEvents: string[] = []
