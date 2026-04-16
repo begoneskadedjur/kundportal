@@ -1,10 +1,9 @@
 // src/components/admin/technicians/management/TechnicianAuthModal.tsx - UPPDATERAD MED VÄLKOMSTMAIL
-import { useState, useEffect } from 'react'
-import { Key, User, AlertCircle, Mail, Send } from 'lucide-react'
+import { useState } from 'react'
+import { Key, User, AlertCircle, Send, Eye, EyeOff } from 'lucide-react'
 import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
 import LoadingSpinner from '../../../shared/LoadingSpinner'
-import { supabase } from '../../../../lib/supabase'
 import { useAuth } from '../../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -26,41 +25,30 @@ export default function TechnicianAuthModal({
   onSuccess, 
   technician 
 }: TechnicianAuthModalProps) {
-  const [formData, setFormData] = useState({
-    display_name: technician.name
-  })
+  const [formData, setFormData] = useState({ display_name: technician.name })
+  const [customPassword, setCustomPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [sendWelcomeEmail] = useState(true) // Alltid true för inbjudningar
-  const [autoGeneratePassword] = useState(true) // Alltid true för säkerhet
   const { user } = useAuth()
 
-  // Hjälpfunktion för att generera säkert lösenord (måste definieras först)
   const generateSecurePassword = (): string => {
     const length = 12
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
     let password = ""
-    
     for (let i = 0; i < length; i++) {
       password += charset.charAt(Math.floor(Math.random() * charset.length))
     }
-    
-    // Säkerställ komplexitet
     const hasLower = /[a-z]/.test(password)
     const hasUpper = /[A-Z]/.test(password)
     const hasNumber = /\d/.test(password)
     const hasSpecial = /[!@#$%]/.test(password)
-    
     if (!hasLower || !hasUpper || !hasNumber || !hasSpecial) {
       return generateSecurePassword()
     }
-    
     return password
   }
 
-  // Generera säkert lösenord automatiskt (dolt för admin)
-  const [generatedPassword] = useState(() => {
-    return !technician.has_login ? generateSecurePassword() : ''
-  })
+  const [generatedPassword] = useState(() => !technician.has_login ? generateSecurePassword() : '')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,9 +65,9 @@ export default function TechnicianAuthModal({
         body: JSON.stringify({
           technician_id: technician.id,
           email: technician.email,
-          password: generatedPassword, // Använd automatiskt genererat lösenord
+          password: customPassword.trim() || generatedPassword,
           display_name: formData.display_name,
-          sendWelcomeEmail: sendWelcomeEmail, // Alltid true
+          sendWelcomeEmail: true,
           invitedBy: user?.id
         })
       })
@@ -174,12 +162,12 @@ export default function TechnicianAuthModal({
                   Stäng
                 </Button>
                 <Button
-                  variant="destructive"
+                  variant="danger"
                   onClick={handleDisableLogin}
                   disabled={loading}
                   className="flex-1"
                 >
-                  {loading ? <LoadingSpinner className="w-4 h-4" /> : 'Inaktivera'}
+                  {loading ? <LoadingSpinner /> : 'Inaktivera'}
                 </Button>
               </div>
             </div>
@@ -195,6 +183,32 @@ export default function TechnicianAuthModal({
                 placeholder="Namn som visas i systemet"
               />
 
+              {/* Valfritt lösenord */}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">
+                  Lösenord (valfritt)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={customPassword}
+                    onChange={(e) => setCustomPassword(e.target.value)}
+                    placeholder="Lämna tomt för auto-genererat"
+                    className="w-full px-3 py-2 pr-10 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {customPassword.trim() ? 'Ditt angivna lösenord används.' : 'Ett säkert lösenord genereras automatiskt.'}
+                </p>
+              </div>
+
               {/* Inbjudningsinformation */}
               <div className="bg-teal-500/10 border border-teal-500/20 rounded-lg p-4">
                 <div className="flex items-center gap-3 mb-3">
@@ -202,14 +216,8 @@ export default function TechnicianAuthModal({
                   <span className="text-white font-medium">Inbjudan via e-post</span>
                 </div>
                 <p className="text-sm text-slate-300 mb-2">
-                  Ett professionellt välkomstmail skickas till <span className="font-medium text-teal-400">{technician.email}</span> med:
+                  Ett välkomstmail skickas till <span className="font-medium text-teal-400">{technician.email}</span> med inloggningsuppgifter.
                 </p>
-                <ul className="text-xs text-slate-400 space-y-1 ml-4">
-                  <li>• Säkra inloggningsuppgifter (auto-genererat lösenord)</li>
-                  <li>• Rollspecifika instruktioner och behörigheter</li>
-                  <li>• Direktlänk till portalen</li>
-                  <li>• Säkerhetspåminnelser</li>
-                </ul>
               </div>
 
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
@@ -244,7 +252,7 @@ export default function TechnicianAuthModal({
                 >
                   {loading ? (
                     <>
-                      <LoadingSpinner className="w-4 h-4 mr-2" />
+                      <LoadingSpinner />
                       Skickar inbjudan...
                     </>
                   ) : (
