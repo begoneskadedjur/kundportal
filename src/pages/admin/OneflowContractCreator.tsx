@@ -19,6 +19,7 @@ import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 interface WizardData {
@@ -130,6 +131,8 @@ export default function OneflowContractCreator() {
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+  const [groupsLoading, setGroupsLoading] = useState(true)
+  const [groupsError, setGroupsError] = useState<string | null>(null)
 
   // 🆕 DYNAMISK BEGONE INFO BASERAT PÅ INLOGGAD ANVÄNDARE
   const [wizardData, setWizardData] = useState<WizardData>({
@@ -169,10 +172,33 @@ export default function OneflowContractCreator() {
   // Mappa logiska steg-ID:n till offer-steg (för renderStepContent)
   const stepOffset = (step: number) => isContract && step >= 5 ? step - 1 : step
 
-  // Hämta kundgrupper
-  useEffect(() => {
-    CustomerGroupService.getActiveGroups().then(setCustomerGroups).catch(console.error)
+  // Hämta kundgrupper (med session-check + error/retry-handling)
+  const loadCustomerGroups = useCallback(async () => {
+    setGroupsLoading(true)
+    setGroupsError(null)
+    try {
+      // Säkerställ att vi har en giltig session innan RLS-skyddad tabell läses
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (!sessionData.session) {
+        throw new Error('Din session har gått ut. Ladda om sidan och logga in igen.')
+      }
+      const groups = await CustomerGroupService.getActiveGroups()
+      setCustomerGroups(groups)
+      console.info(`[CustomerGroups] Laddade ${groups.length} aktiva grupper`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Okänt fel'
+      console.error('[OneflowContractCreator] Kunde inte hämta kundgrupper:', err)
+      setGroupsError(msg)
+      toast.error(`Kunde inte hämta kundgrupper: ${msg}`)
+    } finally {
+      setGroupsLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    loadCustomerGroups()
+  }, [user, loadCustomerGroups])
 
   // Hantera förifyllda data från EditCaseModal
   useEffect(() => {
@@ -606,6 +632,29 @@ export default function OneflowContractCreator() {
         <p className="text-slate-400">Vilken kundgrupp tillhör kunden? Kundnumret tilldelas vid signering.</p>
       </div>
 
+      {groupsLoading && (
+        <div className="max-w-xl mx-auto py-8">
+          <LoadingSpinner text="Laddar kundgrupper…" />
+        </div>
+      )}
+
+      {!groupsLoading && groupsError && (
+        <div className="max-w-xl mx-auto p-4 border border-red-500/40 bg-red-500/10 rounded-xl text-center">
+          <p className="text-red-300 text-sm mb-3">Kunde inte hämta kundgrupper: {groupsError}</p>
+          <Button variant="primary" onClick={loadCustomerGroups}>Försök igen</Button>
+          <p className="text-xs text-slate-400 mt-2">
+            Om problemet kvarstår: logga ut och in igen, eller rensa webbläsarens cache.
+          </p>
+        </div>
+      )}
+
+      {!groupsLoading && !groupsError && customerGroups.length === 0 && (
+        <div className="max-w-xl mx-auto p-4 border border-amber-500/40 bg-amber-500/10 rounded-xl text-center">
+          <p className="text-amber-200 text-sm">Inga aktiva kundgrupper hittades. Kontakta administratör.</p>
+        </div>
+      )}
+
+      {!groupsLoading && !groupsError && customerGroups.length > 0 && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
         {customerGroups.map((group, index) => {
           const capacity = group.series_end - group.series_start + 1
@@ -663,6 +712,7 @@ export default function OneflowContractCreator() {
           )
         })}
       </div>
+      )}
     </div>
   )
 
