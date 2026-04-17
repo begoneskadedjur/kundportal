@@ -122,6 +122,16 @@ export default function BillingSettingsModal({
   const [priceAdjustments, setPriceAdjustments] = useState<Array<{ year: number; adjustment_percent: number; note: string }>>([])
   const [loadingAdjustments, setLoadingAdjustments] = useState(false)
 
+  // Avtalstjänster från signerat kontrakt (case_billing_items)
+  type ContractService = {
+    id: string
+    service_name: string
+    quantity: number
+    total_price: number
+    articles: Array<{ article_name: string; quantity: number; unit_price: number }>
+  }
+  const [contractServices, setContractServices] = useState<ContractService[]>([])
+
   // Billing form state
   const [billingFrequency, setBillingFrequency] = useState<BillingFrequency>('monthly')
   const [priceListId, setPriceListId] = useState<string | null>(null)
@@ -137,7 +147,7 @@ export default function BillingSettingsModal({
   // Init form
   useEffect(() => {
     if (!isOpen || !customerId) return
-    setBillingFrequency(currentBillingFrequency || 'monthly')
+    setBillingFrequency(currentBillingFrequency || 'yearly')
     setPriceListId(currentPriceListId || null)
     setBillingEmail(currentBillingEmail || '')
     setBillingAddress(currentBillingAddress || '')
@@ -146,7 +156,7 @@ export default function BillingSettingsModal({
     setCostCenter(currentCostCenter || '')
     setBillingRecipient(currentBillingRecipient || '')
     setPriceAdjustmentPercent(currentPriceAdjustmentPercent != null ? String(currentPriceAdjustmentPercent) : '')
-    setBillingActive(currentBillingActive ?? false)
+    setBillingActive(currentBillingActive ?? true)
     setContractStartDate(currentContractStartDate || '')
     setContractEndDate(currentContractEndDate || '')
     // Ankarmånad: använd sparad, eller härled från avtalsstartdatum, eller nuvarande månad
@@ -175,6 +185,15 @@ export default function BillingSettingsModal({
   useEffect(() => {
     PriceListService.getActivePriceLists().then(setPriceLists).catch(console.error)
   }, [])
+
+  // Default till standardprislistan om kunden saknar sparad prislista
+  useEffect(() => {
+    if (!isOpen || !customerId) return
+    if (currentPriceListId) return // Kunden har egen prislista → rör inte
+    PriceListService.getDefaultPriceList()
+      .then(pl => { if (pl) setPriceListId(pl.id) })
+      .catch(console.error)
+  }, [isOpen, customerId, currentPriceListId])
 
   // Load premiejusteringshistorik
   useEffect(() => {
@@ -236,6 +255,59 @@ export default function BillingSettingsModal({
         }
       })
       .catch(console.error)
+  }, [isOpen, customerId])
+
+  // Hämta avtalstjänster + interna artiklar från kundens signerade kontrakt (case_billing_items)
+  useEffect(() => {
+    if (!isOpen || !customerId) {
+      setContractServices([])
+      return
+    }
+    ;(async () => {
+      try {
+        const { data: contracts } = await supabase
+          .from('contracts')
+          .select('id')
+          .eq('customer_id', customerId)
+          .in('status', ['signed', 'active'])
+
+        if (!contracts?.length) {
+          setContractServices([])
+          return
+        }
+        const contractIds = contracts.map((c: any) => c.id)
+
+        const { data: items } = await supabase
+          .from('case_billing_items')
+          .select('id, item_type, service_name, article_name, quantity, unit_price, total_price, mapped_service_id')
+          .in('case_id', contractIds)
+          .eq('case_type', 'contract')
+
+        if (!items) {
+          setContractServices([])
+          return
+        }
+        const services: ContractService[] = items
+          .filter((i: any) => i.item_type === 'service')
+          .map((s: any) => ({
+            id: s.id,
+            service_name: s.service_name || 'Okänd tjänst',
+            quantity: s.quantity,
+            total_price: s.total_price,
+            articles: items
+              .filter((a: any) => a.item_type === 'article' && a.mapped_service_id === s.id)
+              .map((a: any) => ({
+                article_name: a.article_name,
+                quantity: a.quantity,
+                unit_price: a.unit_price,
+              })),
+          }))
+        setContractServices(services)
+      } catch (err) {
+        console.error('Kunde inte hämta avtalstjänster:', err)
+        setContractServices([])
+      }
+    })()
   }, [isOpen, customerId])
 
   // Summering
@@ -599,6 +671,40 @@ export default function BillingSettingsModal({
                 </button>
               )}
             </div>
+
+            {/* Ingår i avtalet — tjänster + interna artiklar från signerat kontrakt */}
+            {contractServices.length > 0 && (
+              <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <FileSignature className="w-4 h-4 text-[#20c58f]" />
+                  <h4 className="text-sm font-semibold text-white">Ingår i avtalet</h4>
+                  <span className="px-1.5 py-0.5 text-xs rounded-full bg-[#20c58f]/20 text-[#20c58f]">
+                    {contractServices.length}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {contractServices.map(s => (
+                    <div key={s.id} className="px-3 py-2 bg-slate-800/40 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white">
+                          {s.service_name} × {s.quantity}
+                        </span>
+                        <span className="text-sm text-[#20c58f] font-medium">
+                          {fmt(s.total_price)}
+                        </span>
+                      </div>
+                      {s.articles.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5 text-xs text-slate-400">
+                          {s.articles.map((a, i) => (
+                            <li key={i}>• {a.article_name} × {a.quantity}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Artikel-picker */}
             {showArticleList && priceListId && (

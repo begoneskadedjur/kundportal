@@ -122,6 +122,19 @@ export default function OneflowContractCreator() {
         return '/admin/dashboard';
     }
   }, [profile?.role]);
+
+  // Navigera till offertuppföljning efter success (faller tillbaka till dashboard för admin)
+  const getFollowUpRoute = useCallback(() => {
+    const role = profile?.role || 'admin';
+    switch (role) {
+      case 'koordinator':
+        return '/koordinator/offertuppfoljning';
+      case 'technician':
+        return '/technician/offer-follow-up';
+      default:
+        return '/admin/dashboard';
+    }
+  }, [profile?.role]);
   const [currentStep, setCurrentStep] = useState(1)
   const [maxReachedStep, setMaxReachedStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
@@ -633,9 +646,14 @@ export default function OneflowContractCreator() {
       }
       
       toast.success('✅ Kontrakt skapat framgångslikt!')
-      
+
       // Stäng av confetti efter 5 sekunder
       setTimeout(() => setShowConfetti(false), 5000)
+
+      // Redirecta till offertuppföljning efter kort paus så success-cardet hinner registreras
+      setTimeout(() => {
+        navigate(getFollowUpRoute())
+      }, 2500)
       
     } catch (err: any) {
       // Parse OneFlow parameter_problems om det finns, annars använd generic message
