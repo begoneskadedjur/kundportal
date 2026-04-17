@@ -116,9 +116,11 @@ function OfferRow({
   } | null>(null)
   const [itemsLoading, setItemsLoading] = useState(false)
   const [itemsError, setItemsError] = useState<string | null>(null)
+  const hasFetchedRef = useRef(false)
 
   useEffect(() => {
-    if (!isExpanded || itemsData !== null || itemsLoading) return
+    if (!isExpanded || hasFetchedRef.current) return
+    hasFetchedRef.current = true
     let cancelled = false
     setItemsLoading(true)
     setItemsError(null)
@@ -127,13 +129,16 @@ function OfferRow({
         if (!cancelled) setItemsData(data)
       })
       .catch(err => {
-        if (!cancelled) setItemsError(err instanceof Error ? err.message : 'Okänt fel')
+        if (!cancelled) {
+          setItemsError(err instanceof Error ? err.message : 'Okänt fel')
+          hasFetchedRef.current = false // tillåt retry vid fel
+        }
       })
       .finally(() => {
         if (!cancelled) setItemsLoading(false)
       })
     return () => { cancelled = true }
-  }, [isExpanded, itemsData, itemsLoading, offer.id])
+  }, [isExpanded, offer.id])
 
   useEffect(() => {
     if (!menuOpen) return
