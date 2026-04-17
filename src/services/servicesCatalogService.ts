@@ -186,6 +186,10 @@ export class ServiceCatalogService {
         min_margin_percent: input.min_margin_percent ?? 20,
         recommended_markup_percent: input.recommended_markup_percent ?? 40,
         is_addon_service: input.is_addon_service ?? false,
+        rot_eligible: input.rot_eligible ?? false,
+        rut_eligible: input.rut_eligible ?? false,
+        rot_rate_percent: input.rot_rate_percent ?? null,
+        rut_rate_percent: input.rut_rate_percent ?? null,
       })
       .select().single()
     if (error) {

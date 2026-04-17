@@ -26,6 +26,7 @@ import {
   itemRequiresApproval
 } from '../types/caseBilling'
 import { PriceListService } from './priceListService'
+import { DEFAULT_ROT_PERCENT, DEFAULT_RUT_PERCENT } from '../utils/rotRutConstants'
 
 export class CaseBillingService {
   /**
@@ -460,6 +461,18 @@ export class CaseBillingService {
     }, 0)
     const requiresApproval = items.some(item => item.requires_approval)
     const rotRutDeduction = items.reduce((sum, item) => {
+      if (!item.rot_rut_type) return sum
+      // För tjänsterader: använd servicens override om den finns
+      if (item.item_type === 'service') {
+        const svc = (item as any).service as { rot_rate_percent?: number | null; rut_rate_percent?: number | null } | undefined | null
+        const override = item.rot_rut_type === 'ROT'
+          ? svc?.rot_rate_percent
+          : svc?.rut_rate_percent
+        const fallback = item.rot_rut_type === 'ROT' ? DEFAULT_ROT_PERCENT : DEFAULT_RUT_PERCENT
+        const rate = (override ?? fallback) / 100
+        return sum + item.total_price * rate
+      }
+      // För artikelrader: behåll befintlig logik (lagstadgad 30/50)
       return sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type)
     }, 0)
     const subcontractorTotal = items.reduce((sum, item) => {

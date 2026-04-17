@@ -4,12 +4,17 @@
 import type { SelectedArticleItem } from '../types/products'
 import type { SelectedProduct, CustomerType } from '../types/products'
 import type { ArticleCategory, ARTICLE_UNIT_CONFIG } from '../types/articles'
+import {
+  DEFAULT_ROT_PERCENT,
+  DEFAULT_RUT_PERCENT,
+  ROT_MAX_DEDUCTION,
+  RUT_MAX_DEDUCTION,
+} from './rotRutConstants'
 
-// ROT/RUT-konfiguration
-const ROT_RATE = 0.30
-const ROT_MAX = 50000
-const RUT_RATE = 0.50
-const RUT_MAX = 75000
+const ROT_RATE = DEFAULT_ROT_PERCENT / 100
+const ROT_MAX = ROT_MAX_DEDUCTION
+const RUT_RATE = DEFAULT_RUT_PERCENT / 100
+const RUT_MAX = RUT_MAX_DEDUCTION
 
 export function calculateArticleSubtotal(items: SelectedArticleItem[]): number {
   return items.reduce((sum, item) => sum + item.effectivePrice * item.quantity, 0)
@@ -110,6 +115,59 @@ export function convertArticlesToOneflowProducts(
     },
     quantity: item.quantity
   }))
+}
+
+/**
+ * Konverterar tjänsterader (case_billing_items med item_type='service')
+ * till SelectedProduct[]-format som OneFlow-API:et förväntar sig.
+ * Detta är det som ska skickas till OneFlow — inte inköpsartiklar.
+ */
+export function convertServicesToOneflowProducts(
+  services: Array<{
+    service_name?: string | null
+    service_code?: string | null
+    description?: string | null
+    unit_price: number
+    quantity: number
+    vat_rate?: number | null
+    rot_rut_type?: 'ROT' | 'RUT' | null
+    service?: { rot_rate_percent?: number | null; rut_rate_percent?: number | null } | null
+  }>,
+  _partyType: CustomerType
+): SelectedProduct[] {
+  return services.map((s, idx) => {
+    const vatRate = (s.vat_rate ?? 25) / 100
+    const name = s.service_name || 'Tjänst'
+    const description = s.description || name
+    const taxDeduction: 'rot' | 'rut' | undefined =
+      s.rot_rut_type === 'ROT' ? 'rot' : s.rot_rut_type === 'RUT' ? 'rut' : undefined
+
+    return {
+      product: {
+        id: `service-${s.service_code || idx}`,
+        name,
+        description,
+        category: 'pest_control',
+        pricing: {
+          company: {
+            basePrice: s.unit_price,
+            vatRate
+          },
+          individual: {
+            basePrice: s.unit_price * (1 + vatRate),
+            taxDeduction
+          }
+        },
+        quantityType: 'quantity' as const,
+        oneflowCompatible: true,
+        defaultQuantity: 1,
+        rotEligible: !!s.service?.rot_rate_percent || s.rot_rut_type === 'ROT',
+        rutEligible: !!s.service?.rut_rate_percent || s.rot_rut_type === 'RUT',
+        contractDescription: description
+      },
+      quantity: s.quantity
+    }
+  })
 }
 
 // Variant för anpassat pris: artiklar utan priser + en totalrad

@@ -33,6 +33,7 @@ import type {
   ArticleWithEffectivePrice,
   BillableCaseType,
   CaseBillingSummary,
+  RotRutType,
 } from '../../types/caseBilling'
 import {
   calculateDiscountedPrice,
@@ -40,6 +41,7 @@ import {
   calculateMarginPercent,
   itemRequiresApproval
 } from '../../types/caseBilling'
+import { getEffectiveRotPercent, getEffectiveRutPercent } from '../../utils/rotRutConstants'
 import type { ServiceWithGroup } from '../../types/services'
 import { ARTICLE_CATEGORIES } from '../../types/articles'
 import type { ArticleCategory } from '../../types/articles'
@@ -454,6 +456,52 @@ export default function CaseServiceSelector({
   }
 
   // ──────────────────────────────────────────────────────────────
+  // Uppdatera ROT/RUT-typ + fastighetsbeteckning för en tjänsterad
+  // ──────────────────────────────────────────────────────────────
+  const handleRotRutChange = async (id: string, rotRutType: RotRutType | null) => {
+    if (saving) return
+    if (draftMode && !caseId) {
+      const updated = allItems.map(i => {
+        if (i.id !== id) return i
+        return { ...i, rot_rut_type: rotRutType, fastighetsbeteckning: rotRutType ? i.fastighetsbeteckning : null }
+      })
+      setAllItems(updated)
+      notifyChange(updated)
+      return
+    }
+    if (!caseId) return
+    setSaving(true)
+    try {
+      await CaseBillingService.updateCaseArticle(id, {
+        rot_rut_type: rotRutType,
+        fastighetsbeteckning: rotRutType ? (allItems.find(i => i.id === id)?.fastighetsbeteckning ?? null) : null,
+      })
+      await reloadItems()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleFastighetChange = async (id: string, value: string) => {
+    if (saving) return
+    if (draftMode && !caseId) {
+      const updated = allItems.map(i => i.id === id ? { ...i, fastighetsbeteckning: value || null } : i)
+      setAllItems(updated)
+      notifyChange(updated)
+      return
+    }
+    if (!caseId) return
+    try {
+      await CaseBillingService.updateCaseArticle(id, { fastighetsbeteckning: value || null })
+      await reloadItems()
+    } catch (err: any) {
+      toast.error(err.message)
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
   // Ta bort item
   // ──────────────────────────────────────────────────────────────
   const handleRemove = async (id: string) => {
@@ -619,6 +667,13 @@ export default function CaseServiceSelector({
             {serviceItems.map(item => {
               const isEditing = editingPrice[item.id] !== undefined
               const displayPrice = isEditing ? editingPrice[item.id] : String(item.unit_price)
+              const svc = item.service ?? addonServices.find(s => s.id === item.service_id) ?? null
+              const showRotRut =
+                caseType === 'private'
+                && !!svc
+                && (svc.rot_eligible || svc.rut_eligible)
+              const rotPct = getEffectiveRotPercent(svc)
+              const rutPct = getEffectiveRutPercent(svc)
               return (
                 <div key={item.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg">
                   {/* Namn – alltid full bredd */}
@@ -669,6 +724,57 @@ export default function CaseServiceSelector({
                       </button>
                     )}
                   </div>
+
+                  {/* ROT/RUT-val (endast privatärenden + eligible tjänster) */}
+                  {showRotRut && !readOnly && (
+                    <div className="mt-2 p-2 bg-slate-800/30 border border-slate-700/50 rounded-md space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`rotrut-${item.id}`}
+                            checked={!item.rot_rut_type}
+                            onChange={() => handleRotRutChange(item.id, null)}
+                            className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                          />
+                          <span className="text-xs text-slate-300">Inget avdrag</span>
+                        </label>
+                        {svc.rot_eligible && (
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`rotrut-${item.id}`}
+                              checked={item.rot_rut_type === 'ROT'}
+                              onChange={() => handleRotRutChange(item.id, 'ROT')}
+                              className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                            />
+                            <span className="text-xs text-slate-300">ROT ({rotPct}%)</span>
+                          </label>
+                        )}
+                        {svc.rut_eligible && (
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`rotrut-${item.id}`}
+                              checked={item.rot_rut_type === 'RUT'}
+                              onChange={() => handleRotRutChange(item.id, 'RUT')}
+                              className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                            />
+                            <span className="text-xs text-slate-300">RUT ({rutPct}%)</span>
+                          </label>
+                        )}
+                      </div>
+                      {item.rot_rut_type && (
+                        <input
+                          type="text"
+                          value={item.fastighetsbeteckning ?? ''}
+                          onChange={e => handleFastighetChange(item.id, e.target.value)}
+                          placeholder="Fastighetsbeteckning"
+                          className="w-full px-2 py-1 text-xs bg-slate-800 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}

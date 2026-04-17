@@ -29,6 +29,11 @@ export interface Service {
   min_margin_percent: number
   recommended_markup_percent: number
   is_addon_service: boolean
+  // ROT/RUT-avdrag (endast arbetstidstjänster markeras som eligible)
+  rot_eligible: boolean
+  rut_eligible: boolean
+  rot_rate_percent: number | null  // null = använd global default
+  rut_rate_percent: number | null  // null = använd global default
   created_at: string
   updated_at: string
 }
@@ -67,6 +72,10 @@ export interface CreateServiceInput {
   min_margin_percent?: number
   recommended_markup_percent?: number
   is_addon_service?: boolean
+  rot_eligible?: boolean
+  rut_eligible?: boolean
+  rot_rate_percent?: number | null
+  rut_rate_percent?: number | null
 }
 
 export interface UpdateServiceInput {
@@ -81,6 +90,10 @@ export interface UpdateServiceInput {
   min_margin_percent?: number
   recommended_markup_percent?: number
   is_addon_service?: boolean
+  rot_eligible?: boolean
+  rut_eligible?: boolean
+  rot_rate_percent?: number | null
+  rut_rate_percent?: number | null
 }
 
 export const SERVICE_UNITS = ['st', 'timme', 'dag', 'km', 'm2', 'fp'] as const

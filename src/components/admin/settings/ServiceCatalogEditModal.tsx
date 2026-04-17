@@ -10,6 +10,7 @@ import Select from '../../ui/Select'
 import { ServiceCatalogService } from '../../../services/servicesCatalogService'
 import type { Service, ServiceWithGroup, ServiceGroup, CreateServiceInput, UpdateServiceInput } from '../../../types/services'
 import { SERVICE_UNITS } from '../../../types/services'
+import { DEFAULT_ROT_PERCENT, DEFAULT_RUT_PERCENT } from '../../../utils/rotRutConstants'
 
 interface ServiceCatalogEditModalProps {
   isOpen: boolean
@@ -41,6 +42,11 @@ export default function ServiceCatalogEditModal({
   const [minMarginPercent, setMinMarginPercent] = useState<number>(20)
   const [recommendedMarkupPercent, setRecommendedMarkupPercent] = useState<number>(40)
   const [isAddonService, setIsAddonService] = useState(false)
+  // ROT/RUT-inställningar
+  const [rotEligible, setRotEligible] = useState(false)
+  const [rutEligible, setRutEligible] = useState(false)
+  const [rotRatePercent, setRotRatePercent] = useState<string>('')
+  const [rutRatePercent, setRutRatePercent] = useState<string>('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -58,6 +64,10 @@ export default function ServiceCatalogEditModal({
       setMinMarginPercent(service.min_margin_percent ?? 20)
       setRecommendedMarkupPercent(service.recommended_markup_percent ?? 40)
       setIsAddonService(service.is_addon_service ?? false)
+      setRotEligible(service.rot_eligible ?? false)
+      setRutEligible(service.rut_eligible ?? false)
+      setRotRatePercent(service.rot_rate_percent != null ? String(service.rot_rate_percent) : '')
+      setRutRatePercent(service.rut_rate_percent != null ? String(service.rut_rate_percent) : '')
     } else {
       setCode('')
       setName('')
@@ -71,6 +81,10 @@ export default function ServiceCatalogEditModal({
       setMinMarginPercent(20)
       setRecommendedMarkupPercent(40)
       setIsAddonService(false)
+      setRotEligible(false)
+      setRutEligible(false)
+      setRotRatePercent('')
+      setRutRatePercent('')
     }
   }, [isOpen, service, groups])
 
@@ -81,6 +95,8 @@ export default function ServiceCatalogEditModal({
     setSaving(true)
     try {
       const basePriceNum = basePrice.trim() ? parseFloat(basePrice.trim()) : null
+      const rotRateNum = rotEligible && rotRatePercent.trim() ? parseFloat(rotRatePercent.trim()) : null
+      const rutRateNum = rutEligible && rutRatePercent.trim() ? parseFloat(rutRatePercent.trim()) : null
       if (isCreating) {
         const input: CreateServiceInput = {
           code: code.trim(),
@@ -94,6 +110,10 @@ export default function ServiceCatalogEditModal({
           min_margin_percent: minMarginPercent,
           recommended_markup_percent: recommendedMarkupPercent,
           is_addon_service: isAddonService,
+          rot_eligible: rotEligible,
+          rut_eligible: rutEligible,
+          rot_rate_percent: rotRateNum,
+          rut_rate_percent: rutRateNum,
         }
         await ServiceCatalogService.createService(input)
         toast.success('Tjänst skapad')
@@ -110,6 +130,10 @@ export default function ServiceCatalogEditModal({
           min_margin_percent: minMarginPercent,
           recommended_markup_percent: recommendedMarkupPercent,
           is_addon_service: isAddonService,
+          rot_eligible: rotEligible,
+          rut_eligible: rutEligible,
+          rot_rate_percent: rotRateNum,
+          rut_rate_percent: rutRateNum,
         }
         await ServiceCatalogService.updateService(service!.id, input)
         toast.success('Tjänst uppdaterad')
@@ -287,6 +311,70 @@ export default function ServiceCatalogEditModal({
                       min={0}
                       className={selectClass}
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* ROT/RUT-inställningar */}
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+                <div>
+                  <span className="text-sm font-semibold text-slate-300">ROT/RUT-avdrag</span>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Endast arbetstidstjänster bör markeras. Avdraget gäller enligt Skatteverket.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer mb-1">
+                      <input
+                        type="checkbox"
+                        checked={rotEligible}
+                        onChange={(e) => setRotEligible(e.target.checked)}
+                        className="w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-700 border-slate-600"
+                      />
+                      <span className="text-sm text-slate-300">ROT-kapabel</span>
+                    </label>
+                    {rotEligible && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">ROT-% (tomt = {DEFAULT_ROT_PERCENT})</label>
+                        <input
+                          type="number"
+                          value={rotRatePercent}
+                          onChange={(e) => setRotRatePercent(e.target.value)}
+                          placeholder={String(DEFAULT_ROT_PERCENT)}
+                          min={0}
+                          max={100}
+                          step="0.01"
+                          className={selectClass}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer mb-1">
+                      <input
+                        type="checkbox"
+                        checked={rutEligible}
+                        onChange={(e) => setRutEligible(e.target.checked)}
+                        className="w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-700 border-slate-600"
+                      />
+                      <span className="text-sm text-slate-300">RUT-kapabel</span>
+                    </label>
+                    {rutEligible && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">RUT-% (tomt = {DEFAULT_RUT_PERCENT})</label>
+                        <input
+                          type="number"
+                          value={rutRatePercent}
+                          onChange={(e) => setRutRatePercent(e.target.value)}
+                          placeholder={String(DEFAULT_RUT_PERCENT)}
+                          min={0}
+                          max={100}
+                          step="0.01"
+                          className={selectClass}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

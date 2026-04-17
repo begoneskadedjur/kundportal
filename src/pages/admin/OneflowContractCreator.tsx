@@ -11,15 +11,14 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import PriceListArticleSelector from '../../components/admin/PriceListArticleSelector'
-import ArticleSummary from '../../components/admin/ArticleSummary'
+import CaseServiceSelector from '../../components/shared/CaseServiceSelector'
 import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
 import { SelectedProduct, CustomerType, SelectedArticleItem } from '../../types/products'
-import { convertArticlesToOneflowProducts, convertArticlesToOneflowProductsCustomPrice, generateArticleContractDescription } from '../../utils/articlePricingCalculator'
+import { convertServicesToOneflowProducts } from '../../utils/articlePricingCalculator'
+import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
-import { CaseBillingService } from '../../services/caseBillingService'
 import toast from 'react-hot-toast'
 
 interface WizardData {
@@ -52,6 +51,8 @@ interface WizardData {
   deductionType: 'rot' | 'rut' | 'none' | null
   customTotalPrice: number | null
   selectedProducts: SelectedProduct[]
+  /** Manuellt läge: items från CaseServiceSelector draftMode */
+  draftItems: CaseBillingItemWithRelations[]
   prefillServices?: Array<{
     id: string
     service_name: string | null
@@ -59,6 +60,9 @@ interface WizardData {
     unit_price: number
     quantity: number
     total_price: number
+    vat_rate?: number
+    rot_rut_type?: 'ROT' | 'RUT' | null
+    service?: { rot_rate_percent?: number | null; rut_rate_percent?: number | null } | null
   }>
   
   // Steg 7 - Avtalsobjekt
@@ -119,7 +123,6 @@ export default function OneflowContractCreator() {
   const [creationStep, setCreationStep] = useState('')
   const [createdContract, setCreatedContract] = useState<any>(null)
   const [showConfetti, setShowConfetti] = useState(false)
-  const [showZeroArticlesWarning, setShowZeroArticlesWarning] = useState(false)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
@@ -146,6 +149,7 @@ export default function OneflowContractCreator() {
     deductionType: null,
     customTotalPrice: null,
     selectedProducts: [],
+    draftItems: [],
     agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
     sendForSigning: true,
     customer_group_id: null
@@ -285,7 +289,7 @@ export default function OneflowContractCreator() {
       wizardData.Kontaktperson !== '' ||
       wizardData['e-post-kontaktperson'] !== '' ||
       wizardData.foretag !== '' ||
-      wizardData.selectedPriceListId !== null ||
+      wizardData.draftItems.length > 0 ||
       wizardData.selectedArticles.length > 0
     )
   }, [currentStep, wizardData, createdContract])
@@ -328,74 +332,6 @@ export default function OneflowContractCreator() {
     })
   }
 
-  // Synka artikeländringar tillbaka till ärendet (case_billing_items)
-  const handleArticleSelectionChange = useCallback(async (newArticles: SelectedArticleItem[]) => {
-    const oldArticles = wizardData.selectedArticles
-
-    // Uppdatera wizard-state direkt
-    updateWizardData('selectedArticles', newArticles)
-
-    // Ingen case-koppling → avbryt
-    if (!wizardData.case_id) return
-
-    // Anpassat pris → blockera + revert
-    if (wizardData.customTotalPrice != null && wizardData.customTotalPrice > 0) {
-      toast.error('Kan inte ändra artiklar när anpassat pris är aktivt. Ta bort det anpassade priset i ärendet först.')
-      updateWizardData('selectedArticles', oldArticles)
-      return
-    }
-
-    const caseType = wizardData.partyType === 'company' ? 'business' : 'private'
-    const oldMap = new Map(oldArticles.map(a => [a.article.id, a]))
-    const newMap = new Map(newArticles.map(a => [a.article.id, a]))
-
-    try {
-      // BORTTAGNA: finns i old men inte new
-      for (const [articleId, oldItem] of oldMap) {
-        if (!newMap.has(articleId) && oldItem.caseBillingItemId) {
-          await CaseBillingService.removeCaseArticle(oldItem.caseBillingItemId)
-        }
-      }
-
-      // TILLAGDA: finns i new men inte old
-      for (const [articleId, newItem] of newMap) {
-        if (!oldMap.has(articleId)) {
-          const result = await CaseBillingService.addArticleToCase({
-            case_id: wizardData.case_id,
-            case_type: caseType as any,
-            article_id: articleId,
-            article_name: newItem.article.name,
-            article_code: newItem.article.code,
-            unit_price: newItem.effectivePrice,
-            quantity: newItem.quantity,
-            vat_rate: newItem.article.vat_rate,
-            price_source: newItem.priceListItem ? 'customer_list' : 'standard'
-          })
-          newItem.caseBillingItemId = result.id
-        }
-      }
-
-      // KVANTITET ÄNDRAD: samma artikel, annan kvantitet
-      for (const [articleId, newItem] of newMap) {
-        const oldItem = oldMap.get(articleId)
-        if (oldItem && oldItem.quantity !== newItem.quantity && oldItem.caseBillingItemId) {
-          await CaseBillingService.updateCaseArticle(oldItem.caseBillingItemId, {
-            quantity: newItem.quantity
-          })
-          newItem.caseBillingItemId = oldItem.caseBillingItemId
-        } else if (oldItem?.caseBillingItemId && !newItem.caseBillingItemId) {
-          newItem.caseBillingItemId = oldItem.caseBillingItemId
-        }
-      }
-
-      // Uppdatera med patchade IDs
-      updateWizardData('selectedArticles', [...newArticles])
-    } catch (err) {
-      console.error('Synk-fel:', err)
-      toast.error('Kunde inte spara artikeländring till ärendet')
-    }
-  }, [wizardData.case_id, wizardData.customTotalPrice, wizardData.partyType, wizardData.selectedArticles])
-
   // Steg-nummer för produkter-steget (6 för offerter, 7 för avtal)
   const productsStep = isContract ? 7 : 6
   // Steg-nummer för avtalsobjekt
@@ -409,13 +345,6 @@ export default function OneflowContractCreator() {
 
   const nextStep = () => {
     if (currentStep < STEPS.length) {
-      // Varning vid 0 artiklar i produktsteget
-      if (currentStep === productsStep && wizardData.selectedArticles.length === 0 && !showZeroArticlesWarning) {
-        setShowZeroArticlesWarning(true)
-        return
-      }
-      setShowZeroArticlesWarning(false)
-
       let nextStepNumber = currentStep + 1
 
       // Om vi är på steg 2 (mallval) och har valt en offertmall,
@@ -474,10 +403,11 @@ export default function OneflowContractCreator() {
       return true
     }
 
-    // Produkter – om prefill finns behövs ingen prislista
+    // Produkter – om prefill finns, kräv bara att det finns tjänster.
+    // Manuellt läge: kräv minst en tjänst (item_type='service') i draftItems
     if (currentStep === productsStep) {
       if (wizardData.prefillServices && wizardData.prefillServices.length > 0) return true
-      return wizardData.selectedPriceListId !== null
+      return wizardData.draftItems.some(i => i.item_type === 'service')
     }
     // Avtalsobjekt
     if (currentStep === agreementStep) return wizardData.agreementText.length > 0
@@ -506,7 +436,8 @@ export default function OneflowContractCreator() {
       return ''
     }
     if (currentStep === productsStep) {
-      if (!wizardData.selectedPriceListId) return 'Välj en prislista'
+      if (wizardData.prefillServices && wizardData.prefillServices.length > 0) return ''
+      if (!wizardData.draftItems.some(i => i.item_type === 'service')) return 'Lägg till minst en tjänst'
       return ''
     }
     return ''
@@ -517,13 +448,29 @@ export default function OneflowContractCreator() {
   const selectedTemplate = availableTemplates.find(t => t.id === wizardData.selectedTemplate)
 
   const handleSubmit = async () => {
-    // Konvertera artiklar → SelectedProduct-format för API:et
-    const hasCustomPrice = wizardData.customTotalPrice != null && wizardData.customTotalPrice > 0
-    const convertedProducts = wizardData.selectedArticles.length > 0
-      ? hasCustomPrice
-        ? convertArticlesToOneflowProductsCustomPrice(wizardData.selectedArticles, wizardData.customTotalPrice!, wizardData.partyType as CustomerType)
-        : convertArticlesToOneflowProducts(wizardData.selectedArticles, wizardData.partyType as CustomerType)
-      : wizardData.selectedProducts
+    // Konvertera tjänster → SelectedProduct-format för API:et (aldrig inköpsartiklar!)
+    const partyType = wizardData.partyType as CustomerType
+    let convertedProducts: SelectedProduct[] = []
+
+    if (wizardData.prefillServices && wizardData.prefillServices.length > 0) {
+      // Prefill-läge: använd prefillServices direkt
+      convertedProducts = convertServicesToOneflowProducts(wizardData.prefillServices, partyType)
+    } else {
+      // Manuellt läge: använd draftItems (filtrera bara services — interna artiklar ska ej till OneFlow)
+      const services = wizardData.draftItems
+        .filter(i => i.item_type === 'service')
+        .map(i => ({
+          service_name: i.service_name,
+          service_code: i.service_code,
+          description: i.notes || i.service_name || '',
+          unit_price: i.unit_price,
+          quantity: i.quantity,
+          vat_rate: i.vat_rate,
+          rot_rut_type: i.rot_rut_type,
+          service: i.service,
+        }))
+      convertedProducts = convertServicesToOneflowProducts(services, partyType)
+    }
 
     const LIMIT = 1024
     const part1 = wizardData.agreementText.substring(0, LIMIT)
@@ -572,7 +519,6 @@ export default function OneflowContractCreator() {
           senderEmail: user?.email,
           senderName: wizardData.anstalld,
           selectedProducts: convertedProducts,
-          priceListId: wizardData.selectedPriceListId,
           customerGroupId: wizardData.customer_group_id
         })
       })
@@ -1206,27 +1152,14 @@ export default function OneflowContractCreator() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                  <PriceListArticleSelector
-                    selectedPriceListId={wizardData.selectedPriceListId}
-                    onPriceListChange={(id) => updateWizardData('selectedPriceListId', id)}
-                    selectedArticles={wizardData.selectedArticles}
-                    onSelectionChange={handleArticleSelectionChange}
-                    customerType={wizardData.partyType as CustomerType}
-                    readOnly={!!wizardData.case_id && !!wizardData.customTotalPrice && wizardData.customTotalPrice > 0}
-                  />
-                </div>
-                <div className="lg:col-span-1">
-                  <div className="sticky top-4">
-                    <ArticleSummary
-                      selectedArticles={wizardData.selectedArticles}
-                      customerType={wizardData.partyType as CustomerType}
-                      deductionType={wizardData.deductionType}
-                      customTotalPrice={wizardData.customTotalPrice}
-                    />
-                  </div>
-                </div>
+              <div className="max-w-5xl mx-auto">
+                <CaseServiceSelector
+                  draftMode
+                  caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
+                  customerId={null}
+                  primaryServiceId={null}
+                  onChange={(items) => updateWizardData('draftItems', items)}
+                />
               </div>
             )}
           </div>
@@ -1274,22 +1207,38 @@ export default function OneflowContractCreator() {
                   )}
                 </div>
                 
-                {wizardData.selectedArticles.length > 0 && (
-                  <div className="pt-4 border-t border-slate-700">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const generatedText = generateArticleContractDescription(wizardData.selectedArticles)
-                        updateWizardData('agreementText', generatedText)
-                        toast.success('Beskrivning genererad från valda artiklar!')
-                      }}
-                      className="w-full"
-                    >
-                      ⚡ Generera beskrivning från valda artiklar
-                    </Button>
-                  </div>
-                )}
+                {(() => {
+                  const hasPrefill = wizardData.prefillServices && wizardData.prefillServices.length > 0
+                  const serviceDraftItems = wizardData.draftItems.filter(i => i.item_type === 'service')
+                  const canGenerate = hasPrefill || serviceDraftItems.length > 0
+                  if (!canGenerate) return null
+                  return (
+                    <div className="pt-4 border-t border-slate-700">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const lines = hasPrefill
+                            ? wizardData.prefillServices!.map(s => {
+                                const qty = s.quantity > 1 ? ` (${s.quantity} st)` : ''
+                                return `- ${s.service_name ?? 'Tjänst'}${qty}`
+                              })
+                            : serviceDraftItems.map(i => {
+                                const qty = i.quantity > 1 ? ` (${i.quantity} st)` : ''
+                                const extra = i.notes ? ` - ${i.notes}` : ''
+                                return `- ${i.service_name ?? 'Tjänst'}${qty}${extra}`
+                              })
+                          const generatedText = `Tjänster som ingår:\n\n${lines.join('\n')}`
+                          updateWizardData('agreementText', generatedText)
+                          toast.success('Beskrivning genererad från valda tjänster!')
+                        }}
+                        className="w-full"
+                      >
+                        ⚡ Generera beskrivning från valda tjänster
+                      </Button>
+                    </div>
+                  )
+                })()}
               </div>
             </Card>
           </div>
@@ -1378,16 +1327,6 @@ export default function OneflowContractCreator() {
                 </div>
               </Card>
             </div>
-
-            {/* Artikelsammanfattning */}
-            {wizardData.selectedArticles.length > 0 && (
-              <ArticleSummary
-                selectedArticles={wizardData.selectedArticles}
-                customerType={wizardData.partyType as CustomerType}
-                deductionType={wizardData.deductionType}
-                customTotalPrice={wizardData.customTotalPrice}
-              />
-            )}
 
             {/* Signering */}
             <Card className="p-6">
@@ -1550,7 +1489,10 @@ export default function OneflowContractCreator() {
                         'org-nr': '',
                         selectedPriceListId: null,
                         selectedArticles: [],
+                        deductionType: null,
+                        customTotalPrice: null,
                         selectedProducts: [],
+                        draftItems: [],
                         agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
                         sendForSigning: true,
                         customer_group_id: null
@@ -1641,23 +1583,6 @@ export default function OneflowContractCreator() {
             </motion.div>
           </AnimatePresence>
         </div>
-
-        {/* Varning vid 0 artiklar */}
-        {showZeroArticlesWarning && currentStep === productsStep && (
-          <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center justify-between">
-            <p className="text-amber-400 text-sm">
-              Du har inte valt några artiklar. Vill du fortsätta utan?
-            </p>
-            <div className="flex gap-2 ml-4">
-              <Button variant="outline" size="sm" onClick={() => setShowZeroArticlesWarning(false)}>
-                Tillbaka
-              </Button>
-              <Button size="sm" onClick={() => { setShowZeroArticlesWarning(false); setCurrentStep(agreementStep) }}>
-                Fortsätt ändå
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* Navigation Buttons */}
         {!createdContract && (

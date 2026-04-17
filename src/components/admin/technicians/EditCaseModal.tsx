@@ -588,6 +588,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           unit_price: item.unit_price,
           quantity: item.quantity,
           total_price: item.total_price,
+          vat_rate: item.vat_rate,
+          rot_rut_type: item.rot_rut_type,
+          service: item.service
+            ? {
+                rot_rate_percent: (item.service as any).rot_rate_percent ?? null,
+                rut_rate_percent: (item.service as any).rut_rate_percent ?? null,
+              }
+            : null,
         }))
     } catch (err) {
       console.warn('Kunde inte hämta ärendets artiklar:', err)
