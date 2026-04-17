@@ -13,7 +13,10 @@ import { useNavigate } from 'react-router-dom'
 import { OFFER_STATUS_CONFIG } from '../../../types/casePipeline'
 import { CommentThread } from './CommentThread'
 import CommentSection from '../../communication/CommentSection'
+import { OfferFollowUpService } from '../../../services/offerFollowUpService'
 import type { FollowUpOffer, FollowUpSortBy, FollowUpStatusFilter } from '../../../services/offerFollowUpService'
+import type { CaseBillingItemWithRelations } from '../../../types/caseBilling'
+import OfferItemsSection from './OfferItemsSection'
 import Select from '../../ui/Select'
 
 interface FollowUpTableProps {
@@ -105,6 +108,32 @@ function OfferRow({
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const navigate = useNavigate()
+
+  // Lazy-load tjänster + artiklar vid första expand
+  const [itemsData, setItemsData] = useState<{
+    services: CaseBillingItemWithRelations[]
+    articles: CaseBillingItemWithRelations[]
+  } | null>(null)
+  const [itemsLoading, setItemsLoading] = useState(false)
+  const [itemsError, setItemsError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isExpanded || itemsData !== null || itemsLoading) return
+    let cancelled = false
+    setItemsLoading(true)
+    setItemsError(null)
+    OfferFollowUpService.getContractItems(offer.id)
+      .then(data => {
+        if (!cancelled) setItemsData(data)
+      })
+      .catch(err => {
+        if (!cancelled) setItemsError(err instanceof Error ? err.message : 'Okänt fel')
+      })
+      .finally(() => {
+        if (!cancelled) setItemsLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [isExpanded, itemsData, itemsLoading, offer.id])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -343,6 +372,20 @@ function OfferRow({
                     </a>
                   </div>
                 )}
+              </div>
+
+              {/* Innehåll i offerten: tjänster + interna artiklar */}
+              <div className="pt-2 border-t border-slate-700/50">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <FileText className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-xs font-medium text-slate-300">Innehåll i offerten</span>
+                </div>
+                <OfferItemsSection
+                  services={itemsData?.services || []}
+                  articles={itemsData?.articles || []}
+                  loading={itemsLoading}
+                  error={itemsError}
+                />
               </div>
 
               {/* Kommunikation — intern/extern flikar */}

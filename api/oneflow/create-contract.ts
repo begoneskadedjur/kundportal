@@ -49,6 +49,26 @@ interface ContractRequestBody {
   }>
   // Kundgrupp-ID (vid avtal)
   customerGroupId?: string | null
+  // Draft-items från wizarden (tjänster + interna artiklar) för persistens i case_billing_items
+  draftItems?: Array<{
+    item_type: 'article' | 'service'
+    article_id?: string | null
+    article_code?: string | null
+    article_name?: string | null
+    service_id?: string | null
+    service_code?: string | null
+    service_name?: string | null
+    quantity: number
+    unit_price: number
+    discount_percent?: number
+    discounted_price?: number
+    total_price: number
+    vat_rate?: number
+    price_source?: string
+    notes?: string | null
+    rot_rut_type?: 'ROT' | 'RUT' | null
+    mapped_service_id?: string | null
+  }>
 }
 
 // FÄLTMAPPNING FÖR OLIKA DOKUMENTTYPER
@@ -269,7 +289,8 @@ export default async function handler(
     selectedProducts,
     caseId,
     priceListId,
-    customerGroupId
+    customerGroupId,
+    draftItems
   } = req.body as ContractRequestBody
 
   // Validera användaren
@@ -493,8 +514,63 @@ export default async function handler(
         }
       }
     }
-    
-    return res.status(200).json({ 
+
+    // Persistera draftItems (tjänster + interna artiklar) till case_billing_items
+    // så att de kan visas i offertuppföljningen och andra vyer
+    if (Array.isArray(draftItems) && draftItems.length > 0) {
+      try {
+        const { data: contractRow } = await supabase
+          .from('contracts')
+          .select('id')
+          .eq('oneflow_contract_id', createdContract.id.toString())
+          .single()
+
+        if (contractRow) {
+          const rows = draftItems
+            .filter(item => item && item.item_type && typeof item.total_price === 'number')
+            .map(item => ({
+              case_id: contractRow.id,
+              case_type: 'contract',
+              customer_id: customerId || null,
+              item_type: item.item_type,
+              service_id: item.service_id || null,
+              service_code: item.service_code || null,
+              service_name: item.service_name || null,
+              article_id: item.article_id || null,
+              article_code: item.article_code || null,
+              article_name: item.article_name || item.service_name || '',
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              discount_percent: item.discount_percent ?? 0,
+              discounted_price: item.discounted_price ?? item.unit_price,
+              total_price: item.total_price,
+              vat_rate: item.vat_rate ?? 25,
+              price_source: item.price_source || 'standard',
+              status: 'pending',
+              requires_approval: false,
+              notes: item.notes || null,
+              rot_rut_type: item.rot_rut_type || null,
+              mapped_service_id: item.mapped_service_id || null,
+            }))
+
+          if (rows.length > 0) {
+            const { error: itemsError } = await supabase
+              .from('case_billing_items')
+              .insert(rows)
+
+            if (itemsError) {
+              console.error('Kunde inte spara draftItems till case_billing_items:', itemsError)
+            } else {
+              console.log(`✅ Sparade ${rows.length} draft-items för kontrakt ${contractRow.id}`)
+            }
+          }
+        }
+      } catch (persistErr) {
+        console.error('Oväntat fel vid persistens av draftItems:', persistErr)
+      }
+    }
+
+    return res.status(200).json({
       contract: createdContract,
       quote_id: createdContract.id, // Use contract ID as quote_id for multisite recipient handling
       sender: {

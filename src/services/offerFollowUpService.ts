@@ -1,5 +1,6 @@
 // src/services/offerFollowUpService.ts — Service för offertuppföljning med tekniker-koppling
 import { supabase } from '../lib/supabase'
+import type { CaseBillingItemWithRelations } from '../types/caseBilling'
 
 // === Prioritetskonstanter ===
 export const THRESHOLDS = {
@@ -300,6 +301,26 @@ export class OfferFollowUpService {
       throw new Error(err.message || 'Kunde inte radera offert')
     }
     return response.json()
+  }
+
+  /** Hämta tjänster + interna artiklar kopplade till en offert/avtal */
+  static async getContractItems(contractId: string): Promise<{
+    services: CaseBillingItemWithRelations[]
+    articles: CaseBillingItemWithRelations[]
+  }> {
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .select('*, article:articles(*), service:services(*)')
+      .eq('case_id', contractId)
+      .eq('case_type', 'contract')
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    const items = (data || []) as CaseBillingItemWithRelations[]
+    return {
+      services: items.filter(i => i.item_type === 'service'),
+      articles: items.filter(i => i.item_type === 'article'),
+    }
   }
 
   /** Skicka kommentar (via API-proxy) */

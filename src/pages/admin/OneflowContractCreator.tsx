@@ -551,7 +551,26 @@ export default function OneflowContractCreator() {
           senderEmail: user?.email,
           senderName: wizardData.anstalld,
           selectedProducts: convertedProducts,
-          customerGroupId: wizardData.customer_group_id
+          customerGroupId: wizardData.customer_group_id,
+          draftItems: wizardData.draftItems.map(i => ({
+            item_type: i.item_type,
+            article_id: i.article_id,
+            article_code: i.article_code,
+            article_name: i.article_name,
+            service_id: i.service_id,
+            service_code: i.service_code,
+            service_name: i.service_name,
+            quantity: i.quantity,
+            unit_price: i.unit_price,
+            discount_percent: i.discount_percent,
+            discounted_price: i.discounted_price,
+            total_price: i.total_price,
+            vat_rate: i.vat_rate,
+            price_source: i.price_source,
+            notes: i.notes,
+            rot_rut_type: i.rot_rut_type,
+            mapped_service_id: i.mapped_service_id,
+          }))
         })
       })
       

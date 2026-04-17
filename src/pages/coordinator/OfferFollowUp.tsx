@@ -35,7 +35,7 @@ export default function OfferFollowUp() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  const [sortBy, setSortBy] = useState<FollowUpSortBy>('priority')
+  const [sortBy, setSortBy] = useState<FollowUpSortBy>('newest')
   const [statusFilter, setStatusFilter] = useState<FollowUpStatusFilter>('all')
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
