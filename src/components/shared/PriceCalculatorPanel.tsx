@@ -2,7 +2,7 @@
 // Prisguide 2.0: tilldela interna kostnader till fakturarader, sätt påslag per rad, applicera
 
 import { useEffect } from 'react'
-import { X, Calculator, TrendingUp, AlertTriangle, CheckCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, Calculator, TrendingUp, AlertTriangle, CheckCircle, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 import Button from '../ui/Button'
@@ -261,7 +261,7 @@ export default function PriceCalculatorPanel({
                                   {hasArticles && (
                                     <div className={`flex items-center gap-1 text-xs font-medium mt-0.5 ${getMarginColor(margin)}`}>
                                       {getMarginIcon(margin)}
-                                      {margin.toFixed(0)}% marginal
+                                      {margin.toFixed(1)}% marginal
                                     </div>
                                   )}
                                 </div>
@@ -315,6 +315,15 @@ export default function PriceCalculatorPanel({
                             <span className="flex items-center gap-1 text-red-400">
                               <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
                               &lt; {settings.min_margin_percent}%
+                            </span>
+                          </div>
+
+                          {/* Hjälptext: påslag vs marginal */}
+                          <div className="flex items-start gap-1.5 text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-700/40 leading-relaxed">
+                            <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                            <span>
+                              Påslag räknas på inköpet, marginal på försäljningspriset.
+                              Exempel: inköp 100 kr + 40 % påslag = 140 kr, varav vinst 40 kr = 28.6 % marginal.
                             </span>
                           </div>
                         </div>

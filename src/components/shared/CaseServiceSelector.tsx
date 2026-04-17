@@ -761,7 +761,7 @@ export default function CaseServiceSelector({
                 {marginOk
                   ? <CheckCircle className="w-3.5 h-3.5" />
                   : <AlertTriangle className="w-3.5 h-3.5" />}
-                {marginPercent.toFixed(0)}% marginal
+                {marginPercent.toFixed(1)}% marginal
               </div>
             )}
             {/* Prisguide-knapp */}
