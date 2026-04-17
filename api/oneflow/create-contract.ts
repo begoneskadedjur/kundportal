@@ -51,6 +51,7 @@ interface ContractRequestBody {
   customerGroupId?: string | null
   // Draft-items från wizarden (tjänster + interna artiklar) för persistens i case_billing_items
   draftItems?: Array<{
+    draft_id?: string | null
     item_type: 'article' | 'service'
     article_id?: string | null
     article_code?: string | null
@@ -389,10 +390,21 @@ export default async function handler(
     )
 
     const createdContract = await createResponse.json()
-    
+
     if (!createResponse.ok) {
       console.error('Fel vid skapande av kontrakt:', JSON.stringify(createdContract, null, 2))
-      return res.status(createResponse.status).json(createdContract)
+      console.error('Payload som skickades till OneFlow:', JSON.stringify(createPayload, null, 2))
+      return res.status(createResponse.status).json({
+        message:
+          createdContract.message ||
+          createdContract.detail ||
+          'Fel vid skapande av kontrakt i OneFlow',
+        detail:
+          createdContract.detail ||
+          createdContract.message ||
+          'Se Vercel-loggen för fullständiga detaljer',
+        oneflow_error: createdContract,
+      })
     }
 
     console.log(`${documentTypeText} skapat:`, createdContract.id)
@@ -540,51 +552,104 @@ export default async function handler(
           })
         }
 
-        const rows = draftItems
-          .filter(item => item && item.item_type && typeof item.total_price === 'number')
-          .map(item => ({
-            case_id: contractRow.id,
-            case_type: 'contract',
-            customer_id: customerId || null,
-            item_type: item.item_type,
-            service_id: item.service_id || null,
-            service_code: item.service_code || null,
-            service_name: item.service_name || null,
-            article_id: item.article_id || null,
-            article_code: item.article_code || null,
-            article_name: item.article_name || item.service_name || '',
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            discount_percent: item.discount_percent ?? 0,
-            discounted_price: item.discounted_price ?? item.unit_price,
-            total_price: item.total_price,
-            vat_rate: item.vat_rate ?? 25,
-            price_source: item.price_source || 'standard',
-            status: 'pending',
-            requires_approval: false,
-            notes: item.notes || null,
-            rot_rut_type: item.rot_rut_type || null,
-            mapped_service_id: item.mapped_service_id || null,
-          }))
-
-        console.log(
-          `[persist] Efter filter: ${rows.length} rader (raw: ${draftItems.length})`
+        // Filtrera giltiga rader
+        const validItems = draftItems.filter(
+          item => item && item.item_type && typeof item.total_price === 'number'
         )
 
-        if (rows.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('case_billing_items')
-            .insert(rows)
+        // Hjälp-funktion för att bygga en insert-rad, med override på mapped_service_id
+        const buildRow = (item: typeof validItems[number], mappedServiceIdOverride: string | null) => ({
+          case_id: contractRow.id,
+          case_type: 'contract',
+          customer_id: customerId || null,
+          item_type: item.item_type,
+          service_id: item.service_id || null,
+          service_code: item.service_code || null,
+          service_name: item.service_name || null,
+          article_id: item.article_id || null,
+          article_code: item.article_code || null,
+          article_name: item.article_name || item.service_name || '',
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          discount_percent: item.discount_percent ?? 0,
+          discounted_price: item.discounted_price ?? item.unit_price,
+          total_price: item.total_price,
+          vat_rate: item.vat_rate ?? 25,
+          price_source: item.price_source || 'standard',
+          status: 'pending',
+          requires_approval: false,
+          notes: item.notes || null,
+          rot_rut_type: item.rot_rut_type || null,
+          mapped_service_id: mappedServiceIdOverride,
+        })
 
-          if (itemsError) {
-            console.error('[persist] Insert misslyckades:', itemsError)
+        // Steg 1: insert tjänster först (utan mapped_service_id), så vi kan få deras DB-id:n.
+        // Draft-items skickar klient-genererade UUID:n i `service_id`-fältet fanns tidigare också
+        // men artiklarnas mapped_service_id pekar på TJÄNSTENS draft-item.id, inte service_id.
+        // Eftersom API:et inte får draft-items id, behöver frontend skicka det som en tredje
+        // nyckel `_draft_id` på både tjänsten och på artikelns `mapped_service_id` — vi använder
+        // det värdet här för att bygga mappningen.
+        const services = validItems.filter(i => i.item_type === 'service')
+        const articles = validItems.filter(i => i.item_type === 'article')
+
+        // Mappa från draft-UUID (det frontend skickar som mapped_service_id) till DB-UUID.
+        // Frontend skickar draft-UUID:n som `service_id` för tjänst-rader (se wizardens draftItems).
+        const draftToDbId = new Map<string, string>()
+
+        if (services.length > 0) {
+          const serviceRows = services.map(s => buildRow(s, null))
+          const { data: insertedServices, error: servicesError } = await supabase
+            .from('case_billing_items')
+            .insert(serviceRows)
+            .select('id, service_code, service_name')
+
+          if (servicesError) {
+            console.error('[persist] Insert av services misslyckades:', servicesError)
+            return res.status(502).json({
+              message: 'Kontrakt skapades men tjänster kunde inte sparas',
+              contract: createdContract,
+              persist_error: servicesError.message,
+            })
+          }
+
+          // Mappa insatta tjänster tillbaka till draft-items via index-ordning
+          // (Supabase insert returnerar rader i samma ordning som input)
+          if (insertedServices) {
+            services.forEach((draftService, idx) => {
+              const dbRow = insertedServices[idx]
+              if (dbRow && draftService.draft_id) {
+                draftToDbId.set(draftService.draft_id, dbRow.id)
+              }
+            })
+          }
+
+          console.log(`[persist] Sparade ${serviceRows.length} tjänster`)
+        }
+
+        // Steg 2: insert artiklar med mappad mapped_service_id
+        if (articles.length > 0) {
+          const articleRows = articles.map(a => {
+            // Översätt mapped_service_id från draft-UUID → DB-UUID
+            const mappedDbId = a.mapped_service_id
+              ? draftToDbId.get(a.mapped_service_id) || null
+              : null
+            return buildRow(a, mappedDbId)
+          })
+
+          const { error: articlesError } = await supabase
+            .from('case_billing_items')
+            .insert(articleRows)
+
+          if (articlesError) {
+            console.error('[persist] Insert av articles misslyckades:', articlesError)
             return res.status(502).json({
               message: 'Kontrakt skapades men artiklar kunde inte sparas',
               contract: createdContract,
-              persist_error: itemsError.message,
+              persist_error: articlesError.message,
             })
           }
-          console.log(`✅ Sparade ${rows.length} draft-items för kontrakt ${contractRow.id}`)
+
+          console.log(`[persist] Sparade ${articleRows.length} artiklar`)
         }
       } catch (persistErr: any) {
         console.error('[persist] Oväntat fel:', persistErr)

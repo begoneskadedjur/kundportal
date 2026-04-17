@@ -130,6 +130,7 @@ export default function OneflowContractCreator() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitErrorStep, setSubmitErrorStep] = useState<number | null>(null)
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
   const [groupsLoading, setGroupsLoading] = useState(true)
   const [groupsError, setGroupsError] = useState<string | null>(null)
@@ -566,6 +567,9 @@ export default function OneflowContractCreator() {
           selectedProducts: convertedProducts,
           customerGroupId: wizardData.customer_group_id,
           draftItems: wizardData.draftItems.map(i => ({
+            // Skicka med klient-genererat draft-id så API:et kan mappa
+            // mapped_service_id (draft-UUID) → DB-UUID efter insert
+            draft_id: i.id,
             item_type: i.item_type,
             article_id: i.article_id,
             article_code: i.article_code,
@@ -582,6 +586,7 @@ export default function OneflowContractCreator() {
             price_source: i.price_source,
             notes: i.notes,
             rot_rut_type: i.rot_rut_type,
+            // mapped_service_id innehåller draft-UUID:n som pekar på tjänst-raden i samma batch
             mapped_service_id: i.mapped_service_id,
           }))
         })
@@ -589,7 +594,11 @@ export default function OneflowContractCreator() {
       
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.detail || error.message || 'Ett okänt serverfel inträffade')
+        console.error('[wizard] API-fel:', error)
+        const thrown: any = new Error(error.detail || error.message || 'Ett okänt serverfel inträffade')
+        // Bifoga OneFlow-felobjektet (inkl. parameter_problems) för fält-specifik felhantering
+        thrown.oneflowError = error.oneflow_error || error
+        throw thrown
       }
       
       setCreationStep('Skapar dokument...')
@@ -629,8 +638,40 @@ export default function OneflowContractCreator() {
       setTimeout(() => setShowConfetti(false), 5000)
       
     } catch (err: any) {
-      setSubmitError(err.message || 'Ett okänt fel inträffade')
-      toast.error(`Fel: ${err.message}`)
+      // Parse OneFlow parameter_problems om det finns, annars använd generic message
+      const oneflowErr = err.oneflowError as
+        | { parameter_problems?: Record<string, string[]>; detail?: string }
+        | undefined
+      let userMessage = err.message || 'Ett okänt fel inträffade'
+      let targetStep: number | null = null
+
+      if (oneflowErr?.parameter_problems) {
+        const problems = oneflowErr.parameter_problems
+        const lines: string[] = []
+        for (const [field, msgs] of Object.entries(problems)) {
+          // Mappa OneFlow-fältnamn till läsbar svenska + identifiera vilket steg som ska öppnas
+          if (field === 'participant.email' || field.includes('email')) {
+            lines.push(`E-postadressen är ogiltig. Kontrollera stavning och domän (t.ex. ${wizardData['e-post-kontaktperson']}).`)
+            targetStep = counterpartyStep
+          } else if (field === 'participant.name' || field.includes('name')) {
+            lines.push('Kontaktpersonens namn är ogiltigt.')
+            targetStep = counterpartyStep
+          } else if (field.includes('organization_number') || field.includes('org')) {
+            lines.push('Organisationsnumret är ogiltigt.')
+            targetStep = counterpartyStep
+          } else if (field.includes('phone')) {
+            lines.push('Telefonnumret är ogiltigt.')
+            targetStep = counterpartyStep
+          } else {
+            lines.push(`${field}: ${msgs.join(', ')}`)
+          }
+        }
+        userMessage = lines.join(' ')
+      }
+
+      setSubmitError(userMessage)
+      setSubmitErrorStep(targetStep)
+      toast.error(`Fel: ${userMessage}`)
     } finally {
       setIsCreating(false)
       setCreationStep('')
