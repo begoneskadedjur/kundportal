@@ -43,7 +43,7 @@ import {
 } from '../../types/caseBilling'
 import { getEffectiveRotPercent, getEffectiveRutPercent } from '../../utils/rotRutConstants'
 import type { ServiceWithGroup } from '../../types/services'
-import { ARTICLE_CATEGORIES } from '../../types/articles'
+import { ARTICLE_CATEGORIES, calculatePricePerDosageUnit } from '../../types/articles'
 import type { ArticleCategory } from '../../types/articles'
 import { ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
 import PriceCalculatorPanel from './PriceCalculatorPanel'
@@ -390,8 +390,14 @@ export default function CaseServiceSelector({
   // ──────────────────────────────────────────────────────────────
   const handleAddArticle = async (item: ArticleWithEffectivePrice) => {
     if (saving) return
+    // Doseringsprodukter: räkna om enhetspris till pris per dosenhet (g/ml/m)
+    const isDosage = item.article.is_dosage_product && item.article.total_content && item.article.dosage_unit
+    const unitPrice = isDosage
+      ? Math.round(calculatePricePerDosageUnit(item.effective_price, item.article.total_content!) * 100) / 100
+      : item.effective_price
+
     if (draftMode && !caseId) {
-      const discounted = calculateDiscountedPrice(item.effective_price, 0)
+      const discounted = calculateDiscountedPrice(unitPrice, 0)
       const total = calculateTotalPrice(discounted, 1)
       const draftItem: CaseBillingItemWithRelations = {
         id: crypto.randomUUID(),
@@ -406,7 +412,7 @@ export default function CaseServiceSelector({
         service_name: null,
         item_type: 'article',
         quantity: 1,
-        unit_price: item.effective_price,
+        unit_price: unitPrice,
         discount_percent: 0,
         discounted_price: discounted,
         total_price: total,
@@ -420,6 +426,7 @@ export default function CaseServiceSelector({
         rot_rut_type: null,
         fastighetsbeteckning: null,
         min_quantity: null,
+        mapped_service_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         article: item.article,
@@ -440,7 +447,7 @@ export default function CaseServiceSelector({
         article_code: item.article.code,
         article_name: item.article.name,
         quantity: 1,
-        unit_price: item.effective_price,
+        unit_price: unitPrice,
         vat_rate: item.article.vat_rate,
         price_source: item.price_source,
         added_by_technician_id: technicianId || undefined,
@@ -461,7 +468,9 @@ export default function CaseServiceSelector({
     if (saving) return
     const item = allItems.find(i => i.id === id)
     if (!item) return
-    const newQty = Math.max(1, item.quantity + delta)
+    const isDosage = item.article?.is_dosage_product && item.article?.dosage_unit
+    const minQty = isDosage ? 0.1 : 1
+    const newQty = Math.max(minQty, item.quantity + delta)
     if (draftMode && !caseId) {
       updateDraftItem(id, { quantity: newQty })
       return
@@ -482,7 +491,9 @@ export default function CaseServiceSelector({
     if (saving) return
     const item = allItems.find(i => i.id === id)
     if (!item) return
-    const newQty = Math.max(1, absoluteQty)
+    const isDosage = item.article?.is_dosage_product && item.article?.dosage_unit
+    const minQty = isDosage ? 0.1 : 1
+    const newQty = Math.max(minQty, absoluteQty)
     if (newQty === item.quantity) return
     if (draftMode && !caseId) {
       updateDraftItem(id, { quantity: newQty })
@@ -986,16 +997,24 @@ export default function CaseServiceSelector({
             {/* Befintliga artikelrader */}
             {articleItems.length > 0 && (
               <div className="space-y-1.5">
-                {articleItems.map(item => (
+                {articleItems.map(item => {
+                  const isDosage = item.article?.is_dosage_product && item.article?.dosage_unit
+                  const unitLabel = isDosage ? item.article!.dosage_unit! : 'st'
+                  return (
                   <div key={item.id} className="px-3 py-2 bg-slate-800/40 border border-slate-700/30 rounded-lg">
                     {/* Namn – alltid full bredd */}
                     <div className="text-sm text-white mb-1.5">
                       {item.article_code && <span className="text-xs text-slate-500 mr-1">{item.article_code}</span>}
                       {item.article_name}
+                      {isDosage && item.article?.total_content && (
+                        <span className="text-[10px] text-slate-500 ml-1">
+                          ({item.article.total_content}{item.article.dosage_unit} / fp)
+                        </span>
+                      )}
                     </div>
                     {/* Kontroller på rad 2 */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">{item.unit_price} kr/st</span>
+                      <span className="text-xs text-slate-500">{item.unit_price} kr/{unitLabel}</span>
                       {!readOnly && (
                         <div className="flex items-center gap-1 ml-auto">
                           <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
@@ -1003,13 +1022,16 @@ export default function CaseServiceSelector({
                           </button>
                           <input
                             type="number"
-                            min={1}
+                            min={isDosage ? 0.1 : 1}
+                            step={isDosage ? 0.1 : 1}
                             value={item.quantity}
                             onChange={(e) => {
-                              const n = Math.max(1, parseInt(e.target.value, 10) || 1)
+                              const parsed = isDosage ? parseFloat(e.target.value) : parseInt(e.target.value, 10)
+                              const min = isDosage ? 0.1 : 1
+                              const n = Math.max(min, isNaN(parsed) ? min : parsed)
                               handleQuantitySet(item.id, n)
                             }}
-                            className="w-12 px-1 py-0.5 text-sm bg-slate-700 border border-slate-600 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                            className="w-14 px-1 py-0.5 text-sm bg-slate-700 border border-slate-600 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                           />
                           <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
                             <Plus className="w-3 h-3" />
@@ -1026,7 +1048,8 @@ export default function CaseServiceSelector({
                       )}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
                 <div className="flex justify-between text-xs text-slate-400 px-1">
                   <span>Total inköpskostnad</span>
                   <span className="font-medium text-slate-300">{formatPrice(purchaseCost)}</span>
@@ -1063,23 +1086,36 @@ export default function CaseServiceSelector({
                         </button>
                         {expanded && (
                           <div className="space-y-0.5 ml-2">
-                            {catArticles.map(item => (
-                              <button
-                                type="button"
-                                key={item.article.id}
-                                onClick={() => handleAddArticle(item)}
-                                disabled={saving}
-                                className="w-full flex items-center justify-between px-2 py-1.5 rounded text-left hover:bg-slate-800/60 transition-colors"
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <span className="text-xs text-slate-500 mr-1">{item.article.code}</span>
-                                  <span className="text-sm text-slate-200 truncate">{item.article.name}</span>
-                                </div>
-                                <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
-                                  {formatPrice(item.effective_price)}
-                                </span>
-                              </button>
-                            ))}
+                            {catArticles.map(item => {
+                              const isDosage = item.article.is_dosage_product && item.article.total_content && item.article.dosage_unit
+                              const dosagePrice = isDosage
+                                ? Math.round(calculatePricePerDosageUnit(item.effective_price, item.article.total_content!) * 100) / 100
+                                : null
+                              return (
+                                <button
+                                  type="button"
+                                  key={item.article.id}
+                                  onClick={() => handleAddArticle(item)}
+                                  disabled={saving}
+                                  className="w-full flex items-center justify-between px-2 py-1.5 rounded text-left hover:bg-slate-800/60 transition-colors"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-xs text-slate-500 mr-1">{item.article.code}</span>
+                                    <span className="text-sm text-slate-200 truncate">{item.article.name}</span>
+                                    {isDosage && (
+                                      <span className="text-[10px] text-slate-500 ml-1">
+                                        ({item.article.total_content}{item.article.dosage_unit} / fp)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
+                                    {isDosage
+                                      ? `${formatPrice(dosagePrice!)}/${item.article.dosage_unit}`
+                                      : formatPrice(item.effective_price)}
+                                  </span>
+                                </button>
+                              )
+                            })}
                           </div>
                         )}
                       </div>
