@@ -534,7 +534,20 @@ export default function OneflowContractCreator() {
 
     setIsCreating(true)
     setCreationStep('Förbereder data...')
-    
+
+    // Debug: logga vilka draftItems som skickas till API:et för persistens i case_billing_items
+    console.log(
+      '[wizard] Skickar draftItems:',
+      wizardData.draftItems.length,
+      'items',
+      wizardData.draftItems.map(i => ({
+        type: i.item_type,
+        name: i.service_name || i.article_name,
+        qty: i.quantity,
+        total: i.total_price,
+      }))
+    )
+
     try {
       setCreationStep('Ansluter till Oneflow...')
       const response = await fetch('/api/oneflow/create-contract', {

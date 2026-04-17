@@ -517,6 +517,11 @@ export default async function handler(
 
     // Persistera draftItems (tjänster + interna artiklar) till case_billing_items
     // så att de kan visas i offertuppföljningen och andra vyer
+    console.log(
+      `[persist] draftItems i body: ${
+        Array.isArray(draftItems) ? draftItems.length : 'saknas/ej array'
+      }`
+    )
     if (Array.isArray(draftItems) && draftItems.length > 0) {
       try {
         const { data: contractRow } = await supabase
@@ -525,48 +530,69 @@ export default async function handler(
           .eq('oneflow_contract_id', createdContract.id.toString())
           .single()
 
-        if (contractRow) {
-          const rows = draftItems
-            .filter(item => item && item.item_type && typeof item.total_price === 'number')
-            .map(item => ({
-              case_id: contractRow.id,
-              case_type: 'contract',
-              customer_id: customerId || null,
-              item_type: item.item_type,
-              service_id: item.service_id || null,
-              service_code: item.service_code || null,
-              service_name: item.service_name || null,
-              article_id: item.article_id || null,
-              article_code: item.article_code || null,
-              article_name: item.article_name || item.service_name || '',
-              quantity: item.quantity,
-              unit_price: item.unit_price,
-              discount_percent: item.discount_percent ?? 0,
-              discounted_price: item.discounted_price ?? item.unit_price,
-              total_price: item.total_price,
-              vat_rate: item.vat_rate ?? 25,
-              price_source: item.price_source || 'standard',
-              status: 'pending',
-              requires_approval: false,
-              notes: item.notes || null,
-              rot_rut_type: item.rot_rut_type || null,
-              mapped_service_id: item.mapped_service_id || null,
-            }))
-
-          if (rows.length > 0) {
-            const { error: itemsError } = await supabase
-              .from('case_billing_items')
-              .insert(rows)
-
-            if (itemsError) {
-              console.error('Kunde inte spara draftItems till case_billing_items:', itemsError)
-            } else {
-              console.log(`✅ Sparade ${rows.length} draft-items för kontrakt ${contractRow.id}`)
-            }
-          }
+        if (!contractRow) {
+          console.error(
+            `[persist] Kunde inte hitta contracts-rad för oneflow_contract_id=${createdContract.id}`
+          )
+          return res.status(502).json({
+            message: 'Kontrakt skapades men kunde inte hittas i DB för artikel-persistens',
+            contract: createdContract,
+          })
         }
-      } catch (persistErr) {
-        console.error('Oväntat fel vid persistens av draftItems:', persistErr)
+
+        const rows = draftItems
+          .filter(item => item && item.item_type && typeof item.total_price === 'number')
+          .map(item => ({
+            case_id: contractRow.id,
+            case_type: 'contract',
+            customer_id: customerId || null,
+            item_type: item.item_type,
+            service_id: item.service_id || null,
+            service_code: item.service_code || null,
+            service_name: item.service_name || null,
+            article_id: item.article_id || null,
+            article_code: item.article_code || null,
+            article_name: item.article_name || item.service_name || '',
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount_percent: item.discount_percent ?? 0,
+            discounted_price: item.discounted_price ?? item.unit_price,
+            total_price: item.total_price,
+            vat_rate: item.vat_rate ?? 25,
+            price_source: item.price_source || 'standard',
+            status: 'pending',
+            requires_approval: false,
+            notes: item.notes || null,
+            rot_rut_type: item.rot_rut_type || null,
+            mapped_service_id: item.mapped_service_id || null,
+          }))
+
+        console.log(
+          `[persist] Efter filter: ${rows.length} rader (raw: ${draftItems.length})`
+        )
+
+        if (rows.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('case_billing_items')
+            .insert(rows)
+
+          if (itemsError) {
+            console.error('[persist] Insert misslyckades:', itemsError)
+            return res.status(502).json({
+              message: 'Kontrakt skapades men artiklar kunde inte sparas',
+              contract: createdContract,
+              persist_error: itemsError.message,
+            })
+          }
+          console.log(`✅ Sparade ${rows.length} draft-items för kontrakt ${contractRow.id}`)
+        }
+      } catch (persistErr: any) {
+        console.error('[persist] Oväntat fel:', persistErr)
+        return res.status(502).json({
+          message: 'Kontrakt skapades men artiklar kunde inte sparas (internt fel)',
+          contract: createdContract,
+          persist_error: persistErr?.message || String(persistErr),
+        })
       }
     }
 

@@ -3,6 +3,9 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Clock, Loader2, CalendarDays } from 'lucide-react'
+import DatePicker, { registerLocale } from 'react-datepicker'
+import sv from 'date-fns/locale/sv'
+import 'react-datepicker/dist/react-datepicker.css'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -10,6 +13,8 @@ import { OfferFollowUpService } from '../../../services/offerFollowUpService'
 import { createSystemComment } from '../../../services/communicationService'
 import toast from 'react-hot-toast'
 import type { FollowUpOffer } from '../../../services/offerFollowUpService'
+
+registerLocale('sv', sv)
 
 interface ExtendSigningPeriodDialogProps {
   isOpen: boolean
@@ -19,15 +24,14 @@ interface ExtendSigningPeriodDialogProps {
 }
 
 function toISODate(d: Date): string {
-  const yyyy = d.getUTCFullYear()
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
-  const dd = String(d.getUTCDate()).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
   return `${yyyy}-${mm}-${dd}`
 }
 
-function formatDateSv(iso: string): string {
-  const d = new Date(iso + 'T00:00:00Z')
-  return d.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short', day: 'numeric' })
+function formatDateSv(date: Date): string {
+  return date.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 export default function ExtendSigningPeriodDialog({
@@ -40,18 +44,18 @@ export default function ExtendSigningPeriodDialog({
 
   const defaults = useMemo(() => {
     const today = new Date()
-    today.setUTCHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+    tomorrow.setDate(tomorrow.getDate() + 1)
     const defaultDate = new Date(today)
-    defaultDate.setUTCDate(defaultDate.getUTCDate() + 14)
+    defaultDate.setDate(defaultDate.getDate() + 14)
     return {
-      min: toISODate(tomorrow),
-      default: toISODate(defaultDate),
+      min: tomorrow,
+      default: defaultDate,
     }
   }, [])
 
-  const [expireDate, setExpireDate] = useState(defaults.default)
+  const [expireDate, setExpireDate] = useState<Date | null>(defaults.default)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -69,16 +73,17 @@ export default function ExtendSigningPeriodDialog({
     }
   }
 
-  const isDateValid = expireDate >= defaults.min
+  const isDateValid = expireDate !== null && expireDate >= defaults.min
 
   const handleSubmit = async () => {
-    if (!offer || !isDateValid) return
+    if (!offer || !isDateValid || !expireDate) return
 
+    const isoDate = toISODate(expireDate)
     setSaving(true)
     setError(null)
 
     try {
-      await OfferFollowUpService.extendSigningPeriod(offer.id, expireDate)
+      await OfferFollowUpService.extendSigningPeriod(offer.id, isoDate)
 
       // Logga systemkommentar till offerten
       const userName = profile?.full_name || profile?.email || 'Okänd användare'
@@ -166,13 +171,16 @@ export default function ExtendSigningPeriodDialog({
               Nytt utgångsdatum
             </label>
             <div className="relative">
-              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-              <input
-                type="date"
-                value={expireDate}
-                min={defaults.min}
-                onChange={(e) => setExpireDate(e.target.value)}
+              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none z-10" />
+              <DatePicker
+                selected={expireDate}
+                onChange={(date) => setExpireDate(date)}
+                locale="sv"
+                dateFormat="yyyy-MM-dd"
+                minDate={defaults.min}
+                placeholderText="Välj utgångsdatum..."
                 disabled={saving}
+                wrapperClassName="w-full"
                 className="w-full pl-9 pr-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] focus:ring-2 focus:ring-[#20c58f]/20 transition-all"
               />
             </div>
