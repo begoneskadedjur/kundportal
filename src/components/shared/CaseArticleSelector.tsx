@@ -33,7 +33,7 @@ import type {
 import { calculateRotRutDeduction, calculateDiscountedPrice, calculateTotalPrice, itemRequiresApproval, ROT_RUT_PERCENT } from '../../types/caseBilling'
 import { ARTICLE_CATEGORIES } from '../../types/articles'
 import type { ArticleCategory } from '../../types/articles'
-import { ARTICLE_CATEGORY_CONFIG, ARTICLE_UNIT_CONFIG, DOSAGE_UNIT_CONFIG, calculatePricePerDosageUnit } from '../../types/articles'
+import { ARTICLE_CATEGORY_CONFIG, ARTICLE_UNIT_CONFIG, DOSAGE_UNIT_CONFIG, calculatePricePerDosageUnit, getDosageDisplayUnit } from '../../types/articles'
 
 interface CaseArticleSelectorProps {
   caseId?: string
@@ -85,14 +85,6 @@ const formatPrice = (price: number) =>
     currency: 'SEK',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
-  }).format(price)
-
-const formatDosagePrice = (price: number) =>
-  new Intl.NumberFormat('sv-SE', {
-    style: 'currency',
-    currency: 'SEK',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
   }).format(price)
 
 export default function CaseArticleSelector({
@@ -221,11 +213,15 @@ export default function CaseArticleSelector({
     const unitPrice = isDosage
       ? Math.round(calculatePricePerDosageUnit(articleWithPrice.effective_price, article.total_content!) * 100) / 100
       : articleWithPrice.effective_price
+    // Default-kvantitet: för dosage startar vi på 1 visningsenhet (1 kg / 1 l / 1 m)
+    const defaultQty = isDosage && article.dosage_unit
+      ? getDosageDisplayUnit(article.dosage_unit).factor
+      : 1
 
     if (draftMode) {
       // Draft mode: skapa lokalt item
       const discountedPrice = calculateDiscountedPrice(unitPrice, 0)
-      const totalPrice = calculateTotalPrice(discountedPrice, 1)
+      const totalPrice = calculateTotalPrice(discountedPrice, defaultQty)
       const draftItem: CaseBillingItemWithRelations = {
         id: crypto.randomUUID(),
         case_id: '',
@@ -234,7 +230,11 @@ export default function CaseArticleSelector({
         article_id: article.id,
         article_code: article.code,
         article_name: article.name,
-        quantity: 1,
+        service_id: null,
+        service_code: null,
+        service_name: null,
+        item_type: 'article',
+        quantity: defaultQty,
         unit_price: unitPrice,
         discount_percent: 0,
         discounted_price: discountedPrice,
@@ -249,6 +249,7 @@ export default function CaseArticleSelector({
         rot_rut_type: null,
         fastighetsbeteckning: null,
         min_quantity: null,
+        mapped_service_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         article: article
@@ -268,7 +269,7 @@ export default function CaseArticleSelector({
         article_id: article.id,
         article_code: article.code,
         article_name: article.name,
-        quantity: 1,
+        quantity: defaultQty,
         unit_price: unitPrice,
         vat_rate: article.vat_rate,
         price_source: articleWithPrice.price_source,
@@ -736,19 +737,23 @@ export default function CaseArticleSelector({
                               )}
 
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                {item.article.is_dosage_product && item.article.total_content && item.article.dosage_unit ? (
+                                {item.article.is_dosage_product && item.article.total_content && item.article.dosage_unit ? (() => {
+                                  const disp = getDosageDisplayUnit(item.article.dosage_unit)
+                                  const pricePerDisplay = calculatePricePerDosageUnit(item.effective_price, item.article.total_content) * disp.factor
+                                  return (
                                   <>
                                     <span className="text-[#20c58f] text-sm font-medium">
-                                      {formatDosagePrice(calculatePricePerDosageUnit(item.effective_price, item.article.total_content))}
+                                      {formatPrice(Math.round(pricePerDisplay))}
                                     </span>
                                     <span className="text-[10px] text-slate-500">
-                                      / {DOSAGE_UNIT_CONFIG[item.article.dosage_unit].shortLabel}
+                                      / {disp.unit}
                                     </span>
                                     <span className="text-[10px] text-slate-500">
                                       ({formatPrice(item.effective_price)} / {item.article.total_content}{item.article.dosage_unit})
                                     </span>
                                   </>
-                                ) : (
+                                  )
+                                })() : (
                                   <>
                                     <span className="text-[#20c58f] text-sm font-medium">
                                       {formatPrice(item.effective_price)}
@@ -816,8 +821,12 @@ export default function CaseArticleSelector({
             const article = getArticleForItem(item)
             const unitLabel = article ? ARTICLE_UNIT_CONFIG[article.unit].shortLabel : 'st'
             const isTimeUnit = article?.unit === 'timme'
-            const isDosage = article?.is_dosage_product && article?.total_content && article?.dosage_unit
-            const dosageUnitLabel = isDosage ? DOSAGE_UNIT_CONFIG[article.dosage_unit!].shortLabel : null
+            const isDosage = !!(article?.is_dosage_product && article?.total_content && article?.dosage_unit)
+            // Visningsenhet: g → kg, ml → l, m → m. Lagras alltid i grundenheten.
+            const display = isDosage && article?.dosage_unit ? getDosageDisplayUnit(article.dosage_unit) : null
+            const dosageUnitLabel = display ? display.unit : (isDosage && article?.dosage_unit ? DOSAGE_UNIT_CONFIG[article.dosage_unit].shortLabel : null)
+            const displayQty = display ? +(item.quantity / display.factor).toFixed(3) : item.quantity
+            const displayStepInBaseUnits = display ? display.factor * display.step : 1
 
             return (
               <div
@@ -854,29 +863,29 @@ export default function CaseArticleSelector({
                     <div className="flex items-center gap-3 mt-1.5 text-sm flex-wrap">
                       {/* Kvantitet */}
                       <div className="flex items-center gap-0.5">
-                        {isDosage && !readOnly ? (
+                        {isDosage && !readOnly && display ? (
                           <>
                             <input
                               type="number"
-                              min="0.1"
-                              step="0.1"
-                              defaultValue={item.quantity}
+                              min={display.min}
+                              step={display.step}
+                              defaultValue={displayQty}
                               key={`dosage-${item.id}-${item.quantity}`}
-                              onChange={(e) => handleDosageChange(item, e.target.value)}
+                              onChange={(e) => handleDosageChange(item, String((parseFloat(e.target.value) || display.min) * display.factor))}
                               disabled={saving}
-                              className="w-14 px-1.5 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-white text-center focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                              className="w-16 px-1.5 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-white text-center focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                             />
                             <button
                               type="button"
-                              onClick={() => handleUpdateQuantity(item, -1)}
-                              disabled={saving || item.quantity <= 1}
+                              onClick={() => handleUpdateQuantity(item, -displayStepInBaseUnits)}
+                              disabled={saving || displayQty <= display.min}
                               className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
                             >
                               <Minus className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleUpdateQuantity(item, 1)}
+                              onClick={() => handleUpdateQuantity(item, displayStepInBaseUnits)}
                               disabled={saving}
                               className="p-0.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-50"
                             >
@@ -929,8 +938,8 @@ export default function CaseArticleSelector({
 
                       {/* Enhetspris */}
                       <span className="text-sm text-slate-400">
-                        {isDosage ? (
-                          <>{formatDosagePrice(item.unit_price)}<span className="text-[10px] text-slate-500">/{dosageUnitLabel}</span></>
+                        {isDosage && display ? (
+                          <>{formatPrice(Math.round(item.unit_price * display.factor))}<span className="text-[10px] text-slate-500">/{dosageUnitLabel}</span></>
                         ) : (
                           formatPrice(item.unit_price)
                         )}

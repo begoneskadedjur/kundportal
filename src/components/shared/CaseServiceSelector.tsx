@@ -43,7 +43,7 @@ import {
 } from '../../types/caseBilling'
 import { getEffectiveRotPercent, getEffectiveRutPercent } from '../../utils/rotRutConstants'
 import type { ServiceWithGroup } from '../../types/services'
-import { ARTICLE_CATEGORIES, calculatePricePerDosageUnit } from '../../types/articles'
+import { ARTICLE_CATEGORIES, calculatePricePerDosageUnit, getDosageDisplayUnit } from '../../types/articles'
 import type { ArticleCategory } from '../../types/articles'
 import { ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
 import PriceCalculatorPanel from './PriceCalculatorPanel'
@@ -347,6 +347,7 @@ export default function CaseServiceSelector({
         rot_rut_type: null,
         fastighetsbeteckning: null,
         min_quantity: null,
+        mapped_service_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         service: svc,
@@ -395,10 +396,15 @@ export default function CaseServiceSelector({
     const unitPrice = isDosage
       ? Math.round(calculatePricePerDosageUnit(item.effective_price, item.article.total_content!) * 100) / 100
       : item.effective_price
+    // Default-kvantitet: för dosage startar vi på 1 visningsenhet (1 kg / 1 l / 1 m)
+    // istället för 1 grundenhet (1 g / 1 ml), så användaren ser ett rimligt värde direkt.
+    const defaultQty = isDosage && item.article.dosage_unit
+      ? getDosageDisplayUnit(item.article.dosage_unit).factor
+      : 1
 
     if (draftMode && !caseId) {
       const discounted = calculateDiscountedPrice(unitPrice, 0)
-      const total = calculateTotalPrice(discounted, 1)
+      const total = calculateTotalPrice(discounted, defaultQty)
       const draftItem: CaseBillingItemWithRelations = {
         id: crypto.randomUUID(),
         case_id: '',
@@ -411,7 +417,7 @@ export default function CaseServiceSelector({
         service_code: null,
         service_name: null,
         item_type: 'article',
-        quantity: 1,
+        quantity: defaultQty,
         unit_price: unitPrice,
         discount_percent: 0,
         discounted_price: discounted,
@@ -446,7 +452,7 @@ export default function CaseServiceSelector({
         article_id: item.article.id,
         article_code: item.article.code,
         article_name: item.article.name,
-        quantity: 1,
+        quantity: defaultQty,
         unit_price: unitPrice,
         vat_rate: item.article.vat_rate,
         price_source: item.price_source,
@@ -998,42 +1004,74 @@ export default function CaseServiceSelector({
             {articleItems.length > 0 && (
               <div className="space-y-1.5">
                 {articleItems.map(item => {
-                  const isDosage = item.article?.is_dosage_product && item.article?.dosage_unit
-                  const unitLabel = isDosage ? item.article!.dosage_unit! : 'st'
+                  const isDosage = !!(item.article?.is_dosage_product && item.article?.dosage_unit)
+                  const dosageUnit = item.article?.dosage_unit
+                  // Visningsenhet: g → kg, ml → l, m → m. Lagras alltid i grundenheten.
+                  const display = isDosage && dosageUnit ? getDosageDisplayUnit(dosageUnit) : null
+                  const unitLabel = display ? display.unit : (isDosage ? dosageUnit! : 'st')
+                  const displayQty = display ? item.quantity / display.factor : item.quantity
                   return (
                   <div key={item.id} className="px-3 py-2 bg-slate-800/40 border border-slate-700/30 rounded-lg">
                     {/* Namn – alltid full bredd */}
                     <div className="text-sm text-white mb-1.5">
                       {item.article_code && <span className="text-xs text-slate-500 mr-1">{item.article_code}</span>}
                       {item.article_name}
-                      {isDosage && item.article?.total_content && (
+                      {isDosage && item.article?.total_content && dosageUnit && (
                         <span className="text-[10px] text-slate-500 ml-1">
-                          ({item.article.total_content}{item.article.dosage_unit} / fp)
+                          ({item.article.total_content}{dosageUnit} / fp)
                         </span>
                       )}
                     </div>
                     {/* Kontroller på rad 2 */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">{item.unit_price} kr/{unitLabel}</span>
+                      <span className="text-xs text-slate-500">{item.unit_price} kr/{isDosage ? dosageUnit : 'st'}</span>
                       {!readOnly && (
                         <div className="flex items-center gap-1 ml-auto">
-                          <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (display) {
+                                const nextDisplay = Math.max(display.min, +(displayQty - display.step).toFixed(3))
+                                handleQuantitySet(item.id, Math.round(nextDisplay * display.factor))
+                              } else {
+                                handleQuantityChange(item.id, -1)
+                              }
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
+                          >
                             <Minus className="w-3 h-3" />
                           </button>
                           <input
                             type="number"
-                            min={isDosage ? 0.1 : 1}
-                            step={isDosage ? 0.1 : 1}
-                            value={item.quantity}
+                            min={display ? display.min : 1}
+                            step={display ? display.step : 1}
+                            value={display ? +displayQty.toFixed(3) : item.quantity}
                             onChange={(e) => {
-                              const parsed = isDosage ? parseFloat(e.target.value) : parseInt(e.target.value, 10)
-                              const min = isDosage ? 0.1 : 1
-                              const n = Math.max(min, isNaN(parsed) ? min : parsed)
-                              handleQuantitySet(item.id, n)
+                              if (display) {
+                                const parsed = parseFloat(e.target.value)
+                                const displayN = isNaN(parsed) ? display.min : Math.max(display.min, parsed)
+                                handleQuantitySet(item.id, Math.round(displayN * display.factor))
+                              } else {
+                                const parsed = parseInt(e.target.value, 10)
+                                const n = Math.max(1, isNaN(parsed) ? 1 : parsed)
+                                handleQuantitySet(item.id, n)
+                              }
                             }}
-                            className="w-14 px-1 py-0.5 text-sm bg-slate-700 border border-slate-600 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                            className="w-16 px-1 py-0.5 text-sm bg-slate-700 border border-slate-600 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                           />
-                          <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                          <span className="text-xs text-slate-500">{unitLabel}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (display) {
+                                const nextDisplay = +(displayQty + display.step).toFixed(3)
+                                handleQuantitySet(item.id, Math.round(nextDisplay * display.factor))
+                              } else {
+                                handleQuantityChange(item.id, 1)
+                              }
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
+                          >
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
@@ -1087,9 +1125,11 @@ export default function CaseServiceSelector({
                         {expanded && (
                           <div className="space-y-0.5 ml-2">
                             {catArticles.map(item => {
-                              const isDosage = item.article.is_dosage_product && item.article.total_content && item.article.dosage_unit
-                              const dosagePrice = isDosage
-                                ? Math.round(calculatePricePerDosageUnit(item.effective_price, item.article.total_content!) * 100) / 100
+                              const isDosage = !!(item.article.is_dosage_product && item.article.total_content && item.article.dosage_unit)
+                              const display = isDosage && item.article.dosage_unit ? getDosageDisplayUnit(item.article.dosage_unit) : null
+                              // Pris per visningsenhet (t.ex. kr/kg) – mer läsbart än kr/g
+                              const displayPrice = isDosage && display
+                                ? calculatePricePerDosageUnit(item.effective_price, item.article.total_content!) * display.factor
                                 : null
                               return (
                                 <button
@@ -1109,8 +1149,8 @@ export default function CaseServiceSelector({
                                     )}
                                   </div>
                                   <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
-                                    {isDosage
-                                      ? `${formatPrice(dosagePrice!)}/${item.article.dosage_unit}`
+                                    {isDosage && display
+                                      ? `${formatPrice(Math.round(displayPrice!))}/${display.unit}`
                                       : formatPrice(item.effective_price)}
                                   </span>
                                 </button>

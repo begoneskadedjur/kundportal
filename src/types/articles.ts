@@ -399,6 +399,25 @@ export const calculatePricePerDosageUnit = (
   return effectivePrice / totalContent
 }
 
+/**
+ * För doseringsprodukter: välj användarvänlig visningsenhet.
+ * g → kg, ml → l, m → m (m är redan bra).
+ * Returnerar { unit: 'kg'|'l'|'m', factor: antal grundenheter per visningsenhet }
+ * Exempel: g → { unit: 'kg', factor: 1000 } innebär att 1 kg = 1000 g.
+ */
+export const getDosageDisplayUnit = (
+  dosageUnit: DosageUnit
+): { unit: string; factor: number; step: number; min: number } => {
+  switch (dosageUnit) {
+    case 'g':
+      return { unit: 'kg', factor: 1000, step: 0.01, min: 0.01 }
+    case 'ml':
+      return { unit: 'l', factor: 1000, step: 0.01, min: 0.01 }
+    case 'm':
+      return { unit: 'm', factor: 1, step: 0.1, min: 0.1 }
+  }
+}
+
 export const generateArticleCode = (name: string, category: ArticleCategory): string => {
   const prefix = {
     Inspektion: 'INS',
