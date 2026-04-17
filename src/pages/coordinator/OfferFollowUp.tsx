@@ -27,7 +27,7 @@ function formatKr(value: number): string {
 export default function OfferFollowUp() {
   const { profile, user } = useAuth()
   const userId = user?.id
-  const isCoordinator = profile?.role === 'koordinator' || profile?.role === 'admin'
+  const isCoordinator = profile?.role === 'koordinator' || profile?.role === 'admin' || profile?.role === 'säljare'
   const technicianEmail = isCoordinator ? undefined : profile?.technicians?.email
 
   const [offers, setOffers] = useState<FollowUpOffer[]>([])

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../../contexts/AuthContext'
 import { OFFER_STATUS_CONFIG } from '../../../types/casePipeline'
 import { CommentThread } from './CommentThread'
 import CommentSection from '../../communication/CommentSection'
@@ -106,6 +107,7 @@ function OfferRow({
   onDelete?: (contractId: string) => void
   onExtend?: (contractId: string) => void
 }) {
+  const { profile } = useAuth()
   const [activeTab, setActiveTab] = useState<'internal' | 'external'>('internal')
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
@@ -170,7 +172,11 @@ function OfferRow({
       ? 'ring-2 ring-amber-400/40 shadow-[0_0_18px_-4px_rgba(251,191,36,0.45)]'
       : ''
 
-  const basePath = isCoordinator ? '/koordinator' : '/admin'
+  const basePath =
+    profile?.role === 'säljare' ? '/saljare' :
+    profile?.role === 'koordinator' ? '/koordinator' :
+    profile?.role === 'technician' ? '/technician' :
+    '/admin'
   const customerHref = hasCustomerLink ? `${basePath}/befintliga-kunder?customerId=${offer.customer_id}` : null
 
   return (

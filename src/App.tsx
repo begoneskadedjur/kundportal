@@ -280,6 +280,10 @@ function App() {
               <Route path="kundresa" element={<ProtectedRoute requiredRole="säljare"><CustomerJourney /></ProtectedRoute>} />
               <Route path="avslutade-arenden" element={<ProtectedRoute requiredRole="säljare"><ClosedCasesFunnel /></ProtectedRoute>} />
 
+              {/* Avtal & Offerter */}
+              <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="säljare"><OneflowContractCreator /></ProtectedRoute>} />
+              <Route path="offertuppfoljning" element={<ProtectedRoute requiredRole="säljare"><OfferFollowUp /></ProtectedRoute>} />
+
               {/* Verktyg */}
               <Route path="ai-assistent" element={<ProtectedRoute requiredRole="säljare"><TeamChat /></ProtectedRoute>} />
             </Route>

@@ -15,11 +15,15 @@ import {
   GitBranch,
   Trash2,
   Sparkles,
+  FilePen,
+  FileSignature,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
 export const topLevelItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/saljare/dashboard' },
+  { label: 'Skapa Avtal & Offerter', icon: FilePen, path: '/saljare/oneflow-contract-creator' },
+  { label: 'Offertuppföljning', icon: FileSignature, path: '/saljare/offertuppfoljning' },
 ]
 
 export const navGroups: NavGroup[] = [
@@ -67,6 +71,8 @@ export const mobileBottomItems: NavItem[] = [
 // Breadcrumb-mappning: path -> svenskt namn
 export const breadcrumbMap: Record<string, string> = {
   '/saljare/dashboard': 'Översikt',
+  '/saljare/oneflow-contract-creator': 'Skapa Avtal & Offerter',
+  '/saljare/offertuppfoljning': 'Offertuppföljning',
 
   // Kunder & Avtal
   '/saljare/befintliga-kunder': 'Befintliga kunder',

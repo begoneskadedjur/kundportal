@@ -129,6 +129,8 @@ export default function OneflowContractCreator() {
     switch (role) {
       case 'koordinator':
         return '/koordinator/offertuppfoljning';
+      case 'säljare':
+        return '/saljare/offertuppfoljning';
       case 'technician':
         return '/technician/offer-follow-up';
       default:
