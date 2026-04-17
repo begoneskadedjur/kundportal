@@ -41,6 +41,8 @@ interface FollowUpTableProps {
   hiddenCount?: number
   // Radera-funktion
   onDelete?: (contractId: string) => void
+  // Förläng signeringsperiod
+  onExtend?: (contractId: string) => void
 }
 
 const STATUS_FILTERS: { key: FollowUpStatusFilter; label: string }[] = [
@@ -91,6 +93,7 @@ function OfferRow({
   onUnhide,
   isHiddenByMe,
   onDelete,
+  onExtend,
 }: {
   offer: FollowUpOffer
   isExpanded: boolean
@@ -101,6 +104,7 @@ function OfferRow({
   onUnhide?: (contractId: string) => void
   isHiddenByMe: boolean
   onDelete?: (contractId: string) => void
+  onExtend?: (contractId: string) => void
 }) {
   const [activeTab, setActiveTab] = useState<'internal' | 'external'>('internal')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -221,6 +225,21 @@ function OfferRow({
             {statusConfig.label}
           </span>
 
+          {/* Hint-badge: förläng signering när overdue */}
+          {offer.status === 'overdue' && onExtend && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onExtend(offer.id)
+              }}
+              className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[#20c58f]/15 text-[#20c58f] hover:bg-[#20c58f]/25 transition-colors flex items-center gap-1 flex-shrink-0"
+              title="Förläng signeringsperiod"
+            >
+              <Clock className="w-2.5 h-2.5" />
+              Förläng
+            </button>
+          )}
+
           {/* Dölj-knapp */}
           {(onHide || onUnhide) && (
             <button
@@ -258,7 +277,7 @@ function OfferRow({
           )}
 
           {/* Snabbåtgärder-meny */}
-          {(offer.source_id || offer.contact_email || offer.contact_phone) && (
+          {(offer.source_id || offer.contact_email || offer.contact_phone || (onExtend && !['signed','declined','trashed'].includes(offer.status))) && (
             <div className="flex-shrink-0">
               <button
                 ref={triggerRef}
@@ -319,6 +338,18 @@ function OfferRow({
                   <Phone className="w-3.5 h-3.5 text-purple-400" />
                   Ring kund
                 </a>
+              )}
+              {onExtend && !['signed','declined','trashed'].includes(offer.status) && (
+                <button
+                  onClick={() => {
+                    onExtend(offer.id)
+                    setMenuOpen(false)
+                  }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/50 transition-colors"
+                >
+                  <Clock className="w-3.5 h-3.5 text-[#20c58f]" />
+                  Förläng signering
+                </button>
               )}
             </div>,
             document.body
@@ -480,6 +511,7 @@ export function FollowUpTable({
   onToggleHidden,
   hiddenCount = 0,
   onDelete,
+  onExtend,
 }: FollowUpTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -541,6 +573,7 @@ export function FollowUpTable({
       onUnhide={onUnhide}
       isHiddenByMe={userId ? (offer.hidden_by || []).includes(userId) : false}
       onDelete={onDelete}
+      onExtend={onExtend}
     />
   )
 

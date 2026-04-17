@@ -303,6 +303,23 @@ export class OfferFollowUpService {
     return response.json()
   }
 
+  /** Förläng signeringsperioden för en offert/avtal i Oneflow */
+  static async extendSigningPeriod(
+    contractId: string,
+    expireDate: string
+  ): Promise<{ newStatus: string; expireDate: string }> {
+    const response = await fetch('/api/oneflow/extend-signing-period', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contractId, expireDate }),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ message: 'Okänt fel' }))
+      throw new Error(err.message || 'Kunde inte förlänga signeringsperioden')
+    }
+    return response.json()
+  }
+
   /** Hämta tjänster + interna artiklar kopplade till en offert/avtal */
   static async getContractItems(contractId: string): Promise<{
     services: CaseBillingItemWithRelations[]

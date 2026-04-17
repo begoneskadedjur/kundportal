@@ -10,6 +10,7 @@ import { OfferFollowUpService } from '../../services/offerFollowUpService'
 import { FollowUpTable } from '../../components/coordinator/follow-up/FollowUpTable'
 import { TechnicianCards } from '../../components/coordinator/follow-up/TechnicianCards'
 import DeleteOfferConfirmDialog from '../../components/coordinator/follow-up/DeleteOfferConfirmDialog'
+import ExtendSigningPeriodDialog from '../../components/coordinator/follow-up/ExtendSigningPeriodDialog'
 import OfferActivityFeed from '../../components/coordinator/follow-up/OfferActivityFeed'
 import toast from 'react-hot-toast'
 import type {
@@ -42,6 +43,7 @@ export default function OfferFollowUp() {
   const [showHidden, setShowHidden] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<FollowUpOffer | null>(null)
+  const [extendTarget, setExtendTarget] = useState<FollowUpOffer | null>(null)
 
   const fetchData = async (isRefresh = false) => {
     try {
@@ -132,6 +134,18 @@ export default function OfferFollowUp() {
       setDeleteTarget(null)
     }
   }, [deleteTarget])
+
+  // Förläng-handler: öppna dialog
+  const handleExtend = useCallback((contractId: string) => {
+    const offer = offers.find(o => o.id === contractId)
+    if (offer) setExtendTarget(offer)
+  }, [offers])
+
+  // Efter lyckad förlängning: refetch så status/datum uppdateras
+  const handleExtended = useCallback(() => {
+    fetchData(true)
+    setExtendTarget(null)
+  }, [])
 
   // Sender-email för kommentarer
   const senderEmail = profile?.technicians?.email || undefined
@@ -305,6 +319,7 @@ export default function OfferFollowUp() {
         onToggleHidden={() => setShowHidden(!showHidden)}
         hiddenCount={hiddenCount}
         onDelete={handleDelete}
+        onExtend={handleExtend}
       />
 
       {/* Radera-bekräftelsedialog */}
@@ -313,6 +328,14 @@ export default function OfferFollowUp() {
         onClose={() => setDeleteTarget(null)}
         onDeleted={handleDeleted}
         offer={deleteTarget}
+      />
+
+      {/* Förläng-dialog */}
+      <ExtendSigningPeriodDialog
+        isOpen={!!extendTarget}
+        onClose={() => setExtendTarget(null)}
+        onExtended={handleExtended}
+        offer={extendTarget}
       />
     </div>
   )
