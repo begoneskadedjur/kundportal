@@ -100,6 +100,8 @@ export interface SelectedArticleItem {
   quantity: number
   notes?: string
   caseBillingItemId?: string  // Koppling till case_billing_items.id för synk
+  /** Vid prefill från case: case_billing_items.id för tjänsteraden som artikeln är mappad mot. */
+  mapped_service_id?: string | null
 }
 
 // Prissammanfattning

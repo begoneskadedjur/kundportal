@@ -310,6 +310,7 @@ export class CaseBillingService {
         notes: input.notes !== undefined ? input.notes : existing.notes,
         rot_rut_type: input.rot_rut_type !== undefined ? input.rot_rut_type : existing.rot_rut_type,
         fastighetsbeteckning: input.fastighetsbeteckning !== undefined ? input.fastighetsbeteckning : existing.fastighetsbeteckning,
+        mapped_service_id: input.mapped_service_id !== undefined ? input.mapped_service_id : existing.mapped_service_id,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -318,6 +319,27 @@ export class CaseBillingService {
 
     if (error) throw new Error(`Databasfel: ${error.message}`)
     return data
+  }
+
+  /**
+   * Batch-uppdatera artikel→tjänst-mappningar (från Prisguiden).
+   * assignments: { [articleItemId]: serviceItemId | null }
+   */
+  static async updateArticleMappings(
+    assignments: Record<string, string | null>
+  ): Promise<void> {
+    const entries = Object.entries(assignments)
+    if (entries.length === 0) return
+
+    const updates = entries.map(([id, mapped_service_id]) =>
+      supabase
+        .from('case_billing_items')
+        .update({ mapped_service_id, updated_at: new Date().toISOString() })
+        .eq('id', id)
+    )
+    const results = await Promise.all(updates)
+    const firstError = results.find(r => r.error)?.error
+    if (firstError) throw new Error(`Databasfel: ${firstError.message}`)
   }
 
   /**

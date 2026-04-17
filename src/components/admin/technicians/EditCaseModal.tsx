@@ -577,7 +577,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           effectivePrice: item.unit_price,
           quantity: item.quantity,
           notes: item.notes || undefined,
-          caseBillingItemId: item.id
+          caseBillingItemId: item.id,
+          mapped_service_id: item.mapped_service_id ?? null,
         }))
       prefillServices = billingItems
         .filter(item => item.item_type === 'service')

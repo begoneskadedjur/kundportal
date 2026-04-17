@@ -62,6 +62,8 @@ export interface CaseBillingItem {
   rot_rut_type: RotRutType | null
   fastighetsbeteckning: string | null
   min_quantity: number | null
+  /** För artikel-rader: case_billing_items.id för tjänsteraden som artikeln är mappad mot via Prisguiden. */
+  mapped_service_id: string | null
   created_at: string
   updated_at: string
 }
@@ -127,6 +129,7 @@ export interface UpdateCaseArticleInput {
   rot_rut_type?: RotRutType | null
   fastighetsbeteckning?: string | null
   min_quantity?: number | null
+  mapped_service_id?: string | null
 }
 
 /**

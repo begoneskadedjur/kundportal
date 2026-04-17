@@ -53,6 +53,10 @@ interface WizardData {
   selectedProducts: SelectedProduct[]
   /** Manuellt läge: items från CaseServiceSelector draftMode */
   draftItems: CaseBillingItemWithRelations[]
+  /** Manuellt läge: mappning artikel-id → service-id (från Prisguiden) — lyfts ut så state överlever steg-navigering */
+  draftPriceAssignments: Record<string, string>
+  /** Manuellt läge: påslag per tjänst (från Prisguiden) */
+  draftPriceMarkups: Record<string, number>
   prefillServices?: Array<{
     id: string
     service_name: string | null
@@ -150,6 +154,8 @@ export default function OneflowContractCreator() {
     customTotalPrice: null,
     selectedProducts: [],
     draftItems: [],
+    draftPriceAssignments: {},
+    draftPriceMarkups: {},
     agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
     sendForSigning: true,
     customer_group_id: null
@@ -1158,7 +1164,17 @@ export default function OneflowContractCreator() {
                   caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
                   customerId={null}
                   primaryServiceId={null}
-                  onChange={(items) => updateWizardData('draftItems', items)}
+                  initialDraftItems={wizardData.draftItems}
+                  initialPriceAssignments={wizardData.draftPriceAssignments}
+                  initialPriceMarkups={wizardData.draftPriceMarkups}
+                  onChange={(items, _summary, meta) => {
+                    setWizardData(prev => ({
+                      ...prev,
+                      draftItems: items,
+                      draftPriceAssignments: meta?.priceAssignments ?? prev.draftPriceAssignments,
+                      draftPriceMarkups: meta?.priceMarkups ?? prev.draftPriceMarkups,
+                    }))
+                  }}
                 />
               </div>
             )}
@@ -1210,6 +1226,7 @@ export default function OneflowContractCreator() {
                 {(() => {
                   const hasPrefill = wizardData.prefillServices && wizardData.prefillServices.length > 0
                   const serviceDraftItems = wizardData.draftItems.filter(i => i.item_type === 'service')
+                  const articleDraftItems = wizardData.draftItems.filter(i => i.item_type === 'article')
                   const canGenerate = hasPrefill || serviceDraftItems.length > 0
                   if (!canGenerate) return null
                   return (
@@ -1218,16 +1235,38 @@ export default function OneflowContractCreator() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const lines = hasPrefill
-                            ? wizardData.prefillServices!.map(s => {
-                                const qty = s.quantity > 1 ? ` (${s.quantity} st)` : ''
-                                return `- ${s.service_name ?? 'Tjänst'}${qty}`
+                          const lines: string[] = []
+                          if (hasPrefill) {
+                            wizardData.prefillServices!.forEach(s => {
+                              const qty = s.quantity > 1 ? ` (${s.quantity} st)` : ''
+                              lines.push(`- ${s.service_name ?? 'Tjänst'}${qty}`)
+                              // Artiklar mappade mot denna tjänsterad
+                              const mappedArticles = wizardData.selectedArticles.filter(
+                                a => a.mapped_service_id === s.id
+                              )
+                              mappedArticles.forEach(a => {
+                                const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
+                                const desc = a.article.description ? ` – ${a.article.description}` : ''
+                                lines.push(`   • ${a.article.name}${aQty}${desc}`)
                               })
-                            : serviceDraftItems.map(i => {
-                                const qty = i.quantity > 1 ? ` (${i.quantity} st)` : ''
-                                const extra = i.notes ? ` - ${i.notes}` : ''
-                                return `- ${i.service_name ?? 'Tjänst'}${qty}${extra}`
+                            })
+                          } else {
+                            serviceDraftItems.forEach(svc => {
+                              const qty = svc.quantity > 1 ? ` (${svc.quantity} st)` : ''
+                              const extra = svc.notes ? ` - ${svc.notes}` : ''
+                              lines.push(`- ${svc.service_name ?? 'Tjänst'}${qty}${extra}`)
+                              // Artiklar mappade mot denna tjänst via priceAssignments eller mapped_service_id
+                              const mapped = articleDraftItems.filter(a => {
+                                const assigned = wizardData.draftPriceAssignments[a.id] ?? a.mapped_service_id
+                                return assigned === svc.id
                               })
+                              mapped.forEach(a => {
+                                const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
+                                const desc = a.article?.description ? ` – ${a.article.description}` : ''
+                                lines.push(`   • ${a.article_name}${aQty}${desc}`)
+                              })
+                            })
+                          }
                           const generatedText = `Tjänster som ingår:\n\n${lines.join('\n')}`
                           updateWizardData('agreementText', generatedText)
                           toast.success('Beskrivning genererad från valda tjänster!')
@@ -1327,6 +1366,119 @@ export default function OneflowContractCreator() {
                 </div>
               </Card>
             </div>
+
+            {/* Tjänster & Priser (inkl. mappade artiklar + marginal) */}
+            {(() => {
+              const fmtSEK = (n: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
+              const hasPrefill = wizardData.prefillServices && wizardData.prefillServices.length > 0
+              const draftServices = wizardData.draftItems.filter(i => i.item_type === 'service')
+              const draftArticles = wizardData.draftItems.filter(i => i.item_type === 'article')
+              const hasContent = hasPrefill || draftServices.length > 0
+              if (!hasContent) return null
+
+              let serviceTotal = 0
+              let articleCost = 0
+              let rows: React.ReactNode[] = []
+
+              if (hasPrefill) {
+                serviceTotal = wizardData.prefillServices!.reduce((s, i) => s + i.total_price, 0)
+                articleCost = wizardData.selectedArticles.reduce((s, a) => s + a.effectivePrice * a.quantity, 0)
+                rows = wizardData.prefillServices!.map(s => {
+                  const mapped = wizardData.selectedArticles.filter(a => a.mapped_service_id === s.id)
+                  return (
+                    <div key={s.id} className="flex justify-between items-start py-2 border-b border-slate-700/30 last:border-0">
+                      <div className="flex-1">
+                        <div className="text-sm text-white">
+                          {s.service_name ?? 'Tjänst'} {s.quantity > 1 && <span className="text-slate-500">× {s.quantity}</span>}
+                        </div>
+                        {mapped.map(a => (
+                          <div key={a.article.id} className="text-xs text-slate-500 ml-4 mt-0.5">
+                            • {a.article.name} {a.quantity > 1 && `× ${a.quantity}`}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-4">
+                        {fmtSEK(s.total_price)}
+                      </div>
+                    </div>
+                  )
+                })
+              } else {
+                serviceTotal = draftServices.reduce((s, i) => s + i.total_price, 0)
+                articleCost = draftArticles.reduce((s, i) => s + i.total_price, 0)
+                rows = draftServices.map(svc => {
+                  const mapped = draftArticles.filter(a => {
+                    const assigned = wizardData.draftPriceAssignments[a.id] ?? a.mapped_service_id
+                    return assigned === svc.id
+                  })
+                  return (
+                    <div key={svc.id} className="flex justify-between items-start py-2 border-b border-slate-700/30 last:border-0">
+                      <div className="flex-1">
+                        <div className="text-sm text-white">
+                          {svc.service_name ?? 'Tjänst'} {svc.quantity > 1 && <span className="text-slate-500">× {svc.quantity}</span>}
+                        </div>
+                        {mapped.map(a => (
+                          <div key={a.id} className="text-xs text-slate-500 ml-4 mt-0.5">
+                            • {a.article_name} {a.quantity > 1 && `× ${a.quantity}`}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-4">
+                        {fmtSEK(svc.total_price)}
+                      </div>
+                    </div>
+                  )
+                })
+              }
+
+              const marginAmount = serviceTotal - articleCost
+              const marginPercent = serviceTotal > 0 ? (marginAmount / serviceTotal) * 100 : 0
+              const marginColor = marginPercent >= 35 ? 'text-emerald-400' : marginPercent >= 20 ? 'text-yellow-400' : 'text-red-400'
+
+              return (
+                <Card className="p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <DollarSign className="w-5 h-5" />
+                    Tjänster & Priser
+                  </h3>
+                  <div>{rows}</div>
+                  <div className="flex justify-between pt-3 mt-2 border-t border-slate-700">
+                    <span className="text-sm text-slate-400">Totalt exkl moms</span>
+                    <span className="text-sm font-bold text-white">{fmtSEK(serviceTotal)}</span>
+                  </div>
+                  {articleCost > 0 && (
+                    <>
+                      <div className="flex justify-between mt-2">
+                        <span className="text-xs text-slate-500">Intern inköpskostnad</span>
+                        <span className="text-xs text-slate-400">{fmtSEK(articleCost)}</span>
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <span className="text-xs text-slate-500">Marginal (intern)</span>
+                        <span className={`text-xs font-semibold ${marginColor}`}>
+                          {marginPercent.toFixed(1)}% ({fmtSEK(marginAmount)})
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-2 italic">
+                        Marginalen visas bara internt och skickas inte till kund.
+                      </p>
+                    </>
+                  )}
+                </Card>
+              )
+            })()}
+
+            {/* Avtalsobjekt-förhandsvisning */}
+            {wizardData.agreementText && (
+              <Card className="p-6 mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  {wizardData.documentType === 'offer' ? 'Offertinnehåll (det kunden ser)' : 'Avtalsobjekt (det kunden ser)'}
+                </h3>
+                <pre className="whitespace-pre-wrap text-sm text-slate-300 font-sans bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                  {wizardData.agreementText}
+                </pre>
+              </Card>
+            )}
 
             {/* Signering */}
             <Card className="p-6">
@@ -1493,6 +1645,8 @@ export default function OneflowContractCreator() {
                         customTotalPrice: null,
                         selectedProducts: [],
                         draftItems: [],
+                        draftPriceAssignments: {},
+                        draftPriceMarkups: {},
                         agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
                         sendForSigning: true,
                         customer_group_id: null

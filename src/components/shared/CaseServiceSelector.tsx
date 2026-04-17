@@ -58,11 +58,19 @@ interface CaseServiceSelectorProps {
   primaryServiceId?: string | null
   /** Artikelgrupp att filtrera interna kostnader på (Arbetstid + Övrigt visas alltid) */
   articleGroupId?: string | null
-  onChange?: (items: CaseBillingItemWithRelations[], summary: CaseBillingSummary) => void
+  onChange?: (
+    items: CaseBillingItemWithRelations[],
+    summary: CaseBillingSummary,
+    meta?: { priceAssignments: Record<string, string>; priceMarkups: Record<string, number> }
+  ) => void
   readOnly?: boolean
   className?: string
   /** Draft-läge: items sparas i lokal state istället för DB (används när inget caseId finns) */
   draftMode?: boolean
+  /** För draft-läge: återhämta state från föräldern så att wizard-navigering inte nollställer komponenten */
+  initialDraftItems?: CaseBillingItemWithRelations[]
+  initialPriceAssignments?: Record<string, string>
+  initialPriceMarkups?: Record<string, number>
 }
 
 const formatPrice = (price: number) =>
@@ -103,9 +111,14 @@ export default function CaseServiceSelector({
   readOnly = false,
   className = '',
   draftMode = false,
+  initialDraftItems,
+  initialPriceAssignments,
+  initialPriceMarkups,
 }: CaseServiceSelectorProps) {
   // All data
-  const [allItems, setAllItems] = useState<CaseBillingItemWithRelations[]>([])
+  const [allItems, setAllItems] = useState<CaseBillingItemWithRelations[]>(
+    () => (draftMode && initialDraftItems ? initialDraftItems : [])
+  )
   const [articles, setArticles] = useState<ArticleWithEffectivePrice[]>([])
   const [addonServices, setAddonServices] = useState<ServiceWithGroup[]>([])
   const [resolvedServiceGroupId, setResolvedServiceGroupId] = useState<string | null>(null)
@@ -125,8 +138,12 @@ export default function CaseServiceSelector({
   const [saving, setSaving] = useState(false)
 
   // Prisguide-state som överlever öppna/stäng-cykler
-  const [priceAssignments, setPriceAssignments] = useState<Record<string, string>>({})
-  const [priceMarkups, setPriceMarkups] = useState<Record<string, number>>({})
+  const [priceAssignments, setPriceAssignments] = useState<Record<string, string>>(
+    () => initialPriceAssignments ?? {}
+  )
+  const [priceMarkups, setPriceMarkups] = useState<Record<string, number>>(
+    () => initialPriceMarkups ?? {}
+  )
 
 
   // Inline price editing (service item id → input string)
@@ -134,6 +151,32 @@ export default function CaseServiceSelector({
 
   const onChangeRef = useRef(onChange)
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
+
+  const priceAssignmentsRef = useRef(priceAssignments)
+  const priceMarkupsRef = useRef(priceMarkups)
+  const allItemsRef = useRef<CaseBillingItemWithRelations[]>([])
+  useEffect(() => {
+    priceAssignmentsRef.current = priceAssignments
+    // Notifiera parent om bara mappning ändras (inte items)
+    if (allItemsRef.current.length > 0) {
+      const summary = buildBillingSummary(allItemsRef.current)
+      onChangeRef.current?.(allItemsRef.current, summary, {
+        priceAssignments,
+        priceMarkups: priceMarkupsRef.current,
+      })
+    }
+  }, [priceAssignments])
+  useEffect(() => {
+    priceMarkupsRef.current = priceMarkups
+    if (allItemsRef.current.length > 0) {
+      const summary = buildBillingSummary(allItemsRef.current)
+      onChangeRef.current?.(allItemsRef.current, summary, {
+        priceAssignments: priceAssignmentsRef.current,
+        priceMarkups,
+      })
+    }
+  }, [priceMarkups])
+  useEffect(() => { allItemsRef.current = allItems }, [allItems])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -196,16 +239,36 @@ export default function CaseServiceSelector({
         finalItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
       }
 
+      // I draft-läge utan caseId: behåll befintlig state istället för att nollställa med tom itemsData
+      if (draftMode && !caseId) {
+        setLoading(false)
+        return
+      }
+
       setAllItems(finalItems)
+
+      // Initialisera priceAssignments från DB (mapped_service_id på artikelrader)
+      const initialAssignments: Record<string, string> = {}
+      finalItems.forEach(item => {
+        if (item.item_type === 'article' && item.mapped_service_id) {
+          initialAssignments[item.id] = item.mapped_service_id
+        }
+      })
+      setPriceAssignments(prev => {
+        // Behåll lokala val som inte finns i DB (draft), men låt DB-värden ha företräde för rader som finns där
+        const merged = { ...prev, ...initialAssignments }
+        return merged
+      })
+
       const summary = buildBillingSummary(finalItems)
-      onChangeRef.current?.(finalItems, summary)
+      onChangeRef.current?.(finalItems, summary, { priceAssignments: initialAssignments, priceMarkups: {} })
     } catch (err) {
       console.error(err)
       toast.error('Kunde inte ladda data')
     } finally {
       setLoading(false)
     }
-  }, [caseId, caseType, customerId, primaryServiceId, articleGroupId, technicianId, technicianName])
+  }, [caseId, caseType, customerId, primaryServiceId, articleGroupId, technicianId, technicianName, draftMode])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -227,7 +290,10 @@ export default function CaseServiceSelector({
 
   const notifyChange = (items: CaseBillingItemWithRelations[]) => {
     const summary = buildBillingSummary(items)
-    onChangeRef.current?.(items, summary)
+    onChangeRef.current?.(items, summary, {
+      priceAssignments: priceAssignmentsRef.current,
+      priceMarkups: priceMarkupsRef.current,
+    })
   }
 
   // ──────────────────────────────────────────────────────────────
@@ -412,6 +478,28 @@ export default function CaseServiceSelector({
     }
   }
 
+  const handleQuantitySet = async (id: string, absoluteQty: number) => {
+    if (saving) return
+    const item = allItems.find(i => i.id === id)
+    if (!item) return
+    const newQty = Math.max(1, absoluteQty)
+    if (newQty === item.quantity) return
+    if (draftMode && !caseId) {
+      updateDraftItem(id, { quantity: newQty })
+      return
+    }
+    if (!caseId) return
+    setSaving(true)
+    try {
+      await CaseBillingService.updateCaseArticle(id, { quantity: newQty })
+      await reloadItems()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // ──────────────────────────────────────────────────────────────
   // Uppdatera pris inline (för tjänsterader)
   // ──────────────────────────────────────────────────────────────
@@ -538,6 +626,13 @@ export default function CaseServiceSelector({
   // ──────────────────────────────────────────────────────────────
   const handleApplyPrices = async (prices: Record<string, number>) => {
     if (!caseId && !draftMode) return
+    // Bygg mappning-payload: artikel-id → service-id (eller null om ej tilldelad)
+    const articleIds = allItems.filter(i => i.item_type === 'article').map(i => i.id)
+    const mappingPayload: Record<string, string | null> = {}
+    articleIds.forEach(aid => {
+      mappingPayload[aid] = priceAssignmentsRef.current[aid] ?? null
+    })
+
     if (draftMode && !caseId) {
       let updated = [...allItems]
       Object.entries(prices).forEach(([itemId, price]) => {
@@ -547,6 +642,11 @@ export default function CaseServiceSelector({
           const total = calculateTotalPrice(discounted, i.quantity)
           return { ...i, unit_price: price, discounted_price: discounted, total_price: total }
         })
+      })
+      // Applicera mappning även i draft
+      updated = updated.map(i => {
+        if (i.item_type !== 'article') return i
+        return { ...i, mapped_service_id: mappingPayload[i.id] ?? null }
       })
       setAllItems(updated)
       notifyChange(updated)
@@ -572,6 +672,8 @@ export default function CaseServiceSelector({
             .eq('id', itemId)
         })
       )
+      // Persistera mappning för samtliga artikelrader i samma operation
+      await CaseBillingService.updateArticleMappings(mappingPayload)
       await reloadItems()
       toast.success('Priser uppdaterade')
     } catch (err: any) {
@@ -899,7 +1001,16 @@ export default function CaseServiceSelector({
                           <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
                             <Minus className="w-3 h-3" />
                           </button>
-                          <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const n = Math.max(1, parseInt(e.target.value, 10) || 1)
+                              handleQuantitySet(item.id, n)
+                            }}
+                            className="w-12 px-1 py-0.5 text-sm bg-slate-700 border border-slate-600 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                          />
                           <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
                             <Plus className="w-3 h-3" />
                           </button>
