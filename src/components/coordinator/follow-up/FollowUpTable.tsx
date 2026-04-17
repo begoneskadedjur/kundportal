@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, MessageSquare, ExternalLink,
   Clock, AlertTriangle, User, Mail, Phone,
   FileSignature, Archive, EyeOff, Eye, Search, X, Trash2,
-  MoreVertical, FileText,
+  MoreVertical, FileText, UserCheck, UserX,
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -160,8 +160,21 @@ function OfferRow({
   const statusConfig = OFFER_STATUS_CONFIG[offer.status] || { label: offer.status, color: 'text-slate-400', bgColor: 'bg-slate-500/15' }
   const isArchived = offer.priority === 'archived'
 
+  // Signerat-flöde: markera rader som kräver kundregistrering eller som ska leda till kundvyn
+  const isSignedContract = offer.status === 'signed' && offer.type === 'contract'
+  const hasCustomerLink = isSignedContract && !!offer.customer_id
+  const needsCustomerRegistration = isSignedContract && !offer.customer_id
+  const glowClass = hasCustomerLink
+    ? 'ring-2 ring-[#20c58f]/40 shadow-[0_0_18px_-4px_rgba(32,197,143,0.45)]'
+    : needsCustomerRegistration
+      ? 'ring-2 ring-amber-400/40 shadow-[0_0_18px_-4px_rgba(251,191,36,0.45)]'
+      : ''
+
+  const basePath = isCoordinator ? '/koordinator' : '/admin'
+  const customerHref = hasCustomerLink ? `${basePath}/befintliga-kunder?customerId=${offer.customer_id}` : null
+
   return (
-    <div className={`rounded-xl overflow-hidden ${isArchived ? 'opacity-60' : ''} ${isHiddenByMe ? 'opacity-40' : ''}`}>
+    <div className={`rounded-xl overflow-hidden ${isArchived ? 'opacity-60' : ''} ${isHiddenByMe ? 'opacity-40' : ''} ${glowClass}`}>
       {/* Rad */}
       <button
         onClick={onToggle}
@@ -224,6 +237,30 @@ function OfferRow({
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusConfig.bgColor} ${statusConfig.color}`}>
             {statusConfig.label}
           </span>
+
+          {/* Kundregistreringsstatus för signerade avtal */}
+          {needsCustomerRegistration && (
+            <span
+              className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/15 text-amber-400 flex items-center gap-1 flex-shrink-0"
+              title="Kontraktet är signerat men ingen kund har kopplats ännu. Webhook kan ha missat eller e-post/företagsnamn saknades."
+            >
+              <UserX className="w-2.5 h-2.5" />
+              Kräver kundregistrering
+            </span>
+          )}
+          {hasCustomerLink && customerHref && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate(customerHref)
+              }}
+              className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[#20c58f]/15 text-[#20c58f] hover:bg-[#20c58f]/25 transition-colors flex items-center gap-1 flex-shrink-0"
+              title="Öppna kunden i Befintliga kunder"
+            >
+              <UserCheck className="w-2.5 h-2.5" />
+              Gå till kund
+            </button>
+          )}
 
           {/* Hint-badge: förläng signering när overdue */}
           {offer.status === 'overdue' && onExtend && (

@@ -179,11 +179,14 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
       : 'border-l-[3px] border-l-transparent'
 
   return (
-    <tr className={`border-b border-slate-700/50 transition-colors duration-200 ${
-      isHighlighted
-        ? 'bg-[#20c58f]/10 border-l-[3px] border-l-[#20c58f]'
-        : `hover:bg-slate-800/50 ${isExpanded ? 'bg-slate-800/30' : ''} ${urgencyBorder}`
-    }`}>
+    <tr
+      data-customer-row-id={organization.id}
+      className={`border-b border-slate-700/50 transition-colors duration-200 ${
+        isHighlighted
+          ? 'bg-[#20c58f]/10 border-l-[3px] border-l-[#20c58f] ring-2 ring-[#20c58f]/50 shadow-[0_0_20px_-4px_rgba(32,197,143,0.55)]'
+          : `hover:bg-slate-800/50 ${isExpanded ? 'bg-slate-800/30' : ''} ${urgencyBorder}`
+      }`}
+    >
       {/* Company & Contact Column */}
       <td className="px-6 py-4">
         <div className="flex items-center">

@@ -54,6 +54,8 @@ export interface FollowUpOffer {
   // Koppling till ursprungligt ärende
   source_id: string | null
   source_type: string | null
+  // Koppling till registrerad kund (satt när signerat avtal länkats via webhook)
+  customer_id: string | null
 }
 
 export interface TechnicianOfferStats {
@@ -92,7 +94,8 @@ export type FollowUpSortBy = 'priority' | 'oldest' | 'newest' | 'value_desc' | '
 const OFFER_COLUMNS = `
   id, oneflow_contract_id, type, status, company_name, contact_person,
   contact_email, contact_phone, total_value, begone_employee_name,
-  begone_employee_email, created_at, updated_at, hidden_by, source_id, source_type
+  begone_employee_email, created_at, updated_at, hidden_by, source_id, source_type,
+  customer_id
 `
 
 const EMPTY_KPIS: FollowUpKPIs = {
@@ -165,6 +168,7 @@ export class OfferFollowUpService {
         hidden_by: o.hidden_by || [],
         source_id: o.source_id || null,
         source_type: o.source_type || null,
+        customer_id: o.customer_id || null,
       }
     })
 

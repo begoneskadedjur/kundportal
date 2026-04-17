@@ -1,7 +1,7 @@
 // src/pages/admin/Customers.tsx - Success Management Dashboard för kundhantering
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Search, Filter, RefreshCw, ChevronDown, ChevronUp, ChevronRight,
   Mail, Phone, Building2, User, Calendar, Coins,
@@ -228,6 +228,7 @@ const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { custom
 
 export default function Customers() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   // Use consolidated customers hook instead of regular customer analytics
   const { 
     consolidatedCustomers, 
@@ -271,6 +272,9 @@ export default function Customers() {
   const [contactsOrg, setContactsOrg] = useState<any>(null)
   const [mobileOverflowId, setMobileOverflowId] = useState<string | null>(null)
 
+  // Flash-highlight från URL-param (?customerId=...) när man navigerat hit från offertuppföljningen
+  const [flashCustomerId, setFlashCustomerId] = useState<string | null>(null)
+
   // Close mobile overflow on outside click
   useEffect(() => {
     if (!mobileOverflowId) return
@@ -293,6 +297,7 @@ export default function Customers() {
 
   // Active customer highlight — tracks which org has an open modal
   const activeCustomerId =
+    flashCustomerId ||
     (revenueModalOpen && revenueCustomer?.id) ||
     (editModalOpen && editingOrgId) ||
     (multiSiteDetailOpen && selectedMultiSiteOrg?.id) ||
@@ -379,6 +384,56 @@ export default function Customers() {
     currentPage * pageSize
   )
   const totalPages = Math.ceil(sortedCustomers.length / pageSize)
+
+  // Deep-link via ?customerId=... — hitta kunden, navigera till rätt sida, scrolla + flash-highlighta
+  useEffect(() => {
+    const targetId = searchParams.get('customerId')
+    if (!targetId || loading || consolidatedCustomers.length === 0) return
+
+    // Matcha både på organization-id och site-id (multisite kan länkas via site)
+    const match = consolidatedCustomers.find(org =>
+      org.id === targetId || org.sites.some(s => s.id === targetId)
+    )
+    if (!match) {
+      toast.error('Kunden kunde inte hittas i listan')
+      setSearchParams(prev => { prev.delete('customerId'); return prev }, { replace: true })
+      return
+    }
+
+    // Rensa filter så kunden garanterat syns
+    setSearchInput('')
+    setSearchTerm('')
+    setStatusFilter('all')
+    setHealthFilter('all')
+    setPortalFilter('all')
+    setManagerFilter('all')
+    setOrganizationTypeFilter('all')
+
+    // Bestäm rätt sida baserat på aktuell sortering
+    const index = sortedCustomers.findIndex(org => org.id === match.id)
+    if (index >= 0) {
+      const targetPage = Math.floor(index / pageSize) + 1
+      setCurrentPage(targetPage)
+    }
+
+    setFlashCustomerId(match.id)
+
+    // Scroll efter att DOM hunnit uppdateras
+    const scrollTimer = setTimeout(() => {
+      const el = document.querySelector(`[data-customer-row-id="${match.id}"]`)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 250)
+
+    // Flash-highlight försvinner efter 4s, ta bort URL-param direkt
+    const flashTimer = setTimeout(() => setFlashCustomerId(null), 4000)
+    setSearchParams(prev => { prev.delete('customerId'); return prev }, { replace: true })
+
+    return () => {
+      clearTimeout(scrollTimer)
+      clearTimeout(flashTimer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, consolidatedCustomers])
 
   // Sorteringshantering
   const handleSort = (field: string) => {
