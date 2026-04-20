@@ -196,12 +196,54 @@ export interface ServiceMixPoint {
   groups: Record<string, number> // group name -> arr-värde
 }
 
+export interface TopServiceRow {
+  name: string
+  group: string
+  volume: number
+  margin_pct: number | null
+  contract_count: number
+}
+
+export interface PurchaseArticleContract {
+  contract_id: string
+  company_name: string
+  signed_at: string
+  quantity: number
+  cost: number
+}
+
+export interface PurchaseArticleRow {
+  name: string
+  supplier: string | null
+  top_service_group: string | null // dominerande tjänstegrupp som köpet hör till
+  total_cost: number
+  total_quantity: number
+  contract_count: number
+  avg_cost_per_contract: number
+  contracts: PurchaseArticleContract[] // topp-10 senaste för drill-down
+}
+
+export interface TechnicianDeliveryRow {
+  id: string
+  name: string
+  email: string | null
+  case_count: number
+  contract_count: number
+  contract_ids: string[]
+  total_contract_value: number
+  avg_margin_pct: number | null
+  monthly: Array<{ month: string; cases: number; value: number }>
+}
+
 export interface PipelineTimeSeries {
   months: string[] // 'YYYY-MM' array (chronological)
   volume: MonthlyVolumePoint[]
   margin: MarginTrendPoint[]
   sellers: SellerMomentumRow[]
   service_mix: ServiceMixPoint[]
+  top_services: TopServiceRow[]
+  top_articles: PurchaseArticleRow[]
+  technician_delivery: TechnicianDeliveryRow[]
   available_sellers: Array<{ email: string; name: string }>
   available_service_groups: string[]
 }
@@ -1307,7 +1349,7 @@ export class ContractService {
     const { data: contractsData, error: contractsError } = await supabase
       .from('contracts')
       .select(
-        'id, type, status, total_value, contract_length, created_at, updated_at, start_date, begone_employee_name, begone_employee_email, company_name, contact_person'
+        'id, type, status, total_value, contract_length, created_at, updated_at, start_date, begone_employee_name, begone_employee_email, company_name, contact_person, customer_id'
       )
       .neq('status', 'draft')
       .in('template_id', allowedTemplates)
@@ -1375,6 +1417,20 @@ export class ContractService {
       return val
     }
 
+    // Säljar-nyckel: normalisera mejl (trim + lowercase) så case/whitespace-varianter
+    // av samma säljare slås ihop till en rad.
+    const normEmail = (e: string | null | undefined): string =>
+      (e || '').trim().toLowerCase()
+    // Behåll "prydligaste" namnvarianten per säljare: title-case, trimmad.
+    const prettyName = (n: string | null | undefined): string => {
+      const s = (n || '').trim()
+      if (!s) return ''
+      return s
+        .split(/\s+/)
+        .map(w => w.length > 0 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w)
+        .join(' ')
+    }
+
     contracts.forEach((c: any) => {
       const d = new Date(c.created_at)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -1413,37 +1469,46 @@ export class ContractService {
         }
       })
 
+      const sellerEmailKey = normEmail(c.begone_employee_email)
       margin.push({
         contract_id: c.id,
         company_name: c.company_name || c.contact_person || 'Okänt',
         signed_at: c.updated_at || c.created_at,
         external_total: agg.external_total,
         margin_pct: agg.margin_pct,
-        seller_email: c.begone_employee_email || null,
-        seller_name: c.begone_employee_name || null,
+        seller_email: sellerEmailKey || null,
+        seller_name: prettyName(c.begone_employee_name) || null,
         top_service: topService,
         top_service_group: topServiceGroup,
       })
     })
 
     // 7. Bygg säljar-momentum (per-säljare månadsserie + delta)
+    //    Nyckel = normaliserad email. Behåller prydligaste namn per nyckel.
     const sellerMonthly = new Map<string, Map<string, { value: number; count: number }>>()
     const sellerNameByEmail = new Map<string, string>()
 
     contracts.forEach((c: any) => {
-      if (!c.begone_employee_email) return
+      const key = normEmail(c.begone_employee_email)
+      if (!key) return
       if (c.status !== 'signed' && c.status !== 'active') return
-      sellerNameByEmail.set(c.begone_employee_email, c.begone_employee_name || c.begone_employee_email)
+
+      // Behåll den "längsta/prydligaste" namnvarianten (gör att "Kim Wahlberg" vinner över "kim wahlberg")
+      const candidate = prettyName(c.begone_employee_name)
+      const current = sellerNameByEmail.get(key)
+      if (!current || candidate.length > current.length) {
+        sellerNameByEmail.set(key, candidate || current || key)
+      }
 
       const d = new Date(c.created_at)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      if (!sellerMonthly.has(c.begone_employee_email)) {
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (!sellerMonthly.has(key)) {
         const init = new Map<string, { value: number; count: number }>()
         months.forEach(m => init.set(m, { value: 0, count: 0 }))
-        sellerMonthly.set(c.begone_employee_email, init)
+        sellerMonthly.set(key, init)
       }
-      const series = sellerMonthly.get(c.begone_employee_email)!
-      const point = series.get(key)
+      const series = sellerMonthly.get(key)!
+      const point = series.get(monthKey)
       if (!point) return
       point.value += contractValue(c)
       point.count += 1
@@ -1460,7 +1525,7 @@ export class ContractService {
         let total_prev_30d = 0
         let total_period = 0
         contracts.forEach((c: any) => {
-          if (c.begone_employee_email !== email) return
+          if (normEmail(c.begone_employee_email) !== email) return
           if (c.status !== 'signed' && c.status !== 'active') return
           const created = new Date(c.created_at)
           const val = contractValue(c)
@@ -1513,6 +1578,235 @@ export class ContractService {
     })
     const service_mix = months.map(m => mixByMonth.get(m)!)
 
+    // 9a. Topp-tjänster (aggregerade över hela perioden från billingAgg)
+    const serviceAgg = new Map<string, {
+      name: string
+      group: string
+      volume: number
+      contracts: Set<string>
+      marginSum: number
+      marginCount: number
+    }>()
+    contracts.forEach((c: any) => {
+      if (c.status !== 'signed' && c.status !== 'active') return
+      const agg = billingAgg.get(c.id)
+      if (!agg) return
+      agg.services.forEach(s => {
+        const group = serviceGroupMap.get(s.id) || serviceGroupByName.get(s.name) || 'Övriga tjänster'
+        if (!serviceAgg.has(s.name)) {
+          serviceAgg.set(s.name, {
+            name: s.name,
+            group,
+            volume: 0,
+            contracts: new Set(),
+            marginSum: 0,
+            marginCount: 0,
+          })
+        }
+        const row = serviceAgg.get(s.name)!
+        row.volume += s.total_price
+        row.contracts.add(c.id)
+        if (agg.margin_pct !== null) {
+          row.marginSum += agg.margin_pct
+          row.marginCount += 1
+        }
+      })
+    })
+    const top_services: TopServiceRow[] = Array.from(serviceAgg.values())
+      .map(r => ({
+        name: r.name,
+        group: r.group,
+        volume: r.volume,
+        margin_pct: r.marginCount > 0 ? Math.round(r.marginSum / r.marginCount) : null,
+        contract_count: r.contracts.size,
+      }))
+      .sort((a, b) => b.volume - a.volume)
+
+    // 9b. Topp-artiklar (inköp) — pareto-aggregation per artikel-namn
+    const articleAgg = new Map<string, {
+      name: string
+      total_cost: number
+      total_quantity: number
+      contracts: Set<string>
+      group_counter: Map<string, number> // dominerande tjänstegrupp
+      contract_details: PurchaseArticleContract[]
+    }>()
+    contracts.forEach((c: any) => {
+      if (c.status !== 'signed' && c.status !== 'active') return
+      const agg = billingAgg.get(c.id)
+      if (!agg) return
+      const signedAt = c.updated_at || c.created_at
+      agg.articles.forEach(a => {
+        if (!articleAgg.has(a.name)) {
+          articleAgg.set(a.name, {
+            name: a.name,
+            total_cost: 0,
+            total_quantity: 0,
+            contracts: new Set(),
+            group_counter: new Map(),
+            contract_details: [],
+          })
+        }
+        const row = articleAgg.get(a.name)!
+        row.total_cost += a.total_price
+        row.total_quantity += a.quantity
+        row.contracts.add(c.id)
+        row.contract_details.push({
+          contract_id: c.id,
+          company_name: c.company_name || c.contact_person || 'Okänt',
+          signed_at: signedAt,
+          quantity: a.quantity,
+          cost: a.total_price,
+        })
+        // Mappa artikel till tjänstegrupp via mapped_service_id om möjligt, annars via största tjänsten
+        let mappedGroup: string | null = null
+        if (a.mapped_service_id) {
+          mappedGroup = serviceGroupMap.get(a.mapped_service_id) || null
+        }
+        if (!mappedGroup) {
+          // Använd kontraktets topp-tjänste-grupp som proxy
+          let topVal = 0
+          agg.services.forEach(s => {
+            if (s.total_price > topVal) {
+              topVal = s.total_price
+              mappedGroup = serviceGroupMap.get(s.id) || serviceGroupByName.get(s.name) || null
+            }
+          })
+        }
+        if (mappedGroup) {
+          row.group_counter.set(mappedGroup, (row.group_counter.get(mappedGroup) || 0) + 1)
+        }
+      })
+    })
+    const top_articles: PurchaseArticleRow[] = Array.from(articleAgg.values())
+      .map(r => {
+        let topGroup: string | null = null
+        let topCount = 0
+        r.group_counter.forEach((cnt, g) => {
+          if (cnt > topCount) {
+            topCount = cnt
+            topGroup = g
+          }
+        })
+        const sortedDetails = r.contract_details
+          .sort((a, b) => new Date(b.signed_at).getTime() - new Date(a.signed_at).getTime())
+          .slice(0, 10)
+        return {
+          name: r.name,
+          supplier: null,
+          top_service_group: topGroup,
+          total_cost: r.total_cost,
+          total_quantity: r.total_quantity,
+          contract_count: r.contracts.size,
+          avg_cost_per_contract: r.contracts.size > 0 ? r.total_cost / r.contracts.size : 0,
+          contracts: sortedDetails,
+        }
+      })
+      .sort((a, b) => b.total_cost - a.total_cost)
+
+    // 9c. Tekniker-leverans via cases.primary_assignee (join på customer_id)
+    const technician_delivery: TechnicianDeliveryRow[] = []
+    try {
+      const activeContracts = contracts.filter(
+        (c: any) => (c.status === 'signed' || c.status === 'active') && c.customer_id
+      )
+      const customerIdSet = Array.from(new Set(activeContracts.map((c: any) => c.customer_id)))
+      if (customerIdSet.length > 0) {
+        const { data: caseRows } = await supabase
+          .from('cases')
+          .select('id, customer_id, created_at, primary_assignee_id, primary_assignee_name, primary_assignee_email')
+          .in('customer_id', customerIdSet)
+          .gte('created_at', cutoffISO)
+          .not('primary_assignee_id', 'is', null)
+
+        // Bygg lookup: customer_id -> contract_ids + värden
+        const contractByCustomer = new Map<string, Array<{ id: string; value: number; margin: number | null }>>()
+        activeContracts.forEach((c: any) => {
+          const agg = billingAgg.get(c.id)
+          const arr = contractByCustomer.get(c.customer_id) || []
+          arr.push({
+            id: c.id,
+            value: contractValue(c),
+            margin: agg?.margin_pct ?? null,
+          })
+          contractByCustomer.set(c.customer_id, arr)
+        })
+
+        const techAgg = new Map<string, {
+          id: string
+          name: string
+          email: string | null
+          case_count: number
+          contract_ids: Set<string>
+          value: number
+          marginSum: number
+          marginCount: number
+          monthly: Map<string, { cases: number; value: number }>
+        }>()
+
+        ;(caseRows || []).forEach((row: any) => {
+          const techId = row.primary_assignee_id as string
+          if (!techId) return
+          if (!techAgg.has(techId)) {
+            const init = new Map<string, { cases: number; value: number }>()
+            months.forEach(m => init.set(m, { cases: 0, value: 0 }))
+            techAgg.set(techId, {
+              id: techId,
+              name: row.primary_assignee_name || 'Okänd tekniker',
+              email: row.primary_assignee_email || null,
+              case_count: 0,
+              contract_ids: new Set(),
+              value: 0,
+              marginSum: 0,
+              marginCount: 0,
+              monthly: init,
+            })
+          }
+          const entry = techAgg.get(techId)!
+          entry.case_count += 1
+
+          const d = new Date(row.created_at)
+          const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          const point = entry.monthly.get(monthKey)
+          if (point) point.cases += 1
+
+          const contractsForCustomer = contractByCustomer.get(row.customer_id) || []
+          contractsForCustomer.forEach(ct => {
+            if (!entry.contract_ids.has(ct.id)) {
+              entry.contract_ids.add(ct.id)
+              entry.value += ct.value
+              if (ct.margin !== null) {
+                entry.marginSum += ct.margin
+                entry.marginCount += 1
+              }
+              if (point) point.value += ct.value
+            }
+          })
+        })
+
+        techAgg.forEach(t => {
+          technician_delivery.push({
+            id: t.id,
+            name: t.name,
+            email: t.email,
+            case_count: t.case_count,
+            contract_count: t.contract_ids.size,
+            contract_ids: Array.from(t.contract_ids),
+            total_contract_value: t.value,
+            avg_margin_pct: t.marginCount > 0 ? Math.round(t.marginSum / t.marginCount) : null,
+            monthly: months.map(m => ({
+              month: m,
+              cases: t.monthly.get(m)?.cases || 0,
+              value: t.monthly.get(m)?.value || 0,
+            })),
+          })
+        })
+        technician_delivery.sort((a, b) => b.total_contract_value - a.total_contract_value)
+      }
+    } catch (err) {
+      console.warn('technician_delivery-aggregering misslyckades:', err)
+    }
+
     // 9. Samla tillgängliga filter-alternativ
     const available_sellers = Array.from(sellerNameByEmail.entries())
       .map(([email, name]) => ({ email, name }))
@@ -1528,6 +1822,9 @@ export class ContractService {
       margin,
       sellers,
       service_mix,
+      top_services,
+      top_articles,
+      technician_delivery,
       available_sellers,
       available_service_groups,
     }

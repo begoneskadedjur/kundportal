@@ -7,6 +7,8 @@ import type { SellerMomentumRow } from '../../../services/contractService'
 
 interface SellerMomentumGridProps {
   data: SellerMomentumRow[]
+  onSellerClick?: (seller: SellerMomentumRow) => void
+  activeSellerEmail?: string | null
 }
 
 function formatKr(v: number): string {
@@ -21,7 +23,11 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-export default function SellerMomentumGrid({ data }: SellerMomentumGridProps) {
+export default function SellerMomentumGrid({
+  data,
+  onSellerClick,
+  activeSellerEmail,
+}: SellerMomentumGridProps) {
   if (data.length === 0) {
     return (
       <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
@@ -59,10 +65,18 @@ export default function SellerMomentumGrid({ data }: SellerMomentumGridProps) {
                 ? 'text-green-400'
                 : 'text-red-400'
 
+          const isActive = activeSellerEmail === seller.email
+          const Wrapper: any = onSellerClick ? 'button' : 'div'
           return (
-            <div
+            <Wrapper
               key={seller.email}
-              className="flex items-center gap-3 p-2 bg-slate-800/30 border border-slate-700/50 rounded-lg hover:bg-slate-800/50 transition-colors"
+              onClick={onSellerClick ? () => onSellerClick(seller) : undefined}
+              className={`w-full text-left flex items-center gap-3 p-2 bg-slate-800/30 border rounded-lg transition-colors ${
+                isActive
+                  ? 'border-[#20c58f]/60 bg-[#20c58f]/5'
+                  : 'border-slate-700/50 hover:bg-slate-800/50'
+              } ${onSellerClick ? 'cursor-pointer' : ''}`}
+              title={onSellerClick ? 'Klicka för att filtrera marginalgrafen på denna säljare' : undefined}
             >
               {/* Avatar */}
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#20c58f]/30 to-blue-500/30 border border-slate-700 text-[10px] font-bold text-white flex-shrink-0">
@@ -118,7 +132,7 @@ export default function SellerMomentumGrid({ data }: SellerMomentumGridProps) {
                   {delta === null ? '—' : `${isPositive ? '+' : ''}${delta}%`}
                 </span>
               </div>
-            </div>
+            </Wrapper>
           )
         })}
       </div>

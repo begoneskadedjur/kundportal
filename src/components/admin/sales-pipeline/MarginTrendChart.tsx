@@ -21,6 +21,10 @@ interface MarginTrendChartProps {
   availableSellers: Array<{ email: string; name: string }>
   availableGroups: string[]
   onPointClick?: (contractId: string) => void
+  // Extern kontroll: när satta används dessa istället för intern state
+  externalSellerFilter?: string | null
+  externalGroupFilter?: string | null
+  onFilterChange?: (filters: { seller: string | null; group: string | null }) => void
 }
 
 function formatKr(v: number): string {
@@ -34,9 +38,25 @@ export default function MarginTrendChart({
   availableSellers,
   availableGroups,
   onPointClick,
+  externalSellerFilter,
+  externalGroupFilter,
+  onFilterChange,
 }: MarginTrendChartProps) {
-  const [sellerFilter, setSellerFilter] = useState<string | null>(null)
-  const [groupFilter, setGroupFilter] = useState<string | null>(null)
+  const [internalSeller, setInternalSeller] = useState<string | null>(null)
+  const [internalGroup, setInternalGroup] = useState<string | null>(null)
+
+  // Använd externa filter när de är definierade (undefined = okontrollerat)
+  const sellerFilter = externalSellerFilter !== undefined ? externalSellerFilter : internalSeller
+  const groupFilter = externalGroupFilter !== undefined ? externalGroupFilter : internalGroup
+
+  const setSellerFilter = (v: string | null) => {
+    if (externalSellerFilter === undefined) setInternalSeller(v)
+    onFilterChange?.({ seller: v, group: groupFilter })
+  }
+  const setGroupFilter = (v: string | null) => {
+    if (externalGroupFilter === undefined) setInternalGroup(v)
+    onFilterChange?.({ seller: sellerFilter, group: v })
+  }
 
   const filtered = useMemo(() => {
     return data.filter(d => {

@@ -10,13 +10,14 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from 'recharts'
 import { Layers } from 'lucide-react'
 import type { ServiceMixPoint } from '../../../services/contractService'
 
 interface ServiceMixStreamProps {
   data: ServiceMixPoint[]
+  onGroupClick?: (group: string) => void
+  activeGroup?: string | null
 }
 
 function formatKr(v: number): string {
@@ -37,7 +38,7 @@ const GROUP_COLORS = [
   '#84cc16', // lime
 ]
 
-export default function ServiceMixStream({ data }: ServiceMixStreamProps) {
+export default function ServiceMixStream({ data, onGroupClick, activeGroup }: ServiceMixStreamProps) {
   const { chartData, groups } = useMemo(() => {
     const groupSet = new Set<string>()
     data.forEach(p => Object.keys(p.groups).forEach(g => groupSet.add(g)))
@@ -134,24 +135,52 @@ export default function ServiceMixStream({ data }: ServiceMixStreamProps) {
               labelStyle={{ color: '#e2e8f0', fontWeight: 600 }}
               formatter={(value: any, name: string) => [`${formatKr(Number(value))} kr`, name]}
             />
-            <Legend
-              wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }}
-              iconType="circle"
-              iconSize={8}
-            />
-            {groups.map((g, i) => (
-              <Area
-                key={g}
-                type="monotone"
-                dataKey={g}
-                stackId="1"
-                stroke={GROUP_COLORS[i % GROUP_COLORS.length]}
-                fill={`url(#mix-${i})`}
-                strokeWidth={1.5}
-              />
-            ))}
+            {groups.map((g, i) => {
+              const isActive = activeGroup === g
+              const isDimmed = activeGroup !== null && activeGroup !== undefined && !isActive
+              return (
+                <Area
+                  key={g}
+                  type="monotone"
+                  dataKey={g}
+                  stackId="1"
+                  stroke={GROUP_COLORS[i % GROUP_COLORS.length]}
+                  fill={`url(#mix-${i})`}
+                  strokeWidth={isActive ? 2.5 : 1.5}
+                  fillOpacity={isDimmed ? 0.2 : 1}
+                  onClick={() => onGroupClick?.(g)}
+                  style={onGroupClick ? { cursor: 'pointer' } : undefined}
+                />
+              )
+            })}
           </AreaChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Klickbar legend */}
+      <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-slate-700/30">
+        {groups.map((g, i) => {
+          const isActive = activeGroup === g
+          const color = GROUP_COLORS[i % GROUP_COLORS.length]
+          return (
+            <button
+              key={g}
+              onClick={() => onGroupClick?.(isActive ? '' : g)}
+              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] transition-colors ${
+                isActive
+                  ? 'bg-slate-700/70 text-white ring-1 ring-[#20c58f]/40'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+              }`}
+              title={onGroupClick ? 'Klicka för att filtrera avtalstabellen' : undefined}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              {g}
+            </button>
+          )
+        })}
       </div>
     </div>
   )

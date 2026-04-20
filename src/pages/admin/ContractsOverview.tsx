@@ -30,6 +30,10 @@ import SignedVolumeChart from '../../components/admin/sales-pipeline/SignedVolum
 import MarginTrendChart from '../../components/admin/sales-pipeline/MarginTrendChart'
 import SellerMomentumGrid from '../../components/admin/sales-pipeline/SellerMomentumGrid'
 import ServiceMixStream from '../../components/admin/sales-pipeline/ServiceMixStream'
+import DeepDiveTabs from '../../components/admin/sales-pipeline/DeepDiveTabs'
+import TopServicesBreakdown from '../../components/admin/sales-pipeline/TopServicesBreakdown'
+import PurchaseArticleBreakdown from '../../components/admin/sales-pipeline/PurchaseArticleBreakdown'
+import TechnicianDeliveryGrid from '../../components/admin/sales-pipeline/TechnicianDeliveryGrid'
 
 // ═══ Hjälpfunktioner ═══
 
@@ -98,6 +102,11 @@ export default function ContractsOverview() {
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  // Globala filter som flödar mellan grafer + tabell
+  const [sellerFilter, setSellerFilter] = useState<string | null>(null)
+  const [groupFilter, setGroupFilter] = useState<string | null>(null)
+  const [technicianFilter, setTechnicianFilter] = useState<{ id: string; name: string } | null>(null)
+
   // Tidsserie-data
   const [timeSeries, setTimeSeries] = useState<PipelineTimeSeries | null>(null)
   const [tsLoading, setTsLoading] = useState(true)
@@ -106,6 +115,8 @@ export default function ContractsOverview() {
   const [billingAgg, setBillingAgg] = useState<Map<string, ContractBillingAggregate>>(new Map())
 
   const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map())
+  const marginChartRef = useRef<HTMLDivElement>(null)
+  const deepDiveRef = useRef<HTMLDivElement>(null)
 
   // Ladda tidsserie-data när period ändras
   useEffect(() => {
@@ -153,7 +164,24 @@ export default function ContractsOverview() {
     }
   }, [contracts])
 
-  // Filtrerade kontrakt baserat på tab + sök
+  // Technician-filter: vilka contract_ids har teknikern jobbat på?
+  const technicianContractIds = useMemo(() => {
+    if (!technicianFilter || !timeSeries) return null
+    const row = timeSeries.technician_delivery.find(t => t.id === technicianFilter.id)
+    return row ? new Set(row.contract_ids) : new Set<string>()
+  }, [technicianFilter, timeSeries])
+
+  // Dominerande tjänstegrupp per avtal hämtas från timeSeries.margin (redan beräknad där)
+  const contractTopGroupMap = useMemo(() => {
+    const m = new Map<string, string>()
+    if (!timeSeries) return m
+    timeSeries.margin.forEach(p => {
+      if (p.top_service_group) m.set(p.contract_id, p.top_service_group)
+    })
+    return m
+  }, [timeSeries])
+
+  // Filtrerade kontrakt baserat på tab + sök + globala filter
   const filteredContracts = useMemo(() => {
     let list = contracts
     if (activeTab === 'offer') list = list.filter(c => c.type === 'offer')
@@ -168,11 +196,21 @@ export default function ContractsOverview() {
           (c.begone_employee_name || '').toLowerCase().includes(q)
       )
     }
+    if (sellerFilter) {
+      const sf = sellerFilter.toLowerCase().trim()
+      list = list.filter(c => (c.begone_employee_email || '').toLowerCase().trim() === sf)
+    }
+    if (groupFilter) {
+      list = list.filter(c => contractTopGroupMap.get(c.id) === groupFilter)
+    }
+    if (technicianContractIds) {
+      list = list.filter(c => technicianContractIds.has(c.id))
+    }
     // Nyast först
     return [...list].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
-  }, [contracts, activeTab, searchQuery])
+  }, [contracts, activeTab, searchQuery, sellerFilter, groupFilter, technicianContractIds, contractTopGroupMap])
 
   // ═══ KPI:er per tab ═══
 
@@ -249,6 +287,27 @@ export default function ContractsOverview() {
       setExpandedId(contractId)
     }
   }
+
+  // Scrolla upp till marginalgrafen när användaren filtrerar via djupdyk-widget
+  const scrollToMarginChart = () => {
+    marginChartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  const handleServiceGroupClick = (group: string) => {
+    setGroupFilter(prev => (prev === group ? null : group))
+    scrollToMarginChart()
+  }
+
+  const handleSellerRowClick = (email: string) => {
+    setSellerFilter(prev => (prev === email ? null : email))
+    scrollToMarginChart()
+  }
+
+  const handleTechnicianClick = (tech: { id: string; name: string }) => {
+    setTechnicianFilter(prev => (prev?.id === tech.id ? null : tech))
+  }
+
+  const hasActiveGlobalFilter = !!(sellerFilter || groupFilter || technicianFilter)
 
   const volumeMode = activeTab
 
@@ -409,18 +468,110 @@ export default function ContractsOverview() {
           <span className="text-sm text-slate-400">Laddar trenddata...</span>
         </div>
       ) : timeSeries ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <SignedVolumeChart data={timeSeries.volume} mode={volumeMode} />
-          <MarginTrendChart
-            data={timeSeries.margin}
-            availableSellers={timeSeries.available_sellers}
-            availableGroups={timeSeries.available_service_groups}
-            onPointClick={handlePointClick}
-          />
-          <SellerMomentumGrid data={timeSeries.sellers} />
-          <ServiceMixStream data={timeSeries.service_mix} />
-        </div>
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <SignedVolumeChart data={timeSeries.volume} mode={volumeMode} />
+            <div ref={marginChartRef}>
+              <MarginTrendChart
+                data={timeSeries.margin}
+                availableSellers={timeSeries.available_sellers}
+                availableGroups={timeSeries.available_service_groups}
+                onPointClick={handlePointClick}
+                externalSellerFilter={sellerFilter}
+                externalGroupFilter={groupFilter}
+                onFilterChange={({ seller, group }) => {
+                  setSellerFilter(seller)
+                  setGroupFilter(group)
+                }}
+              />
+            </div>
+            <SellerMomentumGrid
+              data={timeSeries.sellers}
+              onSellerClick={s => handleSellerRowClick(s.email)}
+              activeSellerEmail={sellerFilter}
+            />
+            <ServiceMixStream
+              data={timeSeries.service_mix}
+              onGroupClick={g => setGroupFilter(g || null)}
+              activeGroup={groupFilter}
+            />
+          </div>
+
+          {/* Djupdykning — tjänster / inköp / tekniker */}
+          <div ref={deepDiveRef}>
+            <DeepDiveTabs
+              counts={{
+                services: timeSeries.top_services.length,
+                articles: timeSeries.top_articles.length,
+                technicians: timeSeries.technician_delivery.length,
+              }}
+              services={
+                <TopServicesBreakdown
+                  data={timeSeries.top_services}
+                  onServiceGroupClick={handleServiceGroupClick}
+                />
+              }
+              articles={
+                <PurchaseArticleBreakdown
+                  data={timeSeries.top_articles}
+                  onOpenContract={handlePointClick}
+                />
+              }
+              technicians={
+                <TechnicianDeliveryGrid
+                  data={timeSeries.technician_delivery}
+                  onTechnicianClick={t => handleTechnicianClick({ id: t.id, name: t.name })}
+                  activeTechnicianId={technicianFilter?.id || null}
+                />
+              }
+            />
+          </div>
+        </>
       ) : null}
+
+      {/* Aktivt filter-banner */}
+      {hasActiveGlobalFilter && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-[#20c58f]/5 border border-[#20c58f]/30 rounded-xl text-xs">
+          <span className="text-slate-400">Filter aktivt:</span>
+          {sellerFilter && (
+            <button
+              onClick={() => setSellerFilter(null)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-800/60 border border-slate-700 rounded-md text-slate-200 hover:text-white hover:border-[#20c58f]/60 transition-colors"
+              title="Rensa säljarfilter"
+            >
+              Säljare: {timeSeries?.available_sellers.find(s => s.email === sellerFilter)?.name || sellerFilter} ×
+            </button>
+          )}
+          {groupFilter && (
+            <button
+              onClick={() => setGroupFilter(null)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-800/60 border border-slate-700 rounded-md text-slate-200 hover:text-white hover:border-[#20c58f]/60 transition-colors"
+              title="Rensa tjänstegrupp-filter"
+            >
+              Tjänstegrupp: {groupFilter} ×
+            </button>
+          )}
+          {technicianFilter && (
+            <button
+              onClick={() => setTechnicianFilter(null)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-800/60 border border-slate-700 rounded-md text-slate-200 hover:text-white hover:border-[#20c58f]/60 transition-colors"
+              title="Rensa teknikerfilter"
+            >
+              Tekniker: {technicianFilter.name} ×
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setSellerFilter(null)
+              setGroupFilter(null)
+              setTechnicianFilter(null)
+            }}
+            className="ml-auto text-[#20c58f] hover:text-white text-[11px]"
+          >
+            Rensa alla
+          </button>
+        </div>
+      )}
 
       {/* Tabell */}
       <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl overflow-hidden">

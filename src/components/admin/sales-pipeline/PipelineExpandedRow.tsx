@@ -43,6 +43,28 @@ export default function PipelineExpandedRow({ contractId, basePath }: PipelineEx
     }
   }, [contractId])
 
+  // Marginalpåverkan
+  const external = services.reduce(
+    (s, it) => s + (Number(it.total_price) || 0),
+    0
+  )
+  const internal = articles.reduce(
+    (s, it) => s + (Number(it.total_price) || 0),
+    0
+  )
+  const net = external - internal
+  const marginPct = external > 0 ? Math.round((net / external) * 100) : null
+  const internalPct = external > 0 ? Math.min((internal / external) * 100, 100) : 0
+  const netPct = external > 0 ? Math.max((net / external) * 100, 0) : 0
+  const marginColor =
+    marginPct === null
+      ? 'text-slate-400'
+      : marginPct >= 40
+        ? 'text-green-400'
+        : marginPct >= 20
+          ? 'text-amber-400'
+          : 'text-red-400'
+
   return (
     <div className="space-y-3">
       <OfferItemsSection
@@ -51,6 +73,44 @@ export default function PipelineExpandedRow({ contractId, basePath }: PipelineEx
         loading={loading}
         error={error}
       />
+
+      {!loading && external > 0 && (
+        <div className="p-3 bg-slate-800/30 border border-slate-700/50 rounded-xl">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold text-slate-300">Marginalpåverkan</div>
+            <div className={`text-sm font-bold tabular-nums ${marginColor}`}>
+              {marginPct !== null ? `${marginPct}%` : '—'}
+            </div>
+          </div>
+          <div className="flex h-4 rounded-md overflow-hidden border border-slate-700/50">
+            <div
+              className="bg-red-500/60 flex items-center justify-center text-[9px] text-red-100"
+              style={{ width: `${internalPct}%` }}
+              title={`Inköpskostnad: ${internal.toLocaleString('sv-SE')} kr`}
+            >
+              {internalPct > 12 ? `${Math.round(internalPct)}%` : ''}
+            </div>
+            <div
+              className="bg-green-500/60 flex items-center justify-center text-[9px] text-green-100"
+              style={{ width: `${netPct}%` }}
+              title={`Nettomarginal: ${net.toLocaleString('sv-SE')} kr`}
+            >
+              {netPct > 12 ? `${Math.round(netPct)}%` : ''}
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-500">
+            <span>
+              <span className="inline-block w-2 h-2 rounded-full bg-red-500/60 mr-1" />
+              Inköp {internal.toLocaleString('sv-SE')} kr
+            </span>
+            <span>Pris {external.toLocaleString('sv-SE')} kr</span>
+            <span>
+              Netto {net.toLocaleString('sv-SE')} kr
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500/60 ml-1" />
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-end">
         <button
