@@ -1,5 +1,6 @@
 // src/components/admin/settings/PriceListsSettings.tsx
 // Huvudkomponent för hantering av prislistor i admin
+// Prislistor prissätter TJÄNSTER som kunden köper utöver sitt avtal.
 
 import { useState, useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
@@ -13,8 +14,9 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PriceListService } from '../../../services/priceListService'
-import { ArticleService } from '../../../services/articleService'
-import { PriceList, Article } from '../../../types/articles'
+import { ServiceCatalogService } from '../../../services/servicesCatalogService'
+import { PriceList } from '../../../types/articles'
+import { ServiceWithGroup } from '../../../types/services'
 import { PriceListEditModal } from './PriceListEditModal'
 import { PriceListsTable } from './PriceListsTable'
 import { ArticlePriceListNav } from './ArticlePriceListNav'
@@ -26,7 +28,7 @@ export function PriceListsSettings() {
   const navigate = useNavigate()
   const { visibleColumns, toggleColumn, resetToDefaults } = usePriceListColumnVisibility()
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
+  const [services, setServices] = useState<ServiceWithGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [editingPriceList, setEditingPriceList] = useState<PriceList | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -45,18 +47,17 @@ export function PriceListsSettings() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [priceListsData, articlesData] = await Promise.all([
+      const [priceListsData, servicesData] = await Promise.all([
         PriceListService.getAllPriceLists(),
-        ArticleService.getActiveArticles()
+        ServiceCatalogService.getAllServices()
       ])
       setPriceLists(priceListsData)
-      setArticles(articlesData)
+      setServices(servicesData.filter(s => s.is_active))
 
-      // Ladda antal artiklar per prislista
-      const counts: Record<string, number> = {}
-      for (const pl of priceListsData) {
-        counts[pl.id] = await PriceListService.getItemCount(pl.id)
-      }
+      // N+1-fix: hämta antal tjänstepriser per prislista i ett anrop
+      const counts = await PriceListService.getServiceItemCountsForLists(
+        priceListsData.map(pl => pl.id)
+      )
       setItemCounts(counts)
     } catch (error) {
       console.error('Fel vid laddning av prislistor:', error)
@@ -129,7 +130,7 @@ export function PriceListsSettings() {
     <div className="min-h-screen relative overflow-hidden">
       {/* Bakgrund */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-purple-500/5" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-[#20c58f]/5" />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -142,13 +143,13 @@ export function PriceListsSettings() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
-                <FileText className="w-6 h-6 text-purple-400" />
+              <div className="w-12 h-12 bg-[#20c58f]/10 rounded-xl flex items-center justify-center">
+                <FileText className="w-6 h-6 text-[#20c58f]" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">Prislistor</h1>
                 <p className="text-slate-400 text-sm">
-                  Hantera prislistor med kundspecifika priser
+                  Fasta kundpriser för tjänster utöver avtalet
                 </p>
               </div>
             </div>
@@ -167,12 +168,12 @@ export function PriceListsSettings() {
             <p className="text-sm text-slate-400">Prislistor</p>
           </div>
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
-            <p className="text-2xl font-bold text-emerald-400">{activeCount}</p>
+            <p className="text-2xl font-bold text-[#20c58f]">{activeCount}</p>
             <p className="text-sm text-slate-400">Aktiva</p>
           </div>
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
-            <p className="text-2xl font-bold text-white">{articles.length}</p>
-            <p className="text-sm text-slate-400">Artiklar</p>
+            <p className="text-2xl font-bold text-white">{services.length}</p>
+            <p className="text-sm text-slate-400">Tjänster</p>
           </div>
         </div>
 
@@ -209,7 +210,7 @@ export function PriceListsSettings() {
         {/* Tabell */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+            <Loader2 className="w-8 h-8 text-[#20c58f] animate-spin" />
           </div>
         ) : priceLists.length === 0 ? (
           <div className="text-center py-16 bg-slate-800/30 rounded-xl border border-slate-700/50">
@@ -227,7 +228,7 @@ export function PriceListsSettings() {
           <PriceListsTable
             priceLists={priceLists}
             itemCounts={itemCounts}
-            articles={articles}
+            services={services}
             expandedListId={expandedListId}
             visibleColumns={visibleColumns}
             onToggleExpand={handleToggleExpand}

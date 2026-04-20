@@ -25,6 +25,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { CaseBillingService } from '../../services/caseBillingService'
 import { ServiceCatalogService } from '../../services/servicesCatalogService'
+import { PriceListService } from '../../services/priceListService'
 import { PricingSettingsService } from '../../services/pricingSettingsService'
 import type { PricingSettings } from '../../types/pricingSettings'
 import { DEFAULT_PRICING_SETTINGS } from '../../types/pricingSettings'
@@ -126,6 +127,8 @@ export default function CaseServiceSelector({
   const [pricingSettings, setPricingSettings] = useState<PricingSettings>({
     id: '', ...DEFAULT_PRICING_SETTINGS, updated_at: ''
   })
+  // Map { service_id → fast kundpris } från kundens prislista (tomt om saknas)
+  const [customerServicePrices, setCustomerServicePrices] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
   // UI state
@@ -204,15 +207,17 @@ export default function CaseServiceSelector({
         .from('service_groups').select('id').eq('name', 'Övrigt').maybeSingle()
       setOvrigtServiceGroupId(ovrigtSgRow?.id ?? null)
 
-      const [articlesData, itemsData, allServicesData, settingsData] = await Promise.all([
+      const [articlesData, itemsData, allServicesData, settingsData, customerPricesData] = await Promise.all([
         CaseBillingService.getArticlesWithPrices(customerId, resolvedArticleGroupId),
         caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
         ServiceCatalogService.getAllActiveServices(),
         PricingSettingsService.get(),
+        customerId ? PriceListService.getCustomerServicePrices(customerId) : Promise.resolve({}),
       ])
       setPricingSettings(settingsData)
       setArticles(articlesData)
       setAddonServices(allServicesData)
+      setCustomerServicePrices(customerPricesData)
 
       // Hämta primär tjänst
       let svc: ServiceWithGroup | null = null
@@ -223,6 +228,9 @@ export default function CaseServiceSelector({
       // Auto-skapa fakturarad för primärtjänsten om den saknas
       let finalItems = itemsData
       if (caseId && svc && !itemsData.some(i => i.item_type === 'service' && i.service_id === primaryServiceId)) {
+        // Använd kundens fasta pris om det finns, annars base_price
+        const customerPrice = customerPricesData[svc.id]
+        const priceToUse = customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
         await CaseBillingService.addServiceToCase({
           case_id: caseId,
           case_type: caseType,
@@ -231,7 +239,7 @@ export default function CaseServiceSelector({
           service_code: svc.code,
           service_name: svc.name,
           quantity: 1,
-          unit_price: svc.base_price ?? 0,
+          unit_price: priceToUse,
           vat_rate: 25,
           added_by_technician_id: technicianId || undefined,
           added_by_technician_name: technicianName || undefined,
@@ -316,8 +324,11 @@ export default function CaseServiceSelector({
   // ──────────────────────────────────────────────────────────────
   const handleAddAddon = async (svc: ServiceWithGroup) => {
     if (saving) return
+    // Använd kundens fasta pris om det finns, annars base_price
+    const customerPrice = customerServicePrices[svc.id]
+    const priceToUse = customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
     if (draftMode && !caseId) {
-      const price = svc.base_price ?? 0
+      const price = priceToUse
       const discounted = calculateDiscountedPrice(price, 0)
       const total = calculateTotalPrice(discounted, 1)
       const draftItem: CaseBillingItemWithRelations = {
@@ -362,7 +373,6 @@ export default function CaseServiceSelector({
     if (!caseId) return
     setSaving(true)
     try {
-      const price = svc.base_price ?? 0
       await CaseBillingService.addServiceToCase({
         case_id: caseId,
         case_type: caseType,
@@ -371,7 +381,7 @@ export default function CaseServiceSelector({
         service_code: svc.code,
         service_name: svc.name,
         quantity: 1,
-        unit_price: price,
+        unit_price: priceToUse,
         vat_rate: 25,
         added_by_technician_id: technicianId || undefined,
         added_by_technician_name: technicianName || undefined,
@@ -531,6 +541,11 @@ export default function CaseServiceSelector({
     }
     const item = allItems.find(i => i.id === id)
     if (!item) return
+    // Skydd: kundprislista-låsta tjänster får inte ändras här
+    if (item.service_id && customerServicePrices[item.service_id] !== undefined) {
+      setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
+      return
+    }
     const discounted = calculateDiscountedPrice(newPrice, item.discount_percent)
     const total = calculateTotalPrice(discounted, item.quantity)
     if (draftMode && !caseId) {
@@ -643,6 +658,14 @@ export default function CaseServiceSelector({
   // ──────────────────────────────────────────────────────────────
   const handleApplyPrices = async (prices: Record<string, number>) => {
     if (!caseId && !draftMode) return
+    // Filtrera bort fast-prissatta tjänster — deras pris styrs av kundens prislista
+    const filteredPrices: Record<string, number> = {}
+    Object.entries(prices).forEach(([itemId, price]) => {
+      const it = allItems.find(i => i.id === itemId)
+      if (it?.service_id && customerServicePrices[it.service_id] !== undefined) return
+      filteredPrices[itemId] = price
+    })
+    prices = filteredPrices
     // Bygg mappning-payload: artikel-id → service-id (eller null om ej tilldelad)
     const articleIds = allItems.filter(i => i.item_type === 'article').map(i => i.id)
     const mappingPayload: Record<string, string | null> = {}
@@ -793,14 +816,26 @@ export default function CaseServiceSelector({
                 && (svc.rot_eligible || svc.rut_eligible)
               const rotPct = getEffectiveRotPercent(svc)
               const rutPct = getEffectiveRutPercent(svc)
+              const hasFixedPrice = !!item.service_id && customerServicePrices[item.service_id] !== undefined
               return (
                 <div key={item.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg">
                   {/* Namn – alltid full bredd */}
-                  <div className="text-sm font-medium text-white mb-1.5">
-                    {item.service_code && (
-                      <span className="text-xs text-slate-400 mr-1">{item.service_code}</span>
+                  <div className="text-sm font-medium text-white mb-1.5 flex items-center gap-2 flex-wrap">
+                    <span>
+                      {item.service_code && (
+                        <span className="text-xs text-slate-400 mr-1">{item.service_code}</span>
+                      )}
+                      {item.service_name || item.article_name}
+                    </span>
+                    {hasFixedPrice && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
+                        title="Fast pris från kundens prislista"
+                      >
+                        <CheckCircle className="w-3 h-3" />
+                        Fast pris
+                      </span>
                     )}
-                    {item.service_name || item.article_name}
                   </div>
                   {/* Kontroller på rad 2 */}
                   <div className="flex items-center gap-2">
@@ -821,6 +856,16 @@ export default function CaseServiceSelector({
                       <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-auto">
                         {formatPrice(item.total_price)}
                       </span>
+                    ) : hasFixedPrice ? (
+                      <div className="flex items-center gap-1 ml-auto">
+                        <span
+                          className="w-24 px-2 py-0.5 text-sm text-right bg-[#20c58f]/10 border border-[#20c58f]/30 rounded text-[#20c58f] font-medium cursor-not-allowed"
+                          title="Fast pris från kundens prislista – kan inte ändras här"
+                        >
+                          {item.unit_price}
+                        </span>
+                        <span className="text-xs text-slate-400">kr/st</span>
+                      </div>
                     ) : (
                       <div className="flex items-center gap-1 ml-auto">
                         <input
@@ -1188,6 +1233,11 @@ export default function CaseServiceSelector({
           quantity: i.quantity,
           discount_percent: i.discount_percent,
         }))}
+        fixedPricedItemIds={new Set(
+          serviceItems
+            .filter(i => !!i.service_id && customerServicePrices[i.service_id] !== undefined)
+            .map(i => i.id)
+        )}
         assignments={priceAssignments}
         markups={priceMarkups}
         onAssignmentsChange={setPriceAssignments}

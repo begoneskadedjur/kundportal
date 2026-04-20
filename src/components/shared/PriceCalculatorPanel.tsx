@@ -40,6 +40,13 @@ interface PriceCalculatorPanelProps {
   onAssignmentsChange: (a: Record<string, string>) => void
   onMarkupsChange: (m: Record<string, number>) => void
   onApplyPrices: (prices: Record<string, number>) => Promise<void>
+  /**
+   * Service-item IDs (fakturarader) vars pris styrs av kundens prislista.
+   * För dessa rader:
+   *  - artikel-tilldelning och marginalberäkning fortsätter fungera
+   *  - markup-slider är avstängd och Applicera-knappen skriver inte över deras unit_price
+   */
+  fixedPricedItemIds?: Set<string>
 }
 
 const fmt = (n: number) =>
@@ -55,7 +62,9 @@ export default function PriceCalculatorPanel({
   onAssignmentsChange,
   onMarkupsChange,
   onApplyPrices,
+  fixedPricedItemIds,
 }: PriceCalculatorPanelProps) {
+  const isFixed = (id: string) => !!fixedPricedItemIds?.has(id)
   const [settings, setSettings] = useState<PricingSettings>({ id: '', ...DEFAULT_PRICING_SETTINGS, updated_at: '' })
   const [loadingSettings, setLoadingSettings] = useState(true)
   const [applying, setApplying] = useState(false)
@@ -106,8 +115,9 @@ export default function PriceCalculatorPanel({
     try {
       const rec = settings.recommended_markup_percent
 
-      // Beräkna råpriser per rad
+      // Beräkna råpriser per rad — hoppa över fast-prissatta rader
       const entries = serviceItems
+        .filter(si => !isFixed(si.id))
         .map(si => ({
           id: si.id,
           cost: purchaseCostByService(si.id),
@@ -244,19 +254,31 @@ export default function PriceCalculatorPanel({
                             const cost = purchaseCostByService(si.id)
                             const markup = markups[si.id] ?? settings.recommended_markup_percent
                             const raw = calculateSuggestedPrice(cost, markup)
-                            const price = cost > 0 ? raw : 0
-                            const margin = price > 0 ? calculateMarginPercent(price, cost) : 0
+                            const suggestedPrice = cost > 0 ? raw : 0
                             const hasArticles = cost > 0
+                            const fixed = isFixed(si.id)
+                            // Vid fast pris: marginal räknas på kundens faktiska pris (unit_price × qty)
+                            const fixedPrice = si.unit_price * si.quantity
+                            const price = fixed ? fixedPrice : suggestedPrice
+                            const margin = price > 0 && cost > 0 ? calculateMarginPercent(price, cost) : 0
 
                             return (
-                              <div key={si.id} className={`p-3 rounded-xl border ${hasArticles ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-800/10 border-slate-700/30'}`}>
+                              <div key={si.id} className={`p-3 rounded-xl border ${fixed ? 'bg-[#20c58f]/5 border-[#20c58f]/30' : hasArticles ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-800/10 border-slate-700/30'}`}>
                                 {/* Tjänstnamn på egen rad */}
                                 <div className="mb-2">
-                                  <div className="text-sm font-medium text-white leading-snug">
-                                    {si.service_code && (
-                                      <span className="text-xs text-slate-400 mr-1">{si.service_code}</span>
+                                  <div className="text-sm font-medium text-white leading-snug flex items-center gap-2 flex-wrap">
+                                    <span>
+                                      {si.service_code && (
+                                        <span className="text-xs text-slate-400 mr-1">{si.service_code}</span>
+                                      )}
+                                      {si.service_name || 'Okänd tjänst'}
+                                    </span>
+                                    {fixed && (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium">
+                                        <CheckCircle className="w-3 h-3" />
+                                        Fast pris · {fmt(fixedPrice)}
+                                      </span>
                                     )}
-                                    {si.service_name || 'Okänd tjänst'}
                                   </div>
                                   {hasArticles && (
                                     <div className={`flex items-center gap-1 text-xs font-medium mt-0.5 ${getMarginColor(margin)}`}>
@@ -266,11 +288,16 @@ export default function PriceCalculatorPanel({
                                   )}
                                 </div>
 
-                                {hasArticles ? (
+                                {fixed ? (
+                                  <p className="text-xs text-slate-400">
+                                    Fast pris från kundens prislista — markup ej aktiv. Artikel-kostnader
+                                    används för marginalberäkning.
+                                  </p>
+                                ) : hasArticles ? (
                                   <>
                                     <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
                                       <span>Inköp: {fmt(cost)}</span>
-                                      <span className="font-semibold text-white text-sm">{fmt(price)}</span>
+                                      <span className="font-semibold text-white text-sm">{fmt(suggestedPrice)}</span>
                                     </div>
                                     <div className="space-y-1">
                                       <div className="flex justify-between text-xs text-slate-500">
