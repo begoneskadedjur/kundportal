@@ -149,7 +149,8 @@ function App() {
               <Route path="skapa-avtal" element={<ProtectedRoute requiredRole="admin"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="avtalsdiagnostik" element={<ProtectedRoute requiredRole="admin"><OneflowDiagnostics /></ProtectedRoute>} />
               <Route path="forsaljningspipeline" element={<ProtectedRoute requiredRole="admin"><ContractsOverview /></ProtectedRoute>} />
-              <Route path="offerthantering" element={<ProtectedRoute requiredRole="admin"><CasePipeline /></ProtectedRoute>} />
+              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="admin"><CasePipeline /></ProtectedRoute>} />
+              <Route path="offerthantering" element={<Navigate to="/admin/dokumentsignering" replace />} />
               <Route path="kundresa" element={<ProtectedRoute requiredRole="admin"><CustomerJourney /></ProtectedRoute>} />
               <Route path="avslutade-arenden" element={<ProtectedRoute requiredRole="admin"><ClosedCasesFunnel /></ProtectedRoute>} />
               <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
@@ -239,7 +240,8 @@ function App() {
               <Route path="booking-assistant" element={<ProtectedRoute requiredRole="koordinator"><ScheduleOptimizer /></ProtectedRoute>} />
 
               {/* Ärenden (koordinator-specifik) */}
-              <Route path="offerthantering" element={<ProtectedRoute requiredRole="koordinator"><CasePipeline /></ProtectedRoute>} />
+              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="koordinator"><CasePipeline /></ProtectedRoute>} />
+              <Route path="offerthantering" element={<Navigate to="/koordinator/dokumentsignering" replace />} />
               <Route path="sok-arenden" element={<ProtectedRoute requiredRole="koordinator"><CaseSearch /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="koordinator"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="analytics" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorAnalytics /></ProtectedRoute>} />
@@ -276,7 +278,8 @@ function App() {
               <Route path="forsaljningsmojligheter" element={<ProtectedRoute requiredRole="säljare"><SalesOpportunities /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole="säljare"><Leads /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="säljare"><LeadAnalytics /></ProtectedRoute>} />
-              <Route path="offerthantering" element={<ProtectedRoute requiredRole="säljare"><CasePipeline /></ProtectedRoute>} />
+              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="säljare"><CasePipeline /></ProtectedRoute>} />
+              <Route path="offerthantering" element={<Navigate to="/saljare/dokumentsignering" replace />} />
               <Route path="kundresa" element={<ProtectedRoute requiredRole="säljare"><CustomerJourney /></ProtectedRoute>} />
               <Route path="avslutade-arenden" element={<ProtectedRoute requiredRole="säljare"><ClosedCasesFunnel /></ProtectedRoute>} />
 

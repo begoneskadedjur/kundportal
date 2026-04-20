@@ -111,7 +111,7 @@ function OfferRow({
   onExtend?: (contractId: string) => void
   onStatusChange?: (contractId: string, status: CoordinatorCaseStatus) => void
 }) {
-  const { profile } = useAuth()
+  const { user, profile } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
@@ -120,13 +120,13 @@ function OfferRow({
 
   const handleStatusChange = useCallback(async (status: CoordinatorCaseStatus) => {
     try {
-      await CasePipelineService.updateOfferStatus(offer.id, status)
+      await CasePipelineService.updateOfferStatus(offer.id, status, user?.id)
       onStatusChange?.(offer.id, status)
       toast.success('Status uppdaterad')
     } catch {
       toast.error('Kunde inte byta status')
     }
-  }, [offer.id, onStatusChange])
+  }, [offer.id, onStatusChange, user?.id])
 
   useEffect(() => {
     if (!menuOpen) return

@@ -1,4 +1,4 @@
-// src/pages/coordinator/CasePipeline.tsx — Offerthantering: koordinatorns pipeline (Oneflow-baserad)
+// src/pages/coordinator/CasePipeline.tsx — Dokumentsignering: pipeline för avtal + offerter (Oneflow-baserad)
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -7,6 +7,7 @@ import {
   CalendarCheck, X, Loader2, Send, FileCheck, Banknote,
   TrendingUp, AlertTriangle, Clock, ChevronUp, ChevronDown, ChevronRight,
   PhoneCall, MailIcon, MessageCircle, UserCheck, ExternalLink, CalendarPlus,
+  FileSignature, FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,7 +15,7 @@ import { CasePipelineService } from '../../services/casePipelineService'
 import PipelineColumnSelector, { usePipelineColumnVisibility } from '../../components/coordinator/PipelineColumnSelector'
 import { useOfferStats } from '../../hooks/useOfferStats'
 import type { PipelineOfferRow, PipelineTab, CoordinatorCaseStatus, ContactMethod } from '../../types/casePipeline'
-import { OFFER_STATUS_CONFIG, PIPELINE_TABS } from '../../types/casePipeline'
+import { OFFER_STATUS_CONFIG, PIPELINE_TABS, COORDINATOR_STATUS_CONFIG } from '../../types/casePipeline'
 import OfferRowDetail from '../../components/coordinator/follow-up/OfferRowDetail'
 import CoordinatorStatusDropdown from '../../components/coordinator/follow-up/CoordinatorStatusDropdown'
 import ExtendSigningPeriodDialog from '../../components/coordinator/follow-up/ExtendSigningPeriodDialog'
@@ -67,6 +68,14 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
   { key: 'contact_attempts', label: 'Flest kontaktförsök' },
 ]
 
+type DocumentTypeFilter = 'all' | 'offer' | 'contract'
+
+const DOC_TYPE_FILTERS: { key: DocumentTypeFilter; label: string }[] = [
+  { key: 'all', label: 'Båda' },
+  { key: 'offer', label: 'Offerter' },
+  { key: 'contract', label: 'Avtal' },
+]
+
 // ─── Huvudkomponent ───
 
 export default function CasePipeline() {
@@ -75,12 +84,15 @@ export default function CasePipeline() {
   const [offers, setOffers] = useState<PipelineOfferRow[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<PipelineTab>('alla')
+  const [docTypeFilter, setDocTypeFilter] = useState<DocumentTypeFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [showInsights, setShowInsights] = useState(true)
   const [showDismissed, setShowDismissed] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [extendTarget, setExtendTarget] = useState<PipelineOfferRow | null>(null)
+
+  const isAdmin = profile?.role === 'admin'
 
   // Kontaktförsök-popover
   const [contactPopoverOfferId, setContactPopoverOfferId] = useState<string | null>(null)
@@ -122,6 +134,11 @@ export default function CasePipeline() {
     const tab = PIPELINE_TABS.find(t => t.key === activeTab)!
     let result = offers.filter(o => tab.statuses.includes(o.status))
 
+    // Typfilter (avtal / offerter / båda)
+    if (docTypeFilter !== 'all') {
+      result = result.filter(o => o.type === docTypeFilter)
+    }
+
     // Dölja avfärdade om inte showDismissed
     if (!showDismissed) {
       result = result.filter(o => !o.action?.dismissed_at)
@@ -154,7 +171,7 @@ export default function CasePipeline() {
     })
 
     return result
-  }, [offers, activeTab, searchQuery, sortBy, showDismissed])
+  }, [offers, activeTab, docTypeFilter, searchQuery, sortBy, showDismissed])
 
   // ─── Antal dolda ───
   const dismissedCount = useMemo(() =>
@@ -242,12 +259,12 @@ export default function CasePipeline() {
 
   const handleStatusChange = useCallback(async (o: PipelineOfferRow, status: CoordinatorCaseStatus) => {
     try {
-      const updated = await CasePipelineService.updateOfferStatus(o.id, status)
+      const updated = await CasePipelineService.updateOfferStatus(o.id, status, user?.id)
       setOffers(prev => prev.map(p => p.id === o.id ? { ...p, action: updated } : p))
     } catch {
       toast.error('Kunde inte byta status')
     }
-  }, [])
+  }, [user?.id])
 
   const handleDismiss = useCallback(async (o: PipelineOfferRow) => {
     if (!user?.id) return
@@ -301,8 +318,8 @@ export default function CasePipeline() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <ClipboardList className="w-6 h-6 text-[#20c58f]" />
-          <h1 className="text-xl font-bold text-white">Offerthantering</h1>
+          <FileSignature className="w-6 h-6 text-[#20c58f]" />
+          <h1 className="text-xl font-bold text-white">Dokumentsignering</h1>
           <span className="text-xs text-slate-500 font-medium">Oneflow</span>
         </div>
         <div className="flex items-center gap-2">
@@ -470,6 +487,23 @@ export default function CasePipeline() {
           ))}
         </div>
 
+        {/* Typfilter: Båda / Offerter / Avtal */}
+        <div className="flex bg-slate-800/50 rounded-lg p-0.5">
+          {DOC_TYPE_FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setDocTypeFilter(f.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                docTypeFilter === f.key
+                  ? 'bg-[#20c58f] text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
           <input
@@ -516,7 +550,8 @@ export default function CasePipeline() {
             <thead>
               <tr className="bg-slate-800/60 text-slate-400 border-b border-slate-700/50">
                 {isVisible('expand') && <th className="px-2 py-2.5 font-medium w-8" />}
-                {isVisible('offerStatus') && <th className="px-3 py-2.5 font-medium">Offertstatus</th>}
+                {isVisible('dokumenttyp') && <th className="px-3 py-2.5 font-medium">Typ</th>}
+                {isVisible('offerStatus') && <th className="px-3 py-2.5 font-medium">Dok.status</th>}
                 {isVisible('kund') && <th className="px-3 py-2.5 font-medium">Kund / Kontakt</th>}
                 {isVisible('adress') && <th className="px-3 py-2.5 font-medium">Adress</th>}
                 {isVisible('pris') && <th className="px-3 py-2.5 font-medium">Pris</th>}
@@ -537,6 +572,7 @@ export default function CasePipeline() {
                   onToggleExpand={() => setExpandedId(expandedId === o.id ? null : o.id)}
                   basePath={basePath}
                   senderEmail={senderEmail}
+                  isAdmin={isAdmin}
                   onGoToCustomer={(cid) => navigate(`${basePath}/befintliga-kunder?customerId=${cid}`)}
                   onOpenExtend={(offer) => setExtendTarget(offer)}
                   onAcknowledge={handleAcknowledge}
@@ -790,6 +826,7 @@ interface PipelineRowProps {
   onToggleExpand: () => void
   basePath: string
   senderEmail?: string
+  isAdmin: boolean
   onGoToCustomer: (customerId: string) => void
   onOpenExtend: (offer: PipelineOfferRow) => void
   onAcknowledge: (o: PipelineOfferRow) => void
@@ -810,7 +847,7 @@ interface PipelineRowProps {
 }
 
 function PipelineRow({
-  offer: o, isExpanded, onToggleExpand, basePath, senderEmail,
+  offer: o, isExpanded, onToggleExpand, basePath, senderEmail, isAdmin,
   onGoToCustomer, onOpenExtend,
   onAcknowledge, onOpenContactPopover, contactPopoverOpen,
   onLogContact, onStartEditNote, editingNoteId, noteText, onNoteTextChange,
@@ -825,7 +862,7 @@ function PipelineRow({
 
   // Räkna synliga kolumner för colSpan vid expanded rad
   const visibleColCount = [
-    'expand','offerStatus','kund','adress','pris','ansvarig','skickat','koordStatus','forsok','anteckning','atgarder',
+    'expand','dokumenttyp','offerStatus','kund','adress','pris','ansvarig','skickat','koordStatus','forsok','anteckning','atgarder',
   ].filter(isVisible).length
 
   const rowBg = isDismissed
@@ -854,7 +891,22 @@ function PipelineRow({
         </td>
       )}
 
-      {/* Offertstatus (Oneflow) */}
+      {/* Typ (avtal / offert) */}
+      {isVisible('dokumenttyp') && (
+        <td className="px-3 py-2.5">
+          {o.type === 'contract' ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/15 text-emerald-400">
+              <FileSignature className="w-3 h-3" /> Avtal
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/15 text-blue-400">
+              <FileText className="w-3 h-3" /> Offert
+            </span>
+          )}
+        </td>
+      )}
+
+      {/* Dok.status (Oneflow) */}
       {isVisible('offerStatus') && (
         <td className="px-3 py-2.5">
           <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${offerStatusCfg.bgColor} ${offerStatusCfg.color}`}>
@@ -920,10 +972,32 @@ function PipelineRow({
         </td>
       )}
 
-      {/* Koord.status — delad dropdown */}
+      {/* Koord.status — admin read-only pill, övriga dropdown */}
       {isVisible('koordStatus') && (
         <td className="px-3 py-2.5">
-          <CoordinatorStatusDropdown value={status} onChange={(s) => onStatusChange(o, s)} />
+          {isAdmin ? (
+            (() => {
+              const cfg = COORDINATOR_STATUS_CONFIG[status]
+              const setAt = o.action?.status_updated_at
+              return (
+                <div className="flex flex-col gap-0.5">
+                  <span
+                    className={`inline-flex items-center self-start px-1.5 py-0.5 rounded text-[10px] font-medium ${cfg.bgColor} ${cfg.color}`}
+                    title="Läses endast — koordinatorn sätter statusen"
+                  >
+                    {cfg.label}
+                  </span>
+                  {setAt && (
+                    <span className="text-[9px] text-slate-500" title={new Date(setAt).toLocaleString('sv-SE')}>
+                      Satt {formatRelativeDate(setAt)}
+                    </span>
+                  )}
+                </div>
+              )
+            })()
+          ) : (
+            <CoordinatorStatusDropdown value={status} onChange={(s) => onStatusChange(o, s)} />
+          )}
         </td>
       )}
 

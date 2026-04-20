@@ -12,7 +12,8 @@ export interface PipelineTableColumn {
 
 export const PIPELINE_COLUMNS: PipelineTableColumn[] = [
   { id: 'expand',       label: 'Expandera',         defaultVisible: true,  required: true },
-  { id: 'offerStatus',  label: 'Offertstatus',      defaultVisible: true,  required: true },
+  { id: 'dokumenttyp',  label: 'Typ',               defaultVisible: true,  required: false },
+  { id: 'offerStatus',  label: 'Dok.status',        defaultVisible: true,  required: true },
   { id: 'kund',         label: 'Kund / Kontakt',    defaultVisible: true,  required: true },
   { id: 'adress',       label: 'Adress',            defaultVisible: true,  required: false },
   { id: 'pris',         label: 'Pris',              defaultVisible: true,  required: false },
@@ -24,7 +25,7 @@ export const PIPELINE_COLUMNS: PipelineTableColumn[] = [
   { id: 'atgarder',     label: 'Åtgärder',          defaultVisible: true,  required: true },
 ]
 
-const STORAGE_KEY = 'begone_pipeline_columns_v2'
+const STORAGE_KEY = 'begone_pipeline_columns_v3'
 
 export function usePipelineColumnVisibility() {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {

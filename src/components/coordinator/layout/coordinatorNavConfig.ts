@@ -79,7 +79,7 @@ export const navGroups: NavGroup[] = [
     label: 'Ärenden',
     icon: FileSearch,
     items: [
-      { label: 'Offerthantering', icon: ClipboardList, path: '/koordinator/offerthantering' },
+      { label: 'Dokumentsignering', icon: ClipboardList, path: '/koordinator/dokumentsignering' },
       { label: 'Sök Ärenden', icon: FileSearch, path: '/koordinator/sok-arenden' },
     ],
   },
@@ -125,7 +125,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/booking-assistant': 'Schemaoptimerare',
 
   // Ärenden (koordinator-specifik)
-  '/koordinator/offerthantering': 'Offerthantering',
+  '/koordinator/dokumentsignering': 'Dokumentsignering',
   '/koordinator/sok-arenden': 'Sök Ärenden',
   '/koordinator/oneflow-contract-creator': 'Avtal & Offerter',
   '/koordinator/analytics': 'Analytics & Insights',

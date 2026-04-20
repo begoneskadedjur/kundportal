@@ -38,6 +38,7 @@ export default function OfferFollowUp() {
 
   const [sortBy, setSortBy] = useState<FollowUpSortBy>('newest')
   const [statusFilter, setStatusFilter] = useState<FollowUpStatusFilter>('all')
+  const [docTypeFilter, setDocTypeFilter] = useState<'all' | 'offer' | 'contract'>('all')
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
@@ -65,9 +66,14 @@ export default function OfferFollowUp() {
 
   useEffect(() => { fetchData() }, [technicianEmail])
 
-  // Filtrera på vald tekniker + dolda
+  // Filtrera på typ + vald tekniker + dolda
   const filteredOffers = useMemo(() => {
     let result = offers
+
+    // Typfilter (avtal / offerter / båda)
+    if (docTypeFilter !== 'all') {
+      result = result.filter(o => o.type === docTypeFilter)
+    }
 
     // Filtrera på tekniker
     if (selectedTechnician) {
@@ -84,7 +90,7 @@ export default function OfferFollowUp() {
     }
 
     return result
-  }, [offers, selectedTechnician, techStats, showHidden, userId])
+  }, [offers, docTypeFilter, selectedTechnician, techStats, showHidden, userId])
 
   // Räkna dolda offerter
   const hiddenCount = useMemo(() => {
@@ -163,12 +169,14 @@ export default function OfferFollowUp() {
           coordinator_notes: existing?.coordinator_notes ?? null,
           dismissed_at: existing?.dismissed_at ?? null,
           dismissed_by: existing?.dismissed_by ?? null,
+          status_updated_at: now,
+          status_updated_by: userId ?? null,
           created_at: existing?.created_at ?? now,
           updated_at: now,
         },
       }
     }))
-  }, [])
+  }, [userId])
 
   // Efter lyckad förlängning: refetch så status/datum uppdateras
   const handleExtended = useCallback(() => {
@@ -327,6 +335,30 @@ export default function OfferFollowUp() {
           />
         </div>
       )}
+
+      {/* Typfilter: Båda / Offerter / Avtal */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-slate-500">Typ:</span>
+        <div className="flex bg-slate-800/50 rounded-lg p-0.5">
+          {([
+            { key: 'all', label: 'Båda' },
+            { key: 'offer', label: 'Offerter' },
+            { key: 'contract', label: 'Avtal' },
+          ] as const).map(f => (
+            <button
+              key={f.key}
+              onClick={() => setDocTypeFilter(f.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                docTypeFilter === f.key
+                  ? 'bg-[#20c58f] text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Uppföljningstabell */}
       <FollowUpTable

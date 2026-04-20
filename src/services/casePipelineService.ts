@@ -12,12 +12,11 @@ const OFFER_COLUMNS = `
 export class CasePipelineService {
   // ─── Oneflow-baserade offertmetoder ───
 
-  /** Hämta alla pipeline-offerter (Oneflow) med coordinator actions */
+  /** Hämta alla pipeline-dokument (Oneflow avtal + offerter) med coordinator actions */
   static async getPipelineOffers(): Promise<PipelineOfferRow[]> {
     const { data: offers, error } = await supabase
       .from('contracts')
       .select(OFFER_COLUMNS)
-      .eq('type', 'offer')
       .in('status', ['pending', 'signed', 'overdue', 'declined'])
       .order('created_at', { ascending: true })
 
@@ -128,6 +127,7 @@ export class CasePipelineService {
   static async updateOfferStatus(
     contractId: string,
     status: CoordinatorCaseStatus,
+    userId?: string | null,
   ): Promise<CoordinatorCaseAction> {
     const { data, error } = await supabase
       .from('coordinator_case_actions')
@@ -135,6 +135,8 @@ export class CasePipelineService {
         {
           contract_id: contractId,
           coordinator_status: status,
+          status_updated_at: new Date().toISOString(),
+          status_updated_by: userId ?? null,
         },
         { onConflict: 'contract_id' },
       )
@@ -291,6 +293,7 @@ export class CasePipelineService {
     caseId: string,
     caseType: 'private' | 'business' | 'contract',
     status: CoordinatorCaseStatus,
+    userId?: string | null,
   ): Promise<CoordinatorCaseAction> {
     const { data, error } = await supabase
       .from('coordinator_case_actions')
@@ -299,6 +302,8 @@ export class CasePipelineService {
           case_id: caseId,
           case_type: caseType,
           coordinator_status: status,
+          status_updated_at: new Date().toISOString(),
+          status_updated_by: userId ?? null,
         },
         { onConflict: 'case_id,case_type' },
       )

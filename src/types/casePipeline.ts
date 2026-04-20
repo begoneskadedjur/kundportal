@@ -24,6 +24,8 @@ export interface CoordinatorCaseAction {
   coordinator_notes: string | null
   dismissed_at: string | null
   dismissed_by: string | null
+  status_updated_at: string | null
+  status_updated_by: string | null
   created_at: string
   updated_at: string
 }

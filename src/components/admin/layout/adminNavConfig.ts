@@ -65,7 +65,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/admin/forsaljningsmojligheter' },
       { label: 'Leads', icon: Target, path: '/admin/leads' },
       { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
-      { label: 'Offerthantering', icon: ClipboardList, path: '/admin/offerthantering' },
+      { label: 'Dokumentsignering', icon: ClipboardList, path: '/admin/dokumentsignering' },
       { label: 'Kundresa', icon: GitBranch, path: '/admin/kundresa' },
       { label: 'Avslutade ärenden', icon: Trash2, path: '/admin/avslutade-arenden' },
     ]
@@ -151,7 +151,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/leadsstatistik': 'Leadsstatistik',
   '/admin/anvandarkonton-kund': 'Användarkonton (Kund)',
   '/admin/trafikljusoversikt': 'Trafikljusöversikt',
-  '/admin/offerthantering': 'Offerthantering',
+  '/admin/dokumentsignering': 'Dokumentsignering',
   '/admin/kundresa': 'Kundresa',
   '/admin/avslutade-arenden': 'Avslutade ärenden',
 
