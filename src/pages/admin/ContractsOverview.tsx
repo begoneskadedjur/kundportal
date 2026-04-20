@@ -1,12 +1,12 @@
 // src/pages/admin/ContractsOverview.tsx - Pipeline-fokuserad försäljningsöversikt med kollapsbar sidopanel
 import React, { useState, useMemo, useEffect } from 'react'
 import ReactDOM from 'react-dom'
-import { 
-  FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, 
-  ShoppingCart, Filter, Download, TrendingUp, Users, Package, 
-  Calendar, Clock, AlertTriangle, BarChart3, Percent, Target, 
-  Award, User, Tag, Layers, X,
-  ArrowUp, ArrowDown, Menu, Building2, Mail, Phone, Info
+import {
+  FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle,
+  ShoppingCart, Filter, Download, TrendingUp, Users, Package,
+  Calendar, Clock, AlertTriangle, BarChart3, Percent, Target,
+  Award, User, Tag, Layers, X, ChevronDown, ChevronUp, Activity,
+  ArrowUp, ArrowDown, Menu, Building2, Mail, Phone, Info, Briefcase
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -17,7 +17,7 @@ import ContractImportModal from '../../components/admin/contracts/ContractImport
 import FilesColumn from '../../components/admin/contracts/FilesColumn'
 import FileDownloadButton from '../../components/admin/contracts/FileDownloadButton'
 import { useContracts } from '../../hooks/useContracts'
-import { ContractFilters, ContractWithSourceData } from '../../services/contractService'
+import { ContractFilters, ContractWithSourceData, ContractService, ContractBillingAggregate } from '../../services/contractService'
 import { formatContractValue, getContractStatusColor, getContractStatusText, getContractTypeText } from '../../services/contractService'
 import { PriceListService } from '../../services/priceListService'
 import type { PriceList, PriceListItemWithArticle } from '../../types/articles'
@@ -431,6 +431,187 @@ const PriceListCell: React.FC<{
   return <ProductsCell products={products} />
 }
 
+// Tjänster-cell: visar signerade tjänster från case_billing_items, fallback till OneFlow-produkter
+const ServicesCell: React.FC<{
+  contract: ContractWithSourceData
+  agg?: ContractBillingAggregate | null
+}> = ({ contract, agg }) => {
+  const [showPopover, setShowPopover] = useState(false)
+  const [backdropClickable, setBackdropClickable] = useState(false)
+  const buttonRef = React.useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (showPopover) {
+      setBackdropClickable(false)
+      const t = setTimeout(() => setBackdropClickable(true), 200)
+      return () => clearTimeout(t)
+    }
+  }, [showPopover])
+
+  const services = agg?.services || []
+  if (services.length === 0) {
+    const products = parseContractProducts(contract)
+    return <ProductsCell products={products} />
+  }
+
+  const maxVisible = 2
+  const getPopoverStyle = () => {
+    if (!buttonRef.current) return {}
+    const rect = buttonRef.current.getBoundingClientRect()
+    return {
+      position: 'fixed' as const,
+      left: `${rect.left}px`,
+      top: `${rect.bottom + 8}px`,
+      zIndex: 99999,
+    }
+  }
+
+  return (
+    <div className="relative">
+      <div className="flex flex-wrap gap-1">
+        {services.slice(0, maxVisible).map(s => (
+          <span
+            key={s.id}
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-300"
+          >
+            {s.quantity > 1 && <span className="font-bold mr-1">{s.quantity}×</span>}
+            {s.name}
+          </span>
+        ))}
+        {services.length > maxVisible && (
+          <button
+            ref={buttonRef}
+            type="button"
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-[#20c58f]/20 text-[#20c58f] hover:bg-[#20c58f]/30 transition-all font-medium focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
+            onClick={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              setShowPopover(!showPopover)
+            }}
+          >
+            +{services.length - maxVisible} till
+          </button>
+        )}
+      </div>
+      {showPopover && services.length > maxVisible && ReactDOM.createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[9998]"
+            onClick={() => { if (backdropClickable) setShowPopover(false) }}
+          />
+          <div
+            className="fixed bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-2xl w-80 z-[9999]"
+            style={getPopoverStyle()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-[#20c58f]" />
+                <h4 className="text-sm font-medium text-white">Alla {services.length} tjänster</h4>
+              </div>
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation()
+                  setShowPopover(false)
+                }}
+                className="text-slate-400 hover:text-white p-1 -m-1"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {services.map(s => (
+                <div key={s.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-slate-700/50">
+                  <span className="text-slate-300 truncate flex-1">{s.name}</span>
+                  <span className="text-slate-400 font-mono bg-slate-700/50 px-1.5 py-0.5 rounded ml-2 text-xs">
+                    {s.quantity}×
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
+    </div>
+  )
+}
+
+// Marginal-cell: färgkodad marginal + tooltip med brytning
+const MarginCell: React.FC<{ agg?: ContractBillingAggregate | null }> = ({ agg }) => {
+  if (!agg || agg.margin_pct === null) {
+    return <span className="text-xs text-slate-500" title="Ingen intern kostnadsdata">–</span>
+  }
+  const color =
+    agg.margin_pct >= 30
+      ? 'text-[#20c58f]'
+      : agg.margin_pct >= 15
+        ? 'text-amber-400'
+        : 'text-red-400'
+  const marginVal = agg.external_total - agg.internal_cost
+  const tip = `Extern: ${agg.external_total.toLocaleString('sv-SE')} kr · Intern: ${agg.internal_cost.toLocaleString('sv-SE')} kr · Marginal: ${marginVal.toLocaleString('sv-SE')} kr (${agg.margin_pct}%)`
+  return (
+    <div className={`text-xs font-medium ${color} mt-1`} title={tip}>
+      {agg.margin_pct >= 0 ? '+' : ''}{agg.margin_pct}% marginal
+    </div>
+  )
+}
+
+// Kompakt KPI-card
+const KpiCard: React.FC<{
+  label: string
+  value: string
+  sub?: string
+  icon: React.ComponentType<{ className?: string }>
+  accent?: 'green' | 'blue' | 'red' | 'amber' | 'slate'
+}> = ({ label, value, sub, icon: Icon, accent = 'slate' }) => {
+  const accentMap: Record<string, string> = {
+    green: 'text-[#20c58f]',
+    blue: 'text-blue-400',
+    red: 'text-red-400',
+    amber: 'text-amber-400',
+    slate: 'text-slate-400',
+  }
+  return (
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+      <div className="flex items-start justify-between">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wider text-slate-400">{label}</p>
+          <p className="text-2xl font-bold text-white mt-1 truncate">{value}</p>
+          {sub && <p className={`text-xs mt-1 ${accentMap[accent]}`}>{sub}</p>}
+        </div>
+        <Icon className={`w-5 h-5 ${accentMap[accent]} opacity-60 flex-shrink-0`} />
+      </div>
+    </div>
+  )
+}
+
+// Funnel-stapel för pipelinehälsa
+const FunnelBar: React.FC<{
+  segments: Array<{ label: string; value: number; color: string }>
+}> = ({ segments }) => {
+  const total = segments.reduce((s, x) => s + x.value, 0)
+  if (total === 0) return <p className="text-xs text-slate-500">Ingen data</p>
+  return (
+    <div className="space-y-2">
+      {segments.map(seg => {
+        const pct = Math.round((seg.value / total) * 100)
+        return (
+          <div key={seg.label}>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-slate-300">{seg.label}</span>
+              <span className="text-slate-400">{pct}% · {formatContractValue(seg.value)}</span>
+            </div>
+            <div className="w-full h-2 bg-slate-700/40 rounded-full overflow-hidden">
+              <div className={`h-full ${seg.color}`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // Pipeline filter pills
 const PipelineFilters: React.FC<{
   activeFilter: string,
@@ -481,16 +662,28 @@ export default function ContractsOverview() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set())
-  
-  
+  const [showInsights, setShowInsights] = useState(false)
+
+
   // Modal states
   const [filesModalOpen, setFilesModalOpen] = useState(false)
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null)
   const [selectedContractName, setSelectedContractName] = useState<string>('')
   const [importModalOpen, setImportModalOpen] = useState(false)
 
-  // Prisliste-cache för tabellceller
+  // Prisliste-cache för tabellceller (fallback för legacy-kontrakt)
   const [priceListCache, setPriceListCache] = useState<Map<string, PriceListCellData>>(new Map())
+  // Billing-aggregat per kontrakt (tjänster + interna artiklar från wizarden)
+  const [billingAggMap, setBillingAggMap] = useState<Map<string, ContractBillingAggregate>>(new Map())
+
+  // Hämta billing aggregate för synliga kontrakt
+  useEffect(() => {
+    if (!contracts.length) return
+    const ids = contracts.map(c => c.id).filter(Boolean) as string[]
+    ContractService.getContractBillingAggregate(ids)
+      .then(map => setBillingAggMap(map))
+      .catch(err => console.warn('Kunde inte ladda billing aggregate:', err))
+  }, [contracts.length])
 
   // Hämta prislistedata för kontrakt som har price_list_id (direkt eller via kund)
   useEffect(() => {
@@ -683,131 +876,280 @@ export default function ContractsOverview() {
         <div className="flex-1 min-w-0">
           <div className="space-y-6">
 
-          {/* Kompakt KPI-rad */}
+          {/* Ekonomisk KPI-rad — strategisk vy för säljchef/marknadschef */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400">Totalt Kontraktsvärde</p>
-                  <p className="text-xl font-bold text-white">
-                    {formatContractValue(stats?.total_value || 0)}
-                  </p>
-                  <p className="text-xs text-green-400 mt-1">
-                    {(stats?.total_contracts || 0) + (stats?.total_offers || 0)} dokument totalt
-                  </p>
-                </div>
-                <DollarSign className="w-8 h-8 text-green-500 opacity-50" />
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400">Aktivt Kontraktsvärde</p>
-                  <p className="text-xl font-bold text-white">
-                    {formatContractValue(stats?.signed_value || 0)}
-                  </p>
-                  <p className="text-xs text-blue-400 mt-1">
-                    {stats?.signed_contracts || 0} signerade
-                  </p>
-                </div>
-                <CheckCircle className="w-8 h-8 text-blue-500 opacity-50" />
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400">Konvertering/Signeringsgrad</p>
-                  <p className="text-xl font-bold text-white">
-                    {stats?.overall_conversion_rate || 0}%
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {stats?.signed_contracts || 0} signerade av {((stats?.total_contracts || 0) + (stats?.total_offers || 0) - (stats?.declined_contracts || 0))} möjliga
-                  </p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-purple-500 opacity-50" />
-              </div>
-            </Card>
-
-            <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400">Avvisade intäkter</p>
-                  <p className="text-xl font-bold text-red-400">
-                    {formatContractValue(stats?.declined_value || 0)}
-                  </p>
-                  <p className="text-xs text-red-300 mt-1">
-                    {stats?.declined_contracts || 0} avvisade deals
-                  </p>
-                </div>
-                <AlertTriangle className="w-8 h-8 text-red-500 opacity-50" />
-              </div>
-            </Card>
+            <KpiCard
+              label="ARR"
+              value={formatContractValue(stats?.arr_total || 0)}
+              sub={
+                stats?.arr_delta_30d
+                  ? `${stats.arr_delta_30d > 0 ? '+' : ''}${formatContractValue(stats.arr_delta_30d)} senaste 30d`
+                  : `${stats?.active_contracts || 0} aktiva avtal`
+              }
+              icon={DollarSign}
+              accent="green"
+            />
+            <KpiCard
+              label="MRR"
+              value={formatContractValue(Math.round(stats?.mrr_total || 0))}
+              sub="ARR / 12"
+              icon={TrendingUp}
+              accent="green"
+            />
+            <KpiCard
+              label="Snitt-marginal"
+              value={stats?.avg_margin_pct !== null && stats?.avg_margin_pct !== undefined ? `${stats.avg_margin_pct}%` : '–'}
+              sub={stats?.avg_margin_pct !== null && stats?.avg_margin_pct !== undefined ? 'Signerade med intern data' : 'Ingen intern data'}
+              icon={Percent}
+              accent={
+                (stats?.avg_margin_pct ?? 0) >= 30
+                  ? 'green'
+                  : (stats?.avg_margin_pct ?? 0) >= 15
+                    ? 'amber'
+                    : 'red'
+              }
+            />
+            <KpiCard
+              label="Forecast 30d"
+              value={formatContractValue(Math.round(stats?.forecast_30d || 0))}
+              sub={`Pending × ${stats?.overall_conversion_rate || 0}% konv.`}
+              icon={Activity}
+              accent="blue"
+            />
           </div>
-          
-          {/* Extra KPI-rad för ytterligare insikter */}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400">Snitt signerat deal</p>
-                  <p className="text-xl font-bold text-white">
-                    {formatContractValue(stats?.average_contract_value || 0)}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Genomsnitt av signerade
-                  </p>
-                </div>
-                <Target className="w-8 h-8 text-orange-500 opacity-50" />
-              </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400">Väntande värde</p>
-                  <p className="text-xl font-bold text-blue-400">
-                    {formatContractValue(stats?.pending_value || 0)}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {stats?.pending_contracts || 0} väntande
-                  </p>
-                </div>
-                <Clock className="w-8 h-8 text-blue-500 opacity-50" />
-              </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400">Win Rate</p>
-                  <p className="text-xl font-bold text-white">
-                    {Math.round(((stats?.signed_contracts || 0) / Math.max((stats?.signed_contracts || 0) + (stats?.declined_contracts || 0), 1)) * 100)}%
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Signerade vs avvisade
-                  </p>
-                </div>
-                <Award className="w-8 h-8 text-green-500 opacity-50" />
-              </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400">Pipeline hälsa</p>
-                  <p className="text-xl font-bold text-white">
-                    {Math.round(((stats?.pending_contracts || 0) / Math.max((stats?.total_contracts || 0) + (stats?.total_offers || 0), 1)) * 100)}%
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Andel väntande deals
-                  </p>
-                </div>
-                <BarChart3 className="w-8 h-8 text-purple-500 opacity-50" />
-              </div>
-            </Card>
+            <KpiCard
+              label="Konv.-grad"
+              value={`${stats?.overall_conversion_rate || 0}%`}
+              sub={`${stats?.signed_contracts || 0} av ${((stats?.total_contracts || 0) + (stats?.total_offers || 0) - (stats?.declined_contracts || 0))} möjliga`}
+              icon={Target}
+              accent="blue"
+            />
+            <KpiCard
+              label="Snitt deal"
+              value={formatContractValue(Math.round(stats?.average_contract_value || 0))}
+              sub={`${stats?.signed_contracts || 0} signerade`}
+              icon={Briefcase}
+              accent="slate"
+            />
+            <KpiCard
+              label="Väntande pipeline"
+              value={formatContractValue(stats?.pending_value || 0)}
+              sub={`${stats?.pending_contracts || 0} väntande deals`}
+              icon={Clock}
+              accent="blue"
+            />
+            <KpiCard
+              label="Avvisat värde"
+              value={formatContractValue(stats?.declined_value || 0)}
+              sub={`${stats?.declined_contracts || 0} declined`}
+              icon={AlertTriangle}
+              accent="red"
+            />
           </div>
+
+          {/* Insights-toggle */}
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowInsights(v => !v)}
+              className="text-slate-300 hover:text-[#20c58f]"
+            >
+              {showInsights ? (
+                <><ChevronUp className="w-4 h-4 mr-1" /> Dölj insikter</>
+              ) : (
+                <><ChevronDown className="w-4 h-4 mr-1" /> Visa insikter</>
+              )}
+            </Button>
+          </div>
+
+          {/* Insights-paneler */}
+          {showInsights && stats && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* 3a. Marginal & lönsamhet */}
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                    <Percent className="w-4 h-4 text-[#20c58f]" />
+                    Marginal & lönsamhet
+                  </h4>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Höga marginaler (≥30%)</span>
+                      <span className="text-[#20c58f] font-medium">
+                        {stats.margin_distribution.high.count} · {formatContractValue(stats.margin_distribution.high.value)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Medel (15-30%)</span>
+                      <span className="text-amber-400 font-medium">
+                        {stats.margin_distribution.mid.count} · {formatContractValue(stats.margin_distribution.mid.value)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Låga (&lt;15%)</span>
+                      <span className="text-red-400 font-medium">
+                        {stats.margin_distribution.low.count} · {formatContractValue(stats.margin_distribution.low.value)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t border-slate-700/50 pt-2">
+                      <span className="text-slate-500">Utan intern data</span>
+                      <span className="text-slate-500">{stats.margin_distribution.unknown.count} (legacy)</span>
+                    </div>
+                  </div>
+
+                  {stats.top_profitable_deals.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-700/50">
+                      <p className="text-xs font-semibold text-slate-300 mb-2">Topp 3 lönsammaste</p>
+                      <div className="space-y-1.5">
+                        {stats.top_profitable_deals.map((d, i) => (
+                          <button
+                            key={d.contract_id}
+                            onClick={() => setSearchTerm(d.company_name)}
+                            className="w-full flex items-center justify-between px-2 py-1.5 bg-slate-800/40 hover:bg-slate-800 rounded text-xs text-left transition-colors"
+                          >
+                            <span className="text-slate-300 truncate flex-1">#{i + 1} {d.company_name}</span>
+                            <span className="text-[#20c58f] font-medium ml-2">+{d.margin_pct}%</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3b. Forecast & pipeline-hälsa */}
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                    <Activity className="w-4 h-4 text-blue-400" />
+                    Forecast & pipeline-hälsa
+                  </h4>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Forecast 30d</span>
+                      <span className="text-blue-400 font-medium">{formatContractValue(Math.round(stats.forecast_30d))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Forecast 60d</span>
+                      <span className="text-blue-400 font-medium">{formatContractValue(Math.round(stats.forecast_60d))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Forecast 90d</span>
+                      <span className="text-blue-400 font-medium">{formatContractValue(Math.round(stats.forecast_90d))}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-slate-700/50">
+                    <p className="text-xs font-semibold text-slate-300 mb-2">Pipeline-tratt</p>
+                    <FunnelBar
+                      segments={[
+                        { label: 'Väntande', value: stats.pending_value, color: 'bg-blue-500' },
+                        { label: 'Signerat/Aktivt', value: stats.signed_value, color: 'bg-[#20c58f]' },
+                        { label: 'Avvisat', value: stats.declined_value, color: 'bg-red-500' },
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                {/* 3c. Säljar-performance */}
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-[#20c58f]" />
+                    Säljar-performance
+                  </h4>
+                  <div className="space-y-2">
+                    {stats.seller_performance.length === 0 && (
+                      <p className="text-xs text-slate-500 py-4 text-center">Ingen säljardata</p>
+                    )}
+                    {stats.seller_performance.map((s, i) => (
+                      <button
+                        key={s.email}
+                        onClick={() => setSearchTerm(s.name)}
+                        className="w-full p-2 bg-slate-800/40 hover:bg-slate-800 rounded-lg text-left transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-white truncate">
+                            #{i + 1} {s.name}
+                          </span>
+                          <span className="text-xs text-[#20c58f] font-medium">
+                            {formatContractValue(s.arr_contribution)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-400">
+                          <span>{s.contract_count} avtal</span>
+                          <span>Konv: {s.conversion_rate}%</span>
+                          {s.avg_margin_pct !== null && <span>Marg: {s.avg_margin_pct}%</span>}
+                          <span>Snitt: {formatContractValue(Math.round(s.avg_deal_value))}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3d. Inköpsanalys + Top tjänster */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                    <Package className="w-4 h-4 text-amber-400" />
+                    Topp 10 interna artiklar (inköp)
+                  </h4>
+                  {stats.top_internal_articles.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-4 text-center">Ingen inköpsdata</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {stats.top_internal_articles.map((a, i) => (
+                        <div key={a.name} className="flex items-center justify-between px-2 py-1.5 bg-slate-800/40 rounded text-xs">
+                          <span className="text-slate-300 truncate flex-1">
+                            <span className="text-slate-500 mr-2">#{i + 1}</span>
+                            {a.name}
+                          </span>
+                          <div className="text-right ml-2">
+                            <div className="text-amber-400 font-medium">
+                              {formatContractValue(a.total_cost)}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {a.total_quantity.toLocaleString('sv-SE')} st
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-[#20c58f]" />
+                    Topp 5 tjänster (ARR-bidrag)
+                  </h4>
+                  {stats.top_services_actual.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-4 text-center">Inga tjänstedata</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {stats.top_services_actual.map((s, i) => (
+                        <div key={s.name} className="flex items-center justify-between px-2 py-1.5 bg-slate-800/40 rounded text-xs">
+                          <span className="text-slate-300 truncate flex-1">
+                            <span className="text-slate-500 mr-2">#{i + 1}</span>
+                            {s.name}
+                          </span>
+                          <div className="text-right ml-2">
+                            <div className="text-[#20c58f] font-medium">
+                              {formatContractValue(s.total_arr)}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {s.count.toLocaleString('sv-SE')} st
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Pipeline-stadier filter */}
           <PipelineFilters 
@@ -817,7 +1159,7 @@ export default function ContractsOverview() {
           />
 
           {/* Sök och filter */}
-          <Card className="p-4">
+          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -826,7 +1168,7 @@ export default function ContractsOverview() {
                   placeholder="Sök företag, kontakt, e-post eller säljare..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
                 />
               </div>
 
@@ -852,13 +1194,13 @@ export default function ContractsOverview() {
                 </Button>
               )}
             </div>
-          </Card>
+          </div>
 
           {/* Kontraktslista - Huvudfokus */}
-          <Card className="overflow-hidden">
+          <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-800/50 border-b border-slate-700">
+                <thead className="bg-slate-800/70 border-b border-slate-700 sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Status & Typ
@@ -867,10 +1209,10 @@ export default function ContractsOverview() {
                       Företag / Kontakt
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Prislista / Artiklar
+                      Tjänster
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Kontraktsvärde
+                      Värde & Marginal
                       <span className="block text-xs font-normal text-slate-500 mt-1">
                         Total / Årligt
                       </span>
@@ -889,8 +1231,7 @@ export default function ContractsOverview() {
                 <tbody className="divide-y divide-slate-700">
                   {filteredContracts.map((contract) => {
                     const isMultiYear = contract.contract_length && parseInt(contract.contract_length) > 12
-                    const priceListId = (contract as any).price_list_id || contract.customer_data?.price_list_id
-                    const plData = priceListId ? priceListCache.get(priceListId) || null : null
+                    const agg = billingAggMap.get(contract.id) || null
 
                     return (
                       <tr key={contract.id} className="hover:bg-slate-800/30 transition-colors">
@@ -900,7 +1241,7 @@ export default function ContractsOverview() {
                             <ContractTypeBadge type={contract.type} contractLength={contract.contract_length} />
                           </div>
                         </td>
-                        
+
                         <td className="px-4 py-4">
                           <div>
                             <p className="text-sm font-medium text-white">
@@ -920,11 +1261,11 @@ export default function ContractsOverview() {
                             )}
                           </div>
                         </td>
-                        
+
                         <td className="px-4 py-4">
-                          <PriceListCell contract={contract} priceListData={plData} />
+                          <ServicesCell contract={contract} agg={agg} />
                         </td>
-                        
+
                         <td className="px-4 py-4">
                           <div>
                             {contract.type === 'contract' && contract.contract_length ? (
@@ -932,7 +1273,7 @@ export default function ContractsOverview() {
                                 <p className="text-sm font-bold text-white">
                                   {contract.total_value ? formatContractValue(contract.total_value * parseInt(contract.contract_length)) : '-'}
                                 </p>
-                                <p className="text-xs text-green-400 mt-1">
+                                <p className="text-xs text-[#20c58f] mt-1">
                                   {contract.total_value ? formatContractValue(contract.total_value) : '-'} /år
                                 </p>
                                 <p className="text-xs text-slate-500 mt-1">
@@ -947,6 +1288,7 @@ export default function ContractsOverview() {
                                 <p className="text-xs text-amber-400 mt-1">Engångsjobb</p>
                               </>
                             )}
+                            <MarginCell agg={agg} />
                           </div>
                         </td>
                         
@@ -1017,14 +1359,14 @@ export default function ContractsOverview() {
                 <div className="text-center py-16">
                   <FileText className="w-12 h-12 text-slate-600 mx-auto mb-4" />
                   <p className="text-slate-400">
-                    {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
+                    {searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
                       ? 'Inga kontrakt matchar dina filter'
                       : 'Inga kontrakt att visa'}
                   </p>
                 </div>
               )}
             </div>
-          </Card>
+          </div>
           </div>
         </div>
 
@@ -1056,82 +1398,39 @@ export default function ContractsOverview() {
             </div>
           </div>
 
-          {/* Top säljare */}
+          {/* Top säljare (ARR-bidrag) */}
           <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
             <h4 className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-blue-400" />
-              Top 3 Säljare
+              <Users className="w-4 h-4 text-[#20c58f]" />
+              Top 3 Säljare (ARR)
             </h4>
             <div className="space-y-2">
-              {stats?.top_employees?.slice(0, 3).map((seller: any, index: number) => (
-                <CompactSellerCard
+              {stats?.seller_performance?.slice(0, 3).map((seller, index) => (
+                <div
                   key={seller.email}
-                  seller={seller}
-                  rank={index + 1}
-                  onClick={() => {
-                    setSearchTerm(seller.name)
-                  }}
-                />
+                  onClick={() => setSearchTerm(seller.name)}
+                  className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-white truncate">{seller.name}</p>
+                      <p className="text-[10px] text-slate-400">
+                        {seller.contract_count} avtal · Konv: {seller.conversion_rate}%
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <p className="text-xs font-medium text-[#20c58f]">
+                      {formatContractValue(seller.arr_contribution)}
+                    </p>
+                  </div>
+                </div>
               ))}
-              {!stats?.top_employees?.length && (
+              {!stats?.seller_performance?.length && (
                 <p className="text-xs text-slate-500 text-center py-4">
                   Ingen säljdata tillgänglig
                 </p>
-              )}
-            </div>
-          </div>
-
-          {/* Top 5 Artiklar (från prislistor) med fallback till produkter */}
-          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
-            <h4 className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
-              <Package className="w-4 h-4 text-green-400" />
-              {stats?.popular_articles && stats.popular_articles.length > 0 ? 'Top 5 Artiklar' : 'Top 5 Produkter'}
-            </h4>
-            <div className="space-y-2">
-              {stats?.popular_articles && stats.popular_articles.length > 0 ? (
-                stats.popular_articles.slice(0, 5).map((article: any, index: number) => (
-                  <div
-                    key={`${article.code}-${index}`}
-                    className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">#{index + 1}</span>
-                      <p className="text-sm text-white truncate">{article.name}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-medium text-green-400">
-                        {article.count} st
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Snitt: {new Intl.NumberFormat('sv-SE').format(article.avg_price)} kr/{article.unit}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : stats?.popular_products && stats.popular_products.length > 0 ? (
-                stats.popular_products.slice(0, 5).map((product: any, index: number) => (
-                  <div
-                    key={`${product.name}-${index}`}
-                    className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">#{index + 1}</span>
-                      <p className="text-sm text-white truncate">{product.name}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-medium text-green-400">
-                        {product.count} st
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-4">
-                  <Package className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                  <p className="text-xs text-slate-500">
-                    Ingen artikel- eller produktdata tillgänglig
-                  </p>
-                </div>
               )}
             </div>
           </div>

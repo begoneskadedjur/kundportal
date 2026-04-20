@@ -92,10 +92,135 @@ export interface ContractStats {
   avg_signing_time_days: number
   overdue_count: number
   contracts_expiring_soon: number // Inom 30 dagar
+
+  // Ekonomisk/strategisk analys (driven av case_billing_items)
+  arr_total: number
+  mrr_total: number
+  arr_delta_30d: number // Absolut skillnad vs för 30 dagar sen
+  forecast_30d: number
+  forecast_60d: number
+  forecast_90d: number
+  avg_margin_pct: number | null
+  margin_distribution: {
+    high: { count: number; value: number }
+    mid: { count: number; value: number }
+    low: { count: number; value: number }
+    unknown: { count: number }
+  }
+  top_services_actual: Array<{
+    name: string
+    count: number
+    total_arr: number
+  }>
+  top_internal_articles: Array<{
+    name: string
+    total_quantity: number
+    total_cost: number
+  }>
+  seller_performance: Array<{
+    email: string
+    name: string
+    contract_count: number
+    arr_contribution: number
+    avg_deal_value: number
+    conversion_rate: number
+    avg_margin_pct: number | null
+  }>
+  top_profitable_deals: Array<{
+    contract_id: string
+    company_name: string
+    margin_pct: number
+    margin_value: number
+    external_total: number
+  }>
+}
+
+// Aggregat per kontrakt från case_billing_items (tjänster + interna artiklar)
+export interface ContractBillingAggregate {
+  contractId: string
+  services: Array<{
+    id: string
+    name: string
+    quantity: number
+    total_price: number
+  }>
+  articles: Array<{
+    name: string
+    quantity: number
+    total_price: number
+    mapped_service_id: string | null
+  }>
+  external_total: number
+  internal_cost: number
+  margin_pct: number | null
 }
 
 // Service-klass för contract-hantering
 export class ContractService {
+
+  // Hämta aggregerade billing-items per kontrakt (tjänster + artiklar från wizarden)
+  static async getContractBillingAggregate(
+    contractIds: string[]
+  ): Promise<Map<string, ContractBillingAggregate>> {
+    const result = new Map<string, ContractBillingAggregate>()
+    if (!contractIds.length) return result
+
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .select(
+        'id, case_id, item_type, service_name, article_name, quantity, unit_price, total_price, mapped_service_id'
+      )
+      .in('case_id', contractIds)
+      .eq('case_type', 'contract')
+
+    if (error) {
+      console.warn('getContractBillingAggregate fel:', error)
+      return result
+    }
+
+    const rowsByContract = new Map<string, typeof data>()
+    ;(data || []).forEach(row => {
+      if (!rowsByContract.has(row.case_id)) rowsByContract.set(row.case_id, [])
+      rowsByContract.get(row.case_id)!.push(row)
+    })
+
+    rowsByContract.forEach((rows, contractId) => {
+      const services = rows
+        .filter(r => r.item_type === 'service')
+        .map(r => ({
+          id: r.id,
+          name: r.service_name || 'Okänd tjänst',
+          quantity: Number(r.quantity) || 0,
+          total_price: Number(r.total_price) || 0,
+        }))
+      const articles = rows
+        .filter(r => r.item_type === 'article')
+        .map(r => ({
+          name: r.article_name || 'Okänd artikel',
+          quantity: Number(r.quantity) || 0,
+          total_price: Number(r.total_price) || 0,
+          mapped_service_id: r.mapped_service_id || null,
+        }))
+      const external_total = services.reduce((s, x) => s + x.total_price, 0)
+      const internal_cost = articles.reduce((s, x) => s + x.total_price, 0)
+      const margin_pct =
+        articles.length > 0 && external_total > 0
+          ? Math.round(((external_total - internal_cost) / external_total) * 100)
+          : null
+
+      result.set(contractId, {
+        contractId,
+        services,
+        articles,
+        external_total,
+        internal_cost,
+        margin_pct,
+      })
+    })
+
+    return result
+  }
+
   
   // Hämta alla kontrakt med filter och sökning
   static async getContracts(filters: ContractFilters = {}): Promise<ContractWithSourceData[]> {
@@ -440,8 +565,9 @@ export class ContractService {
       let query = supabase
         .from('contracts')
         .select(`
-          type, status, total_value, created_at, start_date, contract_length,
-          begone_employee_name, begone_employee_email, selected_products
+          id, type, status, total_value, created_at, start_date, contract_length,
+          begone_employee_name, begone_employee_email, selected_products,
+          company_name, contact_person
         `)
 
       // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
@@ -771,6 +897,217 @@ export class ContractService {
       // Genomsnittlig signeringstid (förenklad beräkning)
       const avg_signing_time_days = 7 // Placeholder - kräver mer data för exakt beräkning
 
+      // ========== Ekonomisk/strategisk analys (case_billing_items) ==========
+      const contractIds = contracts
+        .filter((c: any) => c.id && (c.status === 'signed' || c.status === 'active'))
+        .map((c: any) => c.id as string)
+
+      let billingAgg = new Map<string, ContractBillingAggregate>()
+      try {
+        billingAgg = await ContractService.getContractBillingAggregate(contractIds)
+      } catch (e) {
+        console.warn('getContractBillingAggregate misslyckades:', e)
+      }
+
+      // ARR: årligt återkommande intäkter från aktiva/signerade avtal (type='contract')
+      const activeContractRows = contracts.filter(
+        (c: any) => c.type === 'contract' && (c.status === 'signed' || c.status === 'active')
+      )
+      const arr_total = activeContractRows.reduce((sum: number, c: any) => {
+        return sum + (Number(c.total_value) || 0)
+      }, 0)
+      const mrr_total = arr_total / 12
+
+      // ARR-delta (diff vs 30 dagar sen): approximation = ARR för kontrakt skapade <30d sen
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      const arr_delta_30d = activeContractRows
+        .filter((c: any) => new Date(c.created_at) >= thirtyDaysAgo)
+        .reduce((sum: number, c: any) => sum + (Number(c.total_value) || 0), 0)
+
+      // Forecast: förväntat värde från pending deals viktat med global konverteringsgrad
+      const conversionWeight = (overall_conversion_rate || 0) / 100
+      const pendingForForecast = contracts.filter((c: any) => c.status === 'pending')
+      const forecastForWindow = (days: number) => {
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - days)
+        return pendingForForecast
+          .filter((c: any) => new Date(c.created_at) >= cutoff)
+          .reduce((sum: number, c: any) => {
+            let val = Number(c.total_value) || 0
+            if (c.type === 'contract' && c.contract_length) {
+              val = val * parseInt(c.contract_length)
+            }
+            return sum + val * conversionWeight
+          }, 0)
+      }
+      const forecast_30d = forecastForWindow(30)
+      const forecast_60d = forecastForWindow(60)
+      const forecast_90d = forecastForWindow(90)
+
+      // Marginalfördelning (över signerade/aktiva kontrakt med aggregerad data)
+      let high = { count: 0, value: 0 }
+      let mid = { count: 0, value: 0 }
+      let low = { count: 0, value: 0 }
+      let unknown = { count: 0 }
+      const marginList: number[] = []
+      const topDealsCandidates: Array<{
+        contract_id: string
+        company_name: string
+        margin_pct: number
+        margin_value: number
+        external_total: number
+      }> = []
+
+      activeContractRows.forEach((c: any) => {
+        const agg = billingAgg.get(c.id)
+        if (!agg || agg.margin_pct === null) {
+          unknown.count++
+          return
+        }
+        const marginVal = agg.external_total - agg.internal_cost
+        marginList.push(agg.margin_pct)
+        if (agg.margin_pct >= 30) {
+          high.count++
+          high.value += agg.external_total
+        } else if (agg.margin_pct >= 15) {
+          mid.count++
+          mid.value += agg.external_total
+        } else {
+          low.count++
+          low.value += agg.external_total
+        }
+        topDealsCandidates.push({
+          contract_id: c.id,
+          company_name: c.company_name || c.contact_person || 'Okänd',
+          margin_pct: agg.margin_pct,
+          margin_value: marginVal,
+          external_total: agg.external_total,
+        })
+      })
+
+      const avg_margin_pct =
+        marginList.length > 0
+          ? Math.round(marginList.reduce((s, v) => s + v, 0) / marginList.length)
+          : null
+
+      const margin_distribution = { high, mid, low, unknown }
+
+      const top_profitable_deals = topDealsCandidates
+        .sort((a, b) => b.margin_value - a.margin_value)
+        .slice(0, 3)
+
+      // Topp 5 tjänster från faktisk data (signerade/aktiva kontrakt)
+      const serviceAgg = new Map<string, { name: string; count: number; total_arr: number }>()
+      billingAgg.forEach(agg => {
+        agg.services.forEach(s => {
+          const key = s.name
+          const existing = serviceAgg.get(key)
+          if (existing) {
+            existing.count += s.quantity
+            existing.total_arr += s.total_price
+          } else {
+            serviceAgg.set(key, { name: s.name, count: s.quantity, total_arr: s.total_price })
+          }
+        })
+      })
+      const top_services_actual = Array.from(serviceAgg.values())
+        .sort((a, b) => b.total_arr - a.total_arr)
+        .slice(0, 5)
+
+      // Topp 10 interna artiklar (inköpsanalys)
+      const articleAgg = new Map<
+        string,
+        { name: string; total_quantity: number; total_cost: number }
+      >()
+      billingAgg.forEach(agg => {
+        agg.articles.forEach(a => {
+          const key = a.name
+          const existing = articleAgg.get(key)
+          if (existing) {
+            existing.total_quantity += a.quantity
+            existing.total_cost += a.total_price
+          } else {
+            articleAgg.set(key, {
+              name: a.name,
+              total_quantity: a.quantity,
+              total_cost: a.total_price,
+            })
+          }
+        })
+      })
+      const top_internal_articles = Array.from(articleAgg.values())
+        .sort((a, b) => b.total_cost - a.total_cost)
+        .slice(0, 10)
+
+      // Säljar-performance (utökad med ARR, konv.-grad, snitt-marginal)
+      type SellerRow = {
+        email: string
+        name: string
+        contract_count: number
+        arr_contribution: number
+        deal_values: number[]
+        signed_count: number
+        declined_count: number
+        margin_values: number[]
+      }
+      const sellerMap = new Map<string, SellerRow>()
+      contracts.forEach((c: any) => {
+        if (!c.begone_employee_email || !c.begone_employee_name) return
+        const key = c.begone_employee_email
+        let row = sellerMap.get(key)
+        if (!row) {
+          row = {
+            email: key,
+            name: c.begone_employee_name,
+            contract_count: 0,
+            arr_contribution: 0,
+            deal_values: [],
+            signed_count: 0,
+            declined_count: 0,
+            margin_values: [],
+          }
+          sellerMap.set(key, row)
+        }
+        const val = Number(c.total_value) || 0
+        row.deal_values.push(val)
+        if (c.status === 'signed' || c.status === 'active') {
+          row.contract_count++
+          row.signed_count++
+          if (c.type === 'contract') {
+            row.arr_contribution += val
+          } else {
+            row.arr_contribution += val // offers kan bidra engångsmässigt
+          }
+          const agg = billingAgg.get(c.id)
+          if (agg && agg.margin_pct !== null) row.margin_values.push(agg.margin_pct)
+        } else if (c.status === 'declined') {
+          row.declined_count++
+        }
+      })
+
+      const seller_performance = Array.from(sellerMap.values())
+        .map(r => ({
+          email: r.email,
+          name: r.name,
+          contract_count: r.contract_count,
+          arr_contribution: r.arr_contribution,
+          avg_deal_value:
+            r.deal_values.length > 0
+              ? r.deal_values.reduce((s, v) => s + v, 0) / r.deal_values.length
+              : 0,
+          conversion_rate:
+            r.signed_count + r.declined_count > 0
+              ? Math.round((r.signed_count / (r.signed_count + r.declined_count)) * 100)
+              : 0,
+          avg_margin_pct:
+            r.margin_values.length > 0
+              ? Math.round(r.margin_values.reduce((s, v) => s + v, 0) / r.margin_values.length)
+              : null,
+        }))
+        .sort((a, b) => b.arr_contribution - a.arr_contribution)
+        .slice(0, 5)
+
       const stats: ContractStats = {
         // Basic counts
         total_contracts,
@@ -812,7 +1149,21 @@ export class ContractService {
         // Pipeline health
         avg_signing_time_days,
         overdue_count,
-        contracts_expiring_soon
+        contracts_expiring_soon,
+
+        // Ekonomisk/strategisk analys
+        arr_total,
+        mrr_total,
+        arr_delta_30d,
+        forecast_30d,
+        forecast_60d,
+        forecast_90d,
+        avg_margin_pct,
+        margin_distribution,
+        top_services_actual,
+        top_internal_articles,
+        seller_performance,
+        top_profitable_deals,
       }
 
       return stats
