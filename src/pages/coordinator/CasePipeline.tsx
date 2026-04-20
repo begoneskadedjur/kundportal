@@ -1,6 +1,6 @@
 // src/pages/coordinator/CasePipeline.tsx — Dokumentsignering: pipeline för avtal + offerter (Oneflow-baserad)
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ClipboardList, Search, Phone, Eye, EyeOff,
@@ -81,6 +81,7 @@ const DOC_TYPE_FILTERS: { key: DocumentTypeFilter; label: string }[] = [
 export default function CasePipeline() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [offers, setOffers] = useState<PipelineOfferRow[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<PipelineTab>('alla')
@@ -127,6 +128,43 @@ export default function CasePipeline() {
   }, [])
 
   useEffect(() => { fetchOffers() }, [fetchOffers])
+
+  // ─── Highlight-från-query-param (djup-länk från Försäljningspipeline) ───
+  const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map())
+  const highlightHandledRef = useRef<string | null>(null)
+  const highlightId = searchParams.get('highlight')
+
+  useEffect(() => {
+    if (!highlightId || loading) return
+    if (highlightHandledRef.current === highlightId) return
+    const target = offers.find(o => o.id === highlightId)
+    if (!target) return
+
+    // Växla till den tab som innehåller offerten (så den inte filtreras bort)
+    const matchingTab = PIPELINE_TABS.find(t => t.statuses.includes(target.status))
+    if (matchingTab) setActiveTab(matchingTab.key)
+
+    // Se till att rätt doc-typ är synlig
+    if (target.type === 'contract') setDocTypeFilter(prev => prev === 'offer' ? 'all' : prev)
+    if (target.type === 'offer') setDocTypeFilter(prev => prev === 'contract' ? 'all' : prev)
+
+    // Om raden är "dismissed", visa dolda
+    if (target.action?.dismissed_at) setShowDismissed(true)
+
+    setExpandedId(highlightId)
+    highlightHandledRef.current = highlightId
+
+    // Scrolla när DOM hunnit uppdatera
+    requestAnimationFrame(() => {
+      const row = rowRefs.current.get(highlightId)
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+
+    // Ta bort query-param så den inte triggar igen vid tab-byten
+    const next = new URLSearchParams(searchParams)
+    next.delete('highlight')
+    setSearchParams(next, { replace: true })
+  }, [highlightId, loading, offers, searchParams, setSearchParams])
 
   // ─── Filtrering + sökning + sortering ───
 
@@ -570,6 +608,11 @@ export default function CasePipeline() {
                   offer={o}
                   isExpanded={expandedId === o.id}
                   onToggleExpand={() => setExpandedId(expandedId === o.id ? null : o.id)}
+                  rowRef={(el) => {
+                    if (el) rowRefs.current.set(o.id, el)
+                    else rowRefs.current.delete(o.id)
+                  }}
+                  isHighlighted={highlightHandledRef.current === o.id}
                   basePath={basePath}
                   senderEmail={senderEmail}
                   isAdmin={isAdmin}
@@ -824,6 +867,8 @@ interface PipelineRowProps {
   offer: PipelineOfferRow
   isExpanded: boolean
   onToggleExpand: () => void
+  rowRef?: (el: HTMLTableRowElement | null) => void
+  isHighlighted?: boolean
   basePath: string
   senderEmail?: string
   isAdmin: boolean
@@ -847,7 +892,7 @@ interface PipelineRowProps {
 }
 
 function PipelineRow({
-  offer: o, isExpanded, onToggleExpand, basePath, senderEmail, isAdmin,
+  offer: o, isExpanded, onToggleExpand, rowRef, isHighlighted, basePath, senderEmail, isAdmin,
   onGoToCustomer, onOpenExtend,
   onAcknowledge, onOpenContactPopover, contactPopoverOpen,
   onLogContact, onStartEditNote, editingNoteId, noteText, onNoteTextChange,
@@ -875,7 +920,10 @@ function PipelineRow({
 
   return (
     <>
-    <tr className={`border-b border-slate-800/40 border-l-2 ${getAgeBorderColor(o.created_at)} hover:bg-slate-800/30 transition-colors ${rowBg}`}>
+    <tr
+      ref={rowRef}
+      className={`border-b border-slate-800/40 border-l-2 ${getAgeBorderColor(o.created_at)} hover:bg-slate-800/30 transition-colors ${rowBg} ${isHighlighted ? 'ring-2 ring-[#20c58f]/60 ring-inset' : ''}`}
+    >
       {/* Expand-chevron */}
       {isVisible('expand') && (
         <td className="px-2 py-2.5">

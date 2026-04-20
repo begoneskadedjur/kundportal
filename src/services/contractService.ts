@@ -155,6 +155,57 @@ export interface ContractBillingAggregate {
   margin_pct: number | null
 }
 
+// ========== Tidsserier för strategisk pipeline-analys ==========
+
+export interface MonthlyVolumePoint {
+  month: string // 'YYYY-MM'
+  label: string // 'Mar 26' - kort label
+  offer_count: number
+  offer_value: number
+  contract_count: number
+  contract_value: number // ARR-värde (total_value × år)
+  total_count: number
+  total_value: number
+}
+
+export interface MarginTrendPoint {
+  contract_id: string
+  company_name: string
+  signed_at: string // ISO
+  external_total: number
+  margin_pct: number
+  seller_email: string | null
+  seller_name: string | null
+  top_service: string | null
+  top_service_group: string | null
+}
+
+export interface SellerMomentumRow {
+  email: string
+  name: string
+  monthly: Array<{ month: string; value: number; count: number }>
+  total_30d: number
+  total_prev_30d: number
+  delta_pct: number | null // null = ingen data i prev window
+  total_period: number
+}
+
+export interface ServiceMixPoint {
+  month: string
+  label: string
+  groups: Record<string, number> // group name -> arr-värde
+}
+
+export interface PipelineTimeSeries {
+  months: string[] // 'YYYY-MM' array (chronological)
+  volume: MonthlyVolumePoint[]
+  margin: MarginTrendPoint[]
+  sellers: SellerMomentumRow[]
+  service_mix: ServiceMixPoint[]
+  available_sellers: Array<{ email: string; name: string }>
+  available_service_groups: string[]
+}
+
 // Service-klass för contract-hantering
 export class ContractService {
 
@@ -1218,6 +1269,267 @@ export class ContractService {
     } catch (error) {
       console.error('💥 ContractService.deleteContract fel:', error)
       throw error
+    }
+  }
+
+  // ========== Tidsserie-analys för strategisk pipeline-vy ==========
+
+  /**
+   * Hämta komplett tidsserie-data för strategisk pipeline-vy.
+   * Aggregerar signerade/aktiva avtal och offerter per månad för det senaste {monthsBack} perioden.
+   *
+   * Datakällor:
+   * - contracts: metadata (typ, status, säljare, värde, datum)
+   * - case_billing_items (case_type='contract'): tjänster + artiklar
+   * - services / service_groups: tjänstegruppering för mix-analys
+   */
+  static async getPipelineTimeSeries(
+    monthsBack: number = 12
+  ): Promise<PipelineTimeSeries> {
+    // 1. Bygg månadsfönster
+    const months: string[] = []
+    const monthLabels = new Map<string, string>()
+    const now = new Date()
+    const startDate = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1), 1)
+    for (let i = 0; i < monthsBack; i++) {
+      const d = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      months.push(key)
+      monthLabels.set(
+        key,
+        d.toLocaleDateString('sv-SE', { month: 'short', year: '2-digit' }).replace('.', '')
+      )
+    }
+    const cutoffISO = startDate.toISOString()
+
+    // 2. Hämta kontraktsdata inom fönstret
+    const allowedTemplates = Array.from(ALLOWED_TEMPLATE_IDS).concat(['no_template'])
+    const { data: contractsData, error: contractsError } = await supabase
+      .from('contracts')
+      .select(
+        'id, type, status, total_value, contract_length, created_at, updated_at, start_date, begone_employee_name, begone_employee_email, company_name, contact_person'
+      )
+      .neq('status', 'draft')
+      .in('template_id', allowedTemplates)
+      .gte('created_at', cutoffISO)
+
+    if (contractsError) {
+      console.error('getPipelineTimeSeries fel (contracts):', contractsError)
+      throw contractsError
+    }
+
+    const contracts = contractsData || []
+
+    // 3. Hämta billing aggregate för alla signerade/aktiva avtal i fönstret
+    const relevantIds = contracts
+      .filter((c: any) => c.status === 'signed' || c.status === 'active')
+      .map((c: any) => c.id as string)
+    const billingAgg = await ContractService.getContractBillingAggregate(relevantIds)
+
+    // 4. Hämta service-grupperingar för de tjänster som finns i aggregatet
+    const serviceIdSet = new Set<string>()
+    billingAgg.forEach(agg =>
+      agg.services.forEach(s => {
+        if (s.id) serviceIdSet.add(s.id)
+      })
+    )
+    const serviceGroupMap = new Map<string, string>() // service billing-item id -> group name
+    const serviceGroupByName = new Map<string, string>() // service name -> group name
+    if (serviceIdSet.size > 0) {
+      // Notera: s.id är case_billing_items.id, inte services.id — vi behöver en separat lookup.
+      // Hämtar direkt via case_billing_items för att få service_id → services.group_id → service_groups.name
+      const { data: billingRows } = await supabase
+        .from('case_billing_items')
+        .select('id, service_name, service:services(id, group_id, service_groups:service_groups(name))')
+        .in('id', Array.from(serviceIdSet))
+
+      ;(billingRows || []).forEach((r: any) => {
+        const groupName =
+          r.service?.service_groups?.name || r.service?.group?.name || 'Övriga tjänster'
+        serviceGroupMap.set(r.id, groupName)
+        if (r.service_name) serviceGroupByName.set(r.service_name, groupName)
+      })
+    }
+
+    // 5. Bygg volume-tidsserien (per månad)
+    const volumeByMonth = new Map<string, MonthlyVolumePoint>()
+    months.forEach(m => {
+      volumeByMonth.set(m, {
+        month: m,
+        label: monthLabels.get(m) || m,
+        offer_count: 0,
+        offer_value: 0,
+        contract_count: 0,
+        contract_value: 0,
+        total_count: 0,
+        total_value: 0,
+      })
+    })
+
+    const contractValue = (c: any): number => {
+      let val = Number(c.total_value) || 0
+      if (c.type === 'contract' && c.contract_length) {
+        const years = parseInt(c.contract_length) || 1
+        val = val * years
+      }
+      return val
+    }
+
+    contracts.forEach((c: any) => {
+      const d = new Date(c.created_at)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const point = volumeByMonth.get(key)
+      if (!point) return
+      const val = contractValue(c)
+      if (c.type === 'offer') {
+        point.offer_count++
+        point.offer_value += val
+      } else if (c.type === 'contract') {
+        point.contract_count++
+        point.contract_value += val
+      }
+      point.total_count++
+      point.total_value += val
+    })
+
+    const volume = months.map(m => volumeByMonth.get(m)!)
+
+    // 6. Bygg margin scatter-punkter (en per signerat/aktivt avtal med billing-data)
+    const margin: MarginTrendPoint[] = []
+    contracts.forEach((c: any) => {
+      if (c.status !== 'signed' && c.status !== 'active') return
+      const agg = billingAgg.get(c.id)
+      if (!agg || agg.margin_pct === null || agg.external_total <= 0) return
+
+      // Hitta största tjänsten som representativ för avtalet
+      let topService: string | null = null
+      let topServiceValue = 0
+      let topServiceGroup: string | null = null
+      agg.services.forEach(s => {
+        if (s.total_price > topServiceValue) {
+          topServiceValue = s.total_price
+          topService = s.name
+          topServiceGroup = serviceGroupMap.get(s.id) || serviceGroupByName.get(s.name) || null
+        }
+      })
+
+      margin.push({
+        contract_id: c.id,
+        company_name: c.company_name || c.contact_person || 'Okänt',
+        signed_at: c.updated_at || c.created_at,
+        external_total: agg.external_total,
+        margin_pct: agg.margin_pct,
+        seller_email: c.begone_employee_email || null,
+        seller_name: c.begone_employee_name || null,
+        top_service: topService,
+        top_service_group: topServiceGroup,
+      })
+    })
+
+    // 7. Bygg säljar-momentum (per-säljare månadsserie + delta)
+    const sellerMonthly = new Map<string, Map<string, { value: number; count: number }>>()
+    const sellerNameByEmail = new Map<string, string>()
+
+    contracts.forEach((c: any) => {
+      if (!c.begone_employee_email) return
+      if (c.status !== 'signed' && c.status !== 'active') return
+      sellerNameByEmail.set(c.begone_employee_email, c.begone_employee_name || c.begone_employee_email)
+
+      const d = new Date(c.created_at)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (!sellerMonthly.has(c.begone_employee_email)) {
+        const init = new Map<string, { value: number; count: number }>()
+        months.forEach(m => init.set(m, { value: 0, count: 0 }))
+        sellerMonthly.set(c.begone_employee_email, init)
+      }
+      const series = sellerMonthly.get(c.begone_employee_email)!
+      const point = series.get(key)
+      if (!point) return
+      point.value += contractValue(c)
+      point.count += 1
+    })
+
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    const sixtyDaysAgo = new Date()
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
+
+    const sellers: SellerMomentumRow[] = Array.from(sellerMonthly.entries()).map(
+      ([email, series]) => {
+        let total_30d = 0
+        let total_prev_30d = 0
+        let total_period = 0
+        contracts.forEach((c: any) => {
+          if (c.begone_employee_email !== email) return
+          if (c.status !== 'signed' && c.status !== 'active') return
+          const created = new Date(c.created_at)
+          const val = contractValue(c)
+          total_period += val
+          if (created >= thirtyDaysAgo) total_30d += val
+          else if (created >= sixtyDaysAgo) total_prev_30d += val
+        })
+        const delta_pct =
+          total_prev_30d > 0
+            ? Math.round(((total_30d - total_prev_30d) / total_prev_30d) * 100)
+            : total_30d > 0
+              ? null
+              : null
+        return {
+          email,
+          name: sellerNameByEmail.get(email) || email,
+          monthly: months.map(m => ({
+            month: m,
+            value: series.get(m)?.value || 0,
+            count: series.get(m)?.count || 0,
+          })),
+          total_30d,
+          total_prev_30d,
+          delta_pct,
+          total_period,
+        }
+      }
+    )
+    sellers.sort((a, b) => b.total_period - a.total_period)
+
+    // 8. Bygg tjänste-mix (per månad per tjänstegrupp)
+    const mixByMonth = new Map<string, ServiceMixPoint>()
+    months.forEach(m => {
+      mixByMonth.set(m, { month: m, label: monthLabels.get(m) || m, groups: {} })
+    })
+
+    contracts.forEach((c: any) => {
+      if (c.status !== 'signed' && c.status !== 'active') return
+      const agg = billingAgg.get(c.id)
+      if (!agg) return
+      const d = new Date(c.created_at)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const point = mixByMonth.get(key)
+      if (!point) return
+      agg.services.forEach(s => {
+        const group =
+          serviceGroupMap.get(s.id) || serviceGroupByName.get(s.name) || 'Övriga tjänster'
+        point.groups[group] = (point.groups[group] || 0) + s.total_price
+      })
+    })
+    const service_mix = months.map(m => mixByMonth.get(m)!)
+
+    // 9. Samla tillgängliga filter-alternativ
+    const available_sellers = Array.from(sellerNameByEmail.entries())
+      .map(([email, name]) => ({ email, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+
+    const groupSet = new Set<string>()
+    service_mix.forEach(p => Object.keys(p.groups).forEach(g => groupSet.add(g)))
+    const available_service_groups = Array.from(groupSet).sort()
+
+    return {
+      months,
+      volume,
+      margin,
+      sellers,
+      service_mix,
+      available_sellers,
+      available_service_groups,
     }
   }
 
