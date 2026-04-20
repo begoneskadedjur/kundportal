@@ -18,7 +18,6 @@ import {
   Sparkles,
   Image as ImageIcon,
   FileSearch,
-  ClipboardList,
   FilePen,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
@@ -57,7 +56,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/koordinator/forsaljningsmojligheter' },
       { label: 'Leads', icon: Target, path: '/koordinator/leads' },
       { label: 'Leadsstatistik', icon: BarChart3, path: '/koordinator/leadsstatistik' },
-      { label: 'Offertuppföljning', icon: FileSignature, path: '/koordinator/offertuppfoljning' },
+      { label: 'Dokumentsignering', icon: FileSignature, path: '/koordinator/dokumentsignering' },
     ],
   },
   {
@@ -79,7 +78,6 @@ export const navGroups: NavGroup[] = [
     label: 'Ärenden',
     icon: FileSearch,
     items: [
-      { label: 'Dokumentsignering', icon: ClipboardList, path: '/koordinator/dokumentsignering' },
       { label: 'Sök Ärenden', icon: FileSearch, path: '/koordinator/sok-arenden' },
     ],
   },
@@ -108,8 +106,6 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/forsaljningsmojligheter': 'Försäljningsmöjligheter',
   '/koordinator/leads': 'Leads',
   '/koordinator/leadsstatistik': 'Leadsstatistik',
-  '/koordinator/offertuppfoljning': 'Offertuppföljning',
-
   // Fakturering
   '/koordinator/fakturering': 'Fakturering',
 

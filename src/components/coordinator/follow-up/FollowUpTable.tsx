@@ -148,7 +148,13 @@ function OfferRow({
   const isSignedContract = offer.status === 'signed' && offer.type === 'contract'
   const hasCustomerLink = isSignedContract && !!offer.customer_id
   const needsCustomerRegistration = isSignedContract && !offer.customer_id
-  const glowClass = hasCustomerLink
+
+  // Grön highlight släcks så fort koordinatorn lämnar status 'new' (= raden är sedd/hanterad).
+  // Gul ring kvarstår oavsett status tills customer_id sätts.
+  const coordStatus = offer.coordinator_action?.coordinator_status ?? 'new'
+  const isUnhandled = coordStatus === 'new'
+
+  const glowClass = hasCustomerLink && isUnhandled
     ? 'ring-2 ring-[#20c58f]/40 shadow-[0_0_18px_-4px_rgba(32,197,143,0.45)]'
     : needsCustomerRegistration
       ? 'ring-2 ring-amber-400/40 shadow-[0_0_18px_-4px_rgba(251,191,36,0.45)]'

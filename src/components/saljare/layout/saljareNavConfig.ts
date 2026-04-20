@@ -11,7 +11,6 @@ import {
   KeyRound,
   TrendingUp,
   Receipt,
-  ClipboardList,
   GitBranch,
   Trash2,
   Sparkles,
@@ -23,7 +22,7 @@ import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 export const topLevelItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/saljare/dashboard' },
   { label: 'Skapa Avtal & Offerter', icon: FilePen, path: '/saljare/oneflow-contract-creator' },
-  { label: 'Offertuppföljning', icon: FileSignature, path: '/saljare/offertuppfoljning' },
+  { label: 'Dokumentsignering', icon: FileSignature, path: '/saljare/dokumentsignering' },
 ]
 
 export const navGroups: NavGroup[] = [
@@ -47,7 +46,6 @@ export const navGroups: NavGroup[] = [
       { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/saljare/forsaljningsmojligheter' },
       { label: 'Leads', icon: Target, path: '/saljare/leads' },
       { label: 'Leadsstatistik', icon: BarChart3, path: '/saljare/leadsstatistik' },
-      { label: 'Dokumentsignering', icon: ClipboardList, path: '/saljare/dokumentsignering' },
       { label: 'Kundresa', icon: GitBranch, path: '/saljare/kundresa' },
       { label: 'Avslutade ärenden', icon: Trash2, path: '/saljare/avslutade-arenden' },
     ],
@@ -72,7 +70,6 @@ export const mobileBottomItems: NavItem[] = [
 export const breadcrumbMap: Record<string, string> = {
   '/saljare/dashboard': 'Översikt',
   '/saljare/oneflow-contract-creator': 'Skapa Avtal & Offerter',
-  '/saljare/offertuppfoljning': 'Offertuppföljning',
 
   // Kunder & Avtal
   '/saljare/befintliga-kunder': 'Befintliga kunder',

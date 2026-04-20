@@ -43,7 +43,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Leads', icon: TargetIcon, path: '/technician/leads' },
       { label: 'Skapa Avtal & Offerter', icon: FileSignature, path: '/technician/oneflow' },
-      { label: 'Offertuppföljning', icon: TrendingUp, path: '/technician/offer-follow-up' },
+      { label: 'Dokumentsignering', icon: FileSignature, path: '/technician/dokumentsignering' },
       { label: 'Min Kundresa', icon: GitBranch, path: '/technician/min-kundresa' },
     ],
   },
@@ -74,7 +74,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/technician/leads': 'Leads',
   '/technician/oneflow': 'Skapa Avtal & Offerter',
   '/technician/oneflow-contract-creator': 'Skapa Avtal & Offerter',
-  '/technician/offer-follow-up': 'Offertuppföljning',
+  '/technician/dokumentsignering': 'Dokumentsignering',
   '/technician/min-kundresa': 'Min Kundresa',
   '/technician/team-chat': 'AI Assistent',
   '/technician/tillbud-avvikelser': 'Tillbud & Avvikelser',

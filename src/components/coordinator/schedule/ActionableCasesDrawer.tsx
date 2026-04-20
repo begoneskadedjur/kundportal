@@ -96,7 +96,7 @@ export function ActionableCasesDrawer({ cases, actionMap, onScheduleCase, onActi
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate('/koordinator/offerthantering')}
+              onClick={() => navigate('/koordinator/dokumentsignering')}
               className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-slate-400 hover:text-[#20c58f] transition-colors"
             >
               Visa offertpipeline <ExternalLink className="w-3 h-3" />

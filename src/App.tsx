@@ -221,7 +221,7 @@ function App() {
               <Route path="forsaljningsmojligheter" element={<ProtectedRoute requiredRole="koordinator"><SalesOpportunities /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole="koordinator"><Leads /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="koordinator"><LeadAnalytics /></ProtectedRoute>} />
-              <Route path="offertuppfoljning" element={<ProtectedRoute requiredRole="koordinator"><OfferFollowUp /></ProtectedRoute>} />
+              <Route path="offertuppfoljning" element={<Navigate to="/koordinator/dokumentsignering" replace />} />
 
               {/* Fakturering */}
               <Route path="fakturering" element={<ProtectedRoute requiredRole="koordinator"><InvoicingPage /></ProtectedRoute>} />
@@ -240,7 +240,7 @@ function App() {
               <Route path="booking-assistant" element={<ProtectedRoute requiredRole="koordinator"><ScheduleOptimizer /></ProtectedRoute>} />
 
               {/* Ärenden (koordinator-specifik) */}
-              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="koordinator"><CasePipeline /></ProtectedRoute>} />
+              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="koordinator"><OfferFollowUp /></ProtectedRoute>} />
               <Route path="offerthantering" element={<Navigate to="/koordinator/dokumentsignering" replace />} />
               <Route path="sok-arenden" element={<ProtectedRoute requiredRole="koordinator"><CaseSearch /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="koordinator"><OneflowContractCreator /></ProtectedRoute>} />
@@ -278,14 +278,14 @@ function App() {
               <Route path="forsaljningsmojligheter" element={<ProtectedRoute requiredRole="säljare"><SalesOpportunities /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole="säljare"><Leads /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="säljare"><LeadAnalytics /></ProtectedRoute>} />
-              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="säljare"><CasePipeline /></ProtectedRoute>} />
+              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="säljare"><OfferFollowUp /></ProtectedRoute>} />
               <Route path="offerthantering" element={<Navigate to="/saljare/dokumentsignering" replace />} />
               <Route path="kundresa" element={<ProtectedRoute requiredRole="säljare"><CustomerJourney /></ProtectedRoute>} />
               <Route path="avslutade-arenden" element={<ProtectedRoute requiredRole="säljare"><ClosedCasesFunnel /></ProtectedRoute>} />
 
               {/* Avtal & Offerter */}
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="säljare"><OneflowContractCreator /></ProtectedRoute>} />
-              <Route path="offertuppfoljning" element={<ProtectedRoute requiredRole="säljare"><OfferFollowUp /></ProtectedRoute>} />
+              <Route path="offertuppfoljning" element={<Navigate to="/saljare/dokumentsignering" replace />} />
 
               {/* Verktyg */}
               <Route path="ai-assistent" element={<ProtectedRoute requiredRole="säljare"><TeamChat /></ProtectedRoute>} />
@@ -302,7 +302,8 @@ function App() {
               <Route path="leads" element={<ProtectedRoute requiredRole="technician"><Leads /></ProtectedRoute>} />
               <Route path="oneflow" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
-              <Route path="offer-follow-up" element={<ProtectedRoute requiredRole="technician"><OfferFollowUp /></ProtectedRoute>} />
+              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="technician"><OfferFollowUp /></ProtectedRoute>} />
+              <Route path="offer-follow-up" element={<Navigate to="/technician/dokumentsignering" replace />} />
               <Route path="min-kundresa" element={<ProtectedRoute requiredRole="technician"><TechnicianCustomerJourney /></ProtectedRoute>} />
               <Route path="equipment" element={<ProtectedRoute requiredRole="technician"><TechnicianEquipment /></ProtectedRoute>} />
               <Route path="team-chat" element={<ProtectedRoute requiredRole="technician"><TeamChat /></ProtectedRoute>} />

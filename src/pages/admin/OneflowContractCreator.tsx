@@ -123,16 +123,16 @@ export default function OneflowContractCreator() {
     }
   }, [profile?.role]);
 
-  // Navigera till offertuppföljning efter success (faller tillbaka till dashboard för admin)
+  // Navigera till Dokumentsignering efter success (faller tillbaka till dashboard för admin)
   const getFollowUpRoute = useCallback(() => {
     const role = profile?.role || 'admin';
     switch (role) {
       case 'koordinator':
-        return '/koordinator/offertuppfoljning';
+        return '/koordinator/dokumentsignering';
       case 'säljare':
-        return '/saljare/offertuppfoljning';
+        return '/saljare/dokumentsignering';
       case 'technician':
-        return '/technician/offer-follow-up';
+        return '/technician/dokumentsignering';
       default:
         return '/admin/dashboard';
     }
