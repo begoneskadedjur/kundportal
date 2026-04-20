@@ -141,6 +141,35 @@ export default function OfferFollowUp() {
     if (offer) setExtendTarget(offer)
   }, [offers])
 
+  // Koordinator-status ändrad — synka lokal state
+  const handleStatusChange = useCallback((contractId: string, status: string) => {
+    setOffers(prev => prev.map(o => {
+      if (o.id !== contractId) return o
+      const existing = o.action
+      const now = new Date().toISOString()
+      return {
+        ...o,
+        action: {
+          id: existing?.id ?? '',
+          case_id: existing?.case_id ?? null,
+          case_type: existing?.case_type ?? 'contract',
+          contract_id: contractId,
+          coordinator_status: status as any,
+          acknowledged_at: existing?.acknowledged_at ?? null,
+          acknowledged_by: existing?.acknowledged_by ?? null,
+          contact_attempts: existing?.contact_attempts ?? 0,
+          last_contact_attempt_at: existing?.last_contact_attempt_at ?? null,
+          last_contact_method: existing?.last_contact_method ?? null,
+          coordinator_notes: existing?.coordinator_notes ?? null,
+          dismissed_at: existing?.dismissed_at ?? null,
+          dismissed_by: existing?.dismissed_by ?? null,
+          created_at: existing?.created_at ?? now,
+          updated_at: now,
+        },
+      }
+    }))
+  }, [])
+
   // Efter lyckad förlängning: refetch så status/datum uppdateras
   const handleExtended = useCallback(() => {
     fetchData(true)
@@ -320,6 +349,7 @@ export default function OfferFollowUp() {
         hiddenCount={hiddenCount}
         onDelete={handleDelete}
         onExtend={handleExtend}
+        onStatusChange={handleStatusChange}
       />
 
       {/* Radera-bekräftelsedialog */}

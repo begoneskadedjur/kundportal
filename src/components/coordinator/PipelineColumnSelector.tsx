@@ -11,6 +11,7 @@ export interface PipelineTableColumn {
 }
 
 export const PIPELINE_COLUMNS: PipelineTableColumn[] = [
+  { id: 'expand',       label: 'Expandera',         defaultVisible: true,  required: true },
   { id: 'offerStatus',  label: 'Offertstatus',      defaultVisible: true,  required: true },
   { id: 'kund',         label: 'Kund / Kontakt',    defaultVisible: true,  required: true },
   { id: 'adress',       label: 'Adress',            defaultVisible: true,  required: false },

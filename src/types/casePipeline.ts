@@ -32,6 +32,7 @@ export interface CoordinatorCaseAction {
 export interface PipelineOfferRow {
   id: string                        // contracts.id (uuid)
   oneflow_contract_id: string
+  type: 'offer' | 'contract' | string
   status: string                    // pending / signed / declined / overdue
   company_name: string | null
   contact_person: string | null
@@ -42,6 +43,8 @@ export interface PipelineOfferRow {
   template_id: string | null
   begone_employee_name: string | null
   source_id: string | null          // FK till ärendet offerten skapades från
+  source_type: string | null
+  customer_id: string | null        // satt när signerat avtal länkats till kund via webhook
   created_at: string
   updated_at: string
   action: CoordinatorCaseAction | null

@@ -3,9 +3,10 @@ import { supabase } from '../lib/supabase'
 import type { CoordinatorCaseAction, PipelineOfferRow, PipelineCaseRow, CoordinatorCaseStatus, ContactMethod } from '../types/casePipeline'
 
 const OFFER_COLUMNS = `
-  id, oneflow_contract_id, status, company_name, contact_person,
+  id, oneflow_contract_id, type, status, company_name, contact_person,
   contact_email, contact_phone, contact_address, total_value,
-  template_id, begone_employee_name, source_id, created_at, updated_at
+  template_id, begone_employee_name, source_id, source_type, customer_id,
+  created_at, updated_at
 `
 
 export class CasePipelineService {

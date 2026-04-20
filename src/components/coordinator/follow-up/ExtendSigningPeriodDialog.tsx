@@ -12,15 +12,21 @@ import { useAuth } from '../../../contexts/AuthContext'
 import { OfferFollowUpService } from '../../../services/offerFollowUpService'
 import { createSystemComment } from '../../../services/communicationService'
 import toast from 'react-hot-toast'
-import type { FollowUpOffer } from '../../../services/offerFollowUpService'
-
 registerLocale('sv', sv)
+
+export interface ExtendSigningOffer {
+  id: string
+  company_name: string | null
+  contact_person: string | null
+  status: string
+  oneflow_contract_id?: string | null
+}
 
 interface ExtendSigningPeriodDialogProps {
   isOpen: boolean
   onClose: () => void
   onExtended: () => void
-  offer: FollowUpOffer | null
+  offer: ExtendSigningOffer | null
 }
 
 function toISODate(d: Date): string {

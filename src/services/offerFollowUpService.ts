@@ -1,6 +1,7 @@
 // src/services/offerFollowUpService.ts — Service för offertuppföljning med tekniker-koppling
 import { supabase } from '../lib/supabase'
 import type { CaseBillingItemWithRelations } from '../types/caseBilling'
+import type { CoordinatorCaseAction } from '../types/casePipeline'
 
 // === Prioritetskonstanter ===
 export const THRESHOLDS = {
@@ -56,6 +57,8 @@ export interface FollowUpOffer {
   source_type: string | null
   // Koppling till registrerad kund (satt när signerat avtal länkats via webhook)
   customer_id: string | null
+  // Koordinator-åtgärder (status, kvittering, kontaktförsök, etc.)
+  action: CoordinatorCaseAction | null
 }
 
 export interface TechnicianOfferStats {
@@ -146,6 +149,20 @@ export class OfferFollowUpService {
 
     const hasCommentsSet = new Set((commentEvents || []).map(e => e.oneflow_contract_id))
 
+    // 4) Hämta coordinator_case_actions för alla kontrakt
+    const allContractIds = allContracts.map(c => c.id)
+    const { data: actions } = allContractIds.length > 0
+      ? await supabase
+          .from('coordinator_case_actions')
+          .select('*')
+          .in('contract_id', allContractIds)
+      : { data: [] }
+
+    const actionByContractId = new Map<string, CoordinatorCaseAction>()
+    for (const a of actions || []) {
+      if (a.contract_id) actionByContractId.set(a.contract_id, a)
+    }
+
     // === Beräkna offers ===
     const now = Date.now()
     const allOffers: FollowUpOffer[] = allContracts.map(o => {
@@ -169,6 +186,7 @@ export class OfferFollowUpService {
         source_id: o.source_id || null,
         source_type: o.source_type || null,
         customer_id: o.customer_id || null,
+        action: actionByContractId.get(o.id) || null,
       }
     })
 

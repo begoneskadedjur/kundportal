@@ -1,24 +1,24 @@
 // src/components/coordinator/follow-up/FollowUpTable.tsx
 // Expanderbar tabell för offertuppföljning med prioritetsgrupper, dölj-funktion och intern kommunikation
-import { useState, useRef, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ChevronDown, ChevronUp, MessageSquare, ExternalLink,
+  ChevronDown, ChevronUp, MessageSquare,
   Clock, AlertTriangle, User, Mail, Phone,
   FileSignature, Archive, EyeOff, Eye, Search, X, Trash2,
   MoreVertical, FileText, UserCheck, UserX,
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { useAuth } from '../../../contexts/AuthContext'
 import { OFFER_STATUS_CONFIG } from '../../../types/casePipeline'
-import { CommentThread } from './CommentThread'
-import CommentSection from '../../communication/CommentSection'
-import { OfferFollowUpService } from '../../../services/offerFollowUpService'
+import type { CoordinatorCaseStatus } from '../../../types/casePipeline'
+import { CasePipelineService } from '../../../services/casePipelineService'
 import type { FollowUpOffer, FollowUpSortBy, FollowUpStatusFilter } from '../../../services/offerFollowUpService'
-import type { CaseBillingItemWithRelations } from '../../../types/caseBilling'
-import OfferItemsSection from './OfferItemsSection'
 import Select from '../../ui/Select'
+import OfferRowDetail from './OfferRowDetail'
+import CoordinatorStatusDropdown from './CoordinatorStatusDropdown'
 
 interface FollowUpTableProps {
   offers: FollowUpOffer[]
@@ -44,6 +44,8 @@ interface FollowUpTableProps {
   onDelete?: (contractId: string) => void
   // Förläng signeringsperiod
   onExtend?: (contractId: string) => void
+  // Koordinator-status uppdaterad (används för lokal state-sync i förälder)
+  onStatusChange?: (contractId: string, status: CoordinatorCaseStatus) => void
 }
 
 const STATUS_FILTERS: { key: FollowUpStatusFilter; label: string }[] = [
@@ -95,6 +97,7 @@ function OfferRow({
   isHiddenByMe,
   onDelete,
   onExtend,
+  onStatusChange,
 }: {
   offer: FollowUpOffer
   isExpanded: boolean
@@ -106,45 +109,24 @@ function OfferRow({
   isHiddenByMe: boolean
   onDelete?: (contractId: string) => void
   onExtend?: (contractId: string) => void
+  onStatusChange?: (contractId: string, status: CoordinatorCaseStatus) => void
 }) {
   const { profile } = useAuth()
-  const [activeTab, setActiveTab] = useState<'internal' | 'external'>('internal')
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const navigate = useNavigate()
 
-  // Lazy-load tjänster + artiklar vid första expand
-  const [itemsData, setItemsData] = useState<{
-    services: CaseBillingItemWithRelations[]
-    articles: CaseBillingItemWithRelations[]
-  } | null>(null)
-  const [itemsLoading, setItemsLoading] = useState(false)
-  const [itemsError, setItemsError] = useState<string | null>(null)
-  const hasFetchedRef = useRef(false)
-
-  useEffect(() => {
-    if (!isExpanded || hasFetchedRef.current) return
-    hasFetchedRef.current = true
-    let cancelled = false
-    setItemsLoading(true)
-    setItemsError(null)
-    OfferFollowUpService.getContractItems(offer.id)
-      .then(data => {
-        if (!cancelled) setItemsData(data)
-      })
-      .catch(err => {
-        if (!cancelled) {
-          setItemsError(err instanceof Error ? err.message : 'Okänt fel')
-          hasFetchedRef.current = false // tillåt retry vid fel
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setItemsLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [isExpanded, offer.id])
+  const handleStatusChange = useCallback(async (status: CoordinatorCaseStatus) => {
+    try {
+      await CasePipelineService.updateOfferStatus(offer.id, status)
+      onStatusChange?.(offer.id, status)
+      toast.success('Status uppdaterad')
+    } catch {
+      toast.error('Kunde inte byta status')
+    }
+  }, [offer.id, onStatusChange])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -243,6 +225,12 @@ function OfferRow({
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusConfig.bgColor} ${statusConfig.color}`}>
             {statusConfig.label}
           </span>
+
+          {/* Koordinator-status (synlig i alla vyer) */}
+          <CoordinatorStatusDropdown
+            value={offer.action?.coordinator_status ?? 'new'}
+            onChange={handleStatusChange}
+          />
 
           {/* Kundregistreringsstatus för signerade avtal */}
           {needsCustomerRegistration && (
@@ -415,102 +403,7 @@ function OfferRow({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="p-3 bg-slate-800/20 border border-slate-700/30 border-t-0 rounded-b-xl space-y-3">
-              {/* Detaljer */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {offer.contact_email && (
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <Mail className="w-3 h-3" />
-                    <a href={`mailto:${offer.contact_email}`} className="hover:text-white transition-colors truncate">
-                      {offer.contact_email}
-                    </a>
-                  </div>
-                )}
-                {offer.contact_phone && (
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <Phone className="w-3 h-3" />
-                    <a href={`tel:${offer.contact_phone}`} className="hover:text-white transition-colors">
-                      {offer.contact_phone}
-                    </a>
-                  </div>
-                )}
-                <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                  <Clock className="w-3 h-3" />
-                  <span>Skickad {new Date(offer.created_at).toLocaleDateString('sv-SE')}</span>
-                </div>
-                {offer.oneflow_contract_id && (
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <ExternalLink className="w-3 h-3 text-slate-400" />
-                    <a
-                      href={`https://app.oneflow.com/contracts/${offer.oneflow_contract_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#20c58f] hover:underline"
-                    >
-                      Öppna i Oneflow
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* Innehåll i offerten: tjänster + interna artiklar */}
-              <div className="pt-2 border-t border-slate-700/50">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <FileText className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-xs font-medium text-slate-300">Innehåll i offerten</span>
-                </div>
-                <OfferItemsSection
-                  services={itemsData?.services || []}
-                  articles={itemsData?.articles || []}
-                  loading={itemsLoading}
-                  error={itemsError}
-                />
-              </div>
-
-              {/* Kommunikation — intern/extern flikar */}
-              <div className="pt-2 border-t border-slate-700/50">
-                <div className="flex items-center gap-1 mb-2">
-                  <button
-                    onClick={() => setActiveTab('internal')}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                      activeTab === 'internal'
-                        ? 'bg-[#20c58f] text-white'
-                        : 'bg-slate-800/50 text-slate-400 hover:text-slate-300 border border-slate-700/50'
-                    }`}
-                  >
-                    <MessageSquare className="w-3 h-3" />
-                    Intern
-                  </button>
-                  {offer.oneflow_contract_id && (
-                    <button
-                      onClick={() => setActiveTab('external')}
-                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                        activeTab === 'external'
-                          ? 'bg-[#20c58f] text-white'
-                          : 'bg-slate-800/50 text-slate-400 hover:text-slate-300 border border-slate-700/50'
-                      }`}
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      Oneflow
-                    </button>
-                  )}
-                </div>
-
-                {activeTab === 'internal' ? (
-                  <CommentSection
-                    caseId={offer.id}
-                    caseType="contract"
-                    caseTitle={offer.company_name || offer.contact_person || ''}
-                    compact={true}
-                  />
-                ) : offer.oneflow_contract_id ? (
-                  <CommentThread
-                    contractId={offer.oneflow_contract_id}
-                    senderEmail={senderEmail}
-                  />
-                ) : null}
-              </div>
-            </div>
+            <OfferRowDetail offer={offer} senderEmail={senderEmail} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -555,6 +448,7 @@ export function FollowUpTable({
   hiddenCount = 0,
   onDelete,
   onExtend,
+  onStatusChange,
 }: FollowUpTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -617,6 +511,7 @@ export function FollowUpTable({
       isHiddenByMe={userId ? (offer.hidden_by || []).includes(userId) : false}
       onDelete={onDelete}
       onExtend={onExtend}
+      onStatusChange={onStatusChange}
     />
   )
 

@@ -3,10 +3,10 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ClipboardList, Search, Phone, MessageSquare, Eye, EyeOff,
+  ClipboardList, Search, Phone, Eye, EyeOff,
   CalendarCheck, X, Loader2, Send, FileCheck, Banknote,
-  TrendingUp, AlertTriangle, Clock, ChevronUp, ChevronDown,
-  PhoneCall, MailIcon, MessageCircle,
+  TrendingUp, AlertTriangle, Clock, ChevronUp, ChevronDown, ChevronRight,
+  PhoneCall, MailIcon, MessageCircle, UserCheck, ExternalLink, CalendarPlus,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,7 +14,10 @@ import { CasePipelineService } from '../../services/casePipelineService'
 import PipelineColumnSelector, { usePipelineColumnVisibility } from '../../components/coordinator/PipelineColumnSelector'
 import { useOfferStats } from '../../hooks/useOfferStats'
 import type { PipelineOfferRow, PipelineTab, CoordinatorCaseStatus, ContactMethod } from '../../types/casePipeline'
-import { COORDINATOR_STATUS_CONFIG, OFFER_STATUS_CONFIG, PIPELINE_TABS } from '../../types/casePipeline'
+import { OFFER_STATUS_CONFIG, PIPELINE_TABS } from '../../types/casePipeline'
+import OfferRowDetail from '../../components/coordinator/follow-up/OfferRowDetail'
+import CoordinatorStatusDropdown from '../../components/coordinator/follow-up/CoordinatorStatusDropdown'
+import ExtendSigningPeriodDialog from '../../components/coordinator/follow-up/ExtendSigningPeriodDialog'
 
 // ─── Hjälpfunktioner ───
 
@@ -67,15 +70,17 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
 // ─── Huvudkomponent ───
 
 export default function CasePipeline() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [offers, setOffers] = useState<PipelineOfferRow[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<PipelineTab>('alla')
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<SortOption>('oldest')
+  const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [showInsights, setShowInsights] = useState(true)
   const [showDismissed, setShowDismissed] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [extendTarget, setExtendTarget] = useState<PipelineOfferRow | null>(null)
 
   // Kontaktförsök-popover
   const [contactPopoverOfferId, setContactPopoverOfferId] = useState<string | null>(null)
@@ -83,6 +88,13 @@ export default function CasePipeline() {
   // Inline note editing
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
+
+  const basePath =
+    profile?.role === 'säljare' ? '/saljare' :
+    profile?.role === 'koordinator' ? '/koordinator' :
+    profile?.role === 'technician' ? '/technician' :
+    '/admin'
+  const senderEmail = profile?.technicians?.email || undefined
 
   // Kolumnväljare
   const { visibleColumns, toggleColumn, resetToDefaults, isVisible } = usePipelineColumnVisibility()
@@ -503,6 +515,7 @@ export default function CasePipeline() {
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="bg-slate-800/60 text-slate-400 border-b border-slate-700/50">
+                {isVisible('expand') && <th className="px-2 py-2.5 font-medium w-8" />}
                 {isVisible('offerStatus') && <th className="px-3 py-2.5 font-medium">Offertstatus</th>}
                 {isVisible('kund') && <th className="px-3 py-2.5 font-medium">Kund / Kontakt</th>}
                 {isVisible('adress') && <th className="px-3 py-2.5 font-medium">Adress</th>}
@@ -520,6 +533,12 @@ export default function CasePipeline() {
                 <PipelineRow
                   key={o.id}
                   offer={o}
+                  isExpanded={expandedId === o.id}
+                  onToggleExpand={() => setExpandedId(expandedId === o.id ? null : o.id)}
+                  basePath={basePath}
+                  senderEmail={senderEmail}
+                  onGoToCustomer={(cid) => navigate(`${basePath}/befintliga-kunder?customerId=${cid}`)}
+                  onOpenExtend={(offer) => setExtendTarget(offer)}
                   onAcknowledge={handleAcknowledge}
                   onOpenContactPopover={setContactPopoverOfferId}
                   contactPopoverOpen={contactPopoverOfferId === o.id}
@@ -541,6 +560,17 @@ export default function CasePipeline() {
           </table>
         </div>
       )}
+
+      {/* Förläng-dialog */}
+      <ExtendSigningPeriodDialog
+        isOpen={!!extendTarget}
+        onClose={() => setExtendTarget(null)}
+        onExtended={() => {
+          setExtendTarget(null)
+          fetchOffers()
+        }}
+        offer={extendTarget}
+      />
     </div>
   )
 }
@@ -756,6 +786,12 @@ function SortDropdown({ value, onChange }: { value: SortOption; onChange: (v: So
 
 interface PipelineRowProps {
   offer: PipelineOfferRow
+  isExpanded: boolean
+  onToggleExpand: () => void
+  basePath: string
+  senderEmail?: string
+  onGoToCustomer: (customerId: string) => void
+  onOpenExtend: (offer: PipelineOfferRow) => void
   onAcknowledge: (o: PipelineOfferRow) => void
   onOpenContactPopover: (id: string | null) => void
   contactPopoverOpen: boolean
@@ -774,7 +810,9 @@ interface PipelineRowProps {
 }
 
 function PipelineRow({
-  offer: o, onAcknowledge, onOpenContactPopover, contactPopoverOpen,
+  offer: o, isExpanded, onToggleExpand, basePath, senderEmail,
+  onGoToCustomer, onOpenExtend,
+  onAcknowledge, onOpenContactPopover, contactPopoverOpen,
   onLogContact, onStartEditNote, editingNoteId, noteText, onNoteTextChange,
   onSaveNote, onCancelNote, onStatusChange, onBook, onDismiss, onUndismiss, isVisible,
 }: PipelineRowProps) {
@@ -782,7 +820,13 @@ function PipelineRow({
   const status = o.action?.coordinator_status || 'new'
   const isSigned = o.status === 'signed'
   const isDismissed = !!o.action?.dismissed_at
+  const canExtend = o.status === 'pending' || o.status === 'overdue'
   const offerStatusCfg = OFFER_STATUS_CONFIG[o.status] || OFFER_STATUS_CONFIG.pending
+
+  // Räkna synliga kolumner för colSpan vid expanded rad
+  const visibleColCount = [
+    'expand','offerStatus','kund','adress','pris','ansvarig','skickat','koordStatus','forsok','anteckning','atgarder',
+  ].filter(isVisible).length
 
   const rowBg = isDismissed
     ? 'opacity-50'
@@ -793,7 +837,23 @@ function PipelineRow({
         : ''
 
   return (
+    <>
     <tr className={`border-b border-slate-800/40 border-l-2 ${getAgeBorderColor(o.created_at)} hover:bg-slate-800/30 transition-colors ${rowBg}`}>
+      {/* Expand-chevron */}
+      {isVisible('expand') && (
+        <td className="px-2 py-2.5">
+          <button
+            onClick={onToggleExpand}
+            className="p-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+            title={isExpanded ? 'Dölj detaljer' : 'Visa detaljer'}
+          >
+            {isExpanded
+              ? <ChevronDown className="w-3.5 h-3.5" />
+              : <ChevronRight className="w-3.5 h-3.5" />}
+          </button>
+        </td>
+      )}
+
       {/* Offertstatus (Oneflow) */}
       {isVisible('offerStatus') && (
         <td className="px-3 py-2.5">
@@ -860,10 +920,10 @@ function PipelineRow({
         </td>
       )}
 
-      {/* Koord.status — custom dropdown */}
+      {/* Koord.status — delad dropdown */}
       {isVisible('koordStatus') && (
         <td className="px-3 py-2.5">
-          <StatusDropdown value={status} onChange={(s) => onStatusChange(o, s)} />
+          <CoordinatorStatusDropdown value={status} onChange={(s) => onStatusChange(o, s)} />
         </td>
       )}
 
@@ -914,6 +974,41 @@ function PipelineRow({
       {isVisible('atgarder') && (
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-1 relative">
+            {/* Gå till kund (om kopplad) */}
+            {o.customer_id && (
+              <button
+                onClick={() => onGoToCustomer(o.customer_id!)}
+                className="p-1 rounded text-[#20c58f] hover:bg-[#20c58f]/15 transition-colors"
+                title="Gå till kund"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {/* Öppna i Oneflow */}
+            {o.oneflow_contract_id && (
+              <a
+                href={`https://app.oneflow.com/contracts/${o.oneflow_contract_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+                title="Öppna i Oneflow"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+
+            {/* Förläng signeringsperiod */}
+            {canExtend && !isDismissed && (
+              <button
+                onClick={() => onOpenExtend(o)}
+                className="p-1 rounded text-amber-400 hover:bg-amber-500/20 transition-colors"
+                title="Förläng signeringsperiod"
+              >
+                <CalendarPlus className="w-3.5 h-3.5" />
+              </button>
+            )}
+
             {/* Kvittera */}
             {isNew && !isDismissed && (
               <button
@@ -976,48 +1071,35 @@ function PipelineRow({
         </td>
       )}
     </tr>
-  )
-}
-
-// ─── Custom status-dropdown (mörkt tema) ───
-
-function StatusDropdown({ value, onChange }: { value: CoordinatorCaseStatus; onChange: (s: CoordinatorCaseStatus) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const cfg = COORDINATOR_STATUS_CONFIG[value]
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer transition-colors ${cfg.bgColor} ${cfg.color}`}
-      >
-        {cfg.label}
-        <ChevronDown className="w-2.5 h-2.5" />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[120px]">
-          {(Object.entries(COORDINATOR_STATUS_CONFIG) as [CoordinatorCaseStatus, typeof cfg][]).map(([key, val]) => (
-            <button
-              key={key}
-              onClick={() => { onChange(key); setOpen(false) }}
-              className={`w-full text-left px-3 py-1.5 text-[11px] font-medium hover:bg-slate-700/50 transition-colors ${val.color} ${key === value ? val.bgColor : ''}`}
+    {isExpanded && (
+      <tr className="border-b border-slate-800/40 bg-slate-900/30">
+        <td colSpan={visibleColCount} className="p-0">
+          <AnimatePresence initial={false}>
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
             >
-              {val.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+              <OfferRowDetail
+                offer={{
+                  id: o.id,
+                  oneflow_contract_id: o.oneflow_contract_id,
+                  company_name: o.company_name,
+                  contact_person: o.contact_person,
+                  contact_email: o.contact_email,
+                  contact_phone: o.contact_phone,
+                  created_at: o.created_at,
+                }}
+                senderEmail={senderEmail}
+              />
+            </motion.div>
+          </AnimatePresence>
+        </td>
+      </tr>
+    )}
+    </>
   )
 }
 
