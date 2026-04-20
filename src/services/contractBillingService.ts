@@ -21,6 +21,9 @@ import {
   MonthlyCustomerEntry,
   MonthlyCustomerStatus,
   MonthlyPipelineSummary,
+  AdhocInvoiceGrouping,
+  AdhocSalesEntry,
+  AdhocSalesMonth,
 } from '../types/contractBilling'
 import { CaseBillingService } from './caseBillingService'
 import { CustomerContractArticleService } from './customerContractArticleService'
@@ -338,13 +341,19 @@ export class ContractBillingService {
   }
 
   /**
-   * Skapa ad-hoc billing items från ett avslutat ärende
-   * Kopierar alla case_billing_items till contract_billing_items
-   * och markerar case_billing_items som 'billed'
+   * Skapa ad-hoc billing items från ett avslutat ärende.
+   * Kopierar alla case_billing_items till contract_billing_items som
+   * item_type='ad_hoc' och markerar case_billing_items som 'billed'.
+   *
+   * invoice_date sätts från ärendets completedAt — det är detta datum
+   * som styr vilken månadsbucket posten hamnar i på /admin/fakturering.
+   * billing_period_start/end sätts till månaden runt completedAt för
+   * bakåtkompatibilitet men används inte av merförsäljnings-pipelinen.
    */
   static async createAdHocItemsFromCase(
     caseId: string,
-    customerId: string
+    customerId: string,
+    completedAt: Date | string = new Date()
   ): Promise<{ created: number; totalAmount: number }> {
     // 1. Hämta case_billing_items för ärendet
     const caseBillingItems = await CaseBillingService.getCaseBillingItems(caseId, 'contract')
@@ -353,12 +362,19 @@ export class ContractBillingService {
       return { created: 0, totalAmount: 0 }
     }
 
-    // 2. Normalisera till månadsgränser (1:a till sista)
-    const now = new Date()
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString().split('T')[0]
-    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-      .toISOString().split('T')[0]
+    // 2. Normalisera completedAt till YYYY-MM-DD i svensk tid (inte UTC).
+    //    new Date(..).toISOString() drar -2h i sommartid → datum backar en dag.
+    const completedDate = typeof completedAt === 'string'
+      ? new Date(completedAt)
+      : completedAt
+    const y = completedDate.getFullYear()
+    const m = completedDate.getMonth() // 0-indexed
+    const d = completedDate.getDate()
+    const fmt = (n: number) => String(n).padStart(2, '0')
+    const invoiceDate = `${y}-${fmt(m + 1)}-${fmt(d)}`
+    const periodStart = `${y}-${fmt(m + 1)}-01`
+    const lastDayOfMonth = new Date(y, m + 1, 0).getDate()
+    const periodEnd = `${y}-${fmt(m + 1)}-${fmt(lastDayOfMonth)}`
 
     let totalAmount = 0
 
@@ -381,9 +397,10 @@ export class ContractBillingService {
         source: 'case_completion',
         requires_approval: requiresApproval,
         discount_percent: item.discount_percent || 0,
-        original_price: item.unit_price, // Originalpris utan rabatt
+        original_price: item.unit_price,
         billing_period_start: periodStart,
         billing_period_end: periodEnd,
+        invoice_date: invoiceDate,
         status: requiresApproval ? 'pending' : 'approved',
         notes: item.notes || `Från ärende ${caseId}`
       })
@@ -924,10 +941,13 @@ export class ContractBillingService {
     const lastDay = new Date(endY, endM, 0).getDate()
     const periodEnd = `${endMonth}-${String(lastDay).padStart(2, '0')}`
 
-    // 3. Hämta alla billing items inom intervallet
+    // 3. Hämta alla billing items inom intervallet — men BARA årspremie (item_type='contract').
+    //    Ad-hoc (merförsäljning från avslutade ärenden) visas i egen vy via
+    //    getAdhocSalesPipelineData och ska inte blandas in här.
     const items = await this.getBillingItems({
       period_start: periodStart,
       period_end: periodEnd,
+      item_type: 'contract',
     })
 
     // 4. Bygg items-map: customer_id::month_key → items[]
@@ -1100,6 +1120,174 @@ export class ContractBillingService {
         month = 1
         year++
       }
+    }
+
+    return months
+  }
+
+  /**
+   * Pipeline-data för merförsäljning (ad-hoc ärenden på avtalskunder).
+   * Separat från årspremie-pipelinen — bucketeras på invoice_date, inte
+   * billing_period_start, och ignorerar billing_anchor_month/frequency.
+   *
+   * Grupperingen styrs per kund av customers.adhoc_invoice_grouping:
+   * - per_case: en entry per ärende
+   * - monthly_batch: en entry per (kund, månad)
+   */
+  static async getAdhocSalesPipelineData(
+    startMonth: string,
+    endMonth: string
+  ): Promise<AdhocSalesMonth[]> {
+    // 1. Hämta alla ad-hoc items inom intervallet via invoice_date
+    const [startY, startM] = startMonth.split('-').map(Number)
+    const [endY, endM] = endMonth.split('-').map(Number)
+    const periodStart = `${startMonth}-01`
+    const endLastDay = new Date(endY, endM, 0).getDate()
+    const periodEnd = `${endMonth}-${String(endLastDay).padStart(2, '0')}`
+
+    const { data: items, error } = await supabase
+      .from('contract_billing_items')
+      .select(`
+        *,
+        customer:customers(id, company_name, organization_number, billing_email, adhoc_invoice_grouping)
+      `)
+      .eq('item_type', 'ad_hoc')
+      .gte('invoice_date', periodStart)
+      .lte('invoice_date', periodEnd)
+      .order('invoice_date', { ascending: false })
+
+    if (error) throw new Error(`Kunde inte hämta merförsäljningsdata: ${error.message}`)
+
+    const rawItems = (items || []) as Array<ContractBillingItemWithRelations & {
+      customer: {
+        id: string
+        company_name: string
+        organization_number: string | null
+        billing_email: string | null
+        adhoc_invoice_grouping: AdhocInvoiceGrouping
+      }
+    }>
+
+    // 2. Hämta ärende-metadata för alla unika case_id
+    const caseIds = Array.from(new Set(rawItems.map(i => i.case_id).filter(Boolean))) as string[]
+    const caseInfo = new Map<string, { id: string; case_number: string | null; title: string | null; completed_date: string | null }>()
+    if (caseIds.length > 0) {
+      const { data: casesData } = await supabase
+        .from('cases')
+        .select('id, case_number, title, completed_date')
+        .in('id', caseIds)
+      for (const c of casesData || []) {
+        caseInfo.set(c.id, {
+          id: c.id,
+          case_number: c.case_number,
+          title: c.title,
+          completed_date: c.completed_date,
+        })
+      }
+    }
+
+    // 3. Gruppera items per (kund, bucket-nyckel)
+    //    bucket-nyckel = case_id (per_case) eller month_key (monthly_batch)
+    type BucketGroup = {
+      customer_id: string
+      customer: AdhocSalesEntry['customer']
+      grouping: AdhocInvoiceGrouping
+      monthKey: string
+      case_id: string | null
+      items: ContractBillingItemWithRelations[]
+    }
+    const groups = new Map<string, BucketGroup>()
+
+    for (const item of rawItems) {
+      if (!item.invoice_date) continue
+      const monthKey = item.invoice_date.slice(0, 7)
+      const grouping = item.customer.adhoc_invoice_grouping ?? 'per_case'
+      const bucketId = grouping === 'per_case'
+        ? (item.case_id || `no-case-${item.id}`)
+        : `${item.customer_id}::${monthKey}`
+      const mapKey = `${monthKey}::${item.customer_id}::${bucketId}`
+
+      if (!groups.has(mapKey)) {
+        groups.set(mapKey, {
+          customer_id: item.customer_id,
+          customer: {
+            id: item.customer.id,
+            company_name: item.customer.company_name,
+            organization_number: item.customer.organization_number,
+            billing_email: item.customer.billing_email,
+          },
+          grouping,
+          monthKey,
+          case_id: grouping === 'per_case' ? item.case_id : null,
+          items: [],
+        })
+      }
+      groups.get(mapKey)!.items.push(item)
+    }
+
+    // 4. Bygg entries per bucket
+    const entriesByMonth = new Map<string, AdhocSalesEntry[]>()
+    for (const group of groups.values()) {
+      const total = group.items.reduce((sum, i) => sum + Number(i.total_price), 0)
+      const earliestInvoiceDate = group.items
+        .map(i => i.invoice_date)
+        .filter(Boolean)
+        .sort()[0] as string
+      const entry: AdhocSalesEntry = {
+        key: group.grouping === 'per_case' && group.case_id
+          ? group.case_id
+          : `${group.customer_id}::${group.monthKey}`,
+        customer_id: group.customer_id,
+        customer: group.customer,
+        grouping: group.grouping,
+        case: group.case_id ? caseInfo.get(group.case_id) : undefined,
+        items: group.items,
+        total_amount: total,
+        item_count: group.items.length,
+        derived_status: deriveInvoiceStatus(group.items),
+        has_items_requiring_approval: group.items.some(i => i.requires_approval && i.status === 'pending'),
+        invoice_date: earliestInvoiceDate,
+      }
+      if (!entriesByMonth.has(group.monthKey)) entriesByMonth.set(group.monthKey, [])
+      entriesByMonth.get(group.monthKey)!.push(entry)
+    }
+
+    // 5. Generera månader inom intervallet, även tomma
+    const months: AdhocSalesMonth[] = []
+    let year = startY
+    let month = startM
+    while (`${year}-${String(month).padStart(2, '0')}` <= endMonth) {
+      const monthKey = `${year}-${String(month).padStart(2, '0')}`
+      const monthLabel = new Date(year, month - 1, 1)
+        .toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+      const entries = entriesByMonth.get(monthKey) || []
+
+      const statusBreakdown: Record<ContractBillingItemStatus, number> = {
+        pending: 0, approved: 0, draft: 0, sent: 0,
+        overdue: 0, invoiced: 0, paid: 0, cancelled: 0,
+      }
+      let totalAmount = 0
+      for (const entry of entries) {
+        statusBreakdown[entry.derived_status]++
+        totalAmount += entry.total_amount
+      }
+
+      entries.sort((a, b) => {
+        if (a.invoice_date !== b.invoice_date) return b.invoice_date.localeCompare(a.invoice_date)
+        return a.customer.company_name.localeCompare(b.customer.company_name, 'sv')
+      })
+
+      months.push({
+        month_key: monthKey,
+        month_label: monthLabel,
+        entries,
+        total_amount: totalAmount,
+        entry_count: entries.length,
+        status_breakdown: statusBreakdown,
+      })
+
+      month++
+      if (month > 12) { month = 1; year++ }
     }
 
     return months
