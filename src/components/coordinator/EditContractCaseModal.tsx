@@ -1124,10 +1124,13 @@ export default function EditContractCaseModal({
             )
 
             if (hasBillingItems) {
-              // Kopiera till contract_billing_items
+              // Kopiera till contract_billing_items med ärendets avslutsdatum
+              // som invoice_date (trumfar tidszoner och andra datumkällor).
+              const completedAt = new Date()
               const result = await ContractBillingService.createAdHocItemsFromCase(
                 localCaseData.id,
-                effectiveCustomerId
+                effectiveCustomerId,
+                completedAt
               )
               billingItemsCreated = result.created
               console.log('[EditContractCaseModal] Skapade', result.created, 'ad-hoc faktureringsrader, totalt:', result.totalAmount, 'kr')

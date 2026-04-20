@@ -1473,6 +1473,7 @@ export default function Customers() {
           currentContractStartDate={billingSettingsOrg.sites[0]?.contract_start_date ?? null}
           currentContractEndDate={billingSettingsOrg.sites[0]?.contract_end_date ?? null}
           currentBillingAnchorMonth={(billingSettingsOrg.sites[0] as any)?.billing_anchor_month ?? null}
+          currentAdhocInvoiceGrouping={(billingSettingsOrg.sites[0] as any)?.adhoc_invoice_grouping ?? null}
           sites={billingSettingsOrg.sites || []}
           isOpen={billingSettingsOpen}
           onClose={() => {

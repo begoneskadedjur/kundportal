@@ -7,13 +7,15 @@ import {
   Receipt,
   Users,
   Building2,
-  TrendingUp
+  TrendingUp,
+  Plus
 } from 'lucide-react'
 import PrivateBusinessInvoicing from './PrivateBusinessInvoicing'
 import ContractInvoicing from './ContractInvoicing'
+import AdhocInvoicing from './AdhocInvoicing'
 import BillingSummaryLedge from '../../../components/admin/invoicing/BillingSummaryLedge'
 
-type InvoicingTab = 'private-business' | 'contracts'
+type InvoicingTab = 'private-business' | 'contracts' | 'adhoc'
 
 export default function InvoicingPage() {
   const navigate = useNavigate()
@@ -29,6 +31,11 @@ export default function InvoicingPage() {
       id: 'contracts' as InvoicingTab,
       label: 'Avtalskunder',
       icon: Building2
+    },
+    {
+      id: 'adhoc' as InvoicingTab,
+      label: 'Merförsäljning Avtal',
+      icon: Plus
     }
   ]
 
@@ -82,6 +89,7 @@ export default function InvoicingPage() {
       <div className="mt-4">
         {activeTab === 'private-business' && <PrivateBusinessInvoicing />}
         {activeTab === 'contracts' && <ContractInvoicing />}
+        {activeTab === 'adhoc' && <AdhocInvoicing />}
       </div>
     </div>
   )

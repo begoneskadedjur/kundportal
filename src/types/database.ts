@@ -111,6 +111,9 @@ export type Database = {
           // 📅 Faktureringsskema
           billing_anchor_month: number | null  // 1–12, ankarmånad för fakturaschema
           billing_active: boolean              // Ska kunden faktureras?
+
+          // 💰 Merförsäljning (ad-hoc från ärenden)
+          adhoc_invoice_grouping: 'per_case' | 'monthly_batch'
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'

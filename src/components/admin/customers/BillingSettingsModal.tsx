@@ -21,7 +21,7 @@ import {
   type PriceList,
   type ArticleCategory,
 } from '../../../types/articles'
-import { type BillingFrequency, BILLING_FREQUENCY_CONFIG } from '../../../types/contractBilling'
+import { type BillingFrequency, BILLING_FREQUENCY_CONFIG, type AdhocInvoiceGrouping } from '../../../types/contractBilling'
 import toast from 'react-hot-toast'
 
 interface ContractRow {
@@ -60,6 +60,7 @@ interface BillingSettingsModalProps {
   currentContractStartDate?: string | null
   currentContractEndDate?: string | null
   currentBillingAnchorMonth?: number | null
+  currentAdhocInvoiceGrouping?: AdhocInvoiceGrouping | null
   sites: Array<{
     id: string
     site_name?: string | null
@@ -93,6 +94,7 @@ export default function BillingSettingsModal({
   currentContractStartDate,
   currentContractEndDate,
   currentBillingAnchorMonth,
+  currentAdhocInvoiceGrouping,
   sites,
   isOpen,
   onClose,
@@ -142,6 +144,7 @@ export default function BillingSettingsModal({
   const [costCenter, setCostCenter] = useState('')
   const [billingRecipient, setBillingRecipient] = useState('')
   const [priceAdjustmentPercent, setPriceAdjustmentPercent] = useState('')
+  const [adhocInvoiceGrouping, setAdhocInvoiceGrouping] = useState<AdhocInvoiceGrouping>('per_case')
   const [siteBilling, setSiteBilling] = useState<SiteBillingData[]>([])
 
   // Init form
@@ -156,6 +159,7 @@ export default function BillingSettingsModal({
     setCostCenter(currentCostCenter || '')
     setBillingRecipient(currentBillingRecipient || '')
     setPriceAdjustmentPercent(currentPriceAdjustmentPercent != null ? String(currentPriceAdjustmentPercent) : '')
+    setAdhocInvoiceGrouping(currentAdhocInvoiceGrouping || 'per_case')
     setBillingActive(currentBillingActive ?? true)
     setContractStartDate(currentContractStartDate || '')
     setContractEndDate(currentContractEndDate || '')
@@ -179,7 +183,7 @@ export default function BillingSettingsModal({
     )
   }, [isOpen, customerId, currentBillingFrequency, currentPriceListId, currentBillingEmail,
       currentBillingAddress, currentBillingType, currentBillingReference, currentCostCenter,
-      currentBillingRecipient, currentPriceAdjustmentPercent, sites])
+      currentBillingRecipient, currentPriceAdjustmentPercent, currentAdhocInvoiceGrouping, sites])
 
   // Load price lists
   useEffect(() => {
@@ -450,6 +454,7 @@ export default function BillingSettingsModal({
           contract_end_date: contractEndDate || null,
           billing_anchor_month: billingAnchorMonth,
           billing_active: billingActive,
+          adhoc_invoice_grouping: adhocInvoiceGrouping,
           updated_at: new Date().toISOString(),
         })
         .eq('id', customerId)
@@ -634,6 +639,20 @@ export default function BillingSettingsModal({
                   ]}
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Merförsäljning från ärenden</label>
+              <Select
+                value={adhocInvoiceGrouping}
+                onChange={(v) => setAdhocInvoiceGrouping((v as AdhocInvoiceGrouping) || 'per_case')}
+                options={[
+                  { value: 'per_case', label: 'En faktura per ärende' },
+                  { value: 'monthly_batch', label: 'Slå ihop per månad' },
+                ]}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Styr hur avslutade avtalsärenden faktureras utanför årspremien (fliken "Merförsäljning Avtal").
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

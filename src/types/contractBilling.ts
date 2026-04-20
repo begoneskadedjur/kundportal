@@ -52,6 +52,9 @@ export interface ContractBillingItem {
   due_date: string | null
   fortnox_sent_at: string | null
   overdue_at: string | null
+  // Faktureringsdatum för ad-hoc items (ärendets completed_date).
+  // Null för contract-items (de använder billing_period_start istället).
+  invoice_date: string | null
 }
 
 export interface ContractBillingItemWithRelations extends ContractBillingItem {
@@ -409,6 +412,51 @@ export interface MonthlyPipelineSummary {
   total_amount: number
   projected_amount: number
   status_breakdown: Record<MonthlyCustomerStatus, number>
+}
+
+// ===== MERFÖRSÄLJNING (AD-HOC) PIPELINE TYPES =====
+
+export type AdhocInvoiceGrouping = 'per_case' | 'monthly_batch'
+
+/**
+ * En grupperad enhet på merförsäljningsvyn. Beroende på kundens inställning
+ * representerar det antingen ett enskilt ärende (per_case) eller alla
+ * ad-hoc-ärenden för kunden under en månad (monthly_batch).
+ */
+export interface AdhocSalesEntry {
+  /** Stabilt id: antingen case_id eller `${customerId}::${monthKey}` */
+  key: string
+  customer_id: string
+  customer: {
+    id: string
+    company_name: string
+    organization_number: string | null
+    billing_email: string | null
+  }
+  grouping: AdhocInvoiceGrouping
+  /** För per_case-grupperingar: ärendets metadata */
+  case?: {
+    id: string
+    case_number: string | null
+    title: string | null
+    completed_date: string | null
+  }
+  items: ContractBillingItemWithRelations[]
+  total_amount: number
+  item_count: number
+  derived_status: ContractBillingItemStatus
+  has_items_requiring_approval: boolean
+  /** Representativt datum för bucket-beräkning (tidigaste invoice_date i gruppen) */
+  invoice_date: string
+}
+
+export interface AdhocSalesMonth {
+  month_key: string
+  month_label: string
+  entries: AdhocSalesEntry[]
+  total_amount: number
+  entry_count: number
+  status_breakdown: Record<ContractBillingItemStatus, number>
 }
 
 export const PIPELINE_STATUS_CONFIG: Record<MonthlyCustomerStatus, {

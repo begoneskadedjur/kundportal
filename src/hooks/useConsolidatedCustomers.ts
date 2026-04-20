@@ -32,6 +32,7 @@ interface Customer {
   price_adjustment_percent?: number | null
   billing_anchor_month?: number | null
   billing_active?: boolean
+  adhoc_invoice_grouping?: 'per_case' | 'monthly_batch' | null
   is_active: boolean | null
   created_at: string | null
   updated_at: string | null
