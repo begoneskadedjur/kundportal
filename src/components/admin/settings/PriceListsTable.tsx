@@ -366,7 +366,7 @@ export function PriceListsTable({
                             <div className="p-4 bg-slate-900/50 border-t border-slate-700/50">
                               <PriceListItemsEditor
                                 priceListId={priceList.id}
-                                articles={articles}
+                                services={services}
                                 onUpdate={onUpdateItems}
                               />
                             </div>
