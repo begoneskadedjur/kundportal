@@ -1,5 +1,7 @@
 // src/components/admin/settings/PriceListItemsEditor.tsx
-// Kompakt tabell-editor för artikelpriser i en prislista med bekräftelseflöde
+// Kompakt tabell-editor för tjänstepriser i en prislista.
+// Användare kan sätta ett fast kundpris per tjänst; saknat pris → prisguiden
+// (PriceCalculatorPanel) används som fallback vid fakturering.
 
 import { useState, useEffect, useMemo } from 'react'
 import {
@@ -12,43 +14,40 @@ import {
 } from 'lucide-react'
 import { PriceListService } from '../../../services/priceListService'
 import {
-  Article,
-  PriceListItemWithArticle,
-  ARTICLE_CATEGORY_CONFIG,
+  PriceListItemWithService,
   formatArticlePrice
 } from '../../../types/articles'
+import { ServiceWithGroup } from '../../../types/services'
 import toast from 'react-hot-toast'
 
 interface PriceListItemsEditorProps {
   priceListId: string
-  articles: Article[]
+  services: ServiceWithGroup[]
   onUpdate: () => void
 }
 
-type PriceType = 'standard' | 'custom' | 'discount'
+type PriceMode = 'guide' | 'fixed'
 
-interface ArticlePriceState {
-  priceType: PriceType
+interface ServicePriceState {
+  mode: PriceMode
   customPrice: string
-  discountPercent: string
   isSaving: boolean
   savedAt: number | null
-  // Dirty state för bekräftelseflöde
   isDirty: boolean
-  originalPriceType: PriceType
+  originalMode: PriceMode
   originalCustomPrice: string
-  originalDiscountPercent: string
 }
 
 export function PriceListItemsEditor({
   priceListId,
-  articles,
+  services,
   onUpdate
 }: PriceListItemsEditorProps) {
-  const [items, setItems] = useState<PriceListItemWithArticle[]>([])
+  const [items, setItems] = useState<PriceListItemWithService[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [priceStates, setPriceStates] = useState<Record<string, ArticlePriceState>>({})
+  const [groupFilter, setGroupFilter] = useState<string>('all')
+  const [priceStates, setPriceStates] = useState<Record<string, ServicePriceState>>({})
 
   // Selection & bulk markup
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -56,217 +55,178 @@ export function PriceListItemsEditor({
   const [appliedMarkup, setAppliedMarkup] = useState<string | null>(null)
   const [isBulkSaving, setIsBulkSaving] = useState(false)
 
-  // Ladda artikelpriser
+  // Ladda tjänstepriser
   useEffect(() => {
     loadItems()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priceListId])
 
   const loadItems = async () => {
     setLoading(true)
     try {
-      const data = await PriceListService.getPriceListItems(priceListId)
+      const data = await PriceListService.getPriceListServiceItems(priceListId)
       setItems(data)
 
-      // Initialisera priceStates från databas
-      const initialStates: Record<string, ArticlePriceState> = {}
+      const initialStates: Record<string, ServicePriceState> = {}
       data.forEach(item => {
-        if (item.discount_percent && item.discount_percent > 0) {
-          initialStates[item.article_id] = {
-            priceType: 'discount',
-            customPrice: item.custom_price?.toString() || '',
-            discountPercent: item.discount_percent.toString(),
-            isSaving: false,
-            savedAt: null,
-            isDirty: false,
-            originalPriceType: 'discount',
-            originalCustomPrice: item.custom_price?.toString() || '',
-            originalDiscountPercent: item.discount_percent.toString()
-          }
-        } else if (item.custom_price !== null) {
-          initialStates[item.article_id] = {
-            priceType: 'custom',
+        if (item.service_id && item.custom_price !== null) {
+          initialStates[item.service_id] = {
+            mode: 'fixed',
             customPrice: item.custom_price.toString(),
-            discountPercent: '',
             isSaving: false,
             savedAt: null,
             isDirty: false,
-            originalPriceType: 'custom',
-            originalCustomPrice: item.custom_price.toString(),
-            originalDiscountPercent: ''
+            originalMode: 'fixed',
+            originalCustomPrice: item.custom_price.toString()
           }
         }
       })
       setPriceStates(initialStates)
     } catch (error) {
       console.error('Fel vid laddning:', error)
-      toast.error('Kunde inte ladda artikelpriser')
+      toast.error('Kunde inte ladda tjänstepriser')
     } finally {
       setLoading(false)
     }
   }
 
-  // Filtrera artiklar
-  const filteredArticles = useMemo(() => {
-    if (!searchTerm) return articles
+  // Unika grupper för filter
+  const groups = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>()
+    services.forEach(s => {
+      if (s.group) map.set(s.group.id, { id: s.group.id, name: s.group.name })
+    })
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [services])
 
-    const search = searchTerm.toLowerCase()
-    return articles.filter(article =>
-      article.code.toLowerCase().includes(search) ||
-      article.name.toLowerCase().includes(search) ||
-      article.category.toLowerCase().includes(search)
-    )
-  }, [articles, searchTerm])
+  // Filtrera tjänster
+  const filteredServices = useMemo(() => {
+    let list = services
+    if (groupFilter !== 'all') {
+      list = list.filter(s => s.group_id === groupFilter)
+    }
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase()
+      list = list.filter(s =>
+        s.code.toLowerCase().includes(search) ||
+        s.name.toLowerCase().includes(search) ||
+        (s.group?.name.toLowerCase().includes(search) ?? false)
+      )
+    }
+    return list
+  }, [services, searchTerm, groupFilter])
 
   // Selection helpers
-  const toggleSelection = (articleId: string) => {
+  const toggleSelection = (serviceId: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
-      if (next.has(articleId)) {
-        next.delete(articleId)
-      } else {
-        next.add(articleId)
-      }
+      if (next.has(serviceId)) next.delete(serviceId)
+      else next.add(serviceId)
       return next
     })
   }
 
+  const isAllSelected = filteredServices.length > 0 && filteredServices.every(s => selectedIds.has(s.id))
+
   const toggleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(filteredArticles.map(a => a.id)))
-    }
+    if (isAllSelected) setSelectedIds(new Set())
+    else setSelectedIds(new Set(filteredServices.map(s => s.id)))
   }
 
-  const isAllSelected = filteredArticles.length > 0 && filteredArticles.every(a => selectedIds.has(a.id))
   const isSomeSelected = selectedIds.size > 0
 
-  // Bulk markup
+  // Bulk markup — applicera på tjänstens base_price
   const applyBulkMarkup = () => {
     const markup = parseFloat(markupPercent)
-    if (isNaN(markup) || markup <= 0) return
+    if (isNaN(markup)) return
 
     const newStates = { ...priceStates }
+    let affected = 0
 
-    for (const articleId of selectedIds) {
-      const article = articles.find(a => a.id === articleId)
-      if (!article) continue
+    for (const serviceId of selectedIds) {
+      const service = services.find(s => s.id === serviceId)
+      if (!service || service.base_price === null || service.base_price === 0) continue
 
-      const calculatedPrice = Math.round(article.default_price * (1 + markup / 100))
-      const currentState = newStates[articleId]
-      const originalPriceType = currentState?.originalPriceType || 'standard'
+      const calculatedPrice = Math.round(service.base_price * (1 + markup / 100))
+      const currentState = newStates[serviceId]
+      const originalMode = currentState?.originalMode || 'guide'
       const originalCustomPrice = currentState?.originalCustomPrice || ''
-      const originalDiscountPercent = currentState?.originalDiscountPercent || ''
 
-      newStates[articleId] = {
-        priceType: 'custom',
+      newStates[serviceId] = {
+        mode: 'fixed',
         customPrice: calculatedPrice.toString(),
-        discountPercent: '',
         isSaving: false,
         savedAt: null,
         isDirty: true,
-        originalPriceType,
-        originalCustomPrice,
-        originalDiscountPercent
+        originalMode,
+        originalCustomPrice
       }
+      affected++
     }
 
     setPriceStates(newStates)
     setAppliedMarkup(markup.toString())
-    toast.success(`Påslag +${markup}% tillagt på ${selectedIds.size} artiklar`)
+    if (affected === 0) {
+      toast.error('Valda tjänster saknar base_price — inget pris kunde räknas')
+    } else {
+      toast.success(`Påslag +${markup}% på ${affected} tjänst${affected === 1 ? '' : 'er'}`)
+    }
     setSelectedIds(new Set())
     setMarkupPercent('')
   }
 
   // Spara pris till databas
-  const confirmPrice = async (articleId: string, article: Article) => {
-    const state = priceStates[articleId]
+  const confirmPrice = async (serviceId: string) => {
+    const state = priceStates[serviceId]
     if (!state) return
 
     setPriceStates(prev => ({
       ...prev,
-      [articleId]: { ...prev[articleId], isSaving: true }
+      [serviceId]: { ...prev[serviceId], isSaving: true }
     }))
 
     try {
-      if (state.priceType === 'standard') {
-        // Ta bort anpassning
-        await PriceListService.removePriceListItem(priceListId, articleId)
-        // Ta bort från state
+      if (state.mode === 'guide') {
+        await PriceListService.removePriceListServiceItem(priceListId, serviceId)
         setPriceStates(prev => {
-          const newState = { ...prev }
-          delete newState[articleId]
-          return newState
+          const next = { ...prev }
+          delete next[serviceId]
+          return next
         })
-        toast.success('Återställt till standardpris')
-      } else if (state.priceType === 'custom') {
+        toast.success('Fast pris borttaget – prisguiden används')
+      } else {
         const price = parseFloat(state.customPrice)
         if (isNaN(price) || price < 0) {
           toast.error('Ogiltigt pris')
           setPriceStates(prev => ({
             ...prev,
-            [articleId]: { ...prev[articleId], isSaving: false }
+            [serviceId]: { ...prev[serviceId], isSaving: false }
           }))
           return
         }
-        await PriceListService.upsertPriceListItem({
+        await PriceListService.upsertPriceListServiceItem({
           price_list_id: priceListId,
-          article_id: articleId,
-          custom_price: price,
-          discount_percent: 0
+          service_id: serviceId,
+          custom_price: price
         })
-        // Uppdatera original values och rensa dirty
         setPriceStates(prev => ({
           ...prev,
-          [articleId]: {
-            ...prev[articleId],
+          [serviceId]: {
+            ...prev[serviceId],
             isSaving: false,
             savedAt: Date.now(),
             isDirty: false,
-            originalPriceType: 'custom',
-            originalCustomPrice: state.customPrice,
-            originalDiscountPercent: ''
+            originalMode: 'fixed',
+            originalCustomPrice: state.customPrice
           }
         }))
         toast.success('Pris sparat')
-      } else if (state.priceType === 'discount') {
-        const discount = parseFloat(state.discountPercent)
-        if (isNaN(discount) || discount < 0 || discount > 100) {
-          toast.error('Ogiltig rabatt (0-100%)')
-          setPriceStates(prev => ({
-            ...prev,
-            [articleId]: { ...prev[articleId], isSaving: false }
-          }))
-          return
-        }
-        const discountedPrice = article.default_price * (1 - discount / 100)
-        await PriceListService.upsertPriceListItem({
-          price_list_id: priceListId,
-          article_id: articleId,
-          custom_price: Math.round(discountedPrice * 100) / 100,
-          discount_percent: discount
-        })
-        // Uppdatera original values och rensa dirty
-        setPriceStates(prev => ({
-          ...prev,
-          [articleId]: {
-            ...prev[articleId],
-            isSaving: false,
-            savedAt: Date.now(),
-            isDirty: false,
-            originalPriceType: 'discount',
-            originalCustomPrice: Math.round(discountedPrice * 100) / 100 + '',
-            originalDiscountPercent: state.discountPercent
-          }
-        }))
-        toast.success('Rabatt sparad')
       }
 
-      // Rensa savedAt efter 2 sekunder
       setTimeout(() => {
         setPriceStates(prev => ({
           ...prev,
-          [articleId]: prev[articleId] ? { ...prev[articleId], savedAt: null } : prev[articleId]
+          [serviceId]: prev[serviceId] ? { ...prev[serviceId], savedAt: null } : prev[serviceId]
         }))
       }, 2000)
 
@@ -277,222 +237,150 @@ export function PriceListItemsEditor({
       toast.error('Kunde inte spara priset')
       setPriceStates(prev => ({
         ...prev,
-        [articleId]: { ...prev[articleId], isSaving: false }
+        [serviceId]: { ...prev[serviceId], isSaving: false }
       }))
     }
   }
 
-  // Återställ till senast sparade värde
-  const resetPrice = (articleId: string) => {
-    const state = priceStates[articleId]
-    if (!state) {
-      // Om ingen state finns, ta bort eventuell temporär state
-      setPriceStates(prev => {
-        const newState = { ...prev }
-        delete newState[articleId]
-        return newState
-      })
-      return
-    }
+  // Återställ till senast sparade
+  const resetPrice = (serviceId: string) => {
+    const state = priceStates[serviceId]
+    if (!state) return
 
-    // Om original var "standard" (ingen state), ta bort
-    if (state.originalPriceType === 'standard') {
+    if (state.originalMode === 'guide') {
       setPriceStates(prev => {
-        const newState = { ...prev }
-        delete newState[articleId]
-        return newState
+        const next = { ...prev }
+        delete next[serviceId]
+        return next
       })
     } else {
-      // Återställ till original values
       setPriceStates(prev => ({
         ...prev,
-        [articleId]: {
-          ...prev[articleId],
-          priceType: state.originalPriceType,
+        [serviceId]: {
+          ...prev[serviceId],
+          mode: 'fixed',
           customPrice: state.originalCustomPrice,
-          discountPercent: state.originalDiscountPercent,
           isDirty: false
         }
       }))
     }
   }
 
-  // Hantera pristyp-ändring
-  const handlePriceTypeChange = (articleId: string, article: Article, newType: PriceType) => {
-    const currentState = priceStates[articleId]
-    const originalPriceType = currentState?.originalPriceType || 'standard'
-    const originalCustomPrice = currentState?.originalCustomPrice || article.default_price.toString()
-    const originalDiscountPercent = currentState?.originalDiscountPercent || '0'
+  const handleModeChange = (serviceId: string, service: ServiceWithGroup, newMode: PriceMode) => {
+    const currentState = priceStates[serviceId]
+    const originalMode = currentState?.originalMode || 'guide'
+    const originalCustomPrice = currentState?.originalCustomPrice || ''
 
-    // Bestäm nya värden
-    let newCustomPrice = currentState?.customPrice || article.default_price.toString()
-    let newDiscountPercent = currentState?.discountPercent || '0'
-
-    if (newType === 'custom' && !currentState?.customPrice) {
-      newCustomPrice = article.default_price.toString()
-    }
-    if (newType === 'discount' && !currentState?.discountPercent) {
-      newDiscountPercent = '10' // Default 10% rabatt
+    let newCustomPrice = currentState?.customPrice || ''
+    if (newMode === 'fixed' && !newCustomPrice) {
+      newCustomPrice = service.base_price?.toString() || '0'
     }
 
-    // Kolla om det är en ändring
-    const isDirty = newType !== originalPriceType ||
-      (newType === 'custom' && newCustomPrice !== originalCustomPrice) ||
-      (newType === 'discount' && newDiscountPercent !== originalDiscountPercent)
-
-    const newState: ArticlePriceState = {
-      priceType: newType,
-      customPrice: newCustomPrice,
-      discountPercent: newDiscountPercent,
-      isSaving: false,
-      savedAt: null,
-      isDirty,
-      originalPriceType,
-      originalCustomPrice,
-      originalDiscountPercent
-    }
+    const isDirty = newMode !== originalMode ||
+      (newMode === 'fixed' && newCustomPrice !== originalCustomPrice)
 
     setPriceStates(prev => ({
       ...prev,
-      [articleId]: newState
+      [serviceId]: {
+        mode: newMode,
+        customPrice: newCustomPrice,
+        isSaving: false,
+        savedAt: null,
+        isDirty,
+        originalMode,
+        originalCustomPrice
+      }
     }))
   }
 
-  // Hantera prisändring
-  const handlePriceChange = (articleId: string, article: Article, value: string) => {
-    const currentState = priceStates[articleId]
+  const handlePriceChange = (serviceId: string, value: string) => {
+    const currentState = priceStates[serviceId]
     if (!currentState) return
 
     const isDirty = value !== currentState.originalCustomPrice ||
-                    currentState.priceType !== currentState.originalPriceType
+                    currentState.mode !== currentState.originalMode
 
     setPriceStates(prev => ({
       ...prev,
-      [articleId]: {
-        ...prev[articleId],
+      [serviceId]: {
+        ...prev[serviceId],
         customPrice: value,
         isDirty
       }
     }))
   }
 
-  // Hantera rabattändring
-  const handleDiscountChange = (articleId: string, article: Article, value: string) => {
-    const currentState = priceStates[articleId]
-    if (!currentState) return
-
-    const isDirty = value !== currentState.originalDiscountPercent ||
-                    currentState.priceType !== currentState.originalPriceType
-
-    setPriceStates(prev => ({
-      ...prev,
-      [articleId]: {
-        ...prev[articleId],
-        discountPercent: value,
-        isDirty
-      }
-    }))
-  }
-
-  // Räkna statistik
+  // Statistik
   const stats = useMemo(() => {
-    let customCount = 0
-    let discountCount = 0
+    let fixedCount = 0
     let dirtyCount = 0
-
     Object.values(priceStates).forEach(state => {
-      if (state.priceType === 'custom' && !state.isDirty) customCount++
-      if (state.priceType === 'discount' && !state.isDirty) discountCount++
+      if (state.mode === 'fixed' && !state.isDirty) fixedCount++
       if (state.isDirty) dirtyCount++
     })
-
-    return { customCount, discountCount, dirtyCount }
+    return { fixedCount, dirtyCount }
   }, [priceStates])
 
-  // Bekräfta alla osparade (batch)
+  // Bulk-spara alla osparade
   const confirmAllDirty = async () => {
-    const dirtyEntries = Object.entries(priceStates)
-      .filter(([_, state]) => state.isDirty)
-
+    const dirtyEntries = Object.entries(priceStates).filter(([_, s]) => s.isDirty)
     if (dirtyEntries.length === 0) return
 
     setIsBulkSaving(true)
-
     try {
-      // Separera removals (standard) och upserts (custom/discount)
       const removals: string[] = []
-      const upserts: { price_list_id: string; article_id: string; custom_price: number; discount_percent: number }[] = []
+      const upserts: { price_list_id: string; service_id: string; custom_price: number }[] = []
 
-      for (const [articleId, state] of dirtyEntries) {
-        const article = articles.find(a => a.id === articleId)
-        if (!article) continue
-
-        if (state.priceType === 'standard') {
-          removals.push(articleId)
-        } else if (state.priceType === 'custom') {
+      for (const [serviceId, state] of dirtyEntries) {
+        if (state.mode === 'guide') {
+          removals.push(serviceId)
+        } else {
           const price = parseFloat(state.customPrice)
           if (isNaN(price) || price < 0) continue
           upserts.push({
             price_list_id: priceListId,
-            article_id: articleId,
-            custom_price: price,
-            discount_percent: 0
-          })
-        } else if (state.priceType === 'discount') {
-          const discount = parseFloat(state.discountPercent)
-          if (isNaN(discount) || discount < 0 || discount > 100) continue
-          const discountedPrice = Math.round(article.default_price * (1 - discount / 100) * 100) / 100
-          upserts.push({
-            price_list_id: priceListId,
-            article_id: articleId,
-            custom_price: discountedPrice,
-            discount_percent: discount
+            service_id: serviceId,
+            custom_price: price
           })
         }
       }
 
-      // Kör removals individuellt (sällan många)
-      for (const articleId of removals) {
-        await PriceListService.removePriceListItem(priceListId, articleId)
+      for (const serviceId of removals) {
+        await PriceListService.removePriceListServiceItem(priceListId, serviceId)
       }
-
-      // Kör upserts i en batch
       if (upserts.length > 0) {
-        await PriceListService.bulkUpsertPriceListItems(upserts)
+        await PriceListService.bulkUpsertServiceItems(upserts)
       }
 
-      // Uppdatera alla dirty states till saved
       setPriceStates(prev => {
         const next = { ...prev }
-        for (const [articleId, state] of dirtyEntries) {
-          if (state.priceType === 'standard') {
-            delete next[articleId]
+        for (const [serviceId, state] of dirtyEntries) {
+          if (state.mode === 'guide') {
+            delete next[serviceId]
           } else {
-            next[articleId] = {
-              ...next[articleId],
+            next[serviceId] = {
+              ...next[serviceId],
               isSaving: false,
               savedAt: Date.now(),
               isDirty: false,
-              originalPriceType: state.priceType,
-              originalCustomPrice: state.priceType === 'custom' ? state.customPrice : next[articleId]?.customPrice || '',
-              originalDiscountPercent: state.priceType === 'discount' ? state.discountPercent : ''
+              originalMode: 'fixed',
+              originalCustomPrice: state.customPrice
             }
           }
         }
         return next
       })
 
-      const totalSaved = removals.length + upserts.length
-      toast.success(`${totalSaved} pris${totalSaved > 1 ? 'er' : ''} sparade`)
+      const total = removals.length + upserts.length
+      toast.success(`${total} pris${total > 1 ? 'er' : ''} sparade`)
       setAppliedMarkup(null)
 
-      // Rensa savedAt efter 2 sekunder
       setTimeout(() => {
         setPriceStates(prev => {
           const next = { ...prev }
-          for (const [articleId] of dirtyEntries) {
-            if (next[articleId]) {
-              next[articleId] = { ...next[articleId], savedAt: null }
+          for (const [serviceId] of dirtyEntries) {
+            if (next[serviceId]) {
+              next[serviceId] = { ...next[serviceId], savedAt: null }
             }
           }
           return next
@@ -509,64 +397,59 @@ export function PriceListItemsEditor({
     }
   }
 
-  // Ångra alla osparade
   const resetAllDirty = () => {
-    const dirtyArticles = Object.entries(priceStates)
-      .filter(([_, state]) => state.isDirty)
-      .map(([articleId]) => articleId)
-
-    dirtyArticles.forEach(articleId => {
-      resetPrice(articleId)
-    })
+    const dirty = Object.entries(priceStates).filter(([_, s]) => s.isDirty).map(([id]) => id)
+    dirty.forEach(id => resetPrice(id))
     setAppliedMarkup(null)
   }
 
-  // Hjälpfunktion för rad-styling
-  const getRowClass = (priceType: PriceType, isDirty: boolean) => {
-    if (isDirty) {
-      return 'border-l-2 border-amber-400 bg-amber-500/10'
-    }
-    switch (priceType) {
-      case 'custom':
-        return 'border-l-2 border-purple-500 bg-purple-500/5'
-      case 'discount':
-        return 'border-l-2 border-emerald-500 bg-emerald-500/5'
-      default:
-        return ''
-    }
+  const getRowClass = (mode: PriceMode, isDirty: boolean) => {
+    if (isDirty) return 'border-l-2 border-amber-400 bg-amber-500/10'
+    if (mode === 'fixed') return 'border-l-2 border-[#20c58f] bg-[#20c58f]/5'
+    return ''
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-[#20c58f] animate-spin" />
       </div>
     )
   }
 
   return (
     <div className="p-4">
-      {/* Sökfält */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Sök artikel..."
-          className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-        />
+      {/* Sök + gruppfilter */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Sök tjänst..."
+            className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+          />
+        </div>
+        <select
+          value={groupFilter}
+          onChange={(e) => setGroupFilter(e.target.value)}
+          className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+        >
+          <option value="all">Alla grupper</option>
+          {groups.map(g => (
+            <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </select>
       </div>
 
       {/* Bulk-påslag toolbar */}
       {isSomeSelected && (
         <div className="mb-3 p-3 bg-slate-800/50 border border-[#20c58f]/30 rounded-xl flex flex-wrap items-center gap-2">
           <span className="text-sm text-white font-medium">
-            {selectedIds.size} artikel{selectedIds.size > 1 ? 'er' : ''} markerade
+            {selectedIds.size} tjänst{selectedIds.size > 1 ? 'er' : ''} markerade
           </span>
           <div className="h-5 w-px bg-slate-700" />
-
-          {/* Preset-knappar */}
           {[10, 15, 20, 25].map(pct => (
             <button
               key={pct}
@@ -580,31 +463,27 @@ export function PriceListItemsEditor({
               +{pct}%
             </button>
           ))}
-
-          {/* Eget input */}
           <div className="flex items-center gap-1">
             <input
               type="number"
               value={markupPercent}
               onChange={(e) => setMarkupPercent(e.target.value)}
               placeholder="Annat"
-              min="0"
+              min="-50"
               max="500"
               step="1"
               className="w-16 px-2 py-1.5 bg-slate-900 border border-slate-600 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
             />
             <span className="text-xs text-slate-500">%</span>
           </div>
-
           <button
             onClick={applyBulkMarkup}
-            disabled={!markupPercent || parseFloat(markupPercent) <= 0}
+            disabled={markupPercent === ''}
             className="px-4 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
             <Percent className="w-3.5 h-3.5" />
-            Lägg till påslag
+            Sätt pris
           </button>
-
           <button
             onClick={() => { setSelectedIds(new Set()); setMarkupPercent('') }}
             className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg transition-colors ml-auto"
@@ -618,99 +497,69 @@ export function PriceListItemsEditor({
       <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="max-h-96 overflow-y-auto">
 
-          {/* === MOBIL: Kompakt lista === */}
+          {/* MOBIL */}
           <div className="md:hidden divide-y divide-slate-700/30">
-            {filteredArticles.length === 0 ? (
+            {filteredServices.length === 0 ? (
               <div className="px-3 py-8 text-center text-slate-500">
-                {searchTerm ? 'Inga artiklar matchar sökningen' : 'Inga artiklar tillgängliga'}
+                {searchTerm || groupFilter !== 'all' ? 'Inga tjänster matchar filtren' : 'Inga tjänster tillgängliga'}
               </div>
             ) : (
-              filteredArticles.map(article => {
-                const state = priceStates[article.id]
-                const priceType = state?.priceType || 'standard'
+              filteredServices.map(service => {
+                const state = priceStates[service.id]
+                const mode: PriceMode = state?.mode || 'guide'
                 const isDirty = state?.isDirty || false
-                const categoryConfig = ARTICLE_CATEGORY_CONFIG[article.category]
                 const isSaving = state?.isSaving
-                const discountPercent = parseFloat(state?.discountPercent || '0')
-                const discountedPrice = article.default_price * (1 - discountPercent / 100)
-                const rowClass = getRowClass(priceType, isDirty)
-                const isSelected = selectedIds.has(article.id)
+                const rowClass = getRowClass(mode, isDirty)
+                const isSelected = selectedIds.has(service.id)
+                const basePrice = service.base_price
 
                 return (
-                  <div key={article.id} className={`p-3 ${rowClass}`}>
-                    {/* Rad 1: Checkbox + Art nr + Namn + Inköpspris */}
+                  <div key={service.id} className={`p-3 ${rowClass}`}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleSelection(article.id)}
+                          onChange={() => toggleSelection(service.id)}
                           className="w-4 h-4 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f] flex-shrink-0"
                         />
-                        <code className="text-xs font-mono text-slate-400 flex-shrink-0">{article.code}</code>
-                        <span className="text-sm text-white truncate">{article.name}</span>
+                        <code className="text-xs font-mono text-slate-400 flex-shrink-0">{service.code}</code>
+                        <span className="text-sm text-white truncate">{service.name}</span>
                       </div>
                       <span className="text-xs text-slate-500 flex-shrink-0">
-                        Inköp: {formatArticlePrice(article.default_price)}
-                        {priceType !== 'standard' && (() => {
-                          const cp = priceType === 'custom'
-                            ? parseFloat(state?.customPrice || '0')
-                            : discountedPrice
-                          const pct = article.default_price !== 0
-                            ? ((cp / article.default_price) - 1) * 100
-                            : 0
-                          const sign = pct > 0 ? '+' : ''
-                          const color = pct > 0 ? 'text-[#20c58f]' : 'text-amber-400'
-                          return <span className={`ml-1 ${color}`}>({sign}{pct.toFixed(0)}%)</span>
-                        })()}
+                        Grundpris: {basePrice !== null ? formatArticlePrice(basePrice) : '—'}
                       </span>
                     </div>
 
-                    {/* Rad 2: Pristyp + Input */}
                     <div className="flex items-center gap-2 mt-2">
                       <select
-                        value={priceType}
-                        onChange={(e) => handlePriceTypeChange(article.id, article, e.target.value as PriceType)}
-                        className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[44px]"
+                        value={mode}
+                        onChange={(e) => handleModeChange(service.id, service, e.target.value as PriceMode)}
+                        className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f] min-h-[44px]"
                       >
-                        <option value="standard">Standard</option>
-                        <option value="custom">Anpassat</option>
-                        <option value="discount">Rabatt</option>
+                        <option value="guide">Prisguide</option>
+                        <option value="fixed">Fast pris</option>
                       </select>
 
-                      {priceType === 'custom' && (
+                      {mode === 'fixed' && (
                         <div className="flex items-center gap-1 flex-1">
                           <input
                             type="number"
                             value={state?.customPrice || ''}
-                            onChange={(e) => handlePriceChange(article.id, article, e.target.value)}
+                            onChange={(e) => handlePriceChange(service.id, e.target.value)}
                             min="0" step="1"
-                            className="flex-1 min-w-0 px-2 py-1.5 bg-slate-900 border border-purple-500/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[44px]"
+                            className="flex-1 min-w-0 px-2 py-1.5 bg-slate-900 border border-[#20c58f]/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f] min-h-[44px]"
                           />
                           <span className="text-xs text-slate-500">kr</span>
                         </div>
                       )}
 
-                      {priceType === 'discount' && (
-                        <div className="flex items-center gap-1 flex-1">
-                          <input
-                            type="number"
-                            value={state?.discountPercent || ''}
-                            onChange={(e) => handleDiscountChange(article.id, article, e.target.value)}
-                            min="0" max="100" step="1"
-                            className="w-16 px-2 py-1.5 bg-slate-900 border border-emerald-500/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-emerald-500 min-h-[44px]"
-                          />
-                          <span className="text-xs text-slate-500">%</span>
-                          <span className="text-xs text-emerald-400 ml-1">= {formatArticlePrice(discountedPrice)}</span>
-                        </div>
-                      )}
-
                       {isDirty && (
                         <div className="flex items-center gap-1">
-                          <button onClick={() => confirmPrice(article.id, article)} disabled={isSaving} className="p-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white min-h-[44px] min-w-[44px] flex items-center justify-center">
+                          <button onClick={() => confirmPrice(service.id)} disabled={isSaving} className="p-2 rounded bg-[#20c58f] hover:bg-[#1ab07d] text-white min-h-[44px] min-w-[44px] flex items-center justify-center">
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                           </button>
-                          <button onClick={() => resetPrice(article.id)} className="p-2 rounded bg-slate-600 hover:bg-slate-500 text-slate-300 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                          <button onClick={() => resetPrice(service.id)} className="p-2 rounded bg-slate-600 hover:bg-slate-500 text-slate-300 min-h-[44px] min-w-[44px] flex items-center justify-center">
                             <RotateCcw className="w-4 h-4" />
                           </button>
                         </div>
@@ -722,7 +571,7 @@ export function PriceListItemsEditor({
             )}
           </div>
 
-          {/* === DESKTOP: Tabell === */}
+          {/* DESKTOP */}
           <table className="w-full hidden md:table">
             <thead className="bg-slate-900/80 sticky top-0 z-10">
               <tr>
@@ -734,112 +583,89 @@ export function PriceListItemsEditor({
                     className="w-4 h-4 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Art nr
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Namn
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Kategori
-                </th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Inköpspris
-                </th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Påslag
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Pristyp
-                </th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Kundpris
-                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Kod</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Tjänst</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Grupp</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Grundpris</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Diff</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Läge</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Kundpris</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/30">
-              {filteredArticles.length === 0 ? (
+              {filteredServices.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
-                    {searchTerm ? 'Inga artiklar matchar sökningen' : 'Inga artiklar tillgängliga'}
+                    {searchTerm || groupFilter !== 'all' ? 'Inga tjänster matchar filtren' : 'Inga tjänster tillgängliga'}
                   </td>
                 </tr>
               ) : (
-                filteredArticles.map(article => {
-                  const state = priceStates[article.id]
-                  const priceType = state?.priceType || 'standard'
+                filteredServices.map(service => {
+                  const state = priceStates[service.id]
+                  const mode: PriceMode = state?.mode || 'guide'
                   const isDirty = state?.isDirty || false
-                  const categoryConfig = ARTICLE_CATEGORY_CONFIG[article.category]
                   const isSaving = state?.isSaving
                   const justSaved = state?.savedAt && Date.now() - state.savedAt < 2000
-                  const isSelected = selectedIds.has(article.id)
-
-                  // Beräkna rabatterat pris
-                  const discountPercent = parseFloat(state?.discountPercent || '0')
-                  const discountedPrice = article.default_price * (1 - discountPercent / 100)
-
-                  const rowClass = getRowClass(priceType, isDirty)
+                  const isSelected = selectedIds.has(service.id)
+                  const basePrice = service.base_price
+                  const rowClass = getRowClass(mode, isDirty)
 
                   return (
                     <tr
-                      key={article.id}
+                      key={service.id}
                       className={`hover:bg-slate-800/30 transition-colors ${rowClass}`}
                     >
-                      {/* Checkbox */}
                       <td className="px-3 py-2">
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleSelection(article.id)}
+                          onChange={() => toggleSelection(service.id)}
                           className="w-4 h-4 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
                         />
                       </td>
 
-                      {/* Art nr */}
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <code className="text-xs font-mono text-slate-400">
-                          {article.code}
-                        </code>
+                        <code className="text-xs font-mono text-slate-400">{service.code}</code>
                       </td>
 
-                      {/* Namn */}
                       <td className="px-3 py-2">
-                        <span className="text-sm text-white truncate block max-w-[200px]" title={article.name}>
-                          {article.name}
+                        <span className="text-sm text-white truncate block max-w-[220px]" title={service.name}>
+                          {service.name}
                         </span>
                       </td>
 
-                      {/* Kategori */}
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${categoryConfig.bgColor} ${categoryConfig.color}`}>
-                          {categoryConfig.label}
-                        </span>
+                        {service.group ? (
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                            style={{
+                              backgroundColor: `${service.group.color}20`,
+                              color: service.group.color
+                            }}
+                          >
+                            {service.group.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-600">—</span>
+                        )}
                       </td>
 
-                      {/* Inköpspris */}
                       <td className="px-3 py-2 whitespace-nowrap text-right">
                         <span className="text-sm text-slate-500">
-                          {formatArticlePrice(article.default_price)}
+                          {basePrice !== null ? formatArticlePrice(basePrice) : '—'}
                         </span>
                       </td>
 
-                      {/* Påslag */}
                       <td className="px-3 py-2 whitespace-nowrap text-right">
                         {(() => {
-                          if (priceType === 'standard') {
+                          if (mode === 'guide' || basePrice === null || basePrice === 0) {
                             return <span className="text-sm text-slate-500">—</span>
                           }
-                          const customerPrice = priceType === 'custom'
-                            ? parseFloat(state?.customPrice || '0')
-                            : discountedPrice
-                          const diff = customerPrice - article.default_price
-                          const pct = article.default_price !== 0
-                            ? ((customerPrice / article.default_price) - 1) * 100
-                            : 0
-                          const isPositive = diff > 0
-                          const isNegative = diff < 0
-                          const color = isPositive ? 'text-[#20c58f]' : isNegative ? 'text-amber-400' : 'text-slate-500'
-                          const sign = isPositive ? '+' : ''
+                          const customerPrice = parseFloat(state?.customPrice || '0')
+                          const diff = customerPrice - basePrice
+                          const pct = ((customerPrice / basePrice) - 1) * 100
+                          const color = diff > 0 ? 'text-[#20c58f]' : diff < 0 ? 'text-amber-400' : 'text-slate-500'
+                          const sign = diff > 0 ? '+' : ''
                           return (
                             <span className={`text-sm ${color}`}>
                               {sign}{Math.round(diff)} kr ({sign}{pct.toFixed(1)}%)
@@ -848,91 +674,53 @@ export function PriceListItemsEditor({
                         })()}
                       </td>
 
-                      {/* Pristyp */}
                       <td className="px-3 py-2 whitespace-nowrap">
                         <select
-                          value={priceType}
-                          onChange={(e) => handlePriceTypeChange(article.id, article, e.target.value as PriceType)}
-                          className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={mode}
+                          onChange={(e) => handleModeChange(service.id, service, e.target.value as PriceMode)}
+                          className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                         >
-                          <option value="standard">Standard</option>
-                          <option value="custom">Anpassat (kr)</option>
-                          <option value="discount">Rabatt (%)</option>
+                          <option value="guide">Prisguide</option>
+                          <option value="fixed">Fast pris (kr)</option>
                         </select>
                       </td>
 
-                      {/* Kundpris */}
                       <td className="px-3 py-2 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {priceType === 'standard' && (
-                            <span className="text-sm text-slate-400">
-                              {formatArticlePrice(article.default_price)}
-                            </span>
+                          {mode === 'guide' && (
+                            <span className="text-sm text-slate-400 italic">Prisguide används</span>
                           )}
 
-                          {priceType === 'custom' && (
+                          {mode === 'fixed' && (
                             <div className="flex items-center gap-1">
                               <input
                                 type="number"
                                 value={state?.customPrice || ''}
-                                onChange={(e) => handlePriceChange(article.id, article, e.target.value)}
+                                onChange={(e) => handlePriceChange(service.id, e.target.value)}
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && isDirty) {
-                                    confirmPrice(article.id, article)
-                                  } else if (e.key === 'Escape') {
-                                    resetPrice(article.id)
-                                  }
+                                  if (e.key === 'Enter' && isDirty) confirmPrice(service.id)
+                                  else if (e.key === 'Escape') resetPrice(service.id)
                                 }}
                                 min="0"
                                 step="1"
-                                className="w-20 px-2 py-1 bg-slate-900 border border-purple-500/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                className="w-24 px-2 py-1 bg-slate-900 border border-[#20c58f]/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                               />
                               <span className="text-xs text-slate-500">kr</span>
                             </div>
                           )}
 
-                          {priceType === 'discount' && (
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                value={state?.discountPercent || ''}
-                                onChange={(e) => handleDiscountChange(article.id, article, e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && isDirty) {
-                                    confirmPrice(article.id, article)
-                                  } else if (e.key === 'Escape') {
-                                    resetPrice(article.id)
-                                  }
-                                }}
-                                min="0"
-                                max="100"
-                                step="1"
-                                className="w-14 px-2 py-1 bg-slate-900 border border-emerald-500/50 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                              />
-                              <span className="text-xs text-slate-500">%</span>
-                              <span className="text-xs text-emerald-400 ml-1">
-                                = {formatArticlePrice(discountedPrice)}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Bekräftelseknappar - endast om dirty */}
                           {isDirty && (
                             <div className="flex items-center gap-1 ml-2">
                               <button
-                                onClick={() => confirmPrice(article.id, article)}
+                                onClick={() => confirmPrice(service.id)}
                                 disabled={isSaving}
-                                className="p-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
+                                className="p-1.5 rounded bg-[#20c58f] hover:bg-[#1ab07d] text-white transition-colors disabled:opacity-50"
                                 title="Bekräfta (Enter)"
                               >
-                                {isSaving ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <Check className="w-3.5 h-3.5" />
-                                )}
+                                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                               </button>
                               <button
-                                onClick={() => resetPrice(article.id)}
+                                onClick={() => resetPrice(service.id)}
                                 className="p-1.5 rounded bg-slate-600 hover:bg-slate-500 text-slate-300 transition-colors"
                                 title="Ångra (Escape)"
                               >
@@ -941,10 +729,9 @@ export function PriceListItemsEditor({
                             </div>
                           )}
 
-                          {/* Sparindikator - endast om sparat och inte dirty */}
                           {!isDirty && justSaved && !isSaving && (
                             <div className="w-5 ml-2">
-                              <Check className="w-4 h-4 text-emerald-400" />
+                              <Check className="w-4 h-4 text-[#20c58f]" />
                             </div>
                           )}
                         </div>
@@ -962,15 +749,10 @@ export function PriceListItemsEditor({
       <div className="mt-4 pt-4 border-t border-slate-700/50 flex items-center justify-between text-sm">
         <div className="flex items-center gap-3">
           <span className="text-slate-400">
-            {articles.length} artiklar
-            {stats.customCount > 0 && (
+            {services.length} tjänster
+            {stats.fixedCount > 0 && (
               <span className="ml-2">
-                • <span className="text-purple-400">{stats.customCount} anpassade</span>
-              </span>
-            )}
-            {stats.discountCount > 0 && (
-              <span className="ml-2">
-                • <span className="text-emerald-400">{stats.discountCount} med rabatt</span>
+                • <span className="text-[#20c58f]">{stats.fixedCount} med fast pris</span>
               </span>
             )}
           </span>
@@ -978,12 +760,11 @@ export function PriceListItemsEditor({
           {appliedMarkup && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#20c58f]/15 border border-[#20c58f]/30 rounded-lg text-[#20c58f] text-xs font-medium">
               <Percent className="w-3 h-3" />
-              Påslag +{appliedMarkup}% applicerat
+              Påslag {parseFloat(appliedMarkup) >= 0 ? '+' : ''}{appliedMarkup}% applicerat
             </span>
           )}
         </div>
 
-        {/* Global bekräftelse om det finns dirty rows */}
         {stats.dirtyCount > 0 && (
           <div className="flex items-center gap-3">
             <span className="text-amber-400">
@@ -992,13 +773,9 @@ export function PriceListItemsEditor({
             <button
               onClick={confirmAllDirty}
               disabled={isBulkSaving}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-white text-sm rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
             >
-              {isBulkSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Check className="w-4 h-4" />
-              )}
+              {isBulkSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {isBulkSaving ? 'Sparar...' : 'Spara alla'}
             </button>
             <button

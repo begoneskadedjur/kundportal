@@ -203,27 +203,53 @@ export interface UpdatePriceListInput {
 }
 
 /**
- * Prislistepost från databasen
+ * Prislistepost från databasen.
+ * Prissätter antingen en tjänst (nytt flöde) eller en artikel (historik, används ej längre).
+ * XOR-constraint: exakt en av article_id / service_id är satt per rad.
  */
 export interface PriceListItem {
   id: string
   price_list_id: string
-  article_id: string
+  article_id: string | null
+  service_id: string | null
   custom_price: number
-  discount_percent: number
+  discount_percent: number | null
   created_at: string
   updated_at: string
 }
 
 /**
- * Prislistepost med artikeldata
+ * Prislistepost med tjänstedata (nytt flöde)
+ */
+export interface PriceListItemWithService extends PriceListItem {
+  service: {
+    id: string
+    code: string
+    name: string
+    base_price: number | null
+    group_id: string | null
+    is_active: boolean
+  }
+}
+
+/**
+ * Prislistepost med artikeldata (historik)
  */
 export interface PriceListItemWithArticle extends PriceListItem {
   article: Article
 }
 
 /**
- * Input för att skapa/uppdatera prislistepost
+ * Input för att skapa/uppdatera prislistepost för en TJÄNST
+ */
+export interface UpsertPriceListServiceInput {
+  price_list_id: string
+  service_id: string
+  custom_price: number
+}
+
+/**
+ * Input för att skapa/uppdatera prislistepost för en ARTIKEL (historik)
  */
 export interface UpsertPriceListItemInput {
   price_list_id: string

@@ -14,13 +14,14 @@ import {
   FileText,
   Calendar
 } from 'lucide-react'
-import { PriceList, Article } from '../../../types/articles'
+import { PriceList } from '../../../types/articles'
+import { ServiceWithGroup } from '../../../types/services'
 import { PriceListItemsEditor } from './PriceListItemsEditor'
 
 interface PriceListsTableProps {
   priceLists: PriceList[]
   itemCounts: Record<string, number>
-  articles: Article[]
+  services: ServiceWithGroup[]
   expandedListId: string | null
   visibleColumns: Set<string>
   onToggleExpand: (id: string) => void
@@ -36,7 +37,7 @@ interface PriceListsTableProps {
 export function PriceListsTable({
   priceLists,
   itemCounts,
-  articles,
+  services,
   expandedListId,
   visibleColumns,
   onToggleExpand,
@@ -93,7 +94,7 @@ export function PriceListsTable({
                     </button>
                     <span className="font-medium text-white text-sm truncate">{priceList.name}</span>
                     {priceList.is_default && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs flex-shrink-0">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-xs flex-shrink-0">
                         <Star className="w-3 h-3" /> Standard
                       </span>
                     )}
@@ -109,7 +110,7 @@ export function PriceListsTable({
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex items-center gap-3">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">
-                      <FileText className="w-3 h-3" /> {count} artiklar
+                      <FileText className="w-3 h-3" /> {count} tjänster
                     </span>
                     {priceList.description && (
                       <span className="text-xs text-slate-500 truncate max-w-[120px]">{priceList.description}</span>
@@ -117,7 +118,7 @@ export function PriceListsTable({
                   </div>
                   <div className="flex items-center gap-0.5">
                     {!priceList.is_default && (
-                      <button onClick={() => onSetDefault(priceList.id)} disabled={isSettingDefault} className="p-2 text-slate-400 hover:text-purple-400 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Sätt som standard">
+                      <button onClick={() => onSetDefault(priceList.id)} disabled={isSettingDefault} className="p-2 text-slate-400 hover:text-[#20c58f] rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="Sätt som standard">
                         {isSettingDefault ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
                       </button>
                     )}
@@ -155,7 +156,7 @@ export function PriceListsTable({
                     <div className="p-3 bg-slate-900/50 border-t border-slate-700/50">
                       <PriceListItemsEditor
                         priceListId={priceList.id}
-                        articles={articles}
+                        services={services}
                         onUpdate={onUpdateItems}
                       />
                     </div>
@@ -183,7 +184,7 @@ export function PriceListsTable({
               )}
               {visibleColumns.has('articles') && (
                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Artiklar
+                  Tjänster
                 </th>
               )}
               {visibleColumns.has('validity') && (
@@ -236,7 +237,7 @@ export function PriceListsTable({
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-white">{priceList.name}</span>
                         {priceList.is_default && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-xs">
                             <Star className="w-3 h-3" />
                             Standard
                           </span>
@@ -298,7 +299,7 @@ export function PriceListsTable({
                           <button
                             onClick={() => onSetDefault(priceList.id)}
                             disabled={isSettingDefault}
-                            className="p-1.5 text-slate-400 hover:text-purple-400 hover:bg-slate-700 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-[#20c58f] hover:bg-slate-700 rounded-lg transition-colors"
                             title="Sätt som standard"
                           >
                             {isSettingDefault ? (

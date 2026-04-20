@@ -118,7 +118,7 @@ export class ContractBillingService {
 
     let billingItems: CreateBillingItemInput[] = []
 
-    // Prioritera kundspecifika avtalsartiklar om de finns
+    // Prioritera kundspecifika avtalsartiklar om de finns (per-kund avtalsupplägg)
     const contractArticles = await CustomerContractArticleService.getArticles(customerId)
 
     if (contractArticles.length > 0) {
@@ -146,7 +146,7 @@ export class ContractBillingService {
         }
       })
     } else {
-      // Fallback: price_list_items (bakåtkompatibilitet)
+      // Fallback: artikel-rader från kundens prislista (historisk bakåtkompatibilitet)
       if (!customer?.price_list_id) return []
 
       const { data: rawItems, error: itemsError } = await supabase
@@ -159,6 +159,7 @@ export class ContractBillingService {
           )
         `)
         .eq('price_list_id', customer.price_list_id)
+        .not('article_id', 'is', null)
 
       if (itemsError) throw new Error(`Kunde inte hämta artikelpriser: ${itemsError.message}`)
 

@@ -30,13 +30,17 @@ import { DEFAULT_ROT_PERCENT, DEFAULT_RUT_PERCENT } from '../utils/rotRutConstan
 
 export class CaseBillingService {
   /**
-   * Hämta alla aktiva artiklar med effektivt pris för en kund
-   * Prisupplösning sker i följande ordning (fallback-kedja):
-   * 1. Kundens prislista (om kunden har en och artikeln finns där)
-   * 2. Standardprislistan (om artikeln finns där)
-   * 3. Artikelns default_price
+   * Hämta alla aktiva artiklar med effektivt pris.
+   *
+   * Artiklar är interna kostnader/inköp, inte kundpriser — de faktureras
+   * aldrig direkt till kund. Därför används alltid articles.default_price.
+   * Kundspecifik prissättning sker på TJÄNSTE-nivå via prislistor (se
+   * PriceListService.getEffectiveServicePrice).
+   *
+   * customerId-parametern accepteras för bakåtkompatibilitet men används inte
+   * längre för artikelpriser.
    */
-  static async getArticlesWithPrices(customerId?: string | null, articleGroupId?: string | null): Promise<ArticleWithEffectivePrice[]> {
+  static async getArticlesWithPrices(_customerId?: string | null, articleGroupId?: string | null): Promise<ArticleWithEffectivePrice[]> {
     // Om articleGroupId anges: hämta artiklar från den gruppen + alltid Arbetstid och Övrigt
     let allowedArticleIds: Set<string> | null = null
     if (articleGroupId) {
@@ -46,7 +50,6 @@ export class CaseBillingService {
         .eq('group_id', articleGroupId)
       const groupArticleIds = (memberships || []).map((m: any) => m.article_id)
 
-      // Hämta artiklar ur Arbetstid och Övrigt (alltid med)
       const { data: alwaysGroups } = await supabase
         .from('article_groups')
         .select('id')
@@ -66,7 +69,6 @@ export class CaseBillingService {
       if (allowedArticleIds.size === 0) return []
     }
 
-    // Hämta alla aktiva artiklar
     const { data: articles, error } = await supabase
       .from('articles')
       .select('*')
@@ -78,74 +80,15 @@ export class CaseBillingService {
     if (error) throw new Error(`Databasfel: ${error.message}`)
     if (!articles || articles.length === 0) return []
 
-    // Hämta kundens prislista om customerId anges
-    let customerPriceListId: string | null = null
-    if (customerId) {
-      const { data: customer } = await supabase
-        .from('customers')
-        .select('price_list_id')
-        .eq('id', customerId)
-        .single()
-
-      customerPriceListId = customer?.price_list_id || null
-    }
-
-    // Hämta standardprislistan
-    const defaultPriceList = await PriceListService.getDefaultPriceList()
-
-    // Hämta kundens prislisteposter (om kunden har prislista)
-    let customerPriceItems: Record<string, number> = {}
-    if (customerPriceListId) {
-      const items = await PriceListService.getPriceListItems(customerPriceListId)
-      customerPriceItems = items.reduce((acc, item) => {
-        acc[item.article_id] = item.custom_price
-        return acc
-      }, {} as Record<string, number>)
-    }
-
-    // Hämta standardprislistans priser (fallback)
-    let standardPriceItems: Record<string, number> = {}
-    if (defaultPriceList) {
-      const items = await PriceListService.getPriceListItems(defaultPriceList.id)
-      standardPriceItems = items.reduce((acc, item) => {
-        acc[item.article_id] = item.custom_price
-        return acc
-      }, {} as Record<string, number>)
-    }
-
-    // Filtrera artiklar per tillåtna IDs (om grupp angavs)
     const filteredArticles = allowedArticleIds
       ? articles.filter((a: Article) => allowedArticleIds!.has(a.id))
       : articles
 
-    // Bygg resultatet med fallback-kedja:
-    // 1. Kundpris → 2. Standardpris → 3. Artikelns default_price
-    return filteredArticles.map((article: Article) => {
-      // Kolla om artikeln finns i kundens prislista
-      if (customerPriceListId && customerPriceItems[article.id] !== undefined) {
-        return {
-          article,
-          effective_price: customerPriceItems[article.id],
-          price_source: 'customer_list' as PriceSource
-        }
-      }
-
-      // Kolla om artikeln finns i standardprislistan
-      if (standardPriceItems[article.id] !== undefined) {
-        return {
-          article,
-          effective_price: standardPriceItems[article.id],
-          price_source: 'standard' as PriceSource
-        }
-      }
-
-      // Fallback till artikelns default_price
-      return {
-        article,
-        effective_price: article.default_price,
-        price_source: 'standard' as PriceSource
-      }
-    })
+    return filteredArticles.map((article: Article) => ({
+      article,
+      effective_price: article.default_price,
+      price_source: 'standard' as PriceSource
+    }))
   }
 
   /**
@@ -172,62 +115,44 @@ export class CaseBillingService {
   }
 
   /**
-   * Hämta effektivt pris för en artikel baserat på kund
+   * Hämta effektivt pris för en artikel.
+   * Artiklar är interna kostnader — alltid default_price, oavsett kund.
+   * customerId-parametern accepteras för bakåtkompatibilitet.
    */
   static async getEffectivePrice(
     articleId: string,
-    customerId?: string | null
+    _customerId?: string | null
   ): Promise<{ price: number; source: PriceSource }> {
-    // Hämta artikeln
     const { data: article, error: articleError } = await supabase
       .from('articles')
-      .select('*')
+      .select('default_price')
       .eq('id', articleId)
-      .single()
+      .maybeSingle()
 
-    if (articleError || !article) {
-      throw new Error('Artikel hittades inte')
-    }
-
-    // Kolla kundens prislista först
-    if (customerId) {
-      const { data: customer } = await supabase
-        .from('customers')
-        .select('price_list_id')
-        .eq('id', customerId)
-        .single()
-
-      if (customer?.price_list_id) {
-        const { data: priceItem } = await supabase
-          .from('price_list_items')
-          .select('custom_price')
-          .eq('price_list_id', customer.price_list_id)
-          .eq('article_id', articleId)
-          .single()
-
-        if (priceItem) {
-          return { price: priceItem.custom_price, source: 'customer_list' }
-        }
-      }
-    }
-
-    // Fallback till standardprislista
-    const defaultPriceList = await PriceListService.getDefaultPriceList()
-    if (defaultPriceList) {
-      const { data: priceItem } = await supabase
-        .from('price_list_items')
-        .select('custom_price')
-        .eq('price_list_id', defaultPriceList.id)
-        .eq('article_id', articleId)
-        .single()
-
-      if (priceItem) {
-        return { price: priceItem.custom_price, source: 'standard' }
-      }
-    }
-
-    // Fallback till artikelns default_price
+    if (articleError || !article) throw new Error('Artikel hittades inte')
     return { price: article.default_price, source: 'standard' }
+  }
+
+  /**
+   * Hämta effektivt pris för en TJÄNST baserat på kund.
+   *
+   * Returnerar null om ingen kundspecifik prislista har fast pris för
+   * tjänsten → anroparen ska då falla tillbaka på services.base_price /
+   * prisguide (markup).
+   */
+  static async getEffectiveServicePrice(
+    serviceId: string,
+    customerId?: string | null
+  ): Promise<{ price: number; source: 'customer_list' | 'default' } | null> {
+    return PriceListService.getEffectiveServicePrice(serviceId, customerId)
+  }
+
+  /**
+   * Hämta fasta tjänstepriser för en kund som map {service_id: price}.
+   * Används av UI för att visa "Fast pris"-badge + låsa unit_price.
+   */
+  static async getCustomerServicePrices(customerId: string): Promise<Record<string, number>> {
+    return PriceListService.getCustomerServicePrices(customerId)
   }
 
   /**
