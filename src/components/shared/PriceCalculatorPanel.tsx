@@ -47,7 +47,15 @@ interface PriceCalculatorPanelProps {
    *  - markup-slider är avstängd och Applicera-knappen skriver inte över deras unit_price
    */
   fixedPricedItemIds?: Set<string>
+  /**
+   * Ärendetyp — styr om priser visas inkl. eller exkl. moms.
+   * Privat: visa inkl. (kund ser det priset), marginal räknas på inkl.-basen.
+   * Business/contract: oförändrat (exkl.).
+   */
+  caseType?: 'private' | 'business' | 'contract'
 }
+
+const VAT_RATE = 0.25
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
@@ -63,8 +71,12 @@ export default function PriceCalculatorPanel({
   onMarkupsChange,
   onApplyPrices,
   fixedPricedItemIds,
+  caseType,
 }: PriceCalculatorPanelProps) {
   const isFixed = (id: string) => !!fixedPricedItemIds?.has(id)
+  const isPrivate = caseType === 'private'
+  const priceMultiplier = isPrivate ? 1 + VAT_RATE : 1
+  const priceLabel = isPrivate ? 'Inkl. moms' : 'Exkl. moms'
   const [settings, setSettings] = useState<PricingSettings>({ id: '', ...DEFAULT_PRICING_SETTINGS, updated_at: '' })
   const [loadingSettings, setLoadingSettings] = useState(true)
   const [applying, setApplying] = useState(false)
@@ -130,12 +142,15 @@ export default function PriceCalculatorPanel({
         price: calculateSuggestedPrice(e.cost, e.markup),
       }))
 
-      // min_charge_amount gäller HELA ärendet, inte per rad
-      const rawTotal = rawPrices.reduce((s, e) => s + e.price, 0)
-      if (rawTotal < settings.min_charge_amount && rawPrices.length > 0) {
-        const diff = settings.min_charge_amount - rawTotal
+      // min_charge_amount gäller HELA ärendet (jämförs mot det kunden ser).
+      // För privat räknas alltså på inkl. moms-basen; justeringen skrivs
+      // sedan tillbaka till exkl. innan DB sparas.
+      const rawTotalDisplay = rawPrices.reduce((s, e) => s + e.price * priceMultiplier, 0)
+      if (rawTotalDisplay < settings.min_charge_amount && rawPrices.length > 0) {
+        const diffDisplay = settings.min_charge_amount - rawTotalDisplay
+        const diffExkl = diffDisplay / priceMultiplier
         const maxIdx = rawPrices.reduce((best, e, i) => e.cost > rawPrices[best].cost ? i : best, 0)
-        rawPrices[maxIdx].price += diff
+        rawPrices[maxIdx].price += diffExkl
       }
 
       const prices: Record<string, number> = {}
@@ -253,14 +268,16 @@ export default function PriceCalculatorPanel({
                           {serviceItems.map(si => {
                             const cost = purchaseCostByService(si.id)
                             const markup = markups[si.id] ?? settings.recommended_markup_percent
-                            const raw = calculateSuggestedPrice(cost, markup)
-                            const suggestedPrice = cost > 0 ? raw : 0
+                            const rawExkl = calculateSuggestedPrice(cost, markup)
+                            const suggestedPriceExkl = cost > 0 ? rawExkl : 0
+                            const suggestedPriceDisplay = Math.round(suggestedPriceExkl * priceMultiplier)
                             const hasArticles = cost > 0
                             const fixed = isFixed(si.id)
                             // Vid fast pris: marginal räknas på kundens faktiska pris (unit_price × qty)
-                            const fixedPrice = si.unit_price * si.quantity
-                            const price = fixed ? fixedPrice : suggestedPrice
-                            const margin = price > 0 && cost > 0 ? calculateMarginPercent(price, cost) : 0
+                            const fixedPriceExkl = si.unit_price * si.quantity
+                            const fixedPriceDisplay = Math.round(fixedPriceExkl * priceMultiplier)
+                            const priceForMargin = fixed ? fixedPriceExkl * priceMultiplier : suggestedPriceExkl * priceMultiplier
+                            const margin = priceForMargin > 0 && cost > 0 ? calculateMarginPercent(priceForMargin, cost) : 0
 
                             return (
                               <div key={si.id} className={`p-3 rounded-xl border ${fixed ? 'bg-[#20c58f]/5 border-[#20c58f]/30' : hasArticles ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-800/10 border-slate-700/30'}`}>
@@ -276,7 +293,7 @@ export default function PriceCalculatorPanel({
                                     {fixed && (
                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium">
                                         <CheckCircle className="w-3 h-3" />
-                                        Fast pris · {fmt(fixedPrice)}
+                                        Fast pris · {fmt(fixedPriceDisplay)}
                                       </span>
                                     )}
                                   </div>
@@ -297,7 +314,10 @@ export default function PriceCalculatorPanel({
                                   <>
                                     <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
                                       <span>Inköp: {fmt(cost)}</span>
-                                      <span className="font-semibold text-white text-sm">{fmt(suggestedPrice)}</span>
+                                      <span className="flex items-baseline gap-1.5">
+                                        <span className="font-semibold text-white text-sm">{fmt(suggestedPriceDisplay)}</span>
+                                        <span className="text-[10px] text-slate-500">{priceLabel}</span>
+                                      </span>
                                     </div>
                                     <div className="space-y-1">
                                       <div className="flex justify-between text-xs text-slate-500">
@@ -322,7 +342,7 @@ export default function PriceCalculatorPanel({
                                   </>
                                 ) : (
                                   <p className="text-xs text-slate-500">
-                                    Nuvarande pris: {fmt(si.unit_price * si.quantity)} – berörs ej
+                                    Nuvarande pris: {fmt(si.unit_price * si.quantity * priceMultiplier)} {priceLabel.toLowerCase()} – berörs ej
                                   </p>
                                 )}
                               </div>

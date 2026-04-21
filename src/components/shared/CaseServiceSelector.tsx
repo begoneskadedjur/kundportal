@@ -1227,6 +1227,7 @@ export default function CaseServiceSelector({
       <PriceCalculatorPanel
         isOpen={showCalculatorPanel}
         onClose={() => setShowCalculatorPanel(false)}
+        caseType={caseType}
         articleItems={articleItems.map(i => ({
           id: i.id,
           article_name: i.article_name,
