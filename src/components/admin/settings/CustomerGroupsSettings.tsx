@@ -158,9 +158,17 @@ export function CustomerGroupsSettings() {
                       }`}
                     >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Hash className="w-4 h-4 text-[#20c58f]" />
                           <span className="text-sm font-medium text-white">{group.name}</span>
+                          {group.is_private_default && (
+                            <span
+                              className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#20c58f]/15 text-[#20c58f] border border-[#20c58f]/30"
+                              title="Privatärenden tilldelas automatiskt nummer från denna grupp"
+                            >
+                              Privat standard
+                            </span>
+                          )}
                         </div>
                         {group.description && (
                           <p className="text-xs text-slate-500 mt-0.5 ml-6">{group.description}</p>

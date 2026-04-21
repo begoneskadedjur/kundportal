@@ -21,6 +21,7 @@ export function CustomerGroupEditModal({ isOpen, onClose, onSave, group, existin
   const [currentCounter, setCurrentCounter] = useState(0)
   const [description, setDescription] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
+  const [isPrivateDefault, setIsPrivateDefault] = useState(false)
   const [saving, setSaving] = useState(false)
   const [overlapWarning, setOverlapWarning] = useState<string | null>(null)
 
@@ -32,6 +33,7 @@ export function CustomerGroupEditModal({ isOpen, onClose, onSave, group, existin
       setCurrentCounter(group.current_counter)
       setDescription(group.description || '')
       setSortOrder(group.sort_order)
+      setIsPrivateDefault(group.is_private_default || false)
     } else {
       setName('')
       setSeriesStart(0)
@@ -39,9 +41,12 @@ export function CustomerGroupEditModal({ isOpen, onClose, onSave, group, existin
       setCurrentCounter(0)
       setDescription('')
       setSortOrder(existingGroups.length + 1)
+      setIsPrivateDefault(false)
     }
     setOverlapWarning(null)
   }, [group, isOpen, existingGroups.length])
+
+  const currentPrivateDefault = existingGroups.find(g => g.is_private_default && g.id !== group?.id)
 
   // Check for overlapping series ranges
   useEffect(() => {
@@ -88,6 +93,11 @@ export function CustomerGroupEditModal({ isOpen, onClose, onSave, group, existin
     setSaving(true)
     try {
       if (group) {
+        // Om vi aktiverar privat-default och en annan grupp redan har flaggan,
+        // måste vi först rensa den andra (unikt index tillåter bara en rad)
+        if (isPrivateDefault && currentPrivateDefault) {
+          await CustomerGroupService.updateGroup(currentPrivateDefault.id, { is_private_default: false })
+        }
         const update: UpdateCustomerGroupInput = {
           name: name.trim(),
           series_start: seriesStart,
@@ -95,6 +105,7 @@ export function CustomerGroupEditModal({ isOpen, onClose, onSave, group, existin
           current_counter: currentCounter,
           description: description.trim() || undefined,
           sort_order: sortOrder,
+          is_private_default: isPrivateDefault,
         }
         await CustomerGroupService.updateGroup(group.id, update)
         toast.success('Kundgrupp uppdaterad')
@@ -236,6 +247,34 @@ export function CustomerGroupEditModal({ isOpen, onClose, onSave, group, existin
               />
             </div>
           </div>
+
+          {/* Privat-default toggle (bara i redigeringsläge) */}
+          {group && (
+            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isPrivateDefault}
+                  onChange={(e) => setIsPrivateDefault(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-800 border-slate-600"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-white">Standard för privatpersoner</div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    Privatärenden som avslutas tilldelas automatiskt ett kundnummer från denna grupp.
+                  </div>
+                  {isPrivateDefault && currentPrivateDefault && (
+                    <div className="mt-2 flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span>
+                        Flaggan flyttas från <strong>{currentPrivateDefault.name}</strong>. Endast en grupp kan vara standard åt gången.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
