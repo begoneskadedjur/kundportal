@@ -20,6 +20,7 @@ export interface CaseDeleteInfo {
     childCases: number;
     invoices: number;
     billingItems: number;
+    commissionPosts: number;
   };
   canDelete: boolean;
   blockReason?: string;
@@ -159,11 +160,41 @@ export async function getCaseDeleteInfo(
     .eq('case_id', caseId)
     .eq('case_type', caseType);
 
+  // Räkna provisionsposter + kolla om någon är "låst" (på väg till / redan utbetalad)
+  const { data: commissionRows } = await supabase
+    .from('commission_posts')
+    .select('status')
+    .eq('case_id', caseId);
+  const commissionPostsCount = commissionRows?.length || 0;
+  const lockedCommission = (commissionRows || []).find(
+    (r: { status: string }) => r.status !== 'pending_invoice'
+  );
+
+  // Kolla om någon faktura är exporterad/skickad till Fortnox
+  const { data: invoiceRows } = await supabase
+    .from('invoices')
+    .select('status, fortnox_document_number')
+    .eq('case_id', caseId)
+    .eq('case_type', caseType);
+  const lockedInvoice = (invoiceRows || []).find(
+    (r: { status: string; fortnox_document_number: string | null }) =>
+      !!r.fortnox_document_number ||
+      ['sent', 'booked', 'paid'].includes(r.status)
+  );
+
   // Bestäm om ärendet kan raderas
-  const canDelete = childCasesCount === 0;
-  const blockReason = childCasesCount > 0
+  let canDelete = childCasesCount === 0;
+  let blockReason: string | undefined = childCasesCount > 0
     ? `Ärendet har ${childCasesCount} underärende(n) som måste raderas först.`
     : undefined;
+
+  if (canDelete && lockedInvoice) {
+    canDelete = false;
+    blockReason = `Ärendet har en faktura som är skickad till Fortnox (status: ${lockedInvoice.status}). Makulera fakturan först om ärendet ska raderas.`;
+  } else if (canDelete && lockedCommission) {
+    canDelete = false;
+    blockReason = `Ärendet har provisionsposter som är på väg till utbetalning (status: ${lockedCommission.status}). Återställ provisionen först.`;
+  }
 
   return {
     caseId,
@@ -180,6 +211,7 @@ export async function getCaseDeleteInfo(
       childCases: childCasesCount,
       invoices: invoicesCount || 0,
       billingItems: billingItemsCount || 0,
+      commissionPosts: commissionPostsCount,
     },
     canDelete,
     blockReason
@@ -315,7 +347,31 @@ export async function deleteCase(
       }
     }
 
-    // 6. Radera fakturor och tillhörande rader
+    // 6. Radera provisionsposter
+    // Säkerhetskoll: blockera om någon post inte är 'pending_invoice'
+    const { data: commissionRows } = await supabase
+      .from('commission_posts')
+      .select('id, status')
+      .eq('case_id', caseId);
+
+    if (commissionRows && commissionRows.length > 0) {
+      const locked = commissionRows.find(
+        (r: { status: string }) => r.status !== 'pending_invoice'
+      );
+      if (locked) {
+        return {
+          success: false,
+          error: `Ärendet har provisionsposter som är på väg till utbetalning (status: ${locked.status}). Återställ provisionen först.`
+        };
+      }
+      const { error: commissionError } = await supabase
+        .from('commission_posts')
+        .delete()
+        .in('id', commissionRows.map(r => r.id));
+      if (commissionError) console.error('Error deleting commission posts:', commissionError);
+    }
+
+    // 7. Radera fakturor och tillhörande rader
     const { data: invoiceIds } = await supabase
       .from('invoices')
       .select('id')

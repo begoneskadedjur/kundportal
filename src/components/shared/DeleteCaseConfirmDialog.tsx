@@ -2,7 +2,7 @@
 // Bekräftelsedialog för radering av ärenden
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Trash2, X, Loader2, MessageSquare, Image, Bell, FileText, Clock, Receipt, Package } from 'lucide-react';
+import { AlertTriangle, Trash2, X, Loader2, MessageSquare, Image, Bell, FileText, Clock, Receipt, Package, DollarSign } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { getCaseDeleteInfo, deleteCase, type CaseDeleteInfo, type DeleteableCaseType } from '../../services/caseDeleteService';
@@ -99,7 +99,8 @@ export default function DeleteCaseConfirmDialog({
       relatedData.visits +
       relatedData.billingLogs +
       relatedData.invoices +
-      relatedData.billingItems
+      relatedData.billingItems +
+      relatedData.commissionPosts
     );
   };
 
@@ -193,6 +194,21 @@ export default function DeleteCaseConfirmDialog({
               </div>
             )}
 
+            {/* Varning om provisionsposter */}
+            {deleteInfo.canDelete && deleteInfo.relatedData.commissionPosts > 0 && (
+              <div className="bg-amber-500/20 border border-amber-500/40 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <DollarSign className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-400 font-medium">Provisionsposter kopplade till ärendet</p>
+                    <p className="text-amber-300 text-sm mt-1">
+                      {deleteInfo.relatedData.commissionPosts} provisionspost{deleteInfo.relatedData.commissionPosts !== 1 ? 'er' : ''} kommer att raderas permanent.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Relaterad data som kommer att raderas */}
             {deleteInfo.canDelete && getTotalRelatedItems() > 0 && (
               <div className="space-y-3">
@@ -245,6 +261,14 @@ export default function DeleteCaseConfirmDialog({
                       <Package className="w-4 h-4 text-orange-400" />
                       <span className="text-sm text-slate-300">
                         {deleteInfo.relatedData.billingItems} artikelrad{deleteInfo.relatedData.billingItems !== 1 ? 'er' : ''}
+                      </span>
+                    </div>
+                  )}
+                  {deleteInfo.relatedData.commissionPosts > 0 && (
+                    <div className="flex items-center gap-2 bg-slate-800/30 rounded px-3 py-2">
+                      <DollarSign className="w-4 h-4 text-emerald-400" />
+                      <span className="text-sm text-slate-300">
+                        {deleteInfo.relatedData.commissionPosts} provisionspost{deleteInfo.relatedData.commissionPosts !== 1 ? 'er' : ''}
                       </span>
                     </div>
                   )}
