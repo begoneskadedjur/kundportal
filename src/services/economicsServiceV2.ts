@@ -35,7 +35,7 @@ export interface ServiceMarginRow {
   cases_count: number
 }
 
-export type PipelineStatus = 'pending' | 'approved' | 'invoiced' | 'paid'
+export type PipelineStatus = 'pending' | 'sent' | 'paid'
 
 export interface PipelineBucket {
   status: PipelineStatus
@@ -260,9 +260,10 @@ export const getServiceMarginRanking = async (
 ): Promise<ServiceMarginRow[]> => {
   const { data: items } = await supabase
     .from('case_billing_items')
-    .select('case_id, item_type, total_price, quantity, article_id, service_id, mapped_service_id')
-    .gte('created_at', startDate)
-    .lte('created_at', endDate)
+    .select('case_id, item_type, total_price, quantity, article_id, service_id, mapped_service_id, cases!inner(completed_date)')
+    .gte('cases.completed_date', startDate)
+    .lte('cases.completed_date', endDate)
+    .not('cases.completed_date', 'is', null)
     .neq('status', 'cancelled')
 
   if (!items || items.length === 0) return []
@@ -275,18 +276,47 @@ export const getServiceMarginRanking = async (
 
   const stats = new Map<string, { revenue: number; cost: number; cases: Set<string> }>()
 
-  items.forEach((it: any) => {
-    const sid = it.item_type === 'service' ? it.service_id : it.mapped_service_id
-    if (!sid) return
+  const addToStats = (sid: string, revenue: number, cost: number, caseId: string | null) => {
     const s = stats.get(sid) || { revenue: 0, cost: 0, cases: new Set<string>() }
-    if (it.item_type === 'service') {
-      s.revenue += Number(it.total_price || 0)
-    } else if (it.item_type === 'article') {
-      const c = costById.get(it.article_id) || 0
-      s.cost += c * Number(it.quantity || 0)
-    }
-    if (it.case_id) s.cases.add(it.case_id)
+    s.revenue += revenue
+    s.cost += cost
+    if (caseId) s.cases.add(caseId)
     stats.set(sid, s)
+  }
+
+  // Steg 1: bygg map case_id → [{service_id, revenue}] för proportionell allokering
+  const serviceRevenueByCase = new Map<string, Array<{ service_id: string; revenue: number }>>()
+  items.forEach((i: any) => {
+    if (i.item_type !== 'service' || !i.service_id) return
+    const arr = serviceRevenueByCase.get(i.case_id) || []
+    arr.push({ service_id: i.service_id, revenue: Number(i.total_price || 0) })
+    serviceRevenueByCase.set(i.case_id, arr)
+  })
+
+  // Steg 2: service-rader → intäkt
+  items.forEach((i: any) => {
+    if (i.item_type !== 'service' || !i.service_id) return
+    addToStats(i.service_id, Number(i.total_price || 0), 0, i.case_id)
+  })
+
+  // Steg 3: artikel-rader → kostnad (primär: mapped_service_id, fallback: proportionell allokering)
+  items.forEach((a: any) => {
+    if (a.item_type !== 'article') return
+    const cost = (costById.get(a.article_id) || 0) * Number(a.quantity || 0)
+    if (cost === 0) return
+
+    if (a.mapped_service_id) {
+      addToStats(a.mapped_service_id, 0, cost, a.case_id)
+      return
+    }
+
+    const services = serviceRevenueByCase.get(a.case_id) || []
+    const totalRevenue = services.reduce((sum, x) => sum + x.revenue, 0)
+    if (totalRevenue === 0 || services.length === 0) return
+    services.forEach(svc => {
+      const share = svc.revenue / totalRevenue
+      addToStats(svc.service_id, 0, cost * share, a.case_id)
+    })
   })
 
   const sids = Array.from(stats.keys())
@@ -326,57 +356,48 @@ export const getServiceMarginRanking = async (
 
 export const getInvoicePipeline = async (): Promise<PipelineBucket[]> => {
   const buckets: Record<PipelineStatus, PipelineBucket> = {
-    pending:   { status: 'pending',   count: 0, total: 0 },
-    approved:  { status: 'approved',  count: 0, total: 0 },
-    invoiced:  { status: 'invoiced',  count: 0, total: 0 },
-    paid:      { status: 'paid',      count: 0, total: 0 },
+    pending: { status: 'pending', count: 0, total: 0 },
+    sent:    { status: 'sent',    count: 0, total: 0 },
+    paid:    { status: 'paid',    count: 0, total: 0 },
   }
 
-  // contract_billing_items: pending/approved/invoiced/paid
+  // invoices (privat/företag) — draft/pending_approval/ready = pending, sent = sent, paid = paid
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('status, total_amount')
+    .neq('status', 'cancelled')
+
+  inv?.forEach((r: any) => {
+    const s = (r.status || '').toLowerCase()
+    const amt = Number(r.total_amount || 0)
+    if (['draft', 'pending_approval', 'ready'].includes(s)) {
+      buckets.pending.count++; buckets.pending.total += amt
+    } else if (s === 'sent') {
+      buckets.sent.count++; buckets.sent.total += amt
+    } else if (s === 'paid') {
+      buckets.paid.count++; buckets.paid.total += amt
+    }
+  })
+
+  // contract_billing_items (avtalskunder + merförsäljning) — pending/approved = pending, invoiced = sent, paid = paid
   const { data: cbi } = await supabase
     .from('contract_billing_items')
     .select('status, total_price')
     .neq('status', 'cancelled')
 
   cbi?.forEach((r: any) => {
-    const s = r.status as PipelineStatus
-    if (buckets[s]) {
-      buckets[s].count++
-      buckets[s].total += Number(r.total_price || 0)
+    const s = r.status
+    const amt = Number(r.total_price || 0)
+    if (s === 'pending' || s === 'approved') {
+      buckets.pending.count++; buckets.pending.total += amt
+    } else if (s === 'invoiced') {
+      buckets.sent.count++; buckets.sent.total += amt
+    } else if (s === 'paid') {
+      buckets.paid.count++; buckets.paid.total += amt
     }
   })
 
-  // case_billing_items: pending / approved / billed (mappas till invoiced)
-  const { data: cases } = await supabase
-    .from('case_billing_items')
-    .select('status, total_price')
-    .neq('status', 'cancelled')
-
-  cases?.forEach((r: any) => {
-    const raw = r.status
-    const mapped: PipelineStatus | null =
-      raw === 'pending' ? 'pending' :
-      raw === 'approved' ? 'approved' :
-      raw === 'billed' ? 'invoiced' : null
-    if (mapped) {
-      buckets[mapped].count++
-      buckets[mapped].total += Number(r.total_price || 0)
-    }
-  })
-
-  // invoices: alla med status IN (ready, sent) räknas som invoiced; paid räknas som paid
-  const { data: inv } = await supabase
-    .from('invoices')
-    .select('status, total_amount, paid_at')
-
-  inv?.forEach((r: any) => {
-    if (r.paid_at) { buckets.paid.count++; buckets.paid.total += Number(r.total_amount || 0); return }
-    const s = (r.status || '').toLowerCase()
-    if (s === 'pending_approval') { buckets.pending.count++; buckets.pending.total += Number(r.total_amount || 0) }
-    else if (s === 'ready' || s === 'sent' || s === 'overdue') { buckets.invoiced.count++; buckets.invoiced.total += Number(r.total_amount || 0) }
-  })
-
-  return ['pending', 'approved', 'invoiced', 'paid'].map(s => buckets[s as PipelineStatus])
+  return ['pending', 'sent', 'paid'].map(s => buckets[s as PipelineStatus])
 }
 
 // ---------- 5. Overdue aging ----------

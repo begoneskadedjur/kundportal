@@ -7,10 +7,9 @@ import EmptyChartState from './EmptyChartState'
 import type { PipelineStatus } from '../../../services/economicsServiceV2'
 
 const STATUS_META: Record<PipelineStatus, { label: string; color: string; bg: string }> = {
-  pending:  { label: 'Väntar', color: 'text-amber-300',   bg: 'bg-amber-500/20' },
-  approved: { label: 'Godkänt', color: 'text-sky-300',    bg: 'bg-sky-500/20' },
-  invoiced: { label: 'Fakturerat', color: 'text-violet-300', bg: 'bg-violet-500/20' },
-  paid:     { label: 'Betalt', color: 'text-[#20c58f]',   bg: 'bg-[#20c58f]/20' },
+  pending: { label: 'Väntar',   color: 'text-amber-300',  bg: 'bg-amber-500/20' },
+  sent:    { label: 'Skickade', color: 'text-sky-300',    bg: 'bg-sky-500/20' },
+  paid:    { label: 'Betalda',  color: 'text-[#20c58f]',  bg: 'bg-[#20c58f]/20' },
 }
 
 const InvoicePipelineFunnel: React.FC = () => {
