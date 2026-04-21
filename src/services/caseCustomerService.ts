@@ -102,7 +102,7 @@ export class CaseCustomerService {
         customer_number: customerNumber,
         is_active: true,
         billing_active: false,
-        source_type: 'case',
+        source_type: 'manual',
       })
       .select('id')
       .single()
