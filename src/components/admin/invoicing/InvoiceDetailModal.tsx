@@ -352,6 +352,8 @@ export default function InvoiceDetailModal({
 
   const isOverdue = invoice ? isInvoiceOverdue(invoice.due_date, invoice.status) : false
   const statusConfig = invoice ? INVOICE_STATUS_CONFIG[invoice.status] : null
+  // Privat = visa pris inkl. moms i UI. Företag/avtal = exkl. moms. (Lagring/Fortnox påverkas inte.)
+  const isPrivate = invoice?.case_type === 'private'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -507,7 +509,7 @@ export default function InvoiceDetailModal({
                             </td>
                             <td className="px-3 py-2 text-right text-sm text-slate-300">{item.quantity}</td>
                             <td className="px-3 py-2 text-right text-sm text-slate-300">
-                              {formatInvoiceAmount(item.unit_price)}
+                              {formatInvoiceAmount(isPrivate ? item.unit_price * (1 + item.vat_rate / 100) : item.unit_price)}
                             </td>
                             <td className="px-3 py-2 text-right text-sm">
                               {item.discount_percent > 0 ? (
@@ -520,7 +522,7 @@ export default function InvoiceDetailModal({
                               {item.vat_rate}%
                             </td>
                             <td className="px-3 py-2 text-right text-sm text-white font-medium">
-                              {formatInvoiceAmount(item.total_price)}
+                              {formatInvoiceAmount(isPrivate ? item.total_price * (1 + item.vat_rate / 100) : item.total_price)}
                             </td>
                           </tr>
                         ))}
@@ -536,16 +538,20 @@ export default function InvoiceDetailModal({
                       sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type), 0)
                     return (
                       <div className="space-y-1.5">
-                        <div className="flex justify-between text-sm text-slate-400">
-                          <span>Summa exkl. moms</span>
-                          <span className="text-white">{formatInvoiceAmount(invoice.subtotal)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm text-slate-400">
-                          <span>Moms</span>
-                          <span className="text-white">{formatInvoiceAmount(invoice.vat_amount)}</span>
-                        </div>
-                        <div className="pt-2 border-t border-slate-700 flex justify-between items-baseline">
-                          <span className="text-sm font-semibold text-white">Totalt</span>
+                        {!isPrivate && (
+                          <>
+                            <div className="flex justify-between text-sm text-slate-400">
+                              <span>Summa exkl. moms</span>
+                              <span className="text-white">{formatInvoiceAmount(invoice.subtotal)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-slate-400">
+                              <span>Moms</span>
+                              <span className="text-white">{formatInvoiceAmount(invoice.vat_amount)}</span>
+                            </div>
+                          </>
+                        )}
+                        <div className={`${!isPrivate ? 'pt-2 border-t border-slate-700 ' : ''}flex justify-between items-baseline`}>
+                          <span className="text-sm font-semibold text-white">Totalt{isPrivate ? ' (inkl. moms)' : ''}</span>
                           <span className="text-xl font-bold text-emerald-400">
                             {formatInvoiceAmount(invoice.total_amount)}
                           </span>
@@ -590,9 +596,9 @@ export default function InvoiceDetailModal({
                     }
                   }
 
-                  // Räkna total kostnad & total marginal
+                  // Räkna total kostnad & total marginal (privat: mot inkl. för att matcha visade siffror)
                   const totalCost = articleItems.reduce((sum, a) => sum + a.total_price, 0)
-                  const totalRevenue = invoice.subtotal
+                  const totalRevenue = isPrivate ? invoice.total_amount : invoice.subtotal
                   const totalMargin = calculateMarginPercent(totalRevenue, totalCost)
 
                   return (
@@ -618,7 +624,9 @@ export default function InvoiceDetailModal({
                           const svcId = serviceRow.case_billing_item_id!
                           const mappedArticles = articlesByService.get(svcId) || []
                           const svcCost = mappedArticles.reduce((sum, a) => sum + a.total_price, 0)
-                          const svcRevenue = serviceRow.total_price
+                          const svcRevenue = isPrivate
+                            ? serviceRow.total_price * (1 + serviceRow.vat_rate / 100)
+                            : serviceRow.total_price
                           const svcMargin = calculateMarginPercent(svcRevenue, svcCost)
                           const isExpanded = expandedServices.has(svcId)
 

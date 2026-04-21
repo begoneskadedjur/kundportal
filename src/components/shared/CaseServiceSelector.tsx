@@ -283,10 +283,17 @@ export default function CaseServiceSelector({
   const serviceItems = allItems.filter(i => i.item_type === 'service')
   const articleItems = allItems.filter(i => i.item_type === 'article')
 
-  // Marginalberäkning (globala inställningar)
+  // Privat = pris inkl. moms i UI. Företag/avtal = exkl. moms.
+  const VAT_RATE = 0.25
+  const isPrivate = caseType === 'private'
+  const priceMultiplier = isPrivate ? 1 + VAT_RATE : 1
+  const priceLabel = isPrivate ? 'Inkl. moms' : 'Exkl. moms'
+
+  // Marginalberäkning (globala inställningar) – för privat räknas mot inkl. så att intäkt/kostnad/marginal matchar visade siffror
   const serviceCost = serviceItems.reduce((s, i) => s + i.total_price, 0)
   const purchaseCost = articleItems.reduce((s, i) => s + i.total_price, 0)
-  const marginPercent = serviceCost > 0 ? calculateMarginPercent(serviceCost, purchaseCost) : null
+  const serviceRevenueDisplayed = serviceCost * priceMultiplier
+  const marginPercent = serviceRevenueDisplayed > 0 ? calculateMarginPercent(serviceRevenueDisplayed, purchaseCost) : null
   const marginOk = marginPercent === null || marginPercent >= pricingSettings.min_margin_percent
 
   const getMarginColor = () => {
@@ -534,11 +541,13 @@ export default function CaseServiceSelector({
     if (!caseId && !draftMode) return
     const raw = editingPrice[id]
     if (raw === undefined) return
-    const newPrice = parseFloat(raw.replace(',', '.'))
-    if (isNaN(newPrice) || newPrice < 0) {
+    const parsed = parseFloat(raw.replace(',', '.'))
+    if (isNaN(parsed) || parsed < 0) {
       setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
       return
     }
+    // Privat: input är inkl. moms → spara exkl.
+    const newPrice = isPrivate ? parsed / (1 + VAT_RATE) : parsed
     const item = allItems.find(i => i.id === id)
     if (!item) return
     // Skydd: kundprislista-låsta tjänster får inte ändras här
@@ -808,7 +817,8 @@ export default function CaseServiceSelector({
           <div className="space-y-2 mb-2">
             {serviceItems.map(item => {
               const isEditing = editingPrice[item.id] !== undefined
-              const displayPrice = isEditing ? editingPrice[item.id] : String(item.unit_price)
+              const displayUnitPrice = isPrivate ? Math.round(item.unit_price * priceMultiplier) : item.unit_price
+              const displayPrice = isEditing ? editingPrice[item.id] : String(displayUnitPrice)
               const svc = item.service ?? addonServices.find(s => s.id === item.service_id) ?? null
               const showRotRut =
                 caseType === 'private'
@@ -854,7 +864,7 @@ export default function CaseServiceSelector({
                     {/* Pris */}
                     {readOnly ? (
                       <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-auto">
-                        {formatPrice(item.total_price)}
+                        {formatPrice(item.total_price * priceMultiplier)}
                       </span>
                     ) : hasFixedPrice ? (
                       <div className="flex items-center gap-1 ml-auto">
@@ -862,7 +872,7 @@ export default function CaseServiceSelector({
                           className="w-24 px-2 py-0.5 text-sm text-right bg-[#20c58f]/10 border border-[#20c58f]/30 rounded text-[#20c58f] font-medium cursor-not-allowed"
                           title="Fast pris från kundens prislista – kan inte ändras här"
                         >
-                          {item.unit_price}
+                          {displayUnitPrice}
                         </span>
                         <span className="text-xs text-slate-400">kr/st</span>
                       </div>
@@ -874,7 +884,7 @@ export default function CaseServiceSelector({
                           onChange={e => setEditingPrice(prev => ({ ...prev, [item.id]: e.target.value }))}
                           onFocus={() => {
                             if (editingPrice[item.id] === undefined)
-                              setEditingPrice(prev => ({ ...prev, [item.id]: String(item.unit_price) }))
+                              setEditingPrice(prev => ({ ...prev, [item.id]: String(displayUnitPrice) }))
                           }}
                           onBlur={() => handleServicePriceBlur(item.id)}
                           className="w-24 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
@@ -1007,8 +1017,8 @@ export default function CaseServiceSelector({
         {/* Summa tjänster */}
         {serviceItems.length > 0 && (
           <div className="border-t border-slate-700/50 mt-3 pt-2 flex justify-between text-sm">
-            <span className="text-slate-400">Exkl. moms</span>
-            <span className="font-semibold text-white">{formatPrice(serviceCost)}</span>
+            <span className="text-slate-400">{priceLabel}</span>
+            <span className="font-semibold text-white">{formatPrice(serviceCost * priceMultiplier)}</span>
           </div>
         )}
       </div>
