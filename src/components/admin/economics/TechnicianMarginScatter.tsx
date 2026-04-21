@@ -71,7 +71,7 @@ const TechnicianMarginScatter: React.FC = () => {
                 stroke="#94a3b8"
                 fontSize={11}
                 tickFormatter={(v) => `${Math.round(v)}%`}
-                domain={[(min: number) => Math.min(0, Math.floor(min)), (max: number) => Math.ceil(max + 5)]}
+                domain={['auto', 'auto']}
               />
               <ZAxis type="number" dataKey="total_revenue" range={[50, 400]} />
               <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3', stroke: '#475569' }} />

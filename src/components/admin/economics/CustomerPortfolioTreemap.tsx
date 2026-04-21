@@ -41,11 +41,22 @@ const CustomTooltip = ({ active, payload }: any) => {
 }
 
 const TreemapContent: React.FC<any> = (props) => {
-  const { x, y, width, height, company_name, annual_value, margin_percent, case_count } = props
-  if (width < 2 || height < 2) return null
-  const fill = case_count > 0 ? colorForMargin(margin_percent) : '#334155'
+  const { x, y, width, height, depth, company_name, annual_value, margin_percent, case_count } = props
+  // Treemap rendrerar rot-noden (depth 0) och sedan leaf-noder. Rot saknar vår data — hoppa över.
+  if (depth === 0) return null
+  if (typeof width !== 'number' || typeof height !== 'number' || width < 2 || height < 2) return null
+
+  const name = typeof company_name === 'string' ? company_name : ''
+  const safeMargin = typeof margin_percent === 'number' ? margin_percent : null
+  const safeCaseCount = typeof case_count === 'number' ? case_count : 0
+  const safeArr = typeof annual_value === 'number' ? annual_value : 0
+
+  const fill = safeCaseCount > 0 ? colorForMargin(safeMargin) : '#334155'
   const showLabel = width > 80 && height > 40
   const showValue = width > 100 && height > 60
+  const maxChars = Math.max(1, Math.floor(width / 7))
+  const displayName = name.length > maxChars ? name.slice(0, maxChars) + '…' : name
+
   return (
     <g>
       <rect
@@ -60,7 +71,7 @@ const TreemapContent: React.FC<any> = (props) => {
           strokeOpacity: 1,
         }}
       />
-      {showLabel && (
+      {showLabel && name && (
         <text
           x={x + 8}
           y={y + 18}
@@ -69,7 +80,7 @@ const TreemapContent: React.FC<any> = (props) => {
           fontWeight={600}
           style={{ pointerEvents: 'none' }}
         >
-          {company_name.length > Math.floor(width / 7) ? company_name.slice(0, Math.floor(width / 7)) + '…' : company_name}
+          {displayName}
         </text>
       )}
       {showValue && (
@@ -80,7 +91,7 @@ const TreemapContent: React.FC<any> = (props) => {
           fontSize={10}
           style={{ pointerEvents: 'none' }}
         >
-          {formatCurrency(annual_value)}
+          {formatCurrency(safeArr)}
         </text>
       )}
     </g>
