@@ -258,12 +258,26 @@ export const getServiceMarginRanking = async (
   startDate: string,
   endDate: string
 ): Promise<ServiceMarginRow[]> => {
+  // Hämta completed_date från alla tre case-tabellerna (cases/private_cases/business_cases)
+  // eftersom case_billing_items.case_id saknar FK och kan peka mot vilken som helst
+  const [legacyRes, privateRes, businessRes] = await Promise.all([
+    supabase.from('cases').select('id, completed_date').gte('completed_date', startDate).lte('completed_date', endDate).not('completed_date', 'is', null),
+    supabase.from('private_cases').select('id, completed_date').gte('completed_date', startDate).lte('completed_date', endDate).not('completed_date', 'is', null),
+    supabase.from('business_cases').select('id, completed_date').gte('completed_date', startDate).lte('completed_date', endDate).not('completed_date', 'is', null),
+  ])
+
+  const validCaseIds = new Set<string>([
+    ...(legacyRes.data || []).map((c: any) => c.id),
+    ...(privateRes.data || []).map((c: any) => c.id),
+    ...(businessRes.data || []).map((c: any) => c.id),
+  ])
+
+  if (validCaseIds.size === 0) return []
+
   const { data: items } = await supabase
     .from('case_billing_items')
-    .select('case_id, item_type, total_price, quantity, article_id, service_id, mapped_service_id, cases!inner(completed_date)')
-    .gte('cases.completed_date', startDate)
-    .lte('cases.completed_date', endDate)
-    .not('cases.completed_date', 'is', null)
+    .select('case_id, item_type, total_price, quantity, article_id, service_id, mapped_service_id')
+    .in('case_id', Array.from(validCaseIds))
     .neq('status', 'cancelled')
 
   if (!items || items.length === 0) return []
