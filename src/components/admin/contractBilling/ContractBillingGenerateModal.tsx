@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, Zap, Calendar, Users, Loader2, AlertTriangle } from 'lucide-react'
+import { X, FileText, Calendar, Users, Loader2, AlertTriangle } from 'lucide-react'
 import {
   BillingFrequency,
   BILLING_FREQUENCY_CONFIG,
@@ -90,7 +90,7 @@ export function ContractBillingGenerateModal({
         <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-              <Zap className="w-5 h-5 text-emerald-400" />
+              <FileText className="w-5 h-5 text-emerald-400" />
             </div>
             <h2 className="text-xl font-semibold text-white">Generera fakturering</h2>
           </div>
@@ -200,7 +200,7 @@ export function ContractBillingGenerateModal({
               </>
             ) : (
               <>
-                <Zap className="w-4 h-4" />
+                <FileText className="w-4 h-4" />
                 Generera fakturering
               </>
             )}

@@ -18,7 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   BookCheck,
-  Zap
+  FileEdit
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Select from '../../../components/ui/Select'
@@ -406,7 +406,7 @@ export default function PrivateBusinessInvoicing() {
                               className="p-1 text-orange-400 hover:bg-orange-500/20 rounded"
                               title="Skapa utkast i Fortnox"
                             >
-                              <Zap className="w-4 h-4" />
+                              <FileEdit className="w-4 h-4" />
                             </button>
                           )}
                           {invoice.status === 'draft' && (

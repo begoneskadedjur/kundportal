@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   X, FileText, XCircle, Download,
-  RefreshCw, AlertCircle, Zap, Building2, ExternalLink,
+  RefreshCw, AlertCircle, FileEdit, Building2, ExternalLink,
   BookCheck, Send, DollarSign
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -419,7 +419,7 @@ export function ContractInvoiceModal({
                 disabled={generating}
                 className="flex items-center gap-2 px-5 py-2.5 bg-[#20c58f] hover:bg-[#1bb07e] text-white rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
               >
-                {generating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                {generating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                 {generating ? 'Genererar...' : 'Generera fakturarader'}
               </button>
             </div>
@@ -711,7 +711,7 @@ export function ContractInvoiceModal({
                 >
                   {sendingToFortnox
                     ? <RefreshCw className="w-4 h-4 animate-spin" />
-                    : <Zap className="w-4 h-4" />}
+                    : <FileEdit className="w-4 h-4" />}
                   {sendingToFortnox ? 'Skapar utkast...' : invoice.derived_status === 'draft' ? 'Skapa nytt utkast' : 'Skapa utkast i Fortnox'}
                 </button>
               )}
