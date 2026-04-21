@@ -411,6 +411,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [commissionDeductions, setCommissionDeductions] = useState(0)
   const [commissionNotes, setCommissionNotes] = useState('')
   const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
+  const [commissionPostsLocked, setCommissionPostsLocked] = useState(false)
 
   // Vald tjänsteartikel (för CasePreparationsSection)
   const [serviceArticle, setServiceArticle] = useState<Service | null>(null)
@@ -812,10 +813,28 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         setCommissionShares([]);
         setCommissionDeductions(0);
         setCommissionNotes('');
-        // Kolla om provisionsposter redan finns
+        // Kolla om provisionsposter redan finns — och om någon är "låst" (inte längre
+        // pending_invoice, dvs. på väg till eller redan utbetald).
         ProvisionService.getPostsByCase(caseData.id)
-          .then(posts => setExistingCommissionPosts(posts.length))
-          .catch(() => setExistingCommissionPosts(0));
+          .then(posts => {
+            setExistingCommissionPosts(posts.length);
+            setCommissionPostsLocked(posts.some(p => p.status !== 'pending_invoice'));
+            // Förfyll shares/deductions från befintliga poster så användaren ser vad som är satt
+            if (posts.length > 0) {
+              setCommissionShares(posts.map(p => ({
+                technician_id: p.technician_id,
+                technician_name: p.technician_name,
+                technician_email: p.technician_email || undefined,
+                share_percentage: p.share_percentage,
+              })));
+              setCommissionDeductions(posts[0].deductions || 0);
+              setCommissionNotes(posts[0].notes || '');
+            }
+          })
+          .catch(() => {
+            setExistingCommissionPosts(0);
+            setCommissionPostsLocked(false);
+          });
       }
     }
   }, [caseData]);
@@ -946,13 +965,20 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       onSuccess(updatedCaseFromDb);
 
       // ═══════════════════════════════════════════════════════════════════════════
-      // AUTO-FAKTURERING: Generera faktura om ärendet avslutas med billing items
+      // AUTO-FAKTURERING: Generera/uppdatera faktura när ärendet sparas som "Avslutat"
+      //
+      // Kör både vid övergång till Avslutat och vid efterföljande sparningar så att
+      // pris-/prov-uppdateringar slår igenom. upsertInvoiceFromCase raderar och
+      // återskapar en oskickad faktura — låsta fakturor (sent/booked/paid/med
+      // Fortnox-nummer) rörs inte och ett felmeddelande visas istället.
       // ═══════════════════════════════════════════════════════════════════════════
       let invoiceGenerated = false;
-      if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
+      let invoiceUpdated = false;
+      if (formData.status === 'Avslutat') {
         // Endast för private och business cases (inte contract)
         if (tableName === 'private_cases' || tableName === 'business_cases') {
           const billingCaseType = tableName === 'private_cases' ? 'private' : 'business';
+          const wasAlreadyClosed = currentCase.status === 'Avslutat';
 
           try {
             // Kontrollera om det finns billing items
@@ -962,8 +988,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             );
 
             if (hasBillingItems) {
-              // Generera faktura automatiskt
-              await InvoiceService.createInvoiceFromCase(
+              // upsert: skapa ny eller ersätt oskickad
+              await InvoiceService.upsertInvoiceFromCase(
                 currentCase.id,
                 billingCaseType,
                 {
@@ -983,28 +1009,40 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     : undefined
                 }
               );
-              invoiceGenerated = true;
-              console.log('[EditCaseModal] Faktura genererad för ärendet');
+              if (wasAlreadyClosed) {
+                invoiceUpdated = true;
+                console.log('[EditCaseModal] Faktura uppdaterad för ärendet');
+              } else {
+                invoiceGenerated = true;
+                console.log('[EditCaseModal] Faktura genererad för ärendet');
+              }
             }
           } catch (invoiceError: any) {
             // Ärendet är redan sparat, så detta är bara en varning
-            console.warn('[EditCaseModal] Kunde inte generera faktura:', invoiceError);
-            toast.error(`Faktura kunde inte genereras: ${invoiceError.message}`);
+            console.warn('[EditCaseModal] Kunde inte generera/uppdatera faktura:', invoiceError);
+            toast.error(`Faktura: ${invoiceError.message}`);
           }
         }
       }
 
       // ═══════════════════════════════════════════════════════════════════════════
-      // PROVISION: Skapa provisionsposter om ärendet avslutas och är provisionsgrundande
+      // PROVISION: Skapa/uppdatera provisionsposter när ärendet sparas som "Avslutat"
+      //
+      // Kör både vid övergång och vid efterföljande sparningar. upsertPostsForCase
+      // raderar och återskapar poster med status 'pending_invoice' — poster som
+      // redan är på väg till utbetalning (ready_for_payout/approved/paid_out) rörs
+      // inte och användaren får ett felmeddelande.
       // ═══════════════════════════════════════════════════════════════════════════
       let commissionCreated = false;
-      if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
-        if (commissionEligible && commissionShares.length > 0 && existingCommissionPosts === 0) {
+      let commissionUpdated = false;
+      if (formData.status === 'Avslutat') {
+        if (commissionEligible && commissionShares.length > 0) {
+          const wasAlreadyClosed = currentCase.status === 'Avslutat';
           try {
             const casePrice = billingSummary?.subtotal || Number(formData.case_price) || 0;
             const isRotRut = !!(formData.r_rot_rut && formData.r_rot_rut !== 'Nej');
             // Vid ROT/RUT: provision på belopp innan avdrag (= case_price)
-            await ProvisionService.createPostsForCase(
+            await ProvisionService.upsertPostsForCase(
               {
                 case_id: currentCase.id,
                 case_type: currentCase.case_type as 'private' | 'business' | 'contract',
@@ -1018,9 +1056,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               commissionDeductions,
               commissionNotes || undefined
             );
-            commissionCreated = true;
+            if (wasAlreadyClosed && existingCommissionPosts > 0) {
+              commissionUpdated = true;
+            } else {
+              commissionCreated = true;
+            }
           } catch (commErr: any) {
-            console.warn('[EditCaseModal] Provision kunde inte skapas:', commErr);
+            console.warn('[EditCaseModal] Provision kunde inte skapas/uppdateras:', commErr);
             toast.error(`Provision: ${commErr.message}`);
           }
         }
@@ -1035,6 +1077,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         toast.success('Ärendet avslutat och faktura genererad!');
       } else if (commissionCreated) {
         toast.success('Ärendet avslutat och provision skapad!');
+      } else if (invoiceUpdated && commissionUpdated) {
+        toast.success('Ärendet sparat — faktura och provision uppdaterade med nya siffror.');
+      } else if (invoiceUpdated) {
+        toast.success('Ärendet sparat — fakturan uppdaterad med nya siffror.');
+      } else if (commissionUpdated) {
+        toast.success('Ärendet sparat — provisionen uppdaterad med nya siffror.');
       } else {
         toast.success('Ärendet har uppdaterats!');
       }
@@ -1748,6 +1796,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   isRotRut={!!(formData.r_rot_rut && formData.r_rot_rut !== 'Nej')}
                   rotRutOriginalAmount={formData.r_rot_rut && formData.r_rot_rut !== 'Nej' ? (billingSummary?.subtotal || Number(formData.case_price) || 0) : undefined}
                   existingPostCount={existingCommissionPosts}
+                  postsLocked={commissionPostsLocked}
                   subcontractorDeduction={billingSummary?.subcontractor_total || 0}
                 />
               </div>

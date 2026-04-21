@@ -117,7 +117,7 @@ export class ProvisionService {
       throw new Error(`Beloppet ${effectiveBase} kr understiger minsta provisionsgrundande belopp (${settings.min_commission_base} kr exkl moms)`)
     }
 
-    // Kontrollera att poster inte redan finns
+    // Kontrollera att poster inte redan finns (använd upsertPostsForCase för re-create-flödet)
     const existing = await this.getPostsByCase(caseData.case_id)
     if (existing.length > 0) {
       throw new Error('Provisionsposter finns redan för detta ärende')
@@ -161,6 +161,39 @@ export class ProvisionService {
 
     if (error) throw error
     return data as CommissionPost[]
+  }
+
+  // ─── Upsert: ersätt befintliga poster om de fortfarande är "pending_invoice" ─
+  //
+  // Används när ett avslutat ärende sparas igen med ändrat pris. Om provisionsposter
+  // redan finns för ärendet:
+  //   - Alla i status 'pending_invoice' (default) → radera och skapa nya med nytt belopp.
+  //   - Någon har "låst" status (ready_for_payout/approved/paid_out) → kasta fel,
+  //     eftersom provisionen är på väg till eller redan utbetald.
+
+  static async upsertPostsForCase(
+    caseData: Parameters<typeof ProvisionService.createPostsForCase>[0],
+    technicianShares: TechnicianShare[],
+    deductions: number = 0,
+    notes?: string
+  ): Promise<CommissionPost[]> {
+    const existing = await this.getPostsByCase(caseData.case_id)
+
+    if (existing.length > 0) {
+      const locked = existing.filter(p => p.status !== 'pending_invoice')
+      if (locked.length > 0) {
+        throw new Error(
+          `Provisionen för ärendet är redan på väg till utbetalning (status: ${locked[0].status}) och kan inte räknas om.`
+        )
+      }
+      const { error: deleteError } = await supabase
+        .from('commission_posts')
+        .delete()
+        .in('id', existing.map(p => p.id))
+      if (deleteError) throw deleteError
+    }
+
+    return this.createPostsForCase(caseData, technicianShares, deductions, notes)
   }
 
   // ─── Hämta poster ────────────────────────────────────────

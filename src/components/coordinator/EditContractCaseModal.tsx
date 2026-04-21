@@ -193,6 +193,7 @@ export default function EditContractCaseModal({
   const [commissionDeductions, setCommissionDeductions] = useState(0)
   const [commissionNotes, setCommissionNotes] = useState('')
   const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
+  const [commissionPostsLocked, setCommissionPostsLocked] = useState(false)
 
   // Auto-sätt avdrag från underleverantörsartiklar
   useEffect(() => {
@@ -383,8 +384,14 @@ export default function EditContractCaseModal({
       setCommissionDeductions(0)
       setCommissionNotes('')
       ProvisionService.getPostsByCase(caseData.id)
-        .then(posts => setExistingCommissionPosts(posts.length))
-        .catch(() => setExistingCommissionPosts(0))
+        .then(posts => {
+          setExistingCommissionPosts(posts.length)
+          setCommissionPostsLocked(posts.some(p => p.status !== 'pending_invoice'))
+        })
+        .catch(() => {
+          setExistingCommissionPosts(0)
+          setCommissionPostsLocked(false)
+        })
     }
   }, [caseData, isOpen])
 
@@ -1878,6 +1885,7 @@ export default function EditContractCaseModal({
                     onNotesChange={setCommissionNotes}
                     baseAmount={billingSummary?.subtotal || Number(formData.price) || 0}
                     existingPostCount={existingCommissionPosts}
+                    postsLocked={commissionPostsLocked}
                     subcontractorDeduction={billingSummary?.subcontractor_total || 0}
                   />
                 </div>

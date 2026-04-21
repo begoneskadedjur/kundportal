@@ -225,6 +225,65 @@ export class InvoiceService {
   }
 
   /**
+   * Upsert-varianten: skapa faktura för ärende, eller ersätt befintlig oskickad faktura.
+   *
+   * - Om ingen faktura finns → skapa ny (samma som createInvoiceFromCase).
+   * - Om faktura finns med status draft/pending_approval/ready OCH ingen fortnox_document_number
+   *   → radera den (CASCADE tar invoice_items) och skapa ny med uppdaterade priser.
+   * - Om faktura är låst (sent/booked/paid/cancelled) eller redan exporterad till Fortnox
+   *   → kastar fel (kan inte skriva över en redan skickad faktura).
+   *
+   * Används när ett ärende redan är avslutat men sparas igen med ändrade priser.
+   */
+  static async upsertInvoiceFromCase(
+    caseId: string,
+    caseType: 'private' | 'business',
+    customerInfo: {
+      name: string
+      email?: string
+      phone?: string
+      address?: string
+      organization_number?: string
+      invoice_marking?: string
+    }
+  ): Promise<InvoiceWithItems> {
+    const { data: existing, error: fetchError } = await supabase
+      .from('invoices')
+      .select('id, status, fortnox_document_number')
+      .eq('case_id', caseId)
+      .eq('case_type', caseType)
+      .neq('status', 'cancelled')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (fetchError) throw new Error(`Databasfel: ${fetchError.message}`)
+
+    if (existing) {
+      const replaceable: InvoiceStatus[] = ['draft', 'pending_approval', 'ready']
+      const canReplace =
+        replaceable.includes(existing.status as InvoiceStatus) &&
+        !existing.fortnox_document_number
+
+      if (!canReplace) {
+        throw new Error(
+          `Fakturan för ärendet är redan skickad/låst (status: ${existing.status}) och kan inte uppdateras. ` +
+          `Makulera fakturan först om den ska göras om.`
+        )
+      }
+
+      // Radera befintlig — invoice_items cascade:ar bort via FK
+      const { error: deleteError } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', existing.id)
+      if (deleteError) throw new Error(`Databasfel: ${deleteError.message}`)
+    }
+
+    return this.createInvoiceFromCase(caseId, caseType, customerInfo)
+  }
+
+  /**
    * Hämta fakturor med filter
    */
   static async getInvoices(filters?: InvoiceFilters): Promise<Invoice[]> {

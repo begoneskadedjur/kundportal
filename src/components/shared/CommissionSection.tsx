@@ -31,6 +31,9 @@ interface CommissionSectionProps {
   rotRutOriginalAmount?: number
   // Visa om poster redan finns
   existingPostCount?: number
+  // Om någon befintlig post är "låst" (ready_for_payout/approved/paid_out) — då får inget ändras.
+  // Om alla poster är 'pending_invoice' tillåter vi redigering (sparning räknar om dem via upsert).
+  postsLocked?: boolean
   // Automatiskt avdrag från underentreprenörsartiklar
   subcontractorDeduction?: number
 }
@@ -49,6 +52,7 @@ export default function CommissionSection({
   isRotRut,
   rotRutOriginalAmount,
   existingPostCount = 0,
+  postsLocked = false,
   subcontractorDeduction = 0
 }: CommissionSectionProps) {
   const [settings, setSettings] = useState<CommissionSettings | null>(null)
@@ -115,6 +119,9 @@ export default function CommissionSection({
         <div className="mb-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
           <p className="text-xs text-blue-400">
             {existingPostCount} provisionspost(er) redan skapade för detta ärende.
+            {postsLocked
+              ? ' Posterna är på väg till utbetalning och kan inte ändras.'
+              : ' Sparar du ärendet räknas provisionen om med aktuella siffror.'}
           </p>
         </div>
       )}
@@ -128,7 +135,7 @@ export default function CommissionSection({
             checked={isEligible}
             onChange={() => onEligibleChange(true)}
             className="text-[#20c58f] focus:ring-[#20c58f]"
-            disabled={existingPostCount > 0}
+            disabled={postsLocked}
           />
           <span className="text-sm text-slate-300">Ja, provisionsgrundande</span>
         </label>
@@ -139,7 +146,7 @@ export default function CommissionSection({
             checked={!isEligible}
             onChange={() => onEligibleChange(false)}
             className="text-slate-500 focus:ring-slate-500"
-            disabled={existingPostCount > 0}
+            disabled={postsLocked}
           />
           <span className="text-sm text-slate-300">Nej</span>
         </label>
@@ -219,7 +226,7 @@ export default function CommissionSection({
                         onSharesChange(newShares)
                       }}
                       className="w-16 px-2 py-1 text-sm text-right bg-slate-800 border border-slate-600 rounded text-slate-200 focus:ring-[#20c58f] focus:border-[#20c58f]"
-                      disabled={existingPostCount > 0}
+                      disabled={postsLocked}
                     />
                     <span className="text-xs text-slate-400">%</span>
                   </div>
@@ -259,7 +266,7 @@ export default function CommissionSection({
                 onChange={(e) => onDeductionsChange(Number(e.target.value) || 0)}
                 placeholder="0"
                 className="w-32 px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-slate-200 focus:ring-[#20c58f] focus:border-[#20c58f]"
-                disabled={existingPostCount > 0}
+                disabled={postsLocked}
               />
               <span className="text-xs text-slate-400">kr</span>
             </div>
@@ -281,7 +288,7 @@ export default function CommissionSection({
               placeholder="T.ex. fördelning, godkännande, specialfall..."
               rows={2}
               className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-slate-200 placeholder-slate-500 focus:ring-[#20c58f] focus:border-[#20c58f] resize-none"
-              disabled={existingPostCount > 0}
+              disabled={postsLocked}
             />
           </div>
 
