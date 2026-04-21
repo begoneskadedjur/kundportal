@@ -653,21 +653,21 @@ export const getTechnicianMarginScatter = async (
 export const getTechnicianCommissionTrend = async (
   months: number = 12
 ): Promise<{ data: TechnicianCommissionTrendRow[]; technicians: string[] }> => {
+  const since = startOfMonthISO(months)
   const keys = monthsBackFrom(months)
-  const earliest = keys[0]
 
   // Auktoritativ källa: commission_posts (samma som /admin/provisioner).
-  // Gruppering sker på payout_month, inte completed_date. Provisioner som väntar
-  // på att kundens faktura ska betalas (status 'pending_invoice') exkluderas.
+  // Provisioner's månadsväljare grupperar på created_at och visar alla statusar
+  // utom 'cancelled' — vi speglar det för att siffrorna ska matcha.
   const { data, error } = await supabase
     .from('commission_posts')
-    .select('payout_month, technician_name, commission_amount, status')
-    .gte('payout_month', earliest)
-    .in('status', ['ready_for_payout', 'approved', 'paid_out'])
+    .select('created_at, technician_name, commission_amount, status')
+    .gte('created_at', since)
+    .neq('status', 'cancelled')
 
   if (error) throw error
   const posts = (data || []) as Array<{
-    payout_month: string
+    created_at: string
     technician_name: string
     commission_amount: number | null
   }>
@@ -677,8 +677,9 @@ export const getTechnicianCommissionTrend = async (
   const techSet = new Set<string>()
 
   posts.forEach(p => {
-    if (!p.payout_month || !p.technician_name) return
-    const mm = byMonth.get(p.payout_month)
+    if (!p.created_at || !p.technician_name) return
+    const key = p.created_at.slice(0, 7)
+    const mm = byMonth.get(key)
     if (!mm) return
     techSet.add(p.technician_name)
     mm.set(p.technician_name, (mm.get(p.technician_name) || 0) + Number(p.commission_amount || 0))
