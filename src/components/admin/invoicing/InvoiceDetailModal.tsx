@@ -267,6 +267,15 @@ export default function InvoiceDetailModal({
         }))
       )
 
+      // 2c. Hämta ärende-metadata för berikning av Fortnox-payloaden
+      // (leveransdatum, teknikerns namn, ärendenummer för spårbarhet)
+      const caseTable = invoice.case_type === 'private' ? 'private_cases' : 'business_cases'
+      const { data: caseMeta } = await supabase
+        .from(caseTable)
+        .select('case_number, completed_date, start_date, primary_assignee_name')
+        .eq('id', invoice.case_id)
+        .maybeSingle()
+
       // 3. Bygg fakturarader
       const invoiceRows = invoice.items.map(item => ({
         ArticleNumber: item.article_code || undefined,
@@ -282,6 +291,12 @@ export default function InvoiceDetailModal({
       const dueDate = invoice.due_date || new Date(new Date(today).getTime() + 30 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0]
 
+      // Leveransdatum: när jobbet utfördes (completed_date primärt, start_date fallback)
+      const deliveryDateRaw = (caseMeta as any)?.completed_date || (caseMeta as any)?.start_date
+      const deliveryDate = deliveryDateRaw
+        ? new Date(deliveryDateRaw).toISOString().split('T')[0]
+        : undefined
+
       const fortnoxPayload: Record<string, unknown> = {
         CustomerNumber: fortnoxCustomerNumber,
         InvoiceDate: today,
@@ -289,6 +304,16 @@ export default function InvoiceDetailModal({
         InvoiceRows: invoiceRows,
       }
 
+      if (deliveryDate) fortnoxPayload.DeliveryDate = deliveryDate
+      if ((caseMeta as any)?.primary_assignee_name) {
+        fortnoxPayload.OurReference = (caseMeta as any).primary_assignee_name
+      }
+      if ((caseMeta as any)?.case_number) {
+        fortnoxPayload.ExternalInvoiceReference1 = (caseMeta as any).case_number
+      }
+      if (invoice.invoice_number) {
+        fortnoxPayload.ExternalInvoiceReference2 = invoice.invoice_number
+      }
       if (invoice.invoice_marking) fortnoxPayload.YourReference = invoice.invoice_marking
       if (invoice.notes) fortnoxPayload.Remarks = invoice.notes
 
