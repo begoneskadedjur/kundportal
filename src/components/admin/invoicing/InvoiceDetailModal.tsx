@@ -596,9 +596,9 @@ export default function InvoiceDetailModal({
                     }
                   }
 
-                  // Räkna total kostnad & total marginal (privat: mot inkl. för att matcha visade siffror)
+                  // Räkna total kostnad & total marginal — ALLTID på exkl.-basen (momsen är aldrig bolagets intäkt).
                   const totalCost = articleItems.reduce((sum, a) => sum + a.total_price, 0)
-                  const totalRevenue = isPrivate ? invoice.total_amount : invoice.subtotal
+                  const totalRevenue = invoice.subtotal
                   const totalMargin = calculateMarginPercent(totalRevenue, totalCost)
 
                   return (
@@ -624,9 +624,8 @@ export default function InvoiceDetailModal({
                           const svcId = serviceRow.case_billing_item_id!
                           const mappedArticles = articlesByService.get(svcId) || []
                           const svcCost = mappedArticles.reduce((sum, a) => sum + a.total_price, 0)
-                          const svcRevenue = isPrivate
-                            ? serviceRow.total_price * (1 + serviceRow.vat_rate / 100)
-                            : serviceRow.total_price
+                          // Marginal räknas på exkl.-basen — total_price är redan exkl. för alla ärendetyper.
+                          const svcRevenue = serviceRow.total_price
                           const svcMargin = calculateMarginPercent(svcRevenue, svcCost)
                           const isExpanded = expandedServices.has(svcId)
 

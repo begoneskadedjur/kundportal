@@ -276,8 +276,11 @@ export default function PriceCalculatorPanel({
                             // Vid fast pris: marginal räknas på kundens faktiska pris (unit_price × qty)
                             const fixedPriceExkl = si.unit_price * si.quantity
                             const fixedPriceDisplay = Math.round(fixedPriceExkl * priceMultiplier)
-                            const priceForMargin = fixed ? fixedPriceExkl * priceMultiplier : suggestedPriceExkl * priceMultiplier
-                            const margin = priceForMargin > 0 && cost > 0 ? calculateMarginPercent(priceForMargin, cost) : 0
+                            // Marginal räknas ALLTID på exkl.-basen — momsen är aldrig bolagets intäkt.
+                            // För privat: pris exkl. = pris_inkl. / 1,25. Detta ger samma marginal som
+                            // för företag vid samma inkl.-pris (och korrekt ekonomisk definition).
+                            const priceExklForMargin = fixed ? fixedPriceExkl : suggestedPriceExkl
+                            const margin = priceExklForMargin > 0 && cost > 0 ? calculateMarginPercent(priceExklForMargin, cost) : 0
 
                             return (
                               <div key={si.id} className={`p-3 rounded-xl border ${fixed ? 'bg-[#20c58f]/5 border-[#20c58f]/30' : hasArticles ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-800/10 border-slate-700/30'}`}>

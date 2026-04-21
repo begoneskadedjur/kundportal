@@ -289,11 +289,11 @@ export default function CaseServiceSelector({
   const priceMultiplier = isPrivate ? 1 + VAT_RATE : 1
   const priceLabel = isPrivate ? 'Inkl. moms' : 'Exkl. moms'
 
-  // Marginalberäkning (globala inställningar) – för privat räknas mot inkl. så att intäkt/kostnad/marginal matchar visade siffror
+  // Marginalberäkning — räknas ALLTID på exkl.-basen (momsen är aldrig bolagets intäkt).
+  // serviceCost = summa av item.total_price som redan är exkl. i DB, så samma formel funkar för privat + företag.
   const serviceCost = serviceItems.reduce((s, i) => s + i.total_price, 0)
   const purchaseCost = articleItems.reduce((s, i) => s + i.total_price, 0)
-  const serviceRevenueDisplayed = serviceCost * priceMultiplier
-  const marginPercent = serviceRevenueDisplayed > 0 ? calculateMarginPercent(serviceRevenueDisplayed, purchaseCost) : null
+  const marginPercent = serviceCost > 0 ? calculateMarginPercent(serviceCost, purchaseCost) : null
   const marginOk = marginPercent === null || marginPercent >= pricingSettings.min_margin_percent
 
   const getMarginColor = () => {
