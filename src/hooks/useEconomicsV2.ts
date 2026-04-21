@@ -24,6 +24,7 @@ import {
   type CustomerPortfolioRow,
   type TechnicianScatterPoint,
   type TechnicianCommissionTrendRow,
+  type CommissionStatusBreakdown,
   type ThroughputPoint,
   type SparklineMetric,
 } from '../services/economicsServiceV2'
@@ -73,7 +74,7 @@ export const useTechnicianMarginScatter = (range: { start: string; end: string }
 }
 
 export const useTechnicianCommissionTrend = (months: number = 12) =>
-  useAsync<{ data: TechnicianCommissionTrendRow[]; technicians: string[] }>(
+  useAsync<{ data: TechnicianCommissionTrendRow[]; technicians: string[]; statusBreakdown: CommissionStatusBreakdown }>(
     () => getTechnicianCommissionTrend(months), [months]
   )
 

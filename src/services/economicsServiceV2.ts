@@ -75,6 +75,13 @@ export interface TechnicianCommissionTrendRow {
   [technicianName: string]: string | number
 }
 
+export type CommissionStatus = 'pending_invoice' | 'ready_for_payout' | 'approved' | 'paid_out'
+
+export type CommissionStatusBreakdown = Record<
+  string,                                                // month 'YYYY-MM'
+  Record<string, Partial<Record<CommissionStatus, number>>> // technician → status → amount
+>
+
 export interface ThroughputPoint {
   month: string
   avg_days: number
@@ -652,7 +659,11 @@ export const getTechnicianMarginScatter = async (
 
 export const getTechnicianCommissionTrend = async (
   months: number = 12
-): Promise<{ data: TechnicianCommissionTrendRow[]; technicians: string[] }> => {
+): Promise<{
+  data: TechnicianCommissionTrendRow[]
+  technicians: string[]
+  statusBreakdown: CommissionStatusBreakdown
+}> => {
   const since = startOfMonthISO(months)
   const keys = monthsBackFrom(months)
 
@@ -670,19 +681,28 @@ export const getTechnicianCommissionTrend = async (
     created_at: string
     technician_name: string
     commission_amount: number | null
+    status: CommissionStatus
   }>
 
   const byMonth = new Map<string, Map<string, number>>()
   keys.forEach(k => byMonth.set(k, new Map()))
   const techSet = new Set<string>()
+  const statusBreakdown: CommissionStatusBreakdown = {}
+  keys.forEach(k => { statusBreakdown[k] = {} })
 
   posts.forEach(p => {
     if (!p.created_at || !p.technician_name) return
     const key = p.created_at.slice(0, 7)
     const mm = byMonth.get(key)
     if (!mm) return
+    const amount = Number(p.commission_amount || 0)
     techSet.add(p.technician_name)
-    mm.set(p.technician_name, (mm.get(p.technician_name) || 0) + Number(p.commission_amount || 0))
+    mm.set(p.technician_name, (mm.get(p.technician_name) || 0) + amount)
+
+    const monthBreakdown = statusBreakdown[key]
+    if (!monthBreakdown[p.technician_name]) monthBreakdown[p.technician_name] = {}
+    const techBreakdown = monthBreakdown[p.technician_name]
+    techBreakdown[p.status] = (techBreakdown[p.status] || 0) + amount
   })
 
   const technicians = Array.from(techSet).sort()
@@ -692,7 +712,7 @@ export const getTechnicianCommissionTrend = async (
     technicians.forEach(name => { row[name] = mm.get(name) || 0 })
     return row
   })
-  return { data: result, technicians }
+  return { data: result, technicians, statusBreakdown }
 }
 
 // ---------- 10. Case throughput (avg completion days) ----------
