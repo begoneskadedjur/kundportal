@@ -888,7 +888,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         let createdClickUpCaseId: string | null = null;
 
         if (initialCaseData && initialCaseData.case_type !== 'contract') {
-          const { error } = await supabase.from(tableName).update({ ...formData, title: caseNumber }).eq('id', initialCaseData.id);
+          const { error } = await supabase.from(tableName).update({
+            ...formData,
+            title: caseNumber,
+            service_id: serviceId || null,
+            skadedjur: selectedService?.name || formData.skadedjur || null,
+          }).eq('id', initialCaseData.id);
           if (error) throw error;
           createdClickUpCaseId = initialCaseData.id;
           toast.success(`Ärende ${caseNumber} har bokats in!`);
@@ -897,7 +902,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             ...formData,
             title: caseNumber,
             case_number: caseNumber,
-            status: 'Bokad'
+            status: 'Bokad',
+            service_id: serviceId || null,
+            skadedjur: selectedService?.name || formData.skadedjur || null,
           }]).select('id');
           if (error) throw error;
           createdClickUpCaseId = data?.[0]?.id || null;

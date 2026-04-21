@@ -2,7 +2,9 @@
 // Typer för avtalsfakturering
 
 export type BillingFrequency = 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'on_demand'
-export type ContractBillingItemStatus = 'pending' | 'approved' | 'draft' | 'sent' | 'overdue' | 'invoiced' | 'paid' | 'cancelled'
+// Fortnox-linjerat flöde: pending → approved → draft → booked → sent → (overdue) → (invoiced-legacy) → paid
+// cancelled är terminal. 'invoiced' behålls för bakåtkompatibilitet med äldre rader.
+export type ContractBillingItemStatus = 'pending' | 'approved' | 'draft' | 'booked' | 'sent' | 'overdue' | 'invoiced' | 'paid' | 'cancelled'
 export type ContractBillingBatchStatus = 'draft' | 'generated' | 'approved' | 'completed' | 'cancelled'
 
 /**
@@ -46,6 +48,7 @@ export interface ContractBillingItem {
   discount_percent: number
   original_price: number | null
   fortnox_document_number: string | null
+  booked_at: string | null
   sent_at: string | null
   cancelled_at: string | null
   fortnox_cancelled_document_number: string | null
@@ -165,11 +168,17 @@ export const BILLING_ITEM_STATUS_CONFIG: Record<ContractBillingItemStatus, {
     bgColor: 'bg-orange-500/10',
     borderColor: 'border-orange-500/30'
   },
-  sent: {
-    label: 'Skickad',
+  booked: {
+    label: 'Bokförd',
     color: 'text-blue-400',
     bgColor: 'bg-blue-500/10',
     borderColor: 'border-blue-500/30'
+  },
+  sent: {
+    label: 'Skickad',
+    color: 'text-purple-400',
+    bgColor: 'bg-purple-500/10',
+    borderColor: 'border-purple-500/30'
   },
   overdue: {
     label: 'Förfallen',
@@ -346,7 +355,7 @@ export interface ContractBillingPipelineFilters extends ContractBillingItemFilte
 export function deriveInvoiceStatus(
   items: ContractBillingItem[]
 ): ContractBillingItemStatus {
-  const statusOrder: ContractBillingItemStatus[] = ['pending', 'approved', 'draft', 'sent', 'overdue', 'invoiced', 'paid']
+  const statusOrder: ContractBillingItemStatus[] = ['pending', 'approved', 'draft', 'booked', 'sent', 'overdue', 'invoiced', 'paid']
   const nonCancelled = items.filter(i => i.status !== 'cancelled')
 
   if (nonCancelled.length === 0) return 'cancelled'
@@ -367,6 +376,7 @@ export type MonthlyCustomerStatus =
   | 'pending'
   | 'approved'
   | 'draft'
+  | 'booked'
   | 'sent'
   | 'overdue'
   | 'invoiced'
@@ -469,7 +479,8 @@ export const PIPELINE_STATUS_CONFIG: Record<MonthlyCustomerStatus, {
   pending:             { label: 'Redo att skickas',   color: 'text-yellow-400',  bgColor: 'bg-yellow-500/10' },
   approved:            { label: 'Godkänd',            color: 'text-blue-400',    bgColor: 'bg-blue-500/10' },
   draft:               { label: 'Utkast i Fortnox',  color: 'text-orange-400',  bgColor: 'bg-orange-500/10' },
-  sent:                { label: 'Skickad',            color: 'text-blue-400',    bgColor: 'bg-blue-500/10' },
+  booked:              { label: 'Bokförd',            color: 'text-blue-400',    bgColor: 'bg-blue-500/10' },
+  sent:                { label: 'Skickad',            color: 'text-purple-400',  bgColor: 'bg-purple-500/10' },
   overdue:             { label: 'Förfallen',          color: 'text-red-400',     bgColor: 'bg-red-500/10' },
   invoiced:            { label: 'Fakturerad',         color: 'text-purple-400',  bgColor: 'bg-purple-500/10' },
   paid:                { label: 'Betald',             color: 'text-emerald-400', bgColor: 'bg-emerald-500/10' },

@@ -31,7 +31,8 @@ import {
   RotateCcw,
   Trash2,
   Zap,
-  ExternalLink
+  ExternalLink,
+  BookCheck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
@@ -281,8 +282,8 @@ export default function InvoiceDetailModal({
         .update({ fortnox_document_number: fortnoxInvoice.DocumentNumber })
         .eq('id', invoice.id)
 
-      // 6. Uppdatera status till sent + logga
-      await InvoiceService.updateInvoiceStatus(invoice.id, 'sent')
+      // 6. Uppdatera status till draft (utkast i Fortnox — ej bokfört, ej skickat ännu)
+      await InvoiceService.updateInvoiceStatus(invoice.id, 'draft')
       if (user && invoice.case_id) {
         const authorName = profile?.display_name || profile?.email || 'Okänd'
         try {
@@ -290,7 +291,7 @@ export default function InvoiceDetailModal({
             invoice.case_id,
             invoice.case_type as CaseType,
             'status_change',
-            `Faktura skickad till Fortnox (nr ${fortnoxInvoice.DocumentNumber}) — ${invoice.invoice_number}`,
+            `Utkast skapat i Fortnox (nr ${fortnoxInvoice.DocumentNumber}) — ${invoice.invoice_number}`,
             user.id,
             authorName
           )
@@ -299,7 +300,7 @@ export default function InvoiceDetailModal({
         }
       }
 
-      toast.success(`Faktura skapad i Fortnox (nr ${fortnoxInvoice.DocumentNumber})`)
+      toast.success(`Utkast skapat i Fortnox (nr ${fortnoxInvoice.DocumentNumber})`)
       await loadInvoice()
       onStatusChange?.()
     } catch (err: any) {
@@ -945,7 +946,7 @@ export default function InvoiceDetailModal({
             </div>
 
             <div className="flex gap-2">
-              {(invoice.status === 'draft' || invoice.status === 'pending_approval' || invoice.status === 'ready') && (
+              {(invoice.status === 'pending_approval' || invoice.status === 'ready') && (
                 <button
                   onClick={handleSendToFortnox}
                   disabled={sendingToFortnox}
@@ -954,7 +955,37 @@ export default function InvoiceDetailModal({
                   {sendingToFortnox
                     ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     : <Zap className="w-3.5 h-3.5" />}
-                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast'}
+                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast i Fortnox'}
+                </button>
+              )}
+              {invoice.status === 'draft' && (
+                <button
+                  onClick={() => handleStatusChange('booked')}
+                  disabled={updating}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <BookCheck className="w-3.5 h-3.5" />
+                  Bokför
+                </button>
+              )}
+              {invoice.status === 'booked' && (
+                <button
+                  onClick={() => handleStatusChange('sent')}
+                  disabled={updating}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Markera skickad
+                </button>
+              )}
+              {invoice.status === 'sent' && (
+                <button
+                  onClick={() => handleStatusChange('paid')}
+                  disabled={updating}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <DollarSign className="w-3.5 h-3.5" />
+                  Markera betald
                 </button>
               )}
               {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (

@@ -17,7 +17,8 @@ import {
   Clock,
   AlertTriangle,
   Send,
-  X
+  X,
+  BookCheck
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -202,6 +203,7 @@ export function MonthlyBillingPipeline() {
       pending: 0,
       approved: 0,
       draft: 0,
+      booked: 0,
       sent: 0,
       overdue: 0,
       invoiced: 0,
@@ -213,6 +215,7 @@ export function MonthlyBillingPipeline() {
       stats.pending += month.status_breakdown.pending || 0
       stats.approved += month.status_breakdown.approved || 0
       stats.draft += month.status_breakdown.draft || 0
+      stats.booked += (month.status_breakdown as any).booked || 0
       stats.sent += month.status_breakdown.sent || 0
       stats.overdue += month.status_breakdown.overdue || 0
       stats.invoiced += month.status_breakdown.invoiced || 0
@@ -232,9 +235,10 @@ export function MonthlyBillingPipeline() {
     color: string
   }[] = [
     { key: 'awaiting_generation', label: 'Ej genererade', count: totalStats.awaiting_generation, icon: Calendar, color: 'amber' },
-    { key: 'pending',             label: 'Redo att skickas', count: totalStats.pending,          icon: Clock,          color: 'yellow' },
-    { key: 'draft',               label: 'I Fortnox',     count: totalStats.draft,               icon: FileText,       color: 'orange' },
-    { key: 'sent',                label: 'Skickade',      count: totalStats.sent,                icon: Send,           color: 'blue' },
+    { key: 'pending',             label: 'Redo för Fortnox', count: totalStats.pending,          icon: Clock,          color: 'yellow' },
+    { key: 'draft',               label: 'Utkast i Fortnox', count: totalStats.draft,            icon: FileText,       color: 'orange' },
+    { key: 'booked',              label: 'Bokförda',      count: totalStats.booked,              icon: BookCheck,      color: 'blue' },
+    { key: 'sent',                label: 'Skickade',      count: totalStats.sent,                icon: Send,           color: 'purple' },
     { key: 'overdue',             label: 'Förfallna',     count: totalStats.overdue,             icon: AlertTriangle,  color: 'red' },
     { key: 'paid',                label: 'Betalda',       count: totalStats.paid,                icon: DollarSign,     color: 'emerald' },
   ]

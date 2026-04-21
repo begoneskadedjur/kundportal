@@ -81,9 +81,9 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
         </div>
 
         {/* Rad 2 (om bredd och höjd tillåter): ärendenummer · tjänst/skadedjur · adress */}
-        {showSecondLine && (caseNum || (caseData as any).service?.name || caseData.skadedjur || addr) && (
+        {showSecondLine && (caseNum || caseData.service?.name || caseData.skadedjur || addr) && (
           <p className={`text-[10px] truncate mt-0.5 ${style.text} opacity-60`}>
-            {[caseNum, (caseData as any).service?.name || caseData.skadedjur, addr].filter(Boolean).join(' · ')}
+            {[caseNum, caseData.service?.name || caseData.skadedjur, addr].filter(Boolean).join(' · ')}
           </p>
         )}
       </div>

@@ -16,7 +16,9 @@ import {
   Clock,
   Home,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  BookCheck,
+  Zap
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Select from '../../../components/ui/Select'
@@ -120,11 +122,12 @@ export default function PrivateBusinessInvoicing() {
     )
   }
 
-  // Filter badge data
+  // Filter badge data — Fortnox-linjerat flöde
   const filterBadges = stats ? [
-    { key: 'draft' as InvoiceStatus, label: 'Utkast', count: stats.draft.count, amount: stats.draft.amount, icon: FileEdit, color: 'slate' },
-    { key: 'pending_approval' as InvoiceStatus, label: 'Godkännas', count: stats.pending_approval.count, amount: stats.pending_approval.amount, icon: AlertCircle, color: 'orange' },
-    { key: 'ready' as InvoiceStatus, label: 'Redo', count: stats.ready.count, amount: stats.ready.amount, icon: CheckCircle, color: 'blue' },
+    { key: 'pending_approval' as InvoiceStatus, label: 'Godkännas', count: stats.pending_approval.count, amount: stats.pending_approval.amount, icon: AlertCircle, color: 'amber' },
+    { key: 'ready' as InvoiceStatus, label: 'Redo för Fortnox', count: stats.ready.count, amount: stats.ready.amount, icon: CheckCircle, color: 'sky' },
+    { key: 'draft' as InvoiceStatus, label: 'Utkast i Fortnox', count: stats.draft.count, amount: stats.draft.amount, icon: FileEdit, color: 'orange' },
+    { key: 'booked' as InvoiceStatus, label: 'Bokförda', count: stats.booked.count, amount: stats.booked.amount, icon: BookCheck, color: 'blue' },
     { key: 'sent' as InvoiceStatus, label: 'Skickade', count: stats.sent.count, amount: stats.sent.amount, icon: Send, color: 'purple' },
     { key: 'paid' as InvoiceStatus, label: 'Betalda', count: stats.paid.count, amount: stats.paid.amount, icon: DollarSign, color: 'emerald' }
   ] : []
@@ -132,7 +135,9 @@ export default function PrivateBusinessInvoicing() {
   const getColorClasses = (color: string, isActive: boolean) => {
     const colors: Record<string, { active: string; inactive: string }> = {
       slate: { active: 'bg-slate-600 text-white border-slate-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600' },
+      amber: { active: 'bg-amber-500/20 text-amber-400 border-amber-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-amber-500/50' },
       orange: { active: 'bg-orange-500/20 text-orange-400 border-orange-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-orange-500/50' },
+      sky: { active: 'bg-sky-500/20 text-sky-400 border-sky-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-sky-500/50' },
       blue: { active: 'bg-blue-500/20 text-blue-400 border-blue-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-blue-500/50' },
       purple: { active: 'bg-purple-500/20 text-purple-400 border-purple-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-purple-500/50' },
       emerald: { active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-emerald-500/50' }
@@ -397,9 +402,27 @@ export default function PrivateBusinessInvoicing() {
                           )}
                           {invoice.status === 'ready' && (
                             <button
-                              onClick={() => handleStatusChange(invoice.id, 'sent')}
+                              onClick={() => setSelectedInvoiceId(invoice.id)}
+                              className="p-1 text-orange-400 hover:bg-orange-500/20 rounded"
+                              title="Skapa utkast i Fortnox"
+                            >
+                              <Zap className="w-4 h-4" />
+                            </button>
+                          )}
+                          {invoice.status === 'draft' && (
+                            <button
+                              onClick={() => handleStatusChange(invoice.id, 'booked')}
                               className="p-1 text-blue-400 hover:bg-blue-500/20 rounded"
-                              title="Skickad"
+                              title="Bokför"
+                            >
+                              <BookCheck className="w-4 h-4" />
+                            </button>
+                          )}
+                          {invoice.status === 'booked' && (
+                            <button
+                              onClick={() => handleStatusChange(invoice.id, 'sent')}
+                              className="p-1 text-purple-400 hover:bg-purple-500/20 rounded"
+                              title="Markera skickad"
                             >
                               <Send className="w-4 h-4" />
                             </button>

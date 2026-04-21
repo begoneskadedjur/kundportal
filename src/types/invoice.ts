@@ -4,9 +4,11 @@
 import type { BillableCaseType, RotRutType } from './caseBilling'
 
 /**
- * Fakturastatus
+ * Fakturastatus — Fortnox-linjerat flöde
+ * pending_approval → ready → draft (utkast i Fortnox) → booked (bokförd i Fortnox) → sent (skickad till kund) → paid
+ * cancelled är terminal
  */
-export type InvoiceStatus = 'draft' | 'pending_approval' | 'ready' | 'sent' | 'paid' | 'cancelled'
+export type InvoiceStatus = 'draft' | 'pending_approval' | 'ready' | 'booked' | 'sent' | 'paid' | 'cancelled'
 
 /**
  * Faktura från databasen
@@ -36,6 +38,7 @@ export interface Invoice {
   // Datum
   created_at: string
   approved_at: string | null
+  booked_at: string | null
   sent_at: string | null
   paid_at: string | null
   due_date: string | null
@@ -140,6 +143,7 @@ export interface InvoiceStats {
   draft: { count: number; amount: number }
   pending_approval: { count: number; amount: number }
   ready: { count: number; amount: number }
+  booked: { count: number; amount: number }
   sent: { count: number; amount: number }
   paid: { count: number; amount: number }
   cancelled: { count: number; amount: number }
@@ -158,32 +162,40 @@ export const INVOICE_STATUS_CONFIG: Record<InvoiceStatus, {
   icon: string
 }> = {
   draft: {
-    label: 'Utkast',
-    description: 'Faktura skapad men inte klar',
-    color: 'text-slate-400',
-    bgColor: 'bg-slate-500/10',
-    borderColor: 'border-slate-500/30',
+    label: 'Utkast i Fortnox',
+    description: 'Utkast skapat i Fortnox — ej bokfört eller skickat',
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500/10',
+    borderColor: 'border-orange-500/30',
     icon: 'FileEdit'
   },
   pending_approval: {
     label: 'Kräver godkännande',
     description: 'Rabatt given, väntar på admin-godkännande',
-    color: 'text-orange-400',
-    bgColor: 'bg-orange-500/10',
-    borderColor: 'border-orange-500/30',
+    color: 'text-amber-400',
+    bgColor: 'bg-amber-500/10',
+    borderColor: 'border-amber-500/30',
     icon: 'AlertCircle'
   },
   ready: {
-    label: 'Redo att skicka',
-    description: 'Faktura godkänd och redo att skickas',
+    label: 'Redo för Fortnox',
+    description: 'Godkänd och redo att skapas som utkast i Fortnox',
+    color: 'text-sky-400',
+    bgColor: 'bg-sky-500/10',
+    borderColor: 'border-sky-500/30',
+    icon: 'CheckCircle'
+  },
+  booked: {
+    label: 'Bokförd',
+    description: 'Bokförd i Fortnox — redo att skickas till kund',
     color: 'text-blue-400',
     bgColor: 'bg-blue-500/10',
     borderColor: 'border-blue-500/30',
-    icon: 'CheckCircle'
+    icon: 'BookCheck'
   },
   sent: {
     label: 'Skickad',
-    description: 'Faktura skickad till kund',
+    description: 'Skickad till kund',
     color: 'text-purple-400',
     bgColor: 'bg-purple-500/10',
     borderColor: 'border-purple-500/30',

@@ -319,6 +319,9 @@ export class InvoiceService {
         updateData.approved_at = new Date().toISOString()
         updateData.requires_approval = false
         break
+      case 'booked':
+        updateData.booked_at = new Date().toISOString()
+        break
       case 'sent':
         updateData.sent_at = new Date().toISOString()
         break
@@ -348,6 +351,13 @@ export class InvoiceService {
    */
   static async approveInvoice(id: string): Promise<Invoice> {
     return this.updateInvoiceStatus(id, 'ready')
+  }
+
+  /**
+   * Markera faktura som bokförd i Fortnox
+   */
+  static async markAsBooked(id: string): Promise<Invoice> {
+    return this.updateInvoiceStatus(id, 'booked')
   }
 
   /**
@@ -400,11 +410,12 @@ export class InvoiceService {
    * Hämta statistik
    */
   static async getInvoiceStats(): Promise<InvoiceStats> {
-    const statuses: InvoiceStatus[] = ['draft', 'pending_approval', 'ready', 'sent', 'paid', 'cancelled']
+    const statuses: InvoiceStatus[] = ['draft', 'pending_approval', 'ready', 'booked', 'sent', 'paid', 'cancelled']
     const stats: InvoiceStats = {
       draft: { count: 0, amount: 0 },
       pending_approval: { count: 0, amount: 0 },
       ready: { count: 0, amount: 0 },
+      booked: { count: 0, amount: 0 },
       sent: { count: 0, amount: 0 },
       paid: { count: 0, amount: 0 },
       cancelled: { count: 0, amount: 0 },

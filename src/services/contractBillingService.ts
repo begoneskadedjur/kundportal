@@ -473,6 +473,10 @@ export class ContractBillingService {
     // Lägg till tidsstämplar beroende på status
     if (status === 'approved') {
       updateData.approved_at = new Date().toISOString()
+    } else if (status === 'booked') {
+      updateData.booked_at = new Date().toISOString()
+    } else if (status === 'sent') {
+      updateData.sent_at = new Date().toISOString()
     } else if (status === 'invoiced') {
       updateData.invoiced_at = new Date().toISOString()
       if (additionalData?.invoice_number) {
@@ -511,6 +515,10 @@ export class ContractBillingService {
 
     if (status === 'approved') {
       updateData.approved_at = new Date().toISOString()
+    } else if (status === 'booked') {
+      updateData.booked_at = new Date().toISOString()
+    } else if (status === 'sent') {
+      updateData.sent_at = new Date().toISOString()
     } else if (status === 'invoiced') {
       updateData.invoiced_at = new Date().toISOString()
     } else if (status === 'paid') {
@@ -806,7 +814,7 @@ export class ContractBillingService {
     }
 
     const periods: BillingPeriodSummary[] = []
-    const allStatuses: ContractBillingItemStatus[] = ['pending', 'approved', 'invoiced', 'paid', 'cancelled']
+    const allStatuses: ContractBillingItemStatus[] = ['pending', 'approved', 'draft', 'booked', 'sent', 'invoiced', 'paid', 'cancelled']
 
     for (const [, periodInvoices] of periodMap) {
       const first = periodInvoices[0]
@@ -979,6 +987,7 @@ export class ContractBillingService {
         pending: 0,
         approved: 0,
         draft: 0,
+        booked: 0,
         sent: 0,
         overdue: 0,
         invoiced: 0,
@@ -1087,10 +1096,11 @@ export class ContractBillingService {
         awaiting_generation: 3,
         approved: 4,
         draft: 5,
-        sent: 6,
-        invoiced: 7,
-        paid: 8,
-        not_billable: 9,
+        booked: 6,
+        sent: 7,
+        invoiced: 8,
+        paid: 9,
+        not_billable: 10,
       }
       customerEntries.sort((a, b) => {
         const pa = statusPriority[a.status] ?? 9
@@ -1263,7 +1273,7 @@ export class ContractBillingService {
       const entries = entriesByMonth.get(monthKey) || []
 
       const statusBreakdown: Record<ContractBillingItemStatus, number> = {
-        pending: 0, approved: 0, draft: 0, sent: 0,
+        pending: 0, approved: 0, draft: 0, booked: 0, sent: 0,
         overdue: 0, invoiced: 0, paid: 0, cancelled: 0,
       }
       let totalAmount = 0

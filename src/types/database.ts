@@ -1061,6 +1061,7 @@ export type BeGoneCaseRow = (PrivateCasesRow | BusinessCasesRow) & {
   parent_customer_id?: string | null  // För multisite-enheter
   oneflow_contract_id?: string | null // Koppling till Oneflow-offert (för contract cases)
   company_name?: string | null // Företagsnamn (business_cases + contract via adaptCaseToBeGoneRow)
+  service?: { name: string } | null // Joinad tjänst från services-tabellen (via service_id)
 }
 
 // Befintliga hjälptyper

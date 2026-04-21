@@ -92,10 +92,13 @@ export function AdhocSalesPipeline() {
   }
 
   const totalStats = useMemo(() => {
-    const stats = { pending: 0, approved: 0, invoiced: 0, paid: 0, totalAmount: 0, entries: 0 }
+    const stats = { pending: 0, approved: 0, draft: 0, booked: 0, sent: 0, invoiced: 0, paid: 0, totalAmount: 0, entries: 0 }
     for (const month of months) {
       stats.pending += month.status_breakdown.pending || 0
       stats.approved += month.status_breakdown.approved || 0
+      stats.draft += (month.status_breakdown as any).draft || 0
+      stats.booked += (month.status_breakdown as any).booked || 0
+      stats.sent += (month.status_breakdown as any).sent || 0
       stats.invoiced += month.status_breakdown.invoiced || 0
       stats.paid += month.status_breakdown.paid || 0
       stats.totalAmount += month.total_amount

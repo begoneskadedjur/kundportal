@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   X, FileText, XCircle, Download,
-  RefreshCw, AlertCircle, Zap, Building2, ExternalLink
+  RefreshCw, AlertCircle, Zap, Building2, ExternalLink,
+  BookCheck, Send, DollarSign
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
@@ -208,6 +209,26 @@ export function ContractInvoiceModal({
     }
   }
 
+  const handleMarkStatus = async (
+    newStatus: 'booked' | 'sent' | 'paid',
+    successMsg: string
+  ) => {
+    if (!invoice) return
+    setUpdating(true)
+    try {
+      await ContractBillingService.updateInvoiceStatus(
+        invoice.customer_id, invoice.period_start, invoice.period_end, newStatus
+      )
+      toast.success(successMsg)
+      await loadInvoice()
+      onStatusChange()
+    } catch (err: any) {
+      toast.error('Kunde inte uppdatera status: ' + (err.message || 'Okänt fel'))
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   const handleApproveDiscount = async (itemId: string) => {
     try {
       await ContractBillingService.approveDiscount(itemId)
@@ -312,12 +333,11 @@ export function ContractInvoiceModal({
         .from('contract_billing_items')
         .update({
           fortnox_document_number: fortnoxInvoice.DocumentNumber,
-          sent_at: new Date().toISOString(),
           due_date: dueDate30,
         })
         .in('id', itemIds)
 
-      // 6. Uppdatera status till draft (utkast skapat i Fortnox, ej skickat till kund ännu)
+      // 6. Uppdatera status till draft (utkast skapat i Fortnox, ej bokfört/skickat än)
       await ContractBillingService.updateInvoiceStatus(
         invoice.customer_id, invoice.period_start, invoice.period_end, 'draft'
       )
@@ -681,9 +701,9 @@ export function ContractInvoiceModal({
               )}
             </div>
 
-            {/* Höger: statusknappar */}
+            {/* Höger: statusknappar (Fortnox-linjerat flöde) */}
             <div className="flex items-center gap-2">
-                      {(invoice.derived_status === 'pending' || invoice.derived_status === 'approved' || invoice.derived_status === 'draft') && (
+              {(invoice.derived_status === 'pending' || invoice.derived_status === 'approved' || invoice.derived_status === 'draft') && (
                 <button
                   onClick={handleSendToFortnox}
                   disabled={sendingToFortnox}
@@ -692,7 +712,37 @@ export function ContractInvoiceModal({
                   {sendingToFortnox
                     ? <RefreshCw className="w-4 h-4 animate-spin" />
                     : <Zap className="w-4 h-4" />}
-                  {sendingToFortnox ? 'Skapar utkast...' : invoice.derived_status === 'draft' ? 'Skapa nytt utkast' : 'Skapa utkast'}
+                  {sendingToFortnox ? 'Skapar utkast...' : invoice.derived_status === 'draft' ? 'Skapa nytt utkast' : 'Skapa utkast i Fortnox'}
+                </button>
+              )}
+              {invoice.derived_status === 'draft' && (
+                <button
+                  onClick={() => handleMarkStatus('booked', 'Faktura bokförd')}
+                  disabled={updating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <BookCheck className="w-4 h-4" />
+                  Bokför
+                </button>
+              )}
+              {invoice.derived_status === 'booked' && (
+                <button
+                  onClick={() => handleMarkStatus('sent', 'Faktura markerad som skickad')}
+                  disabled={updating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                  Markera skickad
+                </button>
+              )}
+              {invoice.derived_status === 'sent' && (
+                <button
+                  onClick={() => handleMarkStatus('paid', 'Faktura markerad som betald')}
+                  disabled={updating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <DollarSign className="w-4 h-4" />
+                  Markera betald
                 </button>
               )}
               {invoice.derived_status === 'cancelled' && (
