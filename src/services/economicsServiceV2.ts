@@ -653,43 +653,45 @@ export const getTechnicianMarginScatter = async (
 export const getTechnicianCommissionTrend = async (
   months: number = 12
 ): Promise<{ data: TechnicianCommissionTrendRow[]; technicians: string[] }> => {
-  const since = startOfMonthISO(months)
   const keys = monthsBackFrom(months)
+  const earliest = keys[0]
 
-  // Hämta från alla tre case-tabellerna (private/business använder primary_assignee_name)
-  const [legacyRes, privateRes, businessRes] = await Promise.all([
-    supabase.from('cases').select('primary_technician_name, completed_date, commission_amount').gte('completed_date', since).not('completed_date', 'is', null).not('primary_technician_name', 'is', null),
-    supabase.from('private_cases').select('primary_assignee_name, completed_date, commission_amount').gte('completed_date', since).not('completed_date', 'is', null).not('primary_assignee_name', 'is', null),
-    supabase.from('business_cases').select('primary_assignee_name, completed_date, commission_amount').gte('completed_date', since).not('completed_date', 'is', null).not('primary_assignee_name', 'is', null),
-  ])
+  // Auktoritativ källa: commission_posts (samma som /admin/provisioner).
+  // Gruppering sker på payout_month, inte completed_date. Provisioner som väntar
+  // på att kundens faktura ska betalas (status 'pending_invoice') exkluderas.
+  const { data, error } = await supabase
+    .from('commission_posts')
+    .select('payout_month, technician_name, commission_amount, status')
+    .gte('payout_month', earliest)
+    .in('status', ['ready_for_payout', 'approved', 'paid_out'])
 
-  const cases: Array<{ primary_technician_name: string; completed_date: string; commission_amount: number | null }> = [
-    ...((legacyRes.data || []) as any[]),
-    ...((privateRes.data || []) as any[]).map((c: any) => ({ primary_technician_name: c.primary_assignee_name, completed_date: c.completed_date, commission_amount: c.commission_amount })),
-    ...((businessRes.data || []) as any[]).map((c: any) => ({ primary_technician_name: c.primary_assignee_name, completed_date: c.completed_date, commission_amount: c.commission_amount })),
-  ]
+  if (error) throw error
+  const posts = (data || []) as Array<{
+    payout_month: string
+    technician_name: string
+    commission_amount: number | null
+  }>
 
   const byMonth = new Map<string, Map<string, number>>()
   keys.forEach(k => byMonth.set(k, new Map()))
   const techSet = new Set<string>()
 
-  cases?.forEach((c: any) => {
-    const key = c.completed_date.slice(0, 7)
-    if (!byMonth.has(key)) return
-    const mm = byMonth.get(key)!
-    const name = c.primary_technician_name as string
-    techSet.add(name)
-    mm.set(name, (mm.get(name) || 0) + Number(c.commission_amount || 0))
+  posts.forEach(p => {
+    if (!p.payout_month || !p.technician_name) return
+    const mm = byMonth.get(p.payout_month)
+    if (!mm) return
+    techSet.add(p.technician_name)
+    mm.set(p.technician_name, (mm.get(p.technician_name) || 0) + Number(p.commission_amount || 0))
   })
 
   const technicians = Array.from(techSet).sort()
-  const data: TechnicianCommissionTrendRow[] = keys.map(month => {
+  const result: TechnicianCommissionTrendRow[] = keys.map(month => {
     const mm = byMonth.get(month)!
     const row: TechnicianCommissionTrendRow = { month }
     technicians.forEach(name => { row[name] = mm.get(name) || 0 })
     return row
   })
-  return { data, technicians }
+  return { data: result, technicians }
 }
 
 // ---------- 10. Case throughput (avg completion days) ----------
