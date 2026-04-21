@@ -146,15 +146,18 @@ export const getRevenuePulse = async (months: number = 12): Promise<RevenuePulse
     else empty[key].contract_revenue += Number(row.total_price || 0)
   })
 
-  // Case billing items för privat/företag (joinad med cases för case_type + completed_date)
-  const { data: cases } = await supabase
-    .from('cases')
-    .select('id, case_number, completed_date, customer_id')
-    .gte('completed_date', since)
-    .not('completed_date', 'is', null)
+  // Case billing items för privat/företag — hämta completed_date från alla tre case-tabellerna
+  // (case_billing_items.case_id saknar FK och kan peka mot cases / private_cases / business_cases)
+  const [legacyRes, privateRes, businessRes] = await Promise.all([
+    supabase.from('cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('private_cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('business_cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+  ])
 
-  const caseIds = (cases || []).map((c: any) => c.id)
-  const caseById = new Map((cases || []).map((c: any) => [c.id, c]))
+  const caseById = new Map<string, { completed_date: string }>()
+  ;[...(legacyRes.data || []), ...(privateRes.data || []), ...(businessRes.data || [])]
+    .forEach((c: any) => caseById.set(c.id, c))
+  const caseIds = Array.from(caseById.keys())
 
   // case_type härleds via customer.business_type om customer_id finns; annars betrakta som 'private'
   // Men case_billing_items har också case_type-kolumn direkt. Vi använder den.
@@ -193,15 +196,18 @@ export const getMarginByMonth = async (months: number = 12): Promise<MarginPoint
   const bucket: Record<string, MarginPoint> = {}
   keys.forEach(k => { bucket[k] = { month: k, revenue: 0, cost: 0, gross_profit: 0, margin_percent: 0 } })
 
-  // Hämta cases med completed_date inom perioden för att få rätt månad-nyckel
-  const { data: cases } = await supabase
-    .from('cases')
-    .select('id, completed_date')
-    .gte('completed_date', since)
-    .not('completed_date', 'is', null)
+  // Hämta cases med completed_date från alla tre case-tabellerna
+  // (case_billing_items.case_id saknar FK och kan peka mot cases / private_cases / business_cases)
+  const [legacyRes, privateRes, businessRes] = await Promise.all([
+    supabase.from('cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('private_cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('business_cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+  ])
 
-  const caseMonth = new Map((cases || []).map((c: any) => [c.id, c.completed_date?.slice(0, 7)]))
-  const caseIds = (cases || []).map((c: any) => c.id)
+  const caseMonth = new Map<string, string | undefined>()
+  ;[...(legacyRes.data || []), ...(privateRes.data || []), ...(businessRes.data || [])]
+    .forEach((c: any) => caseMonth.set(c.id, c.completed_date?.slice(0, 7)))
+  const caseIds = Array.from(caseMonth.keys())
 
   if (caseIds.length > 0) {
     const { data: items } = await supabase
@@ -579,14 +585,21 @@ export const getTechnicianMarginScatter = async (
   startDate: string,
   endDate: string
 ): Promise<TechnicianScatterPoint[]> => {
-  const { data: cases } = await supabase
-    .from('cases')
-    .select('id, primary_technician_id, primary_technician_name')
-    .gte('completed_date', startDate)
-    .lte('completed_date', endDate)
-    .not('primary_technician_id', 'is', null)
+  // Hämta completed cases från alla tre tabellerna
+  // cases (legacy): primary_technician_id/name | private_cases/business_cases: primary_assignee_id/name
+  const [legacyRes, privateRes, businessRes] = await Promise.all([
+    supabase.from('cases').select('id, primary_technician_id, primary_technician_name').gte('completed_date', startDate).lte('completed_date', endDate).not('primary_technician_id', 'is', null),
+    supabase.from('private_cases').select('id, primary_assignee_id, primary_assignee_name').gte('completed_date', startDate).lte('completed_date', endDate).not('primary_assignee_id', 'is', null),
+    supabase.from('business_cases').select('id, primary_assignee_id, primary_assignee_name').gte('completed_date', startDate).lte('completed_date', endDate).not('primary_assignee_id', 'is', null),
+  ])
 
-  if (!cases || cases.length === 0) return []
+  const cases: Array<{ id: string; primary_technician_id: string; primary_technician_name: string }> = [
+    ...(legacyRes.data || []).map((c: any) => ({ id: c.id, primary_technician_id: c.primary_technician_id, primary_technician_name: c.primary_technician_name })),
+    ...(privateRes.data || []).map((c: any) => ({ id: c.id, primary_technician_id: c.primary_assignee_id, primary_technician_name: c.primary_assignee_name })),
+    ...(businessRes.data || []).map((c: any) => ({ id: c.id, primary_technician_id: c.primary_assignee_id, primary_technician_name: c.primary_assignee_name })),
+  ]
+
+  if (cases.length === 0) return []
 
   const caseIds = cases.map((c: any) => c.id)
   const { data: items } = await supabase
@@ -638,12 +651,18 @@ export const getTechnicianCommissionTrend = async (
   const since = startOfMonthISO(months)
   const keys = monthsBackFrom(months)
 
-  const { data: cases } = await supabase
-    .from('cases')
-    .select('primary_technician_name, completed_date, commission_amount')
-    .gte('completed_date', since)
-    .not('completed_date', 'is', null)
-    .not('primary_technician_name', 'is', null)
+  // Hämta från alla tre case-tabellerna (private/business använder primary_assignee_name)
+  const [legacyRes, privateRes, businessRes] = await Promise.all([
+    supabase.from('cases').select('primary_technician_name, completed_date, commission_amount').gte('completed_date', since).not('completed_date', 'is', null).not('primary_technician_name', 'is', null),
+    supabase.from('private_cases').select('primary_assignee_name, completed_date, commission_amount').gte('completed_date', since).not('completed_date', 'is', null).not('primary_assignee_name', 'is', null),
+    supabase.from('business_cases').select('primary_assignee_name, completed_date, commission_amount').gte('completed_date', since).not('completed_date', 'is', null).not('primary_assignee_name', 'is', null),
+  ])
+
+  const cases: Array<{ primary_technician_name: string; completed_date: string; commission_amount: number | null }> = [
+    ...((legacyRes.data || []) as any[]),
+    ...((privateRes.data || []) as any[]).map((c: any) => ({ primary_technician_name: c.primary_assignee_name, completed_date: c.completed_date, commission_amount: c.commission_amount })),
+    ...((businessRes.data || []) as any[]).map((c: any) => ({ primary_technician_name: c.primary_assignee_name, completed_date: c.completed_date, commission_amount: c.commission_amount })),
+  ]
 
   const byMonth = new Map<string, Map<string, number>>()
   keys.forEach(k => byMonth.set(k, new Map()))
@@ -674,11 +693,17 @@ export const getCaseThroughput = async (months: number = 12): Promise<Throughput
   const since = startOfMonthISO(months)
   const keys = monthsBackFrom(months)
 
-  const { data: cases } = await supabase
-    .from('cases')
-    .select('created_at, completed_date')
-    .gte('completed_date', since)
-    .not('completed_date', 'is', null)
+  // Hämta från alla tre case-tabellerna
+  const [legacyRes, privateRes, businessRes] = await Promise.all([
+    supabase.from('cases').select('created_at, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('private_cases').select('created_at, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('business_cases').select('created_at, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+  ])
+  const cases: Array<{ created_at: string; completed_date: string }> = [
+    ...((legacyRes.data || []) as any[]),
+    ...((privateRes.data || []) as any[]),
+    ...((businessRes.data || []) as any[]),
+  ]
 
   const bucket: Record<string, { sum: number; count: number }> = {}
   keys.forEach(k => { bucket[k] = { sum: 0, count: 0 } })
