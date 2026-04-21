@@ -113,6 +113,28 @@ const startOfMonthISO = (months: number): string => {
   return d.toISOString().split('T')[0]
 }
 
+// Hämta case_billing_items för en (potentiellt stor) lista case_ids genom att chunka requests
+// — URL:en blir för lång och ger 400 om vi skickar 1000+ uuids i en enda .in()-filter
+const fetchCaseBillingItemsByCaseIds = async (
+  caseIds: string[],
+  select: string,
+  chunkSize: number = 200
+): Promise<any[]> => {
+  if (caseIds.length === 0) return []
+  const chunks: string[][] = []
+  for (let i = 0; i < caseIds.length; i += chunkSize) chunks.push(caseIds.slice(i, i + chunkSize))
+
+  const results = await Promise.all(chunks.map(chunk =>
+    supabase
+      .from('case_billing_items')
+      .select(select)
+      .in('case_id', chunk)
+      .neq('status', 'cancelled')
+  ))
+
+  return results.flatMap(r => (r.data as any[] | null) || [])
+}
+
 // ---------- 1. Revenue pulse (4 strömmar över tid) ----------
 
 export const getRevenuePulse = async (months: number = 12): Promise<RevenuePulsePoint[]> => {
@@ -162,13 +184,9 @@ export const getRevenuePulse = async (months: number = 12): Promise<RevenuePulse
   // case_type härleds via customer.business_type om customer_id finns; annars betrakta som 'private'
   // Men case_billing_items har också case_type-kolumn direkt. Vi använder den.
   if (caseIds.length > 0) {
-    const { data: items } = await supabase
-      .from('case_billing_items')
-      .select('case_id, case_type, total_price, item_type, status')
-      .in('case_id', caseIds)
-      .neq('status', 'cancelled')
+    const items = await fetchCaseBillingItemsByCaseIds(caseIds, 'case_id, case_type, total_price, item_type, status')
 
-    items?.forEach((it: any) => {
+    items.forEach((it: any) => {
       const c = caseById.get(it.case_id)
       if (!c || !c.completed_date) return
       const key = c.completed_date.slice(0, 7)
@@ -210,20 +228,16 @@ export const getMarginByMonth = async (months: number = 12): Promise<MarginPoint
   const caseIds = Array.from(caseMonth.keys())
 
   if (caseIds.length > 0) {
-    const { data: items } = await supabase
-      .from('case_billing_items')
-      .select('case_id, item_type, total_price, quantity, article_id')
-      .in('case_id', caseIds)
-      .neq('status', 'cancelled')
+    const items = await fetchCaseBillingItemsByCaseIds(caseIds, 'case_id, item_type, total_price, quantity, article_id')
 
     // Hämta artiklarnas default_price för kostnadsberäkning
-    const articleIds = Array.from(new Set((items || []).map((i: any) => i.article_id).filter(Boolean)))
+    const articleIds = Array.from(new Set(items.map((i: any) => i.article_id).filter(Boolean)))
     const { data: articles } = articleIds.length > 0
       ? await supabase.from('articles').select('id, default_price').in('id', articleIds)
       : { data: [] as any[] }
     const costById = new Map((articles || []).map((a: any) => [a.id, Number(a.default_price || 0)]))
 
-    items?.forEach((it: any) => {
+    items.forEach((it: any) => {
       const key = caseMonth.get(it.case_id)
       if (!key || !bucket[key]) return
       if (it.item_type === 'service') {
@@ -280,13 +294,12 @@ export const getServiceMarginRanking = async (
 
   if (validCaseIds.size === 0) return []
 
-  const { data: items } = await supabase
-    .from('case_billing_items')
-    .select('case_id, item_type, total_price, quantity, article_id, service_id, mapped_service_id')
-    .in('case_id', Array.from(validCaseIds))
-    .neq('status', 'cancelled')
+  const items = await fetchCaseBillingItemsByCaseIds(
+    Array.from(validCaseIds),
+    'case_id, item_type, total_price, quantity, article_id, service_id, mapped_service_id'
+  )
 
-  if (!items || items.length === 0) return []
+  if (items.length === 0) return []
 
   const articleIds = Array.from(new Set(items.map((i: any) => i.article_id).filter(Boolean)))
   const { data: articles } = articleIds.length > 0
@@ -539,19 +552,15 @@ export const getCustomerPortfolio = async (): Promise<CustomerPortfolioRow[]> =>
   let costByCase = new Map<string, { revenue: number; cost: number }>()
 
   if (allCaseIds.length > 0) {
-    const { data: items } = await supabase
-      .from('case_billing_items')
-      .select('case_id, item_type, total_price, quantity, article_id')
-      .in('case_id', allCaseIds)
-      .neq('status', 'cancelled')
+    const items = await fetchCaseBillingItemsByCaseIds(allCaseIds, 'case_id, item_type, total_price, quantity, article_id')
 
-    const articleIds = Array.from(new Set((items || []).map((i: any) => i.article_id).filter(Boolean)))
+    const articleIds = Array.from(new Set(items.map((i: any) => i.article_id).filter(Boolean)))
     const { data: articles } = articleIds.length > 0
       ? await supabase.from('articles').select('id, default_price').in('id', articleIds)
       : { data: [] as any[] }
     const costById = new Map((articles || []).map((a: any) => [a.id, Number(a.default_price || 0)]))
 
-    items?.forEach((it: any) => {
+    items.forEach((it: any) => {
       const k = costByCase.get(it.case_id) || { revenue: 0, cost: 0 }
       if (it.item_type === 'service') k.revenue += Number(it.total_price || 0)
       else if (it.item_type === 'article') k.cost += (costById.get(it.article_id) || 0) * Number(it.quantity || 0)
@@ -602,20 +611,16 @@ export const getTechnicianMarginScatter = async (
   if (cases.length === 0) return []
 
   const caseIds = cases.map((c: any) => c.id)
-  const { data: items } = await supabase
-    .from('case_billing_items')
-    .select('case_id, item_type, total_price, quantity, article_id')
-    .in('case_id', caseIds)
-    .neq('status', 'cancelled')
+  const items = await fetchCaseBillingItemsByCaseIds(caseIds, 'case_id, item_type, total_price, quantity, article_id')
 
-  const articleIds = Array.from(new Set((items || []).map((i: any) => i.article_id).filter(Boolean)))
+  const articleIds = Array.from(new Set(items.map((i: any) => i.article_id).filter(Boolean)))
   const { data: articles } = articleIds.length > 0
     ? await supabase.from('articles').select('id, default_price').in('id', articleIds)
     : { data: [] as any[] }
   const costById = new Map((articles || []).map((a: any) => [a.id, Number(a.default_price || 0)]))
 
   const caseAgg = new Map<string, { revenue: number; cost: number }>()
-  items?.forEach((it: any) => {
+  items.forEach((it: any) => {
     const k = caseAgg.get(it.case_id) || { revenue: 0, cost: 0 }
     if (it.item_type === 'service') k.revenue += Number(it.total_price || 0)
     else if (it.item_type === 'article') k.cost += (costById.get(it.article_id) || 0) * Number(it.quantity || 0)
