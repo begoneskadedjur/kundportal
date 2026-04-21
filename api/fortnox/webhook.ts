@@ -55,80 +55,89 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const now = new Date().toISOString()
 
     // Bestäm ny status baserat på Fortnox-fakturans tillstånd
+    // Fortnox-livscykel: draft (Booked=false) → booked (Booked=true) → sent (Sent=true) → paid (Balance=0)
     const isPaid = invoice.Balance === 0 && invoice.FinalPayDate != null
     const isSent = invoice.Sent === true
+    const isBooked = invoice.Booked === true
     const dueDate = invoice.DueDate ? new Date(invoice.DueDate) : null
     const isOverdue = isSent && !isPaid && dueDate != null && dueDate < new Date()
 
+    // Bestäm målstatus + tidsstämpelfält i prioritetsordning (paid vinner över overdue vinner över sent vinner över booked)
+    let targetStatus: 'paid' | 'overdue' | 'sent' | 'booked' | null = null
+    let timestamp: string = now
     if (isPaid) {
-      // Fakturan betald — uppdatera contract_billing_items
-      const { data: contractItems } = await supabase
+      targetStatus = 'paid'
+      timestamp = new Date(invoice.FinalPayDate).toISOString()
+    } else if (isOverdue) {
+      targetStatus = 'overdue'
+    } else if (isSent) {
+      targetStatus = 'sent'
+    } else if (isBooked) {
+      targetStatus = 'booked'
+    }
+
+    if (!targetStatus) {
+      // Utkast i Fortnox — inget att synka
+      return res.status(200).json({ ok: true, skipped: 'draft-only' })
+    }
+
+    // Statusar som INTE ska skrivas över (terminala eller längre gångna i flödet)
+    // Ex: om faktura redan är 'paid' vill vi inte skriva tillbaka till 'sent'
+    const protectedByTarget: Record<typeof targetStatus & string, string[]> = {
+      paid:    ['paid', 'cancelled'],
+      overdue: ['paid', 'cancelled', 'overdue'],
+      sent:    ['paid', 'cancelled', 'overdue', 'sent'],
+      booked:  ['paid', 'cancelled', 'overdue', 'sent', 'booked', 'invoiced'],
+    }
+    const protectedStatuses = protectedByTarget[targetStatus]
+
+    // --- contract_billing_items ---
+    const contractUpdateData: Record<string, unknown> = { status: targetStatus, updated_at: now }
+    if (targetStatus === 'paid') contractUpdateData.paid_at = timestamp
+    else if (targetStatus === 'overdue') contractUpdateData.overdue_at = timestamp
+    else if (targetStatus === 'sent') contractUpdateData.fortnox_sent_at = timestamp
+    else if (targetStatus === 'booked') contractUpdateData.booked_at = timestamp
+
+    const protectedList = `(${protectedStatuses.map(s => `"${s}"`).join(',')})`
+    const { data: contractItems } = await supabase
+      .from('contract_billing_items')
+      .select('id')
+      .eq('fortnox_document_number', documentNumber)
+      .not('status', 'in', protectedList)
+
+    if (contractItems && contractItems.length > 0) {
+      const ids = contractItems.map((i: { id: string }) => i.id)
+      await supabase
         .from('contract_billing_items')
-        .select('id')
-        .eq('fortnox_document_number', documentNumber)
-        .neq('status', 'paid')
+        .update(contractUpdateData)
+        .in('id', ids)
+      console.log(`Webhook: ${ids.length} contract_billing_items → ${targetStatus} (Fortnox nr ${documentNumber})`)
+    }
 
-      if (contractItems && contractItems.length > 0) {
-        const ids = contractItems.map((i: { id: string }) => i.id)
-        await supabase
-          .from('contract_billing_items')
-          .update({ status: 'paid', paid_at: new Date(invoice.FinalPayDate).toISOString(), updated_at: now })
-          .in('id', ids)
-        console.log(`Webhook: ${ids.length} contract_billing_items → paid (Fortnox nr ${documentNumber})`)
-      }
-
-      // Uppdatera invoices-tabellen
+    // --- invoices (privat/företag) ---
+    const invoiceUpdateData: Record<string, unknown> = { status: targetStatus }
+    if (targetStatus === 'paid') invoiceUpdateData.paid_at = timestamp
+    else if (targetStatus === 'sent') invoiceUpdateData.sent_at = timestamp
+    else if (targetStatus === 'booked') invoiceUpdateData.booked_at = timestamp
+    // obs: 'overdue' finns inte som status i invoices-tabellen — skippa den uppdateringen där
+    if (targetStatus !== 'overdue') {
       const { data: invoiceRows } = await supabase
         .from('invoices')
         .select('id')
         .eq('fortnox_document_number', documentNumber)
-        .neq('status', 'paid')
+        .not('status', 'in', protectedList)
 
       if (invoiceRows && invoiceRows.length > 0) {
         const ids = invoiceRows.map((i: { id: string }) => i.id)
         await supabase
           .from('invoices')
-          .update({ status: 'paid', paid_at: new Date(invoice.FinalPayDate).toISOString() })
+          .update(invoiceUpdateData)
           .in('id', ids)
-        console.log(`Webhook: ${ids.length} invoices → paid (Fortnox nr ${documentNumber})`)
-      }
-
-    } else if (isOverdue) {
-      // Förfallen — skickad men ej betald och förfallodatum har passerat
-      const { data: contractItems } = await supabase
-        .from('contract_billing_items')
-        .select('id')
-        .eq('fortnox_document_number', documentNumber)
-        .not('status', 'in', '("paid","cancelled","overdue")')
-
-      if (contractItems && contractItems.length > 0) {
-        const ids = contractItems.map((i: { id: string }) => i.id)
-        await supabase
-          .from('contract_billing_items')
-          .update({ status: 'overdue', overdue_at: now, updated_at: now })
-          .in('id', ids)
-        console.log(`Webhook: ${ids.length} contract_billing_items → overdue (Fortnox nr ${documentNumber})`)
-      }
-
-    } else if (isSent) {
-      // Skickad till kund men ej betald än
-      const { data: contractItems } = await supabase
-        .from('contract_billing_items')
-        .select('id')
-        .eq('fortnox_document_number', documentNumber)
-        .not('status', 'in', '("paid","cancelled","sent","overdue")')
-
-      if (contractItems && contractItems.length > 0) {
-        const ids = contractItems.map((i: { id: string }) => i.id)
-        await supabase
-          .from('contract_billing_items')
-          .update({ status: 'sent', fortnox_sent_at: now, updated_at: now })
-          .in('id', ids)
-        console.log(`Webhook: ${ids.length} contract_billing_items → sent (Fortnox nr ${documentNumber})`)
+        console.log(`Webhook: ${ids.length} invoices → ${targetStatus} (Fortnox nr ${documentNumber})`)
       }
     }
 
-    return res.status(200).json({ ok: true })
+    return res.status(200).json({ ok: true, status: targetStatus })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Okänt fel'
     console.error('Fortnox webhook fel:', message)
