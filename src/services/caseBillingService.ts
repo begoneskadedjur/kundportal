@@ -519,6 +519,30 @@ export class CaseBillingService {
   }
 
   /**
+   * Kontrollera om ett ärende har minst en fakturerbar rad med belopp > 0.
+   * Används för att gatea customer-nummertilldelning — ett ärende utan faktiskt
+   * belopp (t.ex. inspektion, reklamation, 0-kr-tjänst) ska inte konsumera kundnummer.
+   *
+   * Följer samma filtrering som invoiceService.createInvoiceFromCase:
+   * service-rader om de finns, annars artikel-rader (bakåtkompatibilitet).
+   * Om kundspecifikt anpassat pris finns, returnera true om det är > 0.
+   */
+  static async caseHasBillableAmount(
+    caseId: string,
+    caseType: BillableCaseType
+  ): Promise<boolean> {
+    const customPrice = await this.getCustomPrice(caseId, caseType)
+    if (customPrice !== null) return customPrice > 0
+
+    const items = await this.getCaseBillingItems(caseId, caseType)
+    const services = items.filter(i => i.item_type === 'service')
+    const rows = services.length > 0
+      ? services
+      : items.filter(i => i.item_type === 'article' || !i.item_type)
+    return rows.some(r => (r.unit_price ?? 0) * (r.quantity ?? 0) > 0)
+  }
+
+  /**
    * Hämta anpassat pris för ärende (eller null)
    */
   static async getCustomPrice(

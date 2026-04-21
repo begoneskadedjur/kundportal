@@ -7,6 +7,7 @@ export interface CustomerGroup {
   description: string | null
   sort_order: number
   is_active: boolean
+  is_private_default: boolean
   created_at: string
   updated_at: string
 }
@@ -28,4 +29,5 @@ export interface UpdateCustomerGroupInput {
   description?: string
   sort_order?: number
   is_active?: boolean
+  is_private_default?: boolean
 }

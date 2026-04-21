@@ -44,6 +44,9 @@ import CaseServiceSelector from '../../shared/CaseServiceSelector'
 import { InvoiceService } from '../../../services/invoiceService'
 import { CaseBillingService } from '../../../services/caseBillingService'
 import { PriceListService } from '../../../services/priceListService'
+import { CaseCustomerService } from '../../../services/caseCustomerService'
+import { CustomerGroupService } from '../../../services/customerGroupService'
+import type { CustomerGroup } from '../../../types/customerGroups'
 
 // Kommunikation
 import { CommunicationSlidePanel } from '../../communication'
@@ -412,6 +415,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [commissionNotes, setCommissionNotes] = useState('')
   const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
   const [commissionPostsLocked, setCommissionPostsLocked] = useState(false)
+
+  // Kundnummer & kundgrupp (för auto-tilldelning vid Avslutat + faktura)
+  const [existingCustomerNumber, setExistingCustomerNumber] = useState<number | null>(null)
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+  const [selectedCustomerGroupId, setSelectedCustomerGroupId] = useState<string | null>(null)
+  const [hasBillableAmount, setHasBillableAmount] = useState(false)
 
   // Vald tjänsteartikel (för CasePreparationsSection)
   const [serviceArticle, setServiceArticle] = useState<Service | null>(null)
@@ -835,9 +844,46 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             setExistingCommissionPosts(0);
             setCommissionPostsLocked(false);
           });
+
+        // Slå upp befintlig customer för att visa kundnummer + avgöra om
+        // kundgruppsval behöver visas för nya business-kunder
+        const lookupKey = caseData.case_type === 'private'
+          ? caseData.personnummer
+          : caseData.case_type === 'business'
+            ? caseData.org_nr
+            : null
+        if (lookupKey) {
+          supabase
+            .from('customers')
+            .select('customer_number')
+            .eq('organization_number', lookupKey)
+            .not('customer_number', 'is', null)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+            .then(({ data }) => {
+              setExistingCustomerNumber((data as any)?.customer_number ?? null)
+            })
+        } else {
+          setExistingCustomerNumber(null)
+        }
       }
     }
   }, [caseData]);
+
+  // Ladda aktiva kundgrupper när modalen öppnas (för business-val)
+  useEffect(() => {
+    if (!isOpen) return
+    CustomerGroupService.getActiveGroups()
+      .then(setCustomerGroups)
+      .catch(() => setCustomerGroups([]))
+  }, [isOpen])
+
+  // Håll koll på om ärendet faktiskt har fakturerbart belopp (för gating)
+  useEffect(() => {
+    if (!billingSummary) { setHasBillableAmount(false); return }
+    setHasBillableAmount((billingSummary.subtotal ?? 0) > 0)
+  }, [billingSummary?.subtotal]);
 
   // Slå upp kopplat Oneflow-kontrakt för kommunikationspanelen
   useEffect(() => {
@@ -988,6 +1034,47 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             );
 
             if (hasBillingItems) {
+              // Kontrollera att det finns ett faktiskt fakturerbart belopp (> 0).
+              // Ärenden utan tjänsterader med belopp (t.ex. 0-kr-inspektion) ska
+              // inte tilldela kundnummer eller skapa faktura.
+              const hasBillableAmt = await CaseBillingService.caseHasBillableAmount(
+                currentCase.id,
+                billingCaseType
+              );
+
+              if (hasBillableAmt) {
+                // Se till att en customers-rad finns med customer_number innan
+                // fakturan skapas — annars kan Fortnox-exporten inte hitta kunden.
+                const customerName = billingCaseType === 'business'
+                  ? (formData.company_name || currentCase.company_name || formData.bestallare || currentCase.bestallare || formData.kontaktperson || currentCase.kontaktperson || 'Okänd kund')
+                  : (formData.kontaktperson || currentCase.kontaktperson || 'Okänd kund');
+                const customerEmail = billingCaseType === 'business'
+                  ? (formData.e_post_faktura || currentCase.e_post_faktura || formData.e_post_kontaktperson || currentCase.e_post_kontaktperson)
+                  : (formData.e_post_kontaktperson || currentCase.e_post_kontaktperson);
+                const customerPhone = formData.telefon_kontaktperson || currentCase.telefon_kontaktperson;
+                const customerAddress = formatAddress(formData.adress || currentCase.adress);
+
+                try {
+                  const result = await CaseCustomerService.getOrCreateCaseCustomer({
+                    caseType: billingCaseType,
+                    name: customerName,
+                    personnummer: billingCaseType === 'private' ? (formData.personnummer || currentCase.personnummer) : null,
+                    organization_number: billingCaseType === 'business' ? (formData.org_nr || currentCase.org_nr) : null,
+                    email: customerEmail,
+                    phone: customerPhone,
+                    address: customerAddress,
+                    customerGroupId: billingCaseType === 'business' ? (selectedCustomerGroupId || undefined) : undefined,
+                  });
+                  if (result.customerNumber) {
+                    setExistingCustomerNumber(result.customerNumber);
+                  }
+                } catch (customerError: any) {
+                  console.error('[EditCaseModal] Kunde inte skapa/hämta kund:', customerError);
+                  toast.error(`Kund: ${customerError.message}`);
+                  throw customerError;
+                }
+              }
+
               // upsert: skapa ny eller ersätt oskickad
               await InvoiceService.upsertInvoiceFromCase(
                 currentCase.id,
@@ -1219,6 +1306,20 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     );
   }
 
+  // Blockera Spara när nytt business-ärende avslutas fakturerbart utan vald kundgrupp
+  const needsCustomerGroup =
+    !!currentCase &&
+    currentCase.case_type === 'business' &&
+    formData.status === 'Avslutat' &&
+    hasBillableAmount &&
+    existingCustomerNumber === null &&
+    !selectedCustomerGroupId
+
+  const saveDisabled = loading || timeTrackingLoading || needsCustomerGroup
+  const saveTooltip = needsCustomerGroup
+    ? 'Välj kundgrupp innan ärendet kan avslutas'
+    : undefined
+
   const footer = (
     <div className="flex items-center px-4 py-2 bg-slate-800/50">
       <button
@@ -1233,9 +1334,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={loading || timeTrackingLoading}>
           Avbryt
         </Button>
-        <Button type="submit" form="edit-case-form" size="sm" loading={loading} disabled={loading || timeTrackingLoading}>
-          Spara ändringar
-        </Button>
+        <span title={saveTooltip}>
+          <Button type="submit" form="edit-case-form" size="sm" loading={loading} disabled={saveDisabled}>
+            Spara ändringar
+          </Button>
+        </span>
       </div>
     </div>
   );
@@ -1764,6 +1867,68 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   articleGroupId={articleGroupId}
                   onChange={handleBillingSummaryChange}
                 />
+              </div>
+            )}
+
+            {/* Kundnummer (befintlig kund hittad via person-/org-nr) */}
+            {currentCase && existingCustomerNumber !== null && (
+              <div className="pt-3 border-t border-slate-700/50">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <CheckCircle className="w-4 h-4 text-[#20c58f]" />
+                  <span>Kundnummer: </span>
+                  <span className="font-semibold text-white">{existingCustomerNumber}</span>
+                  <span className="text-slate-500">(återanvänds från befintlig kund)</span>
+                </div>
+              </div>
+            )}
+
+            {/* Kundgruppsval för nya företagskunder (engångskunder) */}
+            {currentCase &&
+              currentCase.case_type === 'business' &&
+              formData.status === 'Avslutat' &&
+              hasBillableAmount &&
+              existingCustomerNumber === null && (
+              <div className="pt-3 border-t border-slate-700/50">
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-[#20c58f]" />
+                    <h3 className="text-sm font-semibold text-white">Kundgrupp (för fakturering)</h3>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Välj kundgrupp så tilldelas ett kundnummer när ärendet sparas. Krävs för Fortnox-export.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {customerGroups
+                      .filter(g => !g.is_private_default)
+                      .map(group => {
+                        const isSelected = selectedCustomerGroupId === group.id
+                        return (
+                          <button
+                            key={group.id}
+                            type="button"
+                            onClick={() => setSelectedCustomerGroupId(group.id)}
+                            className={`text-left p-2.5 rounded-lg border transition-all ${
+                              isSelected
+                                ? 'bg-[#20c58f]/10 border-[#20c58f]'
+                                : 'bg-slate-800/20 border-slate-700/50 hover:border-slate-600'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-white truncate">{group.name}</div>
+                                <div className="text-xs text-slate-500">
+                                  Nästa nr: {group.current_counter} ({group.series_start}–{group.series_end})
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <CheckCircle className="w-4 h-4 text-[#20c58f] flex-shrink-0" />
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
+                  </div>
+                </div>
               </div>
             )}
 
