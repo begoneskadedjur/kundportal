@@ -17,8 +17,7 @@ import {
   Home,
   ChevronDown,
   ChevronUp,
-  BookCheck,
-  FileEdit
+  BookCheck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Select from '../../../components/ui/Select'
