@@ -256,6 +256,17 @@ export default function InvoiceDetailModal({
         billing_address: invoice.customer_address,
       })
 
+      // 2b. Säkerställ att alla artiklar/tjänster finns i Fortnox innan fakturan skickas.
+      // Vi använder våra interna service-/artikelkoder som ArticleNumber.
+      // Saknas artikeln i Fortnox skapas den (Type: SERVICE, med unit + VAT).
+      await FortnoxService.ensureArticlesExistForInvoiceItems(
+        invoice.items.map(i => ({
+          article_code: i.article_code,
+          article_name: i.article_name,
+          vat_rate: i.vat_rate,
+        }))
+      )
+
       // 3. Bygg fakturarader
       const invoiceRows = invoice.items.map(item => ({
         ArticleNumber: item.article_code || undefined,

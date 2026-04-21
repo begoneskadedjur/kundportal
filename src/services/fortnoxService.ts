@@ -1,6 +1,8 @@
 // Fortnox API-klient — anropar intern proxy som hanterar auth
 // Alla anrop går till /api/fortnox/proxy?path=...
 
+import { supabase } from '../lib/supabase'
+
 async function fortnoxRequest<T>(
   path: string,
   method = 'GET',
@@ -221,5 +223,57 @@ export const FortnoxService = {
       },
     })
     return newArticle.Article.ArticleNumber
+  },
+
+  // Säkerställer att alla artiklar i fakturaraderna finns i Fortnox.
+  // Slår först upp i services-tabellen (tjänsteutbudet), faller tillbaka på
+  // articles-tabellen för gamla artikel-rader. Kör findOrCreateArticle
+  // parallellt för varje unik kod — idempotent tack vare GET-före-POST.
+  async ensureArticlesExistForInvoiceItems(
+    items: Array<{ article_code: string | null; article_name: string; vat_rate: number }>
+  ): Promise<void> {
+    const uniqueCodes = Array.from(
+      new Set(items.map(i => i.article_code).filter((c): c is string => !!c))
+    )
+    if (uniqueCodes.length === 0) return
+
+    // Slå upp primärt i services (tjänsteutbudet)
+    const { data: servicesData } = await supabase
+      .from('services')
+      .select('code, name, unit')
+      .in('code', uniqueCodes)
+    const serviceMap = new Map((servicesData || []).map(s => [s.code, s]))
+
+    // Fall tillbaka på articles för koder som inte finns i services
+    const missing = uniqueCodes.filter(c => !serviceMap.has(c))
+    const articleMap = new Map<string, { code: string; name: string; unit: string | null }>()
+    if (missing.length > 0) {
+      const { data: articlesData } = await supabase
+        .from('articles')
+        .select('code, name, unit')
+        .in('code', missing)
+      for (const a of articlesData || []) articleMap.set(a.code, a)
+    }
+
+    await Promise.all(
+      uniqueCodes.map(async code => {
+        const source = serviceMap.get(code) || articleMap.get(code)
+        const fallbackItem = items.find(i => i.article_code === code)
+        try {
+          await this.findOrCreateArticle({
+            code,
+            name: source?.name || fallbackItem?.article_name || code,
+            unit: source?.unit || 'st',
+            vat_rate: fallbackItem?.vat_rate ?? 25,
+          })
+        } catch (err: any) {
+          // 409 Conflict = artikeln finns redan → behandla som ok
+          if (err?.status === 409) return
+          throw new Error(
+            `Kunde inte synka artikel ${code} till Fortnox: ${err?.message || 'okänt fel'}`
+          )
+        }
+      })
+    )
   },
 }
