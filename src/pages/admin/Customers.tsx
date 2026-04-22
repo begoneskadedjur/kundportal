@@ -42,7 +42,16 @@ import toast from 'react-hot-toast'
 import { PriceListService } from '../../services/priceListService'
 import type { PriceList, PriceListItemWithArticle } from '../../types/articles'
 import { ImportedCustomerContractService } from '../../services/importedCustomerContractService'
-import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
+import { CaseBillingService } from '../../services/caseBillingService'
+import { PricingSettingsService } from '../../services/pricingSettingsService'
+import type { CaseBillingItemWithRelations, CaseServiceSummary } from '../../types/caseBilling'
+import type { PricingSettings } from '../../types/pricingSettings'
+
+const getMarginColor = (marginPercent: number, settings: PricingSettings): string => {
+  if (marginPercent >= settings.target_margin_percent) return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+  if (marginPercent >= settings.min_margin_percent) return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+  return 'bg-red-500/20 text-red-400 border border-red-500/30'
+}
 
 // Expanded row component för att visa mer detaljer
 const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { customer: any; colSpan?: number; contacts?: ContactSummary[] }) => {
@@ -51,8 +60,13 @@ const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { custom
     items: PriceListItemWithArticle[]
   }>({ priceList: null, items: [] })
   const [loadingPriceList, setLoadingPriceList] = useState(false)
-  const [contractServices, setContractServices] = useState<CaseBillingItemWithRelations[]>([])
-  const [loadingContractServices, setLoadingContractServices] = useState(false)
+  const [contractData, setContractData] = useState<{
+    services: CaseBillingItemWithRelations[]
+    articles: CaseBillingItemWithRelations[]
+    summary: CaseServiceSummary | null
+  }>({ services: [], articles: [], summary: null })
+  const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
+  const [loadingContract, setLoadingContract] = useState(false)
 
   useEffect(() => {
     const fetchPriceList = async () => {
@@ -74,25 +88,32 @@ const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { custom
   }, [customer.price_list_id])
 
   useEffect(() => {
-    const fetchContractServices = async () => {
+    const fetchContract = async () => {
       if (!customer.id) return
-      setLoadingContractServices(true)
+      setLoadingContract(true)
       try {
-        const contractId = await ImportedCustomerContractService.findContract(customer.id)
+        const [contractId, settings] = await Promise.all([
+          ImportedCustomerContractService.findContract(customer.id),
+          PricingSettingsService.get()
+        ])
+        setPricingSettings(settings)
         if (!contractId) {
-          setContractServices([])
+          setContractData({ services: [], articles: [], summary: null })
           return
         }
-        const { services } = await ImportedCustomerContractService.getItems(contractId)
-        setContractServices(services)
+        const [{ services, articles }, summary] = await Promise.all([
+          ImportedCustomerContractService.getItems(contractId),
+          CaseBillingService.getCaseServiceSummary(contractId, 'contract', settings.min_margin_percent)
+        ])
+        setContractData({ services, articles, summary })
       } catch (err) {
-        console.error('Error fetching contract services:', err)
-        setContractServices([])
+        console.error('Error fetching contract:', err)
+        setContractData({ services: [], articles: [], summary: null })
       } finally {
-        setLoadingContractServices(false)
+        setLoadingContract(false)
       }
     }
-    fetchContractServices()
+    fetchContract()
   }, [customer.id])
 
   return (
@@ -142,27 +163,65 @@ const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { custom
           {/* Avtalsinnehåll (tjänster från fakturainställningar) + Prislista för extra-tjänster */}
           <div className="space-y-4">
             <div>
-              <h4 className="text-sm font-medium text-slate-300 mb-3">Avtalsinnehåll</h4>
-              {loadingContractServices ? (
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium text-slate-300">Avtalsinnehåll</h4>
+                {contractData.summary?.margin_percent != null && pricingSettings && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getMarginColor(
+                    contractData.summary.margin_percent,
+                    pricingSettings
+                  )}`}>
+                    {contractData.summary.margin_percent.toFixed(1)}% marginal
+                  </span>
+                )}
+              </div>
+              {loadingContract ? (
                 <p className="text-xs text-slate-500">Laddar...</p>
-              ) : contractServices.length > 0 ? (
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {contractServices.map(item => (
-                    <div key={item.id} className="flex items-center justify-between text-xs py-1">
-                      <span className="text-slate-200">
-                        {item.quantity > 1 && (
-                          <span className="text-slate-500 mr-1">{item.quantity}×</span>
-                        )}
-                        {item.service_name || item.article_name}
-                      </span>
-                      <span className="text-slate-400 font-mono">
-                        {new Intl.NumberFormat('sv-SE').format(item.total_price)} kr
-                      </span>
-                    </div>
-                  ))}
-                </div>
               ) : (
-                <p className="text-xs text-slate-500">Inget avtalsinnehåll registrerat</p>
+                <>
+                  {contractData.services.length > 0 ? (
+                    <div className="space-y-1 mb-3 max-h-32 overflow-y-auto">
+                      {contractData.services.map(item => (
+                        <div key={item.id} className="flex items-center justify-between text-xs py-1">
+                          <span className="text-slate-200">
+                            {item.quantity > 1 && (
+                              <span className="text-slate-500 mr-1">{item.quantity}×</span>
+                            )}
+                            {item.service_name || item.article_name}
+                          </span>
+                          <span className="text-slate-400 font-mono">
+                            {new Intl.NumberFormat('sv-SE').format(item.total_price)} kr
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 mb-3">Inget avtalsinnehåll registrerat</p>
+                  )}
+
+                  {contractData.articles.length > 0 && (
+                    <div className="pt-2 border-t border-slate-700/50">
+                      <div className="flex items-center justify-between text-xs font-medium text-slate-400 mb-1">
+                        <span>Interna kostnader ({contractData.articles.length})</span>
+                        <span className="font-mono">
+                          {new Intl.NumberFormat('sv-SE').format(contractData.summary?.articles.total_purchase_cost ?? 0)} kr
+                        </span>
+                      </div>
+                      <div className="space-y-0.5 max-h-24 overflow-y-auto">
+                        {contractData.articles.map(item => (
+                          <div key={item.id} className="flex items-center justify-between text-xs text-slate-500 py-0.5">
+                            <span className="truncate">
+                              {item.quantity > 1 && <span className="mr-1">{item.quantity}×</span>}
+                              {item.article_name}
+                            </span>
+                            <span className="font-mono shrink-0 ml-2">
+                              {new Intl.NumberFormat('sv-SE').format(item.total_price)} kr
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
