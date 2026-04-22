@@ -11,7 +11,9 @@ import { ImportedCustomerContractService } from '../../../services/importedCusto
 interface Props {
   customerId: string
   readOnly?: boolean
-  onChange?: () => void
+  /** Kallas när användaren ändrat något. `servicesSubtotal` = summan av
+   *  tjänsterader (exkl. moms) — motsvarar "beräknat årsbelopp". */
+  onChange?: (servicesSubtotal: number) => void
 }
 
 export default function ContractCaseServiceSelector({ customerId, readOnly, onChange }: Props) {
@@ -52,7 +54,7 @@ export default function ContractCaseServiceSelector({ customerId, readOnly, onCh
       caseType="contract"
       customerId={customerId}
       readOnly={readOnly}
-      onChange={() => onChange?.()}
+      onChange={(_items, summary) => onChange?.(summary.subtotal)}
     />
   )
 }
