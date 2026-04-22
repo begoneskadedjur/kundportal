@@ -158,6 +158,8 @@ export default function CaseServiceSelector({
   const priceAssignmentsRef = useRef(priceAssignments)
   const priceMarkupsRef = useRef(priceMarkups)
   const allItemsRef = useRef<CaseBillingItemWithRelations[]>([])
+  // Serialiserar loadData-körningar så parallella anrop inte auto-skapar dubletter
+  const inFlightLoadRef = useRef<Promise<void> | null>(null)
   useEffect(() => {
     priceAssignmentsRef.current = priceAssignments
     // Notifiera parent om bara mappning ändras (inte items)
@@ -182,99 +184,125 @@ export default function CaseServiceSelector({
   useEffect(() => { allItemsRef.current = allItems }, [allItems])
 
   const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      // Lös upp service_group_id + artikelgrupp-ID från tjänsten
-      let resolvedArticleGroupId = articleGroupId ?? null
-      let serviceGroupId: string | null = null
-      if (primaryServiceId) {
-        const { data: svcRow } = await supabase.from('services').select('group_id').eq('id', primaryServiceId).single()
-        if (svcRow?.group_id) {
-          serviceGroupId = svcRow.group_id
-          if (!resolvedArticleGroupId) {
-            const { data: sgRow } = await supabase.from('service_groups').select('name').eq('id', svcRow.group_id).single()
-            if (sgRow?.name) {
-              const { data: agRow } = await supabase.from('article_groups').select('id').eq('name', sgRow.name).maybeSingle()
-              resolvedArticleGroupId = agRow?.id ?? null
+    // Om en körning redan pågår: vänta på den innan en ny startas, så att
+    // efterkommande körningar läser uppdaterad case_billing_items-data.
+    if (inFlightLoadRef.current) {
+      try { await inFlightLoadRef.current } catch { /* hanterat av tidigare körning */ }
+    }
+
+    const run = (async () => {
+      setLoading(true)
+      try {
+        // Lös upp service_group_id + artikelgrupp-ID från tjänsten
+        let resolvedArticleGroupId = articleGroupId ?? null
+        let serviceGroupId: string | null = null
+        if (primaryServiceId) {
+          const { data: svcRow } = await supabase.from('services').select('group_id').eq('id', primaryServiceId).single()
+          if (svcRow?.group_id) {
+            serviceGroupId = svcRow.group_id
+            if (!resolvedArticleGroupId) {
+              const { data: sgRow } = await supabase.from('service_groups').select('name').eq('id', svcRow.group_id).single()
+              if (sgRow?.name) {
+                const { data: agRow } = await supabase.from('article_groups').select('id').eq('name', sgRow.name).maybeSingle()
+                resolvedArticleGroupId = agRow?.id ?? null
+              }
             }
           }
         }
-      }
-      setResolvedServiceGroupId(serviceGroupId)
+        setResolvedServiceGroupId(serviceGroupId)
 
-      // Hämta Övrigt-gruppens ID för att alltid inkludera den i tilläggstjänster
-      const { data: ovrigtSgRow } = await supabase
-        .from('service_groups').select('id').eq('name', 'Övrigt').maybeSingle()
-      setOvrigtServiceGroupId(ovrigtSgRow?.id ?? null)
+        // Hämta Övrigt-gruppens ID för att alltid inkludera den i tilläggstjänster
+        const { data: ovrigtSgRow } = await supabase
+          .from('service_groups').select('id').eq('name', 'Övrigt').maybeSingle()
+        setOvrigtServiceGroupId(ovrigtSgRow?.id ?? null)
 
-      const [articlesData, itemsData, allServicesData, settingsData, customerPricesData] = await Promise.all([
-        CaseBillingService.getArticlesWithPrices(customerId, resolvedArticleGroupId),
-        caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
-        ServiceCatalogService.getAllActiveServices(),
-        PricingSettingsService.get(),
-        customerId ? PriceListService.getCustomerServicePrices(customerId) : Promise.resolve({}),
-      ])
-      setPricingSettings(settingsData)
-      setArticles(articlesData)
-      setAddonServices(allServicesData)
-      setCustomerServicePrices(customerPricesData)
+        const [articlesData, itemsData, allServicesData, settingsData, customerPricesData] = await Promise.all([
+          CaseBillingService.getArticlesWithPrices(customerId, resolvedArticleGroupId),
+          caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
+          ServiceCatalogService.getAllActiveServices(),
+          PricingSettingsService.get(),
+          customerId ? PriceListService.getCustomerServicePrices(customerId) : Promise.resolve({}),
+        ])
+        setPricingSettings(settingsData)
+        setArticles(articlesData)
+        setAddonServices(allServicesData)
+        setCustomerServicePrices(customerPricesData)
 
-      // Hämta primär tjänst
-      let svc: ServiceWithGroup | null = null
-      if (primaryServiceId) {
-        svc = allServicesData.find(s => s.id === primaryServiceId) ?? null
-      }
-
-      // Auto-skapa fakturarad för primärtjänsten om den saknas
-      let finalItems = itemsData
-      if (caseId && svc && !itemsData.some(i => i.item_type === 'service' && i.service_id === primaryServiceId)) {
-        // Använd kundens fasta pris om det finns, annars base_price
-        const customerPrice = customerPricesData[svc.id]
-        const priceToUse = customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
-        await CaseBillingService.addServiceToCase({
-          case_id: caseId,
-          case_type: caseType,
-          customer_id: customerId,
-          service_id: svc.id,
-          service_code: svc.code,
-          service_name: svc.name,
-          quantity: 1,
-          unit_price: priceToUse,
-          vat_rate: 25,
-          added_by_technician_id: technicianId || undefined,
-          added_by_technician_name: technicianName || undefined,
-        })
-        finalItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
-      }
-
-      // I draft-läge utan caseId: behåll befintlig state istället för att nollställa med tom itemsData
-      if (draftMode && !caseId) {
-        setLoading(false)
-        return
-      }
-
-      setAllItems(finalItems)
-
-      // Initialisera priceAssignments från DB (mapped_service_id på artikelrader)
-      const initialAssignments: Record<string, string> = {}
-      finalItems.forEach(item => {
-        if (item.item_type === 'article' && item.mapped_service_id) {
-          initialAssignments[item.id] = item.mapped_service_id
+        // Hämta primär tjänst
+        let svc: ServiceWithGroup | null = null
+        if (primaryServiceId) {
+          svc = allServicesData.find(s => s.id === primaryServiceId) ?? null
         }
-      })
-      setPriceAssignments(prev => {
-        // Behåll lokala val som inte finns i DB (draft), men låt DB-värden ha företräde för rader som finns där
-        const merged = { ...prev, ...initialAssignments }
-        return merged
-      })
 
-      const summary = buildBillingSummary(finalItems)
-      onChangeRef.current?.(finalItems, summary, { priceAssignments: initialAssignments, priceMarkups: {} })
-    } catch (err) {
-      console.error(err)
-      toast.error('Kunde inte ladda data')
+        // Auto-skapa fakturarad för primärtjänsten om den saknas.
+        // Dubbel-läsning precis innan INSERT skyddar mot parallella komponentinstanser
+        // som kan ha hunnit skapa raden medan vi väntade på andra fetches.
+        let finalItems = itemsData
+        if (caseId && svc && !itemsData.some(i => i.item_type === 'service' && i.service_id === primaryServiceId)) {
+          const freshItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
+          const stillMissing = !freshItems.some(
+            i => i.item_type === 'service' && i.service_id === primaryServiceId
+          )
+          if (stillMissing) {
+            const customerPrice = customerPricesData[svc.id]
+            const priceToUse = customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
+            await CaseBillingService.addServiceToCase({
+              case_id: caseId,
+              case_type: caseType,
+              customer_id: customerId,
+              service_id: svc.id,
+              service_code: svc.code,
+              service_name: svc.name,
+              quantity: 1,
+              unit_price: priceToUse,
+              vat_rate: 25,
+              added_by_technician_id: technicianId || undefined,
+              added_by_technician_name: technicianName || undefined,
+            })
+            finalItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
+          } else {
+            finalItems = freshItems
+          }
+        }
+
+        // I draft-läge utan caseId: behåll befintlig state istället för att nollställa med tom itemsData
+        if (draftMode && !caseId) {
+          setLoading(false)
+          return
+        }
+
+        setAllItems(finalItems)
+
+        // Initialisera priceAssignments från DB (mapped_service_id på artikelrader)
+        const initialAssignments: Record<string, string> = {}
+        finalItems.forEach(item => {
+          if (item.item_type === 'article' && item.mapped_service_id) {
+            initialAssignments[item.id] = item.mapped_service_id
+          }
+        })
+        setPriceAssignments(prev => {
+          // Behåll lokala val som inte finns i DB (draft), men låt DB-värden ha företräde för rader som finns där
+          const merged = { ...prev, ...initialAssignments }
+          return merged
+        })
+
+        const summary = buildBillingSummary(finalItems)
+        onChangeRef.current?.(finalItems, summary, { priceAssignments: initialAssignments, priceMarkups: {} })
+      } catch (err) {
+        console.error(err)
+        toast.error('Kunde inte ladda data')
+      } finally {
+        setLoading(false)
+      }
+    })()
+
+    inFlightLoadRef.current = run
+    try {
+      await run
     } finally {
-      setLoading(false)
+      if (inFlightLoadRef.current === run) {
+        inFlightLoadRef.current = null
+      }
     }
   }, [caseId, caseType, customerId, primaryServiceId, articleGroupId, technicianId, technicianName, draftMode])
 
