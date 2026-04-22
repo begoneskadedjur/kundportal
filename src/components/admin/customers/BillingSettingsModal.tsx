@@ -14,7 +14,7 @@ import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { PriceListService } from '../../../services/priceListService'
 import { CustomerContractArticleService } from '../../../services/customerContractArticleService'
-import ContractContentEditor from './ContractContentEditor'
+import ContractCaseServiceSelector from './ContractCaseServiceSelector'
 import type { PriceListItemWithArticle } from '../../../types/articles'
 import {
   ARTICLE_UNIT_CONFIG,
@@ -741,7 +741,7 @@ export default function BillingSettingsModal({
               )
             ) : (
               customerId && (
-                <ContractContentEditor
+                <ContractCaseServiceSelector
                   customerId={customerId}
                   onChange={() => setContractReloadTick(t => t + 1)}
                 />
