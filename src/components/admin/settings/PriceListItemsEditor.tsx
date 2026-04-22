@@ -54,6 +54,8 @@ export function PriceListItemsEditor({
   const [markupPercent, setMarkupPercent] = useState<string>('')
   const [appliedMarkup, setAppliedMarkup] = useState<string | null>(null)
   const [isBulkSaving, setIsBulkSaving] = useState(false)
+  const [bulkMode, setBulkMode] = useState<'percent' | 'fixed'>('percent')
+  const [bulkFixedPrice, setBulkFixedPrice] = useState<string>('')
 
   // Ladda tjänstepriser
   useEffect(() => {
@@ -173,6 +175,41 @@ export function PriceListItemsEditor({
     }
     setSelectedIds(new Set())
     setMarkupPercent('')
+  }
+
+  // Bulk fast pris — sätt samma kr-belopp på alla markerade tjänster
+  const applyBulkFixedPrice = () => {
+    const price = parseFloat(bulkFixedPrice)
+    if (isNaN(price) || price < 0) {
+      toast.error('Ange ett giltigt pris (0 eller högre)')
+      return
+    }
+
+    const priceStr = Math.round(price).toString()
+    const newStates = { ...priceStates }
+    let affected = 0
+
+    for (const serviceId of selectedIds) {
+      const currentState = newStates[serviceId]
+      const originalMode = currentState?.originalMode || 'guide'
+      const originalCustomPrice = currentState?.originalCustomPrice || ''
+
+      newStates[serviceId] = {
+        mode: 'fixed',
+        customPrice: priceStr,
+        isSaving: false,
+        savedAt: null,
+        isDirty: true,
+        originalMode,
+        originalCustomPrice
+      }
+      affected++
+    }
+
+    setPriceStates(newStates)
+    toast.success(`Fast pris ${priceStr} kr satt på ${affected} tjänst${affected === 1 ? '' : 'er'}`)
+    setSelectedIds(new Set())
+    setBulkFixedPrice('')
   }
 
   // Spara pris till databas
@@ -443,49 +480,102 @@ export function PriceListItemsEditor({
         </select>
       </div>
 
-      {/* Bulk-påslag toolbar */}
+      {/* Bulk-toolbar */}
       {isSomeSelected && (
         <div className="mb-3 p-3 bg-slate-800/50 border border-[#20c58f]/30 rounded-xl flex flex-wrap items-center gap-2">
           <span className="text-sm text-white font-medium">
             {selectedIds.size} tjänst{selectedIds.size > 1 ? 'er' : ''} markerade
           </span>
           <div className="h-5 w-px bg-slate-700" />
-          {[10, 15, 20, 25].map(pct => (
+          {/* Mode-toggle */}
+          <div className="flex items-center bg-slate-900 border border-slate-600 rounded-lg p-0.5">
             <button
-              key={pct}
-              onClick={() => setMarkupPercent(pct.toString())}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                markupPercent === pct.toString()
+              onClick={() => setBulkMode('percent')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                bulkMode === 'percent'
                   ? 'bg-[#20c58f] text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              +{pct}%
+              % Påslag
             </button>
-          ))}
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              value={markupPercent}
-              onChange={(e) => setMarkupPercent(e.target.value)}
-              placeholder="Annat"
-              min="-50"
-              max="500"
-              step="1"
-              className="w-16 px-2 py-1.5 bg-slate-900 border border-slate-600 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-            />
-            <span className="text-xs text-slate-500">%</span>
+            <button
+              onClick={() => setBulkMode('fixed')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                bulkMode === 'fixed'
+                  ? 'bg-[#20c58f] text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              kr Fast pris
+            </button>
           </div>
+          <div className="h-5 w-px bg-slate-700" />
+
+          {bulkMode === 'percent' ? (
+            <>
+              {[10, 15, 20, 25].map(pct => (
+                <button
+                  key={pct}
+                  onClick={() => setMarkupPercent(pct.toString())}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    markupPercent === pct.toString()
+                      ? 'bg-[#20c58f] text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  +{pct}%
+                </button>
+              ))}
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={markupPercent}
+                  onChange={(e) => setMarkupPercent(e.target.value)}
+                  placeholder="Annat"
+                  min="-50"
+                  max="500"
+                  step="1"
+                  className="w-16 px-2 py-1.5 bg-slate-900 border border-slate-600 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                />
+                <span className="text-xs text-slate-500">%</span>
+              </div>
+              <button
+                onClick={applyBulkMarkup}
+                disabled={markupPercent === ''}
+                className="px-4 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Percent className="w-3.5 h-3.5" />
+                Sätt pris
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={bulkFixedPrice}
+                  onChange={(e) => setBulkFixedPrice(e.target.value)}
+                  placeholder="Pris i kr"
+                  min="0"
+                  step="1"
+                  className="w-28 px-2 py-1.5 bg-slate-900 border border-slate-600 rounded text-sm text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                />
+                <span className="text-xs text-slate-500">kr</span>
+              </div>
+              <button
+                onClick={applyBulkFixedPrice}
+                disabled={bulkFixedPrice === ''}
+                className="px-4 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                Sätt pris
+              </button>
+            </>
+          )}
+
           <button
-            onClick={applyBulkMarkup}
-            disabled={markupPercent === ''}
-            className="px-4 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <Percent className="w-3.5 h-3.5" />
-            Sätt pris
-          </button>
-          <button
-            onClick={() => { setSelectedIds(new Set()); setMarkupPercent('') }}
+            onClick={() => { setSelectedIds(new Set()); setMarkupPercent(''); setBulkFixedPrice('') }}
             className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg transition-colors ml-auto"
           >
             Avmarkera alla
