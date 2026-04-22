@@ -58,6 +58,7 @@ export default function SingleCustomerDetailModal({
   // Single customer data (direct access since there's only one site)
   const site = customer.sites[0]
   const contractValue = customer.totalContractValue
+  const isAvropsavtal = (!site.annual_value || site.annual_value <= 0) && !!site.contract_start_date
 
   // Kontraktsperiod — korrekt beräkning baserat på start/slut-datum
   const contractProgress = getContractProgress(site.contract_start_date, site.contract_end_date)
@@ -408,7 +409,9 @@ export default function SingleCustomerDetailModal({
                               <span className="text-blue-400">{formatCurrency(billingStats.adHocBilling)}</span>
                             </div>
                             <div className="text-xs text-slate-500 mt-2">
-                              Kontraktsvärde: {formatCurrency(contractValue)}/år
+                              {isAvropsavtal
+                                ? `Avtalsvärde (ackumulerat): ${formatCurrency(contractValue)}`
+                                : `Kontraktsvärde: ${formatCurrency(contractValue)}/år`}
                             </div>
                           </div>
                         </>

@@ -83,6 +83,9 @@ export interface CustomerSite extends Customer {
   // Cases data per site
   casesCount: number
   casesValue: number
+  // Ackumulerat avtalsvärde från fakturerade contract-items inom avtalsperiod
+  // (används som fallback för avropsavtal där annual_value saknas)
+  contractBilledAccum: number
   casesBillingBreakdown: {
     pending: number
     sent: number
@@ -241,7 +244,8 @@ export function useConsolidatedCustomers() {
         casesResult,
         invitationsResult,
         contactsResult,
-        adHocResult
+        adHocResult,
+        contractItemsResult
       ] = await Promise.all([
         supabase.from('customers').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('customer_id, role').eq('role', 'customer'),
@@ -249,7 +253,8 @@ export function useConsolidatedCustomers() {
         supabase.from('cases').select('id, customer_id, title, description, price, billing_status, created_at'),
         supabase.from('user_invitations').select('customer_id, accepted_at, expires_at'),
         supabase.from('customer_contacts').select('customer_id, name, title, responsibility_area, phone, email'),
-        supabase.from('contract_billing_items').select('customer_id, total_price').eq('item_type', 'ad_hoc').neq('status', 'cancelled')
+        supabase.from('contract_billing_items').select('customer_id, total_price').eq('item_type', 'ad_hoc').neq('status', 'cancelled'),
+        supabase.from('contract_billing_items').select('customer_id, total_price, billing_period_start').eq('item_type', 'contract').neq('status', 'cancelled')
       ])
 
       const { data: customersData, error: customersError } = customersResult
@@ -261,11 +266,20 @@ export function useConsolidatedCustomers() {
       const { data: invitationsData, error: invitationsError } = invitationsResult
       const { data: contactsData } = contactsResult
       const { data: adHocData } = adHocResult
+      const { data: contractItemsData } = contractItemsResult
 
       // Bygg ad_hoc-map: customer_id → summerad totalbelopp
       const adHocMap = new Map<string, number>()
       adHocData?.forEach((item: any) => {
         adHocMap.set(item.customer_id, (adHocMap.get(item.customer_id) ?? 0) + (item.total_price ?? 0))
+      })
+
+      // Bygg contract-items-per-kund (filter på period per kund sker nedan när customer-data finns)
+      const contractItemsByCustomer = new Map<string, Array<{ total_price: number; billing_period_start: string | null }>>()
+      contractItemsData?.forEach((item: any) => {
+        const arr = contractItemsByCustomer.get(item.customer_id) || []
+        arr.push({ total_price: item.total_price ?? 0, billing_period_start: item.billing_period_start })
+        contractItemsByCustomer.set(item.customer_id, arr)
       })
 
       // Customer contacts map for search (customer_id -> searchable strings)
@@ -420,6 +434,19 @@ export function useConsolidatedCustomers() {
         const customerCases = casesMap.get(customer.id) || []
         // casesValue = summan av ad_hoc contract_billing_items (ClickUp fasas ut)
         const casesValue = adHocMap.get(customer.id) ?? 0
+
+        // Ackumulerat avtalsvärde: SUM(contract-items inom [contract_start_date, terminated_at || now()])
+        // Används som fallback för avropsavtal (annual_value saknas men contract_start_date finns).
+        const items = contractItemsByCustomer.get(customer.id) || []
+        const startCutoff = customer.contract_start_date ? new Date(customer.contract_start_date) : null
+        const endCutoff = customer.terminated_at ? new Date(customer.terminated_at) : new Date()
+        const contractBilledAccum = items.reduce((sum, it) => {
+          if (!it.billing_period_start) return sum + it.total_price
+          const d = new Date(it.billing_period_start)
+          if (startCutoff && d < startCutoff) return sum
+          if (d > endCutoff) return sum
+          return sum + it.total_price
+        }, 0)
         const casesBillingBreakdown = {
           pending: customerCases.filter(c => c.billing_status === 'pending').length,
           sent: customerCases.filter(c => c.billing_status === 'sent').length,
@@ -442,6 +469,7 @@ export function useConsolidatedCustomers() {
           // Cases data
           casesCount: customerCases.length,
           casesValue,
+          contractBilledAccum,
           casesBillingBreakdown,
           cases: customerCases
         }
@@ -589,7 +617,10 @@ export function useConsolidatedCustomers() {
 
           sites: [customer],
           totalSites: 1,
-          totalContractValue: customer.total_contract_value || 0,
+          // Avropsavtal (ingen årspremie men start-datum finns) → ackumulerat debiterat som avtalsvärde
+          totalContractValue: ((!customer.annual_value || customer.annual_value <= 0) && customer.contract_start_date)
+            ? customer.contractBilledAccum
+            : (customer.total_contract_value || 0),
           totalAnnualValue: customer.annual_value || 0,
           totalMonthlyValue: customer.monthly_value || 0,
           portalAccessStatus: customer.hasPortalAccess ? 'full' : 'none',
@@ -599,7 +630,11 @@ export function useConsolidatedCustomers() {
           // Cases data for single customer
           totalCasesValue: customer.casesValue,
           totalCasesCount: customer.casesCount,
-          totalOrganizationValue: (customer.total_contract_value || 0) + customer.casesValue,
+          totalOrganizationValue:
+            (((!customer.annual_value || customer.annual_value <= 0) && customer.contract_start_date)
+              ? customer.contractBilledAccum
+              : (customer.total_contract_value || 0))
+            + customer.casesValue,
           casesBillingStatus: {
             pending: { 
               count: customer.casesBillingBreakdown.pending, 
@@ -647,7 +682,11 @@ export function useConsolidatedCustomers() {
         
         // Aggregera värden
         org.totalSites = sites.length
-        org.totalContractValue = sites.reduce((sum, site) => sum + (site.total_contract_value || 0), 0)
+        // Avropsavtal per site → ackumulerad debitering istället för fast total_contract_value
+        org.totalContractValue = sites.reduce((sum, site) => {
+          const isAvropsavtal = (!site.annual_value || site.annual_value <= 0) && !!site.contract_start_date
+          return sum + (isAvropsavtal ? site.contractBilledAccum : (site.total_contract_value || 0))
+        }, 0)
         org.totalAnnualValue = sites.reduce((sum, site) => sum + (site.annual_value || 0), 0)
         org.totalMonthlyValue = sites.reduce((sum, site) => sum + (site.monthly_value || 0), 0)
         
