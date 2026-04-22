@@ -176,6 +176,29 @@ function parseContractLengthMonths(text: string | null): number {
   return /år|year/i.test(match[2]) ? n * 12 : n
 }
 
+// Returnerar total_contract_value eller null för avropsavtal.
+// Null när annual_value saknas/0 eller contract_length inte kan tolkas.
+function computeTotalContractValue(
+  annualValue: number | string | null | undefined,
+  contractLengthText: string | null | undefined
+): number | null {
+  const annual =
+    typeof annualValue === 'string' ? parseFloat(annualValue) : annualValue
+  if (annual == null || !Number.isFinite(annual) || annual <= 0) return null
+  if (!contractLengthText) return null
+
+  const match = String(contractLengthText).trim().match(/(\d+(?:[.,]\d+)?)\s*(år|year|years|months?|månader?|månad|mån|m)?/i)
+  if (!match) return null
+
+  const n = parseFloat(match[1].replace(',', '.'))
+  if (!Number.isFinite(n) || n <= 0) return null
+
+  const unit = (match[2] || '').toLowerCase()
+  const months = /^(år|year|years)$/.test(unit) ? Math.round(n * 12) : Math.round(n)
+
+  return Math.round(annual * (months / 12))
+}
+
 function extractOneflowData(contractData: { contract: any; parties: any[] }) {
   const { contract, parties } = contractData
   const customerParty = parties.find((p: any) => !p.my_party)
@@ -325,9 +348,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         })
       }
 
+      // Auto-beräkna total_contract_value från annual_value × avtalslängd
+      // Null för avropsavtal (saknar annual_value eller contract_length)
+      const computedTotalContractValue = computeTotalContractValue(
+        customer_data.annual_value,
+        customer_data.contract_length
+      )
+
+      const insertPayload = {
+        ...customer_data,
+        organization_number: normalized,
+        source_type: 'import',
+        total_contract_value:
+          customer_data.total_contract_value ?? computedTotalContractValue,
+      }
+
       const { data: inserted, error: insertError } = await supabase
         .from('customers')
-        .insert({ ...customer_data, organization_number: normalized, source_type: 'import' })
+        .insert(insertPayload)
         .select()
         .single()
 

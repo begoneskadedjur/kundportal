@@ -41,6 +41,8 @@ import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { PriceListService } from '../../services/priceListService'
 import type { PriceList, PriceListItemWithArticle } from '../../types/articles'
+import { ImportedCustomerContractService } from '../../services/importedCustomerContractService'
+import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 
 // Expanded row component för att visa mer detaljer
 const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { customer: any; colSpan?: number; contacts?: ContactSummary[] }) => {
@@ -49,6 +51,8 @@ const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { custom
     items: PriceListItemWithArticle[]
   }>({ priceList: null, items: [] })
   const [loadingPriceList, setLoadingPriceList] = useState(false)
+  const [contractServices, setContractServices] = useState<CaseBillingItemWithRelations[]>([])
+  const [loadingContractServices, setLoadingContractServices] = useState(false)
 
   useEffect(() => {
     const fetchPriceList = async () => {
@@ -68,6 +72,28 @@ const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { custom
     }
     fetchPriceList()
   }, [customer.price_list_id])
+
+  useEffect(() => {
+    const fetchContractServices = async () => {
+      if (!customer.id) return
+      setLoadingContractServices(true)
+      try {
+        const contractId = await ImportedCustomerContractService.findContract(customer.id)
+        if (!contractId) {
+          setContractServices([])
+          return
+        }
+        const { services } = await ImportedCustomerContractService.getItems(contractId)
+        setContractServices(services)
+      } catch (err) {
+        console.error('Error fetching contract services:', err)
+        setContractServices([])
+      } finally {
+        setLoadingContractServices(false)
+      }
+    }
+    fetchContractServices()
+  }, [customer.id])
 
   return (
     <tr>
@@ -113,34 +139,52 @@ const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { custom
             </div>
           </div>
 
-          {/* Prislista & Artiklar */}
-          <div>
-            <h4 className="text-sm font-medium text-slate-300 mb-3">Prislista & Artiklar</h4>
-            {loadingPriceList ? (
-              <p className="text-xs text-slate-500">Laddar...</p>
-            ) : priceListData.priceList ? (
-              <div>
-                <div className="text-xs text-purple-400 mb-2 font-medium">
-                  {priceListData.priceList.name}
-                </div>
+          {/* Avtalsinnehåll (tjänster från fakturainställningar) + Prislista för extra-tjänster */}
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-sm font-medium text-slate-300 mb-3">Avtalsinnehåll</h4>
+              {loadingContractServices ? (
+                <p className="text-xs text-slate-500">Laddar...</p>
+              ) : contractServices.length > 0 ? (
                 <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {priceListData.items.length > 0 ? (
-                    priceListData.items.map(item => (
-                      <div key={item.id} className="flex items-center justify-between text-xs py-1">
-                        <span className="text-slate-300">{item.article?.name || 'Okänd'}</span>
-                        <span className="text-slate-500 font-mono">
-                          {new Intl.NumberFormat('sv-SE').format(item.custom_price)} kr/{item.article?.unit || 'st'}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-slate-500">Inga artiklar i prislistan</p>
-                  )}
+                  {contractServices.map(item => (
+                    <div key={item.id} className="flex items-center justify-between text-xs py-1">
+                      <span className="text-slate-200">
+                        {item.quantity > 1 && (
+                          <span className="text-slate-500 mr-1">{item.quantity}×</span>
+                        )}
+                        {item.service_name || item.article_name}
+                      </span>
+                      <span className="text-slate-400 font-mono">
+                        {new Intl.NumberFormat('sv-SE').format(item.total_price)} kr
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500">Ingen prislista tilldelad</p>
-            )}
+              ) : (
+                <p className="text-xs text-slate-500">Inget avtalsinnehåll registrerat</p>
+              )}
+            </div>
+
+            <div>
+              <h4 className="text-xs font-medium text-slate-400 mb-2">Prislista för extra-tjänster</h4>
+              {loadingPriceList ? (
+                <p className="text-xs text-slate-500">Laddar...</p>
+              ) : priceListData.priceList ? (
+                <div>
+                  <div className="text-xs text-purple-400 mb-1 font-medium">
+                    {priceListData.priceList.name}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {priceListData.items.length > 0
+                      ? `${priceListData.items.length} specialpris för merförsäljning`
+                      : 'Ingen merförsäljning i prislistan'}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">Ingen prislista tilldelad (standardpriser gäller)</p>
+              )}
+            </div>
           </div>
 
           {/* Health Score Breakdown */}

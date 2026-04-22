@@ -1,6 +1,7 @@
 // src/services/customerService.ts - Utökad med getAllCustomers och deleteCustomer
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { calculateTotalContractValue } from '../utils/contractLength'
 
 // Utökad type med alla nya fält
 export type CreateCustomerData = {
@@ -107,7 +108,7 @@ export const customerService = {
   async updateCustomer(id: string, updates: Partial<CreateCustomerData>) {
     // Konvertera string-värden till rätt datatyper för databas
     const dbUpdates: any = { ...updates }
-    
+
     if (updates.annual_value) {
       dbUpdates.annual_value = parseFloat(updates.annual_value)
     }
@@ -117,7 +118,31 @@ export const customerService = {
     if (updates.total_contract_value) {
       dbUpdates.total_contract_value = parseFloat(updates.total_contract_value)
     }
-    
+
+    // Auto-beräkna total_contract_value när annual_value eller contract_length ändras
+    // (men inte om användaren explicit skickat in ett värde)
+    const annualValueTouched = 'annual_value' in updates
+    const contractLengthTouched = 'contract_length' in updates
+    const totalValueTouched = 'total_contract_value' in updates
+
+    if ((annualValueTouched || contractLengthTouched) && !totalValueTouched) {
+      // Hämta nuvarande värden för fält som inte ändrats denna gång
+      const { data: current } = await supabase
+        .from('customers')
+        .select('annual_value, contract_length')
+        .eq('id', id)
+        .single()
+
+      const effectiveAnnual = annualValueTouched
+        ? dbUpdates.annual_value ?? null
+        : current?.annual_value ?? null
+      const effectiveLength = contractLengthTouched
+        ? updates.contract_length ?? null
+        : current?.contract_length ?? null
+
+      dbUpdates.total_contract_value = calculateTotalContractValue(effectiveAnnual, effectiveLength)
+    }
+
     // Sätt updated_at timestamp
     dbUpdates.updated_at = new Date().toISOString()
 
@@ -127,7 +152,7 @@ export const customerService = {
       .eq('id', id)
       .select()
       .single()
-    
+
     if (error) throw error
     return data
   },
