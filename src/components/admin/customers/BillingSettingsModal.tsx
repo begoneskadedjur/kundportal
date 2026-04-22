@@ -14,6 +14,7 @@ import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { PriceListService } from '../../../services/priceListService'
 import { CustomerContractArticleService } from '../../../services/customerContractArticleService'
+import ContractContentEditor from './ContractContentEditor'
 import type { PriceListItemWithArticle } from '../../../types/articles'
 import {
   ARTICLE_UNIT_CONFIG,
@@ -133,6 +134,10 @@ export default function BillingSettingsModal({
     articles: Array<{ article_name: string; quantity: number; unit_price: number }>
   }
   const [contractServices, setContractServices] = useState<ContractService[]>([])
+  // True om kunden har ett "riktigt" Oneflow-signerat kontrakt (läs-only).
+  // False = ingen contracts-rad, eller bara importerad container → rendera editor.
+  const [hasOneflowContract, setHasOneflowContract] = useState(false)
+  const [contractReloadTick, setContractReloadTick] = useState(0)
 
   // Billing form state
   const [billingFrequency, setBillingFrequency] = useState<BillingFrequency>('monthly')
@@ -265,20 +270,27 @@ export default function BillingSettingsModal({
   useEffect(() => {
     if (!isOpen || !customerId) {
       setContractServices([])
+      setHasOneflowContract(false)
       return
     }
     ;(async () => {
       try {
         const { data: contracts } = await supabase
           .from('contracts')
-          .select('id')
+          .select('id, oneflow_contract_id')
           .eq('customer_id', customerId)
           .in('status', ['signed', 'active'])
 
         if (!contracts?.length) {
           setContractServices([])
+          setHasOneflowContract(false)
           return
         }
+        // "Riktigt" Oneflow = oneflow_contract_id som INTE börjar med 'imported-'
+        const oneflowContracts = contracts.filter(
+          (c: any) => c.oneflow_contract_id && !String(c.oneflow_contract_id).startsWith('imported-')
+        )
+        setHasOneflowContract(oneflowContracts.length > 0)
         const contractIds = contracts.map((c: any) => c.id)
 
         const { data: items } = await supabase
@@ -312,7 +324,7 @@ export default function BillingSettingsModal({
         setContractServices([])
       }
     })()
-  }, [isOpen, customerId])
+  }, [isOpen, customerId, contractReloadTick])
 
   // Summering
   const adjustPct = priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) || 0 : 0
@@ -691,38 +703,49 @@ export default function BillingSettingsModal({
               )}
             </div>
 
-            {/* Ingår i avtalet — tjänster + interna artiklar från signerat kontrakt */}
-            {contractServices.length > 0 && (
-              <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-2">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <FileSignature className="w-4 h-4 text-[#20c58f]" />
-                  <h4 className="text-sm font-semibold text-white">Ingår i avtalet</h4>
-                  <span className="px-1.5 py-0.5 text-xs rounded-full bg-[#20c58f]/20 text-[#20c58f]">
-                    {contractServices.length}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {contractServices.map(s => (
-                    <div key={s.id} className="px-3 py-2 bg-slate-800/40 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-white">
-                          {s.service_name} × {s.quantity}
-                        </span>
-                        <span className="text-sm text-[#20c58f] font-medium">
-                          {fmt(s.total_price)}
-                        </span>
+            {/* Avtalsinnehåll:
+                - Oneflow-signerat kontrakt → read-only lista (befintlig logik)
+                - Ingen Oneflow-rad (importerad kund) → inline-editor */}
+            {hasOneflowContract ? (
+              contractServices.length > 0 && (
+                <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-2">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <FileSignature className="w-4 h-4 text-[#20c58f]" />
+                    <h4 className="text-sm font-semibold text-white">Ingår i avtalet</h4>
+                    <span className="px-1.5 py-0.5 text-xs rounded-full bg-[#20c58f]/20 text-[#20c58f]">
+                      {contractServices.length}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {contractServices.map(s => (
+                      <div key={s.id} className="px-3 py-2 bg-slate-800/40 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-white">
+                            {s.service_name} × {s.quantity}
+                          </span>
+                          <span className="text-sm text-[#20c58f] font-medium">
+                            {fmt(s.total_price)}
+                          </span>
+                        </div>
+                        {s.articles.length > 0 && (
+                          <ul className="mt-1.5 space-y-0.5 text-xs text-slate-400">
+                            {s.articles.map((a, i) => (
+                              <li key={i}>• {a.article_name} × {a.quantity}</li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
-                      {s.articles.length > 0 && (
-                        <ul className="mt-1.5 space-y-0.5 text-xs text-slate-400">
-                          {s.articles.map((a, i) => (
-                            <li key={i}>• {a.article_name} × {a.quantity}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )
+            ) : (
+              customerId && (
+                <ContractContentEditor
+                  customerId={customerId}
+                  onChange={() => setContractReloadTick(t => t + 1)}
+                />
+              )
             )}
 
             {/* Artikel-picker */}
