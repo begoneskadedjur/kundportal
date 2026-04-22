@@ -34,6 +34,8 @@ export interface Service {
   rut_eligible: boolean
   rot_rate_percent: number | null  // null = använd global default
   rut_rate_percent: number | null  // null = använd global default
+  // Om true: tjänsten kan väljas som Avtalstyp på kund.
+  is_contract_service: boolean
   created_at: string
   updated_at: string
 }
@@ -76,6 +78,7 @@ export interface CreateServiceInput {
   rut_eligible?: boolean
   rot_rate_percent?: number | null
   rut_rate_percent?: number | null
+  is_contract_service?: boolean
 }
 
 export interface UpdateServiceInput {
@@ -94,6 +97,7 @@ export interface UpdateServiceInput {
   rut_eligible?: boolean
   rot_rate_percent?: number | null
   rut_rate_percent?: number | null
+  is_contract_service?: boolean
 }
 
 export const SERVICE_UNITS = ['st', 'timme', 'dag', 'km', 'm2', 'fp'] as const

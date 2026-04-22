@@ -12,19 +12,11 @@ import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
 import { CustomerGroupService } from '../../../services/customerGroupService'
 import type { CustomerGroup } from '../../../types/customerGroups'
+import { useContractTypeOptions } from '../../../hooks/useContractTypeOptions'
 
 const MONTHS_SV = [
   'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
   'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
-]
-
-const CONTRACT_TYPE_OPTIONS = [
-  { value: '', label: 'Välj avtalstyp' },
-  { value: 'Skadedjursavtal', label: 'Skadedjursavtal' },
-  { value: 'Avtal Mekaniska fällor', label: 'Avtal Mekaniska fällor' },
-  { value: 'Avtal Betesstationer', label: 'Avtal Betesstationer' },
-  { value: 'Avtal Betongstationer', label: 'Avtal Betongstationer' },
-  { value: 'Avtal Indikationsfällor', label: 'Avtal Indikationsfällor' },
 ]
 
 interface FortnoxInvoiceRow {
@@ -143,6 +135,7 @@ export default function ImportCustomerByOrgnrModal({
 }: ImportCustomerByOrgnrModalProps) {
   const [step, setStep] = useState<Step>('search')
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+  const { options: contractTypeOptions } = useContractTypeOptions()
 
   useEffect(() => {
     CustomerGroupService.getAllGroups().then(setCustomerGroups).catch(() => {})
@@ -474,7 +467,8 @@ export default function ImportCustomerByOrgnrModal({
                   <Select
                     value={preview.contract_type ?? ''}
                     onChange={v => setPreview(prev => prev ? { ...prev, contract_type: v || null } : prev)}
-                    options={CONTRACT_TYPE_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                    placeholder={contractTypeOptions.length === 0 ? 'Flagga tjänster som "Använd som avtalstyp"' : 'Välj avtalstyp'}
+                    options={contractTypeOptions}
                   />
                 </div>
 

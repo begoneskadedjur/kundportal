@@ -19,6 +19,7 @@ import EditableCustomerField from '../../components/admin/EditableCustomerField'
 import ProductsViewer from '../../components/admin/ProductsViewer'
 import { useTechnicians } from '../../hooks/useTechnicians'
 import { SERVICE_FREQUENCIES, CUSTOMER_SIZES, getIndustryCategory } from '../../constants/customerOptions'
+import { useContractTypeOptions } from '../../hooks/useContractTypeOptions'
 
 interface CustomerDetails {
   id: string
@@ -76,6 +77,7 @@ export default function CustomerDetails() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { accountManagers, loading: techniciansLoading } = useTechnicians()
+  const { options: contractTypeOptions } = useContractTypeOptions()
 
   useEffect(() => {
     if (id) {
@@ -313,14 +315,8 @@ export default function CustomerDetails() {
                   value={customer.contract_type}
                   onSave={(value) => handleFieldUpdate('contract_type', value)}
                   type="select"
-                  placeholder="Välj avtalstyp"
-                  options={[
-                    { value: 'Skadedjursavtal', label: 'Skadedjursavtal' },
-                    { value: 'Avtal Betesstationer', label: 'Avtal Betesstationer' },
-                    { value: 'Avtal Betongstationer', label: 'Avtal Betongstationer' },
-                    { value: 'Avtal Mekaniska fällor', label: 'Avtal Mekaniska fällor' },
-                    { value: 'Avtal Indikationsfällor', label: 'Avtal Indikationsfällor' },
-                  ]}
+                  placeholder={contractTypeOptions.length === 0 ? 'Flagga tjänster som "Använd som avtalstyp"' : 'Välj avtalstyp'}
+                  options={contractTypeOptions}
                 />
                 
                 <EditableCustomerField

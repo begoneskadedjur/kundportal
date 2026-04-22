@@ -47,6 +47,8 @@ export default function ServiceCatalogEditModal({
   const [rutEligible, setRutEligible] = useState(false)
   const [rotRatePercent, setRotRatePercent] = useState<string>('')
   const [rutRatePercent, setRutRatePercent] = useState<string>('')
+  // Avtalstyp-flagga — om true visas tjänsten som val i kundens Avtalstyp
+  const [isContractService, setIsContractService] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -68,6 +70,7 @@ export default function ServiceCatalogEditModal({
       setRutEligible(service.rut_eligible ?? false)
       setRotRatePercent(service.rot_rate_percent != null ? String(service.rot_rate_percent) : '')
       setRutRatePercent(service.rut_rate_percent != null ? String(service.rut_rate_percent) : '')
+      setIsContractService(service.is_contract_service ?? false)
     } else {
       setCode('')
       setName('')
@@ -85,6 +88,7 @@ export default function ServiceCatalogEditModal({
       setRutEligible(false)
       setRotRatePercent('')
       setRutRatePercent('')
+      setIsContractService(false)
     }
   }, [isOpen, service, groups])
 
@@ -114,6 +118,7 @@ export default function ServiceCatalogEditModal({
           rut_eligible: rutEligible,
           rot_rate_percent: rotRateNum,
           rut_rate_percent: rutRateNum,
+          is_contract_service: isContractService,
         }
         await ServiceCatalogService.createService(input)
         toast.success('Tjänst skapad')
@@ -134,6 +139,7 @@ export default function ServiceCatalogEditModal({
           rut_eligible: rutEligible,
           rot_rate_percent: rotRateNum,
           rut_rate_percent: rutRateNum,
+          is_contract_service: isContractService,
         }
         await ServiceCatalogService.updateService(service!.id, input)
         toast.success('Tjänst uppdaterad')
@@ -261,6 +267,15 @@ export default function ServiceCatalogEditModal({
                       className="w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-700 border-slate-600"
                     />
                     <span className="text-sm text-slate-300">Visas vid bokning</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isContractService}
+                      onChange={(e) => setIsContractService(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-700 border-slate-600"
+                    />
+                    <span className="text-sm text-slate-300">Använd som avtalstyp</span>
                   </label>
                 </div>
               </div>

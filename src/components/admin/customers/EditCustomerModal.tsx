@@ -10,6 +10,7 @@ import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { CustomerGroupService } from '../../../services/customerGroupService'
 import { CustomerGroup } from '../../../types/customerGroups'
+import { useContractTypeOptions } from '../../../hooks/useContractTypeOptions'
 import toast from 'react-hot-toast'
 
 interface Customer {
@@ -79,6 +80,7 @@ export default function EditCustomerModal({
   const [loading, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+  const { options: contractTypeOptions } = useContractTypeOptions()
 
   useEffect(() => {
     CustomerGroupService.getActiveGroups().then(setCustomerGroups).catch(console.error)
@@ -268,14 +270,8 @@ export default function EditCustomerModal({
               <Select
                 value={formData.contract_type || ''}
                 onChange={(v) => handleInputChange('contract_type', v)}
-                placeholder="Välj avtalstyp"
-                options={[
-                  { value: 'Skadedjursavtal', label: 'Skadedjursavtal' },
-                  { value: 'Avtal Betesstationer', label: 'Avtal Betesstationer' },
-                  { value: 'Avtal Betongstationer', label: 'Avtal Betongstationer' },
-                  { value: 'Avtal Mekaniska fällor', label: 'Avtal Mekaniska fällor' },
-                  { value: 'Avtal Indikationsfällor', label: 'Avtal Indikationsfällor' },
-                ]}
+                placeholder={contractTypeOptions.length === 0 ? 'Flagga tjänster som "Använd som avtalstyp"' : 'Välj avtalstyp'}
+                options={contractTypeOptions}
               />
             </div>
             <div>
