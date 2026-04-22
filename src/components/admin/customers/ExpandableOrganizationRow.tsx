@@ -75,7 +75,10 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-const formatContractPeriod = (org: ConsolidatedCustomer): { period: string; remaining: string; color: string } => {
+const formatContractPeriod = (
+  org: ConsolidatedCustomer,
+  isTerminated: boolean
+): { period: string; remaining: string; color: string } => {
   if (!org.nextRenewalDate) {
     return { period: 'Okänt avtal', remaining: '', color: 'text-slate-400' }
   }
@@ -113,8 +116,13 @@ const formatContractPeriod = (org: ConsolidatedCustomer): { period: string; rema
   let color = 'text-slate-400'
 
   if (diffDays < 0) {
-    remaining = 'Utgånget'
-    color = 'text-red-400'
+    if (isTerminated) {
+      // "Uppsagt"-grenen renderas separat nedan, returnera tomt
+      return { period, remaining: '', color: 'text-slate-400' }
+    }
+    // Avtalet har passerat slutdatum men inte sagts upp → löper vidare
+    remaining = 'Fortlöpande - Avtalstid passerad'
+    color = 'text-amber-400'
   } else if (monthsRemaining <= 6) {
     remaining = `${monthsRemaining} mån kvar`
     color = 'text-red-400'    // Röd - Akut uppmärksamhet
@@ -287,7 +295,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
       {isVisible('contractPeriod') && (
         <td className="px-6 py-4">
           {(() => {
-            const { period, remaining, color } = formatContractPeriod(organization)
+            const { period, remaining, color } = formatContractPeriod(organization, isTerminated)
             return (
               <div className="space-y-1">
                 <div className="text-sm text-slate-200 font-medium">

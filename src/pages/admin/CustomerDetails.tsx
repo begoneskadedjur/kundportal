@@ -38,6 +38,7 @@ interface CustomerDetails {
   oneflow_contract_id?: string | null
   contract_template_id?: string | null
   contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
+  terminated_at?: string | null
   // Avtalsfält
   contract_start_date?: string | null
   contract_end_date?: string | null
@@ -152,11 +153,15 @@ export default function CustomerDetails() {
     return diffMonths
   }
 
-  // BEHÅLLS OFÖRÄNDRAD
   const getExpiryStatus = (monthsLeft: number | null) => {
     if (monthsLeft === null) return { color: 'text-slate-400', text: '-', bgColor: 'bg-slate-500/20' }
-    
-    if (monthsLeft <= 0) return { color: 'text-red-400', text: 'Utgånget', bgColor: 'bg-red-500/20' }
+
+    if (monthsLeft <= 0) {
+      if (customer?.terminated_at) {
+        return { color: 'text-red-400', text: 'Utgånget', bgColor: 'bg-red-500/20' }
+      }
+      return { color: 'text-amber-400', text: 'Fortlöpande - Avtalstid passerad', bgColor: 'bg-amber-500/20' }
+    }
     if (monthsLeft <= 3) return { color: 'text-red-400', text: `${monthsLeft} mån kvar`, bgColor: 'bg-red-500/20' }
     if (monthsLeft <= 6) return { color: 'text-yellow-400', text: `${monthsLeft} mån kvar`, bgColor: 'bg-yellow-500/20' }
     return { color: 'text-green-400', text: `${monthsLeft} mån kvar`, bgColor: 'bg-green-500/20' }

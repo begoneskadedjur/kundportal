@@ -88,24 +88,27 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-const formatContractPeriod = (site: CustomerSite): string => {
-  if (!site.contract_end_date) return 'Okänt'
-  
+const formatContractPeriod = (site: CustomerSite): { text: string; color: string } => {
+  if (!site.contract_end_date) return { text: 'Okänt', color: 'text-slate-400' }
+
   const endDate = new Date(site.contract_end_date)
   const now = new Date()
   const diffTime = endDate.getTime() - now.getTime()
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  
+
   if (diffDays < 0) {
-    return 'Utgånget'
+    if (site.terminated_at) {
+      return { text: 'Utgånget', color: 'text-red-400' }
+    }
+    return { text: 'Fortlöpande - Avtalstid passerad', color: 'text-amber-400' }
   } else if (diffDays <= 30) {
-    return `${diffDays} dagar`
+    return { text: `${diffDays} dagar`, color: 'text-slate-400' }
   } else if (diffDays <= 90) {
     const months = Math.ceil(diffDays / 30)
-    return `${months} mån`
+    return { text: `${months} mån`, color: 'text-slate-400' }
   } else {
     const months = Math.ceil(diffDays / 30)
-    return `${months} mån`
+    return { text: `${months} mån`, color: 'text-slate-400' }
   }
 }
 
@@ -215,9 +218,10 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
 
       {/* Contract Period Column - Only show if different from org */}
       <td className="px-6 py-3">
-        <div className="text-xs text-slate-400">
-          {formatContractPeriod(site)}
-        </div>
+        {(() => {
+          const { text, color } = formatContractPeriod(site)
+          return <div className={`text-xs ${color}`}>{text}</div>
+        })()}
         {site.contractProgress.daysRemaining <= 90 && site.contractProgress.daysRemaining > 0 && (
           <div className="text-xs text-amber-400 mt-1 flex items-center gap-1">
             <div className="w-2 h-2 rounded-full bg-amber-400"></div>

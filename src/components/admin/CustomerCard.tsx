@@ -36,6 +36,7 @@ interface Customer {
   total_contract_value?: number | null
   assigned_account_manager?: string | null
   contract_status?: string
+  terminated_at?: string | null
   // Beräknade fält
   monthsLeft?: number
   activeCases?: number
@@ -282,11 +283,27 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete, onCas
             {customer.is_active ? 'Aktiv' : 'Inaktiv'}
           </span>
 
-          {monthsLeft !== null && (
-            <span className={`px-2 py-1 bg-slate-600/20 text-xs font-medium rounded-md ${statusColor}`}>
-              {monthsLeft > 0 ? `${monthsLeft} mån kvar` : 'Utgånget'}
-            </span>
-          )}
+          {monthsLeft !== null && (() => {
+            if (monthsLeft > 0) {
+              return (
+                <span className={`px-2 py-1 bg-slate-600/20 text-xs font-medium rounded-md ${statusColor}`}>
+                  {monthsLeft} mån kvar
+                </span>
+              )
+            }
+            if (customer.terminated_at) {
+              return (
+                <span className="px-2 py-1 bg-slate-600/20 text-xs font-medium rounded-md text-red-400">
+                  Utgånget
+                </span>
+              )
+            }
+            return (
+              <span className="px-2 py-1 bg-slate-600/20 text-xs font-medium rounded-md text-amber-400">
+                Fortlöpande - Avtalstid passerad
+              </span>
+            )
+          })()}
         </div>
 
         {/* Quick Stats */}
