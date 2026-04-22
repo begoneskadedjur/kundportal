@@ -91,6 +91,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // Kill-switch: pausa importen utan att avregistrera webhooken hos ClickUp
+  if (process.env.CLICKUP_WEBHOOK_PAUSED === 'true') {
+    console.log('⏸️ ClickUp webhook är pausad via CLICKUP_WEBHOOK_PAUSED — ignorerar payload')
+    return res.status(200).json({ message: 'Webhook paused' })
+  }
+
   try {
     console.log('🔔 ClickUp Webhook received')
 
