@@ -223,9 +223,12 @@ export function computePlannedInvoicesPure(customer: CustomerForPlanning): Plann
   const intervals = iterPeriodsPure(start, effectiveEnd, freq, customer.billing_anchor_month)
   const today = todayLocal()
 
+  // Första dag i innevarande månad — en period räknas som "redan fakturerad"
+  // (isHistorical) om periodStart ligger i en månad före denna.
+  const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1)
   return intervals.map(({ periodStart, periodEnd }, idx) => {
     const vatAmount = Math.round(perPeriod * 0.25)
-    const isHistorical = periodEnd < today
+    const isHistorical = periodStart < startOfCurrentMonth
     const due = isHistorical
       ? new Date(periodStart.getTime())
       : new Date(today.getTime())

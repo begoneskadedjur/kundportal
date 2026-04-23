@@ -312,17 +312,9 @@ export default function BillingSettingsModal({
     })
   })()
 
-  // Klassificering för schemats status-etiketter:
-  // Betald = periodStart ligger i en månad FÖRE innevarande månad (redan fakturerat)
-  // Nästa = innevarande månad eller första framtida period
-  // Väntande = senare perioder
-  const currentMonthKey = (() => {
-    const t = new Date()
-    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`
-  })()
-  const isPaidPeriod = (p: typeof plannedSchedule[number]) =>
-    p.periodStart.slice(0, 7) < currentMonthKey
-  const firstActiveIdx = plannedSchedule.findIndex(p => !isPaidPeriod(p))
+  // Status härleds från PlannedInvoice.isHistorical (samma kriterium som
+  // ContractInvoiceGenerator använder för att markera perioder som paid i DB).
+  const firstActiveIdx = plannedSchedule.findIndex(p => !p.isHistorical)
 
   const MONTHS_SV = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
@@ -543,7 +535,7 @@ export default function BillingSettingsModal({
                 <div className="space-y-1 max-h-48 overflow-y-auto">
                   {plannedSchedule.map((p, i) => {
                     const isNext = i === firstActiveIdx
-                    const isPaid = isPaidPeriod(p)
+                    const isPaid = p.isHistorical
                     const date = new Date(p.periodStart + 'T00:00:00')
                     const label = date.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
                     const statusLabel = isPaid ? 'Betald' : isNext ? 'Nästa' : 'Väntande'
