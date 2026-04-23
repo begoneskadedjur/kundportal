@@ -36,16 +36,20 @@ interface SingleCustomerDetailModalProps {
 
 const STATUS_COLORS: Record<string, string> = {
   paid: 'text-green-400 bg-green-500/10 border-green-500/20',
-  invoiced: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-  approved: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
-  pending: 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+  sent: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+  booked: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  ready: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  pending_approval: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  draft: 'text-slate-400 bg-slate-500/10 border-slate-500/20',
 }
 
 const STATUS_LABELS: Record<string, string> = {
   paid: 'Betald',
-  invoiced: 'Fakturerad',
-  approved: 'Godkänd',
-  pending: 'Väntande'
+  sent: 'Skickad',
+  booked: 'Bokförd',
+  ready: 'Redo',
+  pending_approval: 'Godkännas',
+  draft: 'Utkast',
 }
 
 export default function SingleCustomerDetailModal({
@@ -63,11 +67,14 @@ export default function SingleCustomerDetailModal({
   // Kontraktsperiod — korrekt beräkning baserat på start/slut-datum
   const contractProgress = getContractProgress(site.contract_start_date, site.contract_end_date)
 
-  // Hämta faktureringsdata från contract_billing_items
+  // Hämta faktureringsdata från invoices (authoritative källa).
+  // Inkluderar historiska paid-fakturor (is_historical=true) så det totala
+  // fakturerade speglar verkligheten oavsett om data importerades.
   const [billingItems, setBillingItems] = useState<Array<{
-    total_price: number
+    subtotal: number
+    total_amount: number
     status: string
-    item_type: string
+    invoice_type: string
   }>>([])
   const [billingLoading, setBillingLoading] = useState(false)
 
@@ -76,12 +83,13 @@ export default function SingleCustomerDetailModal({
       setBillingLoading(true)
       try {
         const { data, error } = await supabase
-          .from('contract_billing_items')
-          .select('total_price, status, item_type')
+          .from('invoices')
+          .select('subtotal, total_amount, status, invoice_type')
           .eq('customer_id', site.id)
+          .in('invoice_type', ['contract', 'adhoc'])
           .neq('status', 'cancelled')
         if (error) throw error
-        setBillingItems(data || [])
+        setBillingItems((data as any) || [])
       } catch {
         setBillingItems([])
       } finally {
@@ -106,22 +114,25 @@ export default function SingleCustomerDetailModal({
   const billingStats = useMemo(() => {
     const byStatus: Record<string, { amount: number; count: number }> = {
       paid: { amount: 0, count: 0 },
-      invoiced: { amount: 0, count: 0 },
-      approved: { amount: 0, count: 0 },
-      pending: { amount: 0, count: 0 }
+      sent: { amount: 0, count: 0 },
+      booked: { amount: 0, count: 0 },
+      ready: { amount: 0, count: 0 },
+      pending_approval: { amount: 0, count: 0 },
+      draft: { amount: 0, count: 0 },
     }
     billingItems.forEach(i => {
-      if (byStatus[i.status]) {
-        byStatus[i.status].amount += i.total_price
-        byStatus[i.status].count++
+      const bucket = byStatus[i.status]
+      if (bucket) {
+        bucket.amount += i.subtotal
+        bucket.count++
       }
     })
     const contractBilling = billingItems
-      .filter(i => i.item_type === 'contract')
-      .reduce((s, i) => s + i.total_price, 0)
+      .filter(i => i.invoice_type === 'contract')
+      .reduce((s, i) => s + i.subtotal, 0)
     const adHocBilling = billingItems
-      .filter(i => i.item_type === 'ad_hoc')
-      .reduce((s, i) => s + i.total_price, 0)
+      .filter(i => i.invoice_type === 'adhoc')
+      .reduce((s, i) => s + i.subtotal, 0)
     const total = contractBilling + adHocBilling
     return { byStatus, contractBilling, adHocBilling, total }
   }, [billingItems])
@@ -486,7 +497,7 @@ export default function SingleCustomerDetailModal({
                         </div>
                       ) : billingItems.length > 0 ? (
                         <div className="space-y-1.5">
-                          {(['paid', 'invoiced', 'approved', 'pending'] as const).map(status => {
+                          {(['paid', 'sent', 'booked', 'ready', 'pending_approval', 'draft'] as const).map(status => {
                             const data = billingStats.byStatus[status]
                             if (data.amount === 0 && data.count === 0) return null
                             return (
@@ -659,7 +670,7 @@ export default function SingleCustomerDetailModal({
                     </div>
                   ) : billingItems.length > 0 ? (
                     <div className="space-y-3">
-                      {(['paid', 'invoiced', 'approved', 'pending'] as const).map(status => {
+                      {(['paid', 'sent', 'booked', 'ready', 'pending_approval', 'draft'] as const).map(status => {
                         const data = billingStats.byStatus[status]
                         if (data.amount === 0 && data.count === 0) return null
                         return (

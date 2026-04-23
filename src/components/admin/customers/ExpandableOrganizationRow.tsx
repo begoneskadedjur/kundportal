@@ -217,14 +217,28 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                 <div className="w-5 h-5 mr-2" />
               )}
               <div>
-                <div className="font-semibold text-slate-200">
-                  {organization.company_name}
+                <div className="font-semibold text-slate-200 flex items-center flex-wrap gap-1.5">
+                  <span>{organization.company_name}</span>
                   {organization.customer_number && (
-                    <span className="ml-2 text-xs font-mono text-[#20c58f]/70">#{organization.customer_number}</span>
+                    <span className="text-xs font-mono text-[#20c58f]/70">#{organization.customer_number}</span>
                   )}
                   {isMultisite && (
-                    <span className="ml-2 text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full border border-blue-500/30">
+                    <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
                       {organization.totalSites} enheter
+                    </span>
+                  )}
+                  {/* Status-badge: Pausad > Uppsagd > Aktiv */}
+                  {organization.isPaused ? (
+                    <span className="text-[10px] font-medium bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
+                      Pausad{organization.pausedUntil ? ` till ${organization.pausedUntil}` : ''}
+                    </span>
+                  ) : isTerminated ? (
+                    <span className="text-[10px] font-medium bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">
+                      Uppsagt
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-medium bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      Aktiv
                     </span>
                   )}
                 </div>

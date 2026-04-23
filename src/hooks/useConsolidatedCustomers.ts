@@ -32,6 +32,7 @@ interface Customer {
   price_adjustment_percent?: number | null
   billing_anchor_month?: number | null
   billing_active?: boolean
+  billing_paused_until?: string | null
   adhoc_invoice_grouping?: 'per_case' | 'monthly_batch' | null
   is_active: boolean | null
   created_at: string | null
@@ -171,6 +172,8 @@ export interface ConsolidatedCustomer {
   // Status flags
   is_active: boolean
   isTerminated: boolean
+  isPaused: boolean
+  pausedUntil: string | null
   effectiveEndDate?: string | null
   hasExpiringSites: boolean
   hasHighRiskSites: boolean
@@ -582,6 +585,8 @@ export function useConsolidatedCustomers() {
             
             is_active: huvudkontor.is_active || false,
             isTerminated: false,
+            isPaused: false,
+            pausedUntil: null,
             effectiveEndDate: null,
             hasExpiringSites: false,
             hasHighRiskSites: false,
@@ -665,6 +670,8 @@ export function useConsolidatedCustomers() {
 
           is_active: customer.is_active || false,
           isTerminated: !!customer.terminated_at,
+          isPaused: customer.billing_active === false,
+          pausedUntil: customer.billing_paused_until ?? null,
           effectiveEndDate: customer.effective_end_date || null,
           hasExpiringSites: customer.contractProgress.daysRemaining <= 90,
           hasHighRiskSites: customer.churnRisk.risk === 'high',
@@ -781,6 +788,12 @@ export function useConsolidatedCustomers() {
 
         // Termination — org is terminated if ALL sites are terminated
         org.isTerminated = sites.every(site => !!site.terminated_at)
+        // Paus — org är pausad om ALLA sites har billing_active=false
+        org.isPaused = sites.every(site => site.billing_active === false)
+        const pausedSites = sites.filter(s => s.billing_paused_until)
+        org.pausedUntil = pausedSites.length > 0
+          ? pausedSites.sort((a, b) => (a.billing_paused_until ?? '').localeCompare(b.billing_paused_until ?? ''))[0].billing_paused_until ?? null
+          : null
         const terminatedSites = sites.filter(s => s.effective_end_date)
         if (terminatedSites.length > 0) {
           // Use the earliest effective_end_date across sites

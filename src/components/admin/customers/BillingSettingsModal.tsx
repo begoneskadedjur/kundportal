@@ -110,6 +110,7 @@ export default function BillingSettingsModal({
 
   // Avtalsinfo
   const [billingActive, setBillingActive] = useState(false)
+  const [billingPausedUntil, setBillingPausedUntil] = useState('')
   const [contractStartDate, setContractStartDate] = useState('')
   const [contractEndDate, setContractEndDate] = useState('')
   const [billingAnchorMonth, setBillingAnchorMonth] = useState<number | null>(null)
@@ -306,6 +307,19 @@ export default function BillingSettingsModal({
     })()
   }, [isOpen, customerId])
 
+  // Ladda billing_paused_until från DB (saknas som prop)
+  useEffect(() => {
+    if (!isOpen || !customerId) { setBillingPausedUntil(''); return }
+    ;(async () => {
+      const { data } = await supabase
+        .from('customers')
+        .select('billing_paused_until')
+        .eq('id', customerId)
+        .maybeSingle()
+      setBillingPausedUntil((data?.billing_paused_until as string) ?? '')
+    })()
+  }, [isOpen, customerId])
+
   // Summering
   const adjustPct = priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) || 0 : 0
   const hasAdjustment = adjustPct !== 0
@@ -345,13 +359,16 @@ export default function BillingSettingsModal({
 
   // Live-diff: räkna om vid varje faktureringsrelevant ändring.
   // Använder cachad existingInvoices — ingen nätverksslagning per knappslag.
+  // När billing_active=false → planerad-setet är tomt (ingen fakturering).
   useEffect(() => {
     if (!customerId || !isOpen) { setLiveDiff(null); return }
     const LOCKED = new Set(['booked', 'sent', 'paid'])
-    const plannedByKey = new Map(plannedSchedule.map(p => [p.periodStart, p]))
+    // Respektera 'Ska faktureras' för diff — ingen fakturering om avmarkerad.
+    const effectivePlanned = billingActive ? plannedSchedule : []
+    const plannedByKey = new Map(effectivePlanned.map(p => [p.periodStart, p]))
     let create = 0, update = 0, deleteCount = 0, locked = 0
 
-    for (const p of plannedSchedule) {
+    for (const p of effectivePlanned) {
       const ex = existingInvoices.find(e => e.billing_period_start === p.periodStart)
       if (!ex) {
         create++
@@ -373,7 +390,7 @@ export default function BillingSettingsModal({
 
     const total = create + update + deleteCount
     setLiveDiff(total > 0 || locked > 0 ? { create, update, delete: deleteCount, locked } : null)
-  }, [customerId, isOpen, plannedSchedule, existingInvoices])
+  }, [customerId, isOpen, plannedSchedule, existingInvoices, billingActive])
 
   const MONTHS_SV = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
@@ -410,6 +427,7 @@ export default function BillingSettingsModal({
         contract_end_date: contractEndDate || null,
         billing_anchor_month: billingAnchorMonth,
         billing_active: billingActive,
+        billing_paused_until: billingActive ? null : (billingPausedUntil || null),
         adhoc_invoice_grouping: adhocInvoiceGrouping,
         updated_at: new Date().toISOString(),
       })
@@ -554,6 +572,33 @@ export default function BillingSettingsModal({
                 <span className="text-xs font-medium text-slate-300">Ska faktureras</span>
               </label>
             </div>
+
+            {/* Pausvarning + återaktiveringsdatum när billing_active=false */}
+            {!billingActive && (
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 text-xs">
+                    <div className="text-amber-300 font-medium mb-0.5">Fakturering pausad</div>
+                    <div className="text-slate-400">
+                      Inga nya fakturor skapas. Befintliga pending-fakturor kan rensas via "Uppdatera fakturor".
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Återaktivera automatiskt den</label>
+                  <input
+                    type="text"
+                    value={billingPausedUntil}
+                    placeholder="ÅÅÅÅ-MM-DD (lämna tomt för tillsvidare)"
+                    pattern="\d{4}-\d{2}-\d{2}"
+                    onChange={e => setBillingPausedUntil(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Lämna tomt för paus tillsvidare.</p>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Avtalets startdatum</label>
