@@ -92,11 +92,8 @@ async function getCustomerServiceItems(customerId: string, freq: string): Promis
   }))
 }
 
-function freqLabel(freq: string | null): string {
-  if (freq === 'monthly') return 'Månadsvis'
-  if (freq === 'quarterly') return 'Kvartalsvis'
-  if (freq === 'annual') return 'Årsvis'
-  return 'Avtal'
+function buildNotes(seqN: number, totalN: number, periodStart: string, periodEnd: string): string {
+  return `Betalning ${seqN}/${totalN} – Period ${periodStart} t.o.m. ${periodEnd}`
 }
 
 function computeTerminationCutoff(c: CustomerRow): Date | null {
@@ -188,18 +185,21 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
   )
 
   let created = 0
-  for (const { periodStart, periodEnd } of intervals) {
+  const totalN = intervals.length
+  const today = new Date()
+  for (let idx = 0; idx < intervals.length; idx++) {
+    const { periodStart, periodEnd } = intervals[idx]
     const key = toLocalIsoDate(periodStart)
     if (existingByKey.has(key)) continue
 
     const vat = Math.round(perPeriod * 0.25)
-    const due = new Date(periodStart)
+    // due_date = 30 dagar från idag när fakturan skapas (ej från periodStart)
+    const due = new Date(today)
     due.setDate(due.getDate() + 30)
 
     const invNum = await generateInvoiceNumber()
     const serviceItems = await getCustomerServiceItems(customer.id, freq)
-    const periodLabel = periodStart.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
-    const notes = `Avtalsfakturering ${periodLabel} – ${freqLabel(freq)}`
+    const notes = buildNotes(idx + 1, totalN, key, toLocalIsoDate(periodEnd))
 
     const { data: inv, error } = await supabase
       .from('invoices')
@@ -218,7 +218,7 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
         vat_amount: vat,
         total_amount: perPeriod + vat,
         status: 'pending_approval',
-        requires_approval: true,
+        requires_approval: false,
         billing_period_start: key,
         billing_period_end: toLocalIsoDate(periodEnd),
         due_date: toLocalIsoDate(due),

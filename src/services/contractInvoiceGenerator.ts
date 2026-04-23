@@ -30,6 +30,8 @@ export interface PlannedInvoice {
   totalAmount: number
   dueDate: string
   isHistorical: boolean  // true om hela perioden redan passerat (antas betald)
+  sequenceNumber: number     // 1-indexerad position i avtalets hela plan
+  totalSequenceCount: number // totalt antal planerade fakturor
 }
 
 // Publika actions visas i preview, _historical-actions filtreras bort där
@@ -209,9 +211,14 @@ export class ContractInvoiceGenerator {
     const intervals = this.iterPeriods(start, effectiveEnd, freq, customer.billing_anchor_month)
     const today = todayLocal()
 
-    return intervals.map(({ periodStart, periodEnd }) => {
+    return intervals.map(({ periodStart, periodEnd }, idx) => {
       const vatAmount = Math.round(perPeriod * 0.25)
-      const due = new Date(periodStart)
+      const isHistorical = periodEnd < today
+      // Aktuell/framtida: due_date sätts till 30 dagar från idag (kan ändras manuellt innan Fortnox-export).
+      // Historisk: due_date sätts till periodStart + 30 (hanterar gamla redan-betalda).
+      const due = isHistorical
+        ? new Date(periodStart.getTime())
+        : new Date(today.getTime())
       due.setDate(due.getDate() + 30)
       return {
         periodStart: toLocalIsoDate(periodStart),
@@ -220,7 +227,9 @@ export class ContractInvoiceGenerator {
         vatAmount,
         totalAmount: perPeriod + vatAmount,
         dueDate: toLocalIsoDate(due),
-        isHistorical: periodEnd < today,
+        isHistorical,
+        sequenceNumber: idx + 1,
+        totalSequenceCount: intervals.length,
       }
     })
   }
@@ -770,13 +779,11 @@ export class ContractInvoiceGenerator {
   }
 
   /**
-   * Frekvens-etikett för notes-fält.
+   * Generera faktura-anteckning som skickas till Fortnox.
+   * T.ex. "Betalning 2/3 – Period 2026-04-01 t.o.m. 2027-03-31"
    */
-  private static freqLabel(freq: BillingFrequency | null): string {
-    if (freq === 'monthly') return 'Månadsvis'
-    if (freq === 'quarterly') return 'Kvartalsvis'
-    if (freq === 'annual') return 'Årsvis'
-    return 'Avtal'
+  private static buildInvoiceNotes(planned: PlannedInvoice): string {
+    return `Betalning ${planned.sequenceNumber}/${planned.totalSequenceCount} – Period ${planned.periodStart} t.o.m. ${planned.periodEnd}`
   }
 
   // ------- Privata hjälpare för DB-skrivning -------
@@ -787,8 +794,7 @@ export class ContractInvoiceGenerator {
   ): Promise<string> {
     const invoiceNumber = await this.generateInvoiceNumber()
     const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
-    const periodLabel = parseLocalDate(planned.periodStart).toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
-    const notes = `Avtalsfakturering ${periodLabel} – ${this.freqLabel(customer.billing_frequency)}`
+    const notes = this.buildInvoiceNotes(planned)
 
     const { data: inv, error } = await supabase
       .from('invoices')
@@ -807,7 +813,7 @@ export class ContractInvoiceGenerator {
         vat_amount: planned.vatAmount,
         total_amount: planned.totalAmount,
         status: 'pending_approval',
-        requires_approval: true,
+        requires_approval: false,
         billing_period_start: planned.periodStart,
         billing_period_end: planned.periodEnd,
         due_date: planned.dueDate,
@@ -840,8 +846,7 @@ export class ContractInvoiceGenerator {
     const bookedSentAt = periodStart.toISOString()
     const paidAt = parseLocalDate(planned.dueDate).toISOString()
     const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
-    const periodLabel = periodStart.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
-    const notes = `Historisk avtalsfakturering ${periodLabel} – ${this.freqLabel(customer.billing_frequency)}`
+    const notes = this.buildInvoiceNotes(planned)
 
     const { data: inv, error } = await supabase
       .from('invoices')
@@ -896,8 +901,7 @@ export class ContractInvoiceGenerator {
     const bookedSentAt = periodStart.toISOString()
     const paidAt = parseLocalDate(planned.dueDate).toISOString()
     const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
-    const periodLabel = periodStart.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
-    const notes = `Historisk avtalsfakturering ${periodLabel} – ${this.freqLabel(customer.billing_frequency)}`
+    const notes = this.buildInvoiceNotes(planned)
 
     const { error } = await supabase
       .from('invoices')
@@ -926,8 +930,7 @@ export class ContractInvoiceGenerator {
     planned: PlannedInvoice,
   ): Promise<void> {
     const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
-    const periodLabel = parseLocalDate(planned.periodStart).toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
-    const notes = `Avtalsfakturering ${periodLabel} – ${this.freqLabel(customer.billing_frequency)}`
+    const notes = this.buildInvoiceNotes(planned)
 
     const { error } = await supabase
       .from('invoices')
@@ -944,6 +947,7 @@ export class ContractInvoiceGenerator {
         billing_period_end: planned.periodEnd,
         due_date: planned.dueDate,
         notes,
+        requires_approval: false,
       })
       .eq('id', invoiceId)
     if (error) throw new Error(`Kunde inte uppdatera faktura: ${error.message}`)

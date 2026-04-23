@@ -86,6 +86,37 @@ export default function InvoiceDetailModal({
   const [regenerating, setRegenerating] = useState(false)
   const [caseBillingItems, setCaseBillingItems] = useState<CaseBillingItem[]>([])
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set())
+  const [contractCustomer, setContractCustomer] = useState<{
+    contact_person: string | null
+    contact_email: string | null
+    contact_phone: string | null
+    contact_address: string | null
+    billing_frequency: string | null
+    billing_anchor_month: number | null
+    annual_value: number | null
+    contract_start_date: string | null
+    contract_end_date: string | null
+    terminated_at: string | null
+    assigned_account_manager: string | null
+    account_manager_email: string | null
+  } | null>(null)
+
+  // För avtalsfakturor: ladda kunddata + kartposition för rikt sidofält
+  useEffect(() => {
+    if (!invoice || !invoice.customer_id || (invoice.invoice_type !== 'contract' && invoice.invoice_type !== 'adhoc')) {
+      setContractCustomer(null)
+      return
+    }
+    const fetch = async () => {
+      const { data } = await supabase
+        .from('customers')
+        .select('contact_person, contact_email, contact_phone, contact_address, billing_frequency, billing_anchor_month, annual_value, contract_start_date, contract_end_date, terminated_at, assigned_account_manager, account_manager_email')
+        .eq('id', invoice.customer_id)
+        .maybeSingle()
+      setContractCustomer(data as any ?? null)
+    }
+    fetch()
+  }, [invoice?.customer_id, invoice?.invoice_type])
 
   // Hämta ärendekontext via case_id/case_type
   const { caseContext, isLoading: contextLoading } = useCaseContext(
@@ -112,6 +143,28 @@ export default function InvoiceDetailModal({
   useEffect(() => {
     if (!invoice) { setCaseBillingItems([]); return }
     const fetchCaseBilling = async () => {
+      // För avtalsfakturor: hämta från kundens importerade contract istället för invoice.case_id
+      if ((invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc') && invoice.customer_id) {
+        const { data: contract } = await supabase
+          .from('contracts')
+          .select('id')
+          .eq('customer_id', invoice.customer_id)
+          .eq('oneflow_contract_id', `imported-${invoice.customer_id}`)
+          .maybeSingle()
+        if (contract) {
+          const { data } = await supabase
+            .from('case_billing_items')
+            .select('*')
+            .eq('case_id', contract.id)
+            .eq('case_type', 'contract')
+          setCaseBillingItems((data as CaseBillingItem[] | null) || [])
+          return
+        }
+        setCaseBillingItems([])
+        return
+      }
+      // Privat/Företag-ärenden
+      if (!invoice.case_id || !invoice.case_type) { setCaseBillingItems([]); return }
       const { data } = await supabase
         .from('case_billing_items')
         .select('*')
@@ -120,7 +173,7 @@ export default function InvoiceDetailModal({
       setCaseBillingItems((data as CaseBillingItem[] | null) || [])
     }
     fetchCaseBilling()
-  }, [invoice?.case_id, invoice?.case_type])
+  }, [invoice?.case_id, invoice?.case_type, invoice?.invoice_type, invoice?.customer_id])
 
   // Ladda fakturadata
   useEffect(() => {
@@ -1051,21 +1104,92 @@ export default function InvoiceDetailModal({
                           </p>
                         )}
                       </div>
-                      {invoice.notes && (
+
+                      {/* Avtalsöversikt */}
+                      {contractCustomer && (
                         <div className="space-y-1">
-                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Anteckning</h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
-                            <p className="text-sm text-slate-300 whitespace-pre-wrap">{invoice.notes}</p>
+                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Avtal</h4>
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 space-y-1 text-xs">
+                            {contractCustomer.contract_start_date && contractCustomer.contract_end_date && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Period</span>
+                                <span className="text-slate-200">
+                                  {formatInvoiceDate(contractCustomer.contract_start_date)} → {formatInvoiceDate(contractCustomer.contract_end_date)}
+                                </span>
+                              </div>
+                            )}
+                            {contractCustomer.billing_frequency && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Frekvens</span>
+                                <span className="text-slate-200">
+                                  {contractCustomer.billing_frequency === 'annual' ? 'Årsvis' :
+                                   contractCustomer.billing_frequency === 'monthly' ? 'Månadsvis' :
+                                   contractCustomer.billing_frequency === 'quarterly' ? 'Kvartalsvis' :
+                                   contractCustomer.billing_frequency}
+                                </span>
+                              </div>
+                            )}
+                            {contractCustomer.annual_value != null && contractCustomer.annual_value > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Årspremie</span>
+                                <span className="text-slate-200 font-medium">
+                                  {formatInvoiceAmount(contractCustomer.annual_value)}
+                                </span>
+                              </div>
+                            )}
+                            {contractCustomer.terminated_at && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Uppsagt</span>
+                                <span className="text-amber-400">
+                                  {formatInvoiceDate(contractCustomer.terminated_at)}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
+
+                      {/* Anteckning (skickas till Fortnox) */}
+                      {invoice.notes && (
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Beskrivning</h4>
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
+                            <p className="text-sm text-slate-300 whitespace-pre-wrap">{invoice.notes}</p>
+                            <p className="text-[10px] text-slate-500 mt-1">Skickas till Fortnox</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Kund + kontaktperson */}
                       {invoice.customer_id && (
                         <div className="space-y-1">
                           <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Kund</h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 space-y-1">
                             <p className="text-sm text-slate-200 font-medium">{invoice.customer_name}</p>
                             {invoice.organization_number && (
-                              <p className="text-xs text-slate-400 mt-0.5">Org.nr {invoice.organization_number}</p>
+                              <p className="text-xs text-slate-400">Org.nr {invoice.organization_number}</p>
+                            )}
+                            {contractCustomer?.contact_person && (
+                              <div className="flex items-center gap-1.5 text-xs text-slate-300 mt-1">
+                                <User className="w-3 h-3 text-slate-500" />
+                                <span>{contractCustomer.contact_person}</span>
+                              </div>
+                            )}
+                            {contractCustomer?.contact_email && (
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <Mail className="w-3 h-3 text-slate-500" />
+                                <a href={`mailto:${contractCustomer.contact_email}`} className="text-blue-400 hover:text-blue-300 truncate">
+                                  {contractCustomer.contact_email}
+                                </a>
+                              </div>
+                            )}
+                            {contractCustomer?.contact_phone && (
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <Phone className="w-3 h-3 text-slate-500" />
+                                <a href={`tel:${contractCustomer.contact_phone}`} className="text-blue-400 hover:text-blue-300">
+                                  {contractCustomer.contact_phone}
+                                </a>
+                              </div>
                             )}
                             <a
                               href={`/admin/befintliga-kunder?customer=${invoice.customer_id}`}
@@ -1076,6 +1200,30 @@ export default function InvoiceDetailModal({
                             </a>
                           </div>
                         </div>
+                      )}
+
+                      {/* Säljare */}
+                      {contractCustomer?.assigned_account_manager && (
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Säljare</h4>
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
+                            <p className="text-sm text-slate-200">{contractCustomer.assigned_account_manager}</p>
+                            {contractCustomer.account_manager_email && (
+                              <a href={`mailto:${contractCustomer.account_manager_email}`} className="text-xs text-blue-400 hover:text-blue-300">
+                                {contractCustomer.account_manager_email}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Karta */}
+                      {(contractCustomer?.contact_address || invoice.customer_address) && (
+                        <EmbeddedMapPreview
+                          lat={null}
+                          lng={null}
+                          address={contractCustomer?.contact_address || invoice.customer_address || null}
+                        />
                       )}
                     </div>
                   ) : (

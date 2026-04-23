@@ -56,11 +56,8 @@ async function getCustomerServiceItems(customerId, freq) {
   }))
 }
 
-function freqLabel(freq) {
-  if (freq === 'monthly') return 'Månadsvis'
-  if (freq === 'quarterly') return 'Kvartalsvis'
-  if (freq === 'annual') return 'Årsvis'
-  return 'Avtal'
+function buildNotes(seqN, totalN, periodStart, periodEnd) {
+  return `Betalning ${seqN}/${totalN} – Period ${periodStart} t.o.m. ${periodEnd}`
 }
 
 function toLocalIsoDate(d) {
@@ -162,15 +159,18 @@ async function processCustomer(customer) {
   )
 
   const today = todayLocal()
+  const totalN = intervals.length
   let created = 0
   let createdHistorical = 0
-  for (const { periodStart, periodEnd } of intervals) {
+  for (let idx = 0; idx < intervals.length; idx++) {
+    const { periodStart, periodEnd } = intervals[idx]
     const key = toLocalIsoDate(periodStart)
     if (existingByKey.has(key)) continue
 
     const isHistorical = periodEnd < today
     const vat = Math.round(perPeriod * 0.25)
-    const due = new Date(periodStart)
+    // Historisk: due = periodStart + 30. Aktuell/framtida: due = idag + 30.
+    const due = isHistorical ? new Date(periodStart) : new Date(today)
     due.setDate(due.getDate() + 30)
     const dueIso = toLocalIsoDate(due)
 
@@ -179,10 +179,7 @@ async function processCustomer(customer) {
 
     const invNum = await generateInvoiceNumber()
     const serviceItems = await getCustomerServiceItems(customer.id, freq)
-    const periodLabel = periodStart.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
-    const notes = isHistorical
-      ? `Historisk avtalsfakturering ${periodLabel} – ${freqLabel(freq)}`
-      : `Avtalsfakturering ${periodLabel} – ${freqLabel(freq)}`
+    const notes = buildNotes(idx + 1, totalN, key, toLocalIsoDate(periodEnd))
 
     const { data: inv, error } = await supabase
       .from('invoices')
@@ -201,7 +198,7 @@ async function processCustomer(customer) {
         vat_amount: vat,
         total_amount: perPeriod + vat,
         status: isHistorical ? 'paid' : 'pending_approval',
-        requires_approval: !isHistorical,
+        requires_approval: false,
         billing_period_start: key,
         billing_period_end: toLocalIsoDate(periodEnd),
         due_date: dueIso,
