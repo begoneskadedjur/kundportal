@@ -75,7 +75,23 @@ export interface ApplyResult {
   skippedLocked: number
 }
 
-type CustomerRow = {
+/**
+ * Minimalt subset av customer-fält som krävs för att räkna fakturaplan.
+ * Används av både ContractInvoiceGenerator och BillingSettingsModal
+ * (UI:t har inga kund-id-fält när man redigerar nya inställningar).
+ */
+export interface CustomerForPlanning {
+  annual_value: number | null
+  contract_start_date: string | null
+  contract_end_date: string | null
+  terminated_at: string | null
+  billing_frequency: BillingFrequency | null
+  billing_anchor_month: number | null
+  billing_active: boolean | null
+  notice_period_months: number | null
+}
+
+type CustomerRow = CustomerForPlanning & {
   id: string
   company_name: string
   organization_number: string | null
@@ -84,15 +100,7 @@ type CustomerRow = {
   contact_email: string | null
   contact_phone: string | null
   contact_address: string | null
-  annual_value: number | null
   monthly_value: number | null
-  contract_start_date: string | null
-  contract_end_date: string | null
-  terminated_at: string | null
-  billing_frequency: BillingFrequency | null
-  billing_anchor_month: number | null
-  billing_active: boolean | null
-  notice_period_months: number | null
 }
 
 const LOCKED_STATUSES = new Set(['booked', 'sent', 'paid'])
@@ -123,7 +131,7 @@ function todayLocal(): Date {
  * - Fortlöpande (terminated_at > contract_end_date): terminated_at + notice_period_months.
  * Returnerar null om kunden ej är uppsagd.
  */
-function computeTerminationCutoff(customer: CustomerRow): Date | null {
+function computeTerminationCutoff(customer: CustomerForPlanning): Date | null {
   if (!customer.terminated_at) return null
   const notice = customer.notice_period_months ?? 2
   const termDate = new Date(customer.terminated_at)
@@ -134,6 +142,106 @@ function computeTerminationCutoff(customer: CustomerRow): Date | null {
   const cutoff = new Date(termDate)
   cutoff.setMonth(cutoff.getMonth() + notice)
   return cutoff
+}
+
+function amountPerPeriodPure(annual: number, freq: BillingFrequency): number {
+  if (freq === 'monthly') return Math.round(annual / 12)
+  if (freq === 'quarterly') return Math.round(annual / 4)
+  if (freq === 'annual') return Math.round(annual)
+  return 0
+}
+
+function iterPeriodsPure(
+  start: Date,
+  end: Date,
+  freq: BillingFrequency,
+  anchorMonth: number | null,
+): Array<{ periodStart: Date; periodEnd: Date }> {
+  const out: Array<{ periodStart: Date; periodEnd: Date }> = []
+
+  if (freq === 'monthly') {
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1)
+    while (cur <= end) {
+      const periodEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0)
+      out.push({ periodStart: new Date(cur), periodEnd })
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
+    }
+  } else if (freq === 'quarterly') {
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1)
+    while (cur <= end) {
+      const periodEnd = new Date(cur.getFullYear(), cur.getMonth() + 3, 0)
+      out.push({ periodStart: new Date(cur), periodEnd })
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 3, 1)
+    }
+  } else if (freq === 'annual') {
+    const anchor = anchorMonth && anchorMonth >= 1 && anchorMonth <= 12
+      ? anchorMonth - 1
+      : start.getMonth()
+    const startYear = start.getFullYear()
+    const startOfStartMonth = new Date(startYear, start.getMonth(), 1)
+    let firstStart = new Date(startYear, anchor, 1)
+    if (firstStart < startOfStartMonth) {
+      firstStart = new Date(startYear + 1, anchor, 1)
+    }
+    let cur = firstStart
+    while (cur <= end) {
+      const periodEnd = new Date(cur.getFullYear() + 1, cur.getMonth(), 0)
+      // För annual: hela fakturaperioden måste rymmas inom avtalet (ingen partiell).
+      const elevenMonthsForward = new Date(cur.getFullYear(), cur.getMonth() + 11, 1)
+      if (elevenMonthsForward > end) break
+      out.push({ periodStart: new Date(cur), periodEnd })
+      cur = new Date(cur.getFullYear() + 1, cur.getMonth(), 1)
+    }
+  }
+
+  return out
+}
+
+/**
+ * Ren funktion: räkna ut planerade fakturor från kundens avtalsdata.
+ * Används av både ContractInvoiceGenerator (för DB-apply) och BillingSettingsModal
+ * (för preview/fakturaschemat i UI). Inga DB-anrop.
+ */
+export function computePlannedInvoicesPure(customer: CustomerForPlanning): PlannedInvoice[] {
+  const freq = customer.billing_frequency
+  const annual = Number(customer.annual_value ?? 0)
+  const start = customer.contract_start_date ? new Date(customer.contract_start_date) : null
+  const end = customer.contract_end_date ? new Date(customer.contract_end_date) : null
+
+  if (!freq || freq === 'on_demand') return []
+  if (annual <= 0) return []
+  if (!start || !end) return []
+  if (customer.billing_active === false) return []
+
+  let effectiveEnd = end
+  const cutoff = computeTerminationCutoff(customer)
+  if (cutoff && cutoff < effectiveEnd) {
+    effectiveEnd = cutoff
+  }
+
+  const perPeriod = amountPerPeriodPure(annual, freq)
+  const intervals = iterPeriodsPure(start, effectiveEnd, freq, customer.billing_anchor_month)
+  const today = todayLocal()
+
+  return intervals.map(({ periodStart, periodEnd }, idx) => {
+    const vatAmount = Math.round(perPeriod * 0.25)
+    const isHistorical = periodEnd < today
+    const due = isHistorical
+      ? new Date(periodStart.getTime())
+      : new Date(today.getTime())
+    due.setDate(due.getDate() + 30)
+    return {
+      periodStart: toLocalIsoDate(periodStart),
+      periodEnd: toLocalIsoDate(periodEnd),
+      amount: perPeriod,
+      vatAmount,
+      totalAmount: perPeriod + vatAmount,
+      dueDate: toLocalIsoDate(due),
+      isHistorical,
+      sequenceNumber: idx + 1,
+      totalSequenceCount: intervals.length,
+    }
+  })
 }
 
 export class ContractInvoiceGenerator {
@@ -186,109 +294,11 @@ export class ContractInvoiceGenerator {
   }
 
   /**
-   * Räkna ut planerade fakturor. Returnerar tom lista för avropsavtal eller saknad data.
-   * Respekterar uppsägnings-cutoff.
+   * Delegerar till module-level pure function. Behålls för bakåtkompatibilitet
+   * med existerande anropare i klassen.
    */
   private static computePlannedInvoices(customer: CustomerRow): PlannedInvoice[] {
-    const freq = customer.billing_frequency
-    const annual = Number(customer.annual_value ?? 0)
-    const start = customer.contract_start_date ? new Date(customer.contract_start_date) : null
-    const end = customer.contract_end_date ? new Date(customer.contract_end_date) : null
-
-    if (!freq || freq === 'on_demand') return []
-    if (annual <= 0) return []
-    if (!start || !end) return []
-    if (customer.billing_active === false) return []
-
-    // Kapning vid uppsägning: bindningstid respekteras, fortlöpande kapas vid termination_at + notice.
-    let effectiveEnd = end
-    const cutoff = computeTerminationCutoff(customer)
-    if (cutoff && cutoff < effectiveEnd) {
-      effectiveEnd = cutoff
-    }
-
-    const perPeriod = this.amountPerPeriod(annual, freq)
-    const intervals = this.iterPeriods(start, effectiveEnd, freq, customer.billing_anchor_month)
-    const today = todayLocal()
-
-    return intervals.map(({ periodStart, periodEnd }, idx) => {
-      const vatAmount = Math.round(perPeriod * 0.25)
-      const isHistorical = periodEnd < today
-      // Aktuell/framtida: due_date sätts till 30 dagar från idag (kan ändras manuellt innan Fortnox-export).
-      // Historisk: due_date sätts till periodStart + 30 (hanterar gamla redan-betalda).
-      const due = isHistorical
-        ? new Date(periodStart.getTime())
-        : new Date(today.getTime())
-      due.setDate(due.getDate() + 30)
-      return {
-        periodStart: toLocalIsoDate(periodStart),
-        periodEnd: toLocalIsoDate(periodEnd),
-        amount: perPeriod,
-        vatAmount,
-        totalAmount: perPeriod + vatAmount,
-        dueDate: toLocalIsoDate(due),
-        isHistorical,
-        sequenceNumber: idx + 1,
-        totalSequenceCount: intervals.length,
-      }
-    })
-  }
-
-  private static amountPerPeriod(annual: number, freq: BillingFrequency): number {
-    if (freq === 'monthly') return Math.round(annual / 12)
-    if (freq === 'quarterly') return Math.round(annual / 4)
-    if (freq === 'annual') return Math.round(annual)
-    return 0
-  }
-
-  /**
-   * Iterera perioder från avtalsstart till effectiveEnd.
-   * Anchormonth = endast relevant för annual.
-   */
-  private static iterPeriods(
-    start: Date,
-    end: Date,
-    freq: BillingFrequency,
-    anchorMonth: number | null,
-  ): Array<{ periodStart: Date; periodEnd: Date }> {
-    const out: Array<{ periodStart: Date; periodEnd: Date }> = []
-
-    if (freq === 'monthly') {
-      let cur = new Date(start.getFullYear(), start.getMonth(), 1)
-      while (cur <= end) {
-        const periodEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0)
-        out.push({ periodStart: new Date(cur), periodEnd })
-        cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
-      }
-    } else if (freq === 'quarterly') {
-      let cur = new Date(start.getFullYear(), start.getMonth(), 1)
-      while (cur <= end) {
-        const periodEnd = new Date(cur.getFullYear(), cur.getMonth() + 3, 0)
-        out.push({ periodStart: new Date(cur), periodEnd })
-        cur = new Date(cur.getFullYear(), cur.getMonth() + 3, 1)
-      }
-    } else if (freq === 'annual') {
-      const anchor = anchorMonth && anchorMonth >= 1 && anchorMonth <= 12
-        ? anchorMonth - 1
-        : start.getMonth()
-      const startYear = start.getFullYear()
-      const startOfStartMonth = new Date(startYear, start.getMonth(), 1)
-      let firstStart = new Date(startYear, anchor, 1)
-      if (firstStart < startOfStartMonth) {
-        firstStart = new Date(startYear + 1, anchor, 1)
-      }
-      let cur = firstStart
-      while (cur <= end) {
-        const periodEnd = new Date(cur.getFullYear() + 1, cur.getMonth(), 0)
-        // För annual: hela fakturaperioden måste rymmas inom avtalet (ingen partiell).
-        const elevenMonthsForward = new Date(cur.getFullYear(), cur.getMonth() + 11, 1)
-        if (elevenMonthsForward > end) break
-        out.push({ periodStart: new Date(cur), periodEnd })
-        cur = new Date(cur.getFullYear() + 1, cur.getMonth(), 1)
-      }
-    }
-
-    return out
+    return computePlannedInvoicesPure(customer)
   }
 
   /**

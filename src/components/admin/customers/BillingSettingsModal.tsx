@@ -16,7 +16,7 @@ import ContractCaseServiceSelector from './ContractCaseServiceSelector'
 import { type PriceList } from '../../../types/articles'
 import { type BillingFrequency, BILLING_FREQUENCY_CONFIG, type AdhocInvoiceGrouping } from '../../../types/contractBilling'
 import toast from 'react-hot-toast'
-import { ContractInvoiceGenerator, type BillingPlan } from '../../../services/contractInvoiceGenerator'
+import { ContractInvoiceGenerator, computePlannedInvoicesPure, type BillingPlan } from '../../../services/contractInvoiceGenerator'
 import BillingPlanPreviewModal from './BillingPlanPreviewModal'
 
 interface SiteBillingData {
@@ -292,28 +292,28 @@ export default function BillingSettingsModal({
   const freqMonths = BILLING_FREQUENCY_CONFIG[billingFrequency]?.months ?? 1
   const perPeriodAdj = freqMonths > 0 && freqMonths !== 12 ? Math.round(adjustedTotal * freqMonths / 12) : adjustedTotal
 
-  // Fakturaschema – beräkna nästa fakturadatum baserat på ankarmånad + frekvens
-  const billingSchedule: Date[] = []
-  if (billingAnchorMonth != null && freqMonths > 0 && billingFrequency !== 'on_demand') {
-    const today = new Date()
-    let year = today.getFullYear()
-    let m = billingAnchorMonth - 1 // 0-indexed
-    // Backa till rätt start inom innevarande år
-    while (m > today.getMonth()) m -= freqMonths
-    while (m < 0) { m += 12; year-- }
-    // Framåt tills vi har 4 kommande datum (eller 2 för årsvis/halvårsvis)
-    const wantCount = freqMonths >= 6 ? 2 : 4
-    let safety = 0
-    while (billingSchedule.length < wantCount && safety < 30) {
-      const d = new Date(year, m, 1)
-      if (d >= new Date(today.getFullYear(), today.getMonth(), 1)) {
-        billingSchedule.push(d)
-      }
-      m += freqMonths
-      if (m >= 12) { m -= 12; year++ }
-      safety++
-    }
-  }
+  // Fakturaschema – använder samma plan-funktion som ContractInvoiceGenerator
+  // så att det som visas här matchar exakt vad som skapas vid Spara.
+  const plannedSchedule = (() => {
+    if (!contractStartDate || !contractEndDate) return []
+    if (billingFrequency === 'on_demand') return []
+    if (adjustedTotal <= 0) return []
+    if (!billingAnchorMonth && billingFrequency === 'annual') return []
+    return computePlannedInvoicesPure({
+      annual_value: adjustedTotal,
+      contract_start_date: contractStartDate,
+      contract_end_date: contractEndDate,
+      terminated_at: null,
+      billing_frequency: billingFrequency as any,
+      billing_anchor_month: billingAnchorMonth,
+      // Visa alltid schemat även om billing_active=false (pedagogiskt)
+      billing_active: true,
+      notice_period_months: null,
+    })
+  })()
+
+  // Första icke-historiska index → "Nästa"
+  const firstActiveIdx = plannedSchedule.findIndex(p => !p.isHistorical)
 
   const MONTHS_SV = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
@@ -519,27 +519,54 @@ export default function BillingSettingsModal({
               <p className="text-xs text-slate-500 mt-1">Månaden avtalet ingicks – fakturor läggs i denna månad + intervall</p>
             </div>
 
-            {/* Fakturaschema */}
-            {billingSchedule.length > 0 && (
+            {/* Fakturaschema - hela avtalsperiodens planerade fakturor */}
+            {plannedSchedule.length > 0 && (
               <div className="p-2.5 bg-slate-800/40 border border-slate-700/50 rounded-lg">
                 <div className="flex items-center gap-1.5 mb-2">
                   <CalendarDays className="w-3.5 h-3.5 text-[#20c58f]" />
                   <span className="text-xs font-medium text-slate-300">Fakturaschema</span>
-                  <span className="text-xs text-slate-500">· {BILLING_FREQUENCY_CONFIG[billingFrequency]?.label.toLowerCase()}, fakturamånad: {billingAnchorMonth ? MONTHS_SV[billingAnchorMonth - 1] : '–'}</span>
+                  <span className="text-xs text-slate-500">
+                    · {BILLING_FREQUENCY_CONFIG[billingFrequency]?.label.toLowerCase()}
+                    {billingAnchorMonth ? `, fakturamånad: ${MONTHS_SV[billingAnchorMonth - 1]}` : ''}
+                    · {plannedSchedule.length} {plannedSchedule.length === 1 ? 'faktura' : 'fakturor'}
+                  </span>
                 </div>
-                <div className="space-y-1">
-                  {billingSchedule.map((d, i) => {
-                    const isFirst = i === 0
-                    const label = d.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
-                    const amount = freqMonths > 0 ? Math.round(adjustedTotal * freqMonths / 12) : adjustedTotal
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {plannedSchedule.map((p, i) => {
+                    const isNext = i === firstActiveIdx
+                    const isPaid = p.isHistorical
+                    const date = new Date(p.periodStart + 'T00:00:00')
+                    const label = date.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
+                    const statusLabel = isPaid ? 'Betald' : isNext ? 'Nästa' : 'Väntande'
+                    const statusClass = isPaid
+                      ? 'bg-slate-700/50 text-slate-400'
+                      : isNext
+                      ? 'bg-[#20c58f]/20 text-[#20c58f]'
+                      : 'bg-slate-700/30 text-slate-500'
+                    const rowTextClass = isPaid
+                      ? 'text-slate-500'
+                      : isNext
+                      ? 'text-white'
+                      : 'text-slate-400'
+                    const dotClass = isPaid
+                      ? 'bg-slate-600'
+                      : isNext
+                      ? 'bg-[#20c58f]'
+                      : 'bg-slate-600'
                     return (
-                      <div key={i} className={`flex items-center justify-between text-xs ${isFirst ? 'text-white' : 'text-slate-400'}`}>
+                      <div key={i} className={`flex items-center justify-between text-xs ${rowTextClass}`}>
                         <div className="flex items-center gap-1.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${isFirst ? 'bg-[#20c58f]' : 'bg-slate-600'}`} />
-                          <span className={isFirst ? 'font-medium' : ''}>{label.charAt(0).toUpperCase() + label.slice(1)}</span>
-                          {isFirst && <span className="px-1 py-0.5 text-[10px] bg-[#20c58f]/20 text-[#20c58f] rounded">Nästa</span>}
+                          <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+                          <span className={isNext ? 'font-medium' : ''}>
+                            {label.charAt(0).toUpperCase() + label.slice(1)}
+                          </span>
+                          <span className={`px-1 py-0.5 text-[10px] rounded ${statusClass}`}>
+                            {statusLabel}
+                          </span>
                         </div>
-                        {adjustedTotal > 0 && <span className={isFirst ? 'font-semibold text-white' : ''}>{fmt(amount)}</span>}
+                        <span className={isNext ? 'font-semibold text-white' : ''}>
+                          {fmt(p.amount)}
+                        </span>
                       </div>
                     )
                   })}
@@ -547,8 +574,10 @@ export default function BillingSettingsModal({
               </div>
             )}
 
-            {billingAnchorMonth != null && billingFrequency !== 'on_demand' && billingSchedule.length === 0 && (
-              <p className="text-xs text-slate-500">Inga kommande fakturadatum beräknade.</p>
+            {billingAnchorMonth != null && billingFrequency !== 'on_demand' && plannedSchedule.length === 0 && (
+              <p className="text-xs text-slate-500">
+                Inga fakturor planeras — kontrollera avtalsstart, avtalsslut och årspremie.
+              </p>
             )}
           </div>
 
