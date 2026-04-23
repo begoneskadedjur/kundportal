@@ -23,6 +23,43 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 const LOCKED_STATUSES = new Set(['booked', 'sent', 'paid'])
 
+async function getCustomerServiceItems(customerId, freq) {
+  const { data: contract } = await supabase
+    .from('contracts')
+    .select('id')
+    .eq('customer_id', customerId)
+    .eq('oneflow_contract_id', `imported-${customerId}`)
+    .maybeSingle()
+  if (!contract) return []
+
+  const { data: items } = await supabase
+    .from('case_billing_items')
+    .select('article_id, article_code, article_name, service_name, quantity, unit_price, total_price, vat_rate, discount_percent')
+    .eq('case_id', contract.id)
+    .eq('case_type', 'contract')
+    .eq('item_type', 'service')
+  if (!items || items.length === 0) return []
+
+  const divisor = freq === 'monthly' ? 12 : freq === 'quarterly' ? 4 : 1
+  return items.map((s) => ({
+    article_id: s.article_id,
+    article_code: s.article_code,
+    article_name: s.service_name ?? s.article_name ?? 'Avtalstjänst',
+    quantity: s.quantity,
+    unit_price: Math.round(Number(s.unit_price) * 100 / divisor) / 100,
+    total_price: Math.round(Number(s.total_price) * 100 / divisor) / 100,
+    vat_rate: Number(s.vat_rate),
+    discount_percent: Number(s.discount_percent ?? 0),
+  }))
+}
+
+function freqLabel(freq) {
+  if (freq === 'monthly') return 'Månadsvis'
+  if (freq === 'quarterly') return 'Kvartalsvis'
+  if (freq === 'annual') return 'Årsvis'
+  return 'Avtal'
+}
+
 function toLocalIsoDate(d) {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -138,6 +175,12 @@ async function processCustomer(customer) {
     const paidAt = new Date(dueIso).toISOString()
 
     const invNum = await generateInvoiceNumber()
+    const serviceItems = await getCustomerServiceItems(customer.id, freq)
+    const periodLabel = periodStart.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+    const notes = isHistorical
+      ? `Historisk avtalsfakturering ${periodLabel} – ${freqLabel(freq)}`
+      : `Avtalsfakturering ${periodLabel} – ${freqLabel(freq)}`
+
     const { data: inv, error } = await supabase
       .from('invoices')
       .insert({
@@ -163,6 +206,7 @@ async function processCustomer(customer) {
         booked_at: isHistorical ? bookedSentAt : null,
         sent_at: isHistorical ? bookedSentAt : null,
         paid_at: isHistorical ? paidAt : null,
+        notes,
       })
       .select('id')
       .single()
@@ -172,15 +216,28 @@ async function processCustomer(customer) {
       continue
     }
 
-    await supabase.from('invoice_items').insert({
-      invoice_id: inv.id,
-      article_name: `Avtalsfakturering ${key.slice(0, 7)}`,
-      quantity: 1,
-      unit_price: perPeriod,
-      total_price: perPeriod,
-      vat_rate: 25,
-      discount_percent: 0,
-    })
+    const rows = serviceItems.length > 0
+      ? serviceItems.map(it => ({
+          invoice_id: inv.id,
+          article_id: it.article_id,
+          article_code: it.article_code,
+          article_name: it.article_name,
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+          total_price: it.total_price,
+          vat_rate: it.vat_rate,
+          discount_percent: it.discount_percent,
+        }))
+      : [{
+          invoice_id: inv.id,
+          article_name: `Avtalsfakturering ${key.slice(0, 7)}`,
+          quantity: 1,
+          unit_price: perPeriod,
+          total_price: perPeriod,
+          vat_rate: 25,
+          discount_percent: 0,
+        }]
+    await supabase.from('invoice_items').insert(rows)
     if (isHistorical) createdHistorical++
     else created++
   }

@@ -17,6 +17,8 @@ import {
   Home,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
+  Calendar,
   BookCheck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -48,6 +50,66 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
   const [searchTerm, setSearchTerm] = useState('')
   const [rotRutExpanded, setRotRutExpanded] = useState(false)
   const [rotRutFilter, setRotRutFilter] = useState<'all' | 'ROT' | 'RUT'>('all')
+
+  // Månadsgruppering (endast för contract/adhoc)
+  const groupByMonth = invoiceType === 'contract' || invoiceType === 'adhoc'
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set())
+
+  // Auto-expandera aktuell månad när data laddats
+  useEffect(() => {
+    if (!groupByMonth || invoices.length === 0) return
+    if (expandedMonths.size > 0) return
+    const today = new Date()
+    const currentKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+    const keys = new Set(
+      invoices
+        .filter(i => i.billing_period_start)
+        .map(i => (i.billing_period_start as string).slice(0, 7))
+    )
+    if (keys.has(currentKey)) {
+      setExpandedMonths(new Set([currentKey]))
+    } else if (keys.size > 0) {
+      // Annars ta första tillgängliga sorterat
+      const firstKey = Array.from(keys).sort().reverse()[0]
+      setExpandedMonths(new Set([firstKey]))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, groupByMonth])
+
+  // Gruppera invoices per YYYY-MM baserat på billing_period_start
+  const groupedInvoices = groupByMonth
+    ? (() => {
+        const map = new Map<string, Invoice[]>()
+        for (const inv of invoices) {
+          const key = inv.billing_period_start ? inv.billing_period_start.slice(0, 7) : 'okänd'
+          if (!map.has(key)) map.set(key, [])
+          map.get(key)!.push(inv)
+        }
+        // Sortera månader fallande (senaste först)
+        return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a))
+      })()
+    : []
+
+  const toggleMonth = (key: string) => {
+    setExpandedMonths(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const formatMonthLabel = (key: string) => {
+    if (key === 'okänd') return 'Okänd period'
+    const [y, m] = key.split('-').map(Number)
+    const d = new Date(y, m - 1, 1)
+    return d.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
+  }
+
+  const currentMonthKey = (() => {
+    const t = new Date()
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`
+  })()
 
   // Ladda data
   const loadData = useCallback(async () => {
@@ -157,6 +219,139 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
       emerald: { active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-emerald-500/50' }
     }
     return colors[color]?.[isActive ? 'active' : 'inactive'] || colors.slate.inactive
+  }
+
+  // En rad i fakturatabellen (återanvänds av både platt vy och månadsgrupperad vy)
+  const renderInvoiceRow = (invoice: Invoice) => {
+    const isOverdue = isInvoiceOverdue(invoice.due_date, invoice.status)
+    return (
+      <tr
+        key={invoice.id}
+        className={`hover:bg-slate-700/30 ${isOverdue ? 'bg-red-500/5' : ''}`}
+      >
+        <td className="px-3 py-2">
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(invoice.id)}
+            onChange={(e) => setSelectedIds(prev =>
+              e.target.checked ? [...prev, invoice.id] : prev.filter(id => id !== invoice.id)
+            )}
+            className="rounded border-slate-600 bg-slate-700 text-blue-500"
+          />
+        </td>
+        <td className="px-3 py-2 font-mono text-white text-xs">
+          {invoice.invoice_number || '-'}
+        </td>
+        <td className="px-3 py-2">
+          <div className="text-white">{invoice.customer_name}</div>
+          {invoice.organization_number && (
+            <div className="text-xs text-slate-500">{invoice.organization_number}</div>
+          )}
+        </td>
+        <td className="px-3 py-2">
+          {(() => {
+            const type = invoice.invoice_type || (invoice.case_type === 'private' ? 'private' : 'business')
+            const typeMeta: Record<string, { label: string; className: string }> = {
+              private: { label: 'Privat', className: 'bg-blue-500/20 text-blue-400' },
+              business: { label: 'Företag', className: 'bg-purple-500/20 text-purple-400' },
+              contract: { label: 'Avtal', className: 'bg-emerald-500/20 text-emerald-400' },
+              adhoc: { label: 'Merförsäljning', className: 'bg-amber-500/20 text-amber-400' },
+            }
+            const meta = typeMeta[type] ?? typeMeta.business
+            return (
+              <span className={`px-1.5 py-0.5 text-xs rounded ${meta.className}`}>
+                {meta.label}
+              </span>
+            )
+          })()}
+          {invoice.rot_rut_type && (
+            <span className="ml-1 px-1.5 py-0.5 text-xs rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
+              {invoice.rot_rut_type}
+            </span>
+          )}
+        </td>
+        <td className="px-3 py-2 text-slate-400 text-xs">
+          <div>{formatInvoiceDate(invoice.created_at)}</div>
+          {isOverdue && (
+            <div className="text-red-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              Förfallen
+            </div>
+          )}
+        </td>
+        <td className="px-3 py-2 text-right font-medium text-white">
+          {formatInvoiceAmount(invoice.total_amount)}
+        </td>
+        <td className="px-3 py-2 text-center">
+          <StatusBadge status={invoice.status} />
+        </td>
+        <td className="px-3 py-2">
+          <div className="flex items-center justify-end gap-0.5">
+            {invoice.status === 'pending_approval' && (
+              <button
+                onClick={() => handleStatusChange(invoice.id, 'ready')}
+                className="p-1 text-emerald-400 hover:bg-emerald-500/20 rounded"
+                title="Godkänn"
+              >
+                <CheckCircle className="w-4 h-4" />
+              </button>
+            )}
+            {invoice.status === 'ready' && (
+              <button
+                onClick={() => setSelectedInvoiceId(invoice.id)}
+                className="p-1 text-orange-400 hover:bg-orange-500/20 rounded"
+                title="Skapa utkast i Fortnox"
+              >
+                <FileEdit className="w-4 h-4" />
+              </button>
+            )}
+            {invoice.status === 'draft' && (
+              <button
+                onClick={() => handleStatusChange(invoice.id, 'booked')}
+                className="p-1 text-blue-400 hover:bg-blue-500/20 rounded"
+                title="Bokför"
+              >
+                <BookCheck className="w-4 h-4" />
+              </button>
+            )}
+            {invoice.status === 'booked' && (
+              <button
+                onClick={() => handleStatusChange(invoice.id, 'sent')}
+                className="p-1 text-purple-400 hover:bg-purple-500/20 rounded"
+                title="Markera skickad"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            )}
+            {invoice.status === 'sent' && (
+              <button
+                onClick={() => handleStatusChange(invoice.id, 'paid')}
+                className="p-1 text-emerald-400 hover:bg-emerald-500/20 rounded"
+                title="Betald"
+              >
+                <DollarSign className="w-4 h-4" />
+              </button>
+            )}
+            {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+              <button
+                onClick={() => handleStatusChange(invoice.id, 'cancelled')}
+                className="p-1 text-red-400 hover:bg-red-500/20 rounded"
+                title="Makulera"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={() => setSelectedInvoiceId(invoice.id)}
+              className="p-1 text-slate-400 hover:bg-slate-600/50 rounded"
+              title="Detaljer"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          </div>
+        </td>
+      </tr>
+    )
   }
 
   return (
@@ -331,6 +526,59 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
             <FileEdit className="w-10 h-10 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Inga fakturor hittades</p>
           </div>
+        ) : groupByMonth ? (
+          <div className="max-h-[calc(100vh-280px)] overflow-auto divide-y divide-slate-700/50">
+            {groupedInvoices.map(([monthKey, list]) => {
+              const isOpen = expandedMonths.has(monthKey)
+              const totalSum = list.reduce((s, i) => s + i.total_amount, 0)
+              return (
+                <div key={monthKey}>
+                  <button
+                    onClick={() => toggleMonth(monthKey)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700/30 transition-colors text-left"
+                  >
+                    {isOpen
+                      ? <ChevronDown className="w-4 h-4 text-slate-400" />
+                      : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                    <Calendar className="w-4 h-4 text-slate-500" />
+                    <span className="text-white font-medium capitalize">
+                      {formatMonthLabel(monthKey)}
+                    </span>
+                    {monthKey === currentMonthKey && (
+                      <span className="px-1.5 py-0.5 text-xs rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
+                        Nu
+                      </span>
+                    )}
+                    <span className="text-xs text-slate-500 ml-auto mr-4">
+                      {list.length} {list.length === 1 ? 'faktura' : 'fakturor'}
+                    </span>
+                    <span className="text-sm font-medium text-white">
+                      {formatInvoiceAmount(totalSum)}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-900/50">
+                        <tr>
+                          <th className="px-3 py-2 text-left w-8"></th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Nr</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Kund</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Typ</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase">Datum</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase">Belopp</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium text-slate-400 uppercase">Status</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase w-24">Åtgärder</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/50">
+                        {list.map(invoice => renderInvoiceRow(invoice))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         ) : (
           <div className="max-h-[calc(100vh-280px)] overflow-auto">
             <table className="w-full text-sm">
@@ -354,137 +602,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
-                {invoices.map(invoice => {
-                  const isOverdue = isInvoiceOverdue(invoice.due_date, invoice.status)
-                  return (
-                    <tr
-                      key={invoice.id}
-                      className={`hover:bg-slate-700/30 ${isOverdue ? 'bg-red-500/5' : ''}`}
-                    >
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(invoice.id)}
-                          onChange={(e) => setSelectedIds(prev =>
-                            e.target.checked ? [...prev, invoice.id] : prev.filter(id => id !== invoice.id)
-                          )}
-                          className="rounded border-slate-600 bg-slate-700 text-blue-500"
-                        />
-                      </td>
-                      <td className="px-3 py-2 font-mono text-white text-xs">
-                        {invoice.invoice_number || '-'}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="text-white">{invoice.customer_name}</div>
-                        {invoice.organization_number && (
-                          <div className="text-xs text-slate-500">{invoice.organization_number}</div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        {(() => {
-                          const type = invoice.invoice_type || (invoice.case_type === 'private' ? 'private' : 'business')
-                          const typeMeta: Record<string, { label: string; className: string }> = {
-                            private: { label: 'Privat', className: 'bg-blue-500/20 text-blue-400' },
-                            business: { label: 'Företag', className: 'bg-purple-500/20 text-purple-400' },
-                            contract: { label: 'Avtal', className: 'bg-emerald-500/20 text-emerald-400' },
-                            adhoc: { label: 'Merförsäljning', className: 'bg-amber-500/20 text-amber-400' },
-                          }
-                          const meta = typeMeta[type] ?? typeMeta.business
-                          return (
-                            <span className={`px-1.5 py-0.5 text-xs rounded ${meta.className}`}>
-                              {meta.label}
-                            </span>
-                          )
-                        })()}
-                        {invoice.rot_rut_type && (
-                          <span className="ml-1 px-1.5 py-0.5 text-xs rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
-                            {invoice.rot_rut_type}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-slate-400 text-xs">
-                        <div>{formatInvoiceDate(invoice.created_at)}</div>
-                        {isOverdue && (
-                          <div className="text-red-400 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            Förfallen
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium text-white">
-                        {formatInvoiceAmount(invoice.total_amount)}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <StatusBadge status={invoice.status} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center justify-end gap-0.5">
-                          {invoice.status === 'pending_approval' && (
-                            <button
-                              onClick={() => handleStatusChange(invoice.id, 'ready')}
-                              className="p-1 text-emerald-400 hover:bg-emerald-500/20 rounded"
-                              title="Godkänn"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                            </button>
-                          )}
-                          {invoice.status === 'ready' && (
-                            <button
-                              onClick={() => setSelectedInvoiceId(invoice.id)}
-                              className="p-1 text-orange-400 hover:bg-orange-500/20 rounded"
-                              title="Skapa utkast i Fortnox"
-                            >
-                              <FileEdit className="w-4 h-4" />
-                            </button>
-                          )}
-                          {invoice.status === 'draft' && (
-                            <button
-                              onClick={() => handleStatusChange(invoice.id, 'booked')}
-                              className="p-1 text-blue-400 hover:bg-blue-500/20 rounded"
-                              title="Bokför"
-                            >
-                              <BookCheck className="w-4 h-4" />
-                            </button>
-                          )}
-                          {invoice.status === 'booked' && (
-                            <button
-                              onClick={() => handleStatusChange(invoice.id, 'sent')}
-                              className="p-1 text-purple-400 hover:bg-purple-500/20 rounded"
-                              title="Markera skickad"
-                            >
-                              <Send className="w-4 h-4" />
-                            </button>
-                          )}
-                          {invoice.status === 'sent' && (
-                            <button
-                              onClick={() => handleStatusChange(invoice.id, 'paid')}
-                              className="p-1 text-emerald-400 hover:bg-emerald-500/20 rounded"
-                              title="Betald"
-                            >
-                              <DollarSign className="w-4 h-4" />
-                            </button>
-                          )}
-                          {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
-                            <button
-                              onClick={() => handleStatusChange(invoice.id, 'cancelled')}
-                              className="p-1 text-red-400 hover:bg-red-500/20 rounded"
-                              title="Makulera"
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setSelectedInvoiceId(invoice.id)}
-                            className="p-1 text-slate-400 hover:bg-slate-600/50 rounded"
-                            title="Detaljer"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {invoices.map(invoice => renderInvoiceRow(invoice))}
               </tbody>
             </table>
           </div>

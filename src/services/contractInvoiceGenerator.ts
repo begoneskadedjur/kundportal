@@ -4,6 +4,18 @@
 // Event-driven: anropas från BillingSettingsModal, uppsägningsflöde och cron.
 
 import { supabase } from '../lib/supabase'
+import { ImportedCustomerContractService } from './importedCustomerContractService'
+
+interface ContractServiceItem {
+  article_id: string | null
+  article_code: string | null
+  article_name: string
+  quantity: number
+  unit_price: number
+  total_price: number
+  vat_rate: number
+  discount_percent: number
+}
 
 export type BillingFrequency = 'monthly' | 'quarterly' | 'annual' | 'on_demand'
 
@@ -137,13 +149,22 @@ export class ContractInvoiceGenerator {
 
     const { data: existing, error: exErr } = await supabase
       .from('invoices')
-      .select('id, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical')
+      .select('id, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, invoice_items(article_name)')
       .eq('customer_id', customerId)
       .eq('invoice_type', 'contract')
 
     if (exErr) throw new Error(`Kunde inte hämta befintliga fakturor: ${exErr.message}`)
 
-    const entries = this.buildDiff(planned, existing ?? [])
+    // Anrik med has_generic_items-flag för att kunna trigga update av
+    // gamla fakturor som har fallback-artikeln "Avtalsfakturering YYYY-MM".
+    const existingWithFlag = (existing ?? []).map(e => ({
+      ...e,
+      has_generic_items: (e.invoice_items ?? []).every((it: any) =>
+        typeof it.article_name === 'string' && it.article_name.startsWith('Avtalsfakturering ')
+      ),
+    }))
+
+    const entries = this.buildDiff(planned, existingWithFlag)
     const summary = entries.reduce(
       (acc, e) => {
         if (e.action === 'create-historical' || e.action === 'backfill-historical-paid') {
@@ -272,6 +293,7 @@ export class ContractInvoiceGenerator {
       total_amount: number
       subtotal: number
       is_historical: boolean | null
+      has_generic_items?: boolean
     }>,
   ): BillingPlanEntry[] {
     const plannedByKey = new Map(planned.map(p => [p.periodStart, p]))
@@ -331,8 +353,10 @@ export class ContractInvoiceGenerator {
         continue
       }
       const amountMatches = Math.abs(Number(ex.subtotal) - p.amount) < 0.5
+      // Trigga update även om belopp matchar men items är gamla generiska fallback-rader.
+      const needsItemsRefresh = amountMatches && ex.has_generic_items === true
       entries.push({
-        action: amountMatches ? 'keep' : 'update',
+        action: amountMatches && !needsItemsRefresh ? 'keep' : 'update',
         planned: p,
         existingId: ex.id,
         existingStatus: status,
@@ -654,6 +678,91 @@ export class ContractInvoiceGenerator {
     return results
   }
 
+  /**
+   * Hämta kundens avtalsartiklar (service-items) skalade per period.
+   * Returnerar [] om inga service-items finns eller kontrakt saknas.
+   *
+   * Skalning per period:
+   * - annual: items används som de är (totalen per år).
+   * - quarterly: items.total_price / 4
+   * - monthly: items.total_price / 12
+   *
+   * Items article_name = service_name (om satt) annars article_name.
+   */
+  private static async getServiceItemsForCustomer(
+    customerId: string,
+    freq: BillingFrequency,
+  ): Promise<ContractServiceItem[]> {
+    try {
+      const contractId = await ImportedCustomerContractService.findContract(customerId)
+      if (!contractId) return []
+      const { services } = await ImportedCustomerContractService.getItems(contractId)
+      if (services.length === 0) return []
+
+      const divisor = freq === 'monthly' ? 12 : freq === 'quarterly' ? 4 : 1
+
+      return services.map(s => {
+        const scaledUnit = Math.round(Number(s.unit_price) * 100 / divisor) / 100
+        const scaledTotal = Math.round(Number(s.total_price) * 100 / divisor) / 100
+        return {
+          article_id: s.article_id,
+          article_code: s.article_code,
+          article_name: (s as any).service_name ?? s.article_name ?? 'Avtalstjänst',
+          quantity: s.quantity,
+          unit_price: scaledUnit,
+          total_price: scaledTotal,
+          vat_rate: Number(s.vat_rate),
+          discount_percent: Number(s.discount_percent ?? 0),
+        }
+      })
+    } catch (err) {
+      console.error('Kunde inte hämta avtalsartiklar:', err)
+      return []
+    }
+  }
+
+  /**
+   * Bygg invoice_items-rader för en faktura. Om items finns: spegla dem. Annars: generisk.
+   */
+  private static buildInvoiceItemRows(
+    invoiceId: string,
+    planned: PlannedInvoice,
+    serviceItems: ContractServiceItem[],
+  ): Array<Record<string, any>> {
+    if (serviceItems.length > 0) {
+      return serviceItems.map(it => ({
+        invoice_id: invoiceId,
+        article_id: it.article_id,
+        article_code: it.article_code,
+        article_name: it.article_name,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        total_price: it.total_price,
+        vat_rate: it.vat_rate,
+        discount_percent: it.discount_percent,
+      }))
+    }
+    return [{
+      invoice_id: invoiceId,
+      article_name: `Avtalsfakturering ${planned.periodStart.slice(0, 7)}`,
+      quantity: 1,
+      unit_price: planned.amount,
+      total_price: planned.amount,
+      vat_rate: 25,
+      discount_percent: 0,
+    }]
+  }
+
+  /**
+   * Frekvens-etikett för notes-fält.
+   */
+  private static freqLabel(freq: BillingFrequency | null): string {
+    if (freq === 'monthly') return 'Månadsvis'
+    if (freq === 'quarterly') return 'Kvartalsvis'
+    if (freq === 'annual') return 'Årsvis'
+    return 'Avtal'
+  }
+
   // ------- Privata hjälpare för DB-skrivning -------
 
   private static async insertContractInvoice(
@@ -661,6 +770,10 @@ export class ContractInvoiceGenerator {
     planned: PlannedInvoice,
   ): Promise<string> {
     const invoiceNumber = await this.generateInvoiceNumber()
+    const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
+    const periodLabel = parseLocalDate(planned.periodStart).toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+    const notes = `Avtalsfakturering ${periodLabel} – ${this.freqLabel(customer.billing_frequency)}`
+
     const { data: inv, error } = await supabase
       .from('invoices')
       .insert({
@@ -683,6 +796,7 @@ export class ContractInvoiceGenerator {
         billing_period_end: planned.periodEnd,
         due_date: planned.dueDate,
         is_historical: false,
+        notes,
       })
       .select('id')
       .single()
@@ -690,15 +804,8 @@ export class ContractInvoiceGenerator {
     if (error) throw new Error(`Kunde inte skapa faktura: ${error.message}`)
     if (!inv) throw new Error('Faktura skapades ej')
 
-    const { error: itemErr } = await supabase.from('invoice_items').insert({
-      invoice_id: inv.id,
-      article_name: `Avtalsfakturering ${planned.periodStart.slice(0, 7)}`,
-      quantity: 1,
-      unit_price: planned.amount,
-      total_price: planned.amount,
-      vat_rate: 25,
-      discount_percent: 0,
-    })
+    const rows = this.buildInvoiceItemRows(inv.id, planned, serviceItems)
+    const { error: itemErr } = await supabase.from('invoice_items').insert(rows)
     if (itemErr) throw new Error(`Kunde inte skapa fakturarad: ${itemErr.message}`)
 
     return inv.id
@@ -716,6 +823,9 @@ export class ContractInvoiceGenerator {
     const periodStart = parseLocalDate(planned.periodStart)
     const bookedSentAt = periodStart.toISOString()
     const paidAt = parseLocalDate(planned.dueDate).toISOString()
+    const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
+    const periodLabel = periodStart.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+    const notes = `Historisk avtalsfakturering ${periodLabel} – ${this.freqLabel(customer.billing_frequency)}`
 
     const { data: inv, error } = await supabase
       .from('invoices')
@@ -742,6 +852,7 @@ export class ContractInvoiceGenerator {
         sent_at: bookedSentAt,
         paid_at: paidAt,
         is_historical: true,
+        notes,
       })
       .select('id')
       .single()
@@ -749,15 +860,8 @@ export class ContractInvoiceGenerator {
     if (error) throw new Error(`Kunde inte skapa historisk faktura: ${error.message}`)
     if (!inv) throw new Error('Historisk faktura skapades ej')
 
-    const { error: itemErr } = await supabase.from('invoice_items').insert({
-      invoice_id: inv.id,
-      article_name: `Avtalsfakturering ${planned.periodStart.slice(0, 7)}`,
-      quantity: 1,
-      unit_price: planned.amount,
-      total_price: planned.amount,
-      vat_rate: 25,
-      discount_percent: 0,
-    })
+    const rows = this.buildInvoiceItemRows(inv.id, planned, serviceItems)
+    const { error: itemErr } = await supabase.from('invoice_items').insert(rows)
     if (itemErr) throw new Error(`Kunde inte skapa fakturarad: ${itemErr.message}`)
 
     return inv.id
@@ -769,12 +873,15 @@ export class ContractInvoiceGenerator {
    */
   private static async backfillHistoricalPaid(
     invoiceId: string,
-    _customer: CustomerRow,
+    customer: CustomerRow,
     planned: PlannedInvoice,
   ): Promise<void> {
     const periodStart = parseLocalDate(planned.periodStart)
     const bookedSentAt = periodStart.toISOString()
     const paidAt = parseLocalDate(planned.dueDate).toISOString()
+    const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
+    const periodLabel = periodStart.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+    const notes = `Historisk avtalsfakturering ${periodLabel} – ${this.freqLabel(customer.billing_frequency)}`
 
     const { error } = await supabase
       .from('invoices')
@@ -785,9 +892,16 @@ export class ContractInvoiceGenerator {
         sent_at: bookedSentAt,
         paid_at: paidAt,
         is_historical: true,
+        notes,
       })
       .eq('id', invoiceId)
     if (error) throw new Error(`Kunde inte backfilla historisk: ${error.message}`)
+
+    // Byt ut items mot rätt artiklar
+    await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
+    const rows = this.buildInvoiceItemRows(invoiceId, planned, serviceItems)
+    const { error: itemErr } = await supabase.from('invoice_items').insert(rows)
+    if (itemErr) throw new Error(`Kunde inte uppdatera fakturarader: ${itemErr.message}`)
   }
 
   private static async updateContractInvoice(
@@ -795,6 +909,10 @@ export class ContractInvoiceGenerator {
     customer: CustomerRow,
     planned: PlannedInvoice,
   ): Promise<void> {
+    const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
+    const periodLabel = parseLocalDate(planned.periodStart).toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+    const notes = `Avtalsfakturering ${periodLabel} – ${this.freqLabel(customer.billing_frequency)}`
+
     const { error } = await supabase
       .from('invoices')
       .update({
@@ -809,20 +927,14 @@ export class ContractInvoiceGenerator {
         billing_period_start: planned.periodStart,
         billing_period_end: planned.periodEnd,
         due_date: planned.dueDate,
+        notes,
       })
       .eq('id', invoiceId)
     if (error) throw new Error(`Kunde inte uppdatera faktura: ${error.message}`)
 
     await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
-    const { error: itemErr } = await supabase.from('invoice_items').insert({
-      invoice_id: invoiceId,
-      article_name: `Avtalsfakturering ${planned.periodStart.slice(0, 7)}`,
-      quantity: 1,
-      unit_price: planned.amount,
-      total_price: planned.amount,
-      vat_rate: 25,
-      discount_percent: 0,
-    })
+    const rows = this.buildInvoiceItemRows(invoiceId, planned, serviceItems)
+    const { error: itemErr } = await supabase.from('invoice_items').insert(rows)
     if (itemErr) throw new Error(`Kunde inte skapa fakturarad: ${itemErr.message}`)
   }
 

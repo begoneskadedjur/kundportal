@@ -47,6 +47,52 @@ function todayLocal(): Date {
   return new Date(n.getFullYear(), n.getMonth(), n.getDate())
 }
 
+async function getCustomerServiceItems(customerId: string, freq: string): Promise<Array<{
+  article_id: string | null
+  article_code: string | null
+  article_name: string
+  quantity: number
+  unit_price: number
+  total_price: number
+  vat_rate: number
+  discount_percent: number
+}>> {
+  const { data: contract } = await supabase
+    .from('contracts')
+    .select('id')
+    .eq('customer_id', customerId)
+    .eq('oneflow_contract_id', `imported-${customerId}`)
+    .maybeSingle()
+  if (!contract) return []
+
+  const { data: items } = await supabase
+    .from('case_billing_items')
+    .select('article_id, article_code, article_name, service_name, quantity, unit_price, total_price, vat_rate, discount_percent')
+    .eq('case_id', contract.id)
+    .eq('case_type', 'contract')
+    .eq('item_type', 'service')
+  if (!items || items.length === 0) return []
+
+  const divisor = freq === 'monthly' ? 12 : freq === 'quarterly' ? 4 : 1
+  return items.map((s: any) => ({
+    article_id: s.article_id,
+    article_code: s.article_code,
+    article_name: s.service_name ?? s.article_name ?? 'Avtalstjänst',
+    quantity: s.quantity,
+    unit_price: Math.round(Number(s.unit_price) * 100 / divisor) / 100,
+    total_price: Math.round(Number(s.total_price) * 100 / divisor) / 100,
+    vat_rate: Number(s.vat_rate),
+    discount_percent: Number(s.discount_percent ?? 0),
+  }))
+}
+
+function freqLabel(freq: string | null): string {
+  if (freq === 'monthly') return 'Månadsvis'
+  if (freq === 'quarterly') return 'Kvartalsvis'
+  if (freq === 'annual') return 'Årsvis'
+  return 'Avtal'
+}
+
 function computeTerminationCutoff(c: CustomerRow): Date | null {
   if (!c.terminated_at) return null
   const notice = c.notice_period_months ?? 2
@@ -145,6 +191,10 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
     due.setDate(due.getDate() + 30)
 
     const invNum = await generateInvoiceNumber()
+    const serviceItems = await getCustomerServiceItems(customer.id, freq)
+    const periodLabel = periodStart.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+    const notes = `Avtalsfakturering ${periodLabel} – ${freqLabel(freq)}`
+
     const { data: inv, error } = await supabase
       .from('invoices')
       .insert({
@@ -167,21 +217,35 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
         billing_period_end: toLocalIsoDate(periodEnd),
         due_date: toLocalIsoDate(due),
         is_historical: false,
+        notes,
       })
       .select('id')
       .single()
 
     if (error || !inv) continue
 
-    await supabase.from('invoice_items').insert({
-      invoice_id: inv.id,
-      article_name: `Avtalsfakturering ${key.slice(0, 7)}`,
-      quantity: 1,
-      unit_price: perPeriod,
-      total_price: perPeriod,
-      vat_rate: 25,
-      discount_percent: 0,
-    })
+    const rows = serviceItems.length > 0
+      ? serviceItems.map(it => ({
+          invoice_id: inv.id,
+          article_id: it.article_id,
+          article_code: it.article_code,
+          article_name: it.article_name,
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+          total_price: it.total_price,
+          vat_rate: it.vat_rate,
+          discount_percent: it.discount_percent,
+        }))
+      : [{
+          invoice_id: inv.id,
+          article_name: `Avtalsfakturering ${key.slice(0, 7)}`,
+          quantity: 1,
+          unit_price: perPeriod,
+          total_price: perPeriod,
+          vat_rate: 25,
+          discount_percent: 0,
+        }]
+    await supabase.from('invoice_items').insert(rows)
     created++
   }
 

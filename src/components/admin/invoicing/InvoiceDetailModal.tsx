@@ -1039,6 +1039,45 @@ export default function InvoiceDetailModal({
                         maxThumbnails={4}
                       />
                     </div>
+                  ) : invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc' ? (
+                    <div className="p-3 space-y-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-100">
+                          {invoice.invoice_type === 'contract' ? 'Avtalsfakturering' : 'Merförsäljning'}
+                        </h3>
+                        {invoice.billing_period_start && invoice.billing_period_end && (
+                          <p className="text-xs text-slate-400 mt-1">
+                            Period: {formatInvoiceDate(invoice.billing_period_start)} – {formatInvoiceDate(invoice.billing_period_end)}
+                          </p>
+                        )}
+                      </div>
+                      {invoice.notes && (
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Anteckning</h4>
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
+                            <p className="text-sm text-slate-300 whitespace-pre-wrap">{invoice.notes}</p>
+                          </div>
+                        </div>
+                      )}
+                      {invoice.customer_id && (
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Kund</h4>
+                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
+                            <p className="text-sm text-slate-200 font-medium">{invoice.customer_name}</p>
+                            {invoice.organization_number && (
+                              <p className="text-xs text-slate-400 mt-0.5">Org.nr {invoice.organization_number}</p>
+                            )}
+                            <a
+                              href={`/admin/befintliga-kunder?customer=${invoice.customer_id}`}
+                              className="inline-flex items-center gap-1 mt-2 text-xs text-blue-400 hover:text-blue-300"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              Öppna kundkort
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="p-4 text-center text-sm text-slate-500">
                       Kunde inte ladda ärendedata
@@ -1046,21 +1085,23 @@ export default function InvoiceDetailModal({
                   )}
                 </div>
 
-                {/* Kommunikation */}
-                <div className="flex-1 min-h-0 flex flex-col">
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700 bg-slate-800/30">
-                    <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
-                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Kommunikation</span>
+                {/* Kommunikation — endast för fakturor med case-koppling */}
+                {invoice.case_id && invoice.case_type && (
+                  <div className="flex-1 min-h-0 flex flex-col">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700 bg-slate-800/30">
+                      <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Kommunikation</span>
+                    </div>
+                    <div className="flex-1 min-h-0 flex flex-col px-3 py-2">
+                      <CommentSection
+                        caseId={invoice.case_id}
+                        caseType={invoice.case_type as CaseType}
+                        caseTitle={caseContext?.title || invoice.customer_name}
+                        compact={true}
+                      />
+                    </div>
                   </div>
-                  <div className="flex-1 min-h-0 flex flex-col px-3 py-2">
-                    <CommentSection
-                      caseId={invoice.case_id}
-                      caseType={invoice.case_type as CaseType}
-                      caseTitle={caseContext?.title || invoice.customer_name}
-                      compact={true}
-                    />
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Mobil: Collapsible ärendekontext + kommunikation */}
@@ -1118,15 +1159,34 @@ export default function InvoiceDetailModal({
                       </div>
                     )}
 
-                    {/* Kommunikation */}
-                    <div className="min-h-[200px]">
-                      <CommentSection
-                        caseId={invoice.case_id}
-                        caseType={invoice.case_type as CaseType}
-                        caseTitle={caseContext?.title || invoice.customer_name}
-                        compact={true}
-                      />
-                    </div>
+                    {/* Avtalskontext — mobil */}
+                    {(invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc') && (
+                      <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
+                        <p className="text-xs text-slate-400">
+                          {invoice.invoice_type === 'contract' ? 'Avtalsfakturering' : 'Merförsäljning'}
+                        </p>
+                        {invoice.billing_period_start && invoice.billing_period_end && (
+                          <p className="text-xs text-slate-300 mt-1">
+                            Period: {formatInvoiceDate(invoice.billing_period_start)} – {formatInvoiceDate(invoice.billing_period_end)}
+                          </p>
+                        )}
+                        {invoice.notes && (
+                          <p className="text-xs text-slate-300 mt-1">{invoice.notes}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Kommunikation — endast för fakturor med case-koppling */}
+                    {invoice.case_id && invoice.case_type && (
+                      <div className="min-h-[200px]">
+                        <CommentSection
+                          caseId={invoice.case_id}
+                          caseType={invoice.case_type as CaseType}
+                          caseTitle={caseContext?.title || invoice.customer_name}
+                          compact={true}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
