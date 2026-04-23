@@ -32,6 +32,7 @@ import MultiSiteCustomerDetailModal from '../../components/admin/customers/Multi
 import SingleCustomerDetailModal from '../../components/admin/customers/SingleCustomerDetailModal'
 import BillingSettingsModal from '../../components/admin/customers/BillingSettingsModal'
 import CustomerContactsModal from '../../components/admin/customers/CustomerContactsModal'
+import CustomerDetailSidePanel from '../../components/admin/customers/CustomerDetailSidePanel'
 import { 
   formatCurrency, 
   formatContractPeriod,
@@ -375,6 +376,14 @@ export default function Customers() {
   const [contactsOrg, setContactsOrg] = useState<any>(null)
   const [mobileOverflowId, setMobileOverflowId] = useState<string | null>(null)
 
+  // Sidopanel för kunddetaljer (ersätter inline-expand för single-kunder)
+  const [sidePanelOrg, setSidePanelOrg] = useState<any>(null)
+  const sidePanelOpen = sidePanelOrg !== null
+
+  // Collapsade statusgrupper i tabellen
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+  const toggleGroup = (key: string) => setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }))
+
   // Flash-highlight från URL-param (?customerId=...) när man navigerat hit från offertuppföljningen
   const [flashCustomerId, setFlashCustomerId] = useState<string | null>(null)
 
@@ -398,9 +407,10 @@ export default function Customers() {
     return () => document.removeEventListener('mousedown', handler)
   }, [importDropdownOpen])
 
-  // Active customer highlight — tracks which org has an open modal
+  // Active customer highlight — tracks which org has an open modal/panel
   const activeCustomerId =
     flashCustomerId ||
+    (sidePanelOpen && sidePanelOrg?.id) ||
     (revenueModalOpen && revenueCustomer?.id) ||
     (editModalOpen && editingOrgId) ||
     (multiSiteDetailOpen && selectedMultiSiteOrg?.id) ||
@@ -487,6 +497,29 @@ export default function Customers() {
     currentPage * pageSize
   )
   const totalPages = Math.ceil(sortedCustomers.length / pageSize)
+
+  // Gruppera paginerade kunder efter status för desktop-tabellen
+  const groupedCustomers = useMemo(() => {
+    const now = Date.now()
+    const active: any[] = []
+    const paused: any[] = []
+    const terminated: any[] = []
+    const expired: any[] = []
+
+    for (const c of paginatedCustomers) {
+      if (c.isPaused) paused.push(c)
+      else if (c.isTerminated) terminated.push(c)
+      else if (c.nextRenewalDate && new Date(c.nextRenewalDate).getTime() < now) expired.push(c)
+      else active.push(c)
+    }
+
+    return [
+      { key: 'active',     label: 'Aktiva',               dot: 'bg-emerald-500', rows: active },
+      { key: 'paused',     label: 'Pausade',              dot: 'bg-amber-500',   rows: paused },
+      { key: 'expired',    label: 'Fortlöpande (avtalstid passerad)', dot: 'bg-slate-400', rows: expired },
+      { key: 'terminated', label: 'Uppsagda',             dot: 'bg-red-500',     rows: terminated },
+    ].filter(g => g.rows.length > 0)
+  }, [paginatedCustomers])
 
   // Deep-link via ?customerId=... — hitta kunden, navigera till rätt sida, scrolla + flash-highlighta
   useEffect(() => {
@@ -733,7 +766,7 @@ export default function Customers() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4">
       {/* Sidtitel + åtgärdsknappar */}
       <div className="flex items-center justify-between">
         <div>
@@ -869,9 +902,9 @@ export default function Customers() {
       )}
 
       {/* Main content */}
-      <div>
+      <div className="space-y-4">
           {/* Filters */}
-          <Card className="p-4 mb-6 overflow-visible relative z-20">
+          <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl overflow-visible relative z-20">
             <div className="flex gap-3">
               {/* Sökfält — alltid synligt */}
               <div className="relative flex-1">
@@ -889,14 +922,14 @@ export default function Customers() {
                 onClick={() => setFiltersExpanded(!filtersExpanded)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors text-sm font-medium ${
                   filtersExpanded || activeFilterCount > 0
-                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                    ? 'bg-[#20c58f]/10 border-[#20c58f]/30 text-[#20c58f]'
                     : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'
                 }`}
               >
                 <Filter className="w-4 h-4" />
                 Filter
                 {activeFilterCount > 0 && (
-                  <span className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="bg-[#20c58f] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                     {activeFilterCount}
                   </span>
                 )}
@@ -977,16 +1010,16 @@ export default function Customers() {
                 )}
               </div>
             )}
-          </Card>
+          </div>
 
           {/* Snabbvy-knappar */}
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-slate-400 font-medium mr-1">Snabbvy:</span>
             <button
               onClick={() => resetFilters()}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 activePreset === 'all'
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  ? 'bg-[#20c58f]/20 text-[#20c58f] border border-[#20c58f]/30'
                   : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
               }`}
             >
@@ -1271,132 +1304,128 @@ export default function Customers() {
           </div>
 
           {/* === DESKTOP: Tabellvy === */}
-          <Card className="hidden md:block overflow-hidden border-slate-700/50 bg-gradient-to-br from-slate-800/40 to-slate-900/40">
+          <div className="hidden md:block overflow-hidden border border-slate-700 bg-slate-800/30 rounded-xl">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-800/95 backdrop-blur border-b border-slate-600 sticky top-0 z-10">
+                <thead className="bg-slate-900 border-b border-slate-700 sticky top-0 z-10">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('company_name')}>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('company_name')}>
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-blue-400" />
                         Organisation & Kontakt
                         {sortField === 'company_name' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </div>
                     </th>
                     {visibleColumns.has('annualValue') && (
-                      <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalAnnualValue')}>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalAnnualValue')}>
                         <div className="flex items-center justify-end gap-2">
-                          <Coins className="w-4 h-4 text-green-400" />
                           Årspremie
                           {sortField === 'totalAnnualValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                         </div>
                       </th>
                     )}
                     {visibleColumns.has('casesValue') && (
-                      <th className="hidden lg:table-cell px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalCasesValue')}>
+                      <th className="hidden lg:table-cell px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalCasesValue')}>
                         <div className="flex items-center justify-end gap-2">
-                          <Coins className="w-4 h-4 text-blue-400" />
-                          Debiterat utöver avtal
+                          Utöver avtal
                           {sortField === 'totalCasesValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                         </div>
                       </th>
                     )}
                     {visibleColumns.has('contractValue') && (
-                      <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalContractValue')}>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalContractValue')}>
                         <div className="flex items-center justify-end gap-2">
-                          <Coins className="w-4 h-4 text-yellow-400" />
                           Avtalsvärde
                           {sortField === 'totalContractValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                         </div>
                       </th>
                     )}
                     {visibleColumns.has('contractPeriod') && (
-                      <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('daysToNextRenewal')}>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('daysToNextRenewal')}>
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-purple-400" />
                           Kontraktsperiod
                           {sortField === 'daysToNextRenewal' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                         </div>
                       </th>
                     )}
                     {visibleColumns.has('healthScore') && (
-                      <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('healthScore')}>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('healthScore')}>
                         <div className="flex items-center gap-2">
-                          <Activity className="w-4 h-4 text-green-400" />
-                          Health Score
+                          Health
                           {sortField === 'healthScore' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                         </div>
                       </th>
                     )}
                     {visibleColumns.has('churnRisk') && (
-                      <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('churnRisk')}>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('churnRisk')}>
                         <div className="flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 text-red-400" />
-                          Churn Risk
+                          Churn
                           {sortField === 'churnRisk' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                         </div>
                       </th>
                     )}
                     {visibleColumns.has('manager') && (
-                      <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-blue-400" />
-                          Säljare
-                        </div>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Säljare
                       </th>
                     )}
-                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
-                      <div className="flex items-center justify-end gap-2">
-                        <Edit3 className="w-4 h-4 text-slate-400" />
-                        Åtgärder
-                      </div>
-                    </th>
+                    <th className="px-4 py-3 w-10" />
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedCustomers.map((organization) => {
-                    const isExpanded = expandedRows.has(organization.id)
-
-                    const orgContacts = getContactsForOrganization(organization)
-
+                  {groupedCustomers.map((group) => {
+                    const collapsed = collapsedGroups[group.key] === true
+                    const groupColSpan = 2 + [...visibleColumns].filter(c => ['annualValue','casesValue','contractValue','contractPeriod','healthScore','churnRisk','manager'].includes(c)).length
                     return (
-                      <React.Fragment key={organization.id}>
-                        {/* Organization main row */}
-                        <ExpandableOrganizationRow
-                          organization={organization}
-                          isExpanded={isExpanded}
-                          onToggle={() => toggleExpandedRow(organization.id)}
-                          onInviteToPortal={inviteToPortal}
-                          onEdit={(org) => handleEditCustomer(org)}
-                          onViewMultiSiteDetails={handleViewMultiSiteDetails}
-                          onViewSingleCustomerDetails={handleViewSingleCustomerDetails}
-                          onViewRevenue={handleViewRevenue}
-                          onRenewal={handleStartRenewal}
-                          onTerminate={handleTerminate}
-                          onBillingSettings={handleBillingSettings}
-                          onContacts={handleContacts}
-                          visibleColumns={visibleColumns}
-                          contactCount={orgContacts.length}
-                          contactNames={orgContacts.map(c => c.name)}
-                          isHighlighted={activeCustomerId === organization.id}
-                        />
+                      <React.Fragment key={group.key}>
+                        {/* Statusgrupp-header */}
+                        <tr className="bg-slate-800/40 border-y border-slate-700/50">
+                          <td colSpan={groupColSpan} className="px-4 py-1.5">
+                            <button
+                              onClick={() => toggleGroup(group.key)}
+                              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-white transition-colors"
+                            >
+                              {collapsed
+                                ? <ChevronRight className="w-3 h-3" />
+                                : <ChevronDown className="w-3 h-3" />
+                              }
+                              <span className={`w-2 h-2 rounded-full ${group.dot}`} />
+                              <span>{group.label}</span>
+                              <span className="text-slate-500 normal-case font-normal">({group.rows.length})</span>
+                            </button>
+                          </td>
+                        </tr>
 
-                        {/* Contact and units expanded view for multisite organizations */}
-                        {isExpanded && organization.organizationType === 'multisite' && (
-                          <MultisiteExpandedTabs organization={organization} colSpan={visibleColumns.size} contacts={orgContacts} />
-                        )}
+                        {/* Rader i gruppen */}
+                        {!collapsed && group.rows.map((organization: any) => {
+                          const isExpanded = expandedRows.has(organization.id)
+                          const orgContacts = getContactsForOrganization(organization)
 
-                        {/* Expanded details for single-site customers */}
-                        {isExpanded && organization.organizationType === 'single' && (
-                          <ExpandedCustomerRow customer={organization.sites[0]} colSpan={visibleColumns.size} contacts={orgContacts} />
-                        )}
+                          return (
+                            <React.Fragment key={organization.id}>
+                              <ExpandableOrganizationRow
+                                organization={organization}
+                                isExpanded={isExpanded}
+                                onToggleMultisiteSites={() => toggleExpandedRow(organization.id)}
+                                onOpenPanel={(org) => setSidePanelOrg(org)}
+                                visibleColumns={visibleColumns}
+                                contactCount={orgContacts.length}
+                                isHighlighted={activeCustomerId === organization.id}
+                              />
+
+                              {/* Multisite-enheter inline-expand */}
+                              {isExpanded && organization.organizationType === 'multisite' && (
+                                <MultisiteExpandedTabs organization={organization} colSpan={groupColSpan} contacts={orgContacts} />
+                              )}
+                            </React.Fragment>
+                          )
+                        })}
                       </React.Fragment>
                     )
                   })}
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
 
           {/* Tom-state + Pagination (visas för både mobil och desktop) */}
           {sortedCustomers.length === 0 && (
@@ -1601,6 +1630,24 @@ export default function Customers() {
           }}
         />
       )}
+
+      {/* Sidopanel för kunddetaljer */}
+      <CustomerDetailSidePanel
+        organization={sidePanelOrg}
+        contacts={sidePanelOrg ? getContactsForOrganization(sidePanelOrg) : []}
+        isOpen={sidePanelOpen}
+        onClose={() => setSidePanelOrg(null)}
+        onViewFullDetails={(org) => {
+          if (org.organizationType === 'multisite') handleViewMultiSiteDetails(org)
+          else handleViewSingleCustomerDetails(org)
+        }}
+        onEdit={handleEditCustomer}
+        onViewRevenue={handleViewRevenue}
+        onRenewal={handleStartRenewal}
+        onTerminate={handleTerminate}
+        onBillingSettings={handleBillingSettings}
+        onContacts={handleContacts}
+      />
     </div>
   )
 }
