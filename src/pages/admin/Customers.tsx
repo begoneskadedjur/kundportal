@@ -1636,6 +1636,11 @@ export default function Customers() {
         organization={sidePanelOrg}
         contacts={sidePanelOrg ? getContactsForOrganization(sidePanelOrg) : []}
         isOpen={sidePanelOpen}
+        dimmed={
+          revenueModalOpen || editModalOpen || multiSiteDetailOpen ||
+          singleCustomerDetailOpen || renewalModalOpen || terminateModalOpen ||
+          billingSettingsOpen || contactsModalOpen
+        }
         onClose={() => setSidePanelOrg(null)}
         onViewFullDetails={(org) => {
           if (org.organizationType === 'multisite') handleViewMultiSiteDetails(org)

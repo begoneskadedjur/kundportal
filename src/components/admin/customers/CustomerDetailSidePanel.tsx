@@ -8,7 +8,7 @@ import {
   Edit3, TrendingUp, RefreshCw, XCircle, Receipt, ExternalLink,
   Calendar, Coins, Activity, AlertTriangle,
 } from 'lucide-react'
-import { ConsolidatedCustomer, ContactSummary } from '../../../hooks/useConsolidatedCustomers'
+import type { ConsolidatedCustomer, ContactSummary } from '../../../hooks/useConsolidatedCustomers'
 import { PriceListService } from '../../../services/priceListService'
 import { ImportedCustomerContractService } from '../../../services/importedCustomerContractService'
 import { CaseBillingService } from '../../../services/caseBillingService'
@@ -22,6 +22,8 @@ interface Props {
   organization: ConsolidatedCustomer | null
   contacts: ContactSummary[]
   isOpen: boolean
+  /** När true: panelen glider ut ur vägen och ignorerar Escape (en modal öppnad ovanpå). */
+  dimmed?: boolean
   onClose: () => void
   onViewFullDetails: (org: ConsolidatedCustomer) => void
   onEdit: (org: ConsolidatedCustomer) => void
@@ -112,6 +114,7 @@ export default function CustomerDetailSidePanel({
   organization,
   contacts,
   isOpen,
+  dimmed = false,
   onClose,
   onViewFullDetails,
   onEdit,
@@ -138,15 +141,15 @@ export default function CustomerDetailSidePanel({
   const primarySite = organization?.sites?.[0]
   const isMultisite = organization?.organizationType === 'multisite'
 
-  // Close on Escape
+  // Close on Escape — men inte när en modal är öppen ovanpå (dimmed)
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || dimmed) return
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onEsc)
     return () => document.removeEventListener('keydown', onEsc)
-  }, [isOpen, onClose])
+  }, [isOpen, dimmed, onClose])
 
   // Fetch price list (single-site only — multisite visar aggregerad vy separat)
   useEffect(() => {
@@ -222,16 +225,16 @@ export default function CustomerDetailSidePanel({
 
   return (
     <>
-      {/* Backdrop — klick stänger */}
+      {/* Backdrop — klick stänger (inaktiv när dimmed så modalens backdrop hanterar interaktion) */}
       <div
         onClick={onClose}
         className={`fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[100] transition-all duration-300 ${
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          isOpen && !dimmed ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         aria-hidden="true"
       />
 
-      {/* Panel */}
+      {/* Panel — glider ut åt höger när dimmed (modal öppen ovanpå) */}
       <div
         className={`
           fixed z-[101] bg-slate-900 shadow-2xl flex flex-col
@@ -239,12 +242,12 @@ export default function CustomerDetailSidePanel({
           sm:top-0 sm:right-0 sm:h-full sm:w-[520px] lg:w-[640px]
           sm:border-l sm:border-slate-800
           sm:transform sm:transition-transform sm:duration-300 sm:ease-out
-          ${isOpen ? 'sm:translate-x-0' : 'sm:translate-x-full'}
+          ${isOpen && !dimmed ? 'sm:translate-x-0' : 'sm:translate-x-full'}
 
           max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:h-[90vh]
           max-sm:rounded-t-2xl max-sm:border-t max-sm:border-slate-700
           max-sm:transform max-sm:transition-transform max-sm:duration-300 max-sm:ease-out
-          ${isOpen ? 'max-sm:translate-y-0' : 'max-sm:translate-y-full'}
+          ${isOpen && !dimmed ? 'max-sm:translate-y-0' : 'max-sm:translate-y-full'}
         `}
       >
         {/* Drag handle på mobil */}
