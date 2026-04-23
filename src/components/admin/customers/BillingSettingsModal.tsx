@@ -312,8 +312,17 @@ export default function BillingSettingsModal({
     })
   })()
 
-  // Första icke-historiska index → "Nästa"
-  const firstActiveIdx = plannedSchedule.findIndex(p => !p.isHistorical)
+  // Klassificering för schemats status-etiketter:
+  // Betald = periodStart ligger i en månad FÖRE innevarande månad (redan fakturerat)
+  // Nästa = innevarande månad eller första framtida period
+  // Väntande = senare perioder
+  const currentMonthKey = (() => {
+    const t = new Date()
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`
+  })()
+  const isPaidPeriod = (p: typeof plannedSchedule[number]) =>
+    p.periodStart.slice(0, 7) < currentMonthKey
+  const firstActiveIdx = plannedSchedule.findIndex(p => !isPaidPeriod(p))
 
   const MONTHS_SV = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
@@ -534,7 +543,7 @@ export default function BillingSettingsModal({
                 <div className="space-y-1 max-h-48 overflow-y-auto">
                   {plannedSchedule.map((p, i) => {
                     const isNext = i === firstActiveIdx
-                    const isPaid = p.isHistorical
+                    const isPaid = isPaidPeriod(p)
                     const date = new Date(p.periodStart + 'T00:00:00')
                     const label = date.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
                     const statusLabel = isPaid ? 'Betald' : isNext ? 'Nästa' : 'Väntande'
