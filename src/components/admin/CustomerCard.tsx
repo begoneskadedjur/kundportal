@@ -37,6 +37,8 @@ interface Customer {
   assigned_account_manager?: string | null
   contract_status?: string
   terminated_at?: string | null
+  billing_active?: boolean | null
+  billing_paused_until?: string | null
   // Beräknade fält
   monthsLeft?: number
   activeCases?: number
@@ -167,9 +169,34 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete, onCas
               {getBusinessTypeIcon(customer.business_type)}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-semibold text-white truncate">
-                {customer.company_name}
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-semibold text-white truncate">
+                  {customer.company_name}
+                </h3>
+                {(() => {
+                  const isPaused = customer.billing_active === false
+                  const isTerminated = !!customer.terminated_at
+                  if (isPaused) {
+                    return (
+                      <span className="text-[10px] font-medium bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30 whitespace-nowrap">
+                        Pausad{customer.billing_paused_until ? ` till ${customer.billing_paused_until}` : ''}
+                      </span>
+                    )
+                  }
+                  if (isTerminated) {
+                    return (
+                      <span className="text-[10px] font-medium bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30 whitespace-nowrap">
+                        Uppsagt
+                      </span>
+                    )
+                  }
+                  return (
+                    <span className="text-[10px] font-medium bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 whitespace-nowrap">
+                      Aktiv
+                    </span>
+                  )
+                })()}
+              </div>
               <p className="text-sm text-slate-400 truncate">
                 {customer.org_number}
               </p>

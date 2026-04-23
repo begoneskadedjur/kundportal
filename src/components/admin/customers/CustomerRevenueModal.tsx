@@ -5,7 +5,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { X, Coins, FileText, Briefcase, TrendingUp, Calendar } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import { supabase } from '../../../lib/supabase'
-import type { ContractBillingItemStatus, ContractBillingItemType } from '../../../types/contractBilling'
+
+type InvoiceStatus = 'paid' | 'sent' | 'booked' | 'ready' | 'pending_approval' | 'draft' | 'cancelled'
 
 interface CustomerRevenueModalProps {
   customer: ConsolidatedCustomer | null
@@ -14,21 +15,19 @@ interface CustomerRevenueModalProps {
 }
 
 interface BillingItem {
-  total_price: number
-  status: ContractBillingItemStatus
-  item_type: ContractBillingItemType
-  billing_period_start: string
-  billing_period_end: string
-  article_name: string
-  quantity: number
-  unit_price: number
+  subtotal: number
+  total_amount: number
+  status: InvoiceStatus
+  invoice_type: 'contract' | 'adhoc'
+  billing_period_start: string | null
+  billing_period_end: string | null
 }
 
 interface PeriodGroup {
   periodLabel: string
   periodStart: string
   total: number
-  status: ContractBillingItemStatus
+  status: InvoiceStatus
   itemCount: number
 }
 
@@ -40,28 +39,34 @@ const formatCurrency = (amount: number): string =>
     maximumFractionDigits: 0
   }).format(amount)
 
-const STATUS_LABELS: Record<ContractBillingItemStatus, string> = {
+const STATUS_LABELS: Record<InvoiceStatus, string> = {
   paid: 'Betald',
-  invoiced: 'Fakturerad',
-  approved: 'Godkänd',
-  pending: 'Väntande',
-  cancelled: 'Avbruten'
+  sent: 'Skickad',
+  booked: 'Bokförd',
+  ready: 'Redo',
+  pending_approval: 'Godkännas',
+  draft: 'Utkast',
+  cancelled: 'Avbruten',
 }
 
-const STATUS_COLORS: Record<ContractBillingItemStatus, string> = {
+const STATUS_COLORS: Record<InvoiceStatus, string> = {
   paid: 'text-green-400 bg-green-500/10',
-  invoiced: 'text-blue-400 bg-blue-500/10',
-  approved: 'text-purple-400 bg-purple-500/10',
-  pending: 'text-amber-400 bg-amber-500/10',
-  cancelled: 'text-slate-400 bg-slate-500/10'
+  sent: 'text-purple-400 bg-purple-500/10',
+  booked: 'text-blue-400 bg-blue-500/10',
+  ready: 'text-emerald-400 bg-emerald-500/10',
+  pending_approval: 'text-amber-400 bg-amber-500/10',
+  draft: 'text-slate-400 bg-slate-500/10',
+  cancelled: 'text-slate-400 bg-slate-500/10',
 }
 
-const STATUS_BAR_COLORS: Record<ContractBillingItemStatus, string> = {
+const STATUS_BAR_COLORS: Record<InvoiceStatus, string> = {
   paid: 'bg-green-500',
-  invoiced: 'bg-blue-500',
-  approved: 'bg-purple-500',
-  pending: 'bg-amber-500',
-  cancelled: 'bg-slate-500'
+  sent: 'bg-purple-500',
+  booked: 'bg-blue-500',
+  ready: 'bg-emerald-500',
+  pending_approval: 'bg-amber-500',
+  draft: 'bg-slate-500',
+  cancelled: 'bg-slate-500',
 }
 
 export default function CustomerRevenueModal({ customer, isOpen, onClose }: CustomerRevenueModalProps) {
@@ -78,14 +83,16 @@ export default function CustomerRevenueModal({ customer, isOpen, onClose }: Cust
         // Hämta customer_ids från alla sites
         const customerIds = customer.sites.map(s => s.id)
 
+        // Läs från invoices — authoritativ källa, inkluderar historical paid.
         const { data, error } = await supabase
-          .from('contract_billing_items')
-          .select('total_price, status, item_type, billing_period_start, billing_period_end, article_name, quantity, unit_price')
+          .from('invoices')
+          .select('subtotal, total_amount, status, invoice_type, billing_period_start, billing_period_end')
           .in('customer_id', customerIds)
+          .in('invoice_type', ['contract', 'adhoc'])
           .neq('status', 'cancelled')
 
         if (error) throw error
-        setBillingItems(data || [])
+        setBillingItems((data as any) || [])
       } catch (err) {
         console.error('Error fetching billing data:', err)
         setBillingItems([])
@@ -101,23 +108,25 @@ export default function CustomerRevenueModal({ customer, isOpen, onClose }: Cust
   const stats = useMemo(() => {
     if (!customer) return null
 
-    // Kontraktsintäkter per status
-    const byStatus: Record<string, number> = { paid: 0, invoiced: 0, approved: 0, pending: 0 }
+    // Fakturaintäkter per status (alla statusar från invoices)
+    const byStatus: Record<string, number> = {
+      paid: 0, sent: 0, booked: 0, ready: 0, pending_approval: 0, draft: 0,
+    }
     billingItems.forEach(item => {
       if (byStatus[item.status] !== undefined) {
-        byStatus[item.status] += item.total_price
+        byStatus[item.status] += item.subtotal
       }
     })
 
-    const contractTotal = billingItems.reduce((sum, i) => sum + i.total_price, 0)
+    const contractTotal = billingItems.reduce((sum, i) => sum + i.subtotal, 0)
 
     // Uppdelning: avtal vs tillägg
     const recurringRevenue = billingItems
-      .filter(i => i.item_type === 'contract')
-      .reduce((sum, i) => sum + i.total_price, 0)
+      .filter(i => i.invoice_type === 'contract')
+      .reduce((sum, i) => sum + i.subtotal, 0)
     const adHocRevenue = billingItems
-      .filter(i => i.item_type === 'ad_hoc')
-      .reduce((sum, i) => sum + i.total_price, 0)
+      .filter(i => i.invoice_type === 'adhoc')
+      .reduce((sum, i) => sum + i.subtotal, 0)
 
     // Ärendeintäkter (från ConsolidatedCustomer)
     const casesRevenue = customer.totalCasesValue || 0
@@ -126,7 +135,7 @@ export default function CustomerRevenueModal({ customer, isOpen, onClose }: Cust
     const totalAccumulated = contractTotal + casesRevenue
 
     // Max för bar-diagram
-    const maxStatus = Math.max(byStatus.paid, byStatus.invoiced, byStatus.approved, byStatus.pending, 1)
+    const maxStatus = Math.max(...Object.values(byStatus), 1)
 
     return {
       byStatus,
@@ -139,21 +148,21 @@ export default function CustomerRevenueModal({ customer, isOpen, onClose }: Cust
     }
   }, [billingItems, customer])
 
-  // Gruppera per period (senaste 6)
+  // Gruppera per period (senaste 8)
   const periodGroups = useMemo((): PeriodGroup[] => {
     const groups = new Map<string, PeriodGroup>()
 
     billingItems.forEach(item => {
       const start = item.billing_period_start
       const end = item.billing_period_end
-      const key = `${start}::${end}`
+      if (!start) return
+      const key = `${start}::${end ?? ''}`
 
-      // Formatera periodlabel
       const startDate = new Date(start)
       const isSingleDay = start === end
       const periodLabel = isSingleDay
         ? startDate.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })
-        : `${startDate.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })}`
+        : startDate.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
 
       if (!groups.has(key)) {
         groups.set(key, {
@@ -166,10 +175,10 @@ export default function CustomerRevenueModal({ customer, isOpen, onClose }: Cust
       }
 
       const group = groups.get(key)!
-      group.total += item.total_price
+      group.total += item.subtotal
       group.itemCount++
-      // Lägsta status "vinner" (pending < approved < invoiced < paid)
-      const statusOrder: ContractBillingItemStatus[] = ['pending', 'approved', 'invoiced', 'paid']
+      // Lägsta status "vinner" (draft < pending_approval < ready < booked < sent < paid)
+      const statusOrder: InvoiceStatus[] = ['draft', 'pending_approval', 'ready', 'booked', 'sent', 'paid']
       if (statusOrder.indexOf(item.status) < statusOrder.indexOf(group.status)) {
         group.status = item.status
       }
@@ -250,7 +259,7 @@ export default function CustomerRevenueModal({ customer, isOpen, onClose }: Cust
               <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-5">
                 <h3 className="text-sm font-semibold text-white mb-4">Avtalsfakturering per status</h3>
                 <div className="space-y-3">
-                  {(['paid', 'invoiced', 'approved', 'pending'] as ContractBillingItemStatus[]).map(status => {
+                  {(['paid', 'sent', 'booked', 'ready', 'pending_approval', 'draft'] as InvoiceStatus[]).map(status => {
                     const amount = stats.byStatus[status] || 0
                     const barWidth = stats.maxStatus > 0 ? (amount / stats.maxStatus) * 100 : 0
                     return (
