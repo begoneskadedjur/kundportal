@@ -1324,6 +1324,11 @@ export class ContractBillingService {
 
   /**
    * Importera historiska fakturor från Fortnox som contract_billing_items
+   * OCH som motsvarande invoices + invoice_items.
+   *
+   * `contract_billing_items` används av period-/aggregeringslogik (contractBilledAccum).
+   * `invoices` är auktoritativ källa för UI:t ("Totalt fakturerat", CustomerRevenueModal).
+   * Båda tabeller hålls synkade så att importerade kunder syns likadant som fortlöpande.
    */
   static async importHistoricalItems(
     customerId: string,
@@ -1337,31 +1342,116 @@ export class ContractBillingService {
       importType: 'contract' | 'ad_hoc'
     }>
   ): Promise<void> {
-    const items = invoices.map(inv => {
+    if (invoices.length === 0) return
+
+    const normalized = invoices.map(inv => {
       const paid = !!inv.FinalPayDate || inv.Balance === 0
       const [year, month] = inv.InvoiceDate.split('-').map(Number)
       const periodStart = new Date(year, month - 1, 1).toISOString().split('T')[0]
       const periodEnd = new Date(year, month, 0).toISOString().split('T')[0]
-
-      return {
-        customer_id: customerId,
-        item_type: inv.importType,
-        source: 'manual' as const,
-        article_name: inv.importType === 'contract' ? 'Historisk avtalsfaktura' : 'Historisk engångsfaktura',
-        quantity: 1,
-        unit_price: inv.Total,
-        total_price: inv.Total,
-        status: paid ? 'paid' : (inv.Sent ? 'invoiced' : 'pending'),
-        billing_period_start: periodStart,
-        billing_period_end: periodEnd,
-        invoice_number: inv.DocumentNumber,
-        invoiced_at: inv.InvoiceDate,
-        paid_at: inv.FinalPayDate ?? null,
-      }
+      return { inv, paid, periodStart, periodEnd }
     })
 
-    const { error } = await supabase.from('contract_billing_items').insert(items)
-    if (error) throw new Error(`Kunde inte importera historiska fakturor: ${error.message}`)
+    // 1) contract_billing_items (legacy period-källa)
+    const cbiItems = normalized.map(({ inv, paid, periodStart, periodEnd }) => ({
+      customer_id: customerId,
+      item_type: inv.importType,
+      source: 'manual' as const,
+      article_name: inv.importType === 'contract' ? 'Historisk avtalsfaktura' : 'Historisk engångsfaktura',
+      quantity: 1,
+      unit_price: inv.Total,
+      total_price: inv.Total,
+      status: paid ? 'paid' : (inv.Sent ? 'invoiced' : 'pending'),
+      billing_period_start: periodStart,
+      billing_period_end: periodEnd,
+      invoice_number: inv.DocumentNumber,
+      invoiced_at: inv.InvoiceDate,
+      paid_at: inv.FinalPayDate ?? null,
+    }))
+
+    const { error: cbiErr } = await supabase.from('contract_billing_items').insert(cbiItems)
+    if (cbiErr) throw new Error(`Kunde inte importera historiska fakturor: ${cbiErr.message}`)
+
+    // 2) invoices + invoice_items (auktoritativ källa för UI)
+    try {
+      // Hämta kunddata en gång för att fylla invoice-fälten
+      const { data: customer, error: custErr } = await supabase
+        .from('customers')
+        .select('company_name, organization_number, contact_email, contact_phone, contact_address, billing_email, billing_address')
+        .eq('id', customerId)
+        .single()
+      if (custErr || !customer) throw new Error('Kunden kunde inte hämtas för fakturakonvertering')
+
+      // Skippa rader som redan har en motsvarande invoices-rad (idempotent)
+      const docNumbers = normalized.map(n => n.inv.DocumentNumber)
+      const { data: existing } = await supabase
+        .from('invoices')
+        .select('invoice_number')
+        .eq('customer_id', customerId)
+        .in('invoice_number', docNumbers.map(n => `F-${n}`))
+      const existingSet = new Set((existing || []).map((e: any) => e.invoice_number))
+
+      const toInsert = normalized.filter(n => !existingSet.has(`F-${n.inv.DocumentNumber}`))
+      if (toInsert.length === 0) return
+
+      const invoiceRows = toInsert.map(({ inv, paid, periodStart, periodEnd }) => {
+        const isoInvDate = new Date(inv.InvoiceDate).toISOString()
+        const status = paid ? 'paid' : (inv.Sent ? 'sent' : 'draft')
+        return {
+          invoice_number: `F-${inv.DocumentNumber}`,
+          invoice_type: inv.importType === 'contract' ? 'contract' : 'adhoc',
+          customer_id: customerId,
+          case_id: null,
+          case_type: null,
+          customer_name: customer.company_name,
+          customer_email: customer.billing_email ?? customer.contact_email,
+          customer_phone: customer.contact_phone,
+          customer_address: customer.billing_address ?? customer.contact_address,
+          organization_number: customer.organization_number,
+          subtotal: inv.Total,
+          vat_amount: 0,
+          total_amount: inv.Total,
+          status,
+          requires_approval: false,
+          billing_period_start: periodStart,
+          billing_period_end: periodEnd,
+          due_date: inv.FinalPayDate ?? inv.InvoiceDate,
+          booked_at: isoInvDate,
+          sent_at: inv.Sent ? isoInvDate : null,
+          paid_at: inv.FinalPayDate ? new Date(inv.FinalPayDate).toISOString() : null,
+          is_historical: true,
+          notes: `Importerad historisk faktura från Fortnox (${inv.DocumentNumber})`,
+          created_at: isoInvDate,
+        }
+      })
+
+      const { data: insertedInvoices, error: invErr } = await supabase
+        .from('invoices')
+        .insert(invoiceRows)
+        .select('id, invoice_number, subtotal')
+      if (invErr) throw new Error(invErr.message)
+      if (!insertedInvoices) return
+
+      const invoiceItemRows = insertedInvoices.map((row: any) => ({
+        invoice_id: row.id,
+        article_code: 'HIST',
+        article_name: row.invoice_number.startsWith('F-')
+          ? 'Historisk avtalsfaktura (import)'
+          : 'Historisk engångsfaktura (import)',
+        quantity: 1,
+        unit_price: row.subtotal,
+        total_price: row.subtotal,
+        vat_rate: 0,
+        discount_percent: 0,
+      }))
+
+      const { error: itemErr } = await supabase.from('invoice_items').insert(invoiceItemRows)
+      if (itemErr) throw new Error(itemErr.message)
+    } catch (err: any) {
+      // Logga men kasta inte — contract_billing_items har redan skrivits och är datakällan
+      // för aggregat (contractBilledAccum). Backfill-script kan återskapa invoices senare.
+      console.error('[importHistoricalItems] invoices-sync misslyckades:', err?.message || err)
+    }
   }
 
   /**
