@@ -7,14 +7,17 @@ import { supabase } from '../lib/supabase'
 import { ImportedCustomerContractService } from './importedCustomerContractService'
 
 interface ContractServiceItem {
+  case_billing_item_id: string
   article_id: string | null
-  article_code: string | null
-  article_name: string
+  display_code: string | null   // service_code || article_code (samma fallback som invoiceService)
+  display_name: string           // service_name || article_name
   quantity: number
   unit_price: number
   total_price: number
   vat_rate: number
   discount_percent: number
+  rot_rut_type: string | null
+  fastighetsbeteckning: string | null
 }
 
 export type BillingFrequency = 'monthly' | 'quarterly' | 'annual' | 'on_demand'
@@ -702,17 +705,24 @@ export class ContractInvoiceGenerator {
       const divisor = freq === 'monthly' ? 12 : freq === 'quarterly' ? 4 : 1
 
       return services.map(s => {
+        const anyS = s as any
         const scaledUnit = Math.round(Number(s.unit_price) * 100 / divisor) / 100
         const scaledTotal = Math.round(Number(s.total_price) * 100 / divisor) / 100
+        // Samma fallback-kedja som invoiceService.createInvoiceFromCase (rad 187-192)
+        const displayName = anyS.service_name ?? s.article_name ?? 'Avtalstjänst'
+        const displayCode = anyS.service_code ?? s.article_code ?? null
         return {
+          case_billing_item_id: s.id,
           article_id: s.article_id,
-          article_code: s.article_code,
-          article_name: (s as any).service_name ?? s.article_name ?? 'Avtalstjänst',
+          display_code: displayCode,
+          display_name: displayName,
           quantity: s.quantity,
           unit_price: scaledUnit,
           total_price: scaledTotal,
           vat_rate: Number(s.vat_rate),
           discount_percent: Number(s.discount_percent ?? 0),
+          rot_rut_type: (s as any).rot_rut_type ?? null,
+          fastighetsbeteckning: (s as any).fastighetsbeteckning ?? null,
         }
       })
     } catch (err) {
@@ -730,16 +740,22 @@ export class ContractInvoiceGenerator {
     serviceItems: ContractServiceItem[],
   ): Array<Record<string, any>> {
     if (serviceItems.length > 0) {
+      // Spegla invoiceService.createInvoiceFromCase (rad 194-208): tjänstrader sätter
+      // article_id=null (eftersom vi renderar service-koden på article_code-fältet)
+      // men behåller display_code som article_code för Fortnox-matchning.
       return serviceItems.map(it => ({
         invoice_id: invoiceId,
-        article_id: it.article_id,
-        article_code: it.article_code,
-        article_name: it.article_name,
+        case_billing_item_id: it.case_billing_item_id,
+        article_id: null,
+        article_code: it.display_code,
+        article_name: it.display_name,
         quantity: it.quantity,
         unit_price: it.unit_price,
         total_price: it.total_price,
         vat_rate: it.vat_rate,
         discount_percent: it.discount_percent,
+        rot_rut_type: it.rot_rut_type,
+        fastighetsbeteckning: it.fastighetsbeteckning,
       }))
     }
     return [{

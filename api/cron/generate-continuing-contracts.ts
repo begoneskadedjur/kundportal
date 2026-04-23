@@ -48,14 +48,17 @@ function todayLocal(): Date {
 }
 
 async function getCustomerServiceItems(customerId: string, freq: string): Promise<Array<{
+  case_billing_item_id: string
   article_id: string | null
-  article_code: string | null
-  article_name: string
+  display_code: string | null
+  display_name: string
   quantity: number
   unit_price: number
   total_price: number
   vat_rate: number
   discount_percent: number
+  rot_rut_type: string | null
+  fastighetsbeteckning: string | null
 }>> {
   const { data: contract } = await supabase
     .from('contracts')
@@ -67,7 +70,7 @@ async function getCustomerServiceItems(customerId: string, freq: string): Promis
 
   const { data: items } = await supabase
     .from('case_billing_items')
-    .select('article_id, article_code, article_name, service_name, quantity, unit_price, total_price, vat_rate, discount_percent')
+    .select('id, article_id, article_code, article_name, service_id, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, rot_rut_type, fastighetsbeteckning')
     .eq('case_id', contract.id)
     .eq('case_type', 'contract')
     .eq('item_type', 'service')
@@ -75,14 +78,17 @@ async function getCustomerServiceItems(customerId: string, freq: string): Promis
 
   const divisor = freq === 'monthly' ? 12 : freq === 'quarterly' ? 4 : 1
   return items.map((s: any) => ({
+    case_billing_item_id: s.id,
     article_id: s.article_id,
-    article_code: s.article_code,
-    article_name: s.service_name ?? s.article_name ?? 'Avtalstjänst',
+    display_code: s.service_code ?? s.article_code ?? null,
+    display_name: s.service_name ?? s.article_name ?? 'Avtalstjänst',
     quantity: s.quantity,
     unit_price: Math.round(Number(s.unit_price) * 100 / divisor) / 100,
     total_price: Math.round(Number(s.total_price) * 100 / divisor) / 100,
     vat_rate: Number(s.vat_rate),
     discount_percent: Number(s.discount_percent ?? 0),
+    rot_rut_type: s.rot_rut_type ?? null,
+    fastighetsbeteckning: s.fastighetsbeteckning ?? null,
   }))
 }
 
@@ -227,14 +233,17 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
     const rows = serviceItems.length > 0
       ? serviceItems.map(it => ({
           invoice_id: inv.id,
-          article_id: it.article_id,
-          article_code: it.article_code,
-          article_name: it.article_name,
+          case_billing_item_id: it.case_billing_item_id,
+          article_id: null,
+          article_code: it.display_code,
+          article_name: it.display_name,
           quantity: it.quantity,
           unit_price: it.unit_price,
           total_price: it.total_price,
           vat_rate: it.vat_rate,
           discount_percent: it.discount_percent,
+          rot_rut_type: it.rot_rut_type,
+          fastighetsbeteckning: it.fastighetsbeteckning,
         }))
       : [{
           invoice_id: inv.id,
