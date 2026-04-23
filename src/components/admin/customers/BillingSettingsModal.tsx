@@ -4,7 +4,7 @@
 import { useState, useEffect, useId } from 'react'
 import {
   Receipt, Save, Building2, Copy, TrendingUp, Plus,
-  Trash2, Package, CalendarDays, FileSignature
+  Trash2, Package, CalendarDays, FileSignature, AlertCircle, RefreshCw
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -90,6 +90,20 @@ export default function BillingSettingsModal({
   const [planLoading, setPlanLoading] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
+  // Cache befintliga contract-invoices för live-diff (hämtas en gång vid öppning)
+  const [existingInvoices, setExistingInvoices] = useState<Array<{
+    id: string
+    status: string | null
+    billing_period_start: string | null
+    subtotal: number
+    total_amount: number
+  }>>([])
+  const [liveDiff, setLiveDiff] = useState<{
+    create: number
+    update: number
+    delete: number
+    locked: number
+  } | null>(null)
 
   // "Fast avtalsvärde" – override för hela årsbeloppet
   const [fixedContractValue, setFixedContractValue] = useState('')
@@ -279,6 +293,19 @@ export default function BillingSettingsModal({
     })()
   }, [isOpen, customerId, contractReloadTick])
 
+  // Ladda befintliga contract-fakturor för live-diff (en gång per öppning)
+  useEffect(() => {
+    if (!isOpen || !customerId) { setExistingInvoices([]); return }
+    ;(async () => {
+      const { data } = await supabase
+        .from('invoices')
+        .select('id, status, billing_period_start, subtotal, total_amount')
+        .eq('customer_id', customerId)
+        .eq('invoice_type', 'contract')
+      setExistingInvoices((data as any) || [])
+    })()
+  }, [isOpen, customerId])
+
   // Summering
   const adjustPct = priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) || 0 : 0
   const hasAdjustment = adjustPct !== 0
@@ -316,6 +343,38 @@ export default function BillingSettingsModal({
   // ContractInvoiceGenerator använder för att markera perioder som paid i DB).
   const firstActiveIdx = plannedSchedule.findIndex(p => !p.isHistorical)
 
+  // Live-diff: räkna om vid varje faktureringsrelevant ändring.
+  // Använder cachad existingInvoices — ingen nätverksslagning per knappslag.
+  useEffect(() => {
+    if (!customerId || !isOpen) { setLiveDiff(null); return }
+    const LOCKED = new Set(['booked', 'sent', 'paid'])
+    const plannedByKey = new Map(plannedSchedule.map(p => [p.periodStart, p]))
+    let create = 0, update = 0, deleteCount = 0, locked = 0
+
+    for (const p of plannedSchedule) {
+      const ex = existingInvoices.find(e => e.billing_period_start === p.periodStart)
+      if (!ex) {
+        create++
+      } else {
+        const status = ex.status ?? 'draft'
+        if (LOCKED.has(status)) {
+          locked++
+        } else if (Math.abs(Number(ex.subtotal) - p.amount) >= 0.5) {
+          update++
+        }
+      }
+    }
+    for (const ex of existingInvoices) {
+      if (!ex.billing_period_start) continue
+      if (plannedByKey.has(ex.billing_period_start)) continue
+      if (LOCKED.has(ex.status ?? '')) locked++
+      else deleteCount++
+    }
+
+    const total = create + update + deleteCount
+    setLiveDiff(total > 0 || locked > 0 ? { create, update, delete: deleteCount, locked } : null)
+  }, [customerId, isOpen, plannedSchedule, existingInvoices])
+
   const MONTHS_SV = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
   const handleSiteBillingChange = (siteId: string, field: 'billing_email' | 'billing_address', value: string) => {
@@ -326,102 +385,110 @@ export default function BillingSettingsModal({
     setSiteBilling(prev => prev.map(s => s.id === siteId ? { ...s, billing_email: billingEmail, billing_address: billingAddress } : s))
   }
 
+  // Ren DB-uppdatering av kundens faktureringsinställningar.
+  // Påverkar INTE befintliga fakturor — det sker via handleApplyInvoices.
+  const persistCustomerSettings = async (): Promise<boolean> => {
+    if (!customerId) return false
+    const annualValue = adjustedTotal > 0 ? adjustedTotal : null
+    const monthlyValue = annualValue ? Math.round(annualValue / 12) : null
+
+    const { error } = await supabase
+      .from('customers')
+      .update({
+        billing_frequency: billingFrequency,
+        price_list_id: priceListId,
+        billing_email: billingEmail || null,
+        billing_address: billingAddress || null,
+        billing_type: isMultisite ? billingType : null,
+        billing_reference: billingReference || null,
+        cost_center: costCenter || null,
+        billing_recipient: billingRecipient || null,
+        price_adjustment_percent: priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) : null,
+        annual_value: annualValue,
+        monthly_value: monthlyValue,
+        contract_start_date: contractStartDate || null,
+        contract_end_date: contractEndDate || null,
+        billing_anchor_month: billingAnchorMonth,
+        billing_active: billingActive,
+        adhoc_invoice_grouping: adhocInvoiceGrouping,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', customerId)
+    if (error) throw error
+
+    if (priceAdjustments.length > 0) {
+      const rows = priceAdjustments.map(a => ({
+        customer_id: customerId,
+        year: a.year,
+        adjustment_percent: a.adjustment_percent,
+        note: a.note || null,
+      }))
+      const { error: adjError } = await supabase
+        .from('customer_price_adjustments')
+        .upsert(rows, { onConflict: 'customer_id,year' })
+      if (adjError) throw adjError
+    }
+
+    if (isMultisite && billingType === 'per_site') {
+      for (const site of siteBilling) {
+        const { error: se } = await supabase
+          .from('customers')
+          .update({
+            billing_email: site.billing_email || null,
+            billing_address: site.billing_address || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', site.id)
+        if (se) throw se
+      }
+    }
+    return true
+  }
+
+  // "Spara" — endast kundinställningar. Befintliga fakturor orörda.
   const handleSave = async () => {
     if (!customerId) return
     setSaving(true)
     try {
-      // Avtalsinnehåll (tjänster + interna artiklar) sparas direkt av
-      // CaseServiceSelector → case_billing_items. Här sparar vi bara
-      // kundens övergripande fakturerings- och avtalsinställningar.
-
-      // Beräkna annual_value: fast avtalsvärde om satt, annars beräknat från tjänsterader
-      const annualValue = adjustedTotal > 0 ? adjustedTotal : null
-      const monthlyValue = annualValue ? Math.round(annualValue / 12) : null
-
-      // Spara kundinställningar
-      const { error } = await supabase
-        .from('customers')
-        .update({
-          billing_frequency: billingFrequency,
-          price_list_id: priceListId,
-          billing_email: billingEmail || null,
-          billing_address: billingAddress || null,
-          billing_type: isMultisite ? billingType : null,
-          billing_reference: billingReference || null,
-          cost_center: costCenter || null,
-          billing_recipient: billingRecipient || null,
-          price_adjustment_percent: priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) : null,
-          annual_value: annualValue,
-          monthly_value: monthlyValue,
-          contract_start_date: contractStartDate || null,
-          contract_end_date: contractEndDate || null,
-          billing_anchor_month: billingAnchorMonth,
-          billing_active: billingActive,
-          adhoc_invoice_grouping: adhocInvoiceGrouping,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', customerId)
-
-      if (error) throw error
-
-      // 4. Spara premiejusteringshistorik (upsert per år)
-      if (priceAdjustments.length > 0) {
-        const rows = priceAdjustments.map(a => ({
-          customer_id: customerId,
-          year: a.year,
-          adjustment_percent: a.adjustment_percent,
-          note: a.note || null,
-        }))
-        const { error: adjError } = await supabase
-          .from('customer_price_adjustments')
-          .upsert(rows, { onConflict: 'customer_id,year' })
-        if (adjError) throw adjError
-      }
-
-      // 5. Per-site
-      if (isMultisite && billingType === 'per_site') {
-        for (const site of siteBilling) {
-          const { error: se } = await supabase
-            .from('customers')
-            .update({
-              billing_email: site.billing_email || null,
-              billing_address: site.billing_address || null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', site.id)
-          if (se) throw se
-        }
-      }
-
+      const ok = await persistCustomerSettings()
+      if (!ok) return
       toast.success('Faktureringsinställningar sparade!')
-
-      // Beräkna ev. fakturaplan-diff efter sparade inställningar
-      try {
-        setPlanLoading(true)
-        setPlanOpen(true)
-        const newPlan = await ContractInvoiceGenerator.planForCustomer(customerId)
-        setPlan(newPlan)
-        const hasChanges = (newPlan.summary.create + newPlan.summary.update + newPlan.summary.delete + newPlan.summary.historical) > 0
-        if (!hasChanges) {
-          setPlanOpen(false)
-          setPlan(null)
-          onSave()
-          onClose()
-        }
-      } catch (planErr: any) {
-        console.error('Plan error:', planErr)
-        setPlanOpen(false)
-        toast.error('Kunde inte beräkna fakturaplan: ' + planErr.message)
-        onSave()
-        onClose()
-      } finally {
-        setPlanLoading(false)
-      }
+      onSave()
+      onClose()
     } catch (err: any) {
       console.error(err)
       toast.error('Kunde inte spara: ' + err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  // "Uppdatera fakturor" — sparar inställningar och öppnar fakturaplan-preview.
+  const handleApplyInvoices = async () => {
+    if (!customerId) return
+    setSaving(true)
+    try {
+      const ok = await persistCustomerSettings()
+      if (!ok) return
+      setPlanLoading(true)
+      setPlanOpen(true)
+      const newPlan = await ContractInvoiceGenerator.planForCustomer(customerId)
+      setPlan(newPlan)
+      const hasChanges = (newPlan.summary.create + newPlan.summary.update + newPlan.summary.delete + newPlan.summary.historical) > 0
+      if (!hasChanges) {
+        setPlanOpen(false)
+        setPlan(null)
+        toast.success('Inga fakturaändringar behövs')
+        onSave()
+        onClose()
+      }
+    } catch (err: any) {
+      setPlanOpen(false)
+      console.error(err)
+      toast.error('Kunde inte beräkna fakturaplan: ' + err.message)
+    } finally {
+      setSaving(false)
+      setPlanLoading(false)
     }
   }
 
@@ -441,11 +508,10 @@ export default function BillingSettingsModal({
     }
   }
 
+  // Avbryt i preview — stäng bara preview, inte hela modalen.
   const handleCancelPlan = () => {
     setPlanOpen(false)
     setPlan(null)
-    onSave()
-    onClose()
   }
 
   if (!isOpen || !customerId) return null
@@ -519,6 +585,27 @@ export default function BillingSettingsModal({
               />
               <p className="text-xs text-slate-500 mt-1">Månaden avtalet ingicks – fakturor läggs i denna månad + intervall</p>
             </div>
+
+            {/* Live-diff banner: visar hur aktuella ändringar påverkar befintliga fakturor */}
+            {liveDiff && (liveDiff.create + liveDiff.update + liveDiff.delete) > 0 && (
+              <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2 text-xs">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-amber-300 font-medium mb-0.5">
+                    Dina ändringar påverkar befintliga fakturor
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-300">
+                    {liveDiff.create > 0 && <span className="text-emerald-400">{liveDiff.create} nya</span>}
+                    {liveDiff.update > 0 && <span className="text-blue-400">{liveDiff.update} ändras</span>}
+                    {liveDiff.delete > 0 && <span className="text-red-400">{liveDiff.delete} tas bort</span>}
+                    {liveDiff.locked > 0 && <span className="text-slate-500">{liveDiff.locked} låsta (rörs ej)</span>}
+                  </div>
+                  <div className="text-slate-500 mt-0.5">
+                    Spara påverkar bara inställningarna. Klicka "Uppdatera fakturor" för att applicera.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Fakturaschema - hela avtalsperiodens planerade fakturor */}
             {plannedSchedule.length > 0 && (
@@ -877,8 +964,19 @@ export default function BillingSettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-slate-700/50 flex items-center justify-end gap-3 shrink-0">
+        <div className="px-4 py-2.5 border-t border-slate-700/50 flex items-center justify-end gap-2 shrink-0">
           <Button variant="secondary" onClick={onClose} disabled={saving}>Avbryt</Button>
+          {liveDiff && (liveDiff.create + liveDiff.update + liveDiff.delete) > 0 && (
+            <Button
+              variant="secondary"
+              onClick={handleApplyInvoices}
+              disabled={saving}
+              className="flex items-center gap-2 border-amber-500/50 text-amber-300 hover:bg-amber-500/10"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Uppdatera fakturor ({liveDiff.create + liveDiff.update + liveDiff.delete})
+            </Button>
+          )}
           <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
             {saving ? <LoadingSpinner /> : <Save className="w-4 h-4" />}
             Spara
