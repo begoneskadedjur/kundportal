@@ -124,9 +124,10 @@ export default function InvoiceDetailModal({
     isOpen && invoice ? (invoice.case_type as CaseType) : null
   )
 
-  // Hämta preparat för ärendet
+  // Hämta preparat för ärendet (endast för Privat/Företag med case-koppling)
   useEffect(() => {
     if (!invoice) { setPreparations([]); return }
+    if (!invoice.case_id || !invoice.case_type) { setPreparations([]); return }
     const fetchPreparations = async () => {
       const { data } = await supabase
         .from('case_preparations')

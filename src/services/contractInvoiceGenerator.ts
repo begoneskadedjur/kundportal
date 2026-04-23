@@ -808,6 +808,8 @@ export class ContractInvoiceGenerator {
     const invoiceNumber = await this.generateInvoiceNumber()
     const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
     const notes = this.buildInvoiceNotes(planned)
+    // Fakturadatum = periodens startdatum (matchar hur fakturan visas i Fortnox)
+    const createdAt = parseLocalDate(planned.periodStart).toISOString()
 
     const { data: inv, error } = await supabase
       .from('invoices')
@@ -832,6 +834,7 @@ export class ContractInvoiceGenerator {
         due_date: planned.dueDate,
         is_historical: false,
         notes,
+        created_at: createdAt,
       })
       .select('id')
       .single()
@@ -887,6 +890,7 @@ export class ContractInvoiceGenerator {
         paid_at: paidAt,
         is_historical: true,
         notes,
+        created_at: bookedSentAt,
       })
       .select('id')
       .single()
@@ -926,6 +930,7 @@ export class ContractInvoiceGenerator {
         paid_at: paidAt,
         is_historical: true,
         notes,
+        created_at: bookedSentAt,
       })
       .eq('id', invoiceId)
     if (error) throw new Error(`Kunde inte backfilla historisk: ${error.message}`)

@@ -207,6 +207,7 @@ async function processCustomer(customer) {
         sent_at: isHistorical ? bookedSentAt : null,
         paid_at: isHistorical ? paidAt : null,
         notes,
+        created_at: bookedSentAt,
       })
       .select('id')
       .single()

@@ -224,6 +224,7 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
         due_date: toLocalIsoDate(due),
         is_historical: false,
         notes,
+        created_at: periodStart.toISOString(),
       })
       .select('id')
       .single()
