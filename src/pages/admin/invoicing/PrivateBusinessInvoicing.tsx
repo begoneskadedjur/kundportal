@@ -69,8 +69,8 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
     if (keys.has(currentKey)) {
       setExpandedMonths(new Set([currentKey]))
     } else if (keys.size > 0) {
-      // Annars ta första tillgängliga sorterat
-      const firstKey = Array.from(keys).sort().reverse()[0]
+      // Annars ta tidigaste tillgängliga månad
+      const firstKey = Array.from(keys).sort()[0]
       setExpandedMonths(new Set([firstKey]))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,8 +85,8 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
           if (!map.has(key)) map.set(key, [])
           map.get(key)!.push(inv)
         }
-        // Sortera månader fallande (senaste först)
-        return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a))
+        // Sortera månader stigande (tidigaste först)
+        return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
       })()
     : []
 
