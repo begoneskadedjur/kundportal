@@ -13,7 +13,7 @@ import { PriceListService } from '../../../services/priceListService'
 import { ImportedCustomerContractService } from '../../../services/importedCustomerContractService'
 import { CaseBillingService } from '../../../services/caseBillingService'
 import { PricingSettingsService } from '../../../services/pricingSettingsService'
-import type { PriceList, PriceListItemWithArticle } from '../../../types/articles'
+import type { PriceList, PriceListItemWithArticle, PriceListItemWithService } from '../../../types/articles'
 import type { CaseBillingItemWithRelations, CaseServiceSummary } from '../../../types/caseBilling'
 import type { PricingSettings } from '../../../types/pricingSettings'
 import CustomerContractButton from './CustomerContractButton'
@@ -126,8 +126,9 @@ export default function CustomerDetailSidePanel({
 }: Props) {
   const [priceListData, setPriceListData] = useState<{
     priceList: PriceList | null
-    items: PriceListItemWithArticle[]
-  }>({ priceList: null, items: [] })
+    articleItems: PriceListItemWithArticle[]
+    serviceItems: PriceListItemWithService[]
+  }>({ priceList: null, articleItems: [], serviceItems: [] })
   const [loadingPriceList, setLoadingPriceList] = useState(false)
 
   const [contractData, setContractData] = useState<{
@@ -154,18 +155,19 @@ export default function CustomerDetailSidePanel({
   // Fetch price list (single-site only — multisite visar aggregerad vy separat)
   useEffect(() => {
     if (!isOpen || !primarySite?.price_list_id || isMultisite) {
-      setPriceListData({ priceList: null, items: [] })
+      setPriceListData({ priceList: null, articleItems: [], serviceItems: [] })
       return
     }
     let cancelled = false
     setLoadingPriceList(true)
     ;(async () => {
       try {
-        const [pl, items] = await Promise.all([
+        const [pl, articleItems, serviceItems] = await Promise.all([
           PriceListService.getPriceListById(primarySite.price_list_id!),
           PriceListService.getPriceListItems(primarySite.price_list_id!),
+          PriceListService.getPriceListServiceItems(primarySite.price_list_id!),
         ])
-        if (!cancelled) setPriceListData({ priceList: pl, items })
+        if (!cancelled) setPriceListData({ priceList: pl, articleItems, serviceItems })
       } catch (err) {
         console.error('SidePanel price list error:', err)
       } finally {
@@ -522,16 +524,56 @@ export default function CustomerDetailSidePanel({
               {loadingPriceList ? (
                 <p className="text-xs text-slate-500">Laddar...</p>
               ) : priceListData.priceList ? (
-                <div>
-                  <div className="text-sm text-[#20c58f] font-medium mb-0.5">
-                    {priceListData.priceList.name}
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    {priceListData.items.length > 0
-                      ? `${priceListData.items.length} tjänster i prislistan`
-                      : 'Inga tjänster i prislistan än'}
-                  </p>
-                </div>
+                (() => {
+                  const fixedServices = priceListData.serviceItems
+                    .filter(i => i.service && i.custom_price != null)
+                    .map(i => ({
+                      code: i.service!.code,
+                      name: i.service!.name,
+                      price: Number(i.custom_price),
+                    }))
+                    .sort((a, b) => a.name.localeCompare(b.name, 'sv'))
+                  const articleCount = priceListData.articleItems.length
+                  const totalCount = fixedServices.length + articleCount
+                  const previewNames = fixedServices.slice(0, 3).map(s => s.name).join(', ')
+                  const moreCount = Math.max(0, fixedServices.length - 3)
+                  const tooltipContent = fixedServices.length > 0
+                    ? fixedServices.map(s => `${s.name} — ${s.price.toLocaleString('sv-SE')} kr`).join('\n')
+                    : 'Inga tjänster med fast pris'
+                  return (
+                    <div>
+                      <div className="text-sm text-[#20c58f] font-medium mb-1">
+                        {priceListData.priceList.name}
+                      </div>
+                      {totalCount > 0 ? (
+                        <div
+                          className="text-xs text-slate-400 cursor-help"
+                          title={tooltipContent}
+                        >
+                          <span className="text-slate-300 font-medium">
+                            {fixedServices.length} tjänster
+                          </span>
+                          {articleCount > 0 && (
+                            <span className="text-slate-500"> + {articleCount} artiklar</span>
+                          )}
+                          <span className="text-slate-500"> med fast pris</span>
+                          {previewNames && (
+                            <div className="text-slate-500 text-[11px] mt-0.5 truncate">
+                              {previewNames}{moreCount > 0 ? `, +${moreCount} till` : ''}
+                            </div>
+                          )}
+                          <div className="text-[10px] text-slate-600 mt-0.5">
+                            Övriga tjänster använder prisguide/standardpris
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Inga fasta priser satta — alla tjänster använder prisguide/standardpris
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()
               ) : (
                 <p className="text-xs text-slate-500">Ingen prislista tilldelad (standardpriser gäller)</p>
               )}
