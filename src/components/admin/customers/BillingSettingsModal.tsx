@@ -400,7 +400,7 @@ export default function BillingSettingsModal({
         setPlanOpen(true)
         const newPlan = await ContractInvoiceGenerator.planForCustomer(customerId)
         setPlan(newPlan)
-        const hasChanges = (newPlan.summary.create + newPlan.summary.update + newPlan.summary.delete) > 0
+        const hasChanges = (newPlan.summary.create + newPlan.summary.update + newPlan.summary.delete + newPlan.summary.historical) > 0
         if (!hasChanges) {
           setPlanOpen(false)
           setPlan(null)
@@ -429,7 +429,7 @@ export default function BillingSettingsModal({
     try {
       const result = await ContractInvoiceGenerator.apply(plan)
       toast.success(
-        `Plan applicerad: ${result.createdIds.length} nya, ${result.updatedIds.length} uppdaterade, ${result.deletedIds.length} raderade`
+        `Plan applicerad: ${result.createdIds.length} nya, ${result.updatedIds.length} uppdaterade, ${result.deletedIds.length} raderade, ${result.historicalIds.length} historiska`
       )
       setPlanOpen(false)
       setPlan(null)

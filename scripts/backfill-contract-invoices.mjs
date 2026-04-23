@@ -23,6 +23,18 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 const LOCKED_STATUSES = new Set(['booked', 'sent', 'paid'])
 
+function toLocalIsoDate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function todayLocal() {
+  const n = new Date()
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate())
+}
+
 function amountPerPeriod(annual, freq) {
   if (freq === 'monthly') return Math.round(annual / 12)
   if (freq === 'quarterly') return Math.round(annual / 4)
@@ -109,14 +121,21 @@ async function processCustomer(customer) {
     (existing ?? []).filter(e => e.billing_period_start).map(e => [e.billing_period_start, e])
   )
 
+  const today = todayLocal()
   let created = 0
+  let createdHistorical = 0
   for (const { periodStart, periodEnd } of intervals) {
-    const key = periodStart.toISOString().slice(0, 10)
+    const key = toLocalIsoDate(periodStart)
     if (existingByKey.has(key)) continue
 
+    const isHistorical = periodEnd < today
     const vat = Math.round(perPeriod * 0.25)
     const due = new Date(periodStart)
     due.setDate(due.getDate() + 30)
+    const dueIso = toLocalIsoDate(due)
+
+    const bookedSentAt = periodStart.toISOString()
+    const paidAt = new Date(dueIso).toISOString()
 
     const invNum = await generateInvoiceNumber()
     const { data: inv, error } = await supabase
@@ -135,11 +154,15 @@ async function processCustomer(customer) {
         subtotal: perPeriod,
         vat_amount: vat,
         total_amount: perPeriod + vat,
-        status: 'pending_approval',
-        requires_approval: true,
+        status: isHistorical ? 'paid' : 'pending_approval',
+        requires_approval: !isHistorical,
         billing_period_start: key,
-        billing_period_end: periodEnd.toISOString().slice(0, 10),
-        due_date: due.toISOString().slice(0, 10),
+        billing_period_end: toLocalIsoDate(periodEnd),
+        due_date: dueIso,
+        is_historical: isHistorical,
+        booked_at: isHistorical ? bookedSentAt : null,
+        sent_at: isHistorical ? bookedSentAt : null,
+        paid_at: isHistorical ? paidAt : null,
       })
       .select('id')
       .single()
@@ -158,10 +181,11 @@ async function processCustomer(customer) {
       vat_rate: 25,
       discount_percent: 0,
     })
-    created++
+    if (isHistorical) createdHistorical++
+    else created++
   }
 
-  return { created }
+  return { created, createdHistorical }
 }
 
 async function main() {
@@ -185,17 +209,19 @@ async function main() {
   console.log(`Bearbetar ${customers?.length ?? 0} kunder...`)
 
   let totalCreated = 0
+  let totalHistorical = 0
   for (const c of customers ?? []) {
     const result = await processCustomer(c)
     if (result.skipped) {
       console.log(`  SKIP ${c.company_name}: ${result.reason}`)
     } else {
-      console.log(`  ${c.company_name}: ${result.created} fakturor skapade`)
+      console.log(`  ${c.company_name}: ${result.created} nya, ${result.createdHistorical} historiska`)
       totalCreated += result.created
+      totalHistorical += result.createdHistorical
     }
   }
 
-  console.log(`\nKlart. Totalt ${totalCreated} nya fakturor.`)
+  console.log(`\nKlart. Totalt ${totalCreated} nya + ${totalHistorical} historiska fakturor.`)
 }
 
 main().catch(err => {

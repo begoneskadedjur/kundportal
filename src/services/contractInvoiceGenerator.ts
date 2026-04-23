@@ -8,16 +8,28 @@ import { supabase } from '../lib/supabase'
 export type BillingFrequency = 'monthly' | 'quarterly' | 'annual' | 'on_demand'
 
 export interface PlannedInvoice {
-  periodStart: string  // ISO date
-  periodEnd: string    // ISO date
-  amount: number       // belopp exkl. moms
+  periodStart: string  // ISO date (lokal)
+  periodEnd: string
+  amount: number
   vatAmount: number
   totalAmount: number
   dueDate: string
+  isHistorical: boolean  // true om hela perioden redan passerat (antas betald)
 }
 
+// Publika actions visas i preview, _historical-actions filtreras bort där
+// men räknas i summary.
+export type BillingPlanAction =
+  | 'keep'
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'locked'
+  | 'create-historical'
+  | 'backfill-historical-paid'
+
 export interface BillingPlanEntry {
-  action: 'keep' | 'create' | 'update' | 'delete' | 'locked'
+  action: BillingPlanAction
   planned?: PlannedInvoice
   existingId?: string
   existingStatus?: string
@@ -34,6 +46,7 @@ export interface BillingPlan {
     delete: number
     locked: number
     keep: number
+    historical: number  // create-historical + backfill-historical-paid
   }
 }
 
@@ -41,6 +54,7 @@ export interface ApplyResult {
   createdIds: string[]
   updatedIds: string[]
   deletedIds: string[]
+  historicalIds: string[]
   skippedLocked: number
 }
 
@@ -67,6 +81,44 @@ type CustomerRow = {
 const LOCKED_STATUSES = new Set(['booked', 'sent', 'paid'])
 const EDITABLE_STATUSES = new Set(['draft', 'pending_approval', 'ready'])
 
+// TZ-säker YYYY-MM-DD (svensk lokal tid, inte UTC).
+function toLocalIsoDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// Parse YYYY-MM-DD som lokal midnatt (undviker UTC-hopp).
+function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, (m ?? 1) - 1, d ?? 1)
+}
+
+function todayLocal(): Date {
+  const n = new Date()
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate())
+}
+
+/**
+ * Kapningsdatum vid uppsägning:
+ * - Inom bindningstid (terminated_at <= contract_end_date): avtalet löper till contract_end_date (inga framtida rader raderas).
+ * - Fortlöpande (terminated_at > contract_end_date): terminated_at + notice_period_months.
+ * Returnerar null om kunden ej är uppsagd.
+ */
+function computeTerminationCutoff(customer: CustomerRow): Date | null {
+  if (!customer.terminated_at) return null
+  const notice = customer.notice_period_months ?? 2
+  const termDate = new Date(customer.terminated_at)
+  const contractEnd = customer.contract_end_date ? new Date(customer.contract_end_date) : null
+
+  if (contractEnd && termDate <= contractEnd) return contractEnd
+
+  const cutoff = new Date(termDate)
+  cutoff.setMonth(cutoff.getMonth() + notice)
+  return cutoff
+}
+
 export class ContractInvoiceGenerator {
   /**
    * Skapa fakturaplan för en kund. Returnerar diff mot befintliga invoices.
@@ -85,7 +137,7 @@ export class ContractInvoiceGenerator {
 
     const { data: existing, error: exErr } = await supabase
       .from('invoices')
-      .select('id, status, billing_period_start, billing_period_end, total_amount, subtotal')
+      .select('id, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical')
       .eq('customer_id', customerId)
       .eq('invoice_type', 'contract')
 
@@ -94,18 +146,22 @@ export class ContractInvoiceGenerator {
     const entries = this.buildDiff(planned, existing ?? [])
     const summary = entries.reduce(
       (acc, e) => {
-        acc[e.action] = (acc[e.action] ?? 0) + 1
+        if (e.action === 'create-historical' || e.action === 'backfill-historical-paid') {
+          acc.historical += 1
+        } else {
+          ;(acc as any)[e.action] = ((acc as any)[e.action] ?? 0) + 1
+        }
         return acc
       },
-      { keep: 0, create: 0, update: 0, delete: 0, locked: 0 } as BillingPlan['summary']
+      { keep: 0, create: 0, update: 0, delete: 0, locked: 0, historical: 0 } as BillingPlan['summary']
     )
 
     return { customerId, entries, summary }
   }
 
   /**
-   * Räkna ut planerade fakturor från kundens avtal + frekvens.
-   * Returnerar tom lista för avropsavtal (on_demand) eller saknad data.
+   * Räkna ut planerade fakturor. Returnerar tom lista för avropsavtal eller saknad data.
+   * Respekterar uppsägnings-cutoff.
    */
   private static computePlannedInvoices(customer: CustomerRow): PlannedInvoice[] {
     const freq = customer.billing_frequency
@@ -118,29 +174,29 @@ export class ContractInvoiceGenerator {
     if (!start || !end) return []
     if (customer.billing_active === false) return []
 
-    // Kapning vid uppsägning
+    // Kapning vid uppsägning: bindningstid respekteras, fortlöpande kapas vid termination_at + notice.
     let effectiveEnd = end
-    if (customer.terminated_at) {
-      const termEnd = new Date(customer.terminated_at)
-      const notice = customer.notice_period_months ?? 2
-      termEnd.setMonth(termEnd.getMonth() + notice)
-      if (termEnd < effectiveEnd) effectiveEnd = termEnd
+    const cutoff = computeTerminationCutoff(customer)
+    if (cutoff && cutoff < effectiveEnd) {
+      effectiveEnd = cutoff
     }
 
     const perPeriod = this.amountPerPeriod(annual, freq)
     const intervals = this.iterPeriods(start, effectiveEnd, freq, customer.billing_anchor_month)
+    const today = todayLocal()
 
     return intervals.map(({ periodStart, periodEnd }) => {
       const vatAmount = Math.round(perPeriod * 0.25)
       const due = new Date(periodStart)
       due.setDate(due.getDate() + 30)
       return {
-        periodStart: periodStart.toISOString().slice(0, 10),
-        periodEnd: periodEnd.toISOString().slice(0, 10),
+        periodStart: toLocalIsoDate(periodStart),
+        periodEnd: toLocalIsoDate(periodEnd),
         amount: perPeriod,
         vatAmount,
         totalAmount: perPeriod + vatAmount,
-        dueDate: due.toISOString().slice(0, 10),
+        dueDate: toLocalIsoDate(due),
+        isHistorical: periodEnd < today,
       }
     })
   }
@@ -154,7 +210,7 @@ export class ContractInvoiceGenerator {
 
   /**
    * Iterera perioder från avtalsstart till effectiveEnd.
-   * Anchormonth = endast relevant för annual (vilken månad faktureras?).
+   * Anchormonth = endast relevant för annual.
    */
   private static iterPeriods(
     start: Date,
@@ -182,8 +238,6 @@ export class ContractInvoiceGenerator {
       const anchor = anchorMonth && anchorMonth >= 1 && anchorMonth <= 12
         ? anchorMonth - 1
         : start.getMonth()
-      // Första fakturan i anchor-månaden. Accepteras om anchor-månaden är samma
-      // som eller efter start-månaden inom startårets kalender.
       const startYear = start.getFullYear()
       const startOfStartMonth = new Date(startYear, start.getMonth(), 1)
       let firstStart = new Date(startYear, anchor, 1)
@@ -193,9 +247,7 @@ export class ContractInvoiceGenerator {
       let cur = firstStart
       while (cur <= end) {
         const periodEnd = new Date(cur.getFullYear() + 1, cur.getMonth(), 0)
-        // För annual: ta med perioden endast om hela fakturaperioden ryms inom avtalet.
-        // Om slutdatumet är tidigare än cur + 11 mån — avtalet slutar innan en hel ny
-        // period — hoppa över. Annars räknar vi fel.
+        // För annual: hela fakturaperioden måste rymmas inom avtalet (ingen partiell).
         const elevenMonthsForward = new Date(cur.getFullYear(), cur.getMonth() + 11, 1)
         if (elevenMonthsForward > end) break
         out.push({ periodStart: new Date(cur), periodEnd })
@@ -207,8 +259,8 @@ export class ContractInvoiceGenerator {
   }
 
   /**
-   * Bygg diff: planerade vs befintliga.
-   * Nyckel = billing_period_start (YYYY-MM-DD).
+   * Bygg diff: planerade vs befintliga. Nyckel = billing_period_start (YYYY-MM-DD).
+   * Historiska perioder får separata actions för att filtreras ut ur preview.
    */
   private static buildDiff(
     planned: PlannedInvoice[],
@@ -219,6 +271,7 @@ export class ContractInvoiceGenerator {
       billing_period_end: string | null
       total_amount: number
       subtotal: number
+      is_historical: boolean | null
     }>,
   ): BillingPlanEntry[] {
     const plannedByKey = new Map(planned.map(p => [p.periodStart, p]))
@@ -230,14 +283,42 @@ export class ContractInvoiceGenerator {
 
     const entries: BillingPlanEntry[] = []
 
-    // För varje planerad: skapa, uppdatera eller keep
     for (const p of planned) {
       const ex = existingByKey.get(p.periodStart)
+
       if (!ex) {
-        entries.push({ action: 'create', planned: p })
+        entries.push({
+          action: p.isHistorical ? 'create-historical' : 'create',
+          planned: p,
+        })
         continue
       }
+
       const status = ex.status ?? 'draft'
+
+      // Historisk period + befintlig rad med fel status → backfill till paid.
+      if (p.isHistorical) {
+        if (status !== 'paid' || !ex.is_historical) {
+          entries.push({
+            action: 'backfill-historical-paid',
+            planned: p,
+            existingId: ex.id,
+            existingStatus: status,
+            existingAmount: ex.total_amount,
+          })
+        } else {
+          entries.push({
+            action: 'keep',
+            planned: p,
+            existingId: ex.id,
+            existingStatus: status,
+            existingAmount: ex.total_amount,
+          })
+        }
+        continue
+      }
+
+      // Aktuell/framtida period
       if (LOCKED_STATUSES.has(status)) {
         entries.push({
           action: 'locked',
@@ -250,26 +331,16 @@ export class ContractInvoiceGenerator {
         continue
       }
       const amountMatches = Math.abs(Number(ex.subtotal) - p.amount) < 0.5
-      if (amountMatches) {
-        entries.push({
-          action: 'keep',
-          planned: p,
-          existingId: ex.id,
-          existingStatus: status,
-          existingAmount: ex.total_amount,
-        })
-      } else {
-        entries.push({
-          action: 'update',
-          planned: p,
-          existingId: ex.id,
-          existingStatus: status,
-          existingAmount: ex.total_amount,
-        })
-      }
+      entries.push({
+        action: amountMatches ? 'keep' : 'update',
+        planned: p,
+        existingId: ex.id,
+        existingStatus: status,
+        existingAmount: ex.total_amount,
+      })
     }
 
-    // För varje befintlig utan motsvarande plan: delete eller locked
+    // Befintliga utan motsvarande plan
     for (const ex of existing) {
       if (!ex.billing_period_start) continue
       if (plannedByKey.has(ex.billing_period_start)) continue
@@ -320,7 +391,9 @@ export class ContractInvoiceGenerator {
       .single()
     if (cErr || !customer) throw new Error(`Kunde inte hämta kund: ${cErr?.message}`)
 
-    const result: ApplyResult = { createdIds: [], updatedIds: [], deletedIds: [], skippedLocked: 0 }
+    const result: ApplyResult = {
+      createdIds: [], updatedIds: [], deletedIds: [], historicalIds: [], skippedLocked: 0,
+    }
 
     for (const entry of plan.entries) {
       if (entry.action === 'keep') continue
@@ -338,6 +411,16 @@ export class ContractInvoiceGenerator {
       if (entry.action === 'create' && entry.planned) {
         const id = await this.insertContractInvoice(customer as CustomerRow, entry.planned)
         result.createdIds.push(id)
+        continue
+      }
+      if (entry.action === 'create-historical' && entry.planned) {
+        const id = await this.insertHistoricalPaidInvoice(customer as CustomerRow, entry.planned)
+        result.historicalIds.push(id)
+        continue
+      }
+      if (entry.action === 'backfill-historical-paid' && entry.existingId && entry.planned) {
+        await this.backfillHistoricalPaid(entry.existingId, customer as CustomerRow, entry.planned)
+        result.historicalIds.push(entry.existingId)
         continue
       }
       if (entry.action === 'update' && entry.existingId && entry.planned) {
@@ -358,26 +441,26 @@ export class ContractInvoiceGenerator {
   }
 
   /**
-   * När en kund sägs upp: radera framtida icke-låsta fakturor efter notice period.
+   * När en kund sägs upp: radera framtida icke-låsta fakturor efter cutoff.
+   * Bindningstiden respekteras — fakturor inom contract_start→contract_end raderas aldrig.
    */
   static async cancelFutureAfterTermination(customerId: string): Promise<number> {
     const { data: customer, error } = await supabase
       .from('customers')
-      .select('terminated_at, notice_period_months')
+      .select('*')
       .eq('id', customerId)
       .single()
-    if (error || !customer?.terminated_at) return 0
+    if (error || !customer) return 0
 
-    const cutoff = new Date(customer.terminated_at)
-    cutoff.setMonth(cutoff.getMonth() + (customer.notice_period_months ?? 2))
-    const cutoffIso = cutoff.toISOString().slice(0, 10)
+    const cutoff = computeTerminationCutoff(customer as CustomerRow)
+    if (!cutoff) return 0
 
     const { data: toDelete, error: fErr } = await supabase
       .from('invoices')
       .select('id, status, billing_period_start')
       .eq('customer_id', customerId)
       .eq('invoice_type', 'contract')
-      .gte('billing_period_start', cutoffIso)
+      .gt('billing_period_start', toLocalIsoDate(cutoff))
 
     if (fErr) throw new Error(fErr.message)
 
@@ -392,9 +475,7 @@ export class ContractInvoiceGenerator {
   }
 
   /**
-   * Skapa/uppdatera en adhoc-faktura för en uppsättning contract_billing_items (item_type=ad_hoc).
-   * grouping='per_case' → en faktura per case_id
-   * grouping='monthly_batch' → en faktura per (customer_id, YYYY-MM)
+   * Skapa/uppdatera en adhoc-faktura för contract_billing_items (item_type=ad_hoc).
    */
   static async generateAdhocInvoiceForCase(params: {
     customerId: string
@@ -411,12 +492,11 @@ export class ContractInvoiceGenerator {
       .single()
     if (cErr || !customer) return null
 
-    // Hämta adhoc-items för detta case (eller alla osammanskickade för kund+månad)
     const completedDate = typeof completedAt === 'string' ? new Date(completedAt) : completedAt
     const y = completedDate.getFullYear()
     const m = completedDate.getMonth()
-    const monthStart = new Date(y, m, 1).toISOString().slice(0, 10)
-    const monthEnd = new Date(y, m + 1, 0).toISOString().slice(0, 10)
+    const monthStart = toLocalIsoDate(new Date(y, m, 1))
+    const monthEnd = toLocalIsoDate(new Date(y, m + 1, 0))
 
     let q = supabase
       .from('contract_billing_items')
@@ -439,7 +519,6 @@ export class ContractInvoiceGenerator {
     const vatAmount = items.reduce((sum, i) => sum + Number(i.total_price) * (Number(i.vat_rate) / 100), 0)
     const total = subtotal + vatAmount
 
-    // Om monthly_batch: försök hitta befintlig pending adhoc-invoice för månaden
     let existingInvoiceId: string | null = null
     if (grouping === 'monthly_batch') {
       const { data: existing } = await supabase
@@ -456,13 +535,11 @@ export class ContractInvoiceGenerator {
     let invoiceId: string
     if (existingInvoiceId) {
       invoiceId = existingInvoiceId
-      // Lägg bara till nya items till befintlig invoice
-      await this.addItemsToAdhocInvoice(invoiceId, items, customer as CustomerRow)
-      // Uppdatera totals
+      await this.addItemsToAdhocInvoice(invoiceId, items)
       await this.recalculateInvoiceTotals(invoiceId)
     } else {
       const invNum = await this.generateInvoiceNumber()
-      const due = new Date(monthStart)
+      const due = parseLocalDate(monthStart)
       due.setDate(due.getDate() + 30)
       const c = customer as CustomerRow
       const { data: inv, error: insErr } = await supabase
@@ -485,16 +562,15 @@ export class ContractInvoiceGenerator {
           requires_approval: true,
           billing_period_start: monthStart,
           billing_period_end: monthEnd,
-          due_date: due.toISOString().slice(0, 10),
+          due_date: toLocalIsoDate(due),
         })
         .select('id')
         .single()
       if (insErr || !inv) return null
       invoiceId = inv.id
-      await this.addItemsToAdhocInvoice(invoiceId, items, c)
+      await this.addItemsToAdhocInvoice(invoiceId, items)
     }
 
-    // Länka contract_billing_items till invoice + markera som invoiced
     const itemIds = items.map(i => i.id)
     await supabase
       .from('contract_billing_items')
@@ -516,7 +592,6 @@ export class ContractInvoiceGenerator {
       vat_rate: number
       discount_percent: number | null
     }>,
-    _customer: CustomerRow,
   ): Promise<void> {
     const rows = items.map(i => ({
       invoice_id: invoiceId,
@@ -555,7 +630,7 @@ export class ContractInvoiceGenerator {
    * men terminated_at ej satt, regenerera plan så nästa period kommer in.
    */
   static async generateContinuingContracts(): Promise<{ customerId: string; created: number }[]> {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = toLocalIsoDate(todayLocal())
     const { data: customers, error } = await supabase
       .from('customers')
       .select('id')
@@ -607,6 +682,7 @@ export class ContractInvoiceGenerator {
         billing_period_start: planned.periodStart,
         billing_period_end: planned.periodEnd,
         due_date: planned.dueDate,
+        is_historical: false,
       })
       .select('id')
       .single()
@@ -626,6 +702,92 @@ export class ContractInvoiceGenerator {
     if (itemErr) throw new Error(`Kunde inte skapa fakturarad: ${itemErr.message}`)
 
     return inv.id
+  }
+
+  /**
+   * Skapar en historisk faktura direkt som status=paid, is_historical=true.
+   * Datum sätts som om Fortnox-webhook registrerat den.
+   */
+  private static async insertHistoricalPaidInvoice(
+    customer: CustomerRow,
+    planned: PlannedInvoice,
+  ): Promise<string> {
+    const invoiceNumber = await this.generateInvoiceNumber()
+    const periodStart = parseLocalDate(planned.periodStart)
+    const bookedSentAt = periodStart.toISOString()
+    const paidAt = parseLocalDate(planned.dueDate).toISOString()
+
+    const { data: inv, error } = await supabase
+      .from('invoices')
+      .insert({
+        invoice_number: invoiceNumber,
+        invoice_type: 'contract',
+        customer_id: customer.id,
+        case_id: null,
+        case_type: null,
+        customer_name: customer.company_name,
+        customer_email: customer.billing_email ?? customer.contact_email,
+        customer_phone: customer.contact_phone,
+        customer_address: customer.billing_address ?? customer.contact_address,
+        organization_number: customer.organization_number,
+        subtotal: planned.amount,
+        vat_amount: planned.vatAmount,
+        total_amount: planned.totalAmount,
+        status: 'paid',
+        requires_approval: false,
+        billing_period_start: planned.periodStart,
+        billing_period_end: planned.periodEnd,
+        due_date: planned.dueDate,
+        booked_at: bookedSentAt,
+        sent_at: bookedSentAt,
+        paid_at: paidAt,
+        is_historical: true,
+      })
+      .select('id')
+      .single()
+
+    if (error) throw new Error(`Kunde inte skapa historisk faktura: ${error.message}`)
+    if (!inv) throw new Error('Historisk faktura skapades ej')
+
+    const { error: itemErr } = await supabase.from('invoice_items').insert({
+      invoice_id: inv.id,
+      article_name: `Avtalsfakturering ${planned.periodStart.slice(0, 7)}`,
+      quantity: 1,
+      unit_price: planned.amount,
+      total_price: planned.amount,
+      vat_rate: 25,
+      discount_percent: 0,
+    })
+    if (itemErr) throw new Error(`Kunde inte skapa fakturarad: ${itemErr.message}`)
+
+    return inv.id
+  }
+
+  /**
+   * Uppdaterar en befintlig faktura till status=paid + is_historical=true.
+   * Används för redan-skapade backfill-rader som ligger som pending_approval.
+   */
+  private static async backfillHistoricalPaid(
+    invoiceId: string,
+    _customer: CustomerRow,
+    planned: PlannedInvoice,
+  ): Promise<void> {
+    const periodStart = parseLocalDate(planned.periodStart)
+    const bookedSentAt = periodStart.toISOString()
+    const paidAt = parseLocalDate(planned.dueDate).toISOString()
+
+    const { error } = await supabase
+      .from('invoices')
+      .update({
+        status: 'paid',
+        requires_approval: false,
+        booked_at: bookedSentAt,
+        sent_at: bookedSentAt,
+        paid_at: paidAt,
+        is_historical: true,
+      })
+      .eq('id', invoiceId)
+    if (error) throw new Error(`Kunde inte backfilla historisk: ${error.message}`)
   }
 
   private static async updateContractInvoice(

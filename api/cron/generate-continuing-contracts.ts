@@ -2,6 +2,7 @@
 // Säkerhetsnät: regenererar fakturaplan för fortlöpande avtal vars
 // contract_end_date passerat men terminated_at ej satt.
 // Körs 1:a varje månad 03:00 UTC via Vercel Cron.
+// Respekterar uppsägnings-cutoff (bindningstid + 60 dagar notice).
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
@@ -12,8 +13,6 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-const LOCKED_STATUSES = new Set(['booked', 'sent', 'paid'])
 
 type CustomerRow = {
   id: string
@@ -33,6 +32,30 @@ type CustomerRow = {
   billing_anchor_month: number | null
   billing_active: boolean | null
   notice_period_months: number | null
+}
+
+// TZ-säker YYYY-MM-DD
+function toLocalIsoDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function todayLocal(): Date {
+  const n = new Date()
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate())
+}
+
+function computeTerminationCutoff(c: CustomerRow): Date | null {
+  if (!c.terminated_at) return null
+  const notice = c.notice_period_months ?? 2
+  const termDate = new Date(c.terminated_at)
+  const contractEnd = c.contract_end_date ? new Date(c.contract_end_date) : null
+  if (contractEnd && termDate <= contractEnd) return contractEnd
+  const cutoff = new Date(termDate)
+  cutoff.setMonth(cutoff.getMonth() + notice)
+  return cutoff
 }
 
 function amountPerPeriod(annual: number, freq: string): number {
@@ -65,11 +88,15 @@ function iterPeriods(
     }
   } else if (freq === 'annual') {
     const anchor = anchorMonth && anchorMonth >= 1 && anchorMonth <= 12 ? anchorMonth - 1 : start.getMonth()
-    let firstStart = new Date(start.getFullYear(), anchor, 1)
-    if (firstStart < start) firstStart = new Date(start.getFullYear() + 1, anchor, 1)
+    const startYear = start.getFullYear()
+    const startOfStartMonth = new Date(startYear, start.getMonth(), 1)
+    let firstStart = new Date(startYear, anchor, 1)
+    if (firstStart < startOfStartMonth) firstStart = new Date(startYear + 1, anchor, 1)
     let cur = firstStart
     while (cur <= end) {
       const pe = new Date(cur.getFullYear() + 1, cur.getMonth(), 0)
+      const elevenAhead = new Date(cur.getFullYear(), cur.getMonth() + 11, 1)
+      if (elevenAhead > end) break
       out.push({ periodStart: new Date(cur), periodEnd: pe })
       cur = new Date(cur.getFullYear() + 1, cur.getMonth(), 1)
     }
@@ -86,10 +113,14 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
   if (!freq || freq === 'on_demand' || annual <= 0 || !start || !end) return 0
   if (customer.billing_active === false) return 0
 
-  // Fortlöpande: förläng end 12 månader framåt från idag
+  // Fortlöpande-horisont: 12 mån framåt från idag.
   const now = new Date()
-  const effectiveEnd = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate())
-  if (end > effectiveEnd) return 0  // inte fortlöpande
+  let effectiveEnd = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate())
+  if (end > effectiveEnd) return 0  // inte fortlöpande ännu
+
+  // Respektera cutoff vid uppsägning
+  const cutoff = computeTerminationCutoff(customer)
+  if (cutoff && cutoff < effectiveEnd) effectiveEnd = cutoff
 
   const perPeriod = amountPerPeriod(annual, freq)
   const intervals = iterPeriods(start, effectiveEnd, freq, customer.billing_anchor_month)
@@ -106,7 +137,7 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
 
   let created = 0
   for (const { periodStart, periodEnd } of intervals) {
-    const key = periodStart.toISOString().slice(0, 10)
+    const key = toLocalIsoDate(periodStart)
     if (existingByKey.has(key)) continue
 
     const vat = Math.round(perPeriod * 0.25)
@@ -133,8 +164,9 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
         status: 'pending_approval',
         requires_approval: true,
         billing_period_start: key,
-        billing_period_end: periodEnd.toISOString().slice(0, 10),
-        due_date: due.toISOString().slice(0, 10),
+        billing_period_end: toLocalIsoDate(periodEnd),
+        due_date: toLocalIsoDate(due),
+        is_historical: false,
       })
       .select('id')
       .single()
@@ -169,9 +201,9 @@ async function generateInvoiceNumber(): Promise<string> {
   return `${prefix}-${seq}`
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(_req: VercelRequest, res: VercelResponse) {
   try {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = toLocalIsoDate(todayLocal())
     const { data: customers, error } = await supabase
       .from('customers')
       .select('*')

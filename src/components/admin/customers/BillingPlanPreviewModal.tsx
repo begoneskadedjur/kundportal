@@ -1,11 +1,12 @@
 // src/components/admin/customers/BillingPlanPreviewModal.tsx
 // Visar diff av faktureringsplan mot befintliga invoices innan apply.
+// Historiska perioder filtreras bort från listan men räknas i summary.
 
 import React from 'react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import LoadingSpinner from '../../shared/LoadingSpinner'
-import type { BillingPlan, BillingPlanEntry } from '../../../services/contractInvoiceGenerator'
+import type { BillingPlan, BillingPlanEntry, BillingPlanAction } from '../../../services/contractInvoiceGenerator'
 
 interface Props {
   isOpen: boolean
@@ -18,13 +19,16 @@ interface Props {
 const formatAmount = (n: number | undefined) =>
   n != null ? new Intl.NumberFormat('sv-SE').format(Math.round(n)) + ' kr' : '-'
 
+// TZ-säker: parse YYYY-MM-DD som lokal midnatt så månaden inte hoppar.
 const formatPeriod = (start?: string) => {
   if (!start) return '-'
-  const d = new Date(start)
+  const [y, m] = start.split('-').map(Number)
+  if (!y || !m) return start
+  const d = new Date(y, m - 1, 1)
   return d.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
 }
 
-const actionMeta: Record<BillingPlanEntry['action'], { label: string; className: string }> = {
+const actionMeta: Partial<Record<BillingPlanAction, { label: string; className: string }>> = {
   create: { label: 'SKAPAS', className: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
   update: { label: 'UPPDATERAS', className: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
   delete: { label: 'RADERAS', className: 'bg-red-500/20 text-red-300 border-red-500/40' },
@@ -32,12 +36,24 @@ const actionMeta: Record<BillingPlanEntry['action'], { label: string; className:
   keep: { label: 'OFÖRÄNDRAD', className: 'bg-slate-700/40 text-slate-400 border-slate-600/40' },
 }
 
+// Actions som inte visas i listan (historiska skapas/backfillas silent)
+const HIDDEN_ACTIONS = new Set<BillingPlanAction>([
+  'create-historical',
+  'backfill-historical-paid',
+])
+
 export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfirm, onCancel }: Props) {
   if (!isOpen) return null
 
-  const hasChanges = plan && (plan.summary.create + plan.summary.update + plan.summary.delete) > 0
+  const hasVisibleChanges = plan
+    ? (plan.summary.create + plan.summary.update + plan.summary.delete) > 0
+    : false
+  const hasHistorical = (plan?.summary.historical ?? 0) > 0
+  const hasAnythingToApply = hasVisibleChanges || hasHistorical
 
-  const changeEntries = plan?.entries.filter(e => e.action !== 'keep') ?? []
+  const visibleEntries = (plan?.entries ?? []).filter(
+    e => !HIDDEN_ACTIONS.has(e.action) && e.action !== 'keep'
+  )
 
   return (
     <Modal isOpen={isOpen} onClose={onCancel} title="Förhandsgranska fakturaplan" size="lg">
@@ -51,7 +67,7 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
 
         {!loading && plan && (
           <>
-            <div className="mb-4 p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <div className="mb-4 p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-1">
               <div className="flex items-center gap-4 text-xs text-slate-300">
                 <span className="text-emerald-400">{plan.summary.create} nya</span>
                 <span className="text-blue-400">{plan.summary.update} ändras</span>
@@ -59,16 +75,26 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
                 <span className="text-slate-400">{plan.summary.locked} låsta</span>
                 <span className="text-slate-500">{plan.summary.keep} oförändrade</span>
               </div>
+              {hasHistorical && (
+                <div className="text-xs text-slate-500">
+                  {plan.summary.historical} historiska perioder registreras som betalda (visas ej i fakturering).
+                </div>
+              )}
             </div>
 
-            {!hasChanges ? (
+            {!hasAnythingToApply ? (
               <div className="py-6 text-center text-sm text-slate-400">
                 Inga fakturaändringar behövs — planen stämmer med befintliga fakturor.
               </div>
+            ) : visibleEntries.length === 0 ? (
+              <div className="py-6 text-center text-sm text-slate-400">
+                Endast historiska perioder att registrera — inga aktiva ändringar att granska.
+              </div>
             ) : (
               <div className="max-h-96 overflow-y-auto space-y-1">
-                {changeEntries.map((entry, i) => {
+                {visibleEntries.map((entry, i) => {
                   const meta = actionMeta[entry.action]
+                  if (!meta) return null
                   return (
                     <div
                       key={i}
@@ -100,8 +126,8 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
 
       <div className="px-4 py-2.5 border-t border-slate-700/50 flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel}>Avbryt</Button>
-        <Button variant="primary" onClick={onConfirm} disabled={loading || !hasChanges}>
-          {hasChanges ? 'Applicera plan' : 'Stäng'}
+        <Button variant="primary" onClick={onConfirm} disabled={loading || !hasAnythingToApply}>
+          {hasAnythingToApply ? 'Applicera plan' : 'Stäng'}
         </Button>
       </div>
     </Modal>

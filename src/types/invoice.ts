@@ -22,6 +22,7 @@ export interface Invoice {
   customer_id: string | null
   billing_period_start: string | null
   billing_period_end: string | null
+  is_historical: boolean
 
   // Kundinformation
   customer_name: string
@@ -138,6 +139,7 @@ export interface InvoiceFilters {
   case_type?: 'private' | 'business'
   invoice_type?: InvoiceType | InvoiceType[]
   requires_approval?: boolean
+  include_historical?: boolean  // default false — historiska paid-rader filtreras bort
   from_date?: string
   to_date?: string
   search?: string

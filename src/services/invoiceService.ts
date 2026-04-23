@@ -312,6 +312,11 @@ export class InvoiceService {
       }
     }
 
+    // Historiska (retroaktivt registrerade som betalda) filtreras bort per default.
+    if (!filters?.include_historical) {
+      query = query.eq('is_historical', false)
+    }
+
     if (filters?.requires_approval !== undefined) {
       query = query.eq('requires_approval', filters.requires_approval)
     }
