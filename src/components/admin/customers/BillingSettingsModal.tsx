@@ -16,6 +16,8 @@ import ContractCaseServiceSelector from './ContractCaseServiceSelector'
 import { type PriceList } from '../../../types/articles'
 import { type BillingFrequency, BILLING_FREQUENCY_CONFIG, type AdhocInvoiceGrouping } from '../../../types/contractBilling'
 import toast from 'react-hot-toast'
+import { ContractInvoiceGenerator, type BillingPlan } from '../../../services/contractInvoiceGenerator'
+import BillingPlanPreviewModal from './BillingPlanPreviewModal'
 
 interface SiteBillingData {
   id: string
@@ -84,6 +86,9 @@ export default function BillingSettingsModal({
 }: BillingSettingsModalProps) {
   const uid = useId()
   const [saving, setSaving] = useState(false)
+  const [plan, setPlan] = useState<BillingPlan | null>(null)
+  const [planLoading, setPlanLoading] = useState(false)
+  const [planOpen, setPlanOpen] = useState(false)
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
 
   // "Fast avtalsvärde" – override för hela årsbeloppet
@@ -388,14 +393,58 @@ export default function BillingSettingsModal({
       }
 
       toast.success('Faktureringsinställningar sparade!')
-      onSave()
-      onClose()
+
+      // Beräkna ev. fakturaplan-diff efter sparade inställningar
+      try {
+        setPlanLoading(true)
+        setPlanOpen(true)
+        const newPlan = await ContractInvoiceGenerator.planForCustomer(customerId)
+        setPlan(newPlan)
+        const hasChanges = (newPlan.summary.create + newPlan.summary.update + newPlan.summary.delete) > 0
+        if (!hasChanges) {
+          setPlanOpen(false)
+          setPlan(null)
+          onSave()
+          onClose()
+        }
+      } catch (planErr: any) {
+        console.error('Plan error:', planErr)
+        setPlanOpen(false)
+        toast.error('Kunde inte beräkna fakturaplan: ' + planErr.message)
+        onSave()
+        onClose()
+      } finally {
+        setPlanLoading(false)
+      }
     } catch (err: any) {
       console.error(err)
       toast.error('Kunde inte spara: ' + err.message)
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleConfirmPlan = async () => {
+    if (!plan) return
+    try {
+      const result = await ContractInvoiceGenerator.apply(plan)
+      toast.success(
+        `Plan applicerad: ${result.createdIds.length} nya, ${result.updatedIds.length} uppdaterade, ${result.deletedIds.length} raderade`
+      )
+      setPlanOpen(false)
+      setPlan(null)
+      onSave()
+      onClose()
+    } catch (err: any) {
+      toast.error('Kunde inte applicera plan: ' + err.message)
+    }
+  }
+
+  const handleCancelPlan = () => {
+    setPlanOpen(false)
+    setPlan(null)
+    onSave()
+    onClose()
   }
 
   if (!isOpen || !customerId) return null
@@ -806,6 +855,14 @@ export default function BillingSettingsModal({
           </Button>
         </div>
       </div>
+
+      <BillingPlanPreviewModal
+        isOpen={planOpen}
+        plan={plan}
+        loading={planLoading}
+        onConfirm={handleConfirmPlan}
+        onCancel={handleCancelPlan}
+      />
     </div>
   )
 }

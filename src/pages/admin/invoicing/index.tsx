@@ -11,8 +11,6 @@ import {
   Plus
 } from 'lucide-react'
 import PrivateBusinessInvoicing from './PrivateBusinessInvoicing'
-import ContractInvoicing from './ContractInvoicing'
-import AdhocInvoicing from './AdhocInvoicing'
 import BillingSummaryLedge from '../../../components/admin/invoicing/BillingSummaryLedge'
 
 type InvoicingTab = 'private-business' | 'contracts' | 'adhoc'
@@ -87,9 +85,9 @@ export default function InvoicingPage() {
 
       {/* Tab Content */}
       <div className="mt-4">
-        {activeTab === 'private-business' && <PrivateBusinessInvoicing />}
-        {activeTab === 'contracts' && <ContractInvoicing />}
-        {activeTab === 'adhoc' && <AdhocInvoicing />}
+        {activeTab === 'private-business' && <PrivateBusinessInvoicing invoiceType="private-business" />}
+        {activeTab === 'contracts' && <PrivateBusinessInvoicing invoiceType="contract" />}
+        {activeTab === 'adhoc' && <PrivateBusinessInvoicing invoiceType="adhoc" />}
       </div>
     </div>
   )

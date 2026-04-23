@@ -5,6 +5,7 @@ import { X, AlertTriangle, Calendar, DollarSign } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
+import { ContractInvoiceGenerator } from '../../../services/contractInvoiceGenerator'
 
 interface TerminateContractModalProps {
   organization: ConsolidatedCustomer | null
@@ -101,6 +102,20 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
 
       if (schedulesError) {
         console.error('Error cancelling recurring schedules:', schedulesError)
+      }
+
+      // Radera framtida icke-låsta avtalsfakturor efter uppsägningstidens slut
+      let totalFutureDeleted = 0
+      for (const sid of siteIds) {
+        try {
+          const deleted = await ContractInvoiceGenerator.cancelFutureAfterTermination(sid)
+          totalFutureDeleted += deleted
+        } catch (err) {
+          console.error('Error cancelling future invoices:', err)
+        }
+      }
+      if (totalFutureDeleted > 0) {
+        toast.success(`${totalFutureDeleted} framtida avtalsfakturor raderade`)
       }
 
       toast.success(`Avtal uppsagt for ${organization.company_name} — slutdatum: ${formatDate(effectiveEndDate)}`)

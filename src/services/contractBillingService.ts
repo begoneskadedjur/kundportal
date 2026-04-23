@@ -416,6 +416,25 @@ export class ContractBillingService {
     // 4. Markera case_billing_items som 'billed'
     await CaseBillingService.updateCaseItemsStatus(caseId, 'contract', 'billed')
 
+    // 5. Generera adhoc-invoice enligt kundens grouping
+    try {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('adhoc_invoice_grouping')
+        .eq('id', customerId)
+        .single()
+      const grouping = (customer?.adhoc_invoice_grouping ?? 'per_case') as 'per_case' | 'monthly_batch'
+      const { ContractInvoiceGenerator } = await import('./contractInvoiceGenerator')
+      await ContractInvoiceGenerator.generateAdhocInvoiceForCase({
+        customerId,
+        caseId,
+        completedAt: completedDate,
+        grouping,
+      })
+    } catch (err) {
+      console.error('Kunde inte skapa adhoc-invoice:', err)
+    }
+
     return {
       created: caseBillingItems.length,
       totalAmount

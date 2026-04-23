@@ -28,7 +28,13 @@ import { calculateRotRutDeduction, ROT_RUT_PERCENT } from '../../../types/caseBi
 import type { RotRutType } from '../../../types/caseBilling'
 import InvoiceDetailModal from '../../../components/admin/invoicing/InvoiceDetailModal'
 
-export default function PrivateBusinessInvoicing() {
+type InvoiceTabType = 'private-business' | 'contract' | 'adhoc'
+
+interface Props {
+  invoiceType?: InvoiceTabType
+}
+
+export default function PrivateBusinessInvoicing({ invoiceType = 'private-business' }: Props) {
   // State
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [stats, setStats] = useState<InvoiceStats | null>(null)
@@ -52,6 +58,15 @@ export default function PrivateBusinessInvoicing() {
       if (caseTypeFilter !== 'all') filters.case_type = caseTypeFilter
       if (searchTerm) filters.search = searchTerm
 
+      // Filter per invoice_type beroende på vilken flik
+      if (invoiceType === 'private-business') {
+        filters.invoice_type = ['private', 'business']
+      } else if (invoiceType === 'contract') {
+        filters.invoice_type = 'contract'
+      } else if (invoiceType === 'adhoc') {
+        filters.invoice_type = 'adhoc'
+      }
+
       const [invoicesData, statsData] = await Promise.all([
         InvoiceService.getInvoices(filters),
         InvoiceService.getInvoiceStats()
@@ -66,7 +81,7 @@ export default function PrivateBusinessInvoicing() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, caseTypeFilter, searchTerm])
+  }, [statusFilter, caseTypeFilter, searchTerm, invoiceType])
 
   useEffect(() => {
     loadData()
@@ -160,20 +175,24 @@ export default function PrivateBusinessInvoicing() {
           />
         </div>
 
-        {/* Kundtyp */}
-        <Select
-          value={caseTypeFilter}
-          onChange={(v) => setCaseTypeFilter(v as any)}
-          options={[
-            { value: 'all', label: 'Alla' },
-            { value: 'private', label: 'Privat' },
-            { value: 'business', label: 'Företag' },
-          ]}
-          className="w-32"
-        />
+        {/* Kundtyp - endast för Privat & Företag-fliken */}
+        {invoiceType === 'private-business' && (
+          <>
+            <Select
+              value={caseTypeFilter}
+              onChange={(v) => setCaseTypeFilter(v as any)}
+              options={[
+                { value: 'all', label: 'Alla' },
+                { value: 'private', label: 'Privat' },
+                { value: 'business', label: 'Företag' },
+              ]}
+              className="w-32"
+            />
 
-        {/* Divider */}
-        <div className="w-px h-6 bg-slate-700" />
+            {/* Divider */}
+            <div className="w-px h-6 bg-slate-700" />
+          </>
+        )}
 
         {/* Status filter badges */}
         {filterBadges.map(badge => {
@@ -362,11 +381,21 @@ export default function PrivateBusinessInvoicing() {
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <span className={`px-1.5 py-0.5 text-xs rounded ${
-                          invoice.case_type === 'private' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
-                        }`}>
-                          {invoice.case_type === 'private' ? 'Privat' : 'Företag'}
-                        </span>
+                        {(() => {
+                          const type = invoice.invoice_type || (invoice.case_type === 'private' ? 'private' : 'business')
+                          const typeMeta: Record<string, { label: string; className: string }> = {
+                            private: { label: 'Privat', className: 'bg-blue-500/20 text-blue-400' },
+                            business: { label: 'Företag', className: 'bg-purple-500/20 text-purple-400' },
+                            contract: { label: 'Avtal', className: 'bg-emerald-500/20 text-emerald-400' },
+                            adhoc: { label: 'Merförsäljning', className: 'bg-amber-500/20 text-amber-400' },
+                          }
+                          const meta = typeMeta[type] ?? typeMeta.business
+                          return (
+                            <span className={`px-1.5 py-0.5 text-xs rounded ${meta.className}`}>
+                              {meta.label}
+                            </span>
+                          )
+                        })()}
                         {invoice.rot_rut_type && (
                           <span className="ml-1 px-1.5 py-0.5 text-xs rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
                             {invoice.rot_rut_type}

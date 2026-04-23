@@ -304,6 +304,14 @@ export class InvoiceService {
       query = query.eq('case_type', filters.case_type)
     }
 
+    if (filters?.invoice_type) {
+      if (Array.isArray(filters.invoice_type)) {
+        query = query.in('invoice_type', filters.invoice_type)
+      } else {
+        query = query.eq('invoice_type', filters.invoice_type)
+      }
+    }
+
     if (filters?.requires_approval !== undefined) {
       query = query.eq('requires_approval', filters.requires_approval)
     }

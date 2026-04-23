@@ -16,8 +16,12 @@ export type InvoiceStatus = 'draft' | 'pending_approval' | 'ready' | 'booked' | 
 export interface Invoice {
   id: string
   invoice_number: string | null
-  case_id: string
-  case_type: 'private' | 'business'
+  case_id: string | null
+  case_type: 'private' | 'business' | null
+  invoice_type: 'private' | 'business' | 'contract' | 'adhoc'
+  customer_id: string | null
+  billing_period_start: string | null
+  billing_period_end: string | null
 
   // Kundinformation
   customer_name: string
@@ -127,9 +131,12 @@ export interface CreateInvoiceItemInput {
 /**
  * Filter för att hämta fakturor
  */
+export type InvoiceType = 'private' | 'business' | 'contract' | 'adhoc'
+
 export interface InvoiceFilters {
   status?: InvoiceStatus | InvoiceStatus[]
   case_type?: 'private' | 'business'
+  invoice_type?: InvoiceType | InvoiceType[]
   requires_approval?: boolean
   from_date?: string
   to_date?: string
