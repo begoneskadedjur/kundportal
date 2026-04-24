@@ -1379,6 +1379,7 @@ export default function CaseServiceSelector({
           quantity: i.quantity,
           unit_price: i.unit_price,
           total_price: i.total_price,
+          default_price: i.article?.default_price ?? null,
         }))}
         customerArticlePrices={customerArticlePrices}
         serviceItems={serviceItems.map(i => ({

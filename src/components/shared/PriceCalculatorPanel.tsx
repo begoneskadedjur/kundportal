@@ -20,8 +20,11 @@ interface ArticleItem {
   article_name: string
   article_code?: string | null
   quantity: number
+  /** Priset som visas på raden i UI — lika med kundpris för avtalsartiklar, annars default_price */
   unit_price: number
   total_price: number
+  /** Artikelns grunddata-pris (articles.default_price) — den verkliga inköpskostnaden. */
+  default_price?: number | null
 }
 
 type CustomerArticlePrice = { custom_price: number; quantity_tiers: QuantityTier[] | null }
@@ -121,47 +124,62 @@ export default function PriceCalculatorPanel({
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
-   * Effektivt enhetspris för en artikel — slår upp kundspecifik prislista + tiers
-   * om artikeln finns där, annars faller tillbaka till artikelns unit_price
-   * (vilket normalt är articles.default_price).
+   * Kundens avtalade enhetspris för en artikel (tier eller custom_price).
+   * Returnerar null om kunden inte har ett avtalspris för artikeln.
    */
-  const effectiveUnitPrice = (a: ArticleItem): number => {
-    if (!a.article_id || !customerArticlePrices) return a.unit_price
+  const customerUnitPrice = (a: ArticleItem): number | null => {
+    if (!a.article_id || !customerArticlePrices) return null
     const cp = customerArticlePrices[a.article_id]
-    if (!cp) return a.unit_price
+    if (!cp) return null
     if (cp.quantity_tiers && cp.quantity_tiers.length > 0) {
       return resolveTieredPrice(a.quantity, cp.quantity_tiers)
     }
     return cp.custom_price
   }
 
-  /** True om artikeln har ett kundspecifikt pris (med eller utan tiers) */
-  const hasCustomerPrice = (a: ArticleItem): boolean => {
-    if (!a.article_id || !customerArticlePrices) return false
-    return !!customerArticlePrices[a.article_id]
-  }
+  /** Verklig inköpskostnad per enhet = articles.default_price (oberoende av kundavtal) */
+  const purchaseUnitCost = (a: ArticleItem): number =>
+    a.default_price != null ? a.default_price : a.unit_price
+
+  const hasCustomerPrice = (a: ArticleItem): boolean => customerUnitPrice(a) !== null
 
   /**
-   * Total "kostnad" (för marginalkalkyl) = summan av tilldelade artiklars effektiva pris × antal.
-   * OBS: för artiklar med kundspecifikt pris är det egentligen kundens pris (inte inköpskostnad).
-   * Dessa behandlas separat i handleApply så de inte får markup.
+   * Total verklig inköpskostnad (används för marginalkalkyl).
+   * = sum(default_price * qty) för alla tilldelade artiklar, oavsett om kunden har avtalspris.
    */
   const purchaseCostByService = (serviceId: string) =>
     articleItems
       .filter(a => assignments[a.id] === serviceId)
-      .reduce((sum, a) => sum + effectiveUnitPrice(a) * a.quantity, 0)
+      .reduce((sum, a) => sum + purchaseUnitCost(a) * a.quantity, 0)
 
-  /** Summa av artiklar med kundspecifikt pris för en tjänst (dessa blir tjänstens pris direkt) */
-  const customerPricedCostByService = (serviceId: string) =>
+  /**
+   * Summa av artiklar med kundavtal — detta är låst intäkt per tjänsterad,
+   * ingen markup får läggas på.
+   */
+  const customerPricedByService = (serviceId: string) =>
     articleItems
       .filter(a => assignments[a.id] === serviceId && hasCustomerPrice(a))
-      .reduce((sum, a) => sum + effectiveUnitPrice(a) * a.quantity, 0)
+      .reduce((sum, a) => sum + (customerUnitPrice(a)! * a.quantity), 0)
 
-  /** Kostnad av artiklar UTAN kundspecifikt pris (här applicerar vi markup) */
+  /**
+   * Bas-kostnad för artiklar UTAN kundavtal (markup-able).
+   * Här använder vi verklig inköpskostnad (default_price) så markup räknas på rätt bas.
+   */
   const markupableCostByService = (serviceId: string) =>
     articleItems
       .filter(a => assignments[a.id] === serviceId && !hasCustomerPrice(a))
-      .reduce((sum, a) => sum + effectiveUnitPrice(a) * a.quantity, 0)
+      .reduce((sum, a) => sum + purchaseUnitCost(a) * a.quantity, 0)
+
+  /** True om alla tilldelade artiklar på tjänsten har kundavtalspris (→ slider låst) */
+  const isServiceFullyLockedByCustomer = (serviceId: string): boolean => {
+    const assigned = articleItems.filter(a => assignments[a.id] === serviceId)
+    if (assigned.length === 0) return false
+    return assigned.every(a => hasCustomerPrice(a))
+  }
+
+  /** True om åtminstone en artikel på tjänsten har kundavtalspris */
+  const hasAnyCustomerPriceOnService = (serviceId: string): boolean =>
+    articleItems.some(a => assignments[a.id] === serviceId && hasCustomerPrice(a))
 
   const getMarginColor = (margin: number) => {
     if (margin >= settings.target_margin_percent) return 'text-emerald-400'
@@ -186,7 +204,7 @@ export default function PriceCalculatorPanel({
         .filter(si => !isFixed(si.id))
         .map(si => ({
           id: si.id,
-          customerPriced: customerPricedCostByService(si.id),
+          customerPriced: customerPricedByService(si.id),
           markupable: markupableCostByService(si.id),
           markup: markups[si.id] ?? rec,
         }))
@@ -322,22 +340,21 @@ export default function PriceCalculatorPanel({
                       {showPricing && (
                         <div className="p-3 space-y-4">
                           {serviceItems.map(si => {
-                            const cost = purchaseCostByService(si.id)
-                            const customerPriced = customerPricedCostByService(si.id)
-                            const markupable = markupableCostByService(si.id)
+                            const cost = purchaseCostByService(si.id)                 // verklig inköpskostnad (default_price × qty)
+                            const customerPriced = customerPricedByService(si.id)      // låst kund-intäkt (tier × qty)
+                            const markupable = markupableCostByService(si.id)          // bas-kostnad för artiklar som får markup
                             const markup = markups[si.id] ?? settings.recommended_markup_percent
-                            // Kundpris-del läggs direkt; markupable-delen får markup
+                            const locked = isServiceFullyLockedByCustomer(si.id)
+                            const hasMix = hasAnyCustomerPriceOnService(si.id) && !locked
+                            // Slutpris = låst del (kundavtalspris) + markup-del (inköp × (1+markup))
                             const rawExkl = customerPriced + calculateSuggestedPrice(markupable, markup)
-                            const suggestedPriceExkl = cost > 0 ? rawExkl : 0
+                            const suggestedPriceExkl = cost > 0 || customerPriced > 0 ? rawExkl : 0
                             const suggestedPriceDisplay = Math.round(suggestedPriceExkl * priceMultiplier)
-                            const hasArticles = cost > 0
+                            const hasArticles = cost > 0 || customerPriced > 0
                             const fixed = isFixed(si.id)
-                            // Vid fast pris: marginal räknas på kundens faktiska pris (unit_price × qty)
                             const fixedPriceExkl = si.unit_price * si.quantity
                             const fixedPriceDisplay = Math.round(fixedPriceExkl * priceMultiplier)
                             // Marginal räknas ALLTID på exkl.-basen — momsen är aldrig bolagets intäkt.
-                            // För privat: pris exkl. = pris_inkl. / 1,25. Detta ger samma marginal som
-                            // för företag vid samma inkl.-pris (och korrekt ekonomisk definition).
                             const priceExklForMargin = fixed ? fixedPriceExkl : suggestedPriceExkl
                             const margin = priceExklForMargin > 0 && cost > 0 ? calculateMarginPercent(priceExklForMargin, cost) : 0
 
@@ -358,6 +375,12 @@ export default function PriceCalculatorPanel({
                                         Fast pris · {fmt(fixedPriceDisplay)}
                                       </span>
                                     )}
+                                    {locked && !fixed && (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium">
+                                        <CheckCircle className="w-3 h-3" />
+                                        Låst av avtal
+                                      </span>
+                                    )}
                                   </div>
                                   {hasArticles && (
                                     <div className={`flex items-center gap-1 text-xs font-medium mt-0.5 ${getMarginColor(margin)}`}>
@@ -374,33 +397,52 @@ export default function PriceCalculatorPanel({
                                   </p>
                                 ) : hasArticles ? (
                                   <>
-                                    <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                                      <span>Inköp: {fmt(cost)}</span>
-                                      <span className="flex items-baseline gap-1.5">
-                                        <span className="font-semibold text-white text-sm">{fmt(suggestedPriceDisplay)}</span>
-                                        <span className="text-[10px] text-slate-500">{priceLabel}</span>
-                                      </span>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <div className="flex justify-between text-xs text-slate-500">
-                                        <span>Påslag</span>
-                                        <span className="font-medium text-slate-300">{markup.toFixed(0)}%</span>
+                                    <div className="space-y-0.5 mb-2 text-xs text-slate-400">
+                                      <div className="flex items-center justify-between">
+                                        <span>Inköp (kostnad): {fmt(cost)}</span>
+                                        <span className="flex items-baseline gap-1.5">
+                                          <span className="font-semibold text-white text-sm">{fmt(suggestedPriceDisplay)}</span>
+                                          <span className="text-[10px] text-slate-500">{priceLabel}</span>
+                                        </span>
                                       </div>
-                                      <input
-                                        type="range"
-                                        min={0}
-                                        max={300}
-                                        step={5}
-                                        value={markup}
-                                        onChange={e => onMarkupsChange({ ...markups, [si.id]: parseFloat(e.target.value) })}
-                                        className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-[#20c58f]"
-                                      />
-                                      <div className="flex justify-between text-xs text-slate-600">
-                                        <span>0%</span>
-                                        <span>Rek: {settings.recommended_markup_percent}%</span>
-                                        <span>300%</span>
-                                      </div>
+                                      {customerPriced > 0 && (
+                                        <div className="flex items-center gap-1 text-[11px] text-[#20c58f]">
+                                          <CheckCircle className="w-3 h-3" />
+                                          <span>Låst kundpris: {fmt(customerPriced * priceMultiplier)} {priceLabel.toLowerCase()}</span>
+                                        </div>
+                                      )}
+                                      {hasMix && (
+                                        <div className="text-[11px] text-slate-500">
+                                          Påslag gäller endast {fmt(markupable * priceMultiplier)} {priceLabel.toLowerCase()} (icke-avtalsartiklar)
+                                        </div>
+                                      )}
                                     </div>
+                                    {locked ? (
+                                      <p className="text-xs text-slate-500 italic">
+                                        Alla tilldelade artiklar har avtalspris — påslag påverkar ingenting och är låst.
+                                      </p>
+                                    ) : (
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between text-xs text-slate-500">
+                                          <span>Påslag {hasMix ? '(icke-avtalsartiklar)' : ''}</span>
+                                          <span className="font-medium text-slate-300">{markup.toFixed(0)}%</span>
+                                        </div>
+                                        <input
+                                          type="range"
+                                          min={0}
+                                          max={300}
+                                          step={5}
+                                          value={markup}
+                                          onChange={e => onMarkupsChange({ ...markups, [si.id]: parseFloat(e.target.value) })}
+                                          className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-[#20c58f]"
+                                        />
+                                        <div className="flex justify-between text-xs text-slate-600">
+                                          <span>0%</span>
+                                          <span>Rek: {settings.recommended_markup_percent}%</span>
+                                          <span>300%</span>
+                                        </div>
+                                      </div>
+                                    )}
                                   </>
                                 ) : (
                                   <p className="text-xs text-slate-500">
