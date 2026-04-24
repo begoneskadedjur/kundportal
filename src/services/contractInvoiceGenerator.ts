@@ -981,11 +981,21 @@ export class ContractInvoiceGenerator {
     const year = now.getFullYear()
     const month = String(now.getMonth() + 1).padStart(2, '0')
     const prefix = `INV-${year}${month}`
-    const { count } = await supabase
+    // Hämta högsta befintliga sekvensnummer istället för count() — count räknar
+    // inte raderade rader, vilket orsakar kollision när rader städats bort.
+    const { data } = await supabase
       .from('invoices')
-      .select('*', { count: 'exact', head: true })
-      .like('invoice_number', `${prefix}%`)
-    const seq = String((count || 0) + 1).padStart(4, '0')
+      .select('invoice_number')
+      .like('invoice_number', `${prefix}-%`)
+      .order('invoice_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    let nextSeq = 1
+    if (data?.invoice_number) {
+      const match = /-(\d+)$/.exec(data.invoice_number)
+      if (match) nextSeq = parseInt(match[1], 10) + 1
+    }
+    const seq = String(nextSeq).padStart(4, '0')
     return `${prefix}-${seq}`
   }
 }
