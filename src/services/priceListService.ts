@@ -363,18 +363,49 @@ export class PriceListService {
     return (data || []) as PriceListItemWithArticle[]
   }
 
+  /**
+   * Skapa/uppdatera en artikelrad i prislistan.
+   *
+   * Obs: DB:ns unique-index för (price_list_id, article_id) är partiell
+   * (WHERE article_id IS NOT NULL), vilket PostgREST/supabase-js inte kan
+   * hantera via onConflict. Därför gör vi en check-then-insert-or-update
+   * manuellt (samma mönster som upsertPriceListServiceItem).
+   */
   static async upsertPriceListItem(input: UpsertPriceListItemInput): Promise<PriceListItem> {
+    const { data: existing } = await supabase
+      .from('price_list_items')
+      .select('id')
+      .eq('price_list_id', input.price_list_id)
+      .eq('article_id', input.article_id)
+      .maybeSingle()
+
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from('price_list_items')
+        .update({
+          custom_price: input.custom_price,
+          discount_percent: input.discount_percent ?? 0,
+          quantity_tiers: input.quantity_tiers ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+
+      if (error) throw new Error(`Databasfel: ${error.message}`)
+      return data
+    }
+
     const { data, error } = await supabase
       .from('price_list_items')
-      .upsert({
+      .insert({
         price_list_id: input.price_list_id,
         article_id: input.article_id,
         service_id: null,
         custom_price: input.custom_price,
         discount_percent: input.discount_percent ?? 0,
         quantity_tiers: input.quantity_tiers ?? null,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'price_list_id,article_id' })
+      })
       .select()
       .single()
 
@@ -382,24 +413,55 @@ export class PriceListService {
     return data
   }
 
+  /** Bulk-upsert artikelrader (check-then-insert-or-update, partiellt unique-index) */
   static async bulkUpsertPriceListItems(items: UpsertPriceListItemInput[]): Promise<void> {
     if (items.length === 0) return
 
-    const rows = items.map(item => ({
-      price_list_id: item.price_list_id,
-      article_id: item.article_id,
-      service_id: null,
-      custom_price: item.custom_price,
-      discount_percent: item.discount_percent ?? 0,
-      quantity_tiers: item.quantity_tiers ?? null,
-      updated_at: new Date().toISOString()
-    }))
-
-    const { error } = await supabase
+    const priceListIds = [...new Set(items.map(i => i.price_list_id))]
+    const { data: existing } = await supabase
       .from('price_list_items')
-      .upsert(rows, { onConflict: 'price_list_id,article_id' })
+      .select('id, price_list_id, article_id')
+      .in('price_list_id', priceListIds)
+      .not('article_id', 'is', null)
 
-    if (error) throw new Error(`Databasfel: ${error.message}`)
+    const existingMap = new Map<string, string>()
+    for (const row of existing || []) {
+      if (row.article_id) existingMap.set(`${row.price_list_id}:${row.article_id}`, row.id)
+    }
+
+    const toUpdate: Array<{ id: string; input: UpsertPriceListItemInput }> = []
+    const toInsert: UpsertPriceListItemInput[] = []
+    for (const item of items) {
+      const existingId = existingMap.get(`${item.price_list_id}:${item.article_id}`)
+      if (existingId) toUpdate.push({ id: existingId, input: item })
+      else toInsert.push(item)
+    }
+
+    if (toInsert.length > 0) {
+      const rows = toInsert.map(i => ({
+        price_list_id: i.price_list_id,
+        article_id: i.article_id,
+        service_id: null,
+        custom_price: i.custom_price,
+        discount_percent: i.discount_percent ?? 0,
+        quantity_tiers: i.quantity_tiers ?? null,
+      }))
+      const { error } = await supabase.from('price_list_items').insert(rows)
+      if (error) throw new Error(`Databasfel: ${error.message}`)
+    }
+
+    for (const { id, input } of toUpdate) {
+      const { error } = await supabase
+        .from('price_list_items')
+        .update({
+          custom_price: input.custom_price,
+          discount_percent: input.discount_percent ?? 0,
+          quantity_tiers: input.quantity_tiers ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+      if (error) throw new Error(`Databasfel: ${error.message}`)
+    }
   }
 
   /**
