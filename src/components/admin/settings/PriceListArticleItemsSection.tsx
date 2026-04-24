@@ -281,7 +281,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                 <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Grupp</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Grundpris</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Kundpris</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Staffning</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Mängdrabatter</th>
                 <th className="px-3 py-2 w-20" />
               </tr>
             </thead>
@@ -323,7 +323,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                             hasTiers ? 'border-slate-700 text-slate-500' : 'border-slate-600'
                           }`}
                           disabled={hasTiers}
-                          title={hasTiers ? 'Staffning aktiv — kundpriset styrs av tier-priserna' : 'Fast pris oavsett antal'}
+                          title={hasTiers ? 'Mängdrabatter aktiva — kundpriset styrs av tier-priserna' : 'Fast pris oavsett antal'}
                         />
                         <span className="text-xs text-slate-500 ml-1">kr</span>
                       </td>
@@ -336,7 +336,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                             ? <ChevronDown className="w-3 h-3" />
                             : <ChevronRight className="w-3 h-3" />}
                           <Layers className="w-3 h-3" />
-                          <span>{hasTiers ? `${state.tiers!.length} nivåer: ${tierSummary(state.tiers)}` : 'Inga staffningar'}</span>
+                          <span>{hasTiers ? `${state.tiers!.length} nivåer: ${tierSummary(state.tiers)}` : 'Inga mängdrabatter'}</span>
                         </button>
                       </td>
                       <td className="px-3 py-2">
@@ -367,7 +367,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="text-xs text-slate-400">
-                                Staffning: lägsta antal → pris/styck. Första nivån måste starta på 1.
+                                Mängdrabatter: lägsta antal → pris/styck. Första nivån måste starta på 1.
                               </div>
                               <button
                                 onClick={() => addTier(item.article_id!)}
@@ -379,7 +379,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                             </div>
                             {!hasTiers ? (
                               <div className="text-xs text-slate-500 italic py-2">
-                                Ingen staffning satt — fast pris används oavsett antal. Klicka "Lägg till nivå" för att börja.
+                                Inga mängdrabatter satta — fast pris används oavsett antal. Klicka "Lägg till nivå" för att börja.
                               </div>
                             ) : (
                               <div className="space-y-1">
