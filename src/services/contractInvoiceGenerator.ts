@@ -265,7 +265,7 @@ export class ContractInvoiceGenerator {
 
     const { data: existing, error: exErr } = await supabase
       .from('invoices')
-      .select('id, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, invoice_items(article_name)')
+      .select('id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, invoice_items(article_name)')
       .eq('customer_id', customerId)
       .eq('invoice_type', 'contract')
 
@@ -319,9 +319,27 @@ export class ContractInvoiceGenerator {
       subtotal: number
       is_historical: boolean | null
       has_generic_items?: boolean
+      invoice_number?: string | null
     }>,
   ): BillingPlanEntry[] {
-    const plannedByKey = new Map(planned.map(p => [p.periodStart, p]))
+    // Filtrera bort planerade perioder som redan täcks av importerade Fortnox-fakturor
+    // (invoice_number LIKE 'F-%', is_historical = true). En importerad faktura med
+    // billing_period_start/end täcker alla planerade vars periodStart ligger i intervallet.
+    const coveredRanges = existing
+      .filter(e =>
+        e.is_historical === true
+        && !!e.invoice_number
+        && e.invoice_number.startsWith('F-')
+        && !!e.billing_period_start
+        && !!e.billing_period_end
+      )
+      .map(e => ({ start: e.billing_period_start as string, end: e.billing_period_end as string }))
+
+    const filteredPlanned = coveredRanges.length === 0
+      ? planned
+      : planned.filter(p => !coveredRanges.some(r => p.periodStart >= r.start && p.periodStart <= r.end))
+
+    const plannedByKey = new Map(filteredPlanned.map(p => [p.periodStart, p]))
     const existingByKey = new Map(
       existing
         .filter(e => e.billing_period_start)
@@ -330,7 +348,7 @@ export class ContractInvoiceGenerator {
 
     const entries: BillingPlanEntry[] = []
 
-    for (const p of planned) {
+    for (const p of filteredPlanned) {
       const ex = existingByKey.get(p.periodStart)
 
       if (!ex) {

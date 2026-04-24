@@ -1344,23 +1344,102 @@ export class ContractBillingService {
   ): Promise<void> {
     if (invoices.length === 0) return
 
+    // Hämta kunddata (inkl. avtalsparametrar för period-matchning)
+    const { data: customer, error: custErr } = await supabase
+      .from('customers')
+      .select('company_name, organization_number, contact_email, contact_phone, contact_address, billing_email, billing_address, contract_start_date, contract_end_date, billing_frequency')
+      .eq('id', customerId)
+      .single()
+    if (custErr || !customer) throw new Error('Kunden kunde inte hämtas för import')
+
+    /**
+     * För 'contract'-rader: beräkna den avtalsperiod som en Fortnox-faktura
+     * faller inom eller precis före. Ex: avtal startar 2025-03-10, annual frekvens.
+     * Fortnox-faktura 2026-02-04 → period 2025-03-10 → 2026-03-09 (år 1) — eller
+     * tolkas som förskottsbetalning för år 2 (2026-03-10 → 2027-03-09)?
+     *
+     * Regel: matcha den period vars slutmånad är närmast (men inte efter)
+     * fakturadatumet. Förskottsfakturor är vanligast → om fakturadatum ligger
+     * precis i månaden innan en ny period, matchar vi den perioden.
+     */
+    const monthsForFreq = (freq: string | null | undefined): number => {
+      switch (freq) {
+        case 'monthly': return 1
+        case 'quarterly': return 3
+        case 'semi_annual': return 6
+        case 'annual': return 12
+        default: return 0
+      }
+    }
+
+    const addMonths = (date: Date, m: number) => {
+      const d = new Date(date)
+      d.setMonth(d.getMonth() + m)
+      return d
+    }
+
+    const toLocalIso = (d: Date) => {
+      const y = d.getFullYear()
+      const mo = String(d.getMonth() + 1).padStart(2, '0')
+      const da = String(d.getDate()).padStart(2, '0')
+      return `${y}-${mo}-${da}`
+    }
+
+    const resolveContractPeriod = (invoiceDateStr: string): { periodStart: string; periodEnd: string } | null => {
+      if (!customer.contract_start_date || !customer.billing_frequency) return null
+      const monthsPerPeriod = monthsForFreq(customer.billing_frequency)
+      if (monthsPerPeriod === 0) return null
+
+      const contractStart = new Date(customer.contract_start_date)
+      const invDate = new Date(invoiceDateStr)
+      // Generera perioder tills vi täcker invoiceDate + 1 period
+      let periodStart = new Date(contractStart)
+      for (let i = 0; i < 120; i++) { // max 120 perioder (=10 år månatligt)
+        const periodEnd = addMonths(periodStart, monthsPerPeriod)
+        periodEnd.setDate(periodEnd.getDate() - 1) // slutdatum inklusivt
+        // Förskottsfaktura: fakturadatum ≤ periodens slut och ≥ periodens start minus ~1 mån
+        const earliestInvoice = new Date(periodStart)
+        earliestInvoice.setMonth(earliestInvoice.getMonth() - 1)
+        if (invDate >= earliestInvoice && invDate <= periodEnd) {
+          return { periodStart: toLocalIso(periodStart), periodEnd: toLocalIso(periodEnd) }
+        }
+        // Nästa period
+        periodStart = addMonths(periodStart, monthsPerPeriod)
+        if (customer.contract_end_date && periodStart > new Date(customer.contract_end_date)) break
+      }
+      return null
+    }
+
     const normalized = invoices.map(inv => {
       const paid = !!inv.FinalPayDate || inv.Balance === 0
+      // Default: månads-period (utskicksmånaden)
       const [year, month] = inv.InvoiceDate.split('-').map(Number)
-      const periodStart = new Date(year, month - 1, 1).toISOString().split('T')[0]
-      const periodEnd = new Date(year, month, 0).toISOString().split('T')[0]
-      return { inv, paid, periodStart, periodEnd }
+      let periodStart = new Date(year, month - 1, 1).toISOString().split('T')[0]
+      let periodEnd = new Date(year, month, 0).toISOString().split('T')[0]
+      // För contract-typ: försök hitta exakt avtalsperiod
+      if (inv.importType === 'contract') {
+        const resolved = resolveContractPeriod(inv.InvoiceDate)
+        if (resolved) {
+          periodStart = resolved.periodStart
+          periodEnd = resolved.periodEnd
+        }
+      }
+      // Moms: Fortnox Total är inkl. moms → separera
+      const totalInclVat = inv.Total
+      const subtotal = Math.round(totalInclVat / 1.25)
+      const vatAmount = totalInclVat - subtotal
+      return { inv, paid, periodStart, periodEnd, subtotal, vatAmount, totalInclVat }
     })
 
-    // 1) contract_billing_items (legacy period-källa)
-    const cbiItems = normalized.map(({ inv, paid, periodStart, periodEnd }) => ({
+    // 1) contract_billing_items (legacy period-källa) — använd exkl. moms
+    const cbiItems = normalized.map(({ inv, paid, periodStart, periodEnd, subtotal }) => ({
       customer_id: customerId,
       item_type: inv.importType,
       source: 'manual' as const,
       article_name: inv.importType === 'contract' ? 'Historisk avtalsfaktura' : 'Historisk engångsfaktura',
       quantity: 1,
-      unit_price: inv.Total,
-      total_price: inv.Total,
+      unit_price: subtotal,
+      total_price: subtotal,
       status: paid ? 'paid' : (inv.Sent ? 'invoiced' : 'pending'),
       billing_period_start: periodStart,
       billing_period_end: periodEnd,
@@ -1374,14 +1453,6 @@ export class ContractBillingService {
 
     // 2) invoices + invoice_items (auktoritativ källa för UI)
     try {
-      // Hämta kunddata en gång för att fylla invoice-fälten
-      const { data: customer, error: custErr } = await supabase
-        .from('customers')
-        .select('company_name, organization_number, contact_email, contact_phone, contact_address, billing_email, billing_address')
-        .eq('id', customerId)
-        .single()
-      if (custErr || !customer) throw new Error('Kunden kunde inte hämtas för fakturakonvertering')
-
       // Skippa rader som redan har en motsvarande invoices-rad (idempotent)
       const docNumbers = normalized.map(n => n.inv.DocumentNumber)
       const { data: existing } = await supabase
@@ -1394,7 +1465,7 @@ export class ContractBillingService {
       const toInsert = normalized.filter(n => !existingSet.has(`F-${n.inv.DocumentNumber}`))
       if (toInsert.length === 0) return
 
-      const invoiceRows = toInsert.map(({ inv, paid, periodStart, periodEnd }) => {
+      const invoiceRows = toInsert.map(({ inv, paid, periodStart, periodEnd, subtotal, vatAmount, totalInclVat }) => {
         const isoInvDate = new Date(inv.InvoiceDate).toISOString()
         const status = paid ? 'paid' : (inv.Sent ? 'sent' : 'draft')
         return {
@@ -1408,9 +1479,9 @@ export class ContractBillingService {
           customer_phone: customer.contact_phone,
           customer_address: customer.billing_address ?? customer.contact_address,
           organization_number: customer.organization_number,
-          subtotal: inv.Total,
-          vat_amount: 0,
-          total_amount: inv.Total,
+          subtotal,
+          vat_amount: vatAmount,
+          total_amount: totalInclVat,
           status,
           requires_approval: false,
           billing_period_start: periodStart,
@@ -1428,28 +1499,26 @@ export class ContractBillingService {
       const { data: insertedInvoices, error: invErr } = await supabase
         .from('invoices')
         .insert(invoiceRows)
-        .select('id, invoice_number, subtotal')
+        .select('id, invoice_number, subtotal, invoice_type')
       if (invErr) throw new Error(invErr.message)
       if (!insertedInvoices) return
 
       const invoiceItemRows = insertedInvoices.map((row: any) => ({
         invoice_id: row.id,
         article_code: 'HIST',
-        article_name: row.invoice_number.startsWith('F-')
+        article_name: row.invoice_type === 'contract'
           ? 'Historisk avtalsfaktura (import)'
           : 'Historisk engångsfaktura (import)',
         quantity: 1,
         unit_price: row.subtotal,
         total_price: row.subtotal,
-        vat_rate: 0,
+        vat_rate: 25,
         discount_percent: 0,
       }))
 
       const { error: itemErr } = await supabase.from('invoice_items').insert(invoiceItemRows)
       if (itemErr) throw new Error(itemErr.message)
     } catch (err: any) {
-      // Logga men kasta inte — contract_billing_items har redan skrivits och är datakällan
-      // för aggregat (contractBilledAccum). Backfill-script kan återskapa invoices senare.
       console.error('[importHistoricalItems] invoices-sync misslyckades:', err?.message || err)
     }
   }
