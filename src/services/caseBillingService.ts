@@ -40,7 +40,7 @@ export class CaseBillingService {
    * customerId-parametern accepteras för bakåtkompatibilitet men används inte
    * längre för artikelpriser.
    */
-  static async getArticlesWithPrices(_customerId?: string | null, articleGroupId?: string | null): Promise<ArticleWithEffectivePrice[]> {
+  static async getArticlesWithPrices(customerId?: string | null, articleGroupId?: string | null): Promise<ArticleWithEffectivePrice[]> {
     // Om articleGroupId anges: hämta artiklar från den gruppen + alltid Arbetstid och Övrigt
     let allowedArticleIds: Set<string> | null = null
     if (articleGroupId) {
@@ -69,14 +69,20 @@ export class CaseBillingService {
       if (allowedArticleIds.size === 0) return []
     }
 
-    const { data: articles, error } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('is_active', true)
-      .order('category', { ascending: true })
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true })
+    const [articlesResult, customerArticlePrices] = await Promise.all([
+      supabase
+        .from('articles')
+        .select('*')
+        .eq('is_active', true)
+        .order('category', { ascending: true })
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true }),
+      customerId
+        ? PriceListService.getCustomerArticlePrices(customerId)
+        : Promise.resolve({} as Record<string, { custom_price: number; quantity_tiers: import('../types/articles').QuantityTier[] | null }>),
+    ])
 
+    const { data: articles, error } = articlesResult
     if (error) throw new Error(`Databasfel: ${error.message}`)
     if (!articles || articles.length === 0) return []
 
@@ -84,11 +90,27 @@ export class CaseBillingService {
       ? articles.filter((a: Article) => allowedArticleIds!.has(a.id))
       : articles
 
-    return filteredArticles.map((article: Article) => ({
-      article,
-      effective_price: article.default_price,
-      price_source: 'standard' as PriceSource
-    }))
+    return filteredArticles.map((article: Article) => {
+      const cp = customerArticlePrices[article.id]
+      if (cp) {
+        // Kunden har avtalspris på artikeln. Använd första tier eller custom_price.
+        const hasTiers = !!(cp.quantity_tiers && cp.quantity_tiers.length > 0)
+        const basePrice = hasTiers
+          ? [...cp.quantity_tiers!].sort((a, b) => a.min_qty - b.min_qty)[0].unit_price
+          : cp.custom_price
+        return {
+          article,
+          effective_price: basePrice,
+          price_source: 'customer_list' as PriceSource,
+          quantity_tiers: hasTiers ? cp.quantity_tiers : null,
+        }
+      }
+      return {
+        article,
+        effective_price: article.default_price,
+        price_source: 'standard' as PriceSource,
+      }
+    })
   }
 
   /**

@@ -213,6 +213,37 @@ export interface QuantityTier {
 }
 
 /**
+ * Returnerar enhetspriset för en given kvantitet baserat på tiers.
+ * Största `min_qty <= qty` vinner. Faller tillbaka på lägsta tier om inget passar.
+ */
+export function resolveTieredPrice(qty: number, tiers: QuantityTier[]): number {
+  if (!tiers || tiers.length === 0) return 0
+  const desc = [...tiers].sort((a, b) => b.min_qty - a.min_qty)
+  const match = desc.find(t => qty >= t.min_qty)
+  if (match) return match.unit_price
+  const asc = [...tiers].sort((a, b) => a.min_qty - b.min_qty)
+  return asc[0]?.unit_price ?? 0
+}
+
+/**
+ * Formaterar tiers till en kompakt översikt, t.ex. "1-2 st: 5 990 / 3-5 st: 5 390 / 6+ st: 3 390".
+ */
+export function formatTierSummary(tiers: QuantityTier[]): string {
+  if (!tiers || tiers.length === 0) return ''
+  const sorted = [...tiers].sort((a, b) => a.min_qty - b.min_qty)
+  const fmt = (n: number) => new Intl.NumberFormat('sv-SE').format(n)
+  return sorted
+    .map((t, idx) => {
+      const next = sorted[idx + 1]
+      const range = next
+        ? `${t.min_qty}-${next.min_qty - 1} st`
+        : `${t.min_qty}+ st`
+      return `${range}: ${fmt(t.unit_price)}`
+    })
+    .join(' / ')
+}
+
+/**
  * Prislistepost från databasen.
  * Prissätter antingen en tjänst (nytt flöde) eller en artikel.
  * XOR-constraint: exakt en av article_id / service_id är satt per rad.

@@ -133,13 +133,16 @@ export interface UpdateCaseArticleInput {
 }
 
 /**
- * Artikel med effektivt pris (för UI)
+ * Artikel med effektivt pris (för UI).
+ * Om artikeln finns i kundens prislista sätts `price_source = 'customer_list'`
+ * och `quantity_tiers` kan innehålla mängdrabatt-stafflar.
  */
 export interface ArticleWithEffectivePrice {
   article: Article
   effective_price: number
   price_source: PriceSource
   customer_discount_percent?: number
+  quantity_tiers?: import('./articles').QuantityTier[] | null
 }
 
 /**

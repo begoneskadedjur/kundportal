@@ -11,6 +11,7 @@ import type { PricingSettings } from '../../types/pricingSettings'
 import { DEFAULT_PRICING_SETTINGS } from '../../types/pricingSettings'
 import { calculateSuggestedPrice, calculateMarginPercent } from '../../types/caseBilling'
 import type { QuantityTier } from '../../types/articles'
+import { resolveTieredPrice } from '../../types/articles'
 
 interface ArticleItem {
   id: string
@@ -24,19 +25,6 @@ interface ArticleItem {
 }
 
 type CustomerArticlePrice = { custom_price: number; quantity_tiers: QuantityTier[] | null }
-
-/**
- * Returnerar det enhetspris som gäller för en viss kvantitet.
- * Tiers sorterade fallande → första matchning (min_qty ≤ qty) vinner.
- * Faller tillbaka på priset för tier med lägst min_qty om inget passar.
- */
-function resolveTieredPrice(qty: number, tiers: QuantityTier[]): number {
-  const desc = [...tiers].sort((a, b) => b.min_qty - a.min_qty)
-  const match = desc.find(t => qty >= t.min_qty)
-  if (match) return match.unit_price
-  const asc = [...tiers].sort((a, b) => a.min_qty - b.min_qty)
-  return asc[0]?.unit_price ?? 0
-}
 
 interface ServiceItem {
   id: string

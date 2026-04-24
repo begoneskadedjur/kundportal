@@ -44,7 +44,7 @@ import {
 } from '../../types/caseBilling'
 import { getEffectiveRotPercent, getEffectiveRutPercent } from '../../utils/rotRutConstants'
 import type { ServiceWithGroup } from '../../types/services'
-import { ARTICLE_CATEGORIES, calculatePricePerDosageUnit, getDosageDisplayUnit } from '../../types/articles'
+import { ARTICLE_CATEGORIES, calculatePricePerDosageUnit, getDosageDisplayUnit, resolveTieredPrice, formatTierSummary } from '../../types/articles'
 import type { ArticleCategory, QuantityTier } from '../../types/articles'
 import { ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
 
@@ -525,6 +525,17 @@ export default function CaseServiceSelector({
   // ──────────────────────────────────────────────────────────────
   // Uppdatera antal
   // ──────────────────────────────────────────────────────────────
+  /**
+   * Om artikeln har mängdrabatt i kundens prislista: räkna fram korrekt unit_price
+   * för ny kvantitet och skicka med i update-anropet.
+   */
+  const tierPriceForQty = (articleId: string | null | undefined, qty: number): number | null => {
+    if (!articleId) return null
+    const cp = customerArticlePrices[articleId]
+    if (!cp || !cp.quantity_tiers || cp.quantity_tiers.length === 0) return null
+    return resolveTieredPrice(qty, cp.quantity_tiers)
+  }
+
   const handleQuantityChange = async (id: string, delta: number) => {
     if (saving) return
     const item = allItems.find(i => i.id === id)
@@ -532,14 +543,23 @@ export default function CaseServiceSelector({
     const isDosage = item.article?.is_dosage_product && item.article?.dosage_unit
     const minQty = isDosage ? 0.1 : 1
     const newQty = Math.max(minQty, item.quantity + delta)
+    const tierPrice = tierPriceForQty(item.article_id, newQty)
     if (draftMode && !caseId) {
-      updateDraftItem(id, { quantity: newQty })
+      const patch: Partial<CaseBillingItemWithRelations> = { quantity: newQty }
+      if (tierPrice != null) patch.unit_price = tierPrice
+      updateDraftItem(id, patch)
       return
     }
     if (!caseId) return
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(id, { quantity: newQty })
+      if (tierPrice != null && tierPrice !== item.unit_price) {
+        await supabase
+          .from('case_billing_items')
+          .update({ unit_price: tierPrice, updated_at: new Date().toISOString() })
+          .eq('id', id)
+      }
       await reloadItems()
     } catch (err: any) {
       toast.error(err.message)
@@ -556,14 +576,23 @@ export default function CaseServiceSelector({
     const minQty = isDosage ? 0.1 : 1
     const newQty = Math.max(minQty, absoluteQty)
     if (newQty === item.quantity) return
+    const tierPrice = tierPriceForQty(item.article_id, newQty)
     if (draftMode && !caseId) {
-      updateDraftItem(id, { quantity: newQty })
+      const patch: Partial<CaseBillingItemWithRelations> = { quantity: newQty }
+      if (tierPrice != null) patch.unit_price = tierPrice
+      updateDraftItem(id, patch)
       return
     }
     if (!caseId) return
     setSaving(true)
     try {
       await CaseBillingService.updateCaseArticle(id, { quantity: newQty })
+      if (tierPrice != null && tierPrice !== item.unit_price) {
+        await supabase
+          .from('case_billing_items')
+          .update({ unit_price: tierPrice, updated_at: new Date().toISOString() })
+          .eq('id', id)
+      }
       await reloadItems()
     } catch (err: any) {
       toast.error(err.message)
@@ -783,7 +812,12 @@ export default function CaseServiceSelector({
       || item.article.name.toLowerCase().includes(s)
       || item.article.code.toLowerCase().includes(s)
   })
-  const articlesByCategory = filteredArticles.reduce((acc, item) => {
+  // Kundens avtalsartiklar (customer_list + ev. tiers) — visas överst i pickern
+  const contractArticles = filteredArticles.filter(item => item.price_source === 'customer_list')
+  const contractArticleIds = new Set(contractArticles.map(a => a.article.id))
+  const nonContractArticles = filteredArticles.filter(item => !contractArticleIds.has(item.article.id))
+
+  const articlesByCategory = nonContractArticles.reduce((acc, item) => {
     const cat = item.article.category
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(item)
@@ -1103,18 +1137,40 @@ export default function CaseServiceSelector({
                   const display = isDosage && dosageUnit ? getDosageDisplayUnit(dosageUnit) : null
                   const unitLabel = display ? display.unit : (isDosage ? dosageUnit! : 'st')
                   const displayQty = display ? item.quantity / display.factor : item.quantity
+                  const customerPrice = item.article_id ? customerArticlePrices[item.article_id] : undefined
+                  const hasContract = !!customerPrice
+                  const hasTiers = !!(customerPrice?.quantity_tiers && customerPrice.quantity_tiers.length > 0)
+                  const tierSummary = hasTiers ? formatTierSummary(customerPrice!.quantity_tiers!) : ''
                   return (
-                  <div key={item.id} className="px-3 py-2 bg-slate-800/40 border border-slate-700/30 rounded-lg">
+                  <div key={item.id} className={`px-3 py-2 rounded-lg border ${hasContract ? 'bg-[#20c58f]/5 border-[#20c58f]/30' : 'bg-slate-800/40 border-slate-700/30'}`}>
                     {/* Namn – alltid full bredd */}
-                    <div className="text-sm text-white mb-1.5">
-                      {item.article_code && <span className="text-xs text-slate-500 mr-1">{item.article_code}</span>}
-                      {item.article_name}
+                    <div className="text-sm text-white mb-1.5 flex items-center gap-1.5 flex-wrap">
+                      {item.article_code && <span className="text-xs text-slate-500">{item.article_code}</span>}
+                      <span>{item.article_name}</span>
                       {isDosage && item.article?.total_content && dosageUnit && (
-                        <span className="text-[10px] text-slate-500 ml-1">
+                        <span className="text-[10px] text-slate-500">
                           ({item.article.total_content}{dosageUnit} / fp)
                         </span>
                       )}
+                      {hasContract && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[#20c58f]/20 text-[#20c58f] border border-[#20c58f]/30">
+                          Avtalspris
+                        </span>
+                      )}
+                      {hasTiers && (
+                        <span
+                          className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-slate-700/60 text-slate-300 border border-slate-600 cursor-help"
+                          title={tierSummary}
+                        >
+                          Mängdrabatt
+                        </span>
+                      )}
                     </div>
+                    {hasTiers && (
+                      <div className="text-[10px] text-slate-500 mb-1 truncate" title={tierSummary}>
+                        {tierSummary}
+                      </div>
+                    )}
                     {/* Kontroller på rad 2 */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-500">{item.unit_price} kr/{isDosage ? dosageUnit : 'st'}</span>
@@ -1201,6 +1257,55 @@ export default function CaseServiceSelector({
                   />
                 </div>
                 <div className="max-h-64 overflow-y-auto space-y-1">
+                  {/* Kundens avtalsartiklar överst */}
+                  {contractArticles.length > 0 && (
+                    <div className="border-b border-slate-700/50 pb-2 mb-1">
+                      <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-[#20c58f] uppercase tracking-wide">
+                        <Package className="w-3 h-3" />
+                        Kundens avtalsartiklar ({contractArticles.length})
+                      </div>
+                      <div className="space-y-0.5 ml-2">
+                        {contractArticles.map(item => {
+                          const hasTiers = !!(item.quantity_tiers && item.quantity_tiers.length > 0)
+                          const tierSummary = hasTiers ? formatTierSummary(item.quantity_tiers!) : ''
+                          return (
+                            <button
+                              type="button"
+                              key={item.article.id}
+                              onClick={() => handleAddArticle(item)}
+                              disabled={saving}
+                              className="w-full flex items-center justify-between px-2 py-1.5 rounded text-left hover:bg-[#20c58f]/10 border border-[#20c58f]/20 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs text-slate-500">{item.article.code}</span>
+                                  <span className="text-sm text-slate-100 truncate">{item.article.name}</span>
+                                  <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[#20c58f]/20 text-[#20c58f] border border-[#20c58f]/30">
+                                    Avtalspris
+                                  </span>
+                                  {hasTiers && (
+                                    <span
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-slate-700/60 text-slate-300 border border-slate-600 cursor-help"
+                                      title={tierSummary}
+                                    >
+                                      <span>Mängdrabatt</span>
+                                    </span>
+                                  )}
+                                </div>
+                                {hasTiers && (
+                                  <div className="text-[10px] text-slate-500 mt-0.5 truncate">{tierSummary}</div>
+                                )}
+                              </div>
+                              <span className="text-xs text-[#20c58f] font-semibold whitespace-nowrap ml-2">
+                                {hasTiers ? `fr. ${formatPrice(item.effective_price)}` : formatPrice(item.effective_price)}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {ARTICLE_CATEGORIES.filter(cat => articlesByCategory[cat]?.length).map(cat => {
                     const config = ARTICLE_CATEGORY_CONFIG[cat]
                     const catArticles = articlesByCategory[cat] || []
