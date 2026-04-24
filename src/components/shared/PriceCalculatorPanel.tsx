@@ -170,6 +170,33 @@ export default function PriceCalculatorPanel({
       .filter(a => assignments[a.id] === serviceId && !hasCustomerPrice(a))
       .reduce((sum, a) => sum + purchaseUnitCost(a) * a.quantity, 0)
 
+  /**
+   * Per-artikel-breakdown för en tjänsterad — för visning i blandad-/locked-vyn.
+   * `locked`: artiklar med avtalspris (fast intäkt); `markupable`: övriga (får påslag).
+   */
+  const articlesBreakdownByService = (serviceId: string) => {
+    const assigned = articleItems.filter(a => assignments[a.id] === serviceId)
+    const locked = assigned
+      .filter(a => hasCustomerPrice(a))
+      .map(a => {
+        const unit = customerUnitPrice(a)!
+        return {
+          article: a,
+          unitPrice: unit,
+          total: unit * a.quantity,
+          purchaseCost: purchaseUnitCost(a) * a.quantity,
+        }
+      })
+    const markupable = assigned
+      .filter(a => !hasCustomerPrice(a))
+      .map(a => ({
+        article: a,
+        unitPrice: purchaseUnitCost(a),
+        total: purchaseUnitCost(a) * a.quantity,
+      }))
+    return { locked, markupable }
+  }
+
   /** True om alla tilldelade artiklar på tjänsten har kundavtalspris (→ slider låst) */
   const isServiceFullyLockedByCustomer = (serviceId: string): boolean => {
     const assigned = articleItems.filter(a => assignments[a.id] === serviceId)
@@ -395,54 +422,151 @@ export default function PriceCalculatorPanel({
                                     Fast pris från kundens prislista — markup ej aktiv. Artikel-kostnader
                                     används för marginalberäkning.
                                   </p>
+                                ) : hasArticles && (hasMix || locked) ? (
+                                  // ─── Gren 3-4: Blandad eller helt låst av avtal ───
+                                  (() => {
+                                    const { locked: lockedItems, markupable: markupableItems } = articlesBreakdownByService(si.id)
+                                    const markupPriceExkl = calculateSuggestedPrice(markupable, markup)
+                                    const markupPriceDisplay = Math.round(markupPriceExkl * priceMultiplier)
+                                    const customerPricedDisplay = Math.round(customerPriced * priceMultiplier)
+                                    const totalDisplay = Math.round((customerPriced + markupPriceExkl) * priceMultiplier)
+                                    return (
+                                      <div className="space-y-2">
+                                        {/* Block 1: Låst av avtal */}
+                                        {lockedItems.length > 0 && (
+                                          <div className="p-2.5 rounded-lg bg-[#20c58f]/5 border border-[#20c58f]/20">
+                                            <div className="flex items-center gap-1.5 mb-1.5">
+                                              <CheckCircle className="w-3 h-3 text-[#20c58f]" />
+                                              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#20c58f]">
+                                                Låst av avtal
+                                              </span>
+                                            </div>
+                                            <div className="space-y-0.5">
+                                              {lockedItems.map(it => (
+                                                <div key={it.article.id} className="flex items-center justify-between text-xs">
+                                                  <span className="text-slate-300 truncate mr-2">
+                                                    {it.article.article_code && (
+                                                      <span className="text-slate-500 mr-1">{it.article.article_code}</span>
+                                                    )}
+                                                    {it.article.article_name} ×{it.article.quantity}
+                                                  </span>
+                                                  <span className="text-slate-300 font-mono shrink-0">
+                                                    {it.article.quantity}×{fmt(Math.round(it.unitPrice * priceMultiplier))} = {fmt(Math.round(it.total * priceMultiplier))}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-[#20c58f]/20 text-xs">
+                                              <span className="text-slate-400">Summa låst pris</span>
+                                              <span className="text-[#20c58f] font-semibold">{fmt(customerPricedDisplay)}</span>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Block 2: Påslag på övriga (endast om blandad) */}
+                                        {markupableItems.length > 0 && (
+                                          <div className="p-2.5 rounded-lg bg-slate-800/40 border border-slate-700">
+                                            <div className="flex items-center gap-1.5 mb-1.5">
+                                              <TrendingUp className="w-3 h-3 text-amber-400" />
+                                              <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-400">
+                                                Påslag på övriga
+                                              </span>
+                                            </div>
+                                            <div className="space-y-0.5">
+                                              {markupableItems.map(it => (
+                                                <div key={it.article.id} className="flex items-center justify-between text-xs">
+                                                  <span className="text-slate-300 truncate mr-2">
+                                                    {it.article.article_code && (
+                                                      <span className="text-slate-500 mr-1">{it.article.article_code}</span>
+                                                    )}
+                                                    {it.article.article_name} ×{it.article.quantity}
+                                                  </span>
+                                                  <span className="text-slate-400 font-mono shrink-0">
+                                                    inköp {fmt(Math.round(it.total * priceMultiplier))}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-700 text-xs">
+                                              <span className="text-slate-400">Total inköpsbas</span>
+                                              <span className="text-slate-300 font-mono">{fmt(Math.round(markupable * priceMultiplier))}</span>
+                                            </div>
+                                            {/* Slider ligger INUTI blocket → omöjligt att missa vad den påverkar */}
+                                            <div className="mt-2 space-y-1">
+                                              <div className="flex justify-between text-xs text-slate-500">
+                                                <span>Påslag på dessa</span>
+                                                <span className="font-medium text-slate-300">{markup.toFixed(0)}%</span>
+                                              </div>
+                                              <input
+                                                type="range"
+                                                min={0}
+                                                max={300}
+                                                step={5}
+                                                value={markup}
+                                                onChange={e => onMarkupsChange({ ...markups, [si.id]: parseFloat(e.target.value) })}
+                                                className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-[#20c58f]"
+                                              />
+                                              <div className="flex justify-between text-xs text-slate-600">
+                                                <span>0%</span>
+                                                <span>Rek: {settings.recommended_markup_percent}%</span>
+                                                <span>300%</span>
+                                              </div>
+                                              <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-slate-700 text-xs">
+                                                <span className="text-slate-400">Blir</span>
+                                                <span className="text-white font-semibold">{fmt(markupPriceDisplay)}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Helt låst (inga markup-able artiklar) */}
+                                        {locked && markupableItems.length === 0 && (
+                                          <p className="text-xs text-slate-500 italic">
+                                            Alla tilldelade artiklar har avtalspris — påslag påverkar ingenting och är låst.
+                                          </p>
+                                        )}
+
+                                        {/* Totalt */}
+                                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-700 text-sm">
+                                          <span className="text-slate-300 font-medium">Totalt på denna rad</span>
+                                          <span className="flex items-baseline gap-1.5">
+                                            <span className="text-white font-bold">{fmt(totalDisplay)}</span>
+                                            <span className="text-[10px] text-slate-500">{priceLabel}</span>
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )
+                                  })()
                                 ) : hasArticles ? (
+                                  // ─── Gren 2: Endast vanliga artiklar (oförändrad UI) ───
                                   <>
-                                    <div className="space-y-0.5 mb-2 text-xs text-slate-400">
-                                      <div className="flex items-center justify-between">
-                                        <span>Inköp (kostnad): {fmt(cost)}</span>
-                                        <span className="flex items-baseline gap-1.5">
-                                          <span className="font-semibold text-white text-sm">{fmt(suggestedPriceDisplay)}</span>
-                                          <span className="text-[10px] text-slate-500">{priceLabel}</span>
-                                        </span>
-                                      </div>
-                                      {customerPriced > 0 && (
-                                        <div className="flex items-center gap-1 text-[11px] text-[#20c58f]">
-                                          <CheckCircle className="w-3 h-3" />
-                                          <span>Låst kundpris: {fmt(customerPriced * priceMultiplier)} {priceLabel.toLowerCase()}</span>
-                                        </div>
-                                      )}
-                                      {hasMix && (
-                                        <div className="text-[11px] text-slate-500">
-                                          Påslag gäller endast {fmt(markupable * priceMultiplier)} {priceLabel.toLowerCase()} (icke-avtalsartiklar)
-                                        </div>
-                                      )}
+                                    <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                                      <span>Inköp: {fmt(cost)}</span>
+                                      <span className="flex items-baseline gap-1.5">
+                                        <span className="font-semibold text-white text-sm">{fmt(suggestedPriceDisplay)}</span>
+                                        <span className="text-[10px] text-slate-500">{priceLabel}</span>
+                                      </span>
                                     </div>
-                                    {locked ? (
-                                      <p className="text-xs text-slate-500 italic">
-                                        Alla tilldelade artiklar har avtalspris — påslag påverkar ingenting och är låst.
-                                      </p>
-                                    ) : (
-                                      <div className="space-y-1">
-                                        <div className="flex justify-between text-xs text-slate-500">
-                                          <span>Påslag {hasMix ? '(icke-avtalsartiklar)' : ''}</span>
-                                          <span className="font-medium text-slate-300">{markup.toFixed(0)}%</span>
-                                        </div>
-                                        <input
-                                          type="range"
-                                          min={0}
-                                          max={300}
-                                          step={5}
-                                          value={markup}
-                                          onChange={e => onMarkupsChange({ ...markups, [si.id]: parseFloat(e.target.value) })}
-                                          className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-[#20c58f]"
-                                        />
-                                        <div className="flex justify-between text-xs text-slate-600">
-                                          <span>0%</span>
-                                          <span>Rek: {settings.recommended_markup_percent}%</span>
-                                          <span>300%</span>
-                                        </div>
+                                    <div className="space-y-1">
+                                      <div className="flex justify-between text-xs text-slate-500">
+                                        <span>Påslag</span>
+                                        <span className="font-medium text-slate-300">{markup.toFixed(0)}%</span>
                                       </div>
-                                    )}
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={300}
+                                        step={5}
+                                        value={markup}
+                                        onChange={e => onMarkupsChange({ ...markups, [si.id]: parseFloat(e.target.value) })}
+                                        className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-[#20c58f]"
+                                      />
+                                      <div className="flex justify-between text-xs text-slate-600">
+                                        <span>0%</span>
+                                        <span>Rek: {settings.recommended_markup_percent}%</span>
+                                        <span>300%</span>
+                                      </div>
+                                    </div>
                                   </>
                                 ) : (
                                   <p className="text-xs text-slate-500">
