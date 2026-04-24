@@ -203,9 +203,22 @@ export interface UpdatePriceListInput {
 }
 
 /**
+ * Mängdrabatts-tier för artiklar i kundens prislista.
+ * `min_qty` är inklusivt: rad används när antalet på fakturaraden >= min_qty.
+ * Första tier har normalt min_qty=1. Priset gäller per enhet.
+ */
+export interface QuantityTier {
+  min_qty: number
+  unit_price: number
+}
+
+/**
  * Prislistepost från databasen.
- * Prissätter antingen en tjänst (nytt flöde) eller en artikel (historik, används ej längre).
+ * Prissätter antingen en tjänst (nytt flöde) eller en artikel.
  * XOR-constraint: exakt en av article_id / service_id är satt per rad.
+ *
+ * `quantity_tiers` används enbart för artikelrader och ger mängdrabatt per ärende.
+ * Om null: `custom_price` används oavsett kvantitet.
  */
 export interface PriceListItem {
   id: string
@@ -214,6 +227,7 @@ export interface PriceListItem {
   service_id: string | null
   custom_price: number
   discount_percent: number | null
+  quantity_tiers: QuantityTier[] | null
   created_at: string
   updated_at: string
 }
@@ -249,13 +263,15 @@ export interface UpsertPriceListServiceInput {
 }
 
 /**
- * Input för att skapa/uppdatera prislistepost för en ARTIKEL (historik)
+ * Input för att skapa/uppdatera prislistepost för en ARTIKEL.
+ * `quantity_tiers` är valfritt; om satt ger det mängdrabatt per ärende.
  */
 export interface UpsertPriceListItemInput {
   price_list_id: string
   article_id: string
   custom_price: number
   discount_percent?: number
+  quantity_tiers?: QuantityTier[] | null
 }
 
 /**

@@ -10,14 +10,32 @@ import { PricingSettingsService } from '../../services/pricingSettingsService'
 import type { PricingSettings } from '../../types/pricingSettings'
 import { DEFAULT_PRICING_SETTINGS } from '../../types/pricingSettings'
 import { calculateSuggestedPrice, calculateMarginPercent } from '../../types/caseBilling'
+import type { QuantityTier } from '../../types/articles'
 
 interface ArticleItem {
   id: string
+  /** FK till articles-tabellen — används för att slå upp kundspecifikt pris från prislistan */
+  article_id?: string | null
   article_name: string
   article_code?: string | null
   quantity: number
   unit_price: number
   total_price: number
+}
+
+type CustomerArticlePrice = { custom_price: number; quantity_tiers: QuantityTier[] | null }
+
+/**
+ * Returnerar det enhetspris som gäller för en viss kvantitet.
+ * Tiers sorterade fallande → första matchning (min_qty ≤ qty) vinner.
+ * Faller tillbaka på priset för tier med lägst min_qty om inget passar.
+ */
+function resolveTieredPrice(qty: number, tiers: QuantityTier[]): number {
+  const desc = [...tiers].sort((a, b) => b.min_qty - a.min_qty)
+  const match = desc.find(t => qty >= t.min_qty)
+  if (match) return match.unit_price
+  const asc = [...tiers].sort((a, b) => a.min_qty - b.min_qty)
+  return asc[0]?.unit_price ?? 0
 }
 
 interface ServiceItem {
@@ -53,6 +71,13 @@ interface PriceCalculatorPanelProps {
    * Business/contract: oförändrat (exkl.).
    */
   caseType?: 'private' | 'business' | 'contract'
+  /**
+   * Kundspecifika artikelpriser från kundens prislista (inkl. mängdrabatt).
+   * När en artikel finns här: dess effektiva enhetskostnad används i marginal-
+   * och priskalkylen istället för det som står i case_billing_items.
+   * Tillämpas bara för artiklar som är tilldelade till en fakturarad.
+   */
+  customerArticlePrices?: Record<string, CustomerArticlePrice>
 }
 
 const VAT_RATE = 0.25
@@ -72,6 +97,7 @@ export default function PriceCalculatorPanel({
   onApplyPrices,
   fixedPricedItemIds,
   caseType,
+  customerArticlePrices,
 }: PriceCalculatorPanelProps) {
   const isFixed = (id: string) => !!fixedPricedItemIds?.has(id)
   const isPrivate = caseType === 'private'
@@ -106,10 +132,48 @@ export default function PriceCalculatorPanel({
       .finally(() => setLoadingSettings(false))
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * Effektivt enhetspris för en artikel — slår upp kundspecifik prislista + tiers
+   * om artikeln finns där, annars faller tillbaka till artikelns unit_price
+   * (vilket normalt är articles.default_price).
+   */
+  const effectiveUnitPrice = (a: ArticleItem): number => {
+    if (!a.article_id || !customerArticlePrices) return a.unit_price
+    const cp = customerArticlePrices[a.article_id]
+    if (!cp) return a.unit_price
+    if (cp.quantity_tiers && cp.quantity_tiers.length > 0) {
+      return resolveTieredPrice(a.quantity, cp.quantity_tiers)
+    }
+    return cp.custom_price
+  }
+
+  /** True om artikeln har ett kundspecifikt pris (med eller utan tiers) */
+  const hasCustomerPrice = (a: ArticleItem): boolean => {
+    if (!a.article_id || !customerArticlePrices) return false
+    return !!customerArticlePrices[a.article_id]
+  }
+
+  /**
+   * Total "kostnad" (för marginalkalkyl) = summan av tilldelade artiklars effektiva pris × antal.
+   * OBS: för artiklar med kundspecifikt pris är det egentligen kundens pris (inte inköpskostnad).
+   * Dessa behandlas separat i handleApply så de inte får markup.
+   */
   const purchaseCostByService = (serviceId: string) =>
     articleItems
       .filter(a => assignments[a.id] === serviceId)
-      .reduce((sum, a) => sum + a.total_price, 0)
+      .reduce((sum, a) => sum + effectiveUnitPrice(a) * a.quantity, 0)
+
+  /** Summa av artiklar med kundspecifikt pris för en tjänst (dessa blir tjänstens pris direkt) */
+  const customerPricedCostByService = (serviceId: string) =>
+    articleItems
+      .filter(a => assignments[a.id] === serviceId && hasCustomerPrice(a))
+      .reduce((sum, a) => sum + effectiveUnitPrice(a) * a.quantity, 0)
+
+  /** Kostnad av artiklar UTAN kundspecifikt pris (här applicerar vi markup) */
+  const markupableCostByService = (serviceId: string) =>
+    articleItems
+      .filter(a => assignments[a.id] === serviceId && !hasCustomerPrice(a))
+      .reduce((sum, a) => sum + effectiveUnitPrice(a) * a.quantity, 0)
 
   const getMarginColor = (margin: number) => {
     if (margin >= settings.target_margin_percent) return 'text-emerald-400'
@@ -128,18 +192,21 @@ export default function PriceCalculatorPanel({
       const rec = settings.recommended_markup_percent
 
       // Beräkna råpriser per rad — hoppa över fast-prissatta rader
+      // För artiklar med kundspecifikt pris (avropsavtal) används det priset direkt;
+      // övriga artiklar får markup enligt slider.
       const entries = serviceItems
         .filter(si => !isFixed(si.id))
         .map(si => ({
           id: si.id,
-          cost: purchaseCostByService(si.id),
+          customerPriced: customerPricedCostByService(si.id),
+          markupable: markupableCostByService(si.id),
           markup: markups[si.id] ?? rec,
         }))
-        .filter(e => e.cost > 0)
+        .filter(e => e.customerPriced > 0 || e.markupable > 0)
 
       const rawPrices = entries.map(e => ({
         ...e,
-        price: calculateSuggestedPrice(e.cost, e.markup),
+        price: e.customerPriced + calculateSuggestedPrice(e.markupable, e.markup),
       }))
 
       // min_charge_amount gäller HELA ärendet (jämförs mot det kunden ser).
@@ -149,7 +216,8 @@ export default function PriceCalculatorPanel({
       if (rawTotalDisplay < settings.min_charge_amount && rawPrices.length > 0) {
         const diffDisplay = settings.min_charge_amount - rawTotalDisplay
         const diffExkl = diffDisplay / priceMultiplier
-        const maxIdx = rawPrices.reduce((best, e, i) => e.cost > rawPrices[best].cost ? i : best, 0)
+        const totalCost = (e: typeof rawPrices[number]) => e.customerPriced + e.markupable
+        const maxIdx = rawPrices.reduce((best, e, i) => totalCost(e) > totalCost(rawPrices[best]) ? i : best, 0)
         rawPrices[maxIdx].price += diffExkl
       }
 
@@ -267,8 +335,11 @@ export default function PriceCalculatorPanel({
                         <div className="p-3 space-y-4">
                           {serviceItems.map(si => {
                             const cost = purchaseCostByService(si.id)
+                            const customerPriced = customerPricedCostByService(si.id)
+                            const markupable = markupableCostByService(si.id)
                             const markup = markups[si.id] ?? settings.recommended_markup_percent
-                            const rawExkl = calculateSuggestedPrice(cost, markup)
+                            // Kundpris-del läggs direkt; markupable-delen får markup
+                            const rawExkl = customerPriced + calculateSuggestedPrice(markupable, markup)
                             const suggestedPriceExkl = cost > 0 ? rawExkl : 0
                             const suggestedPriceDisplay = Math.round(suggestedPriceExkl * priceMultiplier)
                             const hasArticles = cost > 0

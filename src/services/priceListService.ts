@@ -15,7 +15,8 @@ import {
   PriceListItemWithService,
   PriceListItemWithArticle,
   UpsertPriceListServiceInput,
-  UpsertPriceListItemInput
+  UpsertPriceListItemInput,
+  QuantityTier
 } from '../types/articles'
 
 export class PriceListService {
@@ -371,6 +372,7 @@ export class PriceListService {
         service_id: null,
         custom_price: input.custom_price,
         discount_percent: input.discount_percent ?? 0,
+        quantity_tiers: input.quantity_tiers ?? null,
         updated_at: new Date().toISOString()
       }, { onConflict: 'price_list_id,article_id' })
       .select()
@@ -389,6 +391,7 @@ export class PriceListService {
       service_id: null,
       custom_price: item.custom_price,
       discount_percent: item.discount_percent ?? 0,
+      quantity_tiers: item.quantity_tiers ?? null,
       updated_at: new Date().toISOString()
     }))
 
@@ -397,6 +400,40 @@ export class PriceListService {
       .upsert(rows, { onConflict: 'price_list_id,article_id' })
 
     if (error) throw new Error(`Databasfel: ${error.message}`)
+  }
+
+  /**
+   * Hämta alla kundens artikelpriser (för prisguiden).
+   * Returnerar en map {article_id: {custom_price, quantity_tiers}}.
+   * Tom map om kunden saknar prislista.
+   */
+  static async getCustomerArticlePrices(customerId: string): Promise<Record<string, { custom_price: number; quantity_tiers: QuantityTier[] | null }>> {
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('price_list_id')
+      .eq('id', customerId)
+      .single()
+
+    if (!customer?.price_list_id) return {}
+
+    const { data: items, error } = await supabase
+      .from('price_list_items')
+      .select('article_id, custom_price, quantity_tiers')
+      .eq('price_list_id', customer.price_list_id)
+      .not('article_id', 'is', null)
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+
+    const map: Record<string, { custom_price: number; quantity_tiers: QuantityTier[] | null }> = {}
+    for (const item of items || []) {
+      if (item.article_id) {
+        map[item.article_id] = {
+          custom_price: item.custom_price,
+          quantity_tiers: (item.quantity_tiers as QuantityTier[] | null) ?? null,
+        }
+      }
+    }
+    return map
   }
 
   static async removePriceListItem(priceListId: string, articleId: string): Promise<void> {
@@ -425,7 +462,7 @@ export class PriceListService {
 
     const { data: sourceItems, error: fetchError } = await supabase
       .from('price_list_items')
-      .select('article_id, service_id, custom_price, discount_percent')
+      .select('article_id, service_id, custom_price, discount_percent, quantity_tiers')
       .eq('price_list_id', sourceId)
 
     if (fetchError) throw new Error(`Databasfel vid kopiering: ${fetchError.message}`)
@@ -436,7 +473,8 @@ export class PriceListService {
         article_id: item.article_id,
         service_id: item.service_id,
         custom_price: item.custom_price,
-        discount_percent: item.discount_percent ?? 0
+        discount_percent: item.discount_percent ?? 0,
+        quantity_tiers: item.quantity_tiers ?? null
       }))
 
       const { error: insertError } = await supabase.from('price_list_items').insert(rows)

@@ -19,6 +19,7 @@ import {
 } from '../../../types/articles'
 import { ServiceWithGroup } from '../../../types/services'
 import toast from 'react-hot-toast'
+import { PriceListArticleItemsSection } from './PriceListArticleItemsSection'
 
 interface PriceListItemsEditorProps {
   priceListId: string
@@ -43,6 +44,7 @@ export function PriceListItemsEditor({
   services,
   onUpdate
 }: PriceListItemsEditorProps) {
+  const [activeTab, setActiveTab] = useState<'services' | 'articles'>('services')
   const [items, setItems] = useState<PriceListItemWithService[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -454,8 +456,42 @@ export function PriceListItemsEditor({
     )
   }
 
+  const fixedServiceCount = Object.values(priceStates).filter(s => s.mode === 'fixed').length
+
   return (
     <div className="p-4">
+      {/* Tabs: Tjänster / Artiklar */}
+      <div className="flex gap-1 border-b border-slate-700 mb-4">
+        <button
+          onClick={() => setActiveTab('services')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'services'
+              ? 'text-[#20c58f] border-[#20c58f]'
+              : 'text-slate-400 border-transparent hover:text-white'
+          }`}
+        >
+          Tjänster
+          {fixedServiceCount > 0 && (
+            <span className="ml-1.5 text-xs text-slate-500">({fixedServiceCount})</span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('articles')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'articles'
+              ? 'text-[#20c58f] border-[#20c58f]'
+              : 'text-slate-400 border-transparent hover:text-white'
+          }`}
+        >
+          Artiklar
+        </button>
+      </div>
+
+      {activeTab === 'articles' && (
+        <PriceListArticleItemsSection priceListId={priceListId} onUpdate={onUpdate} />
+      )}
+
+      {activeTab === 'services' && <>
       {/* Sök + gruppfilter */}
       <div className="flex items-center gap-2 mb-4">
         <div className="relative flex-1">
@@ -878,6 +914,7 @@ export function PriceListItemsEditor({
           </div>
         )}
       </div>
+      </>}
     </div>
   )
 }

@@ -45,8 +45,14 @@ import {
 import { getEffectiveRotPercent, getEffectiveRutPercent } from '../../utils/rotRutConstants'
 import type { ServiceWithGroup } from '../../types/services'
 import { ARTICLE_CATEGORIES, calculatePricePerDosageUnit, getDosageDisplayUnit } from '../../types/articles'
-import type { ArticleCategory } from '../../types/articles'
+import type { ArticleCategory, QuantityTier } from '../../types/articles'
 import { ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
+
+/**
+ * Kundspecifikt artikelpris — `custom_price` används när `quantity_tiers` är null,
+ * annars slår tier-priset för matchande min_qty.
+ */
+type CustomerArticlePrice = { custom_price: number; quantity_tiers: QuantityTier[] | null }
 import PriceCalculatorPanel from './PriceCalculatorPanel'
 
 interface CaseServiceSelectorProps {
@@ -129,6 +135,8 @@ export default function CaseServiceSelector({
   })
   // Map { service_id → fast kundpris } från kundens prislista (tomt om saknas)
   const [customerServicePrices, setCustomerServicePrices] = useState<Record<string, number>>({})
+  // Map { article_id → { custom_price, quantity_tiers } } — avropsavtal med fasta artikelpriser/mängdrabatt
+  const [customerArticlePrices, setCustomerArticlePrices] = useState<Record<string, CustomerArticlePrice>>({})
   const [loading, setLoading] = useState(true)
 
   // UI state
@@ -216,17 +224,19 @@ export default function CaseServiceSelector({
           .from('service_groups').select('id').eq('name', 'Övrigt').maybeSingle()
         setOvrigtServiceGroupId(ovrigtSgRow?.id ?? null)
 
-        const [articlesData, itemsData, allServicesData, settingsData, customerPricesData] = await Promise.all([
+        const [articlesData, itemsData, allServicesData, settingsData, customerPricesData, customerArticlePricesData] = await Promise.all([
           CaseBillingService.getArticlesWithPrices(customerId, resolvedArticleGroupId),
           caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
           ServiceCatalogService.getAllActiveServices(),
           PricingSettingsService.get(),
           customerId ? PriceListService.getCustomerServicePrices(customerId) : Promise.resolve({}),
+          customerId ? PriceListService.getCustomerArticlePrices(customerId) : Promise.resolve({}),
         ])
         setPricingSettings(settingsData)
         setArticles(articlesData)
         setAddonServices(allServicesData)
         setCustomerServicePrices(customerPricesData)
+        setCustomerArticlePrices(customerArticlePricesData)
 
         // Hämta primär tjänst
         let svc: ServiceWithGroup | null = null
@@ -1258,12 +1268,14 @@ export default function CaseServiceSelector({
         caseType={caseType}
         articleItems={articleItems.map(i => ({
           id: i.id,
+          article_id: i.article_id,
           article_name: i.article_name,
           article_code: i.article_code,
           quantity: i.quantity,
           unit_price: i.unit_price,
           total_price: i.total_price,
         }))}
+        customerArticlePrices={customerArticlePrices}
         serviceItems={serviceItems.map(i => ({
           id: i.id,
           service_name: i.service_name,
