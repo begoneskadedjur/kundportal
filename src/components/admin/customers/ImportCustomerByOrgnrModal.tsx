@@ -11,6 +11,8 @@ import Select from '../../ui/Select'
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
 import { CustomerGroupService } from '../../../services/customerGroupService'
+import { PriceListService } from '../../../services/priceListService'
+import type { PriceList } from '../../../types/articles'
 import type { CustomerGroup } from '../../../types/customerGroups'
 import { useContractTypeOptions } from '../../../hooks/useContractTypeOptions'
 
@@ -65,6 +67,7 @@ interface PreviewData {
   customer_group_id: string | null
   billing_frequency: BillingFrequency
   billing_anchor_month: number
+  price_list_id: string | null
 }
 
 interface ImportCustomerByOrgnrModalProps {
@@ -135,10 +138,12 @@ export default function ImportCustomerByOrgnrModal({
 }: ImportCustomerByOrgnrModalProps) {
   const [step, setStep] = useState<Step>('search')
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+  const [priceLists, setPriceLists] = useState<PriceList[]>([])
   const { options: contractTypeOptions } = useContractTypeOptions()
 
   useEffect(() => {
     CustomerGroupService.getAllGroups().then(setCustomerGroups).catch(() => {})
+    PriceListService.getAllPriceLists().then(setPriceLists).catch(() => {})
   }, [])
   const [orgNr, setOrgNr] = useState('')
   const [searching, setSearching] = useState(false)
@@ -209,6 +214,7 @@ export default function ImportCustomerByOrgnrModal({
         account_manager_email: data.preview.account_manager_email ?? null,
         contract_end_date: data.preview.contract_end_date ?? null,
         customer_group_id: data.preview.customer_group_id ?? null,
+        price_list_id: data.preview.price_list_id ?? null,
       })
 
       const fetchedInvoices: FortnoxInvoice[] = data.invoices ?? []
@@ -503,12 +509,25 @@ export default function ImportCustomerByOrgnrModal({
                 )}
 
                 {/* Faktureringsfrekvens */}
-                <div className="col-span-2">
+                <div>
                   <label className="text-xs font-medium text-slate-400 mb-1 block">Faktureringsfrekvens</label>
                   <Select
                     value={preview.billing_frequency}
                     onChange={v => setPreview(prev => prev ? { ...prev, billing_frequency: v as BillingFrequency } : prev)}
-                    options={Object.entries(BILLING_FREQUENCY_CONFIG).map(([key, cfg]) => ({ value: key, label: `${cfg.label} – ${cfg.description}` }))}
+                    options={Object.entries(BILLING_FREQUENCY_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label }))}
+                  />
+                </div>
+
+                {/* Prislista */}
+                <div>
+                  <label className="text-xs font-medium text-slate-400 mb-1 block">Prislista för extra-tjänster</label>
+                  <Select
+                    value={preview.price_list_id ?? ''}
+                    onChange={v => setPreview(prev => prev ? { ...prev, price_list_id: v || null } : prev)}
+                    options={[
+                      { value: '', label: 'Standardprislista (auto)' },
+                      ...priceLists.map(pl => ({ value: pl.id, label: pl.name })),
+                    ]}
                   />
                 </div>
               </div>

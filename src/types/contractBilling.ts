@@ -140,7 +140,7 @@ export const BILLING_FREQUENCY_CONFIG: Record<BillingFrequency, { label: string;
   quarterly: { label: 'Kvartalsvis', months: 3, description: 'Faktureras var tredje månad' },
   semi_annual: { label: 'Halvårsvis', months: 6, description: 'Faktureras var sjätte månad' },
   annual: { label: 'Årsvis', months: 12, description: 'Faktureras en gång per år' },
-  on_demand: { label: 'Vid behov', months: 0, description: 'Faktureras manuellt vid behov' }
+  on_demand: { label: 'Per ärende', months: 0, description: 'Faktureras per avslutat ärende (avropsavtal)' }
 }
 
 // UI-konfiguration för faktureringsstatus
