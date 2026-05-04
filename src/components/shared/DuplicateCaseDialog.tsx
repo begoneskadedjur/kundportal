@@ -2,7 +2,7 @@
 // Dialog för att duplicera ett ärende. Användaren väljer schema och vilka 1:N-relationer som följer med.
 
 import { useState, useMemo } from 'react'
-import Portal from '../ui/Portal'
+import { createPortal } from 'react-dom'
 import {
   X,
   Copy,
@@ -304,5 +304,11 @@ export default function DuplicateCaseDialog({
     </div>
   )
 
-  return <Portal>{content}</Portal>
+  // Rendera till #modal-root om Modal-komponenten har skapat en sådan,
+  // annars body. Vi rensar inte containern på unmount — den ägs av Modal.
+  const target = (typeof document !== 'undefined'
+    ? (document.getElementById('modal-root') ?? document.body)
+    : null)
+  if (!target) return null
+  return createPortal(content, target)
 }
