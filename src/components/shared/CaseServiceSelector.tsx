@@ -42,7 +42,7 @@ import {
   calculateMarginPercent,
   itemRequiresApproval
 } from '../../types/caseBilling'
-import { getEffectiveRotPercent, getEffectiveRutPercent } from '../../utils/rotRutConstants'
+import { getEffectiveRotPercent, getEffectiveRutPercent, calculateRotRutSummary } from '../../utils/rotRutConstants'
 import type { ServiceWithGroup } from '../../types/services'
 import { ARTICLE_CATEGORIES, calculatePricePerDosageUnit, getDosageDisplayUnit, resolveTieredPrice, formatTierSummary } from '../../types/articles'
 import type { ArticleCategory, QuantityTier } from '../../types/articles'
@@ -372,6 +372,13 @@ export default function CaseServiceSelector({
     // Använd kundens fasta pris om det finns, annars base_price
     const customerPrice = customerServicePrices[svc.id]
     const priceToUse = customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
+    // Auto-sätt rot_rut_type baserat på tjänstens berättigande (privatärenden).
+    // Om både ROT och RUT är tillåtna lämnas valet öppet så användaren får välja.
+    const autoRotRutType: RotRutType | null = isPrivate
+      ? (svc.rot_eligible && !svc.rut_eligible ? 'ROT'
+        : svc.rut_eligible && !svc.rot_eligible ? 'RUT'
+        : null)
+      : null
     if (draftMode && !caseId) {
       const price = priceToUse
       const discounted = calculateDiscountedPrice(price, 0)
@@ -400,7 +407,7 @@ export default function CaseServiceSelector({
         status: 'pending',
         requires_approval: false,
         notes: null,
-        rot_rut_type: null,
+        rot_rut_type: autoRotRutType,
         fastighetsbeteckning: null,
         min_quantity: null,
         mapped_service_id: null,
@@ -430,6 +437,7 @@ export default function CaseServiceSelector({
         vat_rate: 25,
         added_by_technician_id: technicianId || undefined,
         added_by_technician_name: technicianName || undefined,
+        rot_rut_type: autoRotRutType,
       })
       await reloadItems()
       setShowAddonPicker(false)
@@ -1087,12 +1095,42 @@ export default function CaseServiceSelector({
         )}
 
         {/* Summa tjänster */}
-        {serviceItems.length > 0 && (
-          <div className="border-t border-slate-700/50 mt-3 pt-2 flex justify-between text-sm">
-            <span className="text-slate-400">{priceLabel}</span>
-            <span className="font-semibold text-white">{formatPrice(serviceCost * priceMultiplier)}</span>
-          </div>
-        )}
+        {serviceItems.length > 0 && (() => {
+          const rotRut = isPrivate ? calculateRotRutSummary(serviceItems) : null
+          const totalInkl = serviceCost * priceMultiplier
+          const showDeduction = isPrivate && rotRut && rotRut.totalDeduction > 0
+          const customerAmount = showDeduction ? totalInkl - rotRut!.totalDeduction : totalInkl
+          return (
+            <div className="border-t border-slate-700/50 mt-3 pt-2 space-y-1">
+              {rotRut?.hasConflict && (
+                <div className="flex items-start gap-1.5 text-xs text-amber-400 mb-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>Ett ärende kan inte ha både ROT och RUT, dela upp detta i separata ärenden.</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">{priceLabel}</span>
+                <span className="font-semibold text-white">{formatPrice(totalInkl)}</span>
+              </div>
+              {showDeduction && (
+                <>
+                  <div className="flex justify-between text-sm text-[#20c58f]">
+                    <span>{rotRut!.rotRutType}-avdrag</span>
+                    <span>-{formatPrice(rotRut!.totalDeduction)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-1 border-t border-slate-700/30">
+                    <span className="text-slate-300 font-medium">Att betala (kund)</span>
+                    <span className="font-bold text-[#20c58f]">{formatPrice(customerAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span>Skatteverket ansöker om</span>
+                    <span>{formatPrice(rotRut!.totalDeduction)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* ── B: ARTIKEL-KALKYLATOR (intern) ── */}

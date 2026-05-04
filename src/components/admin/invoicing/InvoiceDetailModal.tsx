@@ -40,7 +40,8 @@ import { InvoiceService } from '../../../services/invoiceService'
 import { FortnoxService } from '../../../services/fortnoxService'
 import type { InvoiceWithItems, InvoiceStatus } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
-import { calculateRotRutDeduction, ROT_RUT_PERCENT, calculateMarginPercent } from '../../../types/caseBilling'
+import { ROT_RUT_PERCENT, calculateMarginPercent } from '../../../types/caseBilling'
+import { calculateRotRutSummary } from '../../../utils/rotRutConstants'
 import type { CaseBillingItem } from '../../../types/caseBilling'
 import { useCaseContext } from '../../../hooks/useCaseContext'
 import { formatSwedishDateTime } from '../../../types/database'
@@ -373,11 +374,12 @@ export default function InvoiceDetailModal({
 
       // ROT/RUT
       if (invoice.rot_rut_type && invoice.fastighetsbeteckning) {
+        const rotRutSummary = calculateRotRutSummary(invoice.items)
         fortnoxPayload.HouseWork = true
         fortnoxPayload.HouseWorkType = invoice.rot_rut_type.toUpperCase()
         fortnoxPayload.Housework = {
           HouseWorkType: invoice.rot_rut_type.toUpperCase(),
-          HouseWorkAmount: Math.round(invoice.subtotal * ROT_RUT_PERCENT),
+          HouseWorkAmount: Math.round(rotRutSummary.totalDeduction),
         }
       }
 
@@ -624,8 +626,7 @@ export default function InvoiceDetailModal({
                 {/* Summering */}
                 <div className="bg-slate-800/50 rounded-lg p-3">
                   {(() => {
-                    const rotRutDeduction = invoice.items.reduce((sum, item) =>
-                      sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type), 0)
+                    const rotRutDeduction = calculateRotRutSummary(invoice.items).totalDeduction
                     return (
                       <div className="space-y-1.5">
                         {!isPrivate && (
@@ -821,8 +822,7 @@ export default function InvoiceDetailModal({
 
                 {/* ROT/RUT att ansöka om — framträdande ruta */}
                 {(() => {
-                  const rotRutDeduction = invoice.items.reduce((sum, item) =>
-                    sum + calculateRotRutDeduction(item.total_price, item.rot_rut_type), 0)
+                  const rotRutDeduction = calculateRotRutSummary(invoice.items).totalDeduction
                   if (rotRutDeduction <= 0) return null
                   return (
                     <div className="bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg p-3">
