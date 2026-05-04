@@ -117,7 +117,6 @@ export interface AddCaseServiceInput {
   added_by_technician_id?: string
   added_by_technician_name?: string
   notes?: string
-  rot_rut_type?: RotRutType | null
 }
 
 /**

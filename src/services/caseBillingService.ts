@@ -343,8 +343,7 @@ export class CaseBillingService {
         added_by_technician_name: input.added_by_technician_name || null,
         status: 'pending',
         requires_approval: itemRequiresApproval(discountPercent),
-        notes: input.notes || null,
-        rot_rut_type: input.rot_rut_type ?? null
+        notes: input.notes || null
       })
       .select()
       .single()

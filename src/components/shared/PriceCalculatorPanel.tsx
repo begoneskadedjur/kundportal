@@ -12,6 +12,7 @@ import { DEFAULT_PRICING_SETTINGS } from '../../types/pricingSettings'
 import { calculateSuggestedPrice, calculateMarginPercent } from '../../types/caseBilling'
 import type { QuantityTier } from '../../types/articles'
 import { resolveTieredPrice } from '../../types/articles'
+import { getEffectiveRotPercent, getEffectiveRutPercent } from '../../utils/rotRutConstants'
 
 interface ArticleItem {
   id: string
@@ -25,6 +26,9 @@ interface ArticleItem {
   total_price: number
   /** Artikelns grunddata-pris (articles.default_price) — den verkliga inköpskostnaden. */
   default_price?: number | null
+  /** Artikelns ROT/RUT-berättigande — styr om tjänsten kan bli ROT/RUT-fakturerad. */
+  rot_eligible?: boolean
+  rut_eligible?: boolean
 }
 
 type CustomerArticlePrice = { custom_price: number; quantity_tiers: QuantityTier[] | null }
@@ -36,6 +40,11 @@ interface ServiceItem {
   unit_price: number
   quantity: number
   discount_percent: number
+  /** Tjänstens egna ROT/RUT-flaggor (fallback om ingen mappad artikel är berättigad). */
+  rot_eligible?: boolean
+  rut_eligible?: boolean
+  rot_rate_percent?: number | null
+  rut_rate_percent?: number | null
 }
 
 interface PriceCalculatorPanelProps {
@@ -69,6 +78,12 @@ interface PriceCalculatorPanelProps {
    * Tillämpas bara för artiklar som är tilldelade till en fakturarad.
    */
   customerArticlePrices?: Record<string, CustomerArticlePrice>
+  /**
+   * ROT/RUT-val per tjänsterad (serviceId → 'ROT' | 'RUT' | null).
+   * Visas/ändras bara för privatärenden där någon mappad artikel är ROT/RUT-berättigad.
+   */
+  rotRutSelections?: Record<string, 'ROT' | 'RUT' | null>
+  onRotRutSelectionsChange?: (selections: Record<string, 'ROT' | 'RUT' | null>) => void
 }
 
 const VAT_RATE = 0.25
@@ -89,6 +104,8 @@ export default function PriceCalculatorPanel({
   fixedPricedItemIds,
   caseType,
   customerArticlePrices,
+  rotRutSelections,
+  onRotRutSelectionsChange,
 }: PriceCalculatorPanelProps) {
   const isFixed = (id: string) => !!fixedPricedItemIds?.has(id)
   const isPrivate = caseType === 'private'
@@ -207,6 +224,29 @@ export default function PriceCalculatorPanel({
   /** True om åtminstone en artikel på tjänsten har kundavtalspris */
   const hasAnyCustomerPriceOnService = (serviceId: string): boolean =>
     articleItems.some(a => assignments[a.id] === serviceId && hasCustomerPrice(a))
+
+  /**
+   * ROT/RUT-tillgänglighet per tjänsterad.
+   * Berättigande styrs i första hand av mappade artiklar (interna kostnader),
+   * i andra hand av tjänstens egen flagga.
+   */
+  const rotRutAvailability = (serviceId: string): { canRot: boolean; canRut: boolean } => {
+    const assigned = articleItems.filter(a => assignments[a.id] === serviceId)
+    const articleRot = assigned.some(a => a.rot_eligible)
+    const articleRut = assigned.some(a => a.rut_eligible)
+    const svc = serviceItems.find(s => s.id === serviceId)
+    return {
+      canRot: articleRot || !!svc?.rot_eligible,
+      canRut: articleRut || !!svc?.rut_eligible,
+    }
+  }
+
+  const setRotRutSelection = (serviceId: string, value: 'ROT' | 'RUT' | null) => {
+    const next = { ...(rotRutSelections ?? {}) }
+    if (value === null) delete next[serviceId]
+    else next[serviceId] = value
+    onRotRutSelectionsChange?.(next)
+  }
 
   const getMarginColor = (margin: number) => {
     if (margin >= settings.target_margin_percent) return 'text-emerald-400'
@@ -573,6 +613,75 @@ export default function PriceCalculatorPanel({
                                     Nuvarande pris: {fmt(si.unit_price * si.quantity * priceMultiplier)} {priceLabel.toLowerCase()} – berörs ej
                                   </p>
                                 )}
+
+                                {/* ── ROT/RUT-val (privatärenden, om någon mappad artikel/tjänsten är berättigad) ── */}
+                                {isPrivate && (() => {
+                                  const { canRot, canRut } = rotRutAvailability(si.id)
+                                  if (!canRot && !canRut) return null
+                                  const selection = rotRutSelections?.[si.id] ?? null
+                                  // Slutpris att räkna avdrag på: fast pris om sådant finns, annars suggested
+                                  const totalInkl = fixed ? fixedPriceDisplay : (hasArticles ? suggestedPriceDisplay : Math.round(si.unit_price * si.quantity * priceMultiplier))
+                                  const rotPct = getEffectiveRotPercent(si)
+                                  const rutPct = getEffectiveRutPercent(si)
+                                  const pct = selection === 'ROT' ? rotPct : selection === 'RUT' ? rutPct : 0
+                                  const deduction = Math.round(totalInkl * (pct / 100))
+                                  const customerAmount = totalInkl - deduction
+                                  return (
+                                    <div className="mt-2 pt-2 border-t border-slate-700/40 space-y-1.5">
+                                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                        ROT/RUT-avdrag
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                        <label className="flex items-center gap-1 cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`pg-rotrut-${si.id}`}
+                                            checked={selection === null}
+                                            onChange={() => setRotRutSelection(si.id, null)}
+                                            className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                                          />
+                                          <span className="text-xs text-slate-300">Inget avdrag</span>
+                                        </label>
+                                        {canRot && (
+                                          <label className="flex items-center gap-1 cursor-pointer">
+                                            <input
+                                              type="radio"
+                                              name={`pg-rotrut-${si.id}`}
+                                              checked={selection === 'ROT'}
+                                              onChange={() => setRotRutSelection(si.id, 'ROT')}
+                                              className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                                            />
+                                            <span className="text-xs text-slate-300">ROT ({rotPct}%)</span>
+                                          </label>
+                                        )}
+                                        {canRut && (
+                                          <label className="flex items-center gap-1 cursor-pointer">
+                                            <input
+                                              type="radio"
+                                              name={`pg-rotrut-${si.id}`}
+                                              checked={selection === 'RUT'}
+                                              onChange={() => setRotRutSelection(si.id, 'RUT')}
+                                              className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                                            />
+                                            <span className="text-xs text-slate-300">RUT ({rutPct}%)</span>
+                                          </label>
+                                        )}
+                                      </div>
+                                      {selection && (
+                                        <div className="space-y-0.5 pt-1">
+                                          <div className="flex justify-between text-xs text-[#20c58f]">
+                                            <span>{selection}-avdrag</span>
+                                            <span>-{fmt(deduction)}</span>
+                                          </div>
+                                          <div className="flex justify-between text-xs">
+                                            <span className="text-slate-300 font-medium">Att betala (kund)</span>
+                                            <span className="text-[#20c58f] font-semibold">{fmt(customerAmount)}</span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
                               </div>
                             )
                           })}

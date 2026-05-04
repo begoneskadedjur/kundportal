@@ -155,6 +155,7 @@ export default function CaseServiceSelector({
   const [priceMarkups, setPriceMarkups] = useState<Record<string, number>>(
     () => initialPriceMarkups ?? {}
   )
+  const [priceRotRutSelections, setPriceRotRutSelections] = useState<Record<string, 'ROT' | 'RUT' | null>>({})
 
 
   // Inline price editing (service item id → input string)
@@ -296,6 +297,15 @@ export default function CaseServiceSelector({
           return merged
         })
 
+        // Initialisera ROT/RUT-selections från befintliga tjänsterader
+        const initialRotRut: Record<string, 'ROT' | 'RUT' | null> = {}
+        finalItems.forEach(item => {
+          if (item.item_type === 'service' && item.rot_rut_type) {
+            initialRotRut[item.id] = item.rot_rut_type
+          }
+        })
+        setPriceRotRutSelections(prev => ({ ...prev, ...initialRotRut }))
+
         const summary = buildBillingSummary(finalItems)
         onChangeRef.current?.(finalItems, summary, { priceAssignments: initialAssignments, priceMarkups: {} })
       } catch (err) {
@@ -372,13 +382,6 @@ export default function CaseServiceSelector({
     // Använd kundens fasta pris om det finns, annars base_price
     const customerPrice = customerServicePrices[svc.id]
     const priceToUse = customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
-    // Auto-sätt rot_rut_type baserat på tjänstens berättigande (privatärenden).
-    // Om både ROT och RUT är tillåtna lämnas valet öppet så användaren får välja.
-    const autoRotRutType: RotRutType | null = isPrivate
-      ? (svc.rot_eligible && !svc.rut_eligible ? 'ROT'
-        : svc.rut_eligible && !svc.rot_eligible ? 'RUT'
-        : null)
-      : null
     if (draftMode && !caseId) {
       const price = priceToUse
       const discounted = calculateDiscountedPrice(price, 0)
@@ -407,7 +410,7 @@ export default function CaseServiceSelector({
         status: 'pending',
         requires_approval: false,
         notes: null,
-        rot_rut_type: autoRotRutType,
+        rot_rut_type: null,
         fastighetsbeteckning: null,
         min_quantity: null,
         mapped_service_id: null,
@@ -437,7 +440,6 @@ export default function CaseServiceSelector({
         vat_rate: 25,
         added_by_technician_id: technicianId || undefined,
         added_by_technician_name: technicianName || undefined,
-        rot_rut_type: autoRotRutType,
       })
       await reloadItems()
       setShowAddonPicker(false)
@@ -757,6 +759,10 @@ export default function CaseServiceSelector({
       mappingPayload[aid] = priceAssignmentsRef.current[aid] ?? null
     })
 
+    // ROT/RUT-val per tjänsterad: applicera på alla tjänsterader, inte bara de som fick ny prissättning.
+    // Anledning: användaren kan ändra avdrag utan att flytta sliders, och vi vill att valet sparas ändå.
+    const serviceItemIds = allItems.filter(i => i.item_type === 'service').map(i => i.id)
+
     if (draftMode && !caseId) {
       let updated = [...allItems]
       Object.entries(prices).forEach(([itemId, price]) => {
@@ -771,6 +777,17 @@ export default function CaseServiceSelector({
       updated = updated.map(i => {
         if (i.item_type !== 'article') return i
         return { ...i, mapped_service_id: mappingPayload[i.id] ?? null }
+      })
+      // Applicera ROT/RUT-val per tjänsterad i draft
+      updated = updated.map(i => {
+        if (i.item_type !== 'service') return i
+        const newType = priceRotRutSelections[i.id] ?? null
+        if (i.rot_rut_type === newType) return i
+        return {
+          ...i,
+          rot_rut_type: newType,
+          fastighetsbeteckning: newType ? i.fastighetsbeteckning : null,
+        }
       })
       setAllItems(updated)
       notifyChange(updated)
@@ -798,6 +815,23 @@ export default function CaseServiceSelector({
       )
       // Persistera mappning för samtliga artikelrader i samma operation
       await CaseBillingService.updateArticleMappings(mappingPayload)
+      // Persistera ROT/RUT-val per tjänsterad
+      await Promise.all(
+        serviceItemIds.map(async (sid) => {
+          const item = allItems.find(i => i.id === sid)
+          if (!item) return
+          const newType = priceRotRutSelections[sid] ?? null
+          if (item.rot_rut_type === newType) return
+          await supabase
+            .from('case_billing_items')
+            .update({
+              rot_rut_type: newType,
+              fastighetsbeteckning: newType ? item.fastighetsbeteckning : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', sid)
+        })
+      )
       await reloadItems()
       toast.success('Priser uppdaterade')
     } catch (err: any) {
@@ -900,10 +934,16 @@ export default function CaseServiceSelector({
               const displayUnitPrice = isPrivate ? Math.round(item.unit_price * priceMultiplier) : item.unit_price
               const displayPrice = isEditing ? editingPrice[item.id] : String(displayUnitPrice)
               const svc = item.service ?? addonServices.find(s => s.id === item.service_id) ?? null
-              const showRotRut =
-                caseType === 'private'
-                && !!svc
-                && (svc.rot_eligible || svc.rut_eligible)
+              // ROT/RUT styrs i första hand av mappade artiklar (interna kostnader),
+              // i andra hand av tjänstens egen flagga.
+              const mappedToService = articleItems.filter(a =>
+                priceAssignments[a.id] === item.id || a.mapped_service_id === item.id
+              )
+              const articleRotEligible = mappedToService.some(a => a.article?.rot_eligible)
+              const articleRutEligible = mappedToService.some(a => a.article?.rut_eligible)
+              const showRot = articleRotEligible || !!svc?.rot_eligible
+              const showRut = articleRutEligible || !!svc?.rut_eligible
+              const showRotRut = caseType === 'private' && (showRot || showRut)
               const rotPct = getEffectiveRotPercent(svc)
               const rutPct = getEffectiveRutPercent(svc)
               const hasFixedPrice = !!item.service_id && customerServicePrices[item.service_id] !== undefined
@@ -993,7 +1033,7 @@ export default function CaseServiceSelector({
                           />
                           <span className="text-xs text-slate-300">Inget avdrag</span>
                         </label>
-                        {svc.rot_eligible && (
+                        {showRot && (
                           <label className="flex items-center gap-1 cursor-pointer">
                             <input
                               type="radio"
@@ -1005,7 +1045,7 @@ export default function CaseServiceSelector({
                             <span className="text-xs text-slate-300">ROT ({rotPct}%)</span>
                           </label>
                         )}
-                        {svc.rut_eligible && (
+                        {showRut && (
                           <label className="flex items-center gap-1 cursor-pointer">
                             <input
                               type="radio"
@@ -1418,16 +1458,25 @@ export default function CaseServiceSelector({
           unit_price: i.unit_price,
           total_price: i.total_price,
           default_price: i.article?.default_price ?? null,
+          rot_eligible: !!i.article?.rot_eligible,
+          rut_eligible: !!i.article?.rut_eligible,
         }))}
         customerArticlePrices={customerArticlePrices}
-        serviceItems={serviceItems.map(i => ({
-          id: i.id,
-          service_name: i.service_name,
-          service_code: i.service_code,
-          unit_price: i.unit_price,
-          quantity: i.quantity,
-          discount_percent: i.discount_percent,
-        }))}
+        serviceItems={serviceItems.map(i => {
+          const svc = i.service ?? addonServices.find(s => s.id === i.service_id) ?? null
+          return {
+            id: i.id,
+            service_name: i.service_name,
+            service_code: i.service_code,
+            unit_price: i.unit_price,
+            quantity: i.quantity,
+            discount_percent: i.discount_percent,
+            rot_eligible: !!svc?.rot_eligible,
+            rut_eligible: !!svc?.rut_eligible,
+            rot_rate_percent: svc?.rot_rate_percent ?? null,
+            rut_rate_percent: svc?.rut_rate_percent ?? null,
+          }
+        })}
         fixedPricedItemIds={new Set(
           serviceItems
             .filter(i => !!i.service_id && customerServicePrices[i.service_id] !== undefined)
@@ -1438,6 +1487,8 @@ export default function CaseServiceSelector({
         onAssignmentsChange={setPriceAssignments}
         onMarkupsChange={setPriceMarkups}
         onApplyPrices={handleApplyPrices}
+        rotRutSelections={priceRotRutSelections}
+        onRotRutSelectionsChange={setPriceRotRutSelections}
       />
     </div>
   )
