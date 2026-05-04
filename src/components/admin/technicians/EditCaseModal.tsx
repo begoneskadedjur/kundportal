@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints, Receipt } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints, Receipt, Copy } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -39,6 +39,9 @@ import type { Service } from '../../../types/services'
 
 // Tjänste- och artikelväljare för fakturering
 import CaseServiceSelector from '../../shared/CaseServiceSelector'
+
+// Duplicera-ärende-dialog
+import DuplicateCaseDialog from '../../shared/DuplicateCaseDialog'
 
 // Fakturering - auto-generera vid ärendeavslut
 import { InvoiceService } from '../../../services/invoiceService'
@@ -393,6 +396,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // Återbesök / Nytt ärende val-dialog
   const [showActionDialog, setShowActionDialog] = useState(false)
   const [showRevisitModal, setShowRevisitModal] = useState(false)
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
 
   // Tekniker-lista för initialer-cirklar
   const [technicianList, setTechnicianList] = useState<{ id: string; name: string; role: string }[]>([])
@@ -1459,13 +1463,26 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               <button
                 type="button"
                 onClick={() => { setShowFollowUpDialog(true); setShowActionDialog(false) }}
-                className="w-full p-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-left transition-colors"
+                className="w-full p-4 mb-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-left transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <Plus className="w-5 h-5 text-amber-400 shrink-0" />
                   <div>
                     <p className="text-white font-medium">Skapa nytt ärende</p>
                     <p className="text-sm text-slate-400">Nytt problem hos samma kund (annat skadedjur)</p>
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowDuplicateDialog(true); setShowActionDialog(false) }}
+                className="w-full p-4 bg-[#20c58f]/10 hover:bg-[#20c58f]/20 border border-[#20c58f]/30 rounded-lg text-left transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Copy className="w-5 h-5 text-[#20c58f] shrink-0" />
+                  <div>
+                    <p className="text-white font-medium">Duplicera ärende</p>
+                    <p className="text-sm text-slate-400">Skapa en kopia och välj vad som följer med</p>
                   </div>
                 </div>
               </button>
@@ -2015,6 +2032,34 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             onSuccess(updatedCase)
           }}
           onClose={() => setShowRevisitModal(false)}
+        />
+      )}
+
+      {/* Duplicera-ärende-dialog */}
+      {currentCase && (
+        <DuplicateCaseDialog
+          isOpen={showDuplicateDialog}
+          onClose={() => setShowDuplicateDialog(false)}
+          caseData={{
+            id: currentCase.id,
+            case_type: (currentCase.case_type === 'business' ? 'business' : 'private') as 'private' | 'business',
+            title: currentCase.title,
+            case_number: (currentCase as any).case_number ?? null,
+            startAt: currentCase.start_date ?? null,
+            endAt: currentCase.due_date ?? null,
+          }}
+          createdByTechnicianId={activeView === 'technician' ? profile?.technician_id ?? null : null}
+          createdByTechnicianName={profile?.display_name ?? profile?.full_name ?? null}
+          onDuplicated={(result) => {
+            setShowDuplicateDialog(false)
+            // Hämta nya ärendet och öppna det
+            const newCaseForModal: any = {
+              id: result.id,
+              case_type: result.case_type,
+              case_number: result.case_number,
+            }
+            onSuccess(newCaseForModal)
+          }}
         />
       )}
     </Modal>

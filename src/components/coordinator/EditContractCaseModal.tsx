@@ -10,7 +10,7 @@ import {
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
   FileSignature, ChevronDown, Download, Send, ChevronRight, Receipt, Lightbulb,
   Building, Building2, Image as ImageIcon, Trash2, Plus, AlertTriangle, MessageSquare,
-  Footprints
+  Footprints, Copy
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -38,6 +38,9 @@ import { ContractBillingService } from '../../services/contractBillingService'
 
 // Radering av ärenden
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
+
+// Duplicera-ärende-dialog
+import DuplicateCaseDialog from '../shared/DuplicateCaseDialog'
 
 // Kommunikation - endast för intern användning (ALDRIG för kundvyer)
 import CommunicationSlidePanel from '../communication/CommunicationSlidePanel'
@@ -213,6 +216,7 @@ export default function EditContractCaseModal({
   // Återbesök-states
   const [showActionDialog, setShowActionDialog] = useState(false)
   const [showRevisitModal, setShowRevisitModal] = useState(false)
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
 
   // Kommunikations-panel state - ENDAST för intern användning (ALDRIG för kundvyer)
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
@@ -2397,13 +2401,30 @@ export default function EditContractCaseModal({
                 setShowFollowUpDialog(true)
                 setShowActionDialog(false)
               }}
-              className="w-full p-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-left transition-colors"
+              className="w-full p-4 mb-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-left transition-colors"
             >
               <div className="flex items-center gap-3">
                 <Plus className="w-5 h-5 text-amber-400" />
                 <div>
                   <p className="text-white font-medium">Kopiera ärende</p>
                   <p className="text-sm text-slate-400">Nytt problem hos samma kund (annat skadedjur)</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Alternativ 3: Duplicera ärende */}
+            <button
+              onClick={() => {
+                setShowDuplicateDialog(true)
+                setShowActionDialog(false)
+              }}
+              className="w-full p-4 bg-[#20c58f]/10 hover:bg-[#20c58f]/20 border border-[#20c58f]/30 rounded-lg text-left transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Copy className="w-5 h-5 text-[#20c58f]" />
+                <div>
+                  <p className="text-white font-medium">Duplicera ärende</p>
+                  <p className="text-sm text-slate-400">Skapa en kopia och välj vad som följer med</p>
                 </div>
               </div>
             </button>
@@ -2452,6 +2473,29 @@ export default function EditContractCaseModal({
             // Modalen förblir öppen - tekniker kan boka fler återbesök
           }}
           onClose={() => setShowRevisitModal(false)}
+        />
+      )}
+
+      {/* Duplicera-ärende-dialog */}
+      {localCaseData && (
+        <DuplicateCaseDialog
+          isOpen={showDuplicateDialog}
+          onClose={() => setShowDuplicateDialog(false)}
+          caseData={{
+            id: localCaseData.id,
+            case_type: 'contract',
+            title: formData.title ?? null,
+            case_number: formData.case_number ?? null,
+            startAt: formData.scheduled_start ? new Date(formData.scheduled_start).toISOString() : null,
+            endAt: formData.scheduled_end ? new Date(formData.scheduled_end).toISOString() : null,
+          }}
+          createdByTechnicianId={profile?.technician_id ?? null}
+          createdByTechnicianName={profile?.display_name ?? null}
+          onDuplicated={() => {
+            setShowDuplicateDialog(false)
+            // Uppdatera listan i parent — kopian visas där
+            if (onSuccess) onSuccess()
+          }}
         />
       )}
 
