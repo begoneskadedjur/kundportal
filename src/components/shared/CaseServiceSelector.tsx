@@ -160,6 +160,8 @@ export default function CaseServiceSelector({
 
   // Inline price editing (service item id → input string)
   const [editingPrice, setEditingPrice] = useState<Record<string, string>>({})
+  // Inline fastighetsbeteckning editing (service item id → input string)
+  const [editingFastighet, setEditingFastighet] = useState<Record<string, string>>({})
 
   const onChangeRef = useRef(onChange)
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
@@ -690,17 +692,24 @@ export default function CaseServiceSelector({
     }
   }
 
-  const handleFastighetChange = async (id: string, value: string) => {
-    if (saving) return
+  const handleFastighetBlur = async (id: string) => {
+    const draft = editingFastighet[id]
+    if (draft === undefined) return
+    const value = draft.trim()
+    const item = allItems.find(i => i.id === id)
+    setEditingFastighet(prev => { const n = { ...prev }; delete n[id]; return n })
+    if (!item) return
+    const newValue = value || null
+    if ((item.fastighetsbeteckning ?? null) === newValue) return
     if (draftMode && !caseId) {
-      const updated = allItems.map(i => i.id === id ? { ...i, fastighetsbeteckning: value || null } : i)
+      const updated = allItems.map(i => i.id === id ? { ...i, fastighetsbeteckning: newValue } : i)
       setAllItems(updated)
       notifyChange(updated)
       return
     }
     if (!caseId) return
     try {
-      await CaseBillingService.updateCaseArticle(id, { fastighetsbeteckning: value || null })
+      await CaseBillingService.updateCaseArticle(id, { fastighetsbeteckning: newValue })
       await reloadItems()
     } catch (err: any) {
       toast.error(err.message)
@@ -999,7 +1008,8 @@ export default function CaseServiceSelector({
                     ) : (
                       <div className="flex items-center gap-1 ml-auto">
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           value={displayPrice}
                           onChange={e => setEditingPrice(prev => ({ ...prev, [item.id]: e.target.value }))}
                           onFocus={() => {
@@ -1061,8 +1071,9 @@ export default function CaseServiceSelector({
                       {item.rot_rut_type && (
                         <input
                           type="text"
-                          value={item.fastighetsbeteckning ?? ''}
-                          onChange={e => handleFastighetChange(item.id, e.target.value)}
+                          value={editingFastighet[item.id] ?? item.fastighetsbeteckning ?? ''}
+                          onChange={e => setEditingFastighet(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          onBlur={() => handleFastighetBlur(item.id)}
                           placeholder="Fastighetsbeteckning"
                           className="w-full px-2 py-1 text-xs bg-slate-800 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                         />
