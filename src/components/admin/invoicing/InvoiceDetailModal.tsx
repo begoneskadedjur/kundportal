@@ -81,6 +81,7 @@ export default function InvoiceDetailModal({
   const [loading, setLoading] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [sendingToFortnox, setSendingToFortnox] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [contextExpanded, setContextExpanded] = useState(false)
   const [preparations, setPreparations] = useState<CasePreparationWithDetails[]>([])
   const [staleInfo, setStaleInfo] = useState<{ stale: boolean; reason?: string } | null>(null)
@@ -279,6 +280,42 @@ export default function InvoiceDetailModal({
       toast.error('Kunde inte radera fakturan')
     } finally {
       setUpdating(false)
+    }
+  }
+
+  const handleSyncFromFortnox = async () => {
+    if (!invoice?.fortnox_document_number) return
+    setSyncing(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Du måste vara inloggad')
+        return
+      }
+      const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL
+      const res = await fetch(`${supabaseUrl}/functions/v1/fortnox-sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ invoice_number: invoice.fortnox_document_number }),
+      })
+      if (!res.ok) throw new Error(`Sync misslyckades (${res.status})`)
+      const data = await res.json()
+      const result = data.results?.[0]
+      if (!result || result.skipped) {
+        toast(result?.skipped ? `Inget att uppdatera: ${result.skipped}` : 'Inget att uppdatera')
+      } else {
+        toast.success(`Synkat till status "${result.fortnoxStatus}"`)
+      }
+      await loadInvoice()
+      onStatusChange?.()
+    } catch (err: any) {
+      console.error('Sync error:', err)
+      toast.error(err.message || 'Kunde inte synka från Fortnox')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -1364,6 +1401,18 @@ export default function InvoiceDetailModal({
                   <ExternalLink className="w-3.5 h-3.5" />
                   Fortnox (nr {invoice.fortnox_document_number})
                 </a>
+              )}
+              {invoice.fortnox_document_number &&
+                ['draft', 'sent', 'booked'].includes(invoice.status) && (
+                <button
+                  onClick={handleSyncFromFortnox}
+                  disabled={syncing}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-sm text-slate-200 rounded-lg transition-colors disabled:opacity-50"
+                  title="Hämta senaste status från Fortnox"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                  Synka
+                </button>
               )}
             </div>
 
