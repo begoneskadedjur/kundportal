@@ -2,7 +2,7 @@
 // Dialog för att duplicera ett ärende. Användaren väljer schema och vilka 1:N-relationer som följer med.
 
 import { useState, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import Portal from '../ui/Portal'
 import {
   X,
   Copy,
@@ -146,7 +146,10 @@ export default function DuplicateCaseDialog({
   const allSelected = selectedCount === OPTION_ROWS.length
 
   const content = (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10001] flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      style={{ pointerEvents: 'auto', zIndex: 10001 }}
+    >
       <div className="w-full max-w-2xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 shrink-0">
@@ -301,5 +304,5 @@ export default function DuplicateCaseDialog({
     </div>
   )
 
-  return createPortal(content, document.body)
+  return <Portal>{content}</Portal>
 }
