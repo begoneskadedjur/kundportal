@@ -15,6 +15,7 @@ import CaseServiceSelector from '../../components/shared/CaseServiceSelector'
 import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
 import { SelectedProduct, CustomerType, SelectedArticleItem } from '../../types/products'
 import { convertServicesToOneflowProducts } from '../../utils/articlePricingCalculator'
+import { mapBillingItemsToPrefillServices, mapBillingItemsToSelectedArticles } from '../../utils/billingPrefill'
 import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
 import { CustomerGroupService } from '../../services/customerGroupService'
@@ -451,10 +452,12 @@ export default function OneflowContractCreator() {
       return true
     }
 
-    // Produkter – om prefill finns, kräv bara att det finns tjänster.
+    // Produkter – om ärendet är källan, kräv minst en tjänst i prefillServices.
     // Manuellt läge: kräv minst en tjänst (item_type='service') i draftItems
     if (currentStep === productsStep) {
-      if (wizardData.prefillServices && wizardData.prefillServices.length > 0) return true
+      if (wizardData.case_id) {
+        return !!(wizardData.prefillServices && wizardData.prefillServices.length > 0)
+      }
       return wizardData.draftItems.some(i => i.item_type === 'service')
     }
     // Avtalsobjekt
@@ -484,7 +487,10 @@ export default function OneflowContractCreator() {
       return ''
     }
     if (currentStep === productsStep) {
-      if (wizardData.prefillServices && wizardData.prefillServices.length > 0) return ''
+      if (wizardData.case_id) {
+        if (!wizardData.prefillServices || wizardData.prefillServices.length === 0) return 'Lägg till minst en tjänst på ärendet'
+        return ''
+      }
       if (!wizardData.draftItems.some(i => i.item_type === 'service')) return 'Lägg till minst en tjänst'
       return ''
     }
@@ -500,7 +506,7 @@ export default function OneflowContractCreator() {
     const partyType = wizardData.partyType as CustomerType
     let convertedProducts: SelectedProduct[] = []
 
-    if (wizardData.prefillServices && wizardData.prefillServices.length > 0) {
+    if (wizardData.case_id && wizardData.prefillServices && wizardData.prefillServices.length > 0) {
       // Prefill-läge: använd prefillServices direkt
       convertedProducts = convertServicesToOneflowProducts(wizardData.prefillServices, partyType)
     } else {
@@ -1225,101 +1231,55 @@ export default function OneflowContractCreator() {
         )
 
       case 6: {
-        const hasPrefill = wizardData.prefillServices && wizardData.prefillServices.length > 0
-        const fmtSEK = (n: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
+        const hasCaseLink = !!wizardData.case_id
         return (
-          <div className="space-y-4 max-w-2xl mx-auto">
+          <div className="space-y-4 max-w-5xl mx-auto">
             <div className="text-center mb-6">
               <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
                 <ShoppingCart className="w-6 h-6 text-green-400" />
                 Produkter
               </h3>
               <p className="text-slate-400">
-                {hasPrefill
-                  ? 'Tjänster och interna kostnader från ärendet'
+                {hasCaseLink
+                  ? 'Justera tjänster, interna kostnader och prisguide för ärendet'
                   : `Välj prislista och artiklar som ska ingå i ${wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}`}
               </p>
             </div>
 
-            {hasPrefill ? (
-              <div className="space-y-3">
-                {/* Faktureringstjänster */}
-                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
-                  <p className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wide">
-                    Faktureringstjänster (ingår i offerten)
-                  </p>
-                  {wizardData.prefillServices!.map(s => (
-                    <div key={s.id} className="flex justify-between items-center py-1.5 border-b border-slate-700/30 last:border-0">
-                      <span className="text-sm text-white">
-                        {s.service_code && <span className="text-xs text-slate-400 mr-1">{s.service_code}</span>}
-                        {s.service_name}
-                        {s.quantity > 1 && <span className="text-xs text-slate-500 ml-1">×{s.quantity}</span>}
-                      </span>
-                      <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-4">
-                        {fmtSEK(s.total_price)}
-                      </span>
-                    </div>
-                  ))}
-                  {/* Totalsumma tjänster */}
-                  <div className="flex justify-between items-center pt-2 mt-1">
-                    <span className="text-xs text-slate-400">Totalt exkl. moms</span>
-                    <span className="text-sm font-bold text-white">
-                      {fmtSEK(wizardData.prefillServices!.reduce((s, i) => s + i.total_price, 0))}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Interna kostnadsartiklar (stöd för teknikern) */}
-                {wizardData.selectedArticles.length > 0 && (
-                  <div className="p-3 bg-slate-800/10 border border-slate-700/40 rounded-xl">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                        Interna kostnader
-                      </p>
-                      <span className="text-xs text-slate-600">(ingår ej i offerten)</span>
-                    </div>
-                    {wizardData.selectedArticles.map(item => (
-                      <div key={item.article.id} className="py-1.5 border-b border-slate-700/20 last:border-0">
-                        <div className="flex justify-between items-start">
-                          <span className="text-sm text-slate-400">
-                            {item.article.code && <span className="text-xs text-slate-600 mr-1">{item.article.code}</span>}
-                            {item.article.name}
-                            {item.quantity > 1 && <span className="text-xs text-slate-600 ml-1">×{item.quantity}</span>}
-                          </span>
-                          <span className="text-sm text-slate-500 whitespace-nowrap ml-4 shrink-0">
-                            {fmtSEK(item.effectivePrice * item.quantity)}
-                          </span>
-                        </div>
-                        {item.article.description && (
-                          <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-                            {item.article.description}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {hasCaseLink ? (
+              <CaseServiceSelector
+                caseId={wizardData.case_id}
+                caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
+                customerId={null}
+                primaryServiceId={null}
+                onChange={(items) => {
+                  const services = mapBillingItemsToPrefillServices(items)
+                  const articles = mapBillingItemsToSelectedArticles(items)
+                  setWizardData(prev => ({
+                    ...prev,
+                    prefillServices: services,
+                    selectedArticles: articles,
+                  }))
+                }}
+              />
             ) : (
-              <div className="max-w-5xl mx-auto">
-                <CaseServiceSelector
-                  draftMode
-                  caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
-                  customerId={null}
-                  primaryServiceId={null}
-                  initialDraftItems={wizardData.draftItems}
-                  initialPriceAssignments={wizardData.draftPriceAssignments}
-                  initialPriceMarkups={wizardData.draftPriceMarkups}
-                  onChange={(items, _summary, meta) => {
-                    setWizardData(prev => ({
-                      ...prev,
-                      draftItems: items,
-                      draftPriceAssignments: meta?.priceAssignments ?? prev.draftPriceAssignments,
-                      draftPriceMarkups: meta?.priceMarkups ?? prev.draftPriceMarkups,
-                    }))
-                  }}
-                />
-              </div>
+              <CaseServiceSelector
+                draftMode
+                caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
+                customerId={null}
+                primaryServiceId={null}
+                initialDraftItems={wizardData.draftItems}
+                initialPriceAssignments={wizardData.draftPriceAssignments}
+                initialPriceMarkups={wizardData.draftPriceMarkups}
+                onChange={(items, _summary, meta) => {
+                  setWizardData(prev => ({
+                    ...prev,
+                    draftItems: items,
+                    draftPriceAssignments: meta?.priceAssignments ?? prev.draftPriceAssignments,
+                    draftPriceMarkups: meta?.priceMarkups ?? prev.draftPriceMarkups,
+                  }))
+                }}
+              />
             )}
           </div>
         )
@@ -1367,7 +1327,7 @@ export default function OneflowContractCreator() {
                 </div>
                 
                 {(() => {
-                  const hasPrefill = wizardData.prefillServices && wizardData.prefillServices.length > 0
+                  const hasPrefill = !!wizardData.case_id && !!wizardData.prefillServices && wizardData.prefillServices.length > 0
                   const serviceDraftItems = wizardData.draftItems.filter(i => i.item_type === 'service')
                   const articleDraftItems = wizardData.draftItems.filter(i => i.item_type === 'article')
                   const canGenerate = hasPrefill || serviceDraftItems.length > 0
@@ -1513,6 +1473,9 @@ export default function OneflowContractCreator() {
             {/* Tjänster & Priser (inkl. mappade artiklar + marginal) */}
             {(() => {
               const fmtSEK = (n: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
+              const isPrivate = wizardData.partyType === 'individual'
+              const priceMultiplier = isPrivate ? 1.25 : 1
+              const priceLabel = isPrivate ? 'Totalt inkl. moms' : 'Totalt exkl. moms'
               const hasPrefill = wizardData.prefillServices && wizardData.prefillServices.length > 0
               const draftServices = wizardData.draftItems.filter(i => i.item_type === 'service')
               const draftArticles = wizardData.draftItems.filter(i => i.item_type === 'article')
@@ -1541,7 +1504,7 @@ export default function OneflowContractCreator() {
                         ))}
                       </div>
                       <div className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-4">
-                        {fmtSEK(s.total_price)}
+                        {fmtSEK(s.total_price * priceMultiplier)}
                       </div>
                     </div>
                   )
@@ -1567,7 +1530,7 @@ export default function OneflowContractCreator() {
                         ))}
                       </div>
                       <div className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-4">
-                        {fmtSEK(svc.total_price)}
+                        {fmtSEK(svc.total_price * priceMultiplier)}
                       </div>
                     </div>
                   )
@@ -1586,8 +1549,8 @@ export default function OneflowContractCreator() {
                   </h3>
                   <div>{rows}</div>
                   <div className="flex justify-between pt-3 mt-2 border-t border-slate-700">
-                    <span className="text-sm text-slate-400">Totalt exkl moms</span>
-                    <span className="text-sm font-bold text-white">{fmtSEK(serviceTotal)}</span>
+                    <span className="text-sm text-slate-400">{priceLabel}</span>
+                    <span className="text-sm font-bold text-white">{fmtSEK(serviceTotal * priceMultiplier)}</span>
                   </div>
                   {articleCost > 0 && (
                     <>

@@ -43,6 +43,7 @@ import CaseServiceSelector from '../../shared/CaseServiceSelector'
 // Fakturering - auto-generera vid ärendeavslut
 import { InvoiceService } from '../../../services/invoiceService'
 import { CaseBillingService } from '../../../services/caseBillingService'
+import { mapBillingItemsToPrefillServices, mapBillingItemsToSelectedArticles } from '../../../utils/billingPrefill'
 import { PriceListService } from '../../../services/priceListService'
 import { CaseCustomerService } from '../../../services/caseCustomerService'
 import { CustomerGroupService } from '../../../services/customerGroupService'
@@ -579,35 +580,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     try {
       const caseType = currentCase.case_type === 'private' ? 'private' : 'business'
       billingItems = await CaseBillingService.getCaseBillingItems(currentCase.id, caseType as any)
-      prefillArticles = billingItems
-        .filter(item => item.article) // Bara items med kopplad artikel
-        .map(item => ({
-          article: item.article,
-          priceListItem: null,
-          effectivePrice: item.unit_price,
-          quantity: item.quantity,
-          notes: item.notes || undefined,
-          caseBillingItemId: item.id,
-          mapped_service_id: item.mapped_service_id ?? null,
-        }))
-      prefillServices = billingItems
-        .filter(item => item.item_type === 'service')
-        .map(item => ({
-          id: item.id,
-          service_name: item.service_name,
-          service_code: item.service_code,
-          unit_price: item.unit_price,
-          quantity: item.quantity,
-          total_price: item.total_price,
-          vat_rate: item.vat_rate,
-          rot_rut_type: item.rot_rut_type,
-          service: item.service
-            ? {
-                rot_rate_percent: (item.service as any).rot_rate_percent ?? null,
-                rut_rate_percent: (item.service as any).rut_rate_percent ?? null,
-              }
-            : null,
-        }))
+      prefillArticles = mapBillingItemsToSelectedArticles(billingItems)
+      prefillServices = mapBillingItemsToPrefillServices(billingItems)
     } catch (err) {
       console.warn('Kunde inte hämta ärendets artiklar:', err)
     }
