@@ -250,7 +250,14 @@ export function useConsolidatedCustomers() {
         adHocResult,
         contractItemsResult
       ] = await Promise.all([
-        supabase.from('customers').select('*').order('created_at', { ascending: false }),
+        // Filtrera bort engångskunder (source_type='manual' utan avtalsperiod).
+        // Dessa skapas av caseCustomerService vid privat-/företagsfakturering och
+        // ska inte visas i avtalskund-listan. De finns kvar i DB för fakturasystemet.
+        supabase
+          .from('customers')
+          .select('*')
+          .or('source_type.neq.manual,contract_start_date.not.is.null')
+          .order('created_at', { ascending: false }),
         supabase.from('profiles').select('customer_id, role').eq('role', 'customer'),
         supabase.from('multisite_user_roles').select('organization_id, user_id, is_active, role_type, site_ids').eq('is_active', true),
         supabase.from('cases').select('id, customer_id, title, description, price, billing_status, created_at'),
