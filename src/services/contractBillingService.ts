@@ -1385,6 +1385,22 @@ export class ContractBillingService {
       return `${y}-${mo}-${da}`
     }
 
+    /**
+     * Mappa fakturadatum → avtalsperiod. Fortnox-fakturor är vanligtvis FÖRSKOTT
+     * för kommande period, så om fakturadatum ligger i förskottsfönstret (1 mån
+     * innan periodens start) prioriteras NÄSTA period framför innevarande.
+     *
+     * Exempel: avtal 2025-05-19, annual. Faktura 2026-05-02:
+     *   - Innevarande period: 2025-05-19 → 2026-05-18 (slutar om 16 dagar)
+     *   - Nästa period: 2026-05-19 → 2027-05-18 (börjar om 17 dagar)
+     *   → Förskott för nästa period (riktigt svar: 2026-05-19 → 2027-05-18)
+     *
+     * Algoritm:
+     *   1. Generera alla perioder från contract_start tills vi passerar invoice_date + 1 år
+     *   2. Hitta bästa-match: prioritera period vars start ligger NÄRMAST EFTER fakturadatum
+     *      (förskott). Om ingen sådan finns inom 1 mån framåt, fall tillbaka på den
+     *      period som täcker fakturadatum (eftersläpande).
+     */
     const resolveContractPeriod = (invoiceDateStr: string): { periodStart: string; periodEnd: string } | null => {
       if (!customer.contract_start_date || !customer.billing_frequency) return null
       const monthsPerPeriod = monthsForFreq(customer.billing_frequency)
@@ -1392,21 +1408,34 @@ export class ContractBillingService {
 
       const contractStart = new Date(customer.contract_start_date)
       const invDate = new Date(invoiceDateStr)
-      // Generera perioder tills vi täcker invoiceDate + 1 period
-      let periodStart = new Date(contractStart)
-      for (let i = 0; i < 120; i++) { // max 120 perioder (=10 år månatligt)
-        const periodEnd = addMonths(periodStart, monthsPerPeriod)
-        periodEnd.setDate(periodEnd.getDate() - 1) // slutdatum inklusivt
-        // Förskottsfaktura: fakturadatum ≤ periodens slut och ≥ periodens start minus ~1 mån
-        const earliestInvoice = new Date(periodStart)
-        earliestInvoice.setMonth(earliestInvoice.getMonth() - 1)
-        if (invDate >= earliestInvoice && invDate <= periodEnd) {
-          return { periodStart: toLocalIso(periodStart), periodEnd: toLocalIso(periodEnd) }
-        }
-        // Nästa period
-        periodStart = addMonths(periodStart, monthsPerPeriod)
-        if (customer.contract_end_date && periodStart > new Date(customer.contract_end_date)) break
+      const ADVANCE_WINDOW_DAYS = 35 // Hur många dagar i förväg en faktura räknas som förskott
+
+      // Generera alla perioder upp till invoice_date + 1 period
+      const periods: Array<{ start: Date; end: Date }> = []
+      let cur = new Date(contractStart)
+      for (let i = 0; i < 120; i++) {
+        const end = addMonths(cur, monthsPerPeriod)
+        end.setDate(end.getDate() - 1)
+        periods.push({ start: new Date(cur), end: new Date(end) })
+        cur = addMonths(cur, monthsPerPeriod)
+        if (cur.getTime() > invDate.getTime() + monthsPerPeriod * 31 * 24 * 60 * 60 * 1000) break
       }
+
+      // 1. Förskott: hitta period vars start ligger 0–35 dagar EFTER fakturadatum
+      const advanceCandidate = periods.find(p => {
+        const daysUntilStart = (p.start.getTime() - invDate.getTime()) / (24 * 60 * 60 * 1000)
+        return daysUntilStart >= 0 && daysUntilStart <= ADVANCE_WINDOW_DAYS
+      })
+      if (advanceCandidate) {
+        return { periodStart: toLocalIso(advanceCandidate.start), periodEnd: toLocalIso(advanceCandidate.end) }
+      }
+
+      // 2. Fallback: faktura inom en pågående period (eftersläpande)
+      const currentCandidate = periods.find(p => invDate >= p.start && invDate <= p.end)
+      if (currentCandidate) {
+        return { periodStart: toLocalIso(currentCandidate.start), periodEnd: toLocalIso(currentCandidate.end) }
+      }
+
       return null
     }
 
