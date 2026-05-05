@@ -36,6 +36,20 @@ export class MonthlyReportService {
   }
 
   /**
+   * Hämta alla 24 månader för trendgrafer (light-payload utan jsonb-detaljer).
+   */
+  static async getTrend(): Promise<MonthlyCustomerSnapshot[]> {
+    const { data, error } = await supabase
+      .from('monthly_customer_snapshots')
+      .select('snapshot_month, total_active_customers, total_paused_customers, total_terminated_customers, total_expired_customers, customers_added, customers_terminated, arr_sek, mrr_sek, invoiced_sek, paid_sek, outstanding_sek, overdue_sek, is_estimated')
+      .order('snapshot_month', { ascending: true })
+      .limit(24)
+
+    if (error) throw new Error(error.message)
+    return (data ?? []) as MonthlyCustomerSnapshot[]
+  }
+
+  /**
    * Hämta hela rapporten för en månad (snapshot + diff + cron-körningar).
    */
   static async getReport(monthKey: string): Promise<MonthlyReportData | null> {
