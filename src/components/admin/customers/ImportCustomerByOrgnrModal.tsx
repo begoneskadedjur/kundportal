@@ -10,6 +10,7 @@ import Button from '../../ui/Button'
 import Select from '../../ui/Select'
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
+import { ContractInvoiceGenerator } from '../../../services/contractInvoiceGenerator'
 import { CustomerGroupService } from '../../../services/customerGroupService'
 import { PriceListService } from '../../../services/priceListService'
 import type { PriceList } from '../../../types/articles'
@@ -261,6 +262,17 @@ export default function ImportCustomerByOrgnrModal({
       }
 
       const customerId = data.customer.id
+
+      // Generera fakturaplan: skapar autogen för historiska perioder (paid)
+      // och framtida (pending_approval). Måste köras INNAN Fortnox-import så
+      // dedupe-logiken i importHistoricalItems kan rensa autogen vars period
+      // överlappar Fortnox-rader.
+      try {
+        await ContractInvoiceGenerator.regenerateForCustomer(customerId)
+      } catch (e: any) {
+        console.warn('[import] fakturaplan-generering misslyckades:', e?.message ?? e)
+        toast.error('Kund skapades men fakturaplan kunde inte genereras automatiskt')
+      }
 
       // Importera valda historiska fakturor med rätt typ
       const toImport = invoices
