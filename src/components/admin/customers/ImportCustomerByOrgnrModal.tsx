@@ -268,8 +268,13 @@ export default function ImportCustomerByOrgnrModal({
         .map(inv => ({ ...inv, importType: invoiceTypes[inv.DocumentNumber] ?? 'contract' as const }))
       if (toImport.length > 0) {
         try {
-          await ContractBillingService.importHistoricalItems(customerId, toImport)
-          toast.success(`${toImport.length} historiska faktura(or) importerade till pipeline`)
+          const result = await ContractBillingService.importHistoricalItems(customerId, toImport)
+          const baseMsg = `${result.imported || toImport.length} historiska faktura(or) importerade`
+          if (result.replacedAutogen > 0) {
+            toast.success(`${baseMsg}. ${result.replacedAutogen} autogenererad(e) dubblett(er) rensades.`)
+          } else {
+            toast.success(`${baseMsg} till pipeline`)
+          }
         } catch (e: any) {
           toast.error(`Kund skapades men historikimport misslyckades: ${e.message}`)
         }

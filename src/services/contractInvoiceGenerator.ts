@@ -347,9 +347,12 @@ export class ContractInvoiceGenerator {
       )
       .map(e => ({ start: e.billing_period_start as string, end: e.billing_period_end as string }))
 
+    // Period A överlappar period B om A.start <= B.end OCH A.end >= B.start.
+    // Detta täcker fallet där autogen följer kalendermånad (1 maj → 30 apr) men
+    // Fortnox-fakturan följer faktiskt avtalsanchorum (19 maj → 18 maj nästa år).
     const filteredPlanned = coveredRanges.length === 0
       ? planned
-      : planned.filter(p => !coveredRanges.some(r => p.periodStart >= r.start && p.periodStart <= r.end))
+      : planned.filter(p => !coveredRanges.some(r => p.periodStart <= r.end && p.periodEnd >= r.start))
 
     const plannedByKey = new Map(filteredPlanned.map(p => [p.periodStart, p]))
     const existingByKey = new Map(

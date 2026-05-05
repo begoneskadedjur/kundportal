@@ -1341,8 +1341,8 @@ export class ContractBillingService {
       Sent: boolean
       importType: 'contract' | 'ad_hoc'
     }>
-  ): Promise<void> {
-    if (invoices.length === 0) return
+  ): Promise<{ imported: number; replacedAutogen: number }> {
+    if (invoices.length === 0) return { imported: 0, replacedAutogen: 0 }
 
     // Hämta kunddata (inkl. avtalsparametrar för period-matchning)
     const { data: customer, error: custErr } = await supabase
@@ -1431,6 +1431,36 @@ export class ContractBillingService {
       return { inv, paid, periodStart, periodEnd, subtotal, vatAmount, totalInclVat }
     })
 
+    // 0) Dedupe: ta bort autogenererade historiska invoices (utan F-prefix)
+    // vars period överlappar någon av de inkomna Fortnox-fakturorna. Fortnox-data
+    // är auktoritativ — autogen är bara en planeringsstand-in tills riktig data finns.
+    let replacedAutogen = 0
+    try {
+      const ranges = normalized.map(n => ({ start: n.periodStart, end: n.periodEnd }))
+      // Bygg .or()-filter: en rad matchar om dess period överlappar minst en input-period
+      const orFilter = ranges
+        .map(r => `and(billing_period_start.lte.${r.end},billing_period_end.gte.${r.start})`)
+        .join(',')
+
+      const { data: orphaned } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('customer_id', customerId)
+        .eq('invoice_type', 'contract')
+        .eq('is_historical', true)
+        .not('invoice_number', 'ilike', 'F-%')
+        .or(orFilter)
+
+      const orphanedIds = (orphaned ?? []).map((o: any) => o.id)
+      if (orphanedIds.length > 0) {
+        await supabase.from('invoice_items').delete().in('invoice_id', orphanedIds)
+        await supabase.from('invoices').delete().in('id', orphanedIds)
+        replacedAutogen = orphanedIds.length
+      }
+    } catch (err) {
+      console.warn('[importHistoricalItems] autogen-dedupe misslyckades:', err)
+    }
+
     // 1) contract_billing_items (legacy period-källa) — använd exkl. moms
     const cbiItems = normalized.map(({ inv, paid, periodStart, periodEnd, subtotal }) => ({
       customer_id: customerId,
@@ -1463,7 +1493,7 @@ export class ContractBillingService {
       const existingSet = new Set((existing || []).map((e: any) => e.invoice_number))
 
       const toInsert = normalized.filter(n => !existingSet.has(`F-${n.inv.DocumentNumber}`))
-      if (toInsert.length === 0) return
+      if (toInsert.length === 0) return { imported: 0, replacedAutogen }
 
       const invoiceRows = toInsert.map(({ inv, paid, periodStart, periodEnd, subtotal, vatAmount, totalInclVat }) => {
         const isoInvDate = new Date(inv.InvoiceDate).toISOString()
@@ -1501,7 +1531,7 @@ export class ContractBillingService {
         .insert(invoiceRows)
         .select('id, invoice_number, subtotal, invoice_type')
       if (invErr) throw new Error(invErr.message)
-      if (!insertedInvoices) return
+      if (!insertedInvoices) return { imported: 0, replacedAutogen }
 
       const invoiceItemRows = insertedInvoices.map((row: any) => ({
         invoice_id: row.id,
@@ -1518,8 +1548,11 @@ export class ContractBillingService {
 
       const { error: itemErr } = await supabase.from('invoice_items').insert(invoiceItemRows)
       if (itemErr) throw new Error(itemErr.message)
+
+      return { imported: insertedInvoices.length, replacedAutogen }
     } catch (err: any) {
       console.error('[importHistoricalItems] invoices-sync misslyckades:', err?.message || err)
+      return { imported: 0, replacedAutogen }
     }
   }
 
