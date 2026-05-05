@@ -185,7 +185,10 @@ function iterPeriodsPure(
       firstStart = new Date(startYear + 1, anchor, 1)
     }
     let cur = firstStart
-    while (cur <= end) {
+    // < istället för <=: en period som börjar exakt på end (avtalets slut) ska INTE
+    // skapas — den ligger logiskt efter avtalstiden. Skyddar mot att cron skapar
+    // en ny årsperiod startande på contract_end_date.
+    while (cur < end) {
       const periodEnd = new Date(cur.getFullYear() + 1, cur.getMonth(), 0)
       // För annual: hela fakturaperioden måste rymmas inom avtalet (ingen partiell).
       const elevenMonthsForward = new Date(cur.getFullYear(), cur.getMonth() + 11, 1)
@@ -536,7 +539,10 @@ export class ContractInvoiceGenerator {
       .select('id, status, billing_period_start')
       .eq('customer_id', customerId)
       .eq('invoice_type', 'contract')
-      .gt('billing_period_start', toLocalIsoDate(cutoff))
+      // gte istället för gt: en period som STARTAR exakt på cutoff (avtalsslutet)
+      // ligger logiskt efter avtalstiden och ska raderas. Annars missas annual-perioder
+      // där billing_period_start sammanfaller med contract_end_date.
+      .gte('billing_period_start', toLocalIsoDate(cutoff))
 
     if (fErr) throw new Error(fErr.message)
 

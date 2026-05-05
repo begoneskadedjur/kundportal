@@ -142,7 +142,9 @@ function iterPeriods(
     let firstStart = new Date(startYear, anchor, 1)
     if (firstStart < startOfStartMonth) firstStart = new Date(startYear + 1, anchor, 1)
     let cur = firstStart
-    while (cur <= end) {
+    // < istället för <=: en period som börjar exakt på end (avtalets slut/cutoff)
+    // ska inte skapas — den ligger logiskt efter avtalstiden.
+    while (cur < end) {
       const pe = new Date(cur.getFullYear() + 1, cur.getMonth(), 0)
       const elevenAhead = new Date(cur.getFullYear(), cur.getMonth() + 11, 1)
       if (elevenAhead > end) break
