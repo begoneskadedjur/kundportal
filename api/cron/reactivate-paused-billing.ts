@@ -4,6 +4,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { withCronLog } from '../_lib/cronLogger'
 
 export const config = { maxDuration: 60 }
 
@@ -21,10 +22,9 @@ function todayLocalIso(): string {
 }
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
-  try {
+  const result = await withCronLog('reactivate-paused-billing', async () => {
     const today = todayLocalIso()
 
-    // Hämta kunder där paus-tiden har gått ut
     const { data: customers, error } = await supabase
       .from('customers')
       .select('id, company_name, billing_paused_until')
@@ -36,7 +36,10 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
 
     const ids = (customers ?? []).map(c => c.id)
     if (ids.length === 0) {
-      return res.status(200).json({ success: true, reactivated: 0 })
+      return {
+        status: 'success' as const,
+        summary: { reactivated: 0, details: [] },
+      }
     }
 
     const { error: updateErr } = await supabase
@@ -50,13 +53,17 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
 
     if (updateErr) throw updateErr
 
-    return res.status(200).json({
-      success: true,
-      reactivated: customers?.length ?? 0,
-      details: (customers ?? []).map(c => ({ id: c.id, company_name: c.company_name })),
-    })
-  } catch (err: any) {
-    console.error('Cron reactivate-paused-billing error:', err)
-    return res.status(500).json({ success: false, error: err.message })
+    return {
+      status: 'success' as const,
+      summary: {
+        reactivated: customers?.length ?? 0,
+        details: (customers ?? []).map(c => ({ id: c.id, company_name: c.company_name })),
+      },
+    }
+  })
+
+  if (result.status === 'failed') {
+    return res.status(500).json({ success: false, error: result.errorMessage })
   }
+  return res.status(200).json({ success: true, ...result.summary })
 }

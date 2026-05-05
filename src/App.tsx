@@ -42,6 +42,7 @@ import InvoicingPage from './pages/admin/invoicing';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import CustomerAnalytics from './pages/admin/CustomerAnalytics';
+import MonthlyReport from './pages/admin/MonthlyReport';
 import ImageBank from './pages/admin/ImageBank';
 import TeamChat from './pages/admin/TeamChat';
 import IncidentsPage from './pages/admin/IncidentsPage';
@@ -131,6 +132,7 @@ function App() {
               <Route path="befintliga-kunder" element={<ProtectedRoute requiredRole="admin"><Customers /></ProtectedRoute>} />
               <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="admin"><CustomerDetails /></ProtectedRoute>} />
               <Route path="kundprognos" element={<ProtectedRoute requiredRole="admin"><CustomerAnalytics /></ProtectedRoute>} />
+              <Route path="manadsrapport" element={<ProtectedRoute requiredRole="admin"><MonthlyReport /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><Leads /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><LeadAnalytics /></ProtectedRoute>} />
               <Route path="ekonomi" element={<ProtectedRoute requiredRole="admin"><Economics /></ProtectedRoute>} />
@@ -216,6 +218,7 @@ function App() {
               <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="koordinator"><CustomerDetails /></ProtectedRoute>} />
               <Route path="trafikljusoversikt" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
               <Route path="kundprognos" element={<ProtectedRoute requiredRole="koordinator"><CustomerAnalytics /></ProtectedRoute>} />
+              <Route path="manadsrapport" element={<ProtectedRoute requiredRole="koordinator"><MonthlyReport /></ProtectedRoute>} />
               <Route path="customer-access" element={<AdminOrKoordinatorRoute><CoordinatorOrganizationsPage /></AdminOrKoordinatorRoute>} />
 
               {/* Försäljning */}

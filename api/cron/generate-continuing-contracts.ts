@@ -277,8 +277,10 @@ async function generateInvoiceNumber(): Promise<string> {
   return `${prefix}-${seq}`
 }
 
+import { withCronLog } from '../_lib/cronLogger'
+
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
-  try {
+  const result = await withCronLog('generate-continuing-contracts', async () => {
     const today = toLocalIsoDate(todayLocal())
     const { data: customers, error } = await supabase
       .from('customers')
@@ -290,6 +292,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     if (error) throw error
 
     const results: Array<{ customer_id: string; company_name: string; created: number }> = []
+    const errors: Array<{ customer_id: string; message: string }> = []
     for (const c of customers ?? []) {
       try {
         const created = await regenerateForCustomer(c as CustomerRow)
@@ -298,17 +301,23 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
         }
       } catch (err: any) {
         console.error(`Fel vid regenerering av ${c.id}:`, err.message)
+        errors.push({ customer_id: c.id, message: err.message })
       }
     }
 
-    return res.status(200).json({
-      success: true,
-      customers_processed: customers?.length ?? 0,
-      total_invoices_created: results.reduce((sum, r) => sum + r.created, 0),
-      details: results,
-    })
-  } catch (err: any) {
-    console.error('Cron error:', err)
-    return res.status(500).json({ success: false, error: err.message })
+    return {
+      status: errors.length > 0 ? 'partial' as const : 'success' as const,
+      summary: {
+        customers_processed: customers?.length ?? 0,
+        total_invoices_created: results.reduce((sum, r) => sum + r.created, 0),
+        details: results,
+        errors,
+      },
+    }
+  })
+
+  if (result.status === 'failed') {
+    return res.status(500).json({ success: false, error: result.errorMessage, ...result.summary })
   }
+  return res.status(200).json({ success: true, ...result.summary })
 }

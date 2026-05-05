@@ -6,7 +6,7 @@ import {
   Search, Filter, RefreshCw, ChevronDown, ChevronUp, ChevronRight,
   Mail, Phone, Building2, User, Calendar, Coins,
   AlertTriangle, Activity, Send, Edit3, Users, FilePlus,
-  ExternalLink, MoreVertical, TrendingUp, Receipt, XCircle
+  ExternalLink, MoreVertical, TrendingUp, Receipt, XCircle, FileText
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -846,6 +846,13 @@ export default function Customers() {
           >
             <Activity className="w-4 h-4" />
             <span className="hidden md:inline">Detaljerad Analytics</span>
+          </button>
+          <button
+            onClick={() => navigate('/admin/manadsrapport')}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+          >
+            <FileText className="w-4 h-4" />
+            <span className="hidden md:inline">Månadsrapport</span>
           </button>
         </div>
       </div>
