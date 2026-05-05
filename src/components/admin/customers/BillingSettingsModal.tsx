@@ -17,6 +17,7 @@ import { type PriceList } from '../../../types/articles'
 import { type BillingFrequency, BILLING_FREQUENCY_CONFIG, type AdhocInvoiceGrouping } from '../../../types/contractBilling'
 import toast from 'react-hot-toast'
 import { ContractInvoiceGenerator, computePlannedInvoicesPure, type BillingPlan } from '../../../services/contractInvoiceGenerator'
+import { PaymentTermsService } from '../../../services/paymentTermsService'
 import BillingPlanPreviewModal from './BillingPlanPreviewModal'
 
 interface SiteBillingData {
@@ -104,6 +105,12 @@ export default function BillingSettingsModal({
     delete: number
     locked: number
   } | null>(null)
+
+  // Dynamiska betalningsvillkor (dagar till förfallodatum) — laddas en gång
+  const [contractPaymentTermsDays, setContractPaymentTermsDays] = useState<number>(30)
+  useEffect(() => {
+    PaymentTermsService.getDays('contract').then(setContractPaymentTermsDays).catch(() => {})
+  }, [])
 
   // "Fast avtalsvärde" – override för hela årsbeloppet
   const [fixedContractValue, setFixedContractValue] = useState('')
@@ -350,7 +357,7 @@ export default function BillingSettingsModal({
       // Visa alltid schemat även om billing_active=false (pedagogiskt)
       billing_active: true,
       notice_period_months: null,
-    })
+    }, contractPaymentTermsDays)
   })()
 
   // Status härleds från PlannedInvoice.isHistorical (samma kriterium som

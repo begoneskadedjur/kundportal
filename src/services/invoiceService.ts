@@ -14,6 +14,7 @@ import type {
 } from '../types/invoice'
 import { calculateInvoiceTotals, calculateDueDate } from '../types/invoice'
 import { CaseBillingService } from './caseBillingService'
+import { PaymentTermsService } from './paymentTermsService'
 
 export class InvoiceService {
   /**
@@ -102,6 +103,9 @@ export class InvoiceService {
     // Generera fakturanummer
     const invoiceNumber = await this.generateInvoiceNumber()
 
+    // Hämta dynamiska betalningsvillkor för kategorin
+    const paymentTermsDays = await PaymentTermsService.getDays(caseType)
+
     // Skapa faktura
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
@@ -119,7 +123,7 @@ export class InvoiceService {
         total_amount,
         status: requiresApproval ? 'pending_approval' : 'ready',
         requires_approval: requiresApproval,
-        due_date: calculateDueDate(30),
+        due_date: calculateDueDate(paymentTermsDays),
         rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
         fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null,
         invoice_marking: customerInfo.invoice_marking || null
@@ -482,7 +486,7 @@ export class InvoiceService {
    * Hämta statistik
    */
   static async getInvoiceStats(): Promise<InvoiceStats> {
-    const statuses: InvoiceStatus[] = ['draft', 'pending_approval', 'ready', 'booked', 'sent', 'paid', 'cancelled']
+    const statuses: InvoiceStatus[] = ['draft', 'pending_approval', 'ready', 'booked', 'sent', 'paid', 'cancelled', 'overdue']
     const stats: InvoiceStats = {
       draft: { count: 0, amount: 0 },
       pending_approval: { count: 0, amount: 0 },
@@ -491,6 +495,7 @@ export class InvoiceService {
       sent: { count: 0, amount: 0 },
       paid: { count: 0, amount: 0 },
       cancelled: { count: 0, amount: 0 },
+      overdue: { count: 0, amount: 0 },
       total: { count: 0, amount: 0 }
     }
 

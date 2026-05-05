@@ -27,6 +27,7 @@ import {
   GitBranch,
   Trash2,
   Bug,
+  Calendar,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -115,6 +116,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Kundgrupper', icon: Users, path: '/admin/kundgrupper' },
       { label: 'Fortnox', icon: Building2, path: '/admin/installningar/fortnox' },
+      { label: 'Betalningsvillkor', icon: Calendar, path: '/admin/installningar/betalningsvillkor' },
       { label: 'SMS Mallar', icon: MessageSquareText, path: '/admin/sms-mallar' },
       { label: 'Webhook-config', icon: Wrench, path: '/admin/webhook-config' },
       { label: 'Avtalsdiagnostik', icon: AlertCircle, path: '/admin/avtalsdiagnostik' },
@@ -168,6 +170,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/prislistor': 'Prislistor',
   '/admin/kundgrupper': 'Kundgrupper',
   '/admin/installningar/fortnox': 'Fortnox',
+  '/admin/installningar/betalningsvillkor': 'Betalningsvillkor',
   '/admin/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/admin/bug-reports': 'Buggrapporter',
 }

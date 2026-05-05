@@ -172,13 +172,14 @@ async function syncFortnoxInvoice(documentNumber: string, accessToken: string): 
     contractItemsUpdated = ids.length
   }
 
-  // invoices (privat/företag) — skippa overdue eftersom invoices saknar den statusen
+  // invoices (privat/företag) — stödjer alla statusar inkl. overdue
   let invoicesUpdated = 0
-  if (targetStatus !== 'overdue') {
+  {
     const invoiceUpdate: Record<string, unknown> = { status: targetStatus }
     if (targetStatus === 'paid') invoiceUpdate.paid_at = timestamp
     else if (targetStatus === 'sent') invoiceUpdate.sent_at = timestamp
     else if (targetStatus === 'booked') invoiceUpdate.booked_at = timestamp
+    else if (targetStatus === 'overdue') invoiceUpdate.overdue_at = timestamp
 
     const { data: invoiceRows } = await supabase
       .from('invoices')
@@ -214,7 +215,7 @@ async function findStaleInvoices(): Promise<string[]> {
   const { data: invoiceRows } = await supabase
     .from('invoices')
     .select('fortnox_document_number, created_at')
-    .in('status', ['draft', 'sent', 'booked'])
+    .in('status', ['draft', 'sent', 'booked', 'overdue'])
     .not('fortnox_document_number', 'is', null)
     .lt('created_at', cutoff)
 
@@ -226,7 +227,7 @@ async function findStaleInvoices(): Promise<string[]> {
   const { data: contractRows } = await supabase
     .from('contract_billing_items')
     .select('fortnox_document_number')
-    .in('status', ['draft', 'sent', 'booked'])
+    .in('status', ['draft', 'sent', 'booked', 'overdue'])
     .not('fortnox_document_number', 'is', null)
     .lt('updated_at', cutoff)
 

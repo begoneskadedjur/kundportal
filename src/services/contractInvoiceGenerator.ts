@@ -5,6 +5,7 @@
 
 import { supabase } from '../lib/supabase'
 import { ImportedCustomerContractService } from './importedCustomerContractService'
+import { PaymentTermsService } from './paymentTermsService'
 
 interface ContractServiceItem {
   case_billing_item_id: string
@@ -201,8 +202,15 @@ function iterPeriodsPure(
  * Ren funktion: räkna ut planerade fakturor från kundens avtalsdata.
  * Används av både ContractInvoiceGenerator (för DB-apply) och BillingSettingsModal
  * (för preview/fakturaschemat i UI). Inga DB-anrop.
+ *
+ * `paymentTermsDays` styr antal dagar mellan periodstart/idag och förfallodatum.
+ * Default 30 om inget anges (backward-compatible). Avtalskunder hämtar normalt
+ * detta från PaymentTermsService innan denna funktion anropas.
  */
-export function computePlannedInvoicesPure(customer: CustomerForPlanning): PlannedInvoice[] {
+export function computePlannedInvoicesPure(
+  customer: CustomerForPlanning,
+  paymentTermsDays: number = 30,
+): PlannedInvoice[] {
   const freq = customer.billing_frequency
   const annual = Number(customer.annual_value ?? 0)
   const start = customer.contract_start_date ? new Date(customer.contract_start_date) : null
@@ -232,7 +240,7 @@ export function computePlannedInvoicesPure(customer: CustomerForPlanning): Plann
     const due = isHistorical
       ? new Date(periodStart.getTime())
       : new Date(today.getTime())
-    due.setDate(due.getDate() + 30)
+    due.setDate(due.getDate() + paymentTermsDays)
     return {
       periodStart: toLocalIsoDate(periodStart),
       periodEnd: toLocalIsoDate(periodEnd),
@@ -261,7 +269,7 @@ export class ContractInvoiceGenerator {
     if (error) throw new Error(`Kunde inte hämta kund: ${error.message}`)
     if (!customer) throw new Error('Kund hittades inte')
 
-    const planned = this.computePlannedInvoices(customer as CustomerRow)
+    const planned = await this.computePlannedInvoices(customer as CustomerRow)
 
     const { data: existing, error: exErr } = await supabase
       .from('invoices')
@@ -300,8 +308,9 @@ export class ContractInvoiceGenerator {
    * Delegerar till module-level pure function. Behålls för bakåtkompatibilitet
    * med existerande anropare i klassen.
    */
-  private static computePlannedInvoices(customer: CustomerRow): PlannedInvoice[] {
-    return computePlannedInvoicesPure(customer)
+  private static async computePlannedInvoices(customer: CustomerRow): Promise<PlannedInvoice[]> {
+    const paymentTermsDays = await PaymentTermsService.getDays('contract')
+    return computePlannedInvoicesPure(customer, paymentTermsDays)
   }
 
   /**
@@ -607,7 +616,8 @@ export class ContractInvoiceGenerator {
     } else {
       const invNum = await this.generateInvoiceNumber()
       const due = parseLocalDate(monthStart)
-      due.setDate(due.getDate() + 30)
+      const paymentTermsDays = await PaymentTermsService.getDays('contract')
+      due.setDate(due.getDate() + paymentTermsDays)
       const c = customer as CustomerRow
       const { data: inv, error: insErr } = await supabase
         .from('invoices')

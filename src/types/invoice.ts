@@ -8,7 +8,7 @@ import type { BillableCaseType, RotRutType } from './caseBilling'
  * pending_approval → ready → draft (utkast i Fortnox) → booked (bokförd i Fortnox) → sent (skickad till kund) → paid
  * cancelled är terminal
  */
-export type InvoiceStatus = 'draft' | 'pending_approval' | 'ready' | 'booked' | 'sent' | 'paid' | 'cancelled'
+export type InvoiceStatus = 'draft' | 'pending_approval' | 'ready' | 'booked' | 'sent' | 'paid' | 'cancelled' | 'overdue'
 
 /**
  * Faktura från databasen
@@ -46,6 +46,7 @@ export interface Invoice {
   booked_at: string | null
   sent_at: string | null
   paid_at: string | null
+  overdue_at: string | null
   due_date: string | null
 
   notes: string | null
@@ -156,6 +157,7 @@ export interface InvoiceStats {
   sent: { count: number; amount: number }
   paid: { count: number; amount: number }
   cancelled: { count: number; amount: number }
+  overdue: { count: number; amount: number }
   total: { count: number; amount: number }
 }
 
@@ -225,6 +227,14 @@ export const INVOICE_STATUS_CONFIG: Record<InvoiceStatus, {
     bgColor: 'bg-red-500/10',
     borderColor: 'border-red-500/30',
     icon: 'XCircle'
+  },
+  overdue: {
+    label: 'Förfallen',
+    description: 'Förfallodatum passerat utan betalning',
+    color: 'text-red-400',
+    bgColor: 'bg-red-500/15',
+    borderColor: 'border-red-500/40',
+    icon: 'AlertTriangle'
   }
 }
 

@@ -10,6 +10,7 @@ import {
   Send,
   DollarSign,
   AlertCircle,
+  AlertTriangle,
   FileEdit,
   XCircle,
   Eye,
@@ -205,6 +206,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
     { key: 'draft' as InvoiceStatus, label: 'Utkast i Fortnox', count: stats.draft.count, amount: stats.draft.amount, icon: FileEdit, color: 'orange' },
     { key: 'booked' as InvoiceStatus, label: 'Bokförda', count: stats.booked.count, amount: stats.booked.amount, icon: BookCheck, color: 'blue' },
     { key: 'sent' as InvoiceStatus, label: 'Skickade', count: stats.sent.count, amount: stats.sent.amount, icon: Send, color: 'purple' },
+    { key: 'overdue' as InvoiceStatus, label: 'Förfallna', count: stats.overdue.count, amount: stats.overdue.amount, icon: AlertTriangle, color: 'red' },
     { key: 'paid' as InvoiceStatus, label: 'Betalda', count: stats.paid.count, amount: stats.paid.amount, icon: DollarSign, color: 'emerald' }
   ] : []
 
@@ -216,7 +218,8 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
       sky: { active: 'bg-sky-500/20 text-sky-400 border-sky-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-sky-500/50' },
       blue: { active: 'bg-blue-500/20 text-blue-400 border-blue-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-blue-500/50' },
       purple: { active: 'bg-purple-500/20 text-purple-400 border-purple-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-purple-500/50' },
-      emerald: { active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-emerald-500/50' }
+      emerald: { active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-emerald-500/50' },
+      red: { active: 'bg-red-500/20 text-red-400 border-red-500', inactive: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-red-500/50' }
     }
     return colors[color]?.[isActive ? 'active' : 'inactive'] || colors.slate.inactive
   }

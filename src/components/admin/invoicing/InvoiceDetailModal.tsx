@@ -82,6 +82,9 @@ export default function InvoiceDetailModal({
   const [updating, setUpdating] = useState(false)
   const [sendingToFortnox, setSendingToFortnox] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [editingDueDate, setEditingDueDate] = useState(false)
+  const [dueDateDraft, setDueDateDraft] = useState('')
+  const [savingDueDate, setSavingDueDate] = useState(false)
   const [contextExpanded, setContextExpanded] = useState(false)
   const [preparations, setPreparations] = useState<CasePreparationWithDetails[]>([])
   const [staleInfo, setStaleInfo] = useState<{ stale: boolean; reason?: string } | null>(null)
@@ -187,8 +190,16 @@ export default function InvoiceDetailModal({
 
   // Reset context expanded on close
   useEffect(() => {
-    if (!isOpen) setContextExpanded(false)
+    if (!isOpen) {
+      setContextExpanded(false)
+      setEditingDueDate(false)
+    }
   }, [isOpen])
+
+  // Synka due-date-draft när invoice laddas
+  useEffect(() => {
+    if (invoice?.due_date) setDueDateDraft(invoice.due_date)
+  }, [invoice?.due_date])
 
   const loadInvoice = async () => {
     if (!invoiceId) return
@@ -480,6 +491,28 @@ export default function InvoiceDetailModal({
   if (!isOpen) return null
 
   const isOverdue = invoice ? isInvoiceOverdue(invoice.due_date, invoice.status) : false
+  // Förfallodatum kan redigeras tills fakturan är skickad till Fortnox eller terminal
+  const canEditDueDate = !!invoice && ['pending_approval', 'ready', 'draft'].includes(invoice.status)
+
+  const handleSaveDueDate = async () => {
+    if (!invoice || !dueDateDraft) return
+    setSavingDueDate(true)
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .update({ due_date: dueDateDraft })
+        .eq('id', invoice.id)
+      if (error) throw error
+      toast.success('Förfallodatum uppdaterat')
+      setEditingDueDate(false)
+      await loadInvoice()
+      onStatusChange?.()
+    } catch (err: any) {
+      toast.error(err.message || 'Kunde inte spara förfallodatum')
+    } finally {
+      setSavingDueDate(false)
+    }
+  }
   const statusConfig = invoice ? INVOICE_STATUS_CONFIG[invoice.status] : null
   // Privat = visa pris inkl. moms i UI. Företag/avtal = exkl. moms. (Lagring/Fortnox påverkas inte.)
   const isPrivate = invoice?.case_type === 'private'
@@ -578,14 +611,51 @@ export default function InvoiceDetailModal({
                     <div className="text-sm text-white font-medium">{formatInvoiceDate(invoice.created_at)}</div>
                   </div>
                   <div className={`rounded-lg p-3 ${isOverdue ? 'bg-red-500/20' : 'bg-slate-800/50'}`}>
-                    <div className={`flex items-center gap-1.5 text-xs mb-1 ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
-                      <Calendar className="w-3.5 h-3.5" />
-                      Förfaller
+                    <div className={`flex items-center justify-between gap-1.5 text-xs mb-1 ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        Förfaller
+                      </span>
+                      {canEditDueDate && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingDueDate(true)}
+                          className="text-[10px] uppercase tracking-wide text-[#20c58f] hover:text-[#1bb07e]"
+                        >
+                          Justera
+                        </button>
+                      )}
                     </div>
-                    <div className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-white'}`}>
-                      {formatInvoiceDate(invoice.due_date)}
-                      {isOverdue && <span className="text-xs ml-1">(Förfallen)</span>}
-                    </div>
+                    {editingDueDate && canEditDueDate ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="date"
+                          value={dueDateDraft}
+                          onChange={e => setDueDateDraft(e.target.value)}
+                          className="flex-1 px-2 py-0.5 bg-slate-900 border border-slate-600 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveDueDate}
+                          disabled={savingDueDate}
+                          className="px-2 py-0.5 bg-[#20c58f] hover:bg-[#1bb07e] text-white text-xs rounded disabled:opacity-50"
+                        >
+                          Spara
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setEditingDueDate(false); setDueDateDraft(invoice.due_date ?? '') }}
+                          className="px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded"
+                        >
+                          Avbryt
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-white'}`}>
+                        {formatInvoiceDate(invoice.due_date)}
+                        {isOverdue && <span className="text-xs ml-1">(Förfallen)</span>}
+                      </div>
+                    )}
                   </div>
                   <div className="bg-slate-800/50 rounded-lg p-3">
                     <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-1">
@@ -1427,36 +1497,6 @@ export default function InvoiceDetailModal({
                     ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     : <FileEdit className="w-3.5 h-3.5" />}
                   {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast i Fortnox'}
-                </button>
-              )}
-              {invoice.status === 'draft' && (
-                <button
-                  onClick={() => handleStatusChange('booked')}
-                  disabled={updating}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <BookCheck className="w-3.5 h-3.5" />
-                  Bokför
-                </button>
-              )}
-              {invoice.status === 'booked' && (
-                <button
-                  onClick={() => handleStatusChange('sent')}
-                  disabled={updating}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  Markera skickad
-                </button>
-              )}
-              {invoice.status === 'sent' && (
-                <button
-                  onClick={() => handleStatusChange('paid')}
-                  disabled={updating}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <DollarSign className="w-3.5 h-3.5" />
-                  Markera betald
                 </button>
               )}
               {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
