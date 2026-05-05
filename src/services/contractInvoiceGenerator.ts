@@ -148,6 +148,7 @@ function computeTerminationCutoff(customer: CustomerForPlanning): Date | null {
 function amountPerPeriodPure(annual: number, freq: BillingFrequency): number {
   if (freq === 'monthly') return Math.round(annual / 12)
   if (freq === 'quarterly') return Math.round(annual / 4)
+  if (freq === 'semi_annual') return Math.round(annual / 2)
   if (freq === 'annual') return Math.round(annual)
   return 0
 }
@@ -173,6 +174,18 @@ function iterPeriodsPure(
       const periodEnd = new Date(cur.getFullYear(), cur.getMonth() + 3, 0)
       out.push({ periodStart: new Date(cur), periodEnd })
       cur = new Date(cur.getFullYear(), cur.getMonth() + 3, 1)
+    }
+  } else if (freq === 'semi_annual') {
+    // Halvårsvis: räkna från avtalets startmånad. Ankarmånad används inte
+    // (för halvår finns alltid två perioder per år: anchor och anchor+6).
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1)
+    while (cur < end) {
+      const periodEnd = new Date(cur.getFullYear(), cur.getMonth() + 6, 0)
+      // Hela 6-månadersperioden måste rymmas inom avtalet
+      const fiveMonthsForward = new Date(cur.getFullYear(), cur.getMonth() + 5, 1)
+      if (fiveMonthsForward > end) break
+      out.push({ periodStart: new Date(cur), periodEnd })
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 6, 1)
     }
   } else if (freq === 'annual') {
     const anchor = anchorMonth && anchorMonth >= 1 && anchorMonth <= 12
