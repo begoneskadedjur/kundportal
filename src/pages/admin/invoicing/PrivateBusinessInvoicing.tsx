@@ -308,33 +308,6 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
                 <FileEdit className="w-4 h-4" />
               </button>
             )}
-            {invoice.status === 'draft' && (
-              <button
-                onClick={() => handleStatusChange(invoice.id, 'booked')}
-                className="p-1 text-blue-400 hover:bg-blue-500/20 rounded"
-                title="Bokför"
-              >
-                <BookCheck className="w-4 h-4" />
-              </button>
-            )}
-            {invoice.status === 'booked' && (
-              <button
-                onClick={() => handleStatusChange(invoice.id, 'sent')}
-                className="p-1 text-purple-400 hover:bg-purple-500/20 rounded"
-                title="Markera skickad"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            )}
-            {invoice.status === 'sent' && (
-              <button
-                onClick={() => handleStatusChange(invoice.id, 'paid')}
-                className="p-1 text-emerald-400 hover:bg-emerald-500/20 rounded"
-                title="Betald"
-              >
-                <DollarSign className="w-4 h-4" />
-              </button>
-            )}
             {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
               <button
                 onClick={() => handleStatusChange(invoice.id, 'cancelled')}
