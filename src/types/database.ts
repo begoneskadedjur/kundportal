@@ -235,6 +235,11 @@ export type Database = {
           is_commission_eligible: boolean
           // Tjänsteutbud
           service_id: string | null
+          // Multi-kontrakt-refaktor (Fas 8a): koppling till specifikt avtal när
+          // kunden har flera. Null för kunder utan riktiga contracts-rader
+          // (synth-fallback i runtime). Möjliggör scoping "Vad vi gjort mot
+          // avtal X" via WHERE contract_id = ?.
+          contract_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>
@@ -1852,6 +1857,9 @@ export interface EquipmentPlacement {
   serial_number: string | null
   equipment_type: EquipmentType
   customer_id: string
+  // Multi-kontrakt-refaktor (Fas 8a): koppling till avtal för per-avtals-gruppering
+  // i CustomerEquipmentDualView. Null för kunder utan riktiga contracts-rader.
+  contract_id: string | null
   latitude: number
   longitude: number
   placed_at: string
@@ -1879,6 +1887,14 @@ export interface EquipmentPlacementWithRelations extends EquipmentPlacement {
     id: string
     name: string
   }
+  // Multi-kontrakt-refaktor (Fas 8d): kopplat avtal — null när placeringen
+  // saknar contract_id (synth-fallback eller historisk data).
+  contract?: {
+    id: string
+    address_label: string | null
+    contact_address: string | null
+    oneflow_contract_id: string
+  } | null
   // Dynamisk stationstypdata från station_types-tabellen
   station_type_data?: {
     id: string

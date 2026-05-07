@@ -31,7 +31,7 @@ const CustomTooltip = ({ active, payload }: any) => {
     const data = payload[0].payload
     return (
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg">
-        <p className="text-white font-medium">{data.company_name}</p>
+        <p className="text-white font-medium">{data.display_name ?? data.company_name}</p>
         <p className="text-slate-300 text-sm">Årspremie: {formatCurrency(data.annual_value)}</p>
         <p className="text-slate-300 text-sm">Månader kvar: {data.months_remaining}</p>
         <p className="text-slate-300 text-sm">Account Manager: {data.assigned_account_manager}</p>
@@ -113,9 +113,9 @@ const ExpiringContractsChart: React.FC = () => {
     .slice(0, 10)
     .map(contract => ({
       ...contract,
-      shortName: contract.company_name.length > 15 
-        ? contract.company_name.substring(0, 15) + '...' 
-        : contract.company_name
+      shortName: (contract.display_name ?? contract.company_name).length > 15
+        ? (contract.display_name ?? contract.company_name).substring(0, 15) + '...'
+        : (contract.display_name ?? contract.company_name)
     }))
 
   const totalAtRisk = contracts.reduce((sum, c) => sum + c.annual_value, 0)

@@ -12,7 +12,14 @@ export interface MonthlyRevenue {
 
 export interface ExpiringContract {
   customer_id: string
+  // Multi-kontrakt-refaktor (Fas 8b): scopas till specifikt avtal när kunden har
+  // flera. Null för synth-fallback (kunder utan riktiga contracts-rader).
+  contract_id: string | null
   company_name: string
+  // Visningsetikett: "Bolaget AB" för 1-avtal-kunder, "Bolaget AB — Storgatan 1"
+  // när kunden har flera avtal med olika utförande-adresser.
+  display_name: string
+  address_label: string | null
   contract_end_date: string
   annual_value: number
   assigned_account_manager: string
@@ -499,35 +506,95 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
   }
 }
 
-// Återstående funktioner behålls oförändrade...
+// Multi-kontrakt-refaktor (Fas 8b): query mot contracts-tabellen så att en kund
+// med flera avtal får per-avtal-rader. Synth-fallback: även customers utan
+// aktiv contracts-rad inkluderas via deras customers.contract_end_date.
 export const getExpiringContracts = async (): Promise<ExpiringContract[]> => {
   try {
+    const now = new Date()
     const threeMonthsFromNow = new Date()
     threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3)
 
-    const { data } = await supabase
+    const todayIso = now.toISOString()
+    const threeMonthsIso = threeMonthsFromNow.toISOString()
+
+    // 1. Riktiga contracts-rader inom 3-månaders-fönster
+    const { data: contracts } = await supabase
+      .from('contracts')
+      .select('id, customer_id, contract_end_date, annual_value, address_label, contact_address, customer:customers!contracts_customer_id_fkey(id, company_name, annual_value, assigned_account_manager, is_active)')
+      .in('status', ['signed', 'active'])
+      .neq('billing_active', false)
+      .lte('contract_end_date', threeMonthsIso)
+      .gte('contract_end_date', todayIso)
+      .order('contract_end_date')
+
+    // Räkna kontrakt per kund så vi kan avgöra is_multi för display_name.
+    const contractCountByCustomer = new Map<string, number>()
+    ;(contracts ?? []).forEach((row: any) => {
+      if (!row.customer_id) return
+      contractCountByCustomer.set(
+        row.customer_id,
+        (contractCountByCustomer.get(row.customer_id) ?? 0) + 1
+      )
+    })
+
+    const contractRows: ExpiringContract[] = []
+    const customerIdsCoveredByContracts = new Set<string>()
+
+    ;(contracts ?? []).forEach((row: any) => {
+      if (!row.customer || row.customer.is_active === false) return
+      customerIdsCoveredByContracts.add(row.customer_id)
+      const endDate = new Date(row.contract_end_date)
+      const months_remaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30))
+      const isMulti = (contractCountByCustomer.get(row.customer_id) ?? 0) > 1
+      const addressLabel = row.address_label ?? row.contact_address ?? null
+      const companyName = row.customer.company_name
+      contractRows.push({
+        customer_id: row.customer_id,
+        contract_id: row.id,
+        company_name: companyName,
+        display_name: isMulti && addressLabel ? `${companyName} — ${addressLabel}` : companyName,
+        address_label: addressLabel,
+        contract_end_date: row.contract_end_date,
+        annual_value: Number(row.annual_value ?? row.customer.annual_value ?? 0),
+        assigned_account_manager: row.customer.assigned_account_manager || 'Ej tilldelad',
+        months_remaining,
+        risk_level: months_remaining <= 1 ? 'high' : months_remaining <= 2 ? 'medium' : 'low',
+      })
+    })
+
+    // 2. Synth-fallback: kunder utan riktiga contracts-rader vars
+    // customers.contract_end_date faller inom fönstret.
+    const { data: customersFallback } = await supabase
       .from('customers')
       .select('id, company_name, contract_end_date, annual_value, assigned_account_manager')
       .eq('is_active', true)
-      .lte('contract_end_date', threeMonthsFromNow.toISOString())
-      .gte('contract_end_date', new Date().toISOString())
+      .lte('contract_end_date', threeMonthsIso)
+      .gte('contract_end_date', todayIso)
       .order('contract_end_date')
 
-    return data?.map(customer => {
-      const endDate = new Date(customer.contract_end_date)
-      const now = new Date()
+    const fallbackRows: ExpiringContract[] = []
+    ;(customersFallback ?? []).forEach((c: any) => {
+      if (customerIdsCoveredByContracts.has(c.id)) return
+      const endDate = new Date(c.contract_end_date)
       const months_remaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30))
-      
-      return {
-        customer_id: customer.id,
-        company_name: customer.company_name,
-        contract_end_date: customer.contract_end_date,
-        annual_value: customer.annual_value || 0,
-        assigned_account_manager: customer.assigned_account_manager || 'Ej tilldelad',
+      fallbackRows.push({
+        customer_id: c.id,
+        contract_id: null,
+        company_name: c.company_name,
+        display_name: c.company_name,
+        address_label: null,
+        contract_end_date: c.contract_end_date,
+        annual_value: c.annual_value || 0,
+        assigned_account_manager: c.assigned_account_manager || 'Ej tilldelad',
         months_remaining,
-        risk_level: months_remaining <= 1 ? 'high' : months_remaining <= 2 ? 'medium' : 'low'
-      }
-    }) || []
+        risk_level: months_remaining <= 1 ? 'high' : months_remaining <= 2 ? 'medium' : 'low',
+      })
+    })
+
+    return [...contractRows, ...fallbackRows].sort((a, b) =>
+      a.contract_end_date.localeCompare(b.contract_end_date)
+    )
   } catch (error) {
     console.error('Error fetching expiring contracts:', error)
     throw error

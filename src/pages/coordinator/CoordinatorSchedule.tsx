@@ -186,6 +186,9 @@ export default function CoordinatorSchedule() {
             company_name, contact_address, contact_person, contact_phone,
             contact_email, billing_email, billing_address,
             organization_number, parent_customer_id, site_name, is_multisite
+          ),
+          contract:contracts!cases_contract_id_fkey(
+            id, address_label, contact_address, oneflow_contract_id
           )
         `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('technician_absences').select('*'),

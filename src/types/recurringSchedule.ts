@@ -139,6 +139,9 @@ export interface BatchScheduleUnit {
 export interface RecurringSchedule {
   id: string
   customer_id: string
+  // Multi-kontrakt-refaktor (Fas 8a): koppling till specifikt avtal. Null för
+  // kunder utan riktiga contracts-rader (synth-fallback i runtime).
+  contract_id: string | null
   technician_id: string
   frequency: RecurringFrequency
   day_pattern: RecurringDayPattern

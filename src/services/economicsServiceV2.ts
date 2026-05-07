@@ -56,7 +56,14 @@ export interface PaymentVelocityBucket {
 
 export interface CustomerPortfolioRow {
   customer_id: string
+  // Multi-kontrakt-refaktor (Fas 8b): scopas till specifikt avtal när kunden har
+  // flera. Null för kunder med exakt ett aktivt avtal eller synth-fallback.
+  contract_id: string | null
   company_name: string
+  // Visningsetikett: "Bolaget AB" för 1-avtal-kunder, "Bolaget AB — Storgatan 1"
+  // för flerkontrakts-kunder. Treemap använder denna i `name`.
+  display_name: string
+  address_label: string | null
   annual_value: number
   margin_percent: number // genomsnittlig marginal från kundens ärenden senaste 12 mån
   case_count: number
@@ -531,30 +538,106 @@ export const getPaymentVelocity = async (months: number = 6): Promise<PaymentVel
 // ---------- 7. Customer portfolio (ARR + marginal) ----------
 
 export const getCustomerPortfolio = async (): Promise<CustomerPortfolioRow[]> => {
-  const { data: customers } = await supabase
+  // Multi-kontrakt-refaktor (Fas 8b): query mot contracts-tabellen så att en
+  // kund med flera signerade avtal blir flera portfolio-rader (en per avtal med
+  // sin egna ARR + adressetikett). Synth-fallback från customers behövs ENDAST
+  // för kunder utan riktiga contracts-rader; vi gör det inline genom att även
+  // hämta customers utan aktiv contracts-rad och generera en pseudo-row.
+
+  const { data: contracts } = await supabase
+    .from('contracts')
+    .select('id, customer_id, annual_value, address_label, contact_address, customer:customers!contracts_customer_id_fkey(id, company_name, annual_value, is_active)')
+    .in('status', ['signed', 'active'])
+    .neq('billing_active', false)
+
+  const contractsByCustomer = new Map<string, Array<{ id: string; annual_value: number; address_label: string | null; contact_address: string | null }>>()
+  ;(contracts ?? []).forEach((row: any) => {
+    if (!row.customer_id || !row.customer || row.customer.is_active === false) return
+    const list = contractsByCustomer.get(row.customer_id) ?? []
+    list.push({
+      id: row.id,
+      annual_value: Number(row.annual_value ?? row.customer?.annual_value ?? 0),
+      address_label: row.address_label ?? null,
+      contact_address: row.contact_address ?? null,
+    })
+    contractsByCustomer.set(row.customer_id, list)
+  })
+
+  // Hämta även kunder utan riktiga contracts-rader så vi inte tappar bort dem.
+  const { data: customersFallback } = await supabase
     .from('customers')
     .select('id, company_name, annual_value, is_active')
     .eq('is_active', true)
 
-  if (!customers || customers.length === 0) return []
+  const allRows: Array<{
+    customer_id: string
+    contract_id: string | null
+    company_name: string
+    annual_value: number
+    address_label: string | null
+    is_multi: boolean
+  }> = []
 
+  ;(customersFallback ?? []).forEach((c: any) => {
+    const list = contractsByCustomer.get(c.id) ?? []
+    const companyName = c.company_name || 'Okänd kund'
+    if (list.length === 0) {
+      // Synth-fallback: ingen riktig contracts-rad — använd customer.annual_value.
+      const fallbackArr = Number(c.annual_value || 0)
+      if (fallbackArr <= 0) return
+      allRows.push({
+        customer_id: c.id,
+        contract_id: null,
+        company_name: companyName,
+        annual_value: fallbackArr,
+        address_label: null,
+        is_multi: false,
+      })
+    } else {
+      const isMulti = list.length > 1
+      list.forEach(ct => {
+        if (ct.annual_value <= 0) return
+        allRows.push({
+          customer_id: c.id,
+          contract_id: ct.id,
+          company_name: companyName,
+          annual_value: ct.annual_value,
+          address_label: ct.address_label ?? ct.contact_address ?? null,
+          is_multi: isMulti,
+        })
+      })
+    }
+  })
+
+  if (allRows.length === 0) return []
+
+  // Marginal: beräkna per kontrakt om contract_id finns på cases, annars per kund.
   const sinceISO = startOfMonthISO(12)
-
   const { data: cases } = await supabase
     .from('cases')
-    .select('id, customer_id')
+    .select('id, customer_id, contract_id')
     .gte('completed_date', sinceISO)
     .not('completed_date', 'is', null)
 
-  const caseIdsByCust = new Map<string, string[]>()
+  // Map: contract_id -> caseIds, alt customer_id -> caseIds (fallback)
+  const caseIdsByContract = new Map<string, string[]>()
+  const caseIdsByCustomer = new Map<string, string[]>()
   cases?.forEach((c: any) => {
-    if (!c.customer_id) return
-    const arr = caseIdsByCust.get(c.customer_id) || []
-    arr.push(c.id)
-    caseIdsByCust.set(c.customer_id, arr)
+    if (c.contract_id) {
+      const arr = caseIdsByContract.get(c.contract_id) || []
+      arr.push(c.id)
+      caseIdsByContract.set(c.contract_id, arr)
+    } else if (c.customer_id) {
+      const arr = caseIdsByCustomer.get(c.customer_id) || []
+      arr.push(c.id)
+      caseIdsByCustomer.set(c.customer_id, arr)
+    }
   })
 
-  const allCaseIds = Array.from(caseIdsByCust.values()).flat()
+  const allCaseIds = [
+    ...Array.from(caseIdsByContract.values()).flat(),
+    ...Array.from(caseIdsByCustomer.values()).flat(),
+  ]
 
   let costByCase = new Map<string, { revenue: number; cost: number }>()
 
@@ -575,8 +658,10 @@ export const getCustomerPortfolio = async (): Promise<CustomerPortfolioRow[]> =>
     })
   }
 
-  return customers.map((c: any) => {
-    const caseIds = caseIdsByCust.get(c.id) || []
+  return allRows.map(row => {
+    const caseIds = row.contract_id
+      ? caseIdsByContract.get(row.contract_id) || []
+      : caseIdsByCustomer.get(row.customer_id) || []
     const agg = caseIds.reduce((acc, cid) => {
       const v = costByCase.get(cid)
       if (!v) return acc
@@ -585,10 +670,16 @@ export const getCustomerPortfolio = async (): Promise<CustomerPortfolioRow[]> =>
       return acc
     }, { revenue: 0, cost: 0 })
     const marginPct = agg.revenue > 0 ? ((agg.revenue - agg.cost) / agg.revenue) * 100 : 0
+    const displayName = row.is_multi && row.address_label
+      ? `${row.company_name} — ${row.address_label}`
+      : row.company_name
     return {
-      customer_id: c.id,
-      company_name: c.company_name || 'Okänd kund',
-      annual_value: Number(c.annual_value || 0),
+      customer_id: row.customer_id,
+      contract_id: row.contract_id,
+      company_name: row.company_name,
+      display_name: displayName,
+      address_label: row.address_label,
+      annual_value: row.annual_value,
       margin_percent: marginPct,
       case_count: caseIds.length,
     }

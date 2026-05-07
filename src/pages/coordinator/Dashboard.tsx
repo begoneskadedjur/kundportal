@@ -568,11 +568,11 @@ export default function CoordinatorDashboard() {
                 }
                 return (
                   <div
-                    key={contract.customer_id}
+                    key={contract.contract_id ?? contract.customer_id}
                     className={`border-l-2 rounded-r-lg px-3 py-2 ${riskColors[contract.risk_level]}`}
                   >
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-white truncate">{contract.company_name}</p>
+                      <p className="text-sm text-white truncate">{contract.display_name}</p>
                       <span className={`text-xs flex-shrink-0 ml-2 ${riskTextColors[contract.risk_level]}`}>
                         {contract.months_remaining <= 1 ? '<1 mån' : `${contract.months_remaining} mån`}
                       </span>

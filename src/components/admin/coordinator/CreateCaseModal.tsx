@@ -16,6 +16,8 @@ import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../sh
 import { CaseImageService, CaseImageWithUrl } from '../../../services/caseImageService';
 import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard';
 import { CaseNumberService } from '../../../services/caseNumberService';
+import { ContractService } from '../../../services/contractService';
+import type { ContractWithBilling } from '../../../types/database';
 
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
@@ -70,6 +72,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [customersWithStations, setCustomersWithStations] = useState<Set<string>>(new Set());
   const [selectedContractCustomer, setSelectedContractCustomer] = useState<string | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  // Multi-kontrakt-refaktor (Fas 8c): aktiva avtal för vald kund + valt avtal.
+  // Visas i UI bara när >1, annars auto-väljs det enda. Synth-rader (id 'synth-*')
+  // får aldrig sparas till cases.contract_id — vi filtrerar bort dem vid insert.
+  const [customerContracts, setCustomerContracts] = useState<ContractWithBilling[]>([]);
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [multisiteRoles, setMultisiteRoles] = useState<any[]>([]);
   const [timeSlotDuration, setTimeSlotDuration] = useState(60);
   const [loading, setLoading] = useState(false);
@@ -475,6 +482,37 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   }, [selectedContractCustomer, selectedSiteId, contractCustomers, multisiteRoles]);
 
+  // Multi-kontrakt-refaktor (Fas 8c): hämta aktiva avtal för vald avtalskund.
+  // Använder sitens customer_id för multisite (kontrakt hänger på siten).
+  useEffect(() => {
+    const targetCustomerId = selectedSiteId || selectedContractCustomer;
+    if (!targetCustomerId) {
+      setCustomerContracts([]);
+      setSelectedContractId(null);
+      return;
+    }
+    let cancelled = false;
+    ContractService.getActiveContracts(targetCustomerId)
+      .then(contracts => {
+        if (cancelled) return;
+        setCustomerContracts(contracts);
+        // Auto-välj första (eller enda) — ändrar bara om inget redan valts eller
+        // om kunden bytts.
+        const first = contracts[0]?.id ?? null;
+        setSelectedContractId(prev => {
+          if (prev && contracts.some(c => c.id === prev)) return prev;
+          return first;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCustomerContracts([]);
+          setSelectedContractId(null);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [selectedContractCustomer, selectedSiteId]);
+
   // Click-outside och Escape för kundselektor-dropdown
   useEffect(() => {
     if (!customerDropdownOpen) return;
@@ -724,6 +762,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       const caseNumber = generatedCaseNumber || await CaseNumberService.generateUniqueCaseNumber();
       if (!generatedCaseNumber) setGeneratedCaseNumber(caseNumber);
 
+      // Multi-kontrakt-refaktor (Fas 8c): vilket kontrakt ärendet bokas mot.
+      // Synth-rader (id 'synth-...') sparas inte till DB — null blir signalen
+      // till runtime att fallbacka via customer_id.
+      const persistedContractId = selectedContractId && !selectedContractId.startsWith('synth-')
+        ? selectedContractId
+        : null;
+
       if (caseType === 'inspection') {
         // Hantera stationskontroll-ärenden
         // Om multisite, använd sitens customer_id istället för huvudkundens
@@ -741,6 +786,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         // Skapa case-ärende först
         const caseData = {
           customer_id: actualCustomerId!,
+          contract_id: persistedContractId,
           site_id: customer?.is_multisite ? selectedSiteId : null,
           title: caseNumber,
           description: formData.description || 'Schemalagd stationskontroll',
@@ -835,6 +881,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
         const caseData = {
           customer_id: actualCustomerId, // Använd rätt customer_id (site eller huvudkund)
+          contract_id: persistedContractId,
           site_id: customer?.is_multisite ? selectedSiteId : null,
           title: caseNumber,
           description: formData.description || '',
@@ -1231,7 +1278,36 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   return null;
                 })()
               )}
-              
+
+              {/* Multi-kontrakt-väljare: visas bara när vald avtalskund har > 1
+                  aktivt avtal. Synth-rader (kunder utan riktiga contracts-rader)
+                  räknas inte. För 99% av kunderna med 1 avtal är UI:t oförändrat. */}
+              {(caseType === 'contract' || caseType === 'inspection') &&
+               selectedContractCustomer &&
+               customerContracts.filter(c => !c.id.startsWith('synth-')).length > 1 && (
+                <div className="p-3 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-xl">
+                  <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-[#20c58f]" />
+                    Välj avtal *
+                  </label>
+                  <Select
+                    value={selectedContractId ?? ''}
+                    onChange={v => setSelectedContractId(v || null)}
+                    options={customerContracts
+                      .filter(c => !c.id.startsWith('synth-'))
+                      .map(c => ({
+                        value: c.id,
+                        label: c.address_label || c.contact_address || `Avtal ${c.oneflow_contract_id}`,
+                      }))}
+                    placeholder="Välj vilket avtal ärendet ska bokas mot..."
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Kunden har flera avtal. Välj rätt avtal så att rapporter och historik
+                    kopplas korrekt.
+                  </p>
+                </div>
+              )}
+
               {/* Offertinnehåll (visas om ärendet har Oneflow-koppling) */}
               {offerDetails && (
                 <div className="p-3 bg-[#20c58f]/5 border border-[#20c58f]/20 rounded-xl">

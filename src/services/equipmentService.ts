@@ -36,6 +36,9 @@ export class EquipmentService {
             id, code, name, color, icon, prefix,
             measurement_unit, measurement_label,
             threshold_warning, threshold_critical, threshold_direction
+          ),
+          contract:contracts!equipment_placements_contract_id_fkey(
+            id, address_label, contact_address, oneflow_contract_id
           )
         `)
         .eq('customer_id', customerId)

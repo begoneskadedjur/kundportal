@@ -56,10 +56,10 @@ const ChurnRiskSection: React.FC = () => {
               <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
                 {highRisk.slice(0, 5).map(contract => (
                   <div
-                    key={contract.customer_id}
+                    key={contract.contract_id ?? contract.customer_id}
                     className="flex items-center justify-between text-xs px-2.5 py-2 bg-red-500/5 border border-red-500/15 rounded-lg"
                   >
-                    <span className="text-slate-200 font-medium truncate max-w-[140px]">{contract.company_name}</span>
+                    <span className="text-slate-200 font-medium truncate max-w-[140px]">{contract.display_name}</span>
                     <span className="text-red-400 shrink-0">{contract.months_remaining} mån</span>
                     <span className="text-slate-400 shrink-0">{formatCurrency(contract.annual_value)}</span>
                   </div>

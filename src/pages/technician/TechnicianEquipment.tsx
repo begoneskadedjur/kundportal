@@ -11,6 +11,7 @@ import {
   getEquipmentTypeLabel
 } from '../../types/database'
 import { EquipmentService, CustomerStationSummary } from '../../services/equipmentService'
+import { ContractService } from '../../services/contractService'
 import {
   EquipmentPlacementForm,
   EquipmentFormData,
@@ -288,9 +289,23 @@ export default function TechnicianEquipment() {
 
         toast.success('Utrustning uppdaterad')
       } else {
+        // Multi-kontrakt-refaktor (Fas 8d): auto-resolva contract_id från
+        // kundens aktiva kontrakt. Vid >1 avtal väljs det första — admin kan
+        // sedan flytta utrustning till rätt avtal via CustomerEquipmentDualView.
+        // Synth-rader (id 'synth-...') sparas inte.
+        let resolvedContractId: string | null = null
+        try {
+          const contracts = await ContractService.getActiveContracts(customerId)
+          const real = contracts.filter(c => !c.id.startsWith('synth-'))
+          resolvedContractId = real[0]?.id ?? null
+        } catch {
+          resolvedContractId = null
+        }
+
         // Skapa ny
         const result = await EquipmentService.createEquipment({
           customer_id: customerId,
+          contract_id: resolvedContractId,
           placed_by_technician_id: technicianId,
           equipment_type: formData.equipment_type,
           serial_number: formData.serial_number || null,

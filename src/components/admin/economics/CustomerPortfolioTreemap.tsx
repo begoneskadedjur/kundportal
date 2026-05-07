@@ -21,7 +21,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   const d = payload[0].payload
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl min-w-[200px]">
-      <p className="text-xs font-semibold text-slate-200 mb-1 truncate">{d.company_name}</p>
+      <p className="text-xs font-semibold text-slate-200 mb-1 truncate">{d.display_name}</p>
       <div className="flex justify-between text-xs gap-4 mb-0.5">
         <span className="text-slate-400">ARR</span>
         <span className="text-slate-200 font-medium">{formatCurrency(d.annual_value)}</span>
@@ -41,12 +41,12 @@ const CustomTooltip = ({ active, payload }: any) => {
 }
 
 const TreemapContent: React.FC<any> = (props) => {
-  const { x, y, width, height, depth, company_name, annual_value, margin_percent, case_count } = props
+  const { x, y, width, height, depth, display_name, annual_value, margin_percent, case_count } = props
   // Treemap rendrerar rot-noden (depth 0) och sedan leaf-noder. Rot saknar vår data — hoppa över.
   if (depth === 0) return null
   if (typeof width !== 'number' || typeof height !== 'number' || width < 2 || height < 2) return null
 
-  const name = typeof company_name === 'string' ? company_name : ''
+  const name = typeof display_name === 'string' ? display_name : ''
   const safeMargin = typeof margin_percent === 'number' ? margin_percent : null
   const safeCaseCount = typeof case_count === 'number' ? case_count : 0
   const safeArr = typeof annual_value === 'number' ? annual_value : 0
@@ -141,7 +141,7 @@ const CustomerPortfolioTreemap: React.FC = () => {
             <Treemap
               data={rows}
               dataKey="annual_value"
-              nameKey="company_name"
+              nameKey="display_name"
               aspectRatio={4 / 3}
               stroke="#0f172a"
               content={<TreemapContent />}

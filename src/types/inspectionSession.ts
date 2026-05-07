@@ -58,6 +58,9 @@ export interface StationInspectionSession {
   id: string
   case_id: string | null
   customer_id: string
+  // Multi-kontrakt-refaktor (Fas 8a): koppling till avtal som kontrollen gäller.
+  // Null för kunder utan riktiga contracts-rader.
+  contract_id: string | null
   technician_id: string | null
   scheduled_at: string | null
   scheduled_end: string | null
