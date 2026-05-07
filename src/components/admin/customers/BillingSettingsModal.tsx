@@ -172,7 +172,7 @@ export default function BillingSettingsModal({
   // Init form
   useEffect(() => {
     if (!isOpen || !customerId) return
-    setBillingFrequency(currentBillingFrequency || 'yearly')
+    setBillingFrequency(currentBillingFrequency || 'annual')
     setPriceListId(currentPriceListId || null)
     setBillingEmail(currentBillingEmail || '')
     setBillingAddress(currentBillingAddress || '')

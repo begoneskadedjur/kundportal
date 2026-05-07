@@ -253,7 +253,7 @@ export default function ImportCustomerByOrgnrModal({
 
       setPreview({
         ...data.preview,
-        billing_frequency: data.preview.billing_frequency ?? 'monthly',
+        billing_frequency: data.preview.billing_frequency ?? 'annual',
         billing_anchor_month: anchorMonth,
         contract_type: data.preview.contract_type ?? null,
         agreement_text: data.preview.agreement_text ?? null,
