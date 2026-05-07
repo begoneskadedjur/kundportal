@@ -94,10 +94,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const handleDraftArticlesChange = useCallback((items: CaseBillingItemWithRelations[]) => {
     setDraftBillingItems(items)
   }, []);
-  // Default-expanderad när bokningen sker på ett befintligt ärende (signerad
-  // offert) — då finns ofta tjänsterader redan från offerten som koordinatorn
-  // bör se direkt utan extra klick. Helt nytt ärende från scratch: kollapsad.
-  const [showArticles, setShowArticles] = useState(!!initialCaseData?.id);
+  // Default-stängd vid mount; öppnas explicit nedan via useEffect när
+  // initialCaseData kommer in (befintligt ärende → tjänsterna ska synas direkt).
+  // useState-initialvärdet räcker inte — modalen kan monteras innan koordinator
+  // klickat (initialCaseData = undefined) och låses då till false.
+  const [showArticles, setShowArticles] = useState(false);
   const [offerDetails, setOfferDetails] = useState<{
     agreement_text: string | null;
     selected_products: any[] | null;
@@ -283,6 +284,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       handleReset();
     }
   }, [isOpen, initialCaseData, initialCaseType, handleReset]);
+
+  // Default-expandera Tjänster & fakturarader vid bokning av befintligt ärende.
+  // useState ovan räcker inte eftersom modalen kan monteras med initialCaseData=null
+  // och låsa initialvärdet till false innan propen ändras.
+  useEffect(() => {
+    if (isOpen && initialCaseData?.id) {
+      setShowArticles(true);
+    }
+  }, [isOpen, initialCaseData?.id]);
 
   // Separat useEffect för tekniker-förval - hanterar timing-problem med asynkron laddning
   useEffect(() => {
@@ -1076,7 +1086,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       }
 
       setSubmitted(true);
-      setTimeout(() => { onSuccess(); onClose(); }, 1500);
+      // Vänta in onSuccess (t.ex. fetchData i CoordinatorSchedule) innan
+      // modalen stängs. Annars hinner inte schemats allCases-state uppdateras
+      // före användaren klickar in på ärendet → stale data i EditCaseModal.
+      setTimeout(async () => {
+        await Promise.resolve(onSuccess());
+        onClose();
+      }, 1500);
     } catch (err: any) {
       setError(`Fel: ${err.message}`);
       toast.error('Kunde inte spara ärendet.');

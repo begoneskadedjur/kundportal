@@ -363,7 +363,13 @@ export default function CoordinatorSchedule() {
     }
   }, [])
 
-  const handleCreateSuccess = () => { setIsCreateModalOpen(false); setSelectedCase(null); fetchData() }
+  // Async så CreateCaseModal kan await:a och vänta in färsk data innan
+  // modalen stängs — annars renderar EditCaseModal stale state vid klick.
+  const handleCreateSuccess = async () => {
+    setIsCreateModalOpen(false)
+    setSelectedCase(null)
+    await fetchData()
+  }
   const handleAbsenceCreateSuccess = () => { setIsAbsenceModalOpen(false); fetchData() }
 
   // ─── Render ───
