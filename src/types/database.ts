@@ -484,43 +484,62 @@ export type Database = {
         Row: {
           id: string
           oneflow_contract_id: string
-          
+
           source_type: 'private_case' | 'business_case' | 'manual'
           source_id: string | null
-          
+
           type: 'contract' | 'offer'
-          status: 'pending' | 'signed' | 'declined' | 'active' | 'ended' | 'overdue'
+          status: 'pending' | 'signed' | 'declined' | 'active' | 'ended' | 'overdue' | 'draft' | 'trashed'
           template_id: string
-          
+
           begone_employee_name: string | null
           begone_employee_email: string | null
           contract_length: string | null
           start_date: string | null
-          
+
           // Creator tracking (vem skapade kontraktet)
           created_by_email: string | null
           created_by_name: string | null
           created_by_role: string | null
-          
+
           contact_person: string | null
           contact_email: string | null
           contact_phone: string | null
           contact_address: string | null
           company_name: string | null
           organization_number: string | null
-          
+
           agreement_text: string | null
           total_value: number | null
-          
+
           selected_products: any | null // JSONB
-          
+
           billing_email: string | null
           billing_address: string | null
-          
+
           customer_id: string | null
 
           // Kundgrupp (vald i wizard vid avtal)
           customer_group_id: string | null
+
+          // Multi-kontrakt-refaktor (Fas 1, 2026-05): avtals- och faktureringsfält som
+          // tidigare bodde på customers-raden. customers-fälten är @deprecated men
+          // bevaras under övergångsfas — ContractService.getActiveContracts gör synth-
+          // fallback från customers när ingen rad finns här.
+          annual_value: number | null
+          total_contract_value: number | null
+          billing_frequency: 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'on_demand' | null
+          billing_anchor_month: number | null
+          billing_active: boolean | null
+          contract_start_date: string | null
+          contract_end_date: string | null
+          terminated_at: string | null
+          termination_reason: string | null
+          notice_period_months: number | null
+          effective_end_date: string | null
+          contract_type: string | null
+          address_label: string | null
+          display_order: number | null
 
           created_at: string
           updated_at: string
@@ -1100,6 +1119,13 @@ export type BillingAuditLogUpdate = Database['public']['Tables']['billing_audit_
 export type Contract = Database['public']['Tables']['contracts']['Row']
 export type ContractInsert = Database['public']['Tables']['contracts']['Insert']
 export type ContractUpdate = Database['public']['Tables']['contracts']['Update']
+
+// Multi-kontrakt-refaktor: avtal med faktureringsfält. _synthetic markerar rader
+// som härleds från customers-fallback (ContractService.getActiveContracts) — finns
+// inte i DB. Använd istället för Contract i kod som läser/skriver fakturering.
+export type ContractWithBilling = Contract & {
+  _synthetic?: boolean
+}
 
 // 🆕 CONTRACT FILES TYPES
 export type ContractFile = Database['public']['Tables']['contract_files']['Row']

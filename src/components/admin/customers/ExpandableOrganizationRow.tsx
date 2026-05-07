@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Kompakt rad, klick öppnar sidopanel
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, Users } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, Users, FileSignature } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 
@@ -159,6 +159,24 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                 <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full border border-blue-500/30">
                   {organization.totalSites} enheter
                 </span>
+              )}
+              {/* Multi-kontrakt-badge: signalerar att kunden har flera Oneflow-avtal
+                  som faktureras separat. Visas bara när > 1; för 0/1 förblir UI:t
+                  identiskt med tidigare. */}
+              {organization.contractCount > 1 && (
+                <CustomTooltip
+                  content={
+                    <div className="text-xs">
+                      Kunden har {organization.contractCount} signerade avtal som faktureras separat.
+                    </div>
+                  }
+                  position="bottom"
+                >
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-[#20c58f]/15 text-[#20c58f] px-1.5 py-0.5 rounded-full border border-[#20c58f]/30">
+                    <FileSignature className="w-3 h-3" />
+                    {organization.contractCount} avtal
+                  </span>
+                </CustomTooltip>
               )}
               {/* Status-badge */}
               {organization.isPaused ? (

@@ -1,8 +1,27 @@
 // src/services/contractService.ts - Service för contracts CRUD-operationer
 import { supabase } from '../lib/supabase'
-import { Contract, ContractInsert, ContractUpdate } from '../types/database'
+import { Contract, ContractInsert, ContractUpdate, ContractWithBilling } from '../types/database'
 import { ALLOWED_TEMPLATE_IDS } from '../constants/oneflowTemplates'
 import toast from 'react-hot-toast'
+
+// Multi-kontrakt-refaktor (Fas 2): kolumner som getActiveContracts/getAllContracts
+// /getContractById hämtar. Innehåller både ursprungliga och de nya billing-kolumnerna.
+const CONTRACT_BILLING_COLUMNS = `
+  id, oneflow_contract_id, source_type, source_id, type, status, template_id,
+  begone_employee_name, begone_employee_email, contract_length, start_date,
+  created_by_email, created_by_name, created_by_role,
+  contact_person, contact_email, contact_phone, contact_address,
+  company_name, organization_number, agreement_text, total_value,
+  selected_products, billing_email, billing_address, customer_id,
+  customer_group_id, created_at, updated_at,
+  annual_value, total_contract_value, billing_frequency, billing_anchor_month,
+  billing_active, contract_start_date, contract_end_date, terminated_at,
+  termination_reason, notice_period_months, effective_end_date, contract_type,
+  address_label, display_order
+`
+
+const ACTIVE_CONTRACT_STATUSES = ['signed', 'active'] as const
+const SYNTHETIC_IMPORTED_PREFIX = 'imported-'
 
 export interface ContractWithSourceData extends Contract {
   // Utökad data från källärendet
@@ -1830,6 +1849,206 @@ export class ContractService {
     }
   }
 
+  // ========== Multi-kontrakt-refaktor (Fas 2) ==========
+  //
+  // Sanningskällan för avtals- och faktureringsdata är contracts-tabellen.
+  // Befintliga kunder migreras inte; istället syntetiseras en Contract-rad
+  // från customers-fälten när inga riktiga rader finns. Synth-rader markeras
+  // med _synthetic: true och får aldrig skrivas till DB.
+
+  /**
+   * Hämtar aktiva avtal (status signed/active, billing_active != false) för en kund.
+   * Vid tom resultatlista byggs en syntetisk rad från customers-fälten om kunden
+   * har avtalsdata där (annual_value, oneflow_contract_id eller contract_start_date).
+   */
+  static async getActiveContracts(customerId: string): Promise<ContractWithBilling[]> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .select(CONTRACT_BILLING_COLUMNS)
+      .eq('customer_id', customerId)
+      .in('status', ACTIVE_CONTRACT_STATUSES as unknown as string[])
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
+
+    if (error) throw new Error(`Kunde inte hämta kontrakt: ${error.message}`)
+
+    const rows = (data ?? []).filter((c: any) => c.billing_active !== false) as ContractWithBilling[]
+    if (rows.length > 0) return rows
+
+    const synth = await ContractService.buildSyntheticContract(customerId)
+    return synth ? [synth] : []
+  }
+
+  /**
+   * Som getActiveContracts men inkluderar terminerade och inaktiva. För historikvyer.
+   * Gör INTE synth-fallback — vi vill kunna se "kunden har inget kontrakt" här.
+   */
+  static async getAllContractsWithBilling(customerId: string): Promise<ContractWithBilling[]> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .select(CONTRACT_BILLING_COLUMNS)
+      .eq('customer_id', customerId)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
+
+    if (error) throw new Error(`Kunde inte hämta kontrakt: ${error.message}`)
+    return (data ?? []) as ContractWithBilling[]
+  }
+
+  /**
+   * Hämtar enskild contracts-rad inkl. nya billing-kolumner. Returnerar null om ej hittad.
+   */
+  static async getContractWithBillingById(contractId: string): Promise<ContractWithBilling | null> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .select(CONTRACT_BILLING_COLUMNS)
+      .eq('id', contractId)
+      .maybeSingle()
+
+    if (error) throw new Error(`Kunde inte hämta kontrakt: ${error.message}`)
+    return (data as ContractWithBilling | null) ?? null
+  }
+
+  /**
+   * Uppdatera billing-/avtalsfält på ett kontrakt.
+   * Returnerar uppdaterad rad.
+   */
+  static async updateBilling(
+    contractId: string,
+    patch: Partial<Pick<Contract,
+      | 'annual_value'
+      | 'total_contract_value'
+      | 'billing_frequency'
+      | 'billing_anchor_month'
+      | 'billing_active'
+      | 'contract_start_date'
+      | 'contract_end_date'
+      | 'contract_length'
+      | 'contract_type'
+      | 'notice_period_months'
+      | 'effective_end_date'
+      | 'address_label'
+      | 'agreement_text'
+    >>,
+  ): Promise<ContractWithBilling> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', contractId)
+      .select(CONTRACT_BILLING_COLUMNS)
+      .single()
+
+    if (error) throw new Error(`Kunde inte uppdatera kontrakt: ${error.message}`)
+    return data as ContractWithBilling
+  }
+
+  /**
+   * Markera ett kontrakt som uppsagt.
+   */
+  static async terminateContract(
+    contractId: string,
+    reason: string | null,
+    terminatedAt: string | Date = new Date(),
+  ): Promise<ContractWithBilling> {
+    const iso = terminatedAt instanceof Date ? terminatedAt.toISOString() : terminatedAt
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({
+        terminated_at: iso,
+        termination_reason: reason,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', contractId)
+      .select(CONTRACT_BILLING_COLUMNS)
+      .single()
+
+    if (error) throw new Error(`Kunde inte säga upp kontrakt: ${error.message}`)
+    return data as ContractWithBilling
+  }
+
+  /**
+   * Bygger syntetisk Contract-rad från customers-fält. Returneras med _synthetic: true.
+   * Returnerar null om kunden inte har tillräckligt med avtalsdata för att räknas som
+   * avtalskund (varken oneflow_contract_id, annual_value eller contract_start_date satt).
+   */
+  private static async buildSyntheticContract(customerId: string): Promise<ContractWithBilling | null> {
+    const { data: c, error } = await supabase
+      .from('customers')
+      .select(`
+        id, oneflow_contract_id, annual_value, total_contract_value,
+        contract_start_date, contract_end_date, contract_length, contract_type,
+        billing_frequency, billing_anchor_month, billing_active, terminated_at,
+        termination_reason, notice_period_months, effective_end_date,
+        agreement_text, contact_address, contact_person, contact_email,
+        contact_phone, company_name, organization_number, billing_email,
+        billing_address, customer_group_id
+      `)
+      .eq('id', customerId)
+      .maybeSingle()
+
+    if (error || !c) return null
+
+    const cust = c as any
+    const hasContractData =
+      !!cust.oneflow_contract_id ||
+      (cust.annual_value != null && Number(cust.annual_value) > 0) ||
+      !!cust.contract_start_date
+
+    if (!hasContractData) return null
+
+    const oneflowId = cust.oneflow_contract_id ?? `${SYNTHETIC_IMPORTED_PREFIX}${customerId}`
+    const nowIso = new Date().toISOString()
+
+    const synthetic: ContractWithBilling = {
+      id: `synth-${customerId}`,
+      oneflow_contract_id: oneflowId,
+      source_type: 'manual',
+      source_id: null,
+      type: 'contract',
+      status: cust.terminated_at ? 'ended' : 'active',
+      template_id: 'synthetic',
+      begone_employee_name: null,
+      begone_employee_email: null,
+      contract_length: cust.contract_length,
+      start_date: cust.contract_start_date,
+      created_by_email: null,
+      created_by_name: null,
+      created_by_role: null,
+      contact_person: cust.contact_person,
+      contact_email: cust.contact_email,
+      contact_phone: cust.contact_phone,
+      contact_address: cust.contact_address,
+      company_name: cust.company_name,
+      organization_number: cust.organization_number,
+      agreement_text: cust.agreement_text,
+      total_value: cust.total_contract_value,
+      selected_products: null,
+      billing_email: cust.billing_email,
+      billing_address: cust.billing_address,
+      customer_id: cust.id,
+      customer_group_id: cust.customer_group_id,
+      created_at: nowIso,
+      updated_at: nowIso,
+      annual_value: cust.annual_value,
+      total_contract_value: cust.total_contract_value,
+      billing_frequency: cust.billing_frequency as ContractWithBilling['billing_frequency'],
+      billing_anchor_month: cust.billing_anchor_month,
+      billing_active: cust.billing_active ?? true,
+      contract_start_date: cust.contract_start_date,
+      contract_end_date: cust.contract_end_date,
+      terminated_at: cust.terminated_at,
+      termination_reason: cust.termination_reason,
+      notice_period_months: cust.notice_period_months,
+      effective_end_date: cust.effective_end_date,
+      contract_type: cust.contract_type,
+      address_label: cust.contact_address,
+      display_order: 0,
+      _synthetic: true,
+    }
+
+    return synthetic
+  }
+
   // Hämta väntande offerter för en kund (från den nya vyn)
   static async getCustomerPendingQuotes(customerId?: string) {
     try {
@@ -1858,6 +2077,12 @@ export class ContractService {
       throw error
     }
   }
+}
+
+// Multi-kontrakt-refaktor: identifiera om en ContractWithBilling är syntetisk
+// (härledd från customers-fält i runtime, inte sparad i contracts-tabellen).
+export function isSyntheticContract(contract: ContractWithBilling): boolean {
+  return contract._synthetic === true
 }
 
 // Hjälpfunktioner för kontrakt

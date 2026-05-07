@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import {
   Building2, Search, CheckCircle, AlertCircle, Loader2, ExternalLink, Edit3, Save, Receipt,
-  ChevronDown, ChevronRight, CalendarDays
+  ChevronDown, ChevronRight, CalendarDays, FileSignature
 } from 'lucide-react'
 import { BILLING_FREQUENCY_CONFIG, type BillingFrequency } from '../../../types/contractBilling'
 import Modal from '../../ui/Modal'
@@ -71,6 +71,30 @@ interface PreviewData {
   price_list_id: string | null
 }
 
+// Multi-kontrakt-refaktor (Fas 4): ett extraherat Oneflow-kontrakt från preview-svaret.
+// Motsvarar return-typen från extractOneflowData i api/import-customer-by-orgnr.ts.
+interface ExtractedContract {
+  contact_person: string | null
+  contact_email: string | null
+  contact_phone: string | null
+  contact_address: string | null
+  address_label: string | null
+  contract_start_date: string | null
+  contract_end_date: string | null
+  contract_length: string | null
+  company_name_oneflow: string | null
+  annual_value: number | null
+  total_contract_value: number | null
+  products: Array<{ name: string; quantity: number; price: number; description: string }> | null
+  oneflow_contract_id: string
+  contract_type: string | null
+  agreement_text: string | null
+  sales_person: string | null
+  sales_person_email: string | null
+  assigned_account_manager: string | null
+  account_manager_email: string | null
+}
+
 interface ImportCustomerByOrgnrModalProps {
   isOpen: boolean
   onClose: () => void
@@ -78,6 +102,17 @@ interface ImportCustomerByOrgnrModalProps {
 }
 
 type Step = 'search' | 'preview' | 'saving' | 'done'
+
+// Extraherar antal månader från fritextfältet (t.ex. "6 månader", "3 år").
+// Returnerar null vid okänt format så normalisering hoppas över.
+function parseContractLengthMonthsStrict(text: string | null | undefined): number | null {
+  if (!text) return null
+  const match = String(text).match(/(\d+)\s*(år|year|years|months?|månader?|månad|mån)/i)
+  if (!match) return null
+  const n = parseInt(match[1])
+  if (!Number.isFinite(n) || n <= 0) return null
+  return /år|year/i.test(match[2]) ? n * 12 : n
+}
 
 function Field({
   label, value, onChange, placeholder, type = 'text', readOnly = false
@@ -156,6 +191,10 @@ export default function ImportCustomerByOrgnrModal({
   const [invoiceTypes, setInvoiceTypes] = useState<Record<string, 'contract' | 'ad_hoc'>>({})
   const [error, setError] = useState<{ message: string; existingId?: string; existingName?: string } | null>(null)
   const [savedCustomer, setSavedCustomer] = useState<{ id: string; company_name: string } | null>(null)
+  // Multi-kontrakt-refaktor (Fas 4): alla signerade Oneflow-kontrakt från preview-svaret
+  // + vilka som ska importeras (alla förvalda). Visas som väljarsektion när > 1.
+  const [extractedContracts, setExtractedContracts] = useState<ExtractedContract[]>([])
+  const [selectedContractIds, setSelectedContractIds] = useState<Set<string>>(new Set())
 
   const handleClose = () => {
     setStep('search')
@@ -168,6 +207,8 @@ export default function ImportCustomerByOrgnrModal({
     setError(null)
     setSources(null)
     setSavedCustomer(null)
+    setExtractedContracts([])
+    setSelectedContractIds(new Set())
     onClose()
   }
 
@@ -223,6 +264,13 @@ export default function ImportCustomerByOrgnrModal({
       // Default: alla markerade för import som 'contract'
       setSelectedForImport(new Set(fetchedInvoices.map((inv: FortnoxInvoice) => inv.DocumentNumber)))
       setInvoiceTypes(Object.fromEntries(fetchedInvoices.map((inv: FortnoxInvoice) => [inv.DocumentNumber, 'contract' as const])))
+
+      // Multi-kontrakt: lagra alla extraherade Oneflow-kontrakt + förvälj alla.
+      // Backend returnerar contracts: ExtractedContract[] (Fas 3).
+      const fetchedContracts: ExtractedContract[] = Array.isArray(data.contracts) ? data.contracts : []
+      setExtractedContracts(fetchedContracts)
+      setSelectedContractIds(new Set(fetchedContracts.map(c => c.oneflow_contract_id)))
+
       setSources(data.sources)
       setStep('preview')
     } catch {
@@ -243,10 +291,21 @@ export default function ImportCustomerByOrgnrModal({
         billing_active: true,
       }
 
+      // Multi-kontrakt: skicka valda kontrakt så backend skapar contracts-rader.
+      // Vid 0 hittade Oneflow-kontrakt skickas tom array → backend skapar bara
+      // customer (legacy-läge), exakt som tidigare.
+      const selectedContracts = extractedContracts.filter(c =>
+        selectedContractIds.has(c.oneflow_contract_id)
+      )
+
       const res = await fetch('/api/import-customer-by-orgnr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'confirm', customer_data: customerPayload }),
+        body: JSON.stringify({
+          action: 'confirm',
+          customer_data: customerPayload,
+          selected_contracts: selectedContracts,
+        }),
       })
       const data = await res.json()
 
@@ -427,6 +486,91 @@ export default function ImportCustomerByOrgnrModal({
               </div>
             )}
 
+            {/* Multi-kontrakt-väljare: visas BARA när Oneflow returnerade flera signerade
+                kontrakt för samma org.nr. För 0/1 kontrakt fortsätter resten av modalen
+                fungera som tidigare (avtalsfälten visar primary contract). */}
+            {extractedContracts.length > 1 && (
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+                    <FileSignature className="w-4 h-4 text-slate-400" />
+                    Avtal från Oneflow ({extractedContracts.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedContractIds(prev =>
+                      prev.size === extractedContracts.length
+                        ? new Set()
+                        : new Set(extractedContracts.map(c => c.oneflow_contract_id))
+                    )}
+                    className="text-xs text-[#20c58f] hover:text-[#20c58f]/80"
+                  >
+                    {selectedContractIds.size === extractedContracts.length ? 'Avmarkera alla' : 'Markera alla'}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Kunden har flera signerade avtal. Markera de som ska importeras — varje
+                  avtal skapas som egen rad och faktureras separat.
+                </p>
+                <div className="space-y-2">
+                  {extractedContracts.map(contract => {
+                    const checked = selectedContractIds.has(contract.oneflow_contract_id)
+                    const label = contract.address_label || contract.contact_address || contract.agreement_text || 'Okänd adress'
+                    const period = [contract.contract_start_date, contract.contract_end_date].filter(Boolean).join(' → ') || '—'
+                    const annual = contract.annual_value
+                      ? formatAmount(contract.annual_value)
+                      : 'Avropsavtal'
+                    return (
+                      <label
+                        key={contract.oneflow_contract_id}
+                        className={`flex items-start gap-3 px-3 py-2 rounded-xl border cursor-pointer transition-colors ${
+                          checked
+                            ? 'border-[#20c58f]/40 bg-[#20c58f]/5'
+                            : 'border-slate-700/50 bg-slate-800/20 hover:bg-slate-800/40'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => setSelectedContractIds(prev => {
+                            const next = new Set(prev)
+                            if (next.has(contract.oneflow_contract_id)) {
+                              next.delete(contract.oneflow_contract_id)
+                            } else {
+                              next.add(contract.oneflow_contract_id)
+                            }
+                            return next
+                          })}
+                          className="mt-0.5 rounded border-slate-600 text-[#20c58f] focus:ring-[#20c58f] shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-sm font-medium text-slate-200 truncate">{label}</span>
+                            {contract.contract_type && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-[#20c58f]/15 border border-[#20c58f]/30 text-[#20c58f] rounded-full shrink-0">
+                                {contract.contract_type}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-slate-400">
+                            <span>{period}</span>
+                            <span>·</span>
+                            <span>{annual}</span>
+                            <span>·</span>
+                            <span className="text-slate-500">#{contract.oneflow_contract_id}</span>
+                          </div>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-amber-400/80">
+                  Avtalsfälten nedan visar det första markerade avtalet. Justera per kontrakt
+                  i faktureringsinställningarna efter import.
+                </p>
+              </div>
+            )}
+
             {/* Sektion: Företagsinformation */}
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
               <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
@@ -498,13 +642,25 @@ export default function ImportCustomerByOrgnrModal({
                 <Field label="Avtalsstart" value={preview.contract_start_date ?? ''} onChange={update('contract_start_date')} placeholder="ÅÅÅÅ-MM-DD" />
                 <Field label="Kontraktsslut" value={preview.contract_end_date ?? ''} onChange={update('contract_end_date')} placeholder="ÅÅÅÅ-MM-DD" />
                 <Field label="Avtalslängd" value={preview.contract_length ?? ''} onChange={update('contract_length')} placeholder="t.ex. 3 år" />
-                <Field
-                  label="Årsvärde (kr)"
-                  value={preview.annual_value?.toString() ?? ''}
-                  onChange={v => setPreview(prev => prev ? { ...prev, annual_value: parseFloat(v) || null } : prev)}
-                  placeholder="0"
-                  type="number"
-                />
+                <div>
+                  <Field
+                    label="Årsvärde (kr)"
+                    value={preview.annual_value?.toString() ?? ''}
+                    onChange={v => setPreview(prev => prev ? { ...prev, annual_value: parseFloat(v) || null } : prev)}
+                    placeholder="0"
+                    type="number"
+                  />
+                  {(() => {
+                    const months = parseContractLengthMonthsStrict(preview.contract_length)
+                    if (!months || months >= 12 || !preview.annual_value || preview.annual_value <= 0) return null
+                    const totalValue = Math.round(preview.annual_value * (months / 12))
+                    return (
+                      <p className="text-xs text-amber-400/80 mt-1">
+                        Extrapolerad årstakt från {months} mån avtal · totalvärde {totalValue.toLocaleString('sv-SE')} kr
+                      </p>
+                    )
+                  })()}
+                </div>
                 <Field label="Account Manager" value={preview.assigned_account_manager ?? ''} onChange={update('assigned_account_manager')} placeholder="Ej hämtat" />
                 <Field label="Account Manager e-post" value={preview.account_manager_email ?? ''} onChange={update('account_manager_email')} placeholder="Ej hämtat" />
                 <Field label="Säljare" value={preview.sales_person ?? ''} onChange={update('sales_person')} placeholder="Ej hämtat" />
@@ -720,7 +876,17 @@ export default function ImportCustomerByOrgnrModal({
               <Button variant="ghost" size="sm" onClick={() => { setStep('search'); setError(null) }}>
                 Sök igen
               </Button>
-              <Button variant="primary" size="sm" onClick={handleConfirm}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleConfirm}
+                disabled={extractedContracts.length > 0 && selectedContractIds.size === 0}
+                title={
+                  extractedContracts.length > 0 && selectedContractIds.size === 0
+                    ? 'Markera minst ett avtal för att importera'
+                    : undefined
+                }
+              >
                 <Save className="w-4 h-4 mr-1" />
                 Bekräfta import
               </Button>

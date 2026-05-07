@@ -17,6 +17,7 @@ import { type PriceList } from '../../../types/articles'
 import { type BillingFrequency, BILLING_FREQUENCY_CONFIG, type AdhocInvoiceGrouping } from '../../../types/contractBilling'
 import toast from 'react-hot-toast'
 import { ContractInvoiceGenerator, computePlannedInvoicesPure, type BillingPlan } from '../../../services/contractInvoiceGenerator'
+import { ContractService } from '../../../services/contractService'
 import { PaymentTermsService } from '../../../services/paymentTermsService'
 import BillingPlanPreviewModal from './BillingPlanPreviewModal'
 
@@ -29,6 +30,14 @@ interface SiteBillingData {
 
 interface BillingSettingsModalProps {
   customerId: string | null
+  // Multi-kontrakt-refaktor (Fas 6): scope:ar modalen till ett specifikt kontrakt.
+  // När satt: läs/skriv avtalsfält (annual_value, contract_start_date,
+  // contract_end_date, billing_frequency, billing_anchor_month, billing_active)
+  // mot contracts-raden istället för customers. Kund-fält (billing_email,
+  // billing_address, price_list_id etc) skrivs fortfarande till customers.
+  // När null/undefined: legacy single-kontrakt-läget — alla fält skrivs till customers
+  // (oförändrat beteende från innan Fas 6).
+  contractId?: string | null
   customerName: string
   contactEmail: string
   isMultisite: boolean
@@ -63,6 +72,7 @@ const fmt = (n: number) =>
 
 export default function BillingSettingsModal({
   customerId,
+  contractId = null,
   customerName,
   contactEmail,
   isMultisite,
@@ -139,6 +149,9 @@ export default function BillingSettingsModal({
   // False = ingen contracts-rad, eller bara importerad container → rendera editor.
   const [hasOneflowContract, setHasOneflowContract] = useState(false)
   const [contractReloadTick, setContractReloadTick] = useState(0)
+  // Multi-kontrakt-refaktor (Fas 6): adress-etikett för det scopade kontraktet,
+  // visas i modaltiteln. Bara satt när contractId är inskickat.
+  const [contractAddressLabel, setContractAddressLabel] = useState<string | null>(null)
   // Summa av tjänsterader från CaseServiceSelector (exkl. moms).
   // Används som "beräknat årsbelopp" och placeholder för Fast avtalsvärde.
   const [contractServicesTotal, setContractServicesTotal] = useState(0)
@@ -207,6 +220,33 @@ export default function BillingSettingsModal({
       .then(pl => { if (pl) setPriceListId(pl.id) })
       .catch(console.error)
   }, [isOpen, customerId, currentPriceListId])
+
+  // Multi-kontrakt-refaktor (Fas 6): när modalen scopas till ett specifikt kontrakt,
+  // override:a avtalsfält med contracts-radens värden. Faktureringsfält som tillhör
+  // kunden (billing_email, price_list_id, etc) påverkas inte.
+  useEffect(() => {
+    if (!isOpen || !contractId) {
+      setContractAddressLabel(null)
+      return
+    }
+    let cancelled = false
+    ContractService.getContractWithBillingById(contractId)
+      .then(contract => {
+        if (cancelled || !contract) return
+        // Avtalsfält → lokal state (override:ar prop-default)
+        if (contract.billing_frequency) setBillingFrequency(contract.billing_frequency)
+        setContractStartDate(contract.contract_start_date ?? '')
+        setContractEndDate(contract.contract_end_date ?? '')
+        if (contract.billing_anchor_month != null) setBillingAnchorMonth(contract.billing_anchor_month)
+        if (contract.billing_active != null) setBillingActive(contract.billing_active)
+        if (contract.annual_value != null && Number(contract.annual_value) > 0) {
+          setFixedContractValue(String(contract.annual_value))
+        }
+        setContractAddressLabel(contract.address_label ?? contract.contact_address ?? null)
+      })
+      .catch(err => console.error('[BillingSettingsModal] kunde inte ladda kontrakt:', err))
+    return () => { cancelled = true }
+  }, [isOpen, contractId])
 
   // Load premiejusteringshistorik
   useEffect(() => {
@@ -416,30 +456,56 @@ export default function BillingSettingsModal({
     const annualValue = adjustedTotal > 0 ? adjustedTotal : null
     const monthlyValue = annualValue ? Math.round(annualValue / 12) : null
 
+    // Multi-kontrakt-refaktor (Fas 6): när modalen är scopad till ett kontrakt,
+    // skriv avtalsfälten till contracts-raden istället för customers. Customers-
+    // fälten behålls för bakåtkompat (synth-fallback i ContractService) men är
+    // inte längre sanningskällan för avtalsdata på den här raden.
+    const customerUpdate: Record<string, any> = {
+      price_list_id: priceListId,
+      billing_email: billingEmail || null,
+      billing_address: billingAddress || null,
+      billing_type: isMultisite ? billingType : null,
+      billing_reference: billingReference || null,
+      cost_center: costCenter || null,
+      billing_recipient: billingRecipient || null,
+      price_adjustment_percent: priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) : null,
+      billing_paused_until: billingActive ? null : (billingPausedUntil || null),
+      adhoc_invoice_grouping: adhocInvoiceGrouping,
+      updated_at: new Date().toISOString(),
+    }
+
+    // Avtalsfält: skriv alltid till customers (synth-fallback + dashboards).
+    // När contractId finns skrivs samma data även till contracts (sanningen).
+    customerUpdate.billing_frequency = billingFrequency
+    customerUpdate.annual_value = annualValue
+    customerUpdate.monthly_value = monthlyValue
+    customerUpdate.contract_start_date = contractStartDate || null
+    customerUpdate.contract_end_date = contractEndDate || null
+    customerUpdate.billing_anchor_month = billingAnchorMonth
+    customerUpdate.billing_active = billingActive
+
     const { error } = await supabase
       .from('customers')
-      .update({
-        billing_frequency: billingFrequency,
-        price_list_id: priceListId,
-        billing_email: billingEmail || null,
-        billing_address: billingAddress || null,
-        billing_type: isMultisite ? billingType : null,
-        billing_reference: billingReference || null,
-        cost_center: costCenter || null,
-        billing_recipient: billingRecipient || null,
-        price_adjustment_percent: priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) : null,
-        annual_value: annualValue,
-        monthly_value: monthlyValue,
-        contract_start_date: contractStartDate || null,
-        contract_end_date: contractEndDate || null,
-        billing_anchor_month: billingAnchorMonth,
-        billing_active: billingActive,
-        billing_paused_until: billingActive ? null : (billingPausedUntil || null),
-        adhoc_invoice_grouping: adhocInvoiceGrouping,
-        updated_at: new Date().toISOString(),
-      })
+      .update(customerUpdate)
       .eq('id', customerId)
     if (error) throw error
+
+    // Skriv avtalsfälten även till contracts-raden när scopad
+    if (contractId) {
+      try {
+        await ContractService.updateBilling(contractId, {
+          annual_value: annualValue,
+          billing_frequency: billingFrequency,
+          billing_anchor_month: billingAnchorMonth,
+          billing_active: billingActive,
+          contract_start_date: contractStartDate || null,
+          contract_end_date: contractEndDate || null,
+        })
+      } catch (err) {
+        console.error('[BillingSettingsModal] kunde inte uppdatera contracts-raden:', err)
+        throw err
+      }
+    }
 
     if (priceAdjustments.length > 0) {
       const rows = priceAdjustments.map(a => ({
@@ -554,7 +620,12 @@ export default function BillingSettingsModal({
               <Receipt className="w-4 h-4 text-[#20c58f]" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold text-white truncate">Faktureringsinställningar</h2>
+              <h2 className="text-lg font-semibold text-white truncate">
+                Faktureringsinställningar
+                {contractAddressLabel && (
+                  <span className="text-slate-400 font-normal"> — {contractAddressLabel}</span>
+                )}
+              </h2>
               <p className="text-slate-400 text-xs truncate">{customerName}</p>
             </div>
           </div>

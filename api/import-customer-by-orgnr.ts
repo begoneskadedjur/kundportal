@@ -94,7 +94,11 @@ const getOneflowHeaders = () => ({
 })
 
 
-async function fetchOneflowContractByOrgNr(orgNr: string) {
+// Multi-kontrakt-refaktor (Fas 3): hämtar ALLA signerade/aktiva Oneflow-kontrakt
+// för ett org.nr. Offerter (state ∉ {signed, active}) filtreras bort innan full-
+// fetch så vi aldrig importerar opåskrivna kontrakt. Hämtar full kontraktsdata +
+// parties parallellt.
+async function fetchOneflowContractsByOrgNr(orgNr: string): Promise<Array<{ contract: any; parties: any[] }>> {
   // Org.numret lagras som ett data_field med custom_id "org-nr" i Oneflow-kontrakten
   // Använd filter[data_field_match]=org-nr:<värde> för direkt match
   // Prova både med och utan bindestreck (714800-2590 och 7148002590)
@@ -120,44 +124,47 @@ async function fetchOneflowContractByOrgNr(orgNr: string) {
     if (contracts.length > 0) break
   }
 
-  if (contracts.length === 0) return null
+  if (contracts.length === 0) return []
 
-  // Välj bästa kontrakt: prioritera signed > active > övriga, senast uppdaterat
-  const ranked = [...contracts].sort((a, b) => {
-    const priority = (c: any) =>
-      c.state === 'signed' ? 0 : c.state === 'active' ? 1 : 2
-    if (priority(a) !== priority(b)) return priority(a) - priority(b)
-    return (b.updated_time ?? '').localeCompare(a.updated_time ?? '')
-  })
+  // Filtrera bort offerter/draft/declined — endast signerade/aktiva får importeras
+  const ACTIVE_STATES = new Set(['signed', 'active'])
+  const signed = contracts.filter(c => ACTIVE_STATES.has(String(c.state ?? '')))
+  console.log(`✅ Filtrerade till ${signed.length} signerade/aktiva av ${contracts.length}`)
+  if (signed.length === 0) return []
 
-  const best = ranked[0]
-  console.log(`✅ Bäst match: kontrakt ${best.id} (state: ${best.state})`)
+  // Sortera senast uppdaterat först (stabil UI-ordning)
+  signed.sort((a, b) => (b.updated_time ?? '').localeCompare(a.updated_time ?? ''))
 
-  // Parterna finns redan inline i list-svaret (dokumentationen bekräftar detta)
-  const inlineParties: any[] = Array.isArray(best.parties) ? best.parties : best.parties?.data ?? []
+  // Hämta full contract + parties parallellt per id
+  const results = await Promise.all(signed.map(async (basic) => {
+    const inlineParties: any[] = Array.isArray(basic.parties) ? basic.parties : basic.parties?.data ?? []
 
-  // Hämta fullständig kontraktsdata (data_fields, products etc)
-  const fullRes = await fetch(
-    `https://api.oneflow.com/v1/contracts/${best.id}`,
-    { headers: getOneflowHeaders() }
-  )
-  if (!fullRes.ok) return null
-  const fullContract = await fullRes.json() as any
-
-  // Hämta parties separat om de inte finns inline
-  let parties = inlineParties
-  if (parties.length === 0) {
-    const partiesRes = await fetch(
-      `https://api.oneflow.com/v1/contracts/${best.id}/parties`,
+    const fullRes = await fetch(
+      `https://api.oneflow.com/v1/contracts/${basic.id}`,
       { headers: getOneflowHeaders() }
     )
-    if (partiesRes.ok) {
-      const pd = await partiesRes.json() as any
-      parties = Array.isArray(pd) ? pd : pd.data ?? []
+    if (!fullRes.ok) {
+      console.error(`❌ Oneflow full-fetch fel för ${basic.id}: ${fullRes.status}`)
+      return null
     }
-  }
+    const fullContract = await fullRes.json() as any
 
-  return { contract: fullContract, parties }
+    let parties = inlineParties
+    if (parties.length === 0) {
+      const partiesRes = await fetch(
+        `https://api.oneflow.com/v1/contracts/${basic.id}/parties`,
+        { headers: getOneflowHeaders() }
+      )
+      if (partiesRes.ok) {
+        const pd = await partiesRes.json() as any
+        parties = Array.isArray(pd) ? pd : pd.data ?? []
+      }
+    }
+
+    return { contract: fullContract, parties }
+  }))
+
+  return results.filter((r): r is { contract: any; parties: any[] } => r !== null)
 }
 
 const CONTRACT_TYPE_MAP: Record<string, string> = {
@@ -173,6 +180,17 @@ function parseContractLengthMonths(text: string | null): number {
   const match = text.match(/(\d+)\s*(år|year|months?|månader?)/i)
   if (!match) return 36
   const n = parseInt(match[1])
+  return /år|year/i.test(match[2]) ? n * 12 : n
+}
+
+// Strict-variant: returnerar null vid okänt format. Används för normalisering
+// av annual_value där fel default skulle förvränga kundens årstakt.
+function parseContractLengthMonthsStrict(text: string | null | undefined): number | null {
+  if (!text) return null
+  const match = String(text).match(/(\d+)\s*(år|year|years|months?|månader?|månad|mån)/i)
+  if (!match) return null
+  const n = parseInt(match[1])
+  if (!Number.isFinite(n) || n <= 0) return null
   return /år|year/i.test(match[2]) ? n * 12 : n
 }
 
@@ -244,17 +262,30 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     contract_end_date = start.toISOString().split('T')[0]
   }
 
-  // Produktvärde
-  let annual_value: number | null = null
+  // Produktvärde — Oneflow-summan motsvarar avtalets TOTALVÄRDE (för hela
+  // avtalstiden), inte årstakt. Normalisera till årstakt baserat på avtalslängd
+  // så att resten av systemet (fakturaplan, dashboards) får konsekvent data.
+  let contract_total_value: number | null = null
   const products: any[] = contract.product_groups
     ? contract.product_groups.flatMap((g: any) => g.products || [])
     : contract.products ?? []
 
   if (products.length > 0) {
-    annual_value = products.reduce((sum: number, p: any) => {
+    contract_total_value = products.reduce((sum: number, p: any) => {
       const amount = parseFloat(p.total_amount?.amount ?? p.unit_price?.amount ?? '0')
       return sum + amount * (p.quantity ?? 1)
     }, 0)
+  }
+
+  const contract_length_months = parseContractLengthMonthsStrict(contract_length)
+  let annual_value: number | null = null
+  if (contract_total_value && contract_total_value > 0) {
+    if (contract_length_months && contract_length_months > 0) {
+      annual_value = Math.round(contract_total_value * (12 / contract_length_months))
+    } else {
+      // Fallback: avtalslängd okänd → anta 12 mån (samma som tidigare beteende)
+      annual_value = Math.round(contract_total_value)
+    }
   }
 
   const selectedProducts = products.map((p: any) => ({
@@ -269,11 +300,15 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     contact_email,
     contact_phone,
     contact_address,
+    // Multi-kontrakt-refaktor: address_label används som primär identifierare i UI
+    // när en kund har flera avtal. Default = utförande-adress; kan editeras av admin.
+    address_label: contact_address,
     contract_start_date,
     contract_end_date,
     contract_length,
     company_name_oneflow,
     annual_value: annual_value && annual_value > 0 ? annual_value : null,
+    total_contract_value,
     products: selectedProducts.length > 0 ? selectedProducts : null,
     oneflow_contract_id: String(contract.id),
     contract_type,
@@ -323,7 +358,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Endast POST tillåtet' })
 
   try {
-    const { action, org_nr, customer_data } = req.body
+    const { action, org_nr, customer_data, selected_contracts } = req.body
 
     // ── CONFIRM: spara redan hämtad+redigerad data ───────────────────────────
     if (action === 'confirm') {
@@ -378,7 +413,84 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         })
       }
 
-      return res.status(200).json({ success: true, customer: inserted })
+      // ── Multi-kontrakt-refaktor (Fas 3) ─────────────────────────────────
+      // Om klienten skickar selected_contracts: skapa en contracts-rad per
+      // kontrakt. Customers-fälten på inserted är fortfarande satta från
+      // customer_data (för bakåtkompatibilitet med synth-fallback i ContractService),
+      // men sanningen lever framöver per kontrakt.
+      // Vid fel: rulla tillbaka customer-raden så vi inte lämnar kvarvarande state.
+      let insertedContracts: any[] = []
+      if (Array.isArray(selected_contracts) && selected_contracts.length > 0) {
+        const contractRows = selected_contracts.map((c: any, idx: number) => {
+          const contractTotalValue = computeTotalContractValue(c.annual_value, c.contract_length)
+          // Beräkna contract_end_date från start + längd om saknas
+          let endDate: string | null = c.contract_end_date ?? null
+          if (!endDate && c.contract_start_date && c.contract_length) {
+            const months = parseContractLengthMonthsStrict(c.contract_length)
+            if (months) {
+              const d = new Date(c.contract_start_date)
+              d.setMonth(d.getMonth() + months)
+              endDate = d.toISOString().split('T')[0]
+            }
+          }
+          return {
+            customer_id: inserted.id,
+            oneflow_contract_id: c.oneflow_contract_id,
+            source_type: 'manual',
+            type: 'contract',
+            status: 'active',
+            template_id: 'imported',
+            company_name: inserted.company_name,
+            organization_number: normalized,
+            contact_person: c.contact_person ?? null,
+            contact_email: c.contact_email ?? null,
+            contact_phone: c.contact_phone ?? null,
+            contact_address: c.contact_address ?? null,
+            agreement_text: c.agreement_text ?? null,
+            total_value: contractTotalValue ?? c.total_contract_value ?? null,
+            selected_products: c.products ?? null,
+            // Nya billing-fält (Fas 1)
+            annual_value: c.annual_value ?? null,
+            total_contract_value: contractTotalValue ?? c.total_contract_value ?? null,
+            contract_start_date: c.contract_start_date ?? null,
+            contract_end_date: endDate,
+            contract_length: c.contract_length ?? null,
+            contract_type: c.contract_type ?? null,
+            address_label: c.address_label ?? c.contact_address ?? null,
+            display_order: idx,
+            // Faktureringsfält ärver från customers vid import — admin justerar
+            // sedan per kontrakt via BillingSettingsModal (Fas 6).
+            billing_frequency: customer_data.billing_frequency ?? null,
+            billing_anchor_month: customer_data.billing_anchor_month ?? null,
+            billing_active: customer_data.billing_active ?? true,
+            notice_period_months: customer_data.notice_period_months ?? null,
+          }
+        })
+
+        const { data: contractInsertData, error: contractError } = await supabase
+          .from('contracts')
+          .insert(contractRows)
+          .select()
+
+        if (contractError || !contractInsertData) {
+          console.error('❌ Contracts insert fel:', contractError)
+          // Rollback: hard delete customer-raden
+          await supabase.from('customers').delete().eq('id', inserted.id)
+          return res.status(500).json({
+            success: false,
+            error: 'Kunde inte spara avtal — kunden rullades tillbaka',
+            details: contractError?.message,
+          })
+        }
+        insertedContracts = contractInsertData
+        console.log(`✅ ${insertedContracts.length} kontrakt skapade för kund ${inserted.id}`)
+      }
+
+      return res.status(200).json({
+        success: true,
+        customer: inserted,
+        contracts: insertedContracts,
+      })
     }
 
     // ── PREVIEW: hämta data men spara inte ──────────────────────────────────
@@ -445,10 +557,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('📋 Hämtar från Oneflow + kundgrupper...')
     const customerNumber = parseInt(fortnoxCustomer.CustomerNumber) || null
 
-    const [oneflowData, customerGroupResult] = await Promise.all([
-      fetchOneflowContractByOrgNr(normalized).catch(err => {
+    const [oneflowDataList, customerGroupResult] = await Promise.all([
+      fetchOneflowContractsByOrgNr(normalized).catch(err => {
         console.error('⚠️ Oneflow-fel:', err.message)
-        return null
+        return [] as Array<{ contract: any; parties: any[] }>
       }),
       customerNumber
         ? supabase
@@ -461,9 +573,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : Promise.resolve({ data: null }),
     ])
 
-    const oneflow = oneflowData ? extractOneflowData(oneflowData) : null
+    // Extrahera ALLA signerade/aktiva kontrakt
+    const oneflowContracts = oneflowDataList.map(extractOneflowData)
+    const primary = oneflowContracts[0] ?? null
     const suggestedGroup = (customerGroupResult as any)?.data ?? null
-    console.log(oneflow ? `✅ Oneflow-kontrakt: ${oneflow.oneflow_contract_id}` : '⚠️ Inget Oneflow-kontrakt')
+    console.log(`✅ Oneflow-kontrakt: ${oneflowContracts.length} st`)
     console.log(suggestedGroup ? `👥 Kundgrupp: ${suggestedGroup.name}` : '⚠️ Ingen kundgrupp matchad')
 
     // Bygg förslag på kunddata (ej sparat ännu)
@@ -473,6 +587,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       [fortnoxCustomer.ZipCode, fortnoxCustomer.City].filter(Boolean).join(' '),
     ].filter(Boolean)
 
+    // preview behåller första-kontraktets fält för bakåtkompatibilitet med
+    // existerande UI (tills Fas 4 byter till contracts-arrayen).
     const preview = {
       company_name: fortnoxCustomer.Name,
       organization_number: normalized,
@@ -481,30 +597,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       billing_address: billingParts.length > 0 ? billingParts.join(', ') : null,
       currency: fortnoxCustomer.Currency || 'SEK',
       is_active: fortnoxCustomer.Active !== false,
-      contact_person: oneflow?.contact_person ?? null,
-      contact_email: oneflow?.contact_email ?? null,
-      contact_phone: oneflow?.contact_phone ?? null,
-      contact_address: oneflow?.contact_address ?? null,
-      contract_start_date: oneflow?.contract_start_date ?? null,
-      contract_end_date: oneflow?.contract_end_date ?? null,
-      contract_length: oneflow?.contract_length ?? null,
-      annual_value: oneflow?.annual_value ?? null,
-      products: oneflow?.products ?? null,
-      oneflow_contract_id: oneflow?.oneflow_contract_id ?? null,
-      contract_type: oneflow?.contract_type ?? null,
-      agreement_text: oneflow?.agreement_text ?? null,
-      sales_person: oneflow?.sales_person ?? null,
-      sales_person_email: oneflow?.sales_person_email ?? null,
-      assigned_account_manager: oneflow?.assigned_account_manager ?? null,
-      account_manager_email: oneflow?.account_manager_email ?? null,
+      contact_person: primary?.contact_person ?? null,
+      contact_email: primary?.contact_email ?? null,
+      contact_phone: primary?.contact_phone ?? null,
+      contact_address: primary?.contact_address ?? null,
+      contract_start_date: primary?.contract_start_date ?? null,
+      contract_end_date: primary?.contract_end_date ?? null,
+      contract_length: primary?.contract_length ?? null,
+      annual_value: primary?.annual_value ?? null,
+      products: primary?.products ?? null,
+      oneflow_contract_id: primary?.oneflow_contract_id ?? null,
+      contract_type: primary?.contract_type ?? null,
+      agreement_text: primary?.agreement_text ?? null,
+      sales_person: primary?.sales_person ?? null,
+      sales_person_email: primary?.sales_person_email ?? null,
+      assigned_account_manager: primary?.assigned_account_manager ?? null,
+      account_manager_email: primary?.account_manager_email ?? null,
       customer_group_id: suggestedGroup?.id ?? null,
     }
 
     return res.status(200).json({
       success: true,
       preview,
+      // Multi-kontrakt-refaktor (Fas 3): alla extraherade kontrakt. UI:t använder
+      // detta i Fas 4 för att rendera väljbara kontrakt med checkboxar. När
+      // contracts.length <= 1 är beteendet identiskt med tidigare.
+      contracts: oneflowContracts,
       invoices: invoicesWithRows,
-      sources: { fortnox: true, oneflow: !!oneflow },
+      sources: { fortnox: true, oneflow: oneflowContracts.length > 0 },
       suggested_group: suggestedGroup,
     })
   } catch (err: any) {

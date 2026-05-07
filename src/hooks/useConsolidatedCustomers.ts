@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import type { ContractWithBilling } from '../types/database'
 import {
   calculatePortfolioValue,
   countActiveCustomers,
@@ -80,7 +81,7 @@ export interface CustomerSite extends Customer {
   contractProgress: ReturnType<typeof getContractProgress>
   hasPortalAccess?: boolean
   invitationStatus?: 'none' | 'pending' | 'active'
-  
+
   // Cases data per site
   casesCount: number
   casesValue: number
@@ -102,6 +103,11 @@ export interface CustomerSite extends Customer {
     created_at: string
     case_type: 'private_case' | 'business_case'
   }>
+
+  // Multi-kontrakt-refaktor (Fas 5): aktiva kontrakt för denna site.
+  // Tom array för kunder utan riktiga contracts-rader (synth-fallback hanteras
+  // nu först när någon faktiskt klickar in på faktureringsdetaljer).
+  contracts: ContractWithBilling[]
 }
 
 export type PortalAccessStatus = 'full' | 'partial' | 'none'
@@ -168,6 +174,10 @@ export interface ConsolidatedCustomer {
   nextRenewalDate?: string | null
   daysToNextRenewal?: number | null
   earliestContractStartDate?: string | null
+
+  // Multi-kontrakt-refaktor (Fas 5): totalt antal aktiva kontrakt över alla sites.
+  // > 1 indikerar att kunden har flera Oneflow-avtal som faktureras separat.
+  contractCount: number
   
   // Status flags
   is_active: boolean
@@ -248,7 +258,8 @@ export function useConsolidatedCustomers() {
         invitationsResult,
         contactsResult,
         adHocResult,
-        contractItemsResult
+        contractItemsResult,
+        contractsResult
       ] = await Promise.all([
         // Filtrera bort engångskunder (source_type='manual' utan avtalsperiod).
         // Dessa skapas av caseCustomerService vid privat-/företagsfakturering och
@@ -264,7 +275,25 @@ export function useConsolidatedCustomers() {
         supabase.from('user_invitations').select('customer_id, accepted_at, expires_at'),
         supabase.from('customer_contacts').select('customer_id, name, title, responsibility_area, phone, email'),
         supabase.from('contract_billing_items').select('customer_id, total_price').eq('item_type', 'ad_hoc').neq('status', 'cancelled'),
-        supabase.from('contract_billing_items').select('customer_id, total_price, billing_period_start').eq('item_type', 'contract').neq('status', 'cancelled')
+        supabase.from('contract_billing_items').select('customer_id, total_price, billing_period_start').eq('item_type', 'contract').neq('status', 'cancelled'),
+        // Multi-kontrakt-refaktor (Fas 5): aktiva contracts-rader för alla kunder.
+        // Endast signed/active där billing_active != false. Synth-fallback aktiveras
+        // inte här — endast riktiga rader visas. Sites utan riktiga rader får
+        // contracts: [] och vi behåller customers-fältens värden för aggregat.
+        supabase
+          .from('contracts')
+          .select(
+            `id, oneflow_contract_id, source_type, type, status, template_id,
+             contact_person, contact_email, contact_phone, contact_address,
+             company_name, organization_number, agreement_text, total_value,
+             selected_products, customer_id, customer_group_id, created_at, updated_at,
+             annual_value, total_contract_value, billing_frequency, billing_anchor_month,
+             billing_active, contract_start_date, contract_end_date, contract_length,
+             terminated_at, termination_reason, notice_period_months, effective_end_date,
+             contract_type, address_label, display_order`
+          )
+          .in('status', ['signed', 'active'])
+          .neq('billing_active', false)
       ])
 
       const { data: customersData, error: customersError } = customersResult
@@ -277,6 +306,24 @@ export function useConsolidatedCustomers() {
       const { data: contactsData } = contactsResult
       const { data: adHocData } = adHocResult
       const { data: contractItemsData } = contractItemsResult
+      const { data: contractsData } = contractsResult
+
+      // Bygg contracts-map: customer_id -> ContractWithBilling[]
+      const contractsByCustomer = new Map<string, ContractWithBilling[]>()
+      ;(contractsData ?? []).forEach((c: any) => {
+        if (!c.customer_id) return
+        const arr = contractsByCustomer.get(c.customer_id) ?? []
+        arr.push(c as ContractWithBilling)
+        contractsByCustomer.set(c.customer_id, arr)
+      })
+      // Stabil sortering inom varje grupp
+      contractsByCustomer.forEach(arr => {
+        arr.sort((a, b) => {
+          const ord = (a.display_order ?? 0) - (b.display_order ?? 0)
+          if (ord !== 0) return ord
+          return (a.created_at ?? '').localeCompare(b.created_at ?? '')
+        })
+      })
 
       // Bygg ad_hoc-map: customer_id → summerad totalbelopp
       const adHocMap = new Map<string, number>()
@@ -475,13 +522,16 @@ export function useConsolidatedCustomers() {
           ),
           hasPortalAccess,
           invitationStatus: hasPortalAccess ? 'active' : invitationStatus,
-          
+
           // Cases data
           casesCount: customerCases.length,
           casesValue,
           contractBilledAccum,
           casesBillingBreakdown,
-          cases: customerCases
+          cases: customerCases,
+
+          // Multi-kontrakt-refaktor (Fas 5): kopplade contracts-rader för denna kund.
+          contracts: contractsByCustomer.get(customer.id) ?? [],
         }
       })
 
@@ -589,7 +639,8 @@ export function useConsolidatedCustomers() {
             },
             highestChurnRisk: { score: 0, risk: 'low' as const, color: '#10b981', factors: [], tooltip: 'Low risk' },
             averageRenewalProbability: 0,
-            
+            contractCount: 0,
+
             is_active: huvudkontor.is_active || false,
             isTerminated: false,
             isPaused: false,
@@ -674,6 +725,7 @@ export function useConsolidatedCustomers() {
             ? Math.ceil((new Date(customer.effective_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
             : customer.contractProgress.daysRemaining,
           earliestContractStartDate: customer.contract_start_date,
+          contractCount: customer.contracts.length,
 
           is_active: customer.is_active || false,
           isTerminated: !!customer.terminated_at,
@@ -696,6 +748,7 @@ export function useConsolidatedCustomers() {
         
         // Aggregera värden
         org.totalSites = sites.length
+        org.contractCount = sites.reduce((sum, site) => sum + (site.contracts?.length ?? 0), 0)
         // Avropsavtal per site → ackumulerad debitering istället för fast total_contract_value
         org.totalContractValue = sites.reduce((sum, site) => {
           const isAvropsavtal = (!site.annual_value || site.annual_value <= 0) && !!site.contract_start_date

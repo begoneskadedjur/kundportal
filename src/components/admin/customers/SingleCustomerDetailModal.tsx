@@ -16,7 +16,8 @@ import {
   FileText,
   Activity,
   Shield,
-  TrendingDown
+  TrendingDown,
+  FileSignature
 } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import HealthScoreBadge from './HealthScoreBadge'
@@ -24,6 +25,8 @@ import ChurnRiskBadge from './ChurnRiskBadge'
 import PortalAccessBadge from './PortalAccessBadge'
 import AdminCasesList from './AdminCasesList'
 import CustomerEquipmentDualView from './CustomerEquipmentDualView'
+import ContractDetailRow from './ContractDetailRow'
+import BillingSettingsModal from './BillingSettingsModal'
 import { formatCurrency, getContractProgress } from '../../../utils/customerMetrics'
 import { supabase } from '../../../lib/supabase'
 import { CustomerGroupService } from '../../../services/customerGroupService'
@@ -98,6 +101,10 @@ export default function SingleCustomerDetailModal({
     }
     fetchBilling()
   }, [site.id])
+
+  // Multi-kontrakt-refaktor (Fas 6): contractId-state för per-kontrakt fakturerings-
+  // inställningar. Sätts av ContractDetailRow:s "Fakturering"-knapp.
+  const [billingContractId, setBillingContractId] = useState<string | null>(null)
 
   const [customerGroupName, setCustomerGroupName] = useState<string | null>(null)
   useEffect(() => {
@@ -562,6 +569,34 @@ export default function SingleCustomerDetailModal({
               </div>
             </section>
 
+            {/* Multi-kontrakt-refaktor (Fas 5): Avtalslista — visas bara när kunden
+                har > 1 signerade Oneflow-avtal, så att vi inte introducerar dubbel
+                info för 99% av kunderna som har exakt ett avtal. */}
+            {site.contracts && site.contracts.length > 1 && (
+              <section className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-[#20c58f]/20 rounded-lg border border-[#20c58f]/30">
+                    <FileSignature className="w-5 h-5 text-[#20c58f]" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Avtal <span className="text-slate-400 font-normal">({site.contracts.length})</span>
+                  </h3>
+                </div>
+                <div className="space-y-2">
+                  {site.contracts.map(contract => (
+                    <ContractDetailRow
+                      key={contract.id}
+                      contract={contract}
+                      onOpenBillingSettings={setBillingContractId}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500">
+                  Varje avtal faktureras separat. Justera fakturarytm per avtal i faktureringsinställningarna.
+                </p>
+              </section>
+            )}
+
             {/* Cases Management Section */}
             <section className="space-y-4">
               <div className="flex items-center gap-3">
@@ -861,6 +896,36 @@ export default function SingleCustomerDetailModal({
 
         </div>
       </div>
+
+      {/* Multi-kontrakt-refaktor (Fas 6): per-kontrakt faktureringsinställningar.
+          Öppnas av ContractDetailRow:s "Fakturering"-knapp och scopas till valt kontrakt. */}
+      {billingContractId && (
+        <BillingSettingsModal
+          isOpen={!!billingContractId}
+          onClose={() => setBillingContractId(null)}
+          onSave={() => setBillingContractId(null)}
+          customerId={site.id}
+          contractId={billingContractId}
+          customerName={customer.company_name}
+          contactEmail={customer.contact_email}
+          isMultisite={false}
+          currentBillingFrequency={(site.billing_frequency as any) ?? null}
+          currentPriceListId={site.price_list_id ?? null}
+          currentBillingEmail={site.billing_email ?? null}
+          currentBillingAddress={site.billing_address ?? null}
+          currentBillingType={site.billing_type ?? null}
+          currentBillingReference={site.billing_reference ?? null}
+          currentCostCenter={site.cost_center ?? null}
+          currentBillingRecipient={site.billing_recipient ?? null}
+          currentPriceAdjustmentPercent={site.price_adjustment_percent ?? null}
+          currentBillingActive={site.billing_active ?? false}
+          currentContractStartDate={site.contract_start_date ?? null}
+          currentContractEndDate={site.contract_end_date ?? null}
+          currentBillingAnchorMonth={site.billing_anchor_month ?? null}
+          currentAdhocInvoiceGrouping={site.adhoc_invoice_grouping ?? null}
+          sites={[]}
+        />
+      )}
     </div>
   )
 }

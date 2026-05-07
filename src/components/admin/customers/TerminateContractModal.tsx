@@ -68,10 +68,12 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
       // Uppdatera alla sites i organisationen
       const siteIds = organization.sites.map(s => s.id)
 
+      const terminatedAtIso = new Date().toISOString()
+
       const { error } = await supabase
         .from('customers')
         .update({
-          terminated_at: new Date().toISOString(),
+          terminated_at: terminatedAtIso,
           termination_reason: reason || null,
           effective_end_date: effectiveDateStr,
           contract_status: 'terminated',
@@ -80,6 +82,28 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
         .in('id', siteIds)
 
       if (error) throw error
+
+      // Multi-kontrakt-refaktor (Fas 7): markera även alla riktiga contracts-rader
+      // som uppsagda så att ContractService.getActiveContracts filtrerar bort dem
+      // korrekt och fakturapipelinen scopar invoices via contract_id matchar.
+      // Synth-fallback hanterar redan kunder utan contracts-rader (läser
+      // terminated_at från customers).
+      const { error: contractsError } = await supabase
+        .from('contracts')
+        .update({
+          terminated_at: terminatedAtIso,
+          termination_reason: reason || null,
+          effective_end_date: effectiveDateStr,
+          billing_active: false,
+          updated_at: terminatedAtIso,
+        })
+        .in('customer_id', siteIds)
+        .in('status', ['signed', 'active'])
+
+      if (contractsError) {
+        console.error('Error terminating contracts:', contractsError)
+        // Avbryt inte — customers-uppdateringen lyckades; logga och fortsätt.
+      }
 
       // Cancel future inspection sessions past the effective end date
       const { error: sessionsError } = await supabase

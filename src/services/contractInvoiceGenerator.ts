@@ -6,6 +6,8 @@
 import { supabase } from '../lib/supabase'
 import { ImportedCustomerContractService } from './importedCustomerContractService'
 import { PaymentTermsService } from './paymentTermsService'
+import { ContractService, isSyntheticContract } from './contractService'
+import type { ContractWithBilling } from '../types/database'
 
 interface ContractServiceItem {
   case_billing_item_id: string
@@ -57,6 +59,10 @@ export interface BillingPlanEntry {
 
 export interface BillingPlan {
   customerId: string
+  // Multi-kontrakt-refaktor: när planen är scopad till ett specifikt kontrakt
+  // sätts contractId. För synth-kontrakt (kunder utan riktig contracts-rad)
+  // är contractId null så att invoices.contract_id inte sätts.
+  contractId: string | null
   entries: BillingPlanEntry[]
   summary: {
     create: number
@@ -274,29 +280,98 @@ export function computePlannedInvoicesPure(
 export class ContractInvoiceGenerator {
   /**
    * Skapa fakturaplan för en kund. Returnerar diff mot befintliga invoices.
+   *
+   * Multi-kontrakt-refaktor (Fas 2): hämtar aktiva kontrakt via ContractService.
+   * Om kunden har flera aktiva kontrakt returneras planen för det första (av
+   * display_order/created_at). För full multi-kontrakt-support, använd
+   * planAllForCustomer eller planForContract direkt.
+   *
+   * Synth-kontrakt (kunder utan riktiga contracts-rader) gör att nuvarande
+   * single-contract-beteende bevaras 1:1.
    */
   static async planForCustomer(customerId: string): Promise<BillingPlan> {
-    const { data: customer, error } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('id', customerId)
-      .single()
+    const contracts = await ContractService.getActiveContracts(customerId)
+    if (contracts.length === 0) {
+      // Inga aktiva kontrakt — returnera tom plan istället för att kasta så
+      // anropare som inte är avtalskunder hanteras gracefully.
+      return {
+        customerId,
+        contractId: null,
+        entries: [],
+        summary: { keep: 0, create: 0, update: 0, delete: 0, locked: 0, historical: 0 },
+      }
+    }
+    return this.planForContract(contracts[0], { customerId })
+  }
 
-    if (error) throw new Error(`Kunde inte hämta kund: ${error.message}`)
-    if (!customer) throw new Error('Kund hittades inte')
+  /**
+   * Skapa fakturaplaner för ALLA aktiva kontrakt på en kund. Multi-kontrakt-läge.
+   * Returnerar en plan per kontrakt (även synth).
+   */
+  static async planAllForCustomer(customerId: string): Promise<BillingPlan[]> {
+    const contracts = await ContractService.getActiveContracts(customerId)
+    const plans: BillingPlan[] = []
+    for (const contract of contracts) {
+      plans.push(await this.planForContract(contract, { customerId }))
+    }
+    return plans
+  }
 
-    const planned = await this.computePlannedInvoices(customer as CustomerRow)
+  /**
+   * Skapa fakturaplan för ett enskilt kontrakt. Diff:fas mot invoices för det
+   * specifika contract_id (eller — för synth-kontrakt — alla contract-invoices
+   * på kunden, vilket motsvarar dagens beteende).
+   *
+   * Acceptera antingen ett ContractWithBilling-objekt direkt (snabbare när
+   * anroparen redan har raden) eller ett kontrakt-id som hämtas via DB.
+   */
+  static async planForContract(
+    contractOrId: string | ContractWithBilling,
+    opts?: { customerId?: string },
+  ): Promise<BillingPlan> {
+    const contract = typeof contractOrId === 'string'
+      ? await ContractService.getContractWithBillingById(contractOrId)
+      : contractOrId
 
-    const { data: existing, error: exErr } = await supabase
+    if (!contract) throw new Error('Kontrakt hittades inte')
+    if (!contract.customer_id) throw new Error('Kontrakt saknar customer_id')
+
+    const customerId = opts?.customerId ?? contract.customer_id
+    const isSynth = isSyntheticContract(contract)
+
+    const planningInput: CustomerForPlanning = {
+      annual_value: contract.annual_value,
+      contract_start_date: contract.contract_start_date,
+      contract_end_date: contract.contract_end_date,
+      terminated_at: contract.terminated_at,
+      billing_frequency: contract.billing_frequency as BillingFrequency | null,
+      billing_anchor_month: contract.billing_anchor_month,
+      billing_active: contract.billing_active,
+      notice_period_months: contract.notice_period_months,
+    }
+
+    const paymentTermsDays = await PaymentTermsService.getDays('contract')
+    const planned = computePlannedInvoicesPure(planningInput, paymentTermsDays)
+
+    // För riktiga kontrakt: scopa invoices på contract_id. För synth: hämta alla
+    // contract-invoices på kunden (dagens beteende — ingen contract_id finns ännu).
+    let existingQuery = supabase
       .from('invoices')
       .select('id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, invoice_items(article_name)')
       .eq('customer_id', customerId)
       .eq('invoice_type', 'contract')
 
+    if (!isSynth) {
+      // Inkludera även rader som saknar contract_id (legacy från före refaktor)
+      // så att första körningen efter migration kan koppla rätt rader och
+      // diff:fa korrekt. Filtrera senare när alla rader migrerats.
+      existingQuery = existingQuery.or(`contract_id.eq.${contract.id},contract_id.is.null`)
+    }
+
+    const { data: existing, error: exErr } = await existingQuery
+
     if (exErr) throw new Error(`Kunde inte hämta befintliga fakturor: ${exErr.message}`)
 
-    // Anrik med has_generic_items-flag för att kunna trigga update av
-    // gamla fakturor som har fallback-artikeln "Avtalsfakturering YYYY-MM".
     const existingWithFlag = (existing ?? []).map(e => ({
       ...e,
       has_generic_items: (e.invoice_items ?? []).every((it: any) =>
@@ -317,7 +392,12 @@ export class ContractInvoiceGenerator {
       { keep: 0, create: 0, update: 0, delete: 0, locked: 0, historical: 0 } as BillingPlan['summary']
     )
 
-    return { customerId, entries, summary }
+    return {
+      customerId,
+      contractId: isSynth ? null : contract.id,
+      entries,
+      summary,
+    }
   }
 
   /**
@@ -504,22 +584,22 @@ export class ContractInvoiceGenerator {
         continue
       }
       if (entry.action === 'create' && entry.planned) {
-        const id = await this.insertContractInvoice(customer as CustomerRow, entry.planned)
+        const id = await this.insertContractInvoice(customer as CustomerRow, entry.planned, plan.contractId)
         result.createdIds.push(id)
         continue
       }
       if (entry.action === 'create-historical' && entry.planned) {
-        const id = await this.insertHistoricalPaidInvoice(customer as CustomerRow, entry.planned)
+        const id = await this.insertHistoricalPaidInvoice(customer as CustomerRow, entry.planned, plan.contractId)
         result.historicalIds.push(id)
         continue
       }
       if (entry.action === 'backfill-historical-paid' && entry.existingId && entry.planned) {
-        await this.backfillHistoricalPaid(entry.existingId, customer as CustomerRow, entry.planned)
+        await this.backfillHistoricalPaid(entry.existingId, customer as CustomerRow, entry.planned, plan.contractId)
         result.historicalIds.push(entry.existingId)
         continue
       }
       if (entry.action === 'update' && entry.existingId && entry.planned) {
-        await this.updateContractInvoice(entry.existingId, customer as CustomerRow, entry.planned)
+        await this.updateContractInvoice(entry.existingId, customer as CustomerRow, entry.planned, plan.contractId)
         result.updatedIds.push(entry.existingId)
       }
     }
@@ -528,11 +608,23 @@ export class ContractInvoiceGenerator {
   }
 
   /**
-   * Convenience: plan + apply i ett anrop.
+   * Convenience: plan + apply i ett anrop. Loopar alla aktiva kontrakt på kunden
+   * och applicerar plan per kontrakt. Resultaten slås ihop.
    */
   static async regenerateForCustomer(customerId: string): Promise<ApplyResult> {
-    const plan = await this.planForCustomer(customerId)
-    return this.apply(plan)
+    const plans = await this.planAllForCustomer(customerId)
+    const merged: ApplyResult = {
+      createdIds: [], updatedIds: [], deletedIds: [], historicalIds: [], skippedLocked: 0,
+    }
+    for (const plan of plans) {
+      const r = await this.apply(plan)
+      merged.createdIds.push(...r.createdIds)
+      merged.updatedIds.push(...r.updatedIds)
+      merged.deletedIds.push(...r.deletedIds)
+      merged.historicalIds.push(...r.historicalIds)
+      merged.skippedLocked += r.skippedLocked
+    }
+    return merged
   }
 
   /**
@@ -854,6 +946,7 @@ export class ContractInvoiceGenerator {
   private static async insertContractInvoice(
     customer: CustomerRow,
     planned: PlannedInvoice,
+    contractId: string | null = null,
   ): Promise<string> {
     const invoiceNumber = await this.generateInvoiceNumber()
     const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
@@ -867,6 +960,7 @@ export class ContractInvoiceGenerator {
         invoice_number: invoiceNumber,
         invoice_type: 'contract',
         customer_id: customer.id,
+        contract_id: contractId,
         case_id: null,
         case_type: null,
         customer_name: customer.company_name,
@@ -906,6 +1000,7 @@ export class ContractInvoiceGenerator {
   private static async insertHistoricalPaidInvoice(
     customer: CustomerRow,
     planned: PlannedInvoice,
+    contractId: string | null = null,
   ): Promise<string> {
     const invoiceNumber = await this.generateInvoiceNumber()
     const periodStart = parseLocalDate(planned.periodStart)
@@ -920,6 +1015,7 @@ export class ContractInvoiceGenerator {
         invoice_number: invoiceNumber,
         invoice_type: 'contract',
         customer_id: customer.id,
+        contract_id: contractId,
         case_id: null,
         case_type: null,
         customer_name: customer.company_name,
@@ -963,6 +1059,7 @@ export class ContractInvoiceGenerator {
     invoiceId: string,
     customer: CustomerRow,
     planned: PlannedInvoice,
+    contractId: string | null = null,
   ): Promise<void> {
     const periodStart = parseLocalDate(planned.periodStart)
     const bookedSentAt = periodStart.toISOString()
@@ -970,18 +1067,23 @@ export class ContractInvoiceGenerator {
     const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
     const notes = this.buildInvoiceNotes(planned)
 
+    const updatePayload: Record<string, any> = {
+      status: 'paid',
+      requires_approval: false,
+      booked_at: bookedSentAt,
+      sent_at: bookedSentAt,
+      paid_at: paidAt,
+      is_historical: true,
+      notes,
+      created_at: bookedSentAt,
+    }
+    // Endast skriv contract_id om vi vill koppla till ett riktigt kontrakt.
+    // Synth-anrop (contractId=null) lämnar fältet orört på befintliga rader.
+    if (contractId) updatePayload.contract_id = contractId
+
     const { error } = await supabase
       .from('invoices')
-      .update({
-        status: 'paid',
-        requires_approval: false,
-        booked_at: bookedSentAt,
-        sent_at: bookedSentAt,
-        paid_at: paidAt,
-        is_historical: true,
-        notes,
-        created_at: bookedSentAt,
-      })
+      .update(updatePayload)
       .eq('id', invoiceId)
     if (error) throw new Error(`Kunde inte backfilla historisk: ${error.message}`)
 
@@ -996,27 +1098,31 @@ export class ContractInvoiceGenerator {
     invoiceId: string,
     customer: CustomerRow,
     planned: PlannedInvoice,
+    contractId: string | null = null,
   ): Promise<void> {
     const serviceItems = await this.getServiceItemsForCustomer(customer.id, customer.billing_frequency!)
     const notes = this.buildInvoiceNotes(planned)
 
+    const updatePayload: Record<string, any> = {
+      customer_name: customer.company_name,
+      customer_email: customer.billing_email ?? customer.contact_email,
+      customer_phone: customer.contact_phone,
+      customer_address: customer.billing_address ?? customer.contact_address,
+      organization_number: customer.organization_number,
+      subtotal: planned.amount,
+      vat_amount: planned.vatAmount,
+      total_amount: planned.totalAmount,
+      billing_period_start: planned.periodStart,
+      billing_period_end: planned.periodEnd,
+      due_date: planned.dueDate,
+      notes,
+      requires_approval: false,
+    }
+    if (contractId) updatePayload.contract_id = contractId
+
     const { error } = await supabase
       .from('invoices')
-      .update({
-        customer_name: customer.company_name,
-        customer_email: customer.billing_email ?? customer.contact_email,
-        customer_phone: customer.contact_phone,
-        customer_address: customer.billing_address ?? customer.contact_address,
-        organization_number: customer.organization_number,
-        subtotal: planned.amount,
-        vat_amount: planned.vatAmount,
-        total_amount: planned.totalAmount,
-        billing_period_start: planned.periodStart,
-        billing_period_end: planned.periodEnd,
-        due_date: planned.dueDate,
-        notes,
-        requires_approval: false,
-      })
+      .update(updatePayload)
       .eq('id', invoiceId)
     if (error) throw new Error(`Kunde inte uppdatera faktura: ${error.message}`)
 
