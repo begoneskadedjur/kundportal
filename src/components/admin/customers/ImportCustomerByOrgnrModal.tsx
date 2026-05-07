@@ -263,7 +263,12 @@ export default function ImportCustomerByOrgnrModal({
         account_manager_email: data.preview.account_manager_email ?? null,
         contract_end_date: data.preview.contract_end_date ?? null,
         customer_group_id: data.preview.customer_group_id ?? null,
-        price_list_id: data.preview.price_list_id ?? null,
+        // Standardprislistan vid import om ingen explicit är vald — admin slipper
+        // välja manuellt varje gång. priceLists hämtas från PriceListService.getAllPriceLists
+        // vid mount; den första med is_default=true blir vår default.
+        price_list_id: data.preview.price_list_id
+          ?? priceLists.find(pl => pl.is_default)?.id
+          ?? null,
       })
 
       const fetchedInvoices: FortnoxInvoice[] = data.invoices ?? []
