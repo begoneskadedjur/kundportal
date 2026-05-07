@@ -32,6 +32,7 @@ import CaseImageGallery, { CaseImageGalleryRef } from '../../shared/CaseImageGal
 
 // Preparatanvändning
 import CasePreparationsSection from '../../shared/CasePreparationsSection'
+import CustomerContractButton from '../customers/CustomerContractButton'
 
 // Tjänsteutbud-väljare
 import ServiceArticleSelector from '../../shared/ServiceArticleSelector'
@@ -1341,6 +1342,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="xl" footer={footer} preventClose={true} allowBackdropClose={!loading && !timeTrackingLoading} usePortal={true} className="scroll-smooth"
       headerActions={
         <div className="flex items-center gap-1">
+          {/* Fas 13b: visa signerad offert (Oneflow) — öppna i ny flik eller ladda ned */}
+          {currentCase.oneflow_contract_id && (
+            <CustomerContractButton
+              oneflowContractId={currentCase.oneflow_contract_id}
+              customerName={currentCase.kontaktperson || currentCase.title || 'Ärende'}
+            />
+          )}
           {canCreateFollowUp && (
             <button
               type="button"

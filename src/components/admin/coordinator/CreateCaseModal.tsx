@@ -934,9 +934,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         const tableName = caseType === 'private' ? 'private_cases' : 'business_cases';
         let createdClickUpCaseId: string | null = null;
 
+        // Fas 13b: case_type är JS-only-flagga (markerar tabell-källa) och finns
+        // inte som DB-kolumn. Stripa innan supabase-anrop annars 400.
+        // oneflow_contract_id ÄR riktig kolumn nu — sparas naturligt via spread.
+        const { case_type: _stripCaseType, ...cleanFormData } = formData as any;
+
         if (initialCaseData && initialCaseData.case_type !== 'contract') {
           const { error } = await supabase.from(tableName).update({
-            ...formData,
+            ...cleanFormData,
             title: caseNumber,
             service_id: serviceId || null,
             skadedjur: selectedService?.name || formData.skadedjur || null,
@@ -946,7 +951,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           toast.success(`Ärende ${caseNumber} har bokats in!`);
         } else {
           const { data, error } = await supabase.from(tableName).insert([{
-            ...formData,
+            ...cleanFormData,
             title: caseNumber,
             case_number: caseNumber,
             status: 'Bokad',

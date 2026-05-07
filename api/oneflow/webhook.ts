@@ -1579,11 +1579,15 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             // Automatisk kundregistrering för signerade avtal
             await createCustomerFromSignedContract(contractId)
 
-            // Uppdatera ärendets huvudstatus till bokningsbar (för offerter)
+            // Uppdatera ärendets huvudstatus till bokningsbar (för offerter).
+            // Spara även oneflow_contract_id direkt på ärendet (Fas 13b) så
+            // EditCaseModal/EditBusinessCaseModal kan visa "Visa offert"-knapp
+            // utan runtime-lookup.
             if (contractData.type === 'offer') {
               await updateCaseStatusViaSourceId(contractId, 'Offert signerad - boka in', {
                 start_date: null,
                 due_date: null,
+                oneflow_contract_id: contractId,
               })
             }
 
