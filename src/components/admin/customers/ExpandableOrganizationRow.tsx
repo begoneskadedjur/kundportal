@@ -152,6 +152,20 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
           <div className="min-w-0 flex-1">
             <div className="flex items-center flex-wrap gap-1.5">
               <span className="text-sm font-semibold text-white truncate">{organization.company_name}</span>
+              {/* Multi-kontrakt-refaktor (Fas 9): vid splittade per-avtal-rader bär
+                  organization ett __addressLabel som vi visar som suffix-pill bredvid
+                  företagsnamnet. Detta gör varje rad self-explanatory. */}
+              {(organization as any).__addressLabel && (
+                <CustomTooltip
+                  content={<div className="text-xs">Avtal: {(organization as any).__addressLabel}</div>}
+                  position="bottom"
+                >
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-[#20c58f]/15 text-[#20c58f] px-1.5 py-0.5 rounded-full border border-[#20c58f]/30 max-w-[180px] truncate">
+                    <FileSignature className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{(organization as any).__addressLabel}</span>
+                  </span>
+                </CustomTooltip>
+              )}
               {organization.customer_number != null && (
                 <span className="text-xs font-mono text-[#20c58f]/70">#{organization.customer_number}</span>
               )}
@@ -160,10 +174,9 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                   {organization.totalSites} enheter
                 </span>
               )}
-              {/* Multi-kontrakt-badge: signalerar att kunden har flera Oneflow-avtal
-                  som faktureras separat. Visas bara när > 1; för 0/1 förblir UI:t
-                  identiskt med tidigare. */}
-              {organization.contractCount > 1 && (
+              {/* Multi-kontrakt-badge: visas bara på org-rader (där raderna inte är
+                  splittade per avtal). På splittade rader är varje avtal sin egen rad. */}
+              {organization.contractCount > 1 && !(organization as any).__contractId && (
                 <CustomTooltip
                   content={
                     <div className="text-xs">

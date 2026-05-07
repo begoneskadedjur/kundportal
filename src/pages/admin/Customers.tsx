@@ -372,12 +372,18 @@ export default function Customers() {
   const importDropdownRef = useRef<HTMLDivElement>(null)
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
   const [billingSettingsOrg, setBillingSettingsOrg] = useState<any>(null)
+  // Multi-kontrakt-refaktor (Fas 9): scopa BillingSettingsModal till valt avtal
+  // när användaren öppnar via sidopanel/per-avtal-rad. null = single-kontrakt.
+  const [billingSettingsContractId, setBillingSettingsContractId] = useState<string | null>(null)
   const [contactsModalOpen, setContactsModalOpen] = useState(false)
   const [contactsOrg, setContactsOrg] = useState<any>(null)
   const [mobileOverflowId, setMobileOverflowId] = useState<string | null>(null)
 
   // Sidopanel för kunddetaljer (ersätter inline-expand för single-kunder)
   const [sidePanelOrg, setSidePanelOrg] = useState<any>(null)
+  // Multi-kontrakt-refaktor (Fas 9): vilken kontraktsrad som klickades — sidopanelen
+  // använder det som default-val. null = primärt avtal (1-kontrakt-fallet).
+  const [sidePanelContractId, setSidePanelContractId] = useState<string | null>(null)
   const sidePanelOpen = sidePanelOrg !== null
 
   // Collapsade statusgrupper i tabellen
@@ -491,12 +497,59 @@ export default function Customers() {
     })
   }, [filteredCustomers, sortField, sortDirection])
 
+  // Multi-kontrakt-refaktor (Fas 9): splittra single-customer-orgs med flera
+  // riktiga avtal till en virtuell rad per avtal. Varje rad får override:ade
+  // avtalsfält (annual, slutdatum, contract-värde) och __contractId/__addressLabel
+  // så listan/UI visar avtalets data direkt — inte aggregat. Synth-kontrakt
+  // räknas inte. Multisite lämnas orört (har egen detaljvy).
+  const expandedCustomers = useMemo(() => {
+    const out: any[] = []
+    for (const org of sortedCustomers) {
+      const site = org.sites?.[0]
+      const realContracts: any[] = (site?.contracts ?? []).filter(
+        (c: any) => !c.id?.startsWith?.('synth-')
+      )
+      if (org.organizationType !== 'single' || realContracts.length <= 1) {
+        out.push(org)
+        continue
+      }
+      // Splittra: en rad per avtal, behåll original-org som referens via __originalOrg
+      for (const contract of realContracts) {
+        const annual = Number(contract.annual_value ?? 0)
+        const totalValue = Number(contract.total_contract_value ?? contract.total_value ?? annual)
+        const endDate = contract.contract_end_date ?? contract.effective_end_date ?? null
+        const startDate = contract.contract_start_date ?? null
+        const daysRemaining = endDate
+          ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : null
+        out.push({
+          ...org,
+          // Unikt id för React-key + deep-linking
+          id: `${org.id}::${contract.id}`,
+          __originalOrgId: org.id,
+          __contractId: contract.id,
+          __addressLabel: contract.address_label || contract.contact_address || null,
+          totalAnnualValue: annual,
+          totalMonthlyValue: annual ? Math.round(annual / 12) : 0,
+          totalContractValue: totalValue,
+          earliestContractStartDate: startDate,
+          nextRenewalDate: endDate,
+          daysToNextRenewal: daysRemaining,
+          // Visa adress + företagsnamn i ExpandableOrganizationRow:
+          // raden känner inte till split-läget — vi smugglar in adressen via
+          // ett extra fält och låter raden visa det vid render (se nedan).
+        })
+      }
+    }
+    return out
+  }, [sortedCustomers])
+
   // Paginerade kunder
-  const paginatedCustomers = sortedCustomers.slice(
+  const paginatedCustomers = expandedCustomers.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   )
-  const totalPages = Math.ceil(sortedCustomers.length / pageSize)
+  const totalPages = Math.ceil(expandedCustomers.length / pageSize)
 
   // Gruppera paginerade kunder efter status för desktop-tabellen
   const groupedCustomers = useMemo(() => {
@@ -722,8 +775,9 @@ export default function Customers() {
     setTerminateModalOpen(true)
   }
 
-  const handleBillingSettings = (organization: any) => {
+  const handleBillingSettings = (organization: any, contractId: string | null = null) => {
     setBillingSettingsOrg(organization)
+    setBillingSettingsContractId(contractId)
     setBillingSettingsOpen(true)
   }
 
@@ -1413,7 +1467,16 @@ export default function Customers() {
                                 organization={organization}
                                 isExpanded={isExpanded}
                                 onToggleMultisiteSites={() => toggleExpandedRow(organization.id)}
-                                onOpenPanel={(org) => setSidePanelOrg(org)}
+                                onOpenPanel={(org) => {
+                                  // Multi-kontrakt: splittade rader bär __contractId.
+                                  // Hitta original-org så sidopanelen får full data
+                                  // (med alla avtal) men startar med rätt valt.
+                                  const splitContractId = (org as any).__contractId ?? null
+                                  const originalOrgId = (org as any).__originalOrgId ?? org.id
+                                  const originalOrg = consolidatedCustomers.find(c => c.id === originalOrgId) ?? org
+                                  setSidePanelOrg(originalOrg)
+                                  setSidePanelContractId(splitContractId)
+                                }}
                                 visibleColumns={visibleColumns}
                                 contactCount={orgContacts.length}
                                 isHighlighted={activeCustomerId === organization.id}
@@ -1596,6 +1659,7 @@ export default function Customers() {
       {billingSettingsOrg && (
         <BillingSettingsModal
           customerId={billingSettingsOrg.sites[0]?.id || null}
+          contractId={billingSettingsContractId}
           customerName={billingSettingsOrg.company_name}
           contactEmail={billingSettingsOrg.contact_email}
           isMultisite={billingSettingsOrg.organizationType === 'multisite'}
@@ -1618,6 +1682,7 @@ export default function Customers() {
           onClose={() => {
             setBillingSettingsOpen(false)
             setBillingSettingsOrg(null)
+            setBillingSettingsContractId(null)
           }}
           onSave={refresh}
         />
@@ -1641,6 +1706,7 @@ export default function Customers() {
       {/* Sidopanel för kunddetaljer */}
       <CustomerDetailSidePanel
         organization={sidePanelOrg}
+        initialContractId={sidePanelContractId}
         contacts={sidePanelOrg ? getContactsForOrganization(sidePanelOrg) : []}
         isOpen={sidePanelOpen}
         dimmed={
@@ -1648,7 +1714,10 @@ export default function Customers() {
           singleCustomerDetailOpen || renewalModalOpen || terminateModalOpen ||
           billingSettingsOpen || contactsModalOpen
         }
-        onClose={() => setSidePanelOrg(null)}
+        onClose={() => {
+          setSidePanelOrg(null)
+          setSidePanelContractId(null)
+        }}
         onViewFullDetails={(org) => {
           if (org.organizationType === 'multisite') handleViewMultiSiteDetails(org)
           else handleViewSingleCustomerDetails(org)

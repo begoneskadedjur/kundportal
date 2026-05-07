@@ -2,13 +2,14 @@
 // Sidopanel (slide-over på desktop, bottom sheet på mobil) för kunddetaljer.
 // Ersätter expand-i-rad-mönstret. Query-logik lyft ur ExpandedCustomerRow i Customers.tsx.
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   X, Building2, Mail, Phone, User, MapPin, Users as UsersIcon,
   Edit3, TrendingUp, RefreshCw, XCircle, Receipt, ExternalLink,
-  Calendar, Coins, Activity, AlertTriangle,
+  Calendar, Coins, Activity, AlertTriangle, FileSignature,
 } from 'lucide-react'
 import type { ConsolidatedCustomer, ContactSummary } from '../../../hooks/useConsolidatedCustomers'
+import type { ContractWithBilling } from '../../../types/database'
 import { PriceListService } from '../../../services/priceListService'
 import { ImportedCustomerContractService } from '../../../services/importedCustomerContractService'
 import { CaseBillingService } from '../../../services/caseBillingService'
@@ -20,6 +21,9 @@ import CustomerContractButton from './CustomerContractButton'
 
 interface Props {
   organization: ConsolidatedCustomer | null
+  // Multi-kontrakt-refaktor (Fas 9): vilket avtal som ska vara förvalt när panelen
+  // öppnas (från en per-avtal-rad i listvyn). null = första riktiga avtalet.
+  initialContractId?: string | null
   contacts: ContactSummary[]
   isOpen: boolean
   /** När true: panelen glider ut ur vägen och ignorerar Escape (en modal öppnad ovanpå). */
@@ -30,7 +34,9 @@ interface Props {
   onViewRevenue: (org: ConsolidatedCustomer) => void
   onRenewal: (org: ConsolidatedCustomer) => void
   onTerminate: (org: ConsolidatedCustomer) => void
-  onBillingSettings: (org: ConsolidatedCustomer) => void
+  // Multi-kontrakt-refaktor (Fas 9): contractId scopas till valt avtal när
+  // kunden har flera. null = sidopanelens "primärt avtal"-läge (1-kontrakt-kund).
+  onBillingSettings: (org: ConsolidatedCustomer, contractId?: string | null) => void
   onContacts: (org: ConsolidatedCustomer) => void
 }
 
@@ -112,6 +118,7 @@ function SectionCard({ title, icon: Icon, children, action }: {
 
 export default function CustomerDetailSidePanel({
   organization,
+  initialContractId = null,
   contacts,
   isOpen,
   dimmed = false,
@@ -141,6 +148,31 @@ export default function CustomerDetailSidePanel({
 
   const primarySite = organization?.sites?.[0]
   const isMultisite = organization?.organizationType === 'multisite'
+
+  // Multi-kontrakt-refaktor (Fas 9): valt avtal i sidopanelen. Synth-rader
+  // (id 'synth-*') filtreras bort — de finns inte i DB och ger inget värde
+  // i väljaren. Single-kontrakt-kunder ser ingen väljare.
+  const realContracts = useMemo<ContractWithBilling[]>(
+    () => ((primarySite as any)?.contracts ?? []).filter(
+      (c: ContractWithBilling) => !c.id.startsWith('synth-')
+    ),
+    [primarySite]
+  )
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null)
+  useEffect(() => {
+    // När panelen öppnas: prioritera initialContractId från listvyns per-avtal-
+    // klick. Validera att det fortfarande finns bland realContracts (annars
+    // fallback till första). Single-kontrakt-kunder får null när inga finns.
+    if (initialContractId && realContracts.some(c => c.id === initialContractId)) {
+      setSelectedContractId(initialContractId)
+    } else {
+      setSelectedContractId(realContracts[0]?.id ?? null)
+    }
+  }, [organization?.id, initialContractId, realContracts])
+  const selectedContract = useMemo<ContractWithBilling | null>(
+    () => realContracts.find(c => c.id === selectedContractId) ?? realContracts[0] ?? null,
+    [realContracts, selectedContractId]
+  )
 
   // Close on Escape — men inte när en modal är öppen ovanpå (dimmed)
   useEffect(() => {
@@ -214,16 +246,24 @@ export default function CustomerDetailSidePanel({
 
   if (!organization) return null
 
-  const contractMonthsRemaining = organization.daysToNextRenewal != null
-    ? Math.max(0, Math.round(organization.daysToNextRenewal / 30.44))
+  // Multi-kontrakt: räkna kvarvarande månader från valt kontrakt om det finns,
+  // annars från org-aggregatets nextRenewalDate (single-kontrakt-fallback).
+  const selectedEndIso = selectedContract?.contract_end_date ?? organization.nextRenewalDate
+  const selectedDaysRemaining = selectedEndIso
+    ? Math.ceil((new Date(selectedEndIso).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : organization.daysToNextRenewal ?? null
+  const contractMonthsRemaining = selectedDaysRemaining != null
+    ? Math.max(0, Math.round(selectedDaysRemaining / 30.44))
     : null
 
   const showRenewalButton = !organization.isTerminated
-    && organization.daysToNextRenewal != null
-    && organization.daysToNextRenewal > 0
-    && organization.daysToNextRenewal <= 90
+    && selectedDaysRemaining != null
+    && selectedDaysRemaining > 0
+    && selectedDaysRemaining <= 90
 
-  const oneflowContractId = primarySite?.oneflow_contract_id
+  // Multi-kontrakt: använd valt kontrakts oneflow-id när satt, annars fallback
+  // till customers-fältet (synth/legacy).
+  const oneflowContractId = selectedContract?.oneflow_contract_id ?? primarySite?.oneflow_contract_id
 
   return (
     <>
@@ -312,7 +352,7 @@ export default function CustomerDetailSidePanel({
             Intäkter
           </button>
           <button
-            onClick={() => onBillingSettings(organization)}
+            onClick={() => onBillingSettings(organization, selectedContract?.id ?? null)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
           >
             <Receipt className="w-3.5 h-3.5" />
@@ -353,6 +393,42 @@ export default function CustomerDetailSidePanel({
             </button>
           )}
         </div>
+
+        {/* Multi-kontrakt-väljare: visas bara när kunden har > 1 riktigt avtal.
+            Pills/segmented control — klick byter sidopanelens innehåll till
+            valt avtal. Single-kontrakt-kunder ser ingen extra rad. */}
+        {realContracts.length > 1 && (
+          <div className="px-4 py-2 border-b border-slate-800 bg-slate-900/50">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <FileSignature className="w-3.5 h-3.5 text-[#20c58f]" />
+              <span className="text-xs font-medium text-slate-400">
+                Avtal ({realContracts.length})
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {realContracts.map(contract => {
+                const label = contract.address_label
+                  || contract.contact_address
+                  || `#${contract.oneflow_contract_id}`
+                const isActive = contract.id === selectedContract?.id
+                return (
+                  <button
+                    key={contract.id}
+                    onClick={() => setSelectedContractId(contract.id)}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors truncate max-w-[200px] ${
+                      isActive
+                        ? 'bg-[#20c58f] text-white'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                    title={label}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Innehåll */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -410,52 +486,66 @@ export default function CustomerDetailSidePanel({
             </div>
           </SectionCard>
 
-          {/* Avtal */}
+          {/* Avtal — visar valt avtal när multi-kontrakt, annars org-aggregat */}
           <SectionCard title="Avtal" icon={Calendar}>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Årspremie</p>
-                <p className="text-white font-semibold">{fmtSEK(organization.totalAnnualValue || 0)}</p>
-                <p className="text-xs text-slate-500">{fmtSEK((organization.totalAnnualValue || 0) / 12)}/mån</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Avtalsvärde</p>
-                <p className="text-white font-semibold">{fmtSEK(organization.totalContractValue)}</p>
-                <p className="text-xs text-slate-500">totalt värde</p>
-              </div>
-              {organization.totalCasesValue > 0 && (
-                <div className="col-span-2">
-                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Debiterat utöver avtal</p>
-                  <p className="text-white font-semibold">{fmtSEK(organization.totalCasesValue)}</p>
-                </div>
-              )}
-              {organization.earliestContractStartDate && (
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Avtalsstart</p>
-                  <p className="text-white">{fmtDate(organization.earliestContractStartDate)}</p>
-                </div>
-              )}
-              {organization.nextRenewalDate && (
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Avtalsslut</p>
-                  <p className="text-white">{fmtDate(organization.nextRenewalDate)}</p>
-                  {contractMonthsRemaining != null && !organization.isTerminated && (
-                    <p className={`text-xs ${
-                      contractMonthsRemaining <= 6 ? 'text-red-400' :
-                      contractMonthsRemaining <= 12 ? 'text-amber-400' :
-                      'text-green-400'
-                    }`}>
-                      {contractMonthsRemaining} mån kvar
-                    </p>
-                  )}
-                </div>
-              )}
-              {organization.isTerminated && organization.effectiveEndDate && (
-                <div className="col-span-2">
-                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Uppsägning</p>
-                  <p className="text-red-400">Slutar {fmtDate(organization.effectiveEndDate)}</p>
-                </div>
-              )}
+              {(() => {
+                const annual = selectedContract?.annual_value != null
+                  ? Number(selectedContract.annual_value)
+                  : organization.totalAnnualValue || 0
+                const totalValue = selectedContract?.total_contract_value != null
+                  ? Number(selectedContract.total_contract_value)
+                  : organization.totalContractValue
+                const startDate = selectedContract?.contract_start_date ?? organization.earliestContractStartDate
+                const endDate = selectedContract?.contract_end_date ?? organization.nextRenewalDate
+                return (
+                  <>
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Årspremie</p>
+                      <p className="text-white font-semibold">{fmtSEK(annual)}</p>
+                      <p className="text-xs text-slate-500">{fmtSEK(annual / 12)}/mån</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Avtalsvärde</p>
+                      <p className="text-white font-semibold">{fmtSEK(totalValue)}</p>
+                      <p className="text-xs text-slate-500">totalt värde</p>
+                    </div>
+                    {organization.totalCasesValue > 0 && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Debiterat utöver avtal</p>
+                        <p className="text-white font-semibold">{fmtSEK(organization.totalCasesValue)}</p>
+                      </div>
+                    )}
+                    {startDate && (
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Avtalsstart</p>
+                        <p className="text-white">{fmtDate(startDate)}</p>
+                      </div>
+                    )}
+                    {endDate && (
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Avtalsslut</p>
+                        <p className="text-white">{fmtDate(endDate)}</p>
+                        {contractMonthsRemaining != null && !organization.isTerminated && (
+                          <p className={`text-xs ${
+                            contractMonthsRemaining <= 6 ? 'text-red-400' :
+                            contractMonthsRemaining <= 12 ? 'text-amber-400' :
+                            'text-green-400'
+                          }`}>
+                            {contractMonthsRemaining} mån kvar
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {organization.isTerminated && organization.effectiveEndDate && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Uppsägning</p>
+                        <p className="text-red-400">Slutar {fmtDate(organization.effectiveEndDate)}</p>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           </SectionCard>
 
@@ -701,11 +791,11 @@ export default function CustomerDetailSidePanel({
             </SectionCard>
           )}
 
-          {/* Avtalstext */}
-          {(primarySite as any)?.agreement_text && (
+          {/* Avtalstext — valt avtals text vid multi-kontrakt, annars site-fält */}
+          {(selectedContract?.agreement_text ?? (primarySite as any)?.agreement_text) && (
             <SectionCard title="Avtalstext" icon={Receipt}>
               <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-wrap">
-                {(primarySite as any).agreement_text}
+                {selectedContract?.agreement_text ?? (primarySite as any).agreement_text}
               </p>
             </SectionCard>
           )}
