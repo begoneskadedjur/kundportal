@@ -94,7 +94,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const handleDraftArticlesChange = useCallback((items: CaseBillingItemWithRelations[]) => {
     setDraftBillingItems(items)
   }, []);
-  const [showArticles, setShowArticles] = useState(false);
+  // Default-expanderad när bokningen sker på ett befintligt ärende (signerad
+  // offert) — då finns ofta tjänsterader redan från offerten som koordinatorn
+  // bör se direkt utan extra klick. Helt nytt ärende från scratch: kollapsad.
+  const [showArticles, setShowArticles] = useState(!!initialCaseData?.id);
   const [offerDetails, setOfferDetails] = useState<{
     agreement_text: string | null;
     selected_products: any[] | null;
@@ -934,10 +937,17 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         const tableName = caseType === 'private' ? 'private_cases' : 'business_cases';
         let createdClickUpCaseId: string | null = null;
 
-        // Fas 13b: case_type är JS-only-flagga (markerar tabell-källa) och finns
-        // inte som DB-kolumn. Stripa innan supabase-anrop annars 400.
+        // Fas 13b/14: strippa JS-only-attribut som inte finns som kolumner i
+        // private_cases / business_cases.
+        // - case_type: flagga för tabellrouting
+        // - service: nästlat join-objekt från CoordinatorSchedule:s select
+        //   (`service:services!service_id(name)`)
         // oneflow_contract_id ÄR riktig kolumn nu — sparas naturligt via spread.
-        const { case_type: _stripCaseType, ...cleanFormData } = formData as any;
+        const {
+          case_type: _stripCaseType,
+          service: _stripServiceJoin,
+          ...cleanFormData
+        } = formData as any;
 
         if (initialCaseData && initialCaseData.case_type !== 'contract') {
           const { error } = await supabase.from(tableName).update({
