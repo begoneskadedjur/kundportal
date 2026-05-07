@@ -1744,7 +1744,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       <ServiceArticleSelector
                         groupId={serviceGroupId}
                         serviceId={serviceId}
-                        onGroupChange={(gid) => { setServiceGroupId(gid); setServiceId(null); setSelectedService(null); }}
+                        onGroupChange={(gid) => setServiceGroupId(gid)}
                         onServiceChange={(sid, svc) => { setServiceId(sid); setSelectedService(svc); }}
                         bookingOnly
                       />
