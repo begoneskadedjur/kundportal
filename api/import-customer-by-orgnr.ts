@@ -308,7 +308,7 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     contract_length,
     company_name_oneflow,
     annual_value: annual_value && annual_value > 0 ? annual_value : null,
-    total_contract_value,
+    total_contract_value: contract_total_value,
     products: selectedProducts.length > 0 ? selectedProducts : null,
     oneflow_contract_id: String(contract.id),
     contract_type,
