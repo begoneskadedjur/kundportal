@@ -402,10 +402,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         customer_data.contract_length
       )
 
+      // Multi-kontrakt-refaktor (Fas 11 bug 1): spegla första valda kontraktets
+      // contract_type till customers.contract_type så att EditCustomerModal kan
+      // visa avtalstypen. Tabs-flödet kan ha redigerat första kontraktet —
+      // selected_contracts[0] vinner över customer_data.contract_type (preview-
+      // snapshot taget innan tabs-redigering).
+      const primaryContractType = Array.isArray(selected_contracts) && selected_contracts.length > 0
+        ? selected_contracts[0]?.contract_type ?? null
+        : customer_data.contract_type ?? null
+
       const insertPayload = {
         ...customer_data,
         organization_number: normalized,
         source_type: 'import',
+        contract_type: primaryContractType,
         total_contract_value:
           customer_data.total_contract_value ?? computedTotalContractValue,
       }

@@ -386,6 +386,18 @@ export default function Customers() {
   const [sidePanelContractId, setSidePanelContractId] = useState<string | null>(null)
   const sidePanelOpen = sidePanelOrg !== null
 
+  // Multi-kontrakt-refaktor (Fas 11 bug 2): synka sidePanelOrg när
+  // consolidatedCustomers uppdateras (efter refresh). Annars renderar sidopanelen
+  // stale snapshot tagen vid radklick — admin tvingas stänga + ctrl+shift+r för
+  // att se ändringar gjorda i en modal som anropar refresh().
+  useEffect(() => {
+    if (!sidePanelOrg) return
+    const updated = consolidatedCustomers.find(c => c.id === sidePanelOrg.id)
+    if (updated && updated !== sidePanelOrg) {
+      setSidePanelOrg(updated)
+    }
+  }, [consolidatedCustomers])
+
   // Collapsade statusgrupper i tabellen
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const toggleGroup = (key: string) => setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }))

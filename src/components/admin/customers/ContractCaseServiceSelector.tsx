@@ -10,13 +10,18 @@ import { ImportedCustomerContractService } from '../../../services/importedCusto
 
 interface Props {
   customerId: string
+  /** Multi-kontrakt-refaktor (Fas 11): scopa selectorn till ett specifikt
+   *  contracts.id istället för imported-{customerId}-fallback. När satt:
+   *  hoppa över ImportedCustomerContractService.getOrCreateContract — tjänster
+   *  och artiklar sparas direkt mot detta kontrakts case_billing_items-rader. */
+  contractId?: string | null
   readOnly?: boolean
   /** Kallas när användaren ändrat något. `servicesSubtotal` = summan av
    *  tjänsterader (exkl. moms) — motsvarar "beräknat årsbelopp". */
   onChange?: (servicesSubtotal: number) => void
 }
 
-export default function ContractCaseServiceSelector({ customerId, readOnly, onChange }: Props) {
+export default function ContractCaseServiceSelector({ customerId, contractId: externalContractId, readOnly, onChange }: Props) {
   const [contractId, setContractId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -25,12 +30,21 @@ export default function ContractCaseServiceSelector({ customerId, readOnly, onCh
     let cancelled = false
     setLoading(true)
     setError(null)
+
+    // Multi-kontrakt: när externalContractId ges, skippa imported-fallback
+    // och spara direkt mot det scopade kontraktet.
+    if (externalContractId && !externalContractId.startsWith('synth-')) {
+      setContractId(externalContractId)
+      setLoading(false)
+      return () => { cancelled = true }
+    }
+
     ImportedCustomerContractService.getOrCreateContract(customerId)
       .then(id => { if (!cancelled) setContractId(id) })
       .catch(err => { if (!cancelled) setError(err?.message || 'Kunde inte läsa kontrakt') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [customerId])
+  }, [customerId, externalContractId])
 
   if (loading) {
     return (

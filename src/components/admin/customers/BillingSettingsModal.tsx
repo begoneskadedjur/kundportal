@@ -299,11 +299,20 @@ export default function BillingSettingsModal({
           setHasOneflowContract(false)
           return
         }
-        // "Riktigt" Oneflow = oneflow_contract_id som INTE börjar med 'imported-'
-        const oneflowContracts = contracts.filter(
-          (c: any) => c.oneflow_contract_id && !String(c.oneflow_contract_id).startsWith('imported-')
-        )
-        setHasOneflowContract(oneflowContracts.length > 0)
+        // Multi-kontrakt-refaktor (Fas 11 bug 3): när modalen är scopad till ett
+        // specifikt kontrakt (multi-kontrakt-import) ska editor vara öppen så
+        // admin kan lägga in tjänster/interna kostnader manuellt — exakt samma
+        // flöde som single-kontrakt-importerade kunder. Read-only-läget gäller
+        // bara legacy single-kontrakt-Oneflow-kunder utan contractId-prop.
+        if (contractId) {
+          setHasOneflowContract(false)
+        } else {
+          // "Riktigt" Oneflow = oneflow_contract_id som INTE börjar med 'imported-'
+          const oneflowContracts = contracts.filter(
+            (c: any) => c.oneflow_contract_id && !String(c.oneflow_contract_id).startsWith('imported-')
+          )
+          setHasOneflowContract(oneflowContracts.length > 0)
+        }
         const contractIds = contracts.map((c: any) => c.id)
 
         const { data: items } = await supabase
@@ -339,7 +348,7 @@ export default function BillingSettingsModal({
         setContractServicesTotal(0)
       }
     })()
-  }, [isOpen, customerId, contractReloadTick])
+  }, [isOpen, customerId, contractId, contractReloadTick])
 
   // Ladda befintliga contract-fakturor för live-diff (en gång per öppning)
   useEffect(() => {
@@ -903,6 +912,7 @@ export default function BillingSettingsModal({
               customerId && (
                 <ContractCaseServiceSelector
                   customerId={customerId}
+                  contractId={contractId}
                   onChange={subtotal => {
                     setContractServicesTotal(subtotal)
                     setContractReloadTick(t => t + 1)
