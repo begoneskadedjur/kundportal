@@ -31,7 +31,8 @@ interface Props {
   onClose: () => void
   onViewFullDetails: (org: ConsolidatedCustomer) => void
   onEdit: (org: ConsolidatedCustomer) => void
-  onViewRevenue: (org: ConsolidatedCustomer) => void
+  // Multi-kontrakt-refaktor (Fas 12 bug D): scopa Intäkter-modal till valt avtal.
+  onViewRevenue: (org: ConsolidatedCustomer, contractId?: string | null) => void
   onRenewal: (org: ConsolidatedCustomer) => void
   onTerminate: (org: ConsolidatedCustomer) => void
   // Multi-kontrakt-refaktor (Fas 9): contractId scopas till valt avtal när
@@ -210,6 +211,9 @@ export default function CustomerDetailSidePanel({
   }, [isOpen, primarySite?.price_list_id, isMultisite])
 
   // Fetch contract summary
+  // Multi-kontrakt-refaktor (Fas 12 bug C): när selectedContract finns och inte
+  // är synth → läs case_billing_items via det specifika kontrakt-id:t istället
+  // för imported-{customerId}-fallback. Re-fetcha vid pills-byte.
   useEffect(() => {
     if (!isOpen || !primarySite?.id || isMultisite) {
       setContractData({ services: [], articles: [], summary: null })
@@ -219,19 +223,28 @@ export default function CustomerDetailSidePanel({
     setLoadingContract(true)
     ;(async () => {
       try {
-        const [contractId, settings] = await Promise.all([
-          ImportedCustomerContractService.findContract(primarySite.id),
-          PricingSettingsService.get(),
-        ])
+        const settings = await PricingSettingsService.get()
         if (cancelled) return
         setPricingSettings(settings)
-        if (!contractId) {
+
+        // Hitta target-kontrakt: valt avtal (icke-synth) först, annars
+        // imported-{customerId}-fallback för legacy single-kontrakt-kunder.
+        let targetContractId: string | null = null
+        if (selectedContract && !selectedContract._synthetic && !selectedContract.id.startsWith('synth-')) {
+          targetContractId = selectedContract.id
+        } else {
+          targetContractId = await ImportedCustomerContractService.findContract(primarySite.id)
+        }
+
+        if (cancelled) return
+        if (!targetContractId) {
           setContractData({ services: [], articles: [], summary: null })
           return
         }
+
         const [{ services, articles }, summary] = await Promise.all([
-          ImportedCustomerContractService.getItems(contractId),
-          CaseBillingService.getCaseServiceSummary(contractId, 'contract', settings.min_margin_percent),
+          ImportedCustomerContractService.getItems(targetContractId),
+          CaseBillingService.getCaseServiceSummary(targetContractId, 'contract', settings.min_margin_percent),
         ])
         if (!cancelled) setContractData({ services, articles, summary })
       } catch (err) {
@@ -242,7 +255,7 @@ export default function CustomerDetailSidePanel({
       }
     })()
     return () => { cancelled = true }
-  }, [isOpen, primarySite?.id, isMultisite])
+  }, [isOpen, primarySite?.id, isMultisite, selectedContract?.id])
 
   if (!organization) return null
 
@@ -345,7 +358,7 @@ export default function CustomerDetailSidePanel({
             Redigera
           </button>
           <button
-            onClick={() => onViewRevenue(organization)}
+            onClick={() => onViewRevenue(organization, selectedContract?.id ?? null)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[#20c58f]/10 text-[#20c58f] hover:bg-[#20c58f]/20 transition-colors"
           >
             <TrendingUp className="w-3.5 h-3.5" />
@@ -498,8 +511,15 @@ export default function CustomerDetailSidePanel({
                   : organization.totalContractValue
                 const startDate = selectedContract?.contract_start_date ?? organization.earliestContractStartDate
                 const endDate = selectedContract?.contract_end_date ?? organization.nextRenewalDate
+                const contractTypeLabel = selectedContract?.contract_type ?? (primarySite as any)?.contract_type ?? null
                 return (
                   <>
+                    {contractTypeLabel && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Avtalstyp</p>
+                        <p className="text-white">{contractTypeLabel}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Årspremie</p>
                       <p className="text-white font-semibold">{fmtSEK(annual)}</p>

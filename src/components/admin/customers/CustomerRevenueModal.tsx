@@ -10,6 +10,9 @@ type InvoiceStatus = 'paid' | 'sent' | 'booked' | 'ready' | 'pending_approval' |
 
 interface CustomerRevenueModalProps {
   customer: ConsolidatedCustomer | null
+  // Multi-kontrakt-refaktor (Fas 12 bug D): scopa intäktsöversikten till ett
+  // specifikt avtal när kunden har flera. null = customer-aggregerat (legacy).
+  contractId?: string | null
   isOpen: boolean
   onClose: () => void
 }
@@ -69,7 +72,7 @@ const STATUS_BAR_COLORS: Record<InvoiceStatus, string> = {
   cancelled: 'bg-slate-500',
 }
 
-export default function CustomerRevenueModal({ customer, isOpen, onClose }: CustomerRevenueModalProps) {
+export default function CustomerRevenueModal({ customer, contractId = null, isOpen, onClose }: CustomerRevenueModalProps) {
   const [billingItems, setBillingItems] = useState<BillingItem[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -83,13 +86,21 @@ export default function CustomerRevenueModal({ customer, isOpen, onClose }: Cust
         // Hämta customer_ids från alla sites
         const customerIds = customer.sites.map(s => s.id)
 
-        // Läs från invoices — authoritativ källa, inkluderar historical paid.
-        const { data, error } = await supabase
+        // Multi-kontrakt: filtrera på contract_id när modalen är scopad till ett
+        // specifikt avtal (synth-id sparas inte → ignorera). Annars (single-
+        // kontrakt-kunder eller legacy) aggregera alla customer-invoices.
+        let query = supabase
           .from('invoices')
           .select('subtotal, total_amount, status, invoice_type, billing_period_start, billing_period_end')
           .in('customer_id', customerIds)
           .in('invoice_type', ['contract', 'adhoc'])
           .neq('status', 'cancelled')
+
+        if (contractId && !contractId.startsWith('synth-')) {
+          query = query.eq('contract_id', contractId)
+        }
+
+        const { data, error } = await query
 
         if (error) throw error
         setBillingItems((data as any) || [])
@@ -102,7 +113,7 @@ export default function CustomerRevenueModal({ customer, isOpen, onClose }: Cust
     }
 
     fetchBillingData()
-  }, [isOpen, customer])
+  }, [isOpen, customer, contractId])
 
   // Beräkna aggregeringar
   const stats = useMemo(() => {

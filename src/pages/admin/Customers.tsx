@@ -361,6 +361,8 @@ export default function Customers() {
   const [selectedSingleCustomer, setSelectedSingleCustomer] = useState<any>(null)
   const [revenueModalOpen, setRevenueModalOpen] = useState(false)
   const [revenueCustomer, setRevenueCustomer] = useState<any>(null)
+  // Multi-kontrakt-refaktor (Fas 12 bug D): scopa Intäkter-modal till valt avtal.
+  const [revenueContractId, setRevenueContractId] = useState<string | null>(null)
   const [renewalModalOpen, setRenewalModalOpen] = useState(false)
   const [renewalOrganization, setRenewalOrganization] = useState<any>(null)
   const [terminateModalOpen, setTerminateModalOpen] = useState(false)
@@ -772,8 +774,9 @@ export default function Customers() {
   }
 
   // Handle revenue modal
-  const handleViewRevenue = (organization: any) => {
+  const handleViewRevenue = (organization: any, contractId: string | null = null) => {
     setRevenueCustomer(organization)
+    setRevenueContractId(contractId)
     setRevenueModalOpen(true)
   }
 
@@ -1615,10 +1618,12 @@ export default function Customers() {
       {/* Revenue Modal */}
       <CustomerRevenueModal
         customer={revenueCustomer}
+        contractId={revenueContractId}
         isOpen={revenueModalOpen}
         onClose={() => {
           setRevenueModalOpen(false)
           setRevenueCustomer(null)
+          setRevenueContractId(null)
         }}
       />
 

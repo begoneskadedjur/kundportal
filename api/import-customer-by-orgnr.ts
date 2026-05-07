@@ -506,6 +506,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         insertedContracts = contractInsertData
         console.log(`✅ ${insertedContracts.length} kontrakt skapade för kund ${inserted.id}`)
+
+        // Multi-kontrakt-refaktor (Fas 12 bug B): auto-skapa en tjänsterad i
+        // case_billing_items för varje kontrakt som har contract_type + annual_value.
+        // Mappar contract_type → services.name (samma pattern som
+        // useContractTypeOptions). Fail silent vid no-match, admin lägger till
+        // manuellt via ContractCaseServiceSelector.
+        for (const ic of insertedContracts) {
+          if (!ic.contract_type || !ic.annual_value) continue
+          try {
+            const { data: service } = await supabase
+              .from('services')
+              .select('id, name, code')
+              .eq('name', ic.contract_type)
+              .eq('is_active', true)
+              .maybeSingle()
+            if (!service) {
+              console.warn(`⚠️ Ingen service-rad matchar contract_type "${ic.contract_type}" — tjänsterad ej skapad för kontrakt ${ic.id}`)
+              continue
+            }
+            const annual = Math.round(Number(ic.annual_value))
+            const { error: itemError } = await supabase.from('case_billing_items').insert({
+              case_id: ic.id,
+              case_type: 'contract',
+              customer_id: inserted.id,
+              item_type: 'service',
+              service_id: service.id,
+              service_name: service.name,
+              service_code: service.code ?? null,
+              quantity: 1,
+              unit_price: annual,
+              total_price: annual,
+              vat_rate: 25,
+              price_source: 'standard',
+              status: 'pending',
+            })
+            if (itemError) {
+              console.error(`❌ Kunde inte auto-skapa tjänsterad för kontrakt ${ic.id}:`, itemError)
+            }
+          } catch (err) {
+            console.error(`❌ Auto-skapa tjänsterad failed för kontrakt ${ic.id}:`, err)
+          }
+        }
       }
 
       return res.status(200).json({
