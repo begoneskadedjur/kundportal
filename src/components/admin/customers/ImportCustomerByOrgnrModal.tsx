@@ -16,6 +16,7 @@ import { PriceListService } from '../../../services/priceListService'
 import type { PriceList } from '../../../types/articles'
 import type { CustomerGroup } from '../../../types/customerGroups'
 import { useContractTypeOptions } from '../../../hooks/useContractTypeOptions'
+import CustomerContractButton from './CustomerContractButton'
 
 const MONTHS_SV = [
   'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
@@ -856,13 +857,29 @@ export default function ImportCustomerByOrgnrModal({
                   onChange={v => activeContract ? updateContract('sales_person_email')(v || null) : update('sales_person_email')(v)}
                   placeholder="Ej hämtat"
                 />
-                <Field
-                  label="Oneflow kontrakt-ID"
-                  value={(activeContract?.oneflow_contract_id ?? preview.oneflow_contract_id) ?? ''}
-                  onChange={v => activeContract ? updateContract('oneflow_contract_id')(v) : update('oneflow_contract_id')(v)}
-                  placeholder="Ej hämtat"
-                  readOnly={!!activeContract}
-                />
+                <div>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1 min-w-0">
+                      <Field
+                        label="Oneflow kontrakt-ID"
+                        value={(activeContract?.oneflow_contract_id ?? preview.oneflow_contract_id) ?? ''}
+                        onChange={v => activeContract ? updateContract('oneflow_contract_id')(v) : update('oneflow_contract_id')(v)}
+                        placeholder="Ej hämtat"
+                        readOnly={!!activeContract}
+                      />
+                    </div>
+                    {/* Multi-kontrakt: öppna avtals-PDF direkt från Oneflow under
+                        importen så admin kan dubbelkolla innehållet innan spara. */}
+                    {(activeContract?.oneflow_contract_id ?? preview.oneflow_contract_id) && (
+                      <div className="pb-0.5">
+                        <CustomerContractButton
+                          oneflowContractId={(activeContract?.oneflow_contract_id ?? preview.oneflow_contract_id)!}
+                          customerName={preview.company_name || 'Kund'}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {/* Avtalsobjekt */}
                 {((activeContract?.agreement_text ?? preview.agreement_text) !== null || sources?.oneflow) && (
