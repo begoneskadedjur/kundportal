@@ -811,11 +811,18 @@ export default function ImportCustomerByOrgnrModal({
                     const lengthVal = activeContract?.contract_length ?? preview.contract_length
                     const annualVal = activeContract?.annual_value ?? preview.annual_value
                     const months = parseContractLengthMonthsStrict(lengthVal)
-                    if (!months || months >= 12 || !annualVal || annualVal <= 0) return null
-                    const totalValue = Math.round(annualVal * (months / 12))
+                    if (!months || !annualVal || annualVal <= 0) return null
+                    if (months >= 12) {
+                      const total = Math.round(annualVal * (months / 12))
+                      return (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Avtalstid {months} mån · totalvärde {total.toLocaleString('sv-SE')} kr
+                        </p>
+                      )
+                    }
                     return (
-                      <p className="text-xs text-amber-400/80 mt-1">
-                        Extrapolerad årstakt från {months} mån avtal · totalvärde {totalValue.toLocaleString('sv-SE')} kr
+                      <p className="text-xs text-slate-500 mt-1">
+                        Kortare avtal ({months} mån) — årspremien debiteras en gång
                       </p>
                     )
                   })()}

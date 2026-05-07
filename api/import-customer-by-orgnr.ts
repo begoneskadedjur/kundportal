@@ -196,6 +196,11 @@ function parseContractLengthMonthsStrict(text: string | null | undefined): numbe
 
 // Returnerar total_contract_value eller null för avropsavtal.
 // Null när annual_value saknas/0 eller contract_length inte kan tolkas.
+//
+// Semantik (Fas 10): annual_value ÄR det BeGone debiterar per år, oavsett
+// avtalsperiod. För avtal >=12 mån: totalvärde = annual × år. För avtal
+// <12 mån: totalvärde = annual rakt av (vi delar inte upp kortare perioder
+// — kunden köper hela perioden till årspremien).
 function computeTotalContractValue(
   annualValue: number | string | null | undefined,
   contractLengthText: string | null | undefined
@@ -214,7 +219,11 @@ function computeTotalContractValue(
   const unit = (match[2] || '').toLowerCase()
   const months = /^(år|year|years)$/.test(unit) ? Math.round(n * 12) : Math.round(n)
 
-  return Math.round(annual * (months / 12))
+  if (months >= 12) {
+    return Math.round(annual * (months / 12))
+  }
+  // <12 mån: totalvärde = årspremien (ingen halvering)
+  return Math.round(annual)
 }
 
 function extractOneflowData(contractData: { contract: any; parties: any[] }) {
@@ -262,29 +271,32 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     contract_end_date = start.toISOString().split('T')[0]
   }
 
-  // Produktvärde — Oneflow-summan motsvarar avtalets TOTALVÄRDE (för hela
-  // avtalstiden), inte årstakt. Normalisera till årstakt baserat på avtalslängd
-  // så att resten av systemet (fakturaplan, dashboards) får konsekvent data.
-  let contract_total_value: number | null = null
+  // Multi-kontrakt-refaktor (Fas 10): Oneflow-summan ÄR årspremien (det BeGone
+  // debiterar per år, oavsett avtalsperiod). Ingen extrapolering. För avtal
+  // >=12 mån räknas totalvärdet som annual × år; för <12 mån är totalvärdet
+  // = årspremien (kortare avtal debiteras en gång till samma belopp).
+  let oneflow_sum: number | null = null
   const products: any[] = contract.product_groups
     ? contract.product_groups.flatMap((g: any) => g.products || [])
     : contract.products ?? []
 
   if (products.length > 0) {
-    contract_total_value = products.reduce((sum: number, p: any) => {
+    oneflow_sum = products.reduce((sum: number, p: any) => {
       const amount = parseFloat(p.total_amount?.amount ?? p.unit_price?.amount ?? '0')
       return sum + amount * (p.quantity ?? 1)
     }, 0)
   }
 
+  const annual_value = oneflow_sum && oneflow_sum > 0 ? Math.round(oneflow_sum) : null
+
   const contract_length_months = parseContractLengthMonthsStrict(contract_length)
-  let annual_value: number | null = null
-  if (contract_total_value && contract_total_value > 0) {
-    if (contract_length_months && contract_length_months > 0) {
-      annual_value = Math.round(contract_total_value * (12 / contract_length_months))
+  let total_contract_value: number | null = null
+  if (annual_value && annual_value > 0) {
+    if (contract_length_months && contract_length_months >= 12) {
+      total_contract_value = Math.round(annual_value * (contract_length_months / 12))
     } else {
-      // Fallback: avtalslängd okänd → anta 12 mån (samma som tidigare beteende)
-      annual_value = Math.round(contract_total_value)
+      // <12 mån eller okänd längd → totalvärdet är samma som årspremien
+      total_contract_value = annual_value
     }
   }
 
@@ -308,7 +320,7 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
     contract_length,
     company_name_oneflow,
     annual_value: annual_value && annual_value > 0 ? annual_value : null,
-    total_contract_value: contract_total_value,
+    total_contract_value,
     products: selectedProducts.length > 0 ? selectedProducts : null,
     oneflow_contract_id: String(contract.id),
     contract_type,
