@@ -195,6 +195,11 @@ export default function ImportCustomerByOrgnrModal({
   // + vilka som ska importeras (alla förvalda). Visas som väljarsektion när > 1.
   const [extractedContracts, setExtractedContracts] = useState<ExtractedContract[]>([])
   const [selectedContractIds, setSelectedContractIds] = useState<Set<string>>(new Set())
+  // Multi-kontrakt-refaktor (Fas 4 v2): redigerbara fält per avtal. Tabs-baserad
+  // UI låter admin justera varje avtals data (avtalstid, årsvärde, säljare etc)
+  // separat innan import. Map<oneflow_contract_id, ExtractedContract>.
+  const [editedContracts, setEditedContracts] = useState<Record<string, ExtractedContract>>({})
+  const [activeContractTab, setActiveContractTab] = useState<string | null>(null)
 
   const handleClose = () => {
     setStep('search')
@@ -209,6 +214,8 @@ export default function ImportCustomerByOrgnrModal({
     setSavedCustomer(null)
     setExtractedContracts([])
     setSelectedContractIds(new Set())
+    setEditedContracts({})
+    setActiveContractTab(null)
     onClose()
   }
 
@@ -270,6 +277,12 @@ export default function ImportCustomerByOrgnrModal({
       const fetchedContracts: ExtractedContract[] = Array.isArray(data.contracts) ? data.contracts : []
       setExtractedContracts(fetchedContracts)
       setSelectedContractIds(new Set(fetchedContracts.map(c => c.oneflow_contract_id)))
+      // Bygg per-avtal Map för redigering. Klona varje kontrakt så att admins
+      // ändringar inte muterar den oförändrade extractedContracts-arrayen.
+      const map: Record<string, ExtractedContract> = {}
+      fetchedContracts.forEach(c => { map[c.oneflow_contract_id] = { ...c } })
+      setEditedContracts(map)
+      setActiveContractTab(fetchedContracts[0]?.oneflow_contract_id ?? null)
 
       setSources(data.sources)
       setStep('preview')
@@ -291,12 +304,13 @@ export default function ImportCustomerByOrgnrModal({
         billing_active: true,
       }
 
-      // Multi-kontrakt: skicka valda kontrakt så backend skapar contracts-rader.
-      // Vid 0 hittade Oneflow-kontrakt skickas tom array → backend skapar bara
-      // customer (legacy-läge), exakt som tidigare.
-      const selectedContracts = extractedContracts.filter(c =>
-        selectedContractIds.has(c.oneflow_contract_id)
-      )
+      // Multi-kontrakt: skicka valda kontrakt med redigerade värden från
+      // editedContracts-Map (admin kan ha justerat avtalstid, årsvärde, säljare
+      // etc per avtal i tabsen). Vid 0 Oneflow-kontrakt skickas tom array →
+      // backend skapar bara customer (legacy-läge).
+      const selectedContracts = extractedContracts
+        .filter(c => selectedContractIds.has(c.oneflow_contract_id))
+        .map(c => editedContracts[c.oneflow_contract_id] ?? c)
 
       const res = await fetch('/api/import-customer-by-orgnr', {
         method: 'POST',
@@ -363,6 +377,46 @@ export default function ImportCustomerByOrgnrModal({
   const update = (field: keyof PreviewData) => (value: string) => {
     setPreview(prev => prev ? { ...prev, [field]: value || null } : prev)
   }
+
+  // Multi-kontrakt: aktivt kontrakt i tab-vyn (för avtalsfältens redigering).
+  // Faller tillbaka till första valda om aktiv tab inte längre är vald.
+  const selectedContractsList = extractedContracts.filter(c =>
+    selectedContractIds.has(c.oneflow_contract_id)
+  )
+  const activeContract: ExtractedContract | null = activeContractTab && editedContracts[activeContractTab]
+    ? editedContracts[activeContractTab]
+    : selectedContractsList[0]
+      ? editedContracts[selectedContractsList[0].oneflow_contract_id] ?? selectedContractsList[0]
+      : null
+
+  // Auto-välj första valda när aktiv tab avmarkeras
+  useEffect(() => {
+    if (selectedContractsList.length === 0) return
+    if (!activeContractTab || !selectedContractIds.has(activeContractTab)) {
+      setActiveContractTab(selectedContractsList[0].oneflow_contract_id)
+    }
+  }, [selectedContractIds, selectedContractsList, activeContractTab])
+
+  // Uppdatera ett fält på det aktiva avtalet (per-tab redigering).
+  const updateContract = <K extends keyof ExtractedContract>(field: K) => (value: ExtractedContract[K]) => {
+    if (!activeContractTab) return
+    setEditedContracts(prev => ({
+      ...prev,
+      [activeContractTab]: { ...prev[activeContractTab], [field]: value },
+    }))
+  }
+
+  // Sync ankarmånad i preview när admin byter tab — så "Kommande faktureringar"
+  // och nästa-rad-pillar speglar valt avtals start.
+  useEffect(() => {
+    if (!activeContract?.contract_start_date) return
+    setPreview(prev => {
+      if (!prev) return prev
+      const month = new Date(activeContract.contract_start_date! + 'T00:00:00').getMonth() + 1
+      if (prev.billing_anchor_month === month) return prev
+      return { ...prev, billing_anchor_month: month }
+    })
+  }, [activeContractTab, activeContract?.contract_start_date])
 
   const setInvoiceType = (docNr: string, type: 'contract' | 'ad_hoc') => {
     setInvoiceTypes(prev => ({ ...prev, [docNr]: type }))
@@ -509,8 +563,8 @@ export default function ImportCustomerByOrgnrModal({
                   </button>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Kunden har flera signerade avtal. Markera de som ska importeras — varje
-                  avtal skapas som egen rad och faktureras separat.
+                  Kunden har flera signerade avtal. Markera de som ska importeras —
+                  redigera varje avtals fält separat via tabs nedan.
                 </p>
                 <div className="space-y-2">
                   {extractedContracts.map(contract => {
@@ -564,9 +618,9 @@ export default function ImportCustomerByOrgnrModal({
                     )
                   })}
                 </div>
-                <p className="text-xs text-amber-400/80">
-                  Avtalsfälten nedan visar det första markerade avtalet. Justera per kontrakt
-                  i faktureringsinställningarna efter import.
+                <p className="text-xs text-[#20c58f]/80">
+                  Avtalsfälten nedan visar valt avtal — växla med tabs för att redigera
+                  varje avtal separat innan import.
                 </p>
               </div>
             )}
@@ -600,14 +654,87 @@ export default function ImportCustomerByOrgnrModal({
               </div>
             </div>
 
-            {/* Sektion: Kontaktuppgifter */}
+            {/* Multi-kontrakt: tabs-rad när admin valt fler än ett avtal.
+                Varje tab visar adressetikett + årsvärde. Avtals-/kontaktfält
+                under raden bind till valt avtal via activeContract/updateContract. */}
+            {selectedContractsList.length > 1 && (
+              <div className="flex flex-wrap gap-1.5 px-1">
+                {selectedContractsList.map(c => {
+                  const ec = editedContracts[c.oneflow_contract_id] ?? c
+                  const label = ec.address_label || ec.contact_address || `#${ec.oneflow_contract_id}`
+                  const isActive = activeContractTab === c.oneflow_contract_id
+                  return (
+                    <button
+                      key={c.oneflow_contract_id}
+                      type="button"
+                      onClick={() => setActiveContractTab(c.oneflow_contract_id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors max-w-[260px] ${
+                        isActive
+                          ? 'bg-[#20c58f] text-white'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                      }`}
+                      title={label}
+                    >
+                      <FileSignature className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{label}</span>
+                      {ec.annual_value != null && ec.annual_value > 0 && (
+                        <span className={`text-[10px] shrink-0 ${isActive ? 'text-white/80' : 'text-slate-500'}`}>
+                          {formatAmount(ec.annual_value)}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Sektion: Kontaktuppgifter — per avtal (Oneflow-fältet "utforande-adress"
+                m.fl. ligger på avtalsnivå). Vid >1 valt avtal: tabsen ovan styr. */}
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
-              <h4 className="text-sm font-semibold text-slate-300">Kontaktuppgifter</h4>
+              <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+                Kontaktuppgifter
+                {selectedContractsList.length > 1 && activeContract && (
+                  <span className="text-[10px] text-[#20c58f]/80 font-normal">
+                    • avtal: {activeContract.address_label || activeContract.contact_address || `#${activeContract.oneflow_contract_id}`}
+                  </span>
+                )}
+              </h4>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Kontaktperson" value={preview.contact_person ?? ''} onChange={update('contact_person')} placeholder="Ej hämtat" />
-                <Field label="E-post kontakt" value={preview.contact_email ?? ''} onChange={update('contact_email')} placeholder="Ej hämtat" />
-                <Field label="Telefon" value={preview.contact_phone ?? ''} onChange={update('contact_phone')} placeholder="Ej hämtat" />
-                <Field label="Utförande adress" value={preview.contact_address ?? ''} onChange={update('contact_address')} placeholder="Ej hämtat" />
+                <Field
+                  label="Kontaktperson"
+                  value={(activeContract?.contact_person ?? preview.contact_person) ?? ''}
+                  onChange={v => activeContract ? updateContract('contact_person')(v || null) : update('contact_person')(v)}
+                  placeholder="Ej hämtat"
+                />
+                <Field
+                  label="E-post kontakt"
+                  value={(activeContract?.contact_email ?? preview.contact_email) ?? ''}
+                  onChange={v => activeContract ? updateContract('contact_email')(v || null) : update('contact_email')(v)}
+                  placeholder="Ej hämtat"
+                />
+                <Field
+                  label="Telefon"
+                  value={(activeContract?.contact_phone ?? preview.contact_phone) ?? ''}
+                  onChange={v => activeContract ? updateContract('contact_phone')(v || null) : update('contact_phone')(v)}
+                  placeholder="Ej hämtat"
+                />
+                <Field
+                  label="Utförande adress"
+                  value={(activeContract?.contact_address ?? preview.contact_address) ?? ''}
+                  onChange={v => {
+                    if (activeContract) {
+                      updateContract('contact_address')(v || null)
+                      // Synca address_label automatiskt med utförande-adress
+                      // när admin redigerar (om de inte redan ändrat label).
+                      if (!activeContract.address_label || activeContract.address_label === activeContract.contact_address) {
+                        updateContract('address_label')(v || null)
+                      }
+                    } else {
+                      update('contact_address')(v)
+                    }
+                  }}
+                  placeholder="Ej hämtat"
+                />
               </div>
             </div>
 
@@ -622,38 +749,70 @@ export default function ImportCustomerByOrgnrModal({
               </div>
             </div>
 
-            {/* Sektion: Avtal & fakturering */}
+            {/* Sektion: Avtal & fakturering — avtalsfält per avtal vid multi-kontrakt */}
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
               <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
                 <Receipt className="w-4 h-4 text-slate-400" />Avtal &amp; fakturering
+                {selectedContractsList.length > 1 && activeContract && (
+                  <span className="text-[10px] text-[#20c58f]/80 font-normal">
+                    • avtal: {activeContract.address_label || activeContract.contact_address || `#${activeContract.oneflow_contract_id}`}
+                  </span>
+                )}
               </h4>
               <div className="grid grid-cols-2 gap-3">
                 {/* Avtalstyp */}
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-slate-400 mb-1 block">Avtalstyp</label>
                   <Select
-                    value={preview.contract_type ?? ''}
-                    onChange={v => setPreview(prev => prev ? { ...prev, contract_type: v || null } : prev)}
+                    value={(activeContract?.contract_type ?? preview.contract_type) ?? ''}
+                    onChange={v => activeContract
+                      ? updateContract('contract_type')(v || null)
+                      : setPreview(prev => prev ? { ...prev, contract_type: v || null } : prev)
+                    }
                     placeholder={contractTypeOptions.length === 0 ? 'Flagga tjänster som "Använd som avtalstyp"' : 'Välj avtalstyp'}
                     options={contractTypeOptions}
                   />
                 </div>
 
-                <Field label="Avtalsstart" value={preview.contract_start_date ?? ''} onChange={update('contract_start_date')} placeholder="ÅÅÅÅ-MM-DD" />
-                <Field label="Kontraktsslut" value={preview.contract_end_date ?? ''} onChange={update('contract_end_date')} placeholder="ÅÅÅÅ-MM-DD" />
-                <Field label="Avtalslängd" value={preview.contract_length ?? ''} onChange={update('contract_length')} placeholder="t.ex. 3 år" />
+                <Field
+                  label="Avtalsstart"
+                  value={(activeContract?.contract_start_date ?? preview.contract_start_date) ?? ''}
+                  onChange={v => activeContract ? updateContract('contract_start_date')(v || null) : update('contract_start_date')(v)}
+                  placeholder="ÅÅÅÅ-MM-DD"
+                />
+                <Field
+                  label="Kontraktsslut"
+                  value={(activeContract?.contract_end_date ?? preview.contract_end_date) ?? ''}
+                  onChange={v => activeContract ? updateContract('contract_end_date')(v || null) : update('contract_end_date')(v)}
+                  placeholder="ÅÅÅÅ-MM-DD"
+                />
+                <Field
+                  label="Avtalslängd"
+                  value={(activeContract?.contract_length ?? preview.contract_length) ?? ''}
+                  onChange={v => activeContract ? updateContract('contract_length')(v || null) : update('contract_length')(v)}
+                  placeholder="t.ex. 3 år"
+                />
                 <div>
                   <Field
                     label="Årsvärde (kr)"
-                    value={preview.annual_value?.toString() ?? ''}
-                    onChange={v => setPreview(prev => prev ? { ...prev, annual_value: parseFloat(v) || null } : prev)}
+                    value={(activeContract?.annual_value ?? preview.annual_value)?.toString() ?? ''}
+                    onChange={v => {
+                      const num = parseFloat(v) || null
+                      if (activeContract) {
+                        updateContract('annual_value')(num)
+                      } else {
+                        setPreview(prev => prev ? { ...prev, annual_value: num } : prev)
+                      }
+                    }}
                     placeholder="0"
                     type="number"
                   />
                   {(() => {
-                    const months = parseContractLengthMonthsStrict(preview.contract_length)
-                    if (!months || months >= 12 || !preview.annual_value || preview.annual_value <= 0) return null
-                    const totalValue = Math.round(preview.annual_value * (months / 12))
+                    const lengthVal = activeContract?.contract_length ?? preview.contract_length
+                    const annualVal = activeContract?.annual_value ?? preview.annual_value
+                    const months = parseContractLengthMonthsStrict(lengthVal)
+                    if (!months || months >= 12 || !annualVal || annualVal <= 0) return null
+                    const totalValue = Math.round(annualVal * (months / 12))
                     return (
                       <p className="text-xs text-amber-400/80 mt-1">
                         Extrapolerad årstakt från {months} mån avtal · totalvärde {totalValue.toLocaleString('sv-SE')} kr
@@ -661,19 +820,49 @@ export default function ImportCustomerByOrgnrModal({
                     )
                   })()}
                 </div>
-                <Field label="Account Manager" value={preview.assigned_account_manager ?? ''} onChange={update('assigned_account_manager')} placeholder="Ej hämtat" />
-                <Field label="Account Manager e-post" value={preview.account_manager_email ?? ''} onChange={update('account_manager_email')} placeholder="Ej hämtat" />
-                <Field label="Säljare" value={preview.sales_person ?? ''} onChange={update('sales_person')} placeholder="Ej hämtat" />
-                <Field label="Säljare e-post" value={preview.sales_person_email ?? ''} onChange={update('sales_person_email')} placeholder="Ej hämtat" />
-                <Field label="Oneflow kontrakt-ID" value={preview.oneflow_contract_id ?? ''} onChange={update('oneflow_contract_id')} placeholder="Ej hämtat" />
+                <Field
+                  label="Account Manager"
+                  value={(activeContract?.assigned_account_manager ?? preview.assigned_account_manager) ?? ''}
+                  onChange={v => activeContract ? updateContract('assigned_account_manager')(v || null) : update('assigned_account_manager')(v)}
+                  placeholder="Ej hämtat"
+                />
+                <Field
+                  label="Account Manager e-post"
+                  value={(activeContract?.account_manager_email ?? preview.account_manager_email) ?? ''}
+                  onChange={v => activeContract ? updateContract('account_manager_email')(v || null) : update('account_manager_email')(v)}
+                  placeholder="Ej hämtat"
+                />
+                <Field
+                  label="Säljare"
+                  value={(activeContract?.sales_person ?? preview.sales_person) ?? ''}
+                  onChange={v => activeContract ? updateContract('sales_person')(v || null) : update('sales_person')(v)}
+                  placeholder="Ej hämtat"
+                />
+                <Field
+                  label="Säljare e-post"
+                  value={(activeContract?.sales_person_email ?? preview.sales_person_email) ?? ''}
+                  onChange={v => activeContract ? updateContract('sales_person_email')(v || null) : update('sales_person_email')(v)}
+                  placeholder="Ej hämtat"
+                />
+                <Field
+                  label="Oneflow kontrakt-ID"
+                  value={(activeContract?.oneflow_contract_id ?? preview.oneflow_contract_id) ?? ''}
+                  onChange={v => activeContract ? updateContract('oneflow_contract_id')(v) : update('oneflow_contract_id')(v)}
+                  placeholder="Ej hämtat"
+                  readOnly={!!activeContract}
+                />
 
                 {/* Avtalsobjekt */}
-                {(preview.agreement_text !== null || sources?.oneflow) && (
+                {((activeContract?.agreement_text ?? preview.agreement_text) !== null || sources?.oneflow) && (
                   <div className="col-span-2">
                     <label className="text-xs font-medium text-slate-400 mb-1 block">Avtalsobjekt</label>
                     <textarea
-                      value={preview.agreement_text ?? ''}
-                      onChange={e => setPreview(prev => prev ? { ...prev, agreement_text: e.target.value || null } : prev)}
+                      value={(activeContract?.agreement_text ?? preview.agreement_text) ?? ''}
+                      onChange={e => {
+                        const v = e.target.value || null
+                        if (activeContract) updateContract('agreement_text')(v)
+                        else setPreview(prev => prev ? { ...prev, agreement_text: v } : prev)
+                      }}
                       rows={2}
                       placeholder="Ej hämtat"
                       className="w-full px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent resize-none"
@@ -681,7 +870,7 @@ export default function ImportCustomerByOrgnrModal({
                   </div>
                 )}
 
-                {/* Faktureringsfrekvens */}
+                {/* Faktureringsfrekvens (kund-nivå — gäller alla avtal) */}
                 <div>
                   <label className="text-xs font-medium text-slate-400 mb-1 block">Faktureringsfrekvens</label>
                   <Select
@@ -691,7 +880,7 @@ export default function ImportCustomerByOrgnrModal({
                   />
                 </div>
 
-                {/* Prislista */}
+                {/* Prislista (kund-nivå — gäller alla avtal) */}
                 <div>
                   <label className="text-xs font-medium text-slate-400 mb-1 block">Prislista för extra-tjänster</label>
                   <Select
