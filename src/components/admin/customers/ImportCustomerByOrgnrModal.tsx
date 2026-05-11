@@ -353,13 +353,22 @@ export default function ImportCustomerByOrgnrModal({
         toast.error('Kund skapades men fakturaplan kunde inte genereras automatiskt')
       }
 
+      // Hämta contracts.id för kunden (används för att koppla importerade fakturor)
+      const { data: contractRow } = await supabase
+        .from('contracts')
+        .select('id')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
       // Importera valda historiska fakturor med rätt typ
       const toImport = invoices
         .filter(inv => selectedForImport.has(inv.DocumentNumber))
         .map(inv => ({ ...inv, importType: invoiceTypes[inv.DocumentNumber] ?? 'contract' as const }))
       if (toImport.length > 0) {
         try {
-          const result = await ContractBillingService.importHistoricalItems(customerId, toImport)
+          const result = await ContractBillingService.importHistoricalItems(customerId, toImport, contractRow?.id)
           const baseMsg = `${result.imported || toImport.length} historiska faktura(or) importerade`
           if (result.replacedAutogen > 0) {
             toast.success(`${baseMsg}. ${result.replacedAutogen} autogenererad(e) dubblett(er) rensades.`)

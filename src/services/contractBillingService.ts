@@ -1340,7 +1340,8 @@ export class ContractBillingService {
       FinalPayDate: string | null
       Sent: boolean
       importType: 'contract' | 'ad_hoc'
-    }>
+    }>,
+    contractId?: string,
   ): Promise<{ imported: number; replacedAutogen: number }> {
     if (invoices.length === 0) return { imported: 0, replacedAutogen: 0 }
 
@@ -1550,6 +1551,7 @@ export class ContractBillingService {
           sent_at: inv.Sent ? isoInvDate : null,
           paid_at: inv.FinalPayDate ? new Date(inv.FinalPayDate).toISOString() : null,
           is_historical: true,
+          contract_id: contractId ?? null,
           notes: `Importerad historisk faktura från Fortnox (${inv.DocumentNumber})`,
           created_at: isoInvDate,
         }
