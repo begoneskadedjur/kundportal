@@ -142,8 +142,9 @@ export default function CustomerRevenueModal({ customer, contractId = null, isOp
     // Ärendeintäkter (från ConsolidatedCustomer)
     const casesRevenue = customer.totalCasesValue || 0
 
-    // Totalt ackumulerat
-    const totalAccumulated = contractTotal + casesRevenue
+    // Totalt ackumulerat — casesRevenue exkluderas eftersom adhoc-fakturor
+    // redan ingår i contractTotal via invoices (undviker dubbelräkning)
+    const totalAccumulated = contractTotal
 
     // Max för bar-diagram
     const maxStatus = Math.max(...Object.values(byStatus), 1)
@@ -262,7 +263,7 @@ export default function CustomerRevenueModal({ customer, contractId = null, isOp
                     <Briefcase className="w-4 h-4 text-blue-400" />
                     <span className="text-xs text-slate-400 uppercase tracking-wide">Ärendeintäkter</span>
                   </div>
-                  <div className="text-xl font-bold text-blue-400">{formatCurrency(stats.casesRevenue)}</div>
+                  <div className="text-xl font-bold text-blue-400">{formatCurrency(stats.adHocRevenue)}</div>
                 </div>
               </div>
 
@@ -304,10 +305,6 @@ export default function CustomerRevenueModal({ customer, contractId = null, isOp
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Tilläggstjänster</span>
                     <span className="text-white font-medium">{formatCurrency(stats.adHocRevenue)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">Ärenden (direktfakturering)</span>
-                    <span className="text-white font-medium">{formatCurrency(stats.casesRevenue)}</span>
                   </div>
                   <div className="border-t border-slate-700 pt-2 mt-2 flex justify-between text-sm font-semibold">
                     <span className="text-white">Totalt</span>
