@@ -253,19 +253,6 @@ export default function EditCustomerModal({
               placeholder="XXXXXX-XXXX"
             />
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Företagstyp</label>
-              <Select
-                value={formData.business_type || ''}
-                onChange={(v) => handleInputChange('business_type', v)}
-                placeholder="Välj typ"
-                options={[
-                  { value: 'private', label: 'Privatperson' },
-                  { value: 'business', label: 'Företag' },
-                  { value: 'organization', label: 'Organisation' },
-                ]}
-              />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Avtalstyp</label>
               <Select
                 value={formData.contract_type || ''}

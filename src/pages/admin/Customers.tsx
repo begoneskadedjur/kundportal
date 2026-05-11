@@ -1654,7 +1654,7 @@ export default function Customers() {
         onClose={() => setImportByOrgnrOpen(false)}
         onImported={(customerId) => {
           refresh()
-          navigate(`/admin/befintliga-kunder/${customerId}`)
+          setSearchParams({ customerId })
         }}
       />
 
