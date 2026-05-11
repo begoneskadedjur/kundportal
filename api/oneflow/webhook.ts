@@ -955,8 +955,17 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
     // OBS: contract.total_value från OneFlow är årsvärdet, inte totalt kontraktsvärde
     const annualValue = contract.total_value ? parseFloat(contract.total_value.toString()) : null
     const monthlyValue = annualValue ? annualValue / 12 : null
-    const contractYears = parseContractLength(contract.contract_length) / 12
-    const totalContractValue = annualValue && contractYears ? annualValue * contractYears : null
+    const contractLengthMonths = parseContractLength(contract.contract_length)
+    const contractYears = contractLengthMonths / 12
+    // Semantik: <12 mån → totalvärde = årspremien (ingen halvering), ≥12 mån → annual × år
+    let totalContractValue: number | null = null
+    if (annualValue && annualValue > 0) {
+      if (contractLengthMonths && contractLengthMonths >= 12) {
+        totalContractValue = Math.round(annualValue * contractYears)
+      } else {
+        totalContractValue = Math.round(annualValue)
+      }
+    }
     
     console.log(`💰 Korrigerade finansiella beräkningar:`)
     console.log(`  - Årsvärde från OneFlow: ${annualValue} kr`)
