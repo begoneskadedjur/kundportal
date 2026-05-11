@@ -1477,7 +1477,6 @@ export class ContractBillingService {
         .select('id')
         .eq('customer_id', customerId)
         .eq('invoice_type', 'contract')
-        .eq('is_historical', true)
         .not('invoice_number', 'ilike', 'F-%')
         .or(orFilter)
 
