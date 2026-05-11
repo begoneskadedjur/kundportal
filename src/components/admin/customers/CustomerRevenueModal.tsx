@@ -255,7 +255,7 @@ export default function CustomerRevenueModal({ customer, contractId = null, isOp
                     <FileText className="w-4 h-4 text-purple-400" />
                     <span className="text-xs text-slate-400 uppercase tracking-wide">Kontraktsintäkter</span>
                   </div>
-                  <div className="text-xl font-bold text-purple-400">{formatCurrency(stats.contractTotal)}</div>
+                  <div className="text-xl font-bold text-purple-400">{formatCurrency(stats.recurringRevenue)}</div>
                 </div>
 
                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center">

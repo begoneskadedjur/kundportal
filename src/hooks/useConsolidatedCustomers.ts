@@ -681,9 +681,11 @@ export function useConsolidatedCustomers() {
           sites: [customer],
           totalSites: 1,
           // Avropsavtal (ingen årspremie men start-datum finns) → ackumulerat debiterat som avtalsvärde
+          // Normalavtal → annual_value (inte total_contract_value som kan vara föråldrat)
+          // Båda adderar adhoc (casesValue) så att AVTALSVÄRDE = avtalspremie + utöver avtal
           totalContractValue: ((!customer.annual_value || customer.annual_value <= 0) && customer.contract_start_date)
-            ? customer.contractBilledAccum
-            : (customer.total_contract_value || 0),
+            ? customer.contractBilledAccum + customer.casesValue
+            : (customer.annual_value || 0) + customer.casesValue,
           totalAnnualValue: customer.annual_value || 0,
           totalMonthlyValue: customer.monthly_value || 0,
           portalAccessStatus: customer.hasPortalAccess ? 'full' : 'none',
@@ -694,10 +696,9 @@ export function useConsolidatedCustomers() {
           totalCasesValue: customer.casesValue,
           totalCasesCount: customer.casesCount,
           totalOrganizationValue:
-            (((!customer.annual_value || customer.annual_value <= 0) && customer.contract_start_date)
-              ? customer.contractBilledAccum
-              : (customer.total_contract_value || 0))
-            + customer.casesValue,
+            ((!customer.annual_value || customer.annual_value <= 0) && customer.contract_start_date)
+              ? customer.contractBilledAccum + customer.casesValue
+              : (customer.annual_value || 0) + customer.casesValue,
           casesBillingStatus: {
             pending: { 
               count: customer.casesBillingBreakdown.pending, 
@@ -749,10 +750,12 @@ export function useConsolidatedCustomers() {
         // Aggregera värden
         org.totalSites = sites.length
         org.contractCount = sites.reduce((sum, site) => sum + (site.contracts?.length ?? 0), 0)
-        // Avropsavtal per site → ackumulerad debitering istället för fast total_contract_value
+        // Avropsavtal per site → ackumulerad debitering; normalavtal → annual_value
+        // Adderar casesValue per site (adhoc) så att totalContractValue = premie + utöver avtal
         org.totalContractValue = sites.reduce((sum, site) => {
           const isAvropsavtal = (!site.annual_value || site.annual_value <= 0) && !!site.contract_start_date
-          return sum + (isAvropsavtal ? site.contractBilledAccum : (site.total_contract_value || 0))
+          const base = isAvropsavtal ? site.contractBilledAccum : (site.annual_value || 0)
+          return sum + base + site.casesValue
         }, 0)
         org.totalAnnualValue = sites.reduce((sum, site) => sum + (site.annual_value || 0), 0)
         org.totalMonthlyValue = sites.reduce((sum, site) => sum + (site.monthly_value || 0), 0)
@@ -760,7 +763,7 @@ export function useConsolidatedCustomers() {
         // Aggregera cases-värden
         org.totalCasesValue = sites.reduce((sum, site) => sum + site.casesValue, 0)
         org.totalCasesCount = sites.reduce((sum, site) => sum + site.casesCount, 0)
-        org.totalOrganizationValue = org.totalContractValue + org.totalCasesValue
+        org.totalOrganizationValue = org.totalContractValue
         
         // Aggregera billing status
         org.casesBillingStatus = sites.reduce((acc, site) => {

@@ -1526,7 +1526,7 @@ export class ContractBillingService {
 
       const invoiceRows = toInsert.map(({ inv, paid, periodStart, periodEnd, subtotal, vatAmount, totalInclVat }) => {
         const isoInvDate = new Date(inv.InvoiceDate).toISOString()
-        const status = paid ? 'paid' : (inv.Sent ? 'sent' : 'draft')
+        const status = 'paid'
         return {
           invoice_number: `F-${inv.DocumentNumber}`,
           invoice_type: inv.importType === 'contract' ? 'contract' : 'adhoc',
