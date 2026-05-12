@@ -278,26 +278,22 @@ function ColumnPicker({ active, onChange }: { active: Set<ColKey>; onChange: (s:
 // ─── Sektionsheader ───────────────────────────────────────────────────────────
 
 function SectionHeader({
-  status, count, collapsed, onToggle
-}: { status: ClickUpStatus; count: number; collapsed: boolean; onToggle: () => void }) {
+  status, count, collapsed, onToggle, colSpan
+}: { status: ClickUpStatus; count: number; collapsed: boolean; onToggle: () => void; colSpan: number }) {
   const color = STATUS_CONFIG[status]?.color || '#87909e'
   return (
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 px-4 py-2 bg-slate-800/40 hover:bg-slate-800/60 border-b border-slate-700/50 transition-colors group"
-    >
-      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
-        {status}
-      </span>
-      <span className="text-xs text-slate-500 ml-1">({count})</span>
-      <div className="ml-auto text-slate-500 group-hover:text-slate-300 transition-colors">
-        {collapsed
-          ? <ChevronRight className="w-3.5 h-3.5" />
-          : <ChevronDown className="w-3.5 h-3.5" />
-        }
-      </div>
-    </button>
+    <tr className="border-b border-slate-700/50 bg-slate-800/40 hover:bg-slate-800/60 transition-colors cursor-pointer group" onClick={onToggle}>
+      <td colSpan={colSpan} className="px-4 py-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+          <span className="text-xs font-semibold text-slate-300 uppercase tracking-wide">{status}</span>
+          <span className="text-xs text-slate-500 ml-1">({count})</span>
+          <div className="ml-auto text-slate-500 group-hover:text-slate-300 transition-colors">
+            {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </div>
+        </div>
+      </td>
+    </tr>
   )
 }
 
@@ -599,7 +595,6 @@ export default function CasesPage() {
 
         {!loading && !error && statusGroups.length > 0 && (
           <div className="rounded-xl border border-slate-800 overflow-hidden bg-slate-900">
-            {/* Kolumnhuvuden */}
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700 bg-slate-800/60">
@@ -610,33 +605,28 @@ export default function CasesPage() {
                   ))}
                 </tr>
               </thead>
+              <tbody>
+                {statusGroups.map(({ status, cases }) => (
+                  <React.Fragment key={status}>
+                    <SectionHeader
+                      status={status}
+                      count={cases.length}
+                      collapsed={collapsed.has(status)}
+                      onToggle={() => toggleCollapse(status)}
+                      colSpan={visibleCols.length}
+                    />
+                    {!collapsed.has(status) && cases.map(c => (
+                      <CaseRow
+                        key={`${c.case_type}-${c.id}`}
+                        c={c}
+                        cols={cols}
+                        onClick={() => openCase(c)}
+                      />
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
             </table>
-
-            {/* Statusgrupper */}
-            {statusGroups.map(({ status, cases }) => (
-              <div key={status}>
-                <SectionHeader
-                  status={status}
-                  count={cases.length}
-                  collapsed={collapsed.has(status)}
-                  onToggle={() => toggleCollapse(status)}
-                />
-                {!collapsed.has(status) && (
-                  <table className="w-full">
-                    <tbody>
-                      {cases.map(c => (
-                        <CaseRow
-                          key={`${c.case_type}-${c.id}`}
-                          c={c}
-                          cols={cols}
-                          onClick={() => openCase(c)}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            ))}
           </div>
         )}
       </div>
