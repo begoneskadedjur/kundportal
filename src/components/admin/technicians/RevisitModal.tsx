@@ -239,7 +239,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
   const busySlots = slots.filter(s => s.hasConflict)
 
   const modalContent = (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex flex-col justify-end sm:justify-center sm:items-center sm:p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex flex-col justify-end sm:justify-center sm:items-center sm:p-4 pointer-events-auto">
       <div className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-slate-900 border-t border-slate-700 sm:border sm:rounded-xl shadow-2xl rounded-t-2xl">
 
         {/* Header */}
