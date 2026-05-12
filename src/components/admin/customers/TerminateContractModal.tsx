@@ -34,28 +34,25 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
   const [saving, setSaving] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
 
-  if (!isOpen || !organization) return null
-
   const today = new Date()
-  const contractEnd = organization.nextRenewalDate ? new Date(organization.nextRenewalDate) : null
+  const contractEnd = organization?.nextRenewalDate ? new Date(organization.nextRenewalDate) : null
 
   // Beräkna effective_end_date baserat på affärsreglerna
   const { effectiveEndDate, isWithinContractPeriod } = useMemo(() => {
     if (!contractEnd) {
-      // Inget slutdatum → 2 månader från idag
       const eff = addMonths(today, 2)
       return { effectiveEndDate: eff, isWithinContractPeriod: false }
     }
 
     if (today <= contractEnd) {
-      // Inom avtalstiden → avslutas vid contract_end_date
       return { effectiveEndDate: contractEnd, isWithinContractPeriod: true }
     } else {
-      // Har löpt vidare → 2 månader från idag
       const eff = addMonths(today, 2)
       return { effectiveEndDate: eff, isWithinContractPeriod: false }
     }
-  }, [contractEnd])
+  }, [contractEnd?.toISOString()])
+
+  if (!isOpen || !organization) return null
 
   const formatDate = (d: Date) => d.toLocaleDateString('sv-SE')
   const effectiveDateStr = effectiveEndDate.toISOString().split('T')[0]
