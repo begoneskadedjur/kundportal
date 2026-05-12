@@ -587,29 +587,48 @@ export default function OneflowContractCreator() {
           senderName: wizardData.anstalld,
           selectedProducts: convertedProducts,
           customerGroupId: wizardData.customer_group_id,
-          draftItems: wizardData.draftItems.map(i => ({
-            // Skicka med klient-genererat draft-id så API:et kan mappa
-            // mapped_service_id (draft-UUID) → DB-UUID efter insert
-            draft_id: i.id,
-            item_type: i.item_type,
-            article_id: i.article_id,
-            article_code: i.article_code,
-            article_name: i.article_name,
-            service_id: i.service_id,
-            service_code: i.service_code,
-            service_name: i.service_name,
-            quantity: i.quantity,
-            unit_price: i.unit_price,
-            discount_percent: i.discount_percent,
-            discounted_price: i.discounted_price,
-            total_price: i.total_price,
-            vat_rate: i.vat_rate,
-            price_source: i.price_source,
-            notes: i.notes,
-            rot_rut_type: i.rot_rut_type,
-            // mapped_service_id innehåller draft-UUID:n som pekar på tjänst-raden i samma batch
-            mapped_service_id: i.mapped_service_id,
-          }))
+          draftItems: (wizardData.case_id && wizardData.prefillServices?.length > 0
+            ? wizardData.prefillServices.map(s => ({
+                draft_id: s.id,
+                item_type: 'service' as const,
+                service_id: null,
+                service_code: s.service_code ?? null,
+                service_name: s.service_name ?? null,
+                article_id: null,
+                article_code: null,
+                article_name: s.service_name ?? null,
+                quantity: s.quantity,
+                unit_price: s.unit_price,
+                discount_percent: null,
+                discounted_price: null,
+                total_price: s.total_price,
+                vat_rate: s.vat_rate ?? 25,
+                price_source: null,
+                notes: null,
+                rot_rut_type: s.rot_rut_type ?? null,
+                mapped_service_id: null,
+              }))
+            : wizardData.draftItems.map(i => ({
+                draft_id: i.id,
+                item_type: i.item_type,
+                article_id: i.article_id,
+                article_code: i.article_code,
+                article_name: i.article_name,
+                service_id: i.service_id,
+                service_code: i.service_code,
+                service_name: i.service_name,
+                quantity: i.quantity,
+                unit_price: i.unit_price,
+                discount_percent: i.discount_percent,
+                discounted_price: i.discounted_price,
+                total_price: i.total_price,
+                vat_rate: i.vat_rate,
+                price_source: i.price_source,
+                notes: i.notes,
+                rot_rut_type: i.rot_rut_type,
+                mapped_service_id: i.mapped_service_id,
+              }))
+          )
         })
       })
       
