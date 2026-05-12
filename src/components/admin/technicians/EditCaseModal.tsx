@@ -1367,6 +1367,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   )
 
   return (
+    <>
     <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="xl" footer={footer} preventClose={true} allowBackdropClose={!loading && !timeTrackingLoading} usePortal={true} className="scroll-smooth"
       headerActions={
         <div className="flex items-center gap-1">
@@ -2095,5 +2096,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         onClose={() => setShowRevisitModal(false)}
       />
     )}
+    </>
   )
 }
