@@ -1,6 +1,6 @@
 // src/components/customer/ServiceRequestStatus.tsx - Visual Status Indicator
 import React from 'react'
-import { Clock, Calendar, Wrench, CheckCircle, XCircle, AlertCircle, FileText, Eye } from 'lucide-react'
+import { Clock, Calendar, Wrench, CheckCircle, XCircle, AlertCircle, FileText } from 'lucide-react'
 import { ClickUpStatus, STATUS_CONFIG, getStatusColor, getCustomerStatusDisplay } from '../../types/database'
 
 interface ServiceRequestStatusProps {
@@ -54,20 +54,13 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       case 'Öppen':
         return <Clock className={`${iconSizes[size]} animate-pulse`} />
       case 'Bokad':
-      case 'Bokat':
         return <Calendar className={iconSizes[size]} />
       case 'Offert skickad':
         return <FileText className={iconSizes[size]} />
       case 'Offert signerad - boka in':
         return <CheckCircle className={iconSizes[size]} />
-      case 'Återbesök 1':
-      case 'Återbesök 2':
-      case 'Återbesök 3':
-      case 'Återbesök 4':
-      case 'Återbesök 5':
+      case 'Återbesök':
         return <Wrench className={`${iconSizes[size]} animate-spin-slow`} />
-      case 'Privatperson - review':
-        return <Eye className={iconSizes[size]} />
       case 'Avslutat':
         return <CheckCircle className={iconSizes[size]} />
       case 'Stängt - slasklogg':
@@ -106,9 +99,7 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       </div>
       
       {/* Additional info for scheduled/ongoing status */}
-      {(statusName === 'Bokad' || statusName === 'Bokat' || 
-        statusName === 'Återbesök 1' || statusName === 'Återbesök 2' || 
-        statusName === 'Återbesök 3' || statusName === 'Återbesök 4' || statusName === 'Återbesök 5') && scheduledDate && (
+      {(statusName === 'Bokad' || statusName === 'Återbesök') && scheduledDate && (
         <div className="text-xs text-slate-400 ml-1">
           <div>{formatScheduledDate(scheduledDate)}</div>
           {technicianName && (
@@ -125,8 +116,7 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       )}
       
       {/* Progress indicator for ongoing work */}
-      {(statusName === 'Återbesök 1' || statusName === 'Återbesök 2' || 
-        statusName === 'Återbesök 3' || statusName === 'Återbesök 4' || statusName === 'Återbesök 5') && (
+      {statusName === 'Återbesök' && (
         <div className="text-xs text-blue-400/80 ml-1">
           Arbete pågår
         </div>

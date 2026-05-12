@@ -2,7 +2,7 @@
 import { BeGoneCaseRow } from '../../../types/database'
 import { formatAddress, formatTime } from './scheduleUtils'
 import { getStatusStyle } from './scheduleConstants'
-import { MapPin, Users, Bug, Clock } from 'lucide-react'
+import { MapPin, Users, Bug, Clock, Footprints } from 'lucide-react'
 
 interface EventHoverCardProps {
   caseData: BeGoneCaseRow
@@ -63,6 +63,12 @@ export function EventHoverCard({ caseData }: EventHoverCardProps) {
           <div className="flex items-center gap-1.5">
             <Users className="w-3 h-3 text-slate-500 shrink-0" />
             <span>{technicians.join(', ')}</span>
+          </div>
+        )}
+        {caseData.visit_number && caseData.visit_number > 1 && (
+          <div className="flex items-center gap-1.5">
+            <Footprints className="w-3 h-3 text-blue-400 shrink-0" />
+            <span className="text-blue-300">Besök {caseData.visit_number}</span>
           </div>
         )}
       </div>

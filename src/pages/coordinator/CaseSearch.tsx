@@ -71,9 +71,8 @@ const defaultFilters: FilterState = {
 };
 
 const statusOptions = [
-  'Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in',
-  'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5',
-  'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'
+  'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in',
+  'Återbesök', 'Stängt - slasklogg', 'Avslutat'
 ];
 
 const priorityOptions = ['Låg', 'Normal', 'Hög', 'Akut'];
@@ -106,8 +105,8 @@ const formatPrice = (price: number | null): string => {
 
 const getStatusColor = (status: string): string => {
   const completedStatuses = ['Avslutat', 'Stängt - slasklogg'];
-  const inProgressStatuses = ['Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'];
-  const pendingStatuses = ['Öppen', 'Offert skickad', 'Offert signerad - boka in', 'Privatperson - review'];
+  const inProgressStatuses = ['Bokad', 'Återbesök'];
+  const pendingStatuses = ['Öppen', 'Offert skickad', 'Offert signerad - boka in'];
   
   if (completedStatuses.includes(status)) {
     return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -121,7 +120,7 @@ const getStatusColor = (status: string): string => {
 
 const getStatusIcon = (status: string) => {
   const completedStatuses = ['Avslutat', 'Stängt - slasklogg'];
-  const inProgressStatuses = ['Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'];
+  const inProgressStatuses = ['Bokad', 'Återbesök'];
   
   if (completedStatuses.includes(status)) {
     return CheckCircle;

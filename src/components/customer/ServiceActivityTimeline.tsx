@@ -1,6 +1,6 @@
 // src/components/customer/ServiceActivityTimeline.tsx - Service Activity Timeline
 import React, { useState, useEffect } from 'react'
-import { Clock, CheckCircle, Calendar, Filter, ChevronDown, ChevronRight, Eye, Info, Wrench, XCircle, FileText, Star, AlertCircle } from 'lucide-react'
+import { Clock, CheckCircle, Calendar, Filter, ChevronDown, ChevronRight, Info, Wrench, XCircle, FileText, Star, AlertCircle } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
@@ -95,7 +95,6 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
       all: cases.length,
       'Öppen': 0,
       'Bokad': 0,
-      'Bokat': 0,
       'Pågående': 0,
       'Avslutat': 0,
       'Stängt - slasklogg': 0
@@ -116,7 +115,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
     { value: 'Bokad', label: 'Schemalagda' },
     { value: 'Offert skickad', label: 'Offert skickad' },
     { value: 'Offert signerad - boka in', label: 'Offert signerad' },
-    { value: 'Återbesök 1', label: 'Pågående' },
+    { value: 'Återbesök', label: 'Pågående' },
     { value: 'Avslutat', label: 'Slutförda' },
     { value: 'Stängt - slasklogg', label: 'Stängda' }
   ]
@@ -243,13 +242,10 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                     
                     {/* Icon selection */}
                     {status === 'Öppen' && <Clock className="w-5 h-5 animate-pulse relative z-10" />}
-                    {(status === 'Bokad' || status === 'Bokat') && <Calendar className="w-5 h-5 relative z-10" />}
+                    {status === 'Bokad' && <Calendar className="w-5 h-5 relative z-10" />}
                     {status === 'Offert skickad' && <FileText className="w-5 h-5 relative z-10" />}
                     {status === 'Offert signerad - boka in' && <Star className="w-5 h-5 text-purple-400 relative z-10" />}
-                    {(status === 'Återbesök 1' || status === 'Återbesök 2' || 
-                      status === 'Återbesök 3' || status === 'Återbesök 4' || 
-                      status === 'Återbesök 5') && <Wrench className="w-5 h-5 text-blue-400 animate-pulse relative z-10" />}
-                    {status === 'Privatperson - review' && <Eye className="w-5 h-5 relative z-10" />}
+                    {status === 'Återbesök' && <Wrench className="w-5 h-5 text-blue-400 animate-pulse relative z-10" />}
                     {status === 'Avslutat' && <CheckCircle className="w-5 h-5 text-green-400 relative z-10" />}
                     {status === 'Stängt - slasklogg' && <XCircle className="w-5 h-5 text-red-400 relative z-10" />}
                   </div>

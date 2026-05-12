@@ -229,7 +229,15 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       company_name: caseData.foretag,
       org_number: caseData.org_nr,
       personnummer: caseData.personnummer,
-      case_type: caseData.case_type
+      case_type: caseData.case_type,
+      visit_number: await (async () => {
+        const { count } = await supabase
+          .from('case_updates_log')
+          .select('*', { count: 'exact', head: true })
+          .eq('case_id', caseData.id)
+          .eq('update_type', 'revisit_scheduled')
+        return (count ?? 0) + 1
+      })()
     }
 
     return { caseData: modernCaseData, customerData }

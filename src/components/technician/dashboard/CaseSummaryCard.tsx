@@ -13,18 +13,11 @@ const STATUS_TO_WORKFLOW: Record<string, WorkflowGroup> = {
   'Öppen': 'needs_booking',
   'Offert signerad - boka in': 'needs_booking',
   'Bokad': 'booked',
-  'Bokat': 'booked',
   'Offert skickad': 'offer_sent',
   'Återbesök': 'revisit',
-  'Återbesök 1': 'revisit',
-  'Återbesök 2': 'revisit',
-  'Återbesök 3': 'revisit',
-  'Återbesök 4': 'revisit',
-  'Återbesök 5': 'revisit',
   'Bomkörning': 'needs_action',
   'Ombokning': 'needs_action',
   'Reklamation': 'needs_action',
-  'Privatperson - review': 'needs_action',
   'Generera saneringsrapport': 'report',
 }
 

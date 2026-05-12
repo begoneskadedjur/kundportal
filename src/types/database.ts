@@ -824,20 +824,13 @@ export type Database = {
 // 🎯 CLICKUP STATUS SYSTEM - EXACT internal statuses (used in database, dropdowns, coordinator/technician views)
 export type ClickUpStatus =
   | 'Öppen'
-  | 'Bokad'  // Note: "Bokat" variant also exists in some places
+  | 'Bokad'
   | 'Offert skickad'
   | 'Offert signerad - boka in'
-  | 'Återbesök'  // General revisit status (unlimited revisits, local only - not synced to ClickUp)
-  | 'Återbesök 1'
-  | 'Återbesök 2'
-  | 'Återbesök 3'
-  | 'Återbesök 4'
-  | 'Återbesök 5'
-  | 'Privatperson - review'  // NEVER show in dropdowns or to customers
+  | 'Återbesök'
   | 'Stängt - slasklogg'
   | 'Avslutat'
-  // Legacy/deprecated statuses that may exist in data:
-  | 'Bokat'  // Alternative spelling of Bokad
+  // Legacy statuses — ej längre satta i ny kod, kvarliggande historiska rader
   | 'Bomkörning'
   | 'Generera saneringsrapport'
   | 'Ombokning'
@@ -846,13 +839,13 @@ export type ClickUpStatus =
 // 🆔 STATUS ID TILL NAMN MAPPNING - Med kapitalisering
 export const STATUS_ID_TO_NAME: { [key: string]: ClickUpStatus } = {
   'c127553498_fwlMbGKH': 'Öppen',
-  'c127553498_E9tR4uKl': 'Bokat',
-  'c127553498_vUiYm1mz': 'Återbesök 1',
-  'c127553498_oWvoXUqP': 'Återbesök 2',
-  'c127553498_Pk6EAmNr': 'Återbesök 3',
-  'c127553498_navJy7RM': 'Återbesök 4',
-  'c127553498_i96gm2m8': 'Återbesök 5',
-  'c127553498_aGFV5SBN': 'Privatperson - review',
+  'c127553498_E9tR4uKl': 'Bokad',
+  'c127553498_vUiYm1mz': 'Återbesök',
+  'c127553498_oWvoXUqP': 'Återbesök',
+  'c127553498_Pk6EAmNr': 'Återbesök',
+  'c127553498_navJy7RM': 'Återbesök',
+  'c127553498_i96gm2m8': 'Återbesök',
+  'c127553498_aGFV5SBN': 'Avslutat',
   'c127553498_LeA7jRkh': 'Bomkörning',
   'c127553498_F7cDxTYZ': 'Generera saneringsrapport',
   'c127553498_f4QLnpo0': 'Ombokning',
@@ -866,15 +859,8 @@ export const STATUS_ID_TO_NAME: { [key: string]: ClickUpStatus } = {
 // 📝 STATUS NAMN TILL ID MAPPNING
 export const STATUS_NAME_TO_ID: { [key in ClickUpStatus]: string } = {
   'Öppen': 'c127553498_fwlMbGKH',
-  'Bokat': 'c127553498_E9tR4uKl',
   'Bokad': 'c127553498_E9tR4uKl',
-  'Återbesök': 'local_revisit',  // Local status - not synced to ClickUp
-  'Återbesök 1': 'c127553498_vUiYm1mz',
-  'Återbesök 2': 'c127553498_oWvoXUqP',
-  'Återbesök 3': 'c127553498_Pk6EAmNr',
-  'Återbesök 4': 'c127553498_navJy7RM',
-  'Återbesök 5': 'c127553498_i96gm2m8',
-  'Privatperson - review': 'c127553498_aGFV5SBN',
+  'Återbesök': 'c127553498_vUiYm1mz',
   'Bomkörning': 'c127553498_LeA7jRkh',
   'Generera saneringsrapport': 'c127553498_F7cDxTYZ',
   'Ombokning': 'c127553498_f4QLnpo0',
@@ -888,23 +874,16 @@ export const STATUS_NAME_TO_ID: { [key in ClickUpStatus]: string } = {
 // 🎨 STATUS KONFIGURATION med färger och typer
 export const STATUS_CONFIG: { [key in ClickUpStatus]: { id: string; color: string; type: string; orderindex: number } } = {
   'Öppen': { id: 'c127553498_fwlMbGKH', color: '#87909e', type: 'open', orderindex: 0 },
-  'Bokat': { id: 'c127553498_E9tR4uKl', color: '#f8ae00', type: 'custom', orderindex: 1 },
   'Bokad': { id: 'c127553498_E9tR4uKl', color: '#f8ae00', type: 'custom', orderindex: 1 },
-  'Återbesök': { id: 'local_revisit', color: '#1090e0', type: 'custom', orderindex: 2 },  // Same color as numbered revisits
-  'Återbesök 1': { id: 'c127553498_vUiYm1mz', color: '#1090e0', type: 'custom', orderindex: 2 },
-  'Återbesök 2': { id: 'c127553498_oWvoXUqP', color: '#1090e0', type: 'custom', orderindex: 3 },
-  'Återbesök 3': { id: 'c127553498_Pk6EAmNr', color: '#1090e0', type: 'custom', orderindex: 4 },
-  'Återbesök 4': { id: 'c127553498_navJy7RM', color: '#1090e0', type: 'custom', orderindex: 5 },
-  'Återbesök 5': { id: 'c127553498_i96gm2m8', color: '#1090e0', type: 'custom', orderindex: 6 },
-  'Privatperson - review': { id: 'c127553498_aGFV5SBN', color: '#ee5e99', type: 'custom', orderindex: 7 },
-  'Bomkörning': { id: 'c127553498_LeA7jRkh', color: '#d33d44', type: 'custom', orderindex: 8 },
-  'Generera saneringsrapport': { id: 'c127553498_F7cDxTYZ', color: '#aa8d80', type: 'custom', orderindex: 9 },
-  'Ombokning': { id: 'c127553498_f4QLnpo0', color: '#5f55ee', type: 'custom', orderindex: 10 },
-  'Offert skickad': { id: 'c127553498_ozSZTPqg', color: '#3db88b', type: 'custom', orderindex: 11 },
-  'Offert signerad - boka in': { id: 'c127553498_u6NXTUe8', color: '#85e7a1', type: 'custom', orderindex: 12 },
-  'Reklamation': { id: 'c127553498_V0p3wG0L', color: '#ee5e99', type: 'custom', orderindex: 13 },
-  'Stängt - slasklogg': { id: 'c127553498_PSuyPIHA', color: '#d33d44', type: 'done', orderindex: 14 },
-  'Avslutat': { id: 'c127553498_wQT5njhJ', color: '#008844', type: 'closed', orderindex: 15 },
+  'Återbesök': { id: 'c127553498_vUiYm1mz', color: '#1090e0', type: 'custom', orderindex: 2 },
+  'Bomkörning': { id: 'c127553498_LeA7jRkh', color: '#d33d44', type: 'custom', orderindex: 3 },
+  'Generera saneringsrapport': { id: 'c127553498_F7cDxTYZ', color: '#aa8d80', type: 'custom', orderindex: 4 },
+  'Ombokning': { id: 'c127553498_f4QLnpo0', color: '#5f55ee', type: 'custom', orderindex: 5 },
+  'Offert skickad': { id: 'c127553498_ozSZTPqg', color: '#3db88b', type: 'custom', orderindex: 6 },
+  'Offert signerad - boka in': { id: 'c127553498_u6NXTUe8', color: '#85e7a1', type: 'custom', orderindex: 7 },
+  'Reklamation': { id: 'c127553498_V0p3wG0L', color: '#ee5e99', type: 'custom', orderindex: 8 },
+  'Stängt - slasklogg': { id: 'c127553498_PSuyPIHA', color: '#d33d44', type: 'done', orderindex: 9 },
+  'Avslutat': { id: 'c127553498_wQT5njhJ', color: '#008844', type: 'closed', orderindex: 10 },
 }
 
 // 🔧 HJÄLPFUNKTIONER för status-hantering
@@ -936,21 +915,13 @@ export const getCustomerStatusDisplay = (status: ClickUpStatus): string => {
     case 'Öppen':
       return 'Öppen'
     case 'Bokad':
-    case 'Bokat':
       return 'Bokad'
     case 'Offert skickad':
       return 'Offert skickad'
     case 'Offert signerad - boka in':
       return 'Offert Signerad'
     case 'Återbesök':
-    case 'Återbesök 1':
-    case 'Återbesök 2':
-    case 'Återbesök 3':
-    case 'Återbesök 4':
-    case 'Återbesök 5':
       return 'Pågående'
-    case 'Privatperson - review':
-      return 'Under granskning' // Should rarely be shown to customers
     case 'Stängt - slasklogg':
       return 'Avslutat utan åtgärd'
     case 'Avslutat':
@@ -972,34 +943,20 @@ export const DROPDOWN_STATUSES: ClickUpStatus[] = [
   'Bokad',
   'Offert skickad',
   'Offert signerad - boka in',
-  'Återbesök',  // General revisit status
-  'Återbesök 1',
-  'Återbesök 2',
-  'Återbesök 3',
-  'Återbesök 4',
-  'Återbesök 5',
+  'Återbesök',
   'Stängt - slasklogg',
   'Avslutat'
-  // Note: 'Privatperson - review' is excluded from dropdowns
 ]
 
 // 📊 ALL VALID STATUSES FOR FILTERING (includes all statuses)
 export const ALL_VALID_STATUSES: ClickUpStatus[] = [
   'Öppen',
   'Bokad',
-  'Bokat', // Alternative spelling
   'Offert skickad',
   'Offert signerad - boka in',
-  'Återbesök',  // General revisit status
-  'Återbesök 1',
-  'Återbesök 2',
-  'Återbesök 3',
-  'Återbesök 4',
-  'Återbesök 5',
-  'Privatperson - review',
+  'Återbesök',
   'Stängt - slasklogg',
   'Avslutat',
-  // Legacy statuses
   'Bomkörning',
   'Generera saneringsrapport',
   'Ombokning',
@@ -1086,6 +1043,7 @@ export type BeGoneCaseRow = (PrivateCasesRow | BusinessCasesRow) & {
   oneflow_contract_id?: string | null // Koppling till Oneflow-offert (för contract cases)
   company_name?: string | null // Företagsnamn (business_cases + contract via adaptCaseToBeGoneRow)
   service?: { name: string } | null // Joinad tjänst från services-tabellen (via service_id)
+  visit_number?: number // Beräknat från case_updates_log (revisit_scheduled count + 1)
 }
 
 // Befintliga hjälptyper

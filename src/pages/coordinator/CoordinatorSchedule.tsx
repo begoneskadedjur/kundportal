@@ -215,7 +215,27 @@ export default function CoordinatorSchedule() {
         ...(businessResult.data || []).map(c => ({ ...c, case_type: 'business' as const })),
         ...(contractResult.data || []).map(adaptCaseToBeGoneRow),
       ]
-      setAllCases(combinedCases as BeGoneCaseRow[])
+
+      // Batch-hämta besöksräknare från case_updates_log
+      const caseIds = combinedCases.map(c => c.id)
+      let visitCountMap: Record<string, number> = {}
+      if (caseIds.length > 0) {
+        const { data: logRows } = await supabase
+          .from('case_updates_log')
+          .select('case_id')
+          .in('case_id', caseIds)
+          .eq('update_type', 'revisit_scheduled')
+        if (logRows) {
+          for (const row of logRows) {
+            visitCountMap[row.case_id] = (visitCountMap[row.case_id] || 0) + 1
+          }
+        }
+      }
+
+      setAllCases(combinedCases.map(c => ({
+        ...c,
+        visit_number: (visitCountMap[c.id] || 0) + 1
+      })) as BeGoneCaseRow[])
 
       if (selectedTechRef.current.size === 0 && fetchedTechnicians.length > 0) {
         const defaultSelected = fetchedTechnicians.filter(t => t.role === 'Skadedjurstekniker').map(t => t.id)

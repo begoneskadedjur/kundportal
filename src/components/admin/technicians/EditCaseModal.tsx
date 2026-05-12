@@ -428,6 +428,20 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [selectedCustomerGroupId, setSelectedCustomerGroupId] = useState<string | null>(null)
   const [hasBillableAmount, setHasBillableAmount] = useState(false)
 
+  // Besöksräknare
+  const [visitNumber, setVisitNumber] = useState(1)
+  useEffect(() => {
+    if (!caseData?.id) return
+    ;(async () => {
+      const { count } = await supabase
+        .from('case_updates_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('case_id', caseData.id)
+        .eq('update_type', 'revisit_scheduled')
+      setVisitNumber((count ?? 0) + 1)
+    })()
+  }, [caseData?.id])
+
   // Vald tjänsteartikel (för CasePreparationsSection)
   const [serviceArticle, setServiceArticle] = useState<Service | null>(null)
 
@@ -1330,6 +1344,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const modalTitle = (
     <div className="flex items-center gap-2">
       <span>Ärende: {currentCase.case_number || currentCase.title}</span>
+      {visitNumber > 1 && (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+          Besök {visitNumber}
+        </span>
+      )}
       {!editingTitle && (
         <button onClick={() => setEditingTitle(true)} className="p-1 text-slate-400 hover:text-white rounded transition-colors" title="Redigera ärendenamn">
           <Pencil className="w-3.5 h-3.5" />

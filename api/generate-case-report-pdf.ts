@@ -63,7 +63,7 @@ const nl2br = (text: string | null | undefined): string => {
 
 const getStatusBadgeColor = (status: string) => {
   if (status === 'Slutförd' || status === 'Stängd') return { bg: '#22C55E', text: '#FFFFFF' }
-  if (status === 'Bokad' || status === 'Bokat' || status.startsWith('Återbesök')) return { bg: '#F59E0B', text: '#FFFFFF' }
+  if (status === 'Bokad' || status === 'Återbesök') return { bg: '#F59E0B', text: '#FFFFFF' }
   if (status === 'Öppen') return { bg: '#3B82F6', text: '#FFFFFF' }
   if (status === 'Pågående') return { bg: '#8B5CF6', text: '#FFFFFF' }
   return { bg: '#6B7280', text: '#FFFFFF' }
@@ -307,6 +307,11 @@ const generateSingleCaseHTML = (
         <div class="kpi-label">Tjänst</div>
         <div class="kpi-value">${caseData.pest_type || 'Ej specificerat'}</div>
       </div>
+      ${(caseData.visit_number && caseData.visit_number > 1) ? `
+      <div class="kpi-card">
+        <div class="kpi-label">Antal besök</div>
+        <div class="kpi-value">${caseData.visit_number}</div>
+      </div>` : ''}
     </div>
 
     <!-- Kunduppgifter -->
@@ -572,8 +577,7 @@ const generateSingleCaseHTML = (
 const generateMultipleCasesHTML = (cases: any[], customerData: any, userRole: string, period: string) => {
   const totalCases = cases.length
   const activeCases = cases.filter(c => 
-    ['Öppen', 'Bokad', 'Bokat', 'Pågående'].includes(c.status) || 
-    c.status.startsWith('Återbesök')
+    ['Öppen', 'Bokad', 'Pågående', 'Återbesök'].includes(c.status)
   ).length
   const completedCases = cases.filter(c => 
     ['Slutförd', 'Stängd', 'Avslutat'].includes(c.status)

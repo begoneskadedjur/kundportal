@@ -213,6 +213,20 @@ export default function EditContractCaseModal({
   const [followUpPestType, setFollowUpPestType] = useState('')
   const [followUpLoading, setFollowUpLoading] = useState(false)
 
+  // Besöksräknare
+  const [visitNumber, setVisitNumber] = useState(1)
+  useEffect(() => {
+    if (!caseData?.id) return
+    ;(async () => {
+      const { count } = await supabase
+        .from('case_updates_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('case_id', caseData.id)
+        .eq('update_type', 'revisit_scheduled')
+      setVisitNumber((count ?? 0) + 1)
+    })()
+  }, [caseData?.id])
+
   // Återbesök-states
   const [showActionDialog, setShowActionDialog] = useState(false)
   const [showRevisitModal, setShowRevisitModal] = useState(false)
@@ -1319,6 +1333,11 @@ export default function EditContractCaseModal({
           <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm font-medium">
             {formData.case_number || 'Genererar...'}
           </span>
+          {visitNumber > 1 && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              Besök {visitNumber}
+            </span>
+          )}
         </div>
         <p className="text-sm text-purple-300">Premium kundsupport</p>
       </div>

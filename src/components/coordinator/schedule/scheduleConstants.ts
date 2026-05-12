@@ -80,8 +80,7 @@ export const FILTER_STATUSES: FilterStatus[] = [
   { key: 'Bokad', label: 'Bokad', dot: 'bg-amber-500' },
   { key: 'Offert skickad', label: 'Offert', dot: 'bg-orange-500' },
   { key: 'Offert signerad - boka in', label: 'Signerad', dot: 'bg-[#20c58f]' },
-  { key: '_aterbesok', label: 'Återbesök', dot: 'bg-blue-500', group: ['Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'] },
-  { key: 'Privatperson - review', label: 'Review', dot: 'bg-violet-500' },
+  { key: 'Återbesök', label: 'Återbesök', dot: 'bg-blue-500' },
   { key: 'Stängt - slasklogg', label: 'Stängt', dot: 'bg-red-500' },
   { key: 'Avslutat', label: 'Avslutat', dot: 'bg-emerald-600' },
 ]
