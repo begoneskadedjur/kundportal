@@ -123,7 +123,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
 
       // Filter per invoice_type beroende på vilken flik
       if (invoiceType === 'private-business') {
-        filters.invoice_type = ['private', 'business']
+        filters.invoice_type = ['private', 'business', 'case', 'partial']
       } else if (invoiceType === 'contract') {
         filters.invoice_type = 'contract'
       } else if (invoiceType === 'adhoc') {
