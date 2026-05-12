@@ -13,6 +13,17 @@ import {
   calculateRenewalProbability,
   getContractProgress
 } from '../utils/customerMetrics'
+import { parseContractLengthMonths } from '../utils/contractLength'
+
+// Beräknar totalt avtalsvärde med rätt semantik:
+// ≥12 mån → annual_value × (månader/12), <12 mån → annual_value (ingen halvering)
+// Fallback till annual_value om contract_length saknas.
+function computeContractTotal(annualValue: number | null | undefined, contractLength: string | null | undefined): number {
+  if (!annualValue || annualValue <= 0) return 0
+  const months = parseContractLengthMonths(contractLength)
+  if (!months) return annualValue
+  return months >= 12 ? Math.round(annualValue * (months / 12)) : annualValue
+}
 
 interface Customer {
   id: string
@@ -681,11 +692,11 @@ export function useConsolidatedCustomers() {
           sites: [customer],
           totalSites: 1,
           // Avropsavtal (ingen årspremie men start-datum finns) → ackumulerat debiterat som avtalsvärde
-          // Normalavtal → annual_value (inte total_contract_value som kan vara föråldrat)
-          // Båda adderar adhoc (casesValue) så att AVTALSVÄRDE = avtalspremie + utöver avtal
+          // Normalavtal → annual_value × avtalstid (≥12 mån) eller annual_value (<12 mån)
+          // Båda adderar adhoc (casesValue) så att AVTALSVÄRDE = avtalspremie × tid + utöver avtal
           totalContractValue: ((!customer.annual_value || customer.annual_value <= 0) && customer.contract_start_date)
             ? customer.contractBilledAccum + customer.casesValue
-            : (customer.annual_value || 0) + customer.casesValue,
+            : computeContractTotal(customer.annual_value, customer.contract_length) + customer.casesValue,
           totalAnnualValue: customer.annual_value || 0,
           totalMonthlyValue: customer.monthly_value || 0,
           portalAccessStatus: customer.hasPortalAccess ? 'full' : 'none',
@@ -698,7 +709,7 @@ export function useConsolidatedCustomers() {
           totalOrganizationValue:
             ((!customer.annual_value || customer.annual_value <= 0) && customer.contract_start_date)
               ? customer.contractBilledAccum + customer.casesValue
-              : (customer.annual_value || 0) + customer.casesValue,
+              : computeContractTotal(customer.annual_value, customer.contract_length) + customer.casesValue,
           casesBillingStatus: {
             pending: { 
               count: customer.casesBillingBreakdown.pending, 
@@ -750,11 +761,13 @@ export function useConsolidatedCustomers() {
         // Aggregera värden
         org.totalSites = sites.length
         org.contractCount = sites.reduce((sum, site) => sum + (site.contracts?.length ?? 0), 0)
-        // Avropsavtal per site → ackumulerad debitering; normalavtal → annual_value
-        // Adderar casesValue per site (adhoc) så att totalContractValue = premie + utöver avtal
+        // Avropsavtal per site → ackumulerad debitering; normalavtal → annual_value × avtalstid
+        // Adderar casesValue per site (adhoc) så att totalContractValue = premie × tid + utöver avtal
         org.totalContractValue = sites.reduce((sum, site) => {
           const isAvropsavtal = (!site.annual_value || site.annual_value <= 0) && !!site.contract_start_date
-          const base = isAvropsavtal ? site.contractBilledAccum : (site.annual_value || 0)
+          const base = isAvropsavtal
+            ? site.contractBilledAccum
+            : computeContractTotal(site.annual_value, site.contract_length)
           return sum + base + site.casesValue
         }, 0)
         org.totalAnnualValue = sites.reduce((sum, site) => sum + (site.annual_value || 0), 0)
