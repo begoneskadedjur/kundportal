@@ -171,15 +171,22 @@ export default function InvoiceDetailModal({
       }
       // Privat/Företag-ärenden
       if (!invoice.case_id || !invoice.case_type) { setCaseBillingItems([]); return }
+
+      // Hämta bara items kopplade till denna specifika faktura (inte alla ärendets items)
+      const linkedIds = (invoice.items || [])
+        .map(i => i.case_billing_item_id)
+        .filter(Boolean) as string[]
+
+      if (linkedIds.length === 0) { setCaseBillingItems([]); return }
+
       const { data } = await supabase
         .from('case_billing_items')
         .select('*')
-        .eq('case_id', invoice.case_id)
-        .eq('case_type', invoice.case_type)
+        .in('id', linkedIds)
       setCaseBillingItems((data as CaseBillingItem[] | null) || [])
     }
     fetchCaseBilling()
-  }, [invoice?.case_id, invoice?.case_type, invoice?.invoice_type, invoice?.customer_id])
+  }, [invoice?.case_id, invoice?.case_type, invoice?.invoice_type, invoice?.customer_id, invoice?.items])
 
   // Ladda fakturadata
   useEffect(() => {

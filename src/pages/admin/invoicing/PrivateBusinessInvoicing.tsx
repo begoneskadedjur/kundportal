@@ -253,13 +253,15 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
         </td>
         <td className="px-3 py-2">
           {(() => {
-            const type = invoice.invoice_type || (invoice.case_type === 'private' ? 'private' : 'business')
             const typeMeta: Record<string, { label: string; className: string }> = {
               private: { label: 'Privat', className: 'bg-blue-500/20 text-blue-400' },
               business: { label: 'Företag', className: 'bg-purple-500/20 text-purple-400' },
               contract: { label: 'Avtal', className: 'bg-emerald-500/20 text-emerald-400' },
               adhoc: { label: 'Merförsäljning', className: 'bg-amber-500/20 text-amber-400' },
             }
+            const type = (invoice.invoice_type && typeMeta[invoice.invoice_type])
+              ? invoice.invoice_type
+              : (invoice.case_type === 'private' ? 'private' : 'business')
             const meta = typeMeta[type] ?? typeMeta.business
             return (
               <span className={`px-1.5 py-0.5 text-xs rounded ${meta.className}`}>
