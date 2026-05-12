@@ -38,13 +38,16 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
   const today = new Date()
   const contractEnd = organization?.nextRenewalDate ? new Date(organization.nextRenewalDate) : null
 
+  const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime())
+
   const resolvedEndDate: Date = useMemo(() => {
-    if (customEndDate) return new Date(customEndDate)
+    if (customEndDate && isValidDate(customEndDate)) return new Date(customEndDate)
     if (!contractEnd) return addMonths(today, 2)
     return today <= contractEnd ? contractEnd : addMonths(today, 2)
   }, [customEndDate, contractEnd?.toISOString()])
 
   const isWithinContractPeriod = contractEnd ? resolvedEndDate <= contractEnd : false
+  const customDateValid = !customEndDate || isValidDate(customEndDate)
 
   if (!isOpen || !organization) return null
 
@@ -228,11 +231,20 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
               Slutdatum (valfritt — åsidosätter beräknat datum)
             </label>
             <input
-              type="date"
+              type="text"
               value={customEndDate}
               onChange={(e) => setCustomEndDate(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20"
+              placeholder="ÅÅÅÅ-MM-DD"
+              maxLength={10}
+              className={`w-full bg-slate-800 border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors ${
+                customEndDate && !customDateValid
+                  ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-slate-700 focus:border-red-500/50 focus:ring-red-500/20'
+              }`}
             />
+            {customEndDate && !customDateValid && (
+              <p className="mt-1 text-xs text-red-400">Ogiltigt datumformat — använd ÅÅÅÅ-MM-DD</p>
+            )}
             {customEndDate && (
               <button
                 type="button"
@@ -282,7 +294,7 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
           </button>
           <button
             onClick={handleTerminate}
-            disabled={!confirmed || saving}
+            disabled={!confirmed || saving || !customDateValid}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <AlertTriangle className="w-4 h-4" />
