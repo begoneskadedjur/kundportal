@@ -1281,6 +1281,9 @@ const updateCaseStatusViaSourceId = async (
 
     const updateData: Record<string, any> = { status: newStatus, ...extraFields }
 
+    // private_cases/business_cases saknar quote_status, quote_sent_at, quote_generated_at
+    const { quote_status, quote_sent_at, quote_generated_at, ...caseUpdateData } = updateData
+
     // Prova cases först (legacy)
     const { data: caseRow } = await supabase
       .from('cases')
@@ -1297,7 +1300,7 @@ const updateCaseStatusViaSourceId = async (
     // Prova private_cases
     const { data: privateRow } = await supabase
       .from('private_cases')
-      .update(updateData)
+      .update(caseUpdateData)
       .eq('id', contract.source_id)
       .select('id')
       .maybeSingle()
@@ -1310,7 +1313,7 @@ const updateCaseStatusViaSourceId = async (
     // Prova business_cases
     const { data: businessRow } = await supabase
       .from('business_cases')
-      .update(updateData)
+      .update(caseUpdateData)
       .eq('id', contract.source_id)
       .select('id')
       .maybeSingle()
