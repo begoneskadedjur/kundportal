@@ -503,3 +503,21 @@ export function useContractInsights(): ContractInsights {
 
   return { ...(result ?? empty), loading, error }
 }
+
+// ---- On-demand helpers ----------------------------------------------------
+
+export async function fetchCustomersForService(
+  serviceName: string
+): Promise<{ customerId: string; totalPrice: number; quantity: number }[]> {
+  const { data } = await supabase
+    .from('case_billing_items')
+    .select('customer_id, total_price, quantity')
+    .eq('case_type', 'contract')
+    .eq('item_type', 'service')
+    .eq('service_name', serviceName)
+  return (data || []).map((r: any) => ({
+    customerId: r.customer_id,
+    totalPrice: Number(r.total_price) || 0,
+    quantity: Number(r.quantity) || 1,
+  }))
+}

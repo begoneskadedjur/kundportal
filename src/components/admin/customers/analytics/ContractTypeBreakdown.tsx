@@ -6,6 +6,7 @@ import type { ContractTypeStat } from '../../../../hooks/useContractInsights'
 
 interface Props {
   data: ContractTypeStat[]
+  onTypeClick?: (type: string, count: number, totalArr: number) => void
 }
 
 const COLORS = ['#20c58f', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316']
@@ -36,7 +37,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   )
 }
 
-export default function ContractTypeBreakdown({ data }: Props) {
+export default function ContractTypeBreakdown({ data, onTypeClick }: Props) {
   // Shorten labels for chart
   const chartData = data.slice(0, 10).map(d => ({
     ...d,
@@ -83,7 +84,11 @@ export default function ContractTypeBreakdown({ data }: Props) {
           </thead>
           <tbody className="divide-y divide-slate-800/50">
             {data.map((row, i) => (
-              <tr key={row.type} className="hover:bg-slate-800/30 transition-colors">
+              <tr
+                key={row.type}
+                onClick={() => onTypeClick?.(row.type, row.count, row.totalArr)}
+                className={`transition-colors ${onTypeClick ? 'cursor-pointer hover:bg-slate-800/60' : 'hover:bg-slate-800/30'}`}
+              >
                 <td className="px-3 py-2.5 text-slate-200">
                   <span
                     className="inline-block w-2 h-2 rounded-full mr-2 shrink-0"

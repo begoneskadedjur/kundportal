@@ -6,9 +6,10 @@ import type { TopProduct } from '../../../../hooks/useContractInsights'
 interface Props {
   data: TopProduct[]
   maxRows?: number
+  onServiceClick?: (serviceName: string, occurrences: number, totalValue: number) => void
 }
 
-export default function ProductOccurrenceTable({ data, maxRows = 15 }: Props) {
+export default function ProductOccurrenceTable({ data, maxRows = 15, onServiceClick }: Props) {
   const rows = data.slice(0, maxRows)
   const maxOcc = rows[0]?.occurrences ?? 1
 
@@ -26,7 +27,11 @@ export default function ProductOccurrenceTable({ data, maxRows = 15 }: Props) {
         </thead>
         <tbody className="divide-y divide-slate-800/50">
           {rows.map((row, i) => (
-            <tr key={row.name} className="hover:bg-slate-800/30 transition-colors">
+            <tr
+              key={row.name}
+              onClick={() => onServiceClick?.(row.name, row.occurrences, row.totalValue)}
+              className={`transition-colors ${onServiceClick ? 'cursor-pointer hover:bg-slate-800/60' : 'hover:bg-slate-800/30'}`}
+            >
               <td className="px-3 py-2.5 text-slate-600 tabular-nums">{i + 1}</td>
               <td className="px-3 py-2.5">
                 <div className="flex items-center gap-2">
@@ -34,7 +39,7 @@ export default function ProductOccurrenceTable({ data, maxRows = 15 }: Props) {
                     className="h-1.5 rounded-full bg-[#20c58f] opacity-70 shrink-0"
                     style={{ width: `${Math.max(8, (row.occurrences / maxOcc) * 60)}px` }}
                   />
-                  <span className="text-slate-200">{row.name}</span>
+                  <span className={`${onServiceClick ? 'text-slate-100' : 'text-slate-200'}`}>{row.name}</span>
                 </div>
               </td>
               <td className="px-3 py-2.5 text-right text-white font-semibold tabular-nums">

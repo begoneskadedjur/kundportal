@@ -11,6 +11,7 @@ import { format } from 'date-fns'
 import sv from 'date-fns/locale/sv'
 
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
+import InsightDrillPanel, { type DrillCustomer } from '../../components/shared/InsightDrillPanel'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ARRForecastChart from '../../components/admin/customers/ARRForecastChart'
 import ContractTimelineGantt from '../../components/admin/customers/analytics/ContractTimelineGantt'
@@ -23,7 +24,7 @@ import ContractTypeBreakdown from '../../components/admin/customers/analytics/Co
 import ProductOccurrenceTable from '../../components/admin/customers/analytics/ProductOccurrenceTable'
 import ArrDistributionHistogram from '../../components/admin/customers/analytics/ArrDistributionHistogram'
 
-import { useContractInsights } from '../../hooks/useContractInsights'
+import { useContractInsights, fetchCustomersForService } from '../../hooks/useContractInsights'
 import { useConsolidatedCustomers } from '../../hooks/useConsolidatedCustomers'
 
 // ---- Tab config -----------------------------------------------------------
@@ -70,6 +71,12 @@ const GrowthTooltip = ({ active, payload, label }: any) => {
 export default function CustomerAnalytics() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<TabId>('overview')
+  const [drillPanel, setDrillPanel] = useState<{
+    title: string
+    subtitle: string
+    customers: DrillCustomer[]
+    loading: boolean
+  } | null>(null)
 
   const { loading, error, kpiSummary, growthByMonth, byContractType, bySalesPerson,
     byBillingFrequency, renewalPipeline, topProducts, contractLengthDistribution,
@@ -82,8 +89,60 @@ export default function CustomerAnalytics() {
     [consolidatedCustomers]
   )
 
+  // Lookup: customer_id → customer data (för drill-down enrichment)
+  const customerLookup = useMemo(() => {
+    const map = new Map<string, any>()
+    allCustomers.forEach((c: any) => map.set(c.id, c))
+    return map
+  }, [allCustomers])
+
   const navigateToCustomer = (id: string) => {
     navigate('/admin/befintliga-kunder', { state: { filter: { id } } })
+  }
+
+  // Drill-down: vilka kunder har en viss tjänst i avtalet
+  const handleServiceClick = async (serviceName: string, occurrences: number, totalValue: number) => {
+    setDrillPanel({ title: serviceName, subtitle: `${occurrences} avtal · ${totalValue.toLocaleString('sv-SE')} kr`, customers: [], loading: true })
+    const items = await fetchCustomersForService(serviceName)
+    // Aggregera per kund (en kund kan ha flera rader)
+    const perCustomer = new Map<string, { totalPrice: number; qty: number }>()
+    items.forEach(item => {
+      if (!item.customerId) return
+      if (!perCustomer.has(item.customerId)) perCustomer.set(item.customerId, { totalPrice: 0, qty: 0 })
+      perCustomer.get(item.customerId)!.totalPrice += item.totalPrice
+      perCustomer.get(item.customerId)!.qty += item.quantity
+    })
+    const customers: DrillCustomer[] = Array.from(perCustomer.entries()).map(([customerId, v]) => {
+      const c = customerLookup.get(customerId)
+      return {
+        id: customerId,
+        company_name: c?.company_name ?? 'Okänd kund',
+        annual_value: c?.annual_value ?? null,
+        sales_person: c?.sales_person ?? null,
+        contract_end_date: c?.contract_end_date ?? null,
+        extra: v.qty > 1 ? `${v.qty} st · ${v.totalPrice.toLocaleString('sv-SE')} kr` : `${v.totalPrice.toLocaleString('sv-SE')} kr`,
+      }
+    })
+    setDrillPanel({ title: serviceName, subtitle: `${customers.length} kunder · ${totalValue.toLocaleString('sv-SE')} kr`, customers, loading: false })
+  }
+
+  // Drill-down: vilka kunder tillhör en viss avtalstyp
+  const handleTypeClick = (type: string, count: number, totalArr: number) => {
+    const customers: DrillCustomer[] = allCustomers
+      .filter((c: any) => (c.contract_type || 'Okänd') === type && !c.terminated_at && c.is_active !== false)
+      .map((c: any) => ({
+        id: c.id,
+        company_name: c.company_name,
+        annual_value: c.annual_value ?? null,
+        sales_person: c.sales_person ?? null,
+        contract_end_date: c.contract_end_date ?? null,
+      }))
+    setDrillPanel({
+      title: type,
+      subtitle: `${customers.length} aktiva avtal · ${totalArr.toLocaleString('sv-SE')} kr ARR`,
+      customers,
+      loading: false,
+    })
   }
 
   if (loading) {
@@ -118,6 +177,17 @@ export default function CustomerAnalytics() {
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+      {/* Drill-down panel */}
+      <InsightDrillPanel
+        isOpen={drillPanel !== null}
+        onClose={() => setDrillPanel(null)}
+        title={drillPanel?.title ?? ''}
+        subtitle={drillPanel?.subtitle ?? ''}
+        customers={drillPanel?.customers ?? []}
+        loading={drillPanel?.loading ?? false}
+        onCustomerClick={id => { setDrillPanel(null); navigateToCustomer(id) }}
+      />
+
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Affärsinsikt</h1>
@@ -371,7 +441,7 @@ export default function CustomerAnalytics() {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-slate-200 mb-1">Avtalstyper</h3>
             <p className="text-xs text-slate-500 mb-4">Fördelning av ARR och marginal per avtalstyp</p>
-            <ContractTypeBreakdown data={byContractType} />
+            <ContractTypeBreakdown data={byContractType} onTypeClick={handleTypeClick} />
           </div>
 
           {/* Billing frequency + ARR distribution */}
@@ -433,7 +503,7 @@ export default function CustomerAnalytics() {
               <Package className="w-4 h-4 text-slate-600" />
             </div>
             {topProducts.length > 0 ? (
-              <ProductOccurrenceTable data={topProducts} />
+              <ProductOccurrenceTable data={topProducts} onServiceClick={handleServiceClick} />
             ) : (
               <p className="text-slate-600 text-sm text-center py-8">Inga produkter hittades i avtalsdatan</p>
             )}
