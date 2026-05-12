@@ -261,13 +261,22 @@ export async function getAbsences(staffIds: string[], from: Date, to: Date): Pro
   data.forEach(a => { absences.get(a.technician_id)?.push({ start: new Date(a.start_date), end: new Date(a.end_date) }); });
   return absences;
 }
+export async function getAllActiveStaff(): Promise<StaffMember[]> {
+  const { data, error } = await supabase
+    .from('technicians')
+    .select('id, name, address, work_schedule, is_active')
+    .eq('is_active', true);
+  if (error) throw error;
+  return (data || []).filter((staff: any) => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
+}
+
 export async function getCompetentStaff(pestType: string, requiredTechnicianIds?: string[]): Promise<StaffMember[]> {
-  // Hämta kompetenser med tekniker-data, filtrera på aktiva tekniker
+  // Hämta kompetenser med tekniker-data
+  // Obs: .eq() på embedded !inner-relation fungerar inte alltid i PostgREST — filtrera is_active i JS istället
   let query = supabase
     .from('staff_competencies')
     .select('technicians!inner(id, name, address, work_schedule, is_active)')
-    .eq('pest_type', pestType)
-    .eq('technicians.is_active', true);  // ⭐ Endast aktiva tekniker
+    .eq('pest_type', pestType);
 
   if (requiredTechnicianIds && requiredTechnicianIds.length > 0) {
       query = query.in('technicians.id', requiredTechnicianIds);
@@ -276,7 +285,10 @@ export async function getCompetentStaff(pestType: string, requiredTechnicianIds?
   const { data, error } = await query;
   if (error) throw error;
 
-  return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
+  return data.map((s: any) => s.technicians)
+    .filter(Boolean)
+    .filter((staff: any) => staff.is_active === true)
+    .filter((staff: any) => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
 }
 export async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
     if (origins.length === 0) return new Map();

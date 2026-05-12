@@ -5,9 +5,9 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { startOfDay, addDays, subMinutes, max, min, addMinutes } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
-import { 
+import {
     TechnicianDaySchedule, Suggestion, EventSlot,
-    getCompetentStaff, getSchedules, getAbsences, getTravelTimes,
+    getCompetentStaff, getAllActiveStaff, getSchedules, getAbsences, getTravelTimes,
     buildDailySchedules, calculateEfficiencyScore, TIMEZONE, DEFAULT_TRAVEL_TIME
 } from '../assistant-utils';
 
@@ -94,12 +94,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Endast POST är tillåtet' }); }
   try {
     const { newCaseAddress, pestType, timeSlotDuration = 60, searchStartDate, selectedTechnicianIds } = req.body;
-    if (!newCaseAddress || !pestType) { return res.status(400).json({ error: 'Adress och skadedjurstyp måste anges.' }); }
+    if (!newCaseAddress) { return res.status(400).json({ error: 'Adress måste anges.' }); }
     if (timeSlotDuration < 30 || timeSlotDuration > 480) { return res.status(400).json({ error: 'Arbetstid måste vara mellan 30 minuter och 8 timmar.' }); }
 
     const searchStart = searchStartDate ? startOfDay(new Date(searchStartDate)) : startOfDay(new Date());
     const searchEnd = addDays(searchStart, SEARCH_DAYS_LIMIT);
-    const allCompetentStaff = await getCompetentStaff(pestType);
+    const allCompetentStaff = pestType ? await getCompetentStaff(pestType) : await getAllActiveStaff();
     if (allCompetentStaff.length === 0) { return res.status(200).json([]); }
 
     const staffToSearch = selectedTechnicianIds?.length > 0 ? allCompetentStaff.filter(staff => selectedTechnicianIds.includes(staff.id)) : allCompetentStaff;

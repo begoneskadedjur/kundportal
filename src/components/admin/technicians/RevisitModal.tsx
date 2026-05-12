@@ -277,22 +277,20 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
 
           {/* STEG 1: Datum + längd */}
           {step === 1 && (
-            <div className="bg-teal-500/10 border border-teal-500/30 rounded-lg p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Datum för återbesök</label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Datum för återbesök *</label>
                 <DatePicker
                   selected={selectedDate}
                   onChange={(date) => setSelectedDate(date)}
-                  dateFormat="EEEE d MMMM yyyy"
+                  dateFormat="EEEE d MMM yyyy"
                   locale="sv"
                   minDate={new Date()}
                   filterDate={(date) => date.getDay() !== 0 && date.getDay() !== 6}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
                   placeholderText="Välj datum"
-                  inline
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Besökslängd</label>
                 <div className="flex gap-2 flex-wrap">
