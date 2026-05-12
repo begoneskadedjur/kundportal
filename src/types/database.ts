@@ -937,8 +937,6 @@ export const getCustomerStatusDisplay = (status: ClickUpStatus): string => {
 export const DROPDOWN_STATUSES: ClickUpStatus[] = [
   'Öppen',
   'Bokad',
-  'Offert skickad',
-  'Offert signerad - boka in',
   'Avslutat'
 ]
 

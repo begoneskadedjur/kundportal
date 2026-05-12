@@ -144,7 +144,16 @@ interface BackupData {
   timestamp: string;
 }
 
-const statusOrder = [ 'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök', 'Avslutat' ];
+const MANUAL_STATUSES = ['Öppen', 'Bokad', 'Avslutat']
+const AUTO_STATUSES = ['Återbesök', 'Offert skickad', 'Offert signerad - boka in']
+
+function buildStatusOptions(currentStatus: string) {
+  const list = [...MANUAL_STATUSES]
+  if (AUTO_STATUSES.includes(currentStatus) && !list.includes(currentStatus)) {
+    list.push(currentStatus)
+  }
+  return list.map(s => ({ value: s, label: s }))
+}
 
 // Utility-funktion för att formatera adress (samma logik som TechnicianCases.tsx)
 const formatAddress = (address: any): string => {
@@ -1611,7 +1620,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 <Select
                   value={formData.status || ''}
                   onChange={(v) => setFormData(prev => ({ ...prev, status: v }))}
-                  options={statusOrder.map(s => ({ value: s, label: s }))}
+                  options={buildStatusOptions(formData.status || '')}
                 />
               </div>
               {showTimeTracking && (

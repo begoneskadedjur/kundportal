@@ -156,7 +156,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
       if (error) throw error
 
       // 2. Logga återbesöket i case_updates_log
-      await supabase
+      const { error: logError } = await supabase
         .from('case_updates_log')
         .insert({
           case_id: caseData.id,
@@ -182,6 +182,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           updated_by_id: profile.id,
           updated_by_name: profile.full_name || profile.display_name || 'Okänd'
         })
+      if (logError) console.error('[RevisitContractModal] Failed to log revisit:', logError)
 
       toast.success('Återbesök bokat! Du kan boka fler återbesök.')
 

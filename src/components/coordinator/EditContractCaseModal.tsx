@@ -1682,7 +1682,13 @@ export default function EditContractCaseModal({
                   value={formData.status}
                   onChange={(v) => setFormData(prev => ({ ...prev, status: v }))}
                   disabled={isCustomerView}
-                  options={DROPDOWN_STATUSES.map(s => ({ value: s, label: s }))}
+                  options={(() => {
+                    const manual = ['Öppen', 'Bokad', 'Avslutat']
+                    const auto = ['Återbesök', 'Offert skickad', 'Offert signerad - boka in']
+                    const list = [...manual]
+                    if (auto.includes(formData.status) && !list.includes(formData.status)) list.push(formData.status)
+                    return list.map(s => ({ value: s, label: s }))
+                  })()}
                   className="w-auto"
                 />
               </div>
