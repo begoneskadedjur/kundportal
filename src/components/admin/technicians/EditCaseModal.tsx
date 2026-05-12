@@ -2049,28 +2049,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         caseTitle={currentCase.title}
       />
 
-      {/* Återbesöks-modal */}
-      {showRevisitModal && currentCase && (
-        <RevisitModal
-          caseData={currentCase}
-          onSuccess={(updatedCase) => {
-            setShowRevisitModal(false)
-            // Uppdatera currentCase med nya datum
-            setCurrentCase(updatedCase)
-            // Uppdatera formData med nya datum
-            setFormData(prev => ({
-              ...prev,
-              start_date: updatedCase.start_date,
-              due_date: updatedCase.due_date,
-              status: updatedCase.status
-            }))
-            // Informera parent-komponenten
-            onSuccess(updatedCase)
-          }}
-          onClose={() => setShowRevisitModal(false)}
-        />
-      )}
-
       {/* Duplicera-ärende-dialog */}
       {currentCase && (
         <DuplicateCaseDialog
@@ -2099,5 +2077,23 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         />
       )}
     </Modal>
+
+    {showRevisitModal && currentCase && (
+      <RevisitModal
+        caseData={currentCase}
+        onSuccess={(updatedCase) => {
+          setShowRevisitModal(false)
+          setCurrentCase(updatedCase)
+          setFormData(prev => ({
+            ...prev,
+            start_date: updatedCase.start_date,
+            due_date: updatedCase.due_date,
+            status: updatedCase.status
+          }))
+          onSuccess(updatedCase)
+        }}
+        onClose={() => setShowRevisitModal(false)}
+      />
+    )}
   )
 }
