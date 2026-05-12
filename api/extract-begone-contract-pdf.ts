@@ -147,6 +147,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
+    // Post-processing: ersätt @xbekampning.se med @begone.se (bolagsövergång)
+    const replaceXpert = (email: string | null) =>
+      email ? email.replace(/@xbekampning\.se$/i, '@begone.se') : email
+
+    extractedData.sales_person_email = replaceXpert(extractedData.sales_person_email)
+    extractedData.account_manager_email = replaceXpert(extractedData.account_manager_email)
+
+    // Account manager = säljare om inte explicit angivet separat
+    if (!extractedData.assigned_account_manager) {
+      extractedData.assigned_account_manager = extractedData.sales_person
+      extractedData.account_manager_email = extractedData.sales_person_email
+    }
+
     console.log('=== EXTRACT BEGONE CONTRACT PDF SUCCESS ===')
     console.log('Extracted company:', extractedData.company_name)
     console.log('Confidence:', extractedData.confidence_score)
