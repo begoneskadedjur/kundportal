@@ -140,7 +140,7 @@ export default function CaseArticleSelector({
       } else {
         const [articlesData, itemsData, summaryData] = await Promise.all([
           CaseBillingService.getArticlesWithPrices(customerId),
-          CaseBillingService.getCaseBillingItems(caseId!, caseType),
+          CaseBillingService.getCaseBillingItems(caseId!, caseType, 'all'),
           CaseBillingService.getCaseBillingSummary(caseId!, caseType)
         ])
         setArticles(articlesData)

@@ -353,13 +353,17 @@ export class CaseBillingService {
   }
 
   /**
-   * Hämta alla billing items för ett ärende
+   * Hämta billing items för ett ärende.
+   * Default: bara 'pending'-items (ej fakturerade). Skicka 'all' för att få allt.
+   * Det förhindrar att redan fakturerade rader (status='billed') råkar inkluderas
+   * vid nästa fakturering.
    */
   static async getCaseBillingItems(
     caseId: string,
-    caseType: BillableCaseType
+    caseType: BillableCaseType,
+    status: CaseBillingItemStatus | 'all' = 'pending'
   ): Promise<CaseBillingItemWithRelations[]> {
-    const { data, error } = await supabase
+    let query = supabase
       .from('case_billing_items')
       .select(`
         *,
@@ -370,6 +374,11 @@ export class CaseBillingService {
       .eq('case_type', caseType)
       .order('created_at', { ascending: true })
 
+    if (status !== 'all') {
+      query = query.eq('status', status)
+    }
+
+    const { data, error } = await query
     if (error) throw new Error(`Databasfel: ${error.message}`)
     return (data || []) as CaseBillingItemWithRelations[]
   }
@@ -382,7 +391,7 @@ export class CaseBillingService {
     caseType: BillableCaseType,
     minMarginPercent: number = 20
   ): Promise<CaseServiceSummary> {
-    const items = await this.getCaseBillingItems(caseId, caseType)
+    const items = await this.getCaseBillingItems(caseId, caseType, 'all')
 
     const serviceItems = items.filter(i => i.item_type === 'service')
     const articleItems = items.filter(i => i.item_type === 'article')
@@ -418,7 +427,7 @@ export class CaseBillingService {
     caseId: string,
     caseType: BillableCaseType
   ): Promise<CaseBillingSummary> {
-    const items = await this.getCaseBillingItems(caseId, caseType)
+    const items = await this.getCaseBillingItems(caseId, caseType, 'all')
 
     const subtotal = items.reduce((sum, item) => sum + item.total_price, 0)
     const totalDiscount = items.reduce((sum, item) => {
@@ -535,6 +544,7 @@ export class CaseBillingService {
       .select('*', { count: 'exact', head: true })
       .eq('case_id', caseId)
       .eq('case_type', caseType)
+      .eq('status', 'pending')
 
     if (error) throw new Error(`Databasfel: ${error.message}`)
     return (count || 0) > 0

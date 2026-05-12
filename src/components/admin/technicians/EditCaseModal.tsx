@@ -425,6 +425,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [showHistoryPanel, setShowHistoryPanel] = useState(false)
   const [historyCount, setHistoryCount] = useState(0)
 
+  // Re-mount CaseServiceSelector efter delfaktura (tvingar re-fetch av pending items)
+  const [servicesSelectorKey, setServicesSelectorKey] = useState(0)
+
   // Radering state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
@@ -1914,6 +1917,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             {currentCase && (
               <div className="pt-3 border-t border-slate-700/50">
                 <CaseServiceSelector
+                  key={servicesSelectorKey}
                   caseId={currentCase.id}
                   caseType={currentCase.case_type === 'private' ? 'private' : 'business'}
                   customerId={currentCase.customer_id}
@@ -2124,6 +2128,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           setCurrentCase(updatedCase)
           setRevisitLoggedCount(c => c + 1)
           setHistoryCount(c => c + 1)
+          setServicesSelectorKey(k => k + 1)
           setFormData(prev => ({
             ...prev,
             start_date: updatedCase.start_date,
