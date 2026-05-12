@@ -26,7 +26,6 @@ export class InvoiceService {
     const month = String(now.getMonth() + 1).padStart(2, '0')
     const prefix = `INV-${year}${month}`
 
-    // Räkna antal fakturor denna månad
     const { count, error } = await supabase
       .from('invoices')
       .select('*', { count: 'exact', head: true })
@@ -36,6 +35,28 @@ export class InvoiceService {
 
     const seq = String((count || 0) + 1).padStart(4, '0')
     return `${prefix}-${seq}`
+  }
+
+  // Generera ett fakturanummer och retryra automatiskt vid unique-constraint-kollision
+  private static async generateInvoiceNumberWithRetry(maxAttempts = 5): Promise<string> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        // Kort slumpad fördröjning (50–200 ms) för att undvika att två parallella anrop
+        // fortsätter kollidera på exakt samma sekund
+        await new Promise(r => setTimeout(r, 50 + Math.random() * 150))
+      }
+      const candidate = await this.generateInvoiceNumber()
+      const { data: existing } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('invoice_number', candidate)
+        .maybeSingle()
+      if (!existing) return candidate
+    }
+    // Fallback: lägg till mikrosekunder för att garantera unikhet
+    const now = new Date()
+    const prefix = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+    return `${prefix}-${String(Date.now()).slice(-6)}`
   }
 
   /**
@@ -100,8 +121,8 @@ export class InvoiceService {
     // Kontrollera om godkännande krävs
     const requiresApproval = billingItems.some(item => item.requires_approval)
 
-    // Generera fakturanummer
-    const invoiceNumber = await this.generateInvoiceNumber()
+    // Generera fakturanummer (med retry vid kollision)
+    const invoiceNumber = await this.generateInvoiceNumberWithRetry()
 
     // Hämta dynamiska betalningsvillkor för kategorin
     const paymentTermsDays = await PaymentTermsService.getDays(caseType)
