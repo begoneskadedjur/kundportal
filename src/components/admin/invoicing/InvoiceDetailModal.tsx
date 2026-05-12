@@ -172,17 +172,20 @@ export default function InvoiceDetailModal({
       // Privat/Företag-ärenden
       if (!invoice.case_id || !invoice.case_type) { setCaseBillingItems([]); return }
 
-      // Hämta bara items kopplade till denna specifika faktura (inte alla ärendets items)
-      const linkedIds = (invoice.items || [])
+      // Hämta service-items kopplade till denna faktura
+      const serviceIds = (invoice.items || [])
         .map(i => i.case_billing_item_id)
         .filter(Boolean) as string[]
 
-      if (linkedIds.length === 0) { setCaseBillingItems([]); return }
+      if (serviceIds.length === 0) { setCaseBillingItems([]); return }
 
+      // Hämta service-items + article-items kopplade till dessa tjänster (via mapped_service_id)
       const { data } = await supabase
         .from('case_billing_items')
         .select('*')
-        .in('id', linkedIds)
+        .eq('case_id', invoice.case_id)
+        .eq('case_type', invoice.case_type)
+        .or(`id.in.(${serviceIds.join(',')}),mapped_service_id.in.(${serviceIds.join(',')})`)
       setCaseBillingItems((data as CaseBillingItem[] | null) || [])
     }
     fetchCaseBilling()
