@@ -26,19 +26,20 @@ interface ArendeRow {
   kontaktperson?: string | null   // privat/företag
   contact_person?: string | null  // kontrakt
   adress?: any | null             // JSONB (privat/företag)
-  address_formatted?: string | null // kontrakt
+  address?: any | null              // kontrakt (JSONB)
   primary_assignee_name?: string | null
   primary_assignee_id?: string | null
   secondary_assignee_name?: string | null
   secondary_assignee_id?: string | null
   tertiary_assignee_name?: string | null
   tertiary_assignee_id?: string | null
-  assigned_technician_name?: string | null // kontrakt
+  assigned_technician_name?: string | null    // kontrakt (primary_technician_name)
+  primary_technician_name?: string | null     // kontrakt alias
   skadedjur?: string | null
-  pest_type?: string | null       // kontrakt
+  pest_type?: string | null                   // kontrakt
   service?: { name: string } | null
   due_date?: string | null
-  scheduled_date?: string | null  // kontrakt
+  scheduled_start?: string | null             // kontrakt
   pris?: number | null
   price?: number | null           // kontrakt
   created_at: string
@@ -92,8 +93,8 @@ function getDisplayName(c: ArendeRow): string {
 }
 
 function getDisplayAddress(c: ArendeRow): string {
-  if (c.address_formatted) return c.address_formatted
   if (c.adress) return formatAddress(c.adress) || '—'
+  if (c.address) return formatAddress(c.address) || '—'
   return '—'
 }
 
@@ -103,7 +104,7 @@ function getDisplayService(c: ArendeRow): string {
 }
 
 function getDisplayDueDate(c: ArendeRow): string {
-  const raw = c.due_date || c.scheduled_date
+  const raw = c.due_date || c.scheduled_start
   if (!raw) return '—'
   try {
     return new Date(raw).toLocaleString('sv-SE', {
@@ -160,7 +161,7 @@ function mapToTechnicianCase(c: ArendeRow) {
 
 function AssigneeAvatars({ c }: { c: ArendeRow }) {
   if (c.case_type === 'contract') {
-    const name = c.assigned_technician_name
+    const name = c.primary_technician_name || c.assigned_technician_name
     if (!name) return <span className="text-slate-500 text-xs">—</span>
     return (
       <div className="flex items-center">
@@ -413,7 +414,7 @@ export default function CasesPage() {
         supabase
           .from('cases')
           .select('*, service:services(name)')
-          .order('scheduled_date', { ascending: true, nullsFirst: false }),
+          .order('scheduled_start', { ascending: true, nullsFirst: false }),
       ])
 
       if (privRes.error) throw privRes.error
@@ -423,7 +424,12 @@ export default function CasesPage() {
       const rows: ArendeRow[] = [
         ...(privRes.data || []).map(r => ({ ...r, case_type: 'private' as CaseType, _raw: r })),
         ...(bizRes.data || []).map(r => ({ ...r, case_type: 'business' as CaseType, _raw: r })),
-        ...(contractRes.data || []).map(r => ({ ...r, case_type: 'contract' as CaseType, _raw: r })),
+        ...(contractRes.data || []).map(r => ({
+          ...r,
+          case_type: 'contract' as CaseType,
+          assigned_technician_name: r.primary_technician_name,
+          _raw: r,
+        })),
       ]
       setAllCases(rows)
     } catch (err: any) {
