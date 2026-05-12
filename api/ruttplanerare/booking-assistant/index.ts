@@ -7,7 +7,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 import {
     TechnicianDaySchedule, Suggestion, EventSlot,
-    getCompetentStaff, getAllActiveStaff, getSchedules, getAbsences, getTravelTimes,
+    getCompetentStaff, getAllActiveStaff, getSchedules, getAbsences, getTravelTimes, getTravelTimesFrom,
     buildDailySchedules, calculateEfficiencyScore, TIMEZONE, DEFAULT_TRAVEL_TIME
 } from '../assistant-utils';
 
@@ -16,7 +16,7 @@ const SEARCH_DAYS_LIMIT = 7;
 const MAX_SUGGESTIONS_TOTAL = 20;
 const LATE_JOB_THRESHOLD_MINUTES = 90;
 
-async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDuration: number, travelTimes: Map<string, number>, newCaseAddress: string): Promise<Suggestion[]> {
+async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDuration: number, travelTimes: Map<string, number>, travelTimesFromJob: Map<string, number>, newCaseAddress: string): Promise<Suggestion[]> {
   const suggestions: Suggestion[] = [];
   const lastPossibleStartForJob = subMinutes(daySchedule.workEnd, timeSlotDuration);
   const virtualStartEvent: EventSlot = { start: subMinutes(daySchedule.workStart, 1), end: daySchedule.workStart, type: 'case', title: 'Hemadress', address: daySchedule.technician.address };
@@ -39,8 +39,10 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
     let baseStartTime = isFirstJob ? daySchedule.workStart : max([addMinutes(gapStart, travelTime), daySchedule.workStart]);
     let currentTry = minStartTimeToday ? max([baseStartTime, minStartTimeToday]) : baseStartTime;
     
-    const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration), lastPossibleStartForJob]);
     const isLastGap = !nextEvent;
+    // Restid från nya kunden till nästa befintliga ärendes adress — måste hinnas med
+    const travelTimeToNext = isLastGap ? 0 : (travelTimesFromJob.get(nextEvent!.address || daySchedule.technician.address) ?? DEFAULT_TRAVEL_TIME);
+    const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration + travelTimeToNext), lastPossibleStartForJob]);
 
     while (currentTry <= absoluteLatestStart) {
       const slotEnd = addMinutes(currentTry, timeSlotDuration);
@@ -124,13 +126,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const allAddresses = new Set<string>(staffToSearch.map(s => s.address).filter(Boolean));
     schedules.forEach(cases => cases.forEach(c => { if (c.address) allAddresses.add(c.address); }));
-    
-    const travelTimesToJob = await getTravelTimes(Array.from(allAddresses), newCaseAddress);
+
+    const [travelTimesToJob, travelTimesFromJob] = await Promise.all([
+      getTravelTimes(Array.from(allAddresses), newCaseAddress),
+      getTravelTimesFrom(newCaseAddress, Array.from(allAddresses))
+    ]);
     
     // Använder den nu korrigerade buildDailySchedules-funktionen
     const dailySchedules = buildDailySchedules(staffToSearch, schedules, absences, searchStart, searchEnd);
 
-    const suggestionPromises = dailySchedules.map(daySchedule => findAvailableSlots(daySchedule, timeSlotDuration, travelTimesToJob, newCaseAddress));
+    const suggestionPromises = dailySchedules.map(daySchedule => findAvailableSlots(daySchedule, timeSlotDuration, travelTimesToJob, travelTimesFromJob, newCaseAddress));
     const nestedSuggestions = await Promise.all(suggestionPromises);
     const allSuggestions = nestedSuggestions.flat();
     

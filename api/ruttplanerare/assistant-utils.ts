@@ -334,6 +334,39 @@ export async function getTravelTimes(origins: string[], destination: string): Pr
     return travelTimes;
 }
 
+export async function getTravelTimesFrom(origin: string, destinations: string[]): Promise<Map<string, number>> {
+    if (destinations.length === 0) return new Map();
+    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
+    const travelTimes = new Map<string, number>();
+    const normalizedOrigin = formatAddress(origin).toLowerCase().trim();
+    const uniqueDestinations = [...new Set(destinations)];
+    const destinationsNeedingLookup: string[] = [];
+
+    for (const dest of uniqueDestinations) {
+        if (formatAddress(dest).toLowerCase().trim() === normalizedOrigin) {
+            travelTimes.set(dest, 1);
+        } else {
+            destinationsNeedingLookup.push(dest);
+        }
+    }
+
+    for (let i = 0; i < destinationsNeedingLookup.length; i += 25) {
+        const batch = destinationsNeedingLookup.slice(i, i + 25);
+        const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(batch.join('|'))}&key=${googleMapsApiKey}&mode=driving&language=sv`;
+        try {
+            const matrixResponse = await fetch(matrixApiUrl);
+            const matrixData = await matrixResponse.json() as any;
+            if (matrixData.status !== 'OK') { batch.forEach(dest => travelTimes.set(dest, DEFAULT_TRAVEL_TIME)); continue; }
+            const elements = matrixData.rows[0]?.elements || [];
+            elements.forEach((el: any, index: number) => {
+                if (el.status === 'OK') { travelTimes.set(batch[index], Math.ceil(el.duration.value / 60)); }
+                else { travelTimes.set(batch[index], DEFAULT_TRAVEL_TIME); }
+            });
+        } catch (error) { batch.forEach(dest => travelTimes.set(dest, DEFAULT_TRAVEL_TIME)); }
+    }
+    return travelTimes;
+}
+
 // --- Kärnlogik ---
 export function buildDailySchedules(technicians: StaffMember[], schedules: Map<string, EventSlot[]>, absences: Map<string, AbsencePeriod[]>, searchStart: Date, searchEnd: Date): TechnicianDaySchedule[] {
   const dailySchedules: TechnicianDaySchedule[] = [];
