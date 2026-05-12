@@ -11,12 +11,6 @@ import {
     buildDailySchedules, calculateEfficiencyScore, TIMEZONE, DEFAULT_TRAVEL_TIME
 } from '../assistant-utils';
 
-// --- Debug helper ---
-const getDayKeyDebug = (date: Date) => {
-  const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  return `${days[date.getDay()]}(local)/${days[date.getUTCDay()]}(utc)`;
-};
-
 // --- Konfiguration (specifik för denna fil) ---
 const SEARCH_DAYS_LIMIT = 7;
 const SUGGESTION_STRIDE_MINUTES = 60;
@@ -52,7 +46,6 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
     const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration), lastPossibleStartForJob]);
     const isLastGap = !nextEvent;
 
-    console.log(`[debug-gap] i=${i} gapStart=${gapStart.toISOString()} gapEnd=${gapEnd?.toISOString() ?? 'workEnd'} isFirstJob=${isFirstJob} travelTime=${travelTime} baseStart=${baseStartTime.toISOString()} latestStart=${absoluteLatestStart.toISOString()} currentTry=${currentTry.toISOString()}`);
     while (currentTry <= absoluteLatestStart) {
       const slotEnd = addMinutes(currentTry, timeSlotDuration);
       let travelTimeHome: number | undefined = undefined;
@@ -137,12 +130,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Använder den nu korrigerade buildDailySchedules-funktionen
     const dailySchedules = buildDailySchedules(staffToSearch, schedules, absences, searchStart, searchEnd);
-
-    console.log(`[debug] dailySchedules byggda: ${dailySchedules.length}`);
-    dailySchedules.forEach(ds => {
-      console.log(`[debug] ${ds.technician.name} | ${ds.date.toISOString()} | dayKey=${getDayKeyDebug(ds.date)} | workStart=${ds.workStart.toISOString()} | workEnd=${ds.workEnd.toISOString()} | cases=${ds.existingCases.length} | absences=${ds.absences.length}`);
-      ds.existingCases.forEach(c => console.log(`  [debug-case] ${c.title} | ${c.start.toISOString()} -> ${c.end.toISOString()}`));
-    });
 
     const suggestionPromises = dailySchedules.map(daySchedule => findAvailableSlots(daySchedule, timeSlotDuration, travelTimesToJob, newCaseAddress));
     const nestedSuggestions = await Promise.all(suggestionPromises);

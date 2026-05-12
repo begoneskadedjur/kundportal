@@ -152,7 +152,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
 
       if (!response.ok) throw new Error(`API-fel: ${response.status}`)
       const data = await response.json()
-      const fetched: SingleSuggestion[] = data.suggestions || []
+      const fetched: SingleSuggestion[] = Array.isArray(data) ? data : (data.suggestions || [])
 
       if (fetched.length === 0) {
         setNoSuggestionsReason('Inga lediga tider hittades från detta datum. Prova ett annat datum.')
