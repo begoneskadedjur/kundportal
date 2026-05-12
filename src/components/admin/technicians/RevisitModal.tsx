@@ -205,6 +205,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
         .from('case_updates_log')
         .insert({
           case_id: caseData.id,
+          case_table: tableName,
           case_type: caseData.case_type,
           update_type: 'revisit_scheduled',
           previous_value: JSON.stringify({ start_date: caseData.start_date, due_date: caseData.due_date }),
