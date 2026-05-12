@@ -741,7 +741,7 @@ export function useConsolidatedCustomers() {
 
           is_active: customer.is_active || false,
           isTerminated: !!customer.terminated_at,
-          isPaused: customer.billing_active === false,
+          isPaused: !customer.terminated_at && customer.billing_active === false,
           pausedUntil: customer.billing_paused_until ?? null,
           effectiveEndDate: customer.effective_end_date || null,
           hasExpiringSites: customer.contractProgress.daysRemaining <= 90,
@@ -864,8 +864,8 @@ export function useConsolidatedCustomers() {
 
         // Termination — org is terminated if ALL sites are terminated
         org.isTerminated = sites.every(site => !!site.terminated_at)
-        // Paus — org är pausad om ALLA sites har billing_active=false
-        org.isPaused = sites.every(site => site.billing_active === false)
+        // Paus — pausad om ALLA sites har billing_active=false, men INTE om uppsagd
+        org.isPaused = !org.isTerminated && sites.every(site => site.billing_active === false)
         const pausedSites = sites.filter(s => s.billing_paused_until)
         org.pausedUntil = pausedSites.length > 0
           ? pausedSites.sort((a, b) => (a.billing_paused_until ?? '').localeCompare(b.billing_paused_until ?? ''))[0].billing_paused_until ?? null
