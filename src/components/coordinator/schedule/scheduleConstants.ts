@@ -81,6 +81,6 @@ export const FILTER_STATUSES: FilterStatus[] = [
   { key: 'Offert skickad', label: 'Offert', dot: 'bg-orange-500' },
   { key: 'Offert signerad - boka in', label: 'Signerad', dot: 'bg-[#20c58f]' },
   { key: 'Återbesök', label: 'Återbesök', dot: 'bg-blue-500' },
-  { key: 'Stängt - slasklogg', label: 'Stängt', dot: 'bg-red-500' },
+  { key: 'Borttaget', label: 'Borttaget', dot: 'bg-red-500' },
   { key: 'Avslutat', label: 'Avslutat', dot: 'bg-emerald-600' },
 ]

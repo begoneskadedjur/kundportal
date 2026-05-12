@@ -828,11 +828,10 @@ export type ClickUpStatus =
   | 'Offert skickad'
   | 'Offert signerad - boka in'
   | 'Återbesök'
-  | 'Stängt - slasklogg'
   | 'Avslutat'
+  | 'Borttaget'
   // Legacy statuses — ej längre satta i ny kod, kvarliggande historiska rader
   | 'Bomkörning'
-  | 'Generera saneringsrapport'
   | 'Ombokning'
   | 'Reklamation'
 
@@ -847,12 +846,12 @@ export const STATUS_ID_TO_NAME: { [key: string]: ClickUpStatus } = {
   'c127553498_i96gm2m8': 'Återbesök',
   'c127553498_aGFV5SBN': 'Avslutat',
   'c127553498_LeA7jRkh': 'Bomkörning',
-  'c127553498_F7cDxTYZ': 'Generera saneringsrapport',
+  'c127553498_F7cDxTYZ': 'Avslutat',
   'c127553498_f4QLnpo0': 'Ombokning',
   'c127553498_ozSZTPqg': 'Offert skickad',
   'c127553498_u6NXTUe8': 'Offert signerad - boka in',
   'c127553498_V0p3wG0L': 'Reklamation',
-  'c127553498_PSuyPIHA': 'Stängt - slasklogg',
+  'c127553498_PSuyPIHA': 'Borttaget',
   'c127553498_wQT5njhJ': 'Avslutat',
 }
 
@@ -862,12 +861,11 @@ export const STATUS_NAME_TO_ID: { [key in ClickUpStatus]: string } = {
   'Bokad': 'c127553498_E9tR4uKl',
   'Återbesök': 'c127553498_vUiYm1mz',
   'Bomkörning': 'c127553498_LeA7jRkh',
-  'Generera saneringsrapport': 'c127553498_F7cDxTYZ',
   'Ombokning': 'c127553498_f4QLnpo0',
   'Offert skickad': 'c127553498_ozSZTPqg',
   'Offert signerad - boka in': 'c127553498_u6NXTUe8',
   'Reklamation': 'c127553498_V0p3wG0L',
-  'Stängt - slasklogg': 'c127553498_PSuyPIHA',
+  'Borttaget': 'c127553498_PSuyPIHA',
   'Avslutat': 'c127553498_wQT5njhJ',
 }
 
@@ -877,13 +875,12 @@ export const STATUS_CONFIG: { [key in ClickUpStatus]: { id: string; color: strin
   'Bokad': { id: 'c127553498_E9tR4uKl', color: '#f8ae00', type: 'custom', orderindex: 1 },
   'Återbesök': { id: 'c127553498_vUiYm1mz', color: '#1090e0', type: 'custom', orderindex: 2 },
   'Bomkörning': { id: 'c127553498_LeA7jRkh', color: '#d33d44', type: 'custom', orderindex: 3 },
-  'Generera saneringsrapport': { id: 'c127553498_F7cDxTYZ', color: '#aa8d80', type: 'custom', orderindex: 4 },
-  'Ombokning': { id: 'c127553498_f4QLnpo0', color: '#5f55ee', type: 'custom', orderindex: 5 },
-  'Offert skickad': { id: 'c127553498_ozSZTPqg', color: '#3db88b', type: 'custom', orderindex: 6 },
-  'Offert signerad - boka in': { id: 'c127553498_u6NXTUe8', color: '#85e7a1', type: 'custom', orderindex: 7 },
-  'Reklamation': { id: 'c127553498_V0p3wG0L', color: '#ee5e99', type: 'custom', orderindex: 8 },
-  'Stängt - slasklogg': { id: 'c127553498_PSuyPIHA', color: '#d33d44', type: 'done', orderindex: 9 },
-  'Avslutat': { id: 'c127553498_wQT5njhJ', color: '#008844', type: 'closed', orderindex: 10 },
+  'Ombokning': { id: 'c127553498_f4QLnpo0', color: '#5f55ee', type: 'custom', orderindex: 4 },
+  'Offert skickad': { id: 'c127553498_ozSZTPqg', color: '#3db88b', type: 'custom', orderindex: 5 },
+  'Offert signerad - boka in': { id: 'c127553498_u6NXTUe8', color: '#85e7a1', type: 'custom', orderindex: 6 },
+  'Reklamation': { id: 'c127553498_V0p3wG0L', color: '#ee5e99', type: 'custom', orderindex: 7 },
+  'Borttaget': { id: 'c127553498_PSuyPIHA', color: '#d33d44', type: 'done', orderindex: 8 },
+  'Avslutat': { id: 'c127553498_wQT5njhJ', color: '#008844', type: 'closed', orderindex: 9 },
 }
 
 // 🔧 HJÄLPFUNKTIONER för status-hantering
@@ -905,7 +902,7 @@ export const getStatusType = (status: ClickUpStatus): string => {
 
 // 🎯 IDENTIFIERA STÄNGDA ÄRENDEN baserat på status
 export const isCompletedStatus = (status: ClickUpStatus): boolean => {
-  return status === 'Avslutat' || status === 'Stängt - slasklogg'
+  return status === 'Avslutat' || status === 'Borttaget'
 }
 
 // 👥 CUSTOMER-FACING STATUS DISPLAY MAPPING
@@ -922,13 +919,12 @@ export const getCustomerStatusDisplay = (status: ClickUpStatus): string => {
       return 'Offert Signerad'
     case 'Återbesök':
       return 'Pågående'
-    case 'Stängt - slasklogg':
+    case 'Borttaget':
       return 'Avslutat utan åtgärd'
     case 'Avslutat':
       return 'Genomfört'
     // Legacy statuses - handle gracefully
     case 'Bomkörning':
-    case 'Generera saneringsrapport':
     case 'Ombokning':
     case 'Reklamation':
       return 'Under behandling'
@@ -943,8 +939,6 @@ export const DROPDOWN_STATUSES: ClickUpStatus[] = [
   'Bokad',
   'Offert skickad',
   'Offert signerad - boka in',
-  'Återbesök',
-  'Stängt - slasklogg',
   'Avslutat'
 ]
 
@@ -955,10 +949,9 @@ export const ALL_VALID_STATUSES: ClickUpStatus[] = [
   'Offert skickad',
   'Offert signerad - boka in',
   'Återbesök',
-  'Stängt - slasklogg',
   'Avslutat',
+  'Borttaget',
   'Bomkörning',
-  'Generera saneringsrapport',
   'Ombokning',
   'Reklamation'
 ]

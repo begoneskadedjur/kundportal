@@ -81,8 +81,7 @@ const STATUS_ORDER: ClickUpStatus[] = [
   'Öppen', 'Bokad',
   'Offert skickad', 'Offert signerad - boka in',
   'Återbesök', 'Ombokning', 'Bomkörning', 'Reklamation',
-  'Generera saneringsrapport',
-  'Avslutat', 'Stängt - slasklogg',
+  'Avslutat', 'Borttaget',
 ]
 
 // ─── Hjälpare ─────────────────────────────────────────────────────────────────

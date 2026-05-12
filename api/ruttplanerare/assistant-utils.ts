@@ -78,7 +78,7 @@ export const getDayKey = (date: Date): keyof WorkSchedule => {
 
 // Statusar som ska exkluderas från schemaläggning (ärenden som inte blockerar tid)
 const EXCLUDED_STATUSES = [
-  'Stängt - slasklogg',
+  'Borttaget',
   'Avslutat'
 ];
 

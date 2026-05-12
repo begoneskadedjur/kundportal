@@ -273,11 +273,11 @@ async function fetchBookingsForTechnician(techId: string, from: Date, to: Date) 
     supabase.from('private_cases').select('start_date, due_date, title')
       .or(`primary_assignee_id.eq.${techId},secondary_assignee_id.eq.${techId},tertiary_assignee_id.eq.${techId}`)
       .gte('start_date', fromISO).lte('start_date', toISO)
-      .not('status', 'in', '(Avslutat,Stängt - slasklogg)'),
+      .not('status', 'in', '(Avslutat,Borttaget)'),
     supabase.from('business_cases').select('start_date, due_date, title')
       .or(`primary_assignee_id.eq.${techId},secondary_assignee_id.eq.${techId},tertiary_assignee_id.eq.${techId}`)
       .gte('start_date', fromISO).lte('start_date', toISO)
-      .not('status', 'in', '(Avslutat,Stängt - slasklogg)'),
+      .not('status', 'in', '(Avslutat,Borttaget)'),
     supabase.from('cases').select('scheduled_start, scheduled_end, title')
       .or(`primary_technician_id.eq.${techId},secondary_technician_id.eq.${techId},tertiary_technician_id.eq.${techId}`)
       .gte('scheduled_start', fromISO).lte('scheduled_start', toISO)

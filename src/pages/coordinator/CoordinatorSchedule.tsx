@@ -25,7 +25,7 @@ import PendingRequestsNotifier from '../../components/coordinator/PendingRequest
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat'
 
 const DEFAULT_ACTIVE_STATUSES = ALL_VALID_STATUSES.filter(
-  s => !s.includes('Avslutat') && !s.includes('Stängt')
+  s => s !== 'Avslutat' && s !== 'Borttaget'
 )
 
 /** Skeleton-loading som matchar ScheduleGrid-layouten */

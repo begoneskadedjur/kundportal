@@ -204,10 +204,10 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
         setStats({
           totalSites: sites.length,
           activeCases: cases.filter(c =>
-            ['Öppen', 'Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'].includes(c.status)
+            ['Öppen', 'Bokad', 'Återbesök'].includes(c.status)
           ).length,
           completedThisMonth: cases.filter(c =>
-            ['Avslutat', 'Stängt - slasklogg', 'Slutförd', 'Stängd'].includes(c.status) &&
+            ['Avslutat', 'Borttaget', 'Slutförd', 'Stängd'].includes(c.status) &&
             new Date(c.updated_at) >= startOfMonth
           ).length,
           scheduledVisits: cases.filter(c =>

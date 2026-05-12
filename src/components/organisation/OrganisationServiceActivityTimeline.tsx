@@ -160,10 +160,9 @@ const OrganisationServiceActivityTimeline: React.FC<OrganisationServiceActivityT
       all: cases.length,
       'Öppen': 0,
       'Bokad': 0,
-      'Bokat': 0,
       'Pågående': 0,
       'Avslutat': 0,
-      'Stängt - slasklogg': 0
+      'Borttaget': 0
     }
     
     cases.forEach(c => {
@@ -181,9 +180,9 @@ const OrganisationServiceActivityTimeline: React.FC<OrganisationServiceActivityT
     { value: 'Bokad', label: 'Schemalagda' },
     { value: 'Offert skickad', label: 'Offert skickad' },
     { value: 'Offert signerad - boka in', label: 'Offert signerad' },
-    { value: 'Återbesök 1', label: 'Pågående' },
+    { value: 'Återbesök', label: 'Pågående' },
     { value: 'Avslutat', label: 'Slutförda' },
-    { value: 'Stängt - slasklogg', label: 'Stängda' }
+    { value: 'Borttaget', label: 'Borttagna' }
   ]
 
   if (loading) {
@@ -319,7 +318,7 @@ const OrganisationServiceActivityTimeline: React.FC<OrganisationServiceActivityT
                       status === 'Återbesök 5') && <Wrench className="w-5 h-5 text-blue-400 animate-pulse relative z-10" />}
                     {status === 'Privatperson - review' && <Eye className="w-5 h-5 relative z-10" />}
                     {status === 'Avslutat' && <CheckCircle className="w-5 h-5 text-green-400 relative z-10" />}
-                    {status === 'Stängt - slasklogg' && <XCircle className="w-5 h-5 text-red-400 relative z-10" />}
+                    {status === 'Borttaget' && <XCircle className="w-5 h-5 text-red-400 relative z-10" />}
                   </div>
 
                   {/* Content with glass morphism */}

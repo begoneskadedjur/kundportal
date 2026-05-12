@@ -144,7 +144,7 @@ interface BackupData {
   timestamp: string;
 }
 
-const statusOrder = [ 'Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat' ];
+const statusOrder = [ 'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök', 'Avslutat' ];
 
 // Utility-funktion för att formatera adress (samma logik som TechnicianCases.tsx)
 const formatAddress = (address: any): string => {

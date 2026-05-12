@@ -26,13 +26,8 @@ const STATUS_DOT: Record<string, string> = {
   'Bokad': 'bg-amber-500',
   'Offert skickad': 'bg-orange-500',
   'Offert signerad - boka in': 'bg-[#20c58f]',
-  'Återbesök 1': 'bg-blue-500',
-  'Återbesök 2': 'bg-blue-500',
-  'Återbesök 3': 'bg-blue-500',
-  'Återbesök 4': 'bg-blue-500',
-  'Återbesök 5': 'bg-blue-500',
-  'Privatperson - review': 'bg-violet-500',
-  'Stängt - slasklogg': 'bg-red-500',
+  'Återbesök': 'bg-blue-500',
+  'Borttaget': 'bg-red-500',
   'Avslutat': 'bg-emerald-600',
 }
 
@@ -100,8 +95,8 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
         .limit(10)
 
       if (!inclCompleted) {
-        privateQuery = privateQuery.not('status', 'in', '("Avslutat","Stängt - slasklogg")')
-        businessQuery = businessQuery.not('status', 'in', '("Avslutat","Stängt - slasklogg")')
+        privateQuery = privateQuery.not('status', 'in', '("Avslutat","Borttaget")')
+        businessQuery = businessQuery.not('status', 'in', '("Avslutat","Borttaget")')
       }
 
       const [privateRes, businessRes] = await Promise.all([privateQuery, businessQuery])

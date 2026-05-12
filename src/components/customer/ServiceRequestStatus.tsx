@@ -63,11 +63,10 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
         return <Wrench className={`${iconSizes[size]} animate-spin-slow`} />
       case 'Avslutat':
         return <CheckCircle className={iconSizes[size]} />
-      case 'Stängt - slasklogg':
+      case 'Borttaget':
         return <XCircle className={iconSizes[size]} />
       // Legacy statuses
       case 'Bomkörning':
-      case 'Generera saneringsrapport':
       case 'Ombokning':
       case 'Reklamation':
         return <AlertCircle className={iconSizes[size]} />
