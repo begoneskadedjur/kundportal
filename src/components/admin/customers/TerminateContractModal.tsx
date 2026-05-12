@@ -33,29 +33,23 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [customEndDate, setCustomEndDate] = useState<string>('')
 
   const today = new Date()
   const contractEnd = organization?.nextRenewalDate ? new Date(organization.nextRenewalDate) : null
 
-  // Beräkna effective_end_date baserat på affärsreglerna
-  const { effectiveEndDate, isWithinContractPeriod } = useMemo(() => {
-    if (!contractEnd) {
-      const eff = addMonths(today, 2)
-      return { effectiveEndDate: eff, isWithinContractPeriod: false }
-    }
+  const resolvedEndDate: Date = useMemo(() => {
+    if (customEndDate) return new Date(customEndDate)
+    if (!contractEnd) return addMonths(today, 2)
+    return today <= contractEnd ? contractEnd : addMonths(today, 2)
+  }, [customEndDate, contractEnd?.toISOString()])
 
-    if (today <= contractEnd) {
-      return { effectiveEndDate: contractEnd, isWithinContractPeriod: true }
-    } else {
-      const eff = addMonths(today, 2)
-      return { effectiveEndDate: eff, isWithinContractPeriod: false }
-    }
-  }, [contractEnd?.toISOString()])
+  const isWithinContractPeriod = contractEnd ? resolvedEndDate <= contractEnd : false
 
   if (!isOpen || !organization) return null
 
   const formatDate = (d: Date) => d.toLocaleDateString('sv-SE')
-  const effectiveDateStr = effectiveEndDate.toISOString().split('T')[0]
+  const effectiveDateStr = resolvedEndDate.toISOString().split('T')[0]
 
   const handleTerminate = async () => {
     if (!confirmed) return
@@ -139,7 +133,7 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
         toast.success(`${totalFutureDeleted} framtida avtalsfakturor raderade`)
       }
 
-      toast.success(`Avtal uppsagt for ${organization.company_name} — slutdatum: ${formatDate(effectiveEndDate)}`)
+      toast.success(`Avtal uppsagt for ${organization.company_name} — slutdatum: ${formatDate(resolvedEndDate)}`)
       onTerminated()
       onClose()
     } catch (err) {
@@ -206,21 +200,47 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
         <div className="p-5 border-b border-slate-700">
           <h3 className="text-sm font-medium text-slate-300 mb-3">Uppsägningsberäkning</h3>
 
-          <div className={`rounded-lg p-4 border ${isWithinContractPeriod ? 'bg-blue-500/10 border-blue-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
-            {isWithinContractPeriod ? (
-              <>
-                <p className="text-sm text-blue-300 font-medium mb-1">Uppsägning inom avtalstiden</p>
-                <p className="text-xs text-blue-200/70">
-                  Avtalet avslutas vid nuvarande slutdatum: <strong className="text-white">{formatDate(effectiveEndDate)}</strong>
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-amber-300 font-medium mb-1">Avtalet har löpt vidare efter avtalstiden</p>
-                <p className="text-xs text-amber-200/70">
-                  Uppsägningstid 2 månader. Avtalet avslutas: <strong className="text-white">{formatDate(effectiveEndDate)}</strong>
-                </p>
-              </>
+          {customEndDate ? (
+            <div className="rounded-lg p-4 border bg-slate-700/30 border-slate-600">
+              <p className="text-sm text-slate-300 font-medium mb-1">Manuellt angivet slutdatum</p>
+              <p className="text-xs text-slate-400">
+                Avtalet avslutas: <strong className="text-white">{formatDate(resolvedEndDate)}</strong>
+              </p>
+            </div>
+          ) : isWithinContractPeriod ? (
+            <div className="rounded-lg p-4 border bg-blue-500/10 border-blue-500/30">
+              <p className="text-sm text-blue-300 font-medium mb-1">Uppsägning inom avtalstiden</p>
+              <p className="text-xs text-blue-200/70">
+                Avtalet avslutas vid nuvarande slutdatum: <strong className="text-white">{formatDate(resolvedEndDate)}</strong>
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg p-4 border bg-amber-500/10 border-amber-500/30">
+              <p className="text-sm text-amber-300 font-medium mb-1">Avtalet har löpt vidare efter avtalstiden</p>
+              <p className="text-xs text-amber-200/70">
+                Uppsägningstid 2 månader. Avtalet avslutas: <strong className="text-white">{formatDate(resolvedEndDate)}</strong>
+              </p>
+            </div>
+          )}
+
+          <div className="mt-3">
+            <label className="block text-xs text-slate-400 mb-1">
+              Slutdatum (valfritt — åsidosätter beräknat datum)
+            </label>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20"
+            />
+            {customEndDate && (
+              <button
+                type="button"
+                onClick={() => setCustomEndDate('')}
+                className="mt-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Återställ till beräknat datum
+              </button>
             )}
           </div>
         </div>
@@ -247,7 +267,7 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
               className="mt-0.5 rounded bg-slate-700 border-slate-600 text-red-500 focus:ring-red-500"
             />
             <span className="text-xs text-slate-300">
-              Jag bekräftar att avtalet med <strong>{organization.company_name}</strong> ska sägas upp med slutdatum <strong>{formatDate(effectiveEndDate)}</strong>.
+              Jag bekräftar att avtalet med <strong>{organization.company_name}</strong> ska sägas upp med slutdatum <strong>{formatDate(resolvedEndDate)}</strong>.
             </span>
           </label>
         </div>
