@@ -217,17 +217,20 @@ export default function CoordinatorSchedule() {
       ]
 
       // Batch-hämta besöksräknare från case_updates_log
+      // Hämtar alla revisit_scheduled-rader (ej filtrerat på case_id — undviker för lång URL)
       const caseIds = combinedCases.map(c => c.id)
+      const caseIdSet = new Set(caseIds)
       let visitCountMap: Record<string, number> = {}
       if (caseIds.length > 0) {
         const { data: logRows } = await supabase
           .from('case_updates_log')
           .select('case_id')
-          .in('case_id', caseIds)
           .eq('update_type', 'revisit_scheduled')
         if (logRows) {
           for (const row of logRows) {
-            visitCountMap[row.case_id] = (visitCountMap[row.case_id] || 0) + 1
+            if (caseIdSet.has(row.case_id)) {
+              visitCountMap[row.case_id] = (visitCountMap[row.case_id] || 0) + 1
+            }
           }
         }
       }
