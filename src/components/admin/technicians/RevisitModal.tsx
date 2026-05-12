@@ -145,7 +145,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
           newCaseAddress: address,
           pestType: caseData.skadedjur || '',
           timeSlotDuration: durationMinutes,
-          searchStartDate: format(selectedDate, 'yyyy-MM-dd'),
+          searchStartDate: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`,
           selectedTechnicianIds: [caseData.primary_assignee_id]
         })
       })
