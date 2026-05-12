@@ -545,7 +545,7 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
     // Kontrollera om kontraktet redan finns
     const { data: existingContract, error: checkError } = await supabase
       .from('contracts')
-      .select('id, status')
+      .select('id, status, source_id, source_type')
       .eq('oneflow_contract_id', contractData.oneflow_contract_id)
       .single()
 
@@ -568,6 +568,7 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
         .from('contracts')
         .update({
           ...webhookData,
+          ...(existingContract.source_id ? { source_id: existingContract.source_id, source_type: existingContract.source_type } : {}),
           updated_at: new Date().toISOString()
         })
         .eq('oneflow_contract_id', contractData.oneflow_contract_id)
