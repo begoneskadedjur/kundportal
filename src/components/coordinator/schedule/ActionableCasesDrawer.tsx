@@ -18,6 +18,7 @@ import CommentInput from '../../communication/CommentInput'
 import { useCaseComments } from '../../../hooks/useCaseComments'
 import type { TrackedMention } from '../../../hooks/useMentions'
 import { formatAddress } from './scheduleUtils'
+import { supabase } from '../../../lib/supabase'
 
 interface ActionableCasesDrawerProps {
   cases: BeGoneCaseRow[]
@@ -180,6 +181,34 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
   const [contactOpen, setContactOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const contactBtnRef = useRef<HTMLButtonElement>(null)
+  const [billingTotalInclVat, setBillingTotalInclVat] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!expanded || billingTotalInclVat !== null || !c.oneflow_contract_id) return
+    supabase
+      .from('contracts')
+      .select('id')
+      .eq('oneflow_contract_id', c.oneflow_contract_id)
+      .single()
+      .then(({ data: contract }) => {
+        if (!contract) return
+        supabase
+          .from('case_billing_items')
+          .select('total_price, vat_rate')
+          .eq('case_id', contract.id)
+          .eq('item_type', 'service')
+          .then(({ data: items }) => {
+            if (items?.length) {
+              const incl = items.reduce(
+                (s: number, i: { total_price: number; vat_rate: number }) =>
+                  s + i.total_price * (1 + (i.vat_rate ?? 25) / 100),
+                0
+              )
+              setBillingTotalInclVat(Math.round(incl))
+            }
+          })
+      })
+  }, [expanded, c.oneflow_contract_id, billingTotalInclVat])
 
   const isNew = !action || action.coordinator_status === 'new'
   const status = action?.coordinator_status || 'new'
@@ -389,7 +418,7 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
                   <span className="text-slate-400">Adress: <span className="text-slate-200">{addr || '—'}</span></span>
                   <span className="text-slate-400">Skadedjur: <span className="text-slate-200">{c.skadedjur || '—'}</span></span>
-                  <span className="text-slate-400">Pris: <span className="text-slate-200">{c.pris ? `${c.pris.toLocaleString('sv-SE')} kr` : '—'}</span></span>
+                  <span className="text-slate-400">Pris: <span className="text-slate-200">{billingTotalInclVat !== null ? `${billingTotalInclVat.toLocaleString('sv-SE')} kr` : '—'}</span></span>
                   <span className="text-slate-400">Signerad: <span className="text-slate-200">{formatRelativeDate(c.updated_at)}</span></span>
                 </div>
 

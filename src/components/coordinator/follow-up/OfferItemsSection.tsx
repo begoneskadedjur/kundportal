@@ -44,6 +44,10 @@ export default function OfferItemsSection({ services, articles, loading, error }
   }
 
   const servicesSubtotal = services.reduce((sum, i) => sum + i.total_price, 0)
+  const servicesTotalInclVat = services.reduce(
+    (sum, i) => sum + i.total_price * (1 + (i.vat_rate ?? 25) / 100),
+    0
+  )
   const articlesSubtotal = articles.reduce((sum, i) => sum + i.total_price, 0)
   const marginPercent = servicesSubtotal > 0
     ? calculateMarginPercent(servicesSubtotal, articlesSubtotal)
@@ -87,7 +91,11 @@ export default function OfferItemsSection({ services, articles, loading, error }
           </div>
           <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
             <span className="text-xs font-medium text-slate-400">Summa exkl. moms</span>
-            <span className="text-sm font-semibold text-white">{formatKr(servicesSubtotal)}</span>
+            <span className="text-xs text-slate-400">{formatKr(servicesSubtotal)}</span>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-xs font-semibold text-white">Totalt inkl. moms</span>
+            <span className="text-sm font-semibold text-white">{formatKr(servicesTotalInclVat)}</span>
           </div>
         </div>
       )}
