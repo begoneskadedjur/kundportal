@@ -12,7 +12,8 @@ import {
   ChevronUp,
   User,
   AlertCircle,
-  Loader2
+  Loader2,
+  Receipt
 } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
@@ -23,6 +24,9 @@ import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { toSwedishISOString } from '../../../utils/dateHelpers'
 import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard'
+import { InvoiceService } from '../../../services/invoiceService'
+import { CaseBillingService } from '../../../services/caseBillingService'
+import { CaseCustomerService } from '../../../services/caseCustomerService'
 import toast from 'react-hot-toast'
 import "react-datepicker/dist/react-datepicker.css"
 
@@ -50,6 +54,11 @@ interface TechnicianCase {
   secondary_assignee_name?: string | null
   tertiary_assignee_id?: string | null
   tertiary_assignee_name?: string | null
+  // Kundinfo för delfakturering
+  company_name?: string
+  personnummer?: string
+  org_nr?: string
+  markning_faktura?: string
 }
 
 interface RevisitHistoryEntry {
@@ -100,6 +109,11 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
   // Anteckning
   const [revisitNote, setRevisitNote] = useState('')
 
+  // Delfaktura
+  const [createPartialInvoice, setCreatePartialInvoice] = useState(false)
+  const [pendingBillingItems, setPendingBillingItems] = useState<any[]>([])
+  const [loadingBillingItems, setLoadingBillingItems] = useState(false)
+
   // Historik
   const [revisitHistory, setRevisitHistory] = useState<RevisitHistoryEntry[]>([])
   const [showFullHistory, setShowFullHistory] = useState(false)
@@ -122,6 +136,25 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
     }
     fetchHistory()
   }, [caseData.id])
+
+  // Hämta billing items när vi går till steg 2 (för delfaktura-preview)
+  useEffect(() => {
+    if (step !== 2 || caseData.case_type === 'contract') return
+    const fetchBillingItems = async () => {
+      setLoadingBillingItems(true)
+      try {
+        const caseType = caseData.case_type === 'private' ? 'private' : 'business'
+        const items = await CaseBillingService.getCaseBillingItems(caseData.id, caseType)
+        const serviceItems = items.filter((i: any) => i.item_type === 'service' && i.status === 'pending')
+        setPendingBillingItems(serviceItems.length > 0 ? serviceItems : items.filter((i: any) => i.status === 'pending'))
+      } catch (e) {
+        console.error('Error fetching billing items:', e)
+      } finally {
+        setLoadingBillingItems(false)
+      }
+    }
+    fetchBillingItems()
+  }, [step, caseData.id, caseData.case_type])
 
   const handleDateConfirm = useCallback(async () => {
     if (!selectedDate) return
@@ -188,10 +221,12 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
         : caseData.case_type === 'business'
           ? 'business_cases'
           : 'cases'
+      const billingCaseType = caseData.case_type === 'private' ? 'private' : 'business'
 
       const newStartDate = toSwedishISOString(new Date(selectedSuggestion.start_time))
       const newDueDate = toSwedishISOString(new Date(selectedSuggestion.end_time))
 
+      // 1. Uppdatera ärendet med nya tider och status
       const { data: updatedCase, error } = await supabase
         .from(tableName)
         .update({ start_date: newStartDate, due_date: newDueDate, status: 'Återbesök' })
@@ -201,6 +236,66 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
 
       if (error) throw error
 
+      // 2. Delfaktura om ikryssad
+      let partialInvoiceNumber: string | null = null
+      if (createPartialInvoice && caseData.case_type !== 'contract' && pendingBillingItems.length > 0) {
+        try {
+          const customerName = caseData.case_type === 'business'
+            ? (caseData.company_name || caseData.kontaktperson || 'Okänd kund')
+            : (caseData.kontaktperson || 'Okänd kund')
+
+          // Säkerställ kundnummer (krävs för Fortnox-export)
+          await CaseCustomerService.getOrCreateCaseCustomer({
+            caseType: billingCaseType,
+            name: customerName,
+            personnummer: billingCaseType === 'private' ? caseData.personnummer : null,
+            organization_number: billingCaseType === 'business' ? caseData.org_nr : null,
+            email: caseData.e_post_kontaktperson,
+            phone: caseData.telefon_kontaktperson,
+            address: formatAddress(caseData.adress),
+          })
+
+          const invoice = await InvoiceService.createInvoiceFromCase(
+            caseData.id,
+            billingCaseType,
+            {
+              name: customerName,
+              email: caseData.e_post_kontaktperson,
+              phone: caseData.telefon_kontaktperson,
+              address: formatAddress(caseData.adress),
+              organization_number: billingCaseType === 'business' ? caseData.org_nr : caseData.personnummer,
+              invoice_marking: caseData.markning_faktura,
+            }
+          )
+          partialInvoiceNumber = invoice.invoice_number
+
+          // Logga delfakturan
+          await supabase.from('case_updates_log').insert({
+            case_id: caseData.id,
+            case_table: tableName,
+            case_type: caseData.case_type,
+            update_type: 'partial_invoice_created',
+            updated_by: profile.id,
+            updated_by_id: profile.id,
+            updated_by_name: profile.full_name || profile.display_name || 'Okänd',
+            user_role: (profile as any).role || 'koordinator',
+            user_name: profile.full_name || profile.display_name || 'Okänd',
+            field_changes: { invoice_number: { old: null, new: invoice.invoice_number } },
+            previous_value: null,
+            new_value: JSON.stringify({
+              invoice_number: invoice.invoice_number,
+              amount: invoice.total_amount,
+              items: pendingBillingItems.map((i: any) => ({ name: i.service_name || i.article_name, amount: i.total_price }))
+            }),
+          })
+        } catch (invoiceError: any) {
+          console.error('[RevisitModal] Delfaktura misslyckades:', invoiceError)
+          toast.error(`Delfaktura: ${invoiceError.message}`)
+          // Fortsätt ändå — återbesöket är redan bokat
+        }
+      }
+
+      // 3. Logga återbesöket
       const { error: logError } = await supabase
         .from('case_updates_log')
         .insert({
@@ -223,7 +318,11 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
         })
       if (logError) console.error('[RevisitModal] Failed to log revisit:', logError)
 
-      toast.success('Återbesök bokat!')
+      if (partialInvoiceNumber) {
+        toast.success(`Återbesök bokat och delfaktura ${partialInvoiceNumber} skapad!`)
+      } else {
+        toast.success('Återbesök bokat!')
+      }
       onSuccess({ ...caseData, ...updatedCase, case_type: caseData.case_type })
     } catch (error: any) {
       console.error('Error scheduling revisit:', error)
@@ -375,6 +474,55 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                   placeholder="T.ex. kontrollera betesintag"
                 />
               </div>
+
+              {/* Delfaktura-sektion (bara för private/business med pending billing items) */}
+              {caseData.case_type !== 'contract' && (
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
+                  {loadingBillingItems ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Hämtar tjänster...
+                    </div>
+                  ) : pendingBillingItems.length > 0 ? (
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={createPartialInvoice}
+                          onChange={(e) => setCreatePartialInvoice(e.target.checked)}
+                          className="w-4 h-4 rounded border-slate-600 text-[#20c58f] focus:ring-[#20c58f] bg-slate-800"
+                        />
+                        <span className="text-sm font-medium text-slate-200 flex items-center gap-1.5">
+                          <Receipt className="w-4 h-4 text-[#20c58f]" />
+                          Skapa delfaktura för nuvarande tjänster
+                        </span>
+                      </label>
+                      {createPartialInvoice && (
+                        <div className="ml-6 mt-1 space-y-1">
+                          {pendingBillingItems.map((item: any) => (
+                            <div key={item.id} className="flex items-center justify-between text-xs text-slate-400">
+                              <span>{item.service_name || item.article_name}</span>
+                              <span className="text-white font-medium">{Number(item.total_price).toLocaleString('sv-SE')} kr</span>
+                            </div>
+                          ))}
+                          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-700/50">
+                            <span className="text-slate-400">Totalt (exkl. moms)</span>
+                            <span className="text-[#20c58f] font-semibold">
+                              {pendingBillingItems.reduce((sum: number, i: any) => sum + Number(i.total_price), 0).toLocaleString('sv-SE')} kr
+                            </span>
+                          </div>
+                          <p className="text-xs text-amber-400/80 mt-1">Tjänsterna markeras som fakturerade och tas bort från ärendet.</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                      <Receipt className="w-3.5 h-3.5" />
+                      Inga ofakturerade tjänster på ärendet
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

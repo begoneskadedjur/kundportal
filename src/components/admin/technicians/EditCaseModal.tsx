@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints, Receipt, Copy } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints, Receipt, Copy, History } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -69,6 +69,9 @@ import type { DeleteableCaseType } from '../../../services/caseDeleteService'
 
 // Återbesök modal
 import RevisitModal from './RevisitModal'
+
+// Ärendehistorik
+import CaseHistoryPanel from '../../shared/CaseHistoryPanel'
 
 // Provision
 import CommissionSection from '../../shared/CommissionSection'
@@ -418,6 +421,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
   const [oneflowContractId, setOneflowContractId] = useState<string | null>(null)
 
+  // Historikpanel state
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false)
+  const [historyCount, setHistoryCount] = useState(0)
+
   // Radering state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
@@ -437,19 +444,23 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [selectedCustomerGroupId, setSelectedCustomerGroupId] = useState<string | null>(null)
   const [hasBillableAmount, setHasBillableAmount] = useState(false)
 
-  // Besöksräknare
+  // Besöksräknare + återbesökshistorik
   const [visitNumber, setVisitNumber] = useState(1)
+  const [revisitLoggedCount, setRevisitLoggedCount] = useState(0)
+  const [revisitHistory, setRevisitHistory] = useState<{ id: string; created_at: string; new_value: string; updated_by_name: string }[]>([])
   useEffect(() => {
     if (!caseData?.id) return
     ;(async () => {
-      const { count } = await supabase
+      const { data, count } = await supabase
         .from('case_updates_log')
-        .select('*', { count: 'exact', head: true })
+        .select('id, created_at, new_value, updated_by_name', { count: 'exact' })
         .eq('case_id', caseData.id)
         .eq('update_type', 'revisit_scheduled')
+        .order('created_at', { ascending: false })
       setVisitNumber((count ?? 0) + 1)
+      setRevisitHistory(data || [])
     })()
-  }, [caseData?.id])
+  }, [caseData?.id, revisitLoggedCount])
 
   // Vald tjänsteartikel (för CasePreparationsSection)
   const [serviceArticle, setServiceArticle] = useState<Service | null>(null)
@@ -1388,6 +1399,17 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               <Footprints className="w-5 h-5" />
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setShowHistoryPanel(true)}
+            className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-500/20 rounded-lg transition-all duration-200 relative"
+            title="Ärendehistorik"
+          >
+            <History className="w-5 h-5" />
+            {historyCount > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400" />
+            )}
+          </button>
           {showCommunication && (
             <button
               type="button"
@@ -2030,6 +2052,15 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       </div>
       </div>
 
+      {/* Historikpanel (slide-in från höger) */}
+      <CaseHistoryPanel
+        isOpen={showHistoryPanel}
+        onClose={() => setShowHistoryPanel(false)}
+        caseId={currentCase.id}
+        caseTitle={currentCase.title}
+        onCountChange={setHistoryCount}
+      />
+
       {/* Kommunikations-panel (slide-in från höger) */}
       {showCommunication && (
         <CommunicationSlidePanel
@@ -2091,6 +2122,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         onSuccess={(updatedCase) => {
           setShowRevisitModal(false)
           setCurrentCase(updatedCase)
+          setRevisitLoggedCount(c => c + 1)
+          setHistoryCount(c => c + 1)
           setFormData(prev => ({
             ...prev,
             start_date: updatedCase.start_date,
