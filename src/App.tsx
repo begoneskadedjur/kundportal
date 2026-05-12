@@ -70,6 +70,7 @@ import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
 import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule';
 import ScheduleOptimizer from './pages/coordinator/ScheduleOptimizer';
 import CaseSearch from './pages/coordinator/CaseSearch';
+import CasesPage from './pages/coordinator/CasesPage';
 import CasePipeline from './pages/coordinator/CasePipeline';
 import OfferFollowUp from './pages/coordinator/OfferFollowUp';
 import CoordinatorAnalytics from './pages/coordinator/CoordinatorAnalytics';
@@ -248,6 +249,7 @@ function App() {
               <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="koordinator"><OfferFollowUp /></ProtectedRoute>} />
               <Route path="offerthantering" element={<Navigate to="/koordinator/dokumentsignering" replace />} />
               <Route path="sok-arenden" element={<ProtectedRoute requiredRole="koordinator"><CaseSearch /></ProtectedRoute>} />
+              <Route path="arenden" element={<ProtectedRoute requiredRole="koordinator"><CasesPage /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="koordinator"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="analytics" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorAnalytics /></ProtectedRoute>} />
 
