@@ -208,10 +208,18 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
           case_table: tableName,
           case_type: caseData.case_type,
           update_type: 'revisit_scheduled',
+          updated_by: profile.id,
+          updated_by_id: profile.id,
+          updated_by_name: profile.full_name || profile.display_name || 'Okänd',
+          user_role: (profile as any).role || 'koordinator',
+          user_name: profile.full_name || profile.display_name || 'Okänd',
+          field_changes: {
+            start_date: { old: caseData.start_date, new: newStartDate },
+            due_date: { old: caseData.due_date, new: newDueDate },
+            status: { old: caseData.status, new: 'Återbesök' }
+          },
           previous_value: JSON.stringify({ start_date: caseData.start_date, due_date: caseData.due_date }),
           new_value: JSON.stringify({ start_date: newStartDate, due_date: newDueDate, note: revisitNote }),
-          updated_by_id: profile.id,
-          updated_by_name: profile.full_name || profile.display_name || 'Okänd'
         })
       if (logError) console.error('[RevisitModal] Failed to log revisit:', logError)
 
