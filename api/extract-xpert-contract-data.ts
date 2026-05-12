@@ -36,8 +36,8 @@ Fält att extrahera (ange null om ej funnet):
 - agreement_text: Sammanfattning av tjänster och "Kontaktperson för objekt" (platskontakt). Format: "Tjänster: [lista]. Objektkontakt: [namn, telefon]"
 - products: Array av produkter/tjänster från tjänstetabellen [{name, description, quantity, price}], price är pris/år per tjänst
 - oneflow_contract_id: null (Xpert använder Visma Sign, inte Oneflow)
-- assigned_account_manager: null (dessa kunder hanteras av BeGone efter övertagande, ej känt vid import)
-- sales_person: Xperts säljare/kontaktperson på XB-sidan (t.ex. Jimmy Shamon, Maikel Saliba)
+- assigned_account_manager: null (sätts automatiskt till samma som sales_person i post-processing)
+- sales_person: Xperts säljare = "Kontaktperson för avtalet" på XB-sidan (t.ex. Maikel Saliba). OBS: Jimmy Shamon förekommer i underskriftsfältet som BeGones representant — extrahera INTE Jimmy som sales_person utan leta efter den faktiska kontaktpersonen på Xperts sida i avtalets partstabell
 - business_type: "business" för företagskunder, "organization" för bostadsrättsföreningar/HSB
 - industry_category: Branschkategori baserat på kundtyp (t.ex. "Restaurang", "Bostadsrättsförening", "Livsmedel", "Fastighet")
 - service_frequency: Servicefrekvens från avtalets tjänstetabell (t.ex. "Kvartalsvis", "Halvårsvis", "Månadsvis", "Årsvis")
@@ -156,10 +156,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
+    // Post-processing: ersätt @xbekampning.se med @begone.se (bolagsövergång)
+    const replaceXpert = (email: string | null) =>
+      email ? email.replace(/@xbekampning\.se$/i, '@begone.se') : email
+
+    extractedData.sales_person_email = replaceXpert(extractedData.sales_person_email)
+
+    // Säljare = account manager (samma person)
+    extractedData.assigned_account_manager = extractedData.sales_person
+    extractedData.account_manager_email = replaceXpert(extractedData.sales_person_email)
+
     console.log('=== EXTRACT XPERT CONTRACT DATA SUCCESS ===')
     console.log('Extracted company:', extractedData.company_name)
+    console.log('Extracted sales_person:', extractedData.sales_person)
     console.log('Confidence:', extractedData.confidence_score)
-    console.log('Extracted data preview:', JSON.stringify(extractedData).substring(0, 500))
 
     return res.status(200).json({
       success: true,

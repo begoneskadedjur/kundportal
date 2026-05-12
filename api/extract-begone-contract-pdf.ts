@@ -34,8 +34,8 @@ Fält att extrahera (ange null om ej funnet):
 - products: Array av tjänster/produkter [{name, description, quantity, price}], price är pris/år per tjänst
 - sales_person: BeGones säljare/kontaktperson på BeGone-sidan
 - sales_person_email: BeGones säljarens e-postadress, null om ej angivet
-- assigned_account_manager: Ansvarig account manager på BeGone, null om ej angivet
-- account_manager_email: Account managers e-post, null om ej angivet
+- assigned_account_manager: null (sätts automatiskt till samma som sales_person)
+- account_manager_email: null (sätts automatiskt till samma som sales_person_email)
 - business_type: "business" för företag/AB/HB, "organization" för bostadsrättsföreningar/HSB/kommuner, "private" för privatpersoner
 - confidence_score: 0-100, hur säker du är på extraktionen totalt sett
 - extraction_notes: Eventuella problem, oklarheter eller saknade fält (på svenska)`
@@ -154,11 +154,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     extractedData.sales_person_email = replaceXpert(extractedData.sales_person_email)
     extractedData.account_manager_email = replaceXpert(extractedData.account_manager_email)
 
-    // Account manager = säljare om inte explicit angivet separat
-    if (!extractedData.assigned_account_manager) {
-      extractedData.assigned_account_manager = extractedData.sales_person
-      extractedData.account_manager_email = extractedData.sales_person_email
-    }
+    // Säljare = account manager (alltid samma person)
+    extractedData.assigned_account_manager = extractedData.sales_person
+    extractedData.account_manager_email = extractedData.sales_person_email
 
     console.log('=== EXTRACT BEGONE CONTRACT PDF SUCCESS ===')
     console.log('Extracted company:', extractedData.company_name)
