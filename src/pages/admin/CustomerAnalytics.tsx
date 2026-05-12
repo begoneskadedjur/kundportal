@@ -428,7 +428,7 @@ export default function CustomerAnalytics() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold text-slate-200">Produkter i avtal (top 15)</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Parsad från Oneflow-avtalens innehåll</p>
+                <p className="text-xs text-slate-500 mt-0.5">Faktiska tjänster i aktiva avtal</p>
               </div>
               <Package className="w-4 h-4 text-slate-600" />
             </div>

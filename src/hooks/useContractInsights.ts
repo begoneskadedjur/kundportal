@@ -148,13 +148,7 @@ export function useContractInsights(): ContractInsights {
 
         if (custErr) throw custErr
 
-        // 2. Contracts for product parsing
-        const { data: contracts } = await supabase
-          .from('contracts')
-          .select('customer_id, selected_products')
-          .not('selected_products', 'is', null)
-
-        // 3. Case billing items for margin calc (service=revenue, article=cost)
+        // 2. Case billing items for margin calc (service=revenue, article=cost)
         // We need to link cases back to customers
         const { data: privateCases } = await supabase
           .from('private_cases')
@@ -166,10 +160,7 @@ export function useContractInsights(): ContractInsights {
 
         const { data: billingItems } = await supabase
           .from('case_billing_items')
-          .select(`
-            id, item_type, amount, case_id, case_type,
-            article:articles(default_price)
-          `)
+          .select('id, item_type, total_price, case_id, case_type')
           .in('item_type', ['service', 'article'])
 
         // ---- Build lookup: case_id → customer_id --------------------------
@@ -201,10 +192,9 @@ export function useContractInsights(): ContractInsights {
           }
           const m = marginByCustomer.get(customerId)!
           if (item.item_type === 'service') {
-            m.revenue += Number(item.amount) || 0
+            m.revenue += Number(item.total_price) || 0
           } else if (item.item_type === 'article') {
-            const cost = Number(item.article?.default_price) || Number(item.amount) || 0
-            m.cost += cost
+            m.cost += Number(item.total_price) || 0
           }
         })
 
@@ -389,8 +379,15 @@ export function useContractInsights(): ContractInsights {
           freqMap.get(freq)!.count++
           freqMap.get(freq)!.arr += Number(c.annual_value) || 0
         })
+        const BILLING_FREQ_LABELS: Record<string, string> = {
+          annual: 'Årsvis',
+          semi_annual: 'Halvårsvis',
+          quarterly: 'Kvartalsvis',
+          monthly: 'Månadsvis',
+          on_demand: 'Vid behov',
+        }
         const byBillingFrequency: BillingFreqStat[] = Array.from(freqMap.entries())
-          .map(([freq, v]) => ({ freq, count: v.count, totalArr: v.arr }))
+          .map(([freq, v]) => ({ freq: BILLING_FREQ_LABELS[freq] || freq, count: v.count, totalArr: v.arr }))
           .sort((a, b) => b.count - a.count)
 
         // ---- Renewal pipeline ----------------------------------------------
@@ -418,39 +415,19 @@ export function useContractInsights(): ContractInsights {
           ['0-3m', '3-6m', '6-12m', '12m+'] as const
         ).map(bucket => ({ bucket, ...buckets[bucket] }))
 
-        // ---- Top products from JSONB ----------------------------------------
+        // ---- Top products från faktiska avtalstjänster ----------------------
+        const { data: contractServiceItems } = await supabase
+          .from('case_billing_items')
+          .select('service_name, total_price')
+          .eq('case_type', 'contract')
+          .eq('item_type', 'service')
+
         const productMap = new Map<string, { occurrences: number; totalValue: number }>()
-        const contractsByCustomer = new Map<string, any[]>()
-        ;(contracts || []).forEach((c: any) => {
-          if (!contractsByCustomer.has(c.customer_id)) {
-            contractsByCustomer.set(c.customer_id, [])
-          }
-          contractsByCustomer.get(c.customer_id)!.push(c)
-        })
-
-        // Parse selected_products JSONB: [{ products: [{ name, price_2: { amount: { amount } } }] }]
-        ;(contracts || []).forEach((contract: any) => {
-          if (!contract.selected_products) return
-          try {
-            const sections = Array.isArray(contract.selected_products)
-              ? contract.selected_products
-              : JSON.parse(contract.selected_products)
-
-            sections.forEach((section: any) => {
-              const prods = section.products || []
-              prods.forEach((p: any) => {
-                const name = p.name || p.product_name || 'Okänd produkt'
-                const price =
-                  p.price_2?.amount?.amount ??
-                  p.price?.amount ??
-                  p.price_2?.amount ??
-                  0
-                if (!productMap.has(name)) productMap.set(name, { occurrences: 0, totalValue: 0 })
-                productMap.get(name)!.occurrences++
-                productMap.get(name)!.totalValue += Number(price) || 0
-              })
-            })
-          } catch (_) {}
+        ;(contractServiceItems || []).forEach((item: any) => {
+          const name = item.service_name || 'Okänd tjänst'
+          if (!productMap.has(name)) productMap.set(name, { occurrences: 0, totalValue: 0 })
+          productMap.get(name)!.occurrences++
+          productMap.get(name)!.totalValue += Number(item.total_price) || 0
         })
         const topProducts: TopProduct[] = Array.from(productMap.entries())
           .map(([name, v]) => ({
