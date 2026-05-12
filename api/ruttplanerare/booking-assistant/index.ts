@@ -13,11 +13,7 @@ import {
 
 // --- Konfiguration (specifik för denna fil) ---
 const SEARCH_DAYS_LIMIT = 7;
-const SUGGESTION_STRIDE_MINUTES = 60;
 const MAX_SUGGESTIONS_TOTAL = 20;
-const MAX_SUGGESTIONS_PER_TECH_DAY_HIGH_SCORE = 5;
-const MAX_SUGGESTIONS_PER_TECH_DAY_LOW_SCORE = 2;
-const HIGH_SCORE_THRESHOLD = 80;
 const LATE_JOB_THRESHOLD_MINUTES = 90;
 
 async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDuration: number, travelTimes: Map<string, number>, newCaseAddress: string): Promise<Suggestion[]> {
@@ -84,7 +80,10 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
         origin_case_title: isFirstJob ? undefined : (currentEvent.title || undefined),
         origin_end_time: isFirstJob ? undefined : currentEvent.end.toISOString()
       });
-      currentTry = addMinutes(currentTry, SUGGESTION_STRIDE_MINUTES);
+      // Ett naturligt förslag per gap — det tidigast möjliga.
+      // Hemstart = alltid workStart (teknikern ska inte sitta hemma halva dagen).
+      // Efter föregående ärende = gapStart + restid (inga konstgjorda stride-varianter).
+      break;
     }
   }
   return suggestions;
@@ -135,23 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const nestedSuggestions = await Promise.all(suggestionPromises);
     const allSuggestions = nestedSuggestions.flat();
     
-    const groupedByDayAndTech = allSuggestions.reduce((acc, sugg) => {
-        const day = sugg.start_time.split('T')[0];
-        const key = `${day}-${sugg.technician_id}`;
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(sugg);
-        return acc;
-    }, {} as Record<string, Suggestion[]>);
-
-    let balancedSuggestions: Suggestion[] = [];
-    for (const key in groupedByDayAndTech) {
-        const group = groupedByDayAndTech[key].sort((a,b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-        const score = group[0].efficiency_score;
-        const limit = score >= HIGH_SCORE_THRESHOLD ? MAX_SUGGESTIONS_PER_TECH_DAY_HIGH_SCORE : MAX_SUGGESTIONS_PER_TECH_DAY_LOW_SCORE;
-        balancedSuggestions.push(...group.slice(0, limit));
-    }
-    
-    const sortedSuggestions = balancedSuggestions
+    const sortedSuggestions = allSuggestions
       .sort((a, b) => {
         const dateA = new Date(a.start_time).setHours(0,0,0,0);
         const dateB = new Date(b.start_time).setHours(0,0,0,0);
