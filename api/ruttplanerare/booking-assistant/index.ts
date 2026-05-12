@@ -137,8 +137,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const suggestionPromises = dailySchedules.map(daySchedule => findAvailableSlots(daySchedule, timeSlotDuration, travelTimesToJob, travelTimesFromJob, newCaseAddress));
     const nestedSuggestions = await Promise.all(suggestionPromises);
-    const allSuggestions = nestedSuggestions.flat();
-    
+    let allSuggestions = nestedSuggestions.flat();
+
+    // Om flera tekniker: behåll bara tider där ALLA är lediga (intersection på start_time per dag)
+    if (staffToSearch.length > 1) {
+      const requiredCount = staffToSearch.length;
+      const grouped = allSuggestions.reduce((acc, s) => {
+        // Avrunda till närmaste 5-min för att matcha tider som är nästan identiska
+        const key = `${s.start_time.split('T')[0]}-${s.start_time}`;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(s);
+        return acc;
+      }, {} as Record<string, Suggestion[]>);
+
+      // Behåll bara slots där alla tekniker har ett förslag
+      allSuggestions = Object.values(grouped)
+        .filter(group => group.length >= requiredCount)
+        .map(group => ({
+          ...group[0],
+          // Kombinera teknikernamn och högsta restid för gruppen
+          technician_name: group.map(s => s.technician_name).join(', '),
+          travel_time_minutes: Math.max(...group.map(s => s.travel_time_minutes)),
+          efficiency_score: Math.round(group.reduce((sum, s) => sum + s.efficiency_score, 0) / group.length),
+        }));
+    }
+
     const sortedSuggestions = allSuggestions
       .sort((a, b) => {
         const dateA = new Date(a.start_time).setHours(0,0,0,0);

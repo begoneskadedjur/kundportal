@@ -46,6 +46,10 @@ interface TechnicianCase {
   parent_case_id?: string | null
   primary_assignee_id?: string | null
   primary_assignee_name?: string | null
+  secondary_assignee_id?: string | null
+  secondary_assignee_name?: string | null
+  tertiary_assignee_id?: string | null
+  tertiary_assignee_name?: string | null
 }
 
 interface RevisitHistoryEntry {
@@ -123,7 +127,13 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
     if (!selectedDate) return
 
     const address = formatAddress(caseData.adress)
-    if (!address || !caseData.primary_assignee_id) {
+    const technicianIds = [
+      caseData.primary_assignee_id,
+      caseData.secondary_assignee_id,
+      caseData.tertiary_assignee_id,
+    ].filter(Boolean) as string[]
+
+    if (!address || technicianIds.length === 0) {
       setNoSuggestionsReason(
         !address
           ? 'Ärendet saknar adress — kan inte hämta smarta förslag.'
@@ -146,7 +156,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
           pestType: caseData.skadedjur || '',
           timeSlotDuration: durationMinutes,
           searchStartDate: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`,
-          selectedTechnicianIds: [caseData.primary_assignee_id]
+          selectedTechnicianIds: technicianIds
         })
       })
 
@@ -253,12 +263,19 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                   <p className="text-slate-400 text-sm truncate">{formatAddress(caseData.adress)}</p>
                 )}
               </div>
-              {caseData.primary_assignee_name && (
-                <div className="flex items-center gap-1.5 text-sm text-slate-400 shrink-0">
-                  <User className="w-3.5 h-3.5" />
-                  {caseData.primary_assignee_name}
-                </div>
-              )}
+              {(() => {
+                const names = [
+                  caseData.primary_assignee_name,
+                  caseData.secondary_assignee_name,
+                  caseData.tertiary_assignee_name,
+                ].filter(Boolean)
+                return names.length > 0 ? (
+                  <div className="flex items-start gap-1.5 text-sm text-slate-400 shrink-0">
+                    <User className="w-3.5 h-3.5 mt-0.5" />
+                    <span>{names.join(', ')}</span>
+                  </div>
+                ) : null
+              })()}
             </div>
           </div>
 
