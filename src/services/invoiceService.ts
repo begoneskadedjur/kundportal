@@ -72,7 +72,8 @@ export class InvoiceService {
       address?: string
       organization_number?: string
       invoice_marking?: string
-    }
+    },
+    invoiceType: string = 'case'
   ): Promise<InvoiceWithItems> {
     // Hämta billing items för ärendet
     const allBillingItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
@@ -147,7 +148,8 @@ export class InvoiceService {
         due_date: calculateDueDate(paymentTermsDays),
         rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
         fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null,
-        invoice_marking: customerInfo.invoice_marking || null
+        invoice_marking: customerInfo.invoice_marking || null,
+        invoice_type: invoiceType
       })
       .select()
       .single()
@@ -278,6 +280,7 @@ export class InvoiceService {
       .eq('case_id', caseId)
       .eq('case_type', caseType)
       .neq('status', 'cancelled')
+      .neq('invoice_type', 'partial')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -605,23 +608,24 @@ export class InvoiceService {
     // Bara relevant för icke-skickade/betalda fakturor
     if (['sent', 'paid', 'cancelled'].includes(invoice.status)) return { stale: false }
 
-    // Hämta aktuella case_billing_items (bara fakturarader)
-    const allCaseItems = await CaseBillingService.getCaseBillingItems(
-      invoice.case_id,
-      invoice.case_type
-    )
-    const serviceItems2 = allCaseItems.filter(i => i.item_type === 'service')
-    const caseItems = serviceItems2.length > 0 ? serviceItems2 : allCaseItems.filter(i => i.item_type === 'article' || !i.item_type)
+    // Hämta case_billing_items kopplade till just denna faktura
+    const linkedItemIds = invoice.items
+      .filter(i => i.case_billing_item_id != null)
+      .map(i => i.case_billing_item_id!)
 
-    // Jämför antal (exkludera "Anpassat pris"-raden som har case_billing_item_id = null)
-    const invoiceLinkedItems = invoice.items.filter(i => i.case_billing_item_id != null).length
-    const countMismatch = caseItems.length !== invoiceLinkedItems
+    const { data: caseItemsData } = linkedItemIds.length > 0
+      ? await supabase.from('case_billing_items').select('*').in('id', linkedItemIds)
+      : { data: [] }
+    const caseItems = caseItemsData || []
+
+    // Jämför antal mot kopplade items
+    const countMismatch = caseItems.length !== linkedItemIds.length
 
     // Kolla om artiklar uppdaterats efter fakturaskapande
     // Lägg till 10 sekunders tolerans — vid auto-fakturering skapas fakturan
     // i samma flöde som ärendet uppdateras, så timestamps kan vara nästan identiska
     const invoiceCreatedMs = new Date(invoice.created_at).getTime() + 10000
-    const modifiedAfter = caseItems.some(item =>
+    const modifiedAfter = caseItems.some((item: any) =>
       new Date(item.updated_at).getTime() > invoiceCreatedMs
     )
 
@@ -654,10 +658,18 @@ export class InvoiceService {
       throw new Error('Kan inte uppdatera en skickad/betald/avbruten faktura')
     }
 
-    // Hämta aktuella billing items + custom price (bara fakturarader)
-    const allBillingItemsRegen = await CaseBillingService.getCaseBillingItems(invoice.case_id, invoice.case_type)
-    const serviceItemsRegen = allBillingItemsRegen.filter(i => i.item_type === 'service')
-    const billingItems = serviceItemsRegen.length > 0 ? serviceItemsRegen : allBillingItemsRegen.filter(i => i.item_type === 'article' || !i.item_type)
+    // Hämta billing items kopplade till just denna faktura (undviker att mixas med pending/andra fakturors items)
+    const linkedItemIds = invoice.items
+      .filter(i => i.case_billing_item_id != null)
+      .map(i => i.case_billing_item_id!)
+    if (linkedItemIds.length === 0) throw new Error('Inga fakturerbara tjänster på ärendet')
+
+    const { data: billingItemsData, error: billingFetchError } = await supabase
+      .from('case_billing_items')
+      .select('*, article:articles(*), service:services(*)')
+      .in('id', linkedItemIds)
+    if (billingFetchError) throw new Error(`Databasfel: ${billingFetchError.message}`)
+    const billingItems = billingItemsData || []
     if (billingItems.length === 0) throw new Error('Inga fakturerbara tjänster på ärendet')
 
     const customPrice = await CaseBillingService.getCustomPrice(invoice.case_id, invoice.case_type)

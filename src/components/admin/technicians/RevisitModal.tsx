@@ -265,7 +265,8 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
               address: formatAddress(caseData.adress),
               organization_number: billingCaseType === 'business' ? caseData.org_nr : caseData.personnummer,
               invoice_marking: caseData.markning_faktura,
-            }
+            },
+            'partial'
           )
           partialInvoiceNumber = invoice.invoice_number
 
