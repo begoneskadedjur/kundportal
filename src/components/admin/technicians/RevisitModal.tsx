@@ -239,8 +239,8 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
   const busySlots = slots.filter(s => s.hasConflict)
 
   const modalContent = (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex flex-col justify-end sm:justify-center sm:items-center sm:p-4">
+      <div className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-slate-900 border-t border-slate-700 sm:border sm:rounded-xl shadow-2xl rounded-t-2xl">
 
         {/* Header */}
         <div className="sticky top-0 z-10 bg-slate-900 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
@@ -491,5 +491,6 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
     </div>
   )
 
-  return createPortal(modalContent, document.body)
+  const portalRoot = document.getElementById('modal-root') || document.body
+  return createPortal(modalContent, portalRoot)
 }
