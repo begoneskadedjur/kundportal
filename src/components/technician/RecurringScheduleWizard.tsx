@@ -776,6 +776,22 @@ export function RecurringScheduleWizard({
                                         ))}
                                       </select>
                                     </div>
+                                    {(() => {
+                                      const ms = customConfig.active_months_start || 3
+                                      const me = customConfig.active_months_end || 11
+                                      const now = new Date()
+                                      const nowMonth = now.getMonth() + 1
+                                      const nowYear = now.getFullYear()
+                                      // Beräkna startår: nästa gång ms inträffar
+                                      const startYear = nowMonth > ms ? nowYear + 1 : nowYear
+                                      // Om säsongen spänner över ett årsskifte (t.ex. okt–feb), slutåret är ett år efter startåret
+                                      const endYear = ms > me ? startYear + 1 : startYear
+                                      return (
+                                        <p className="text-xs text-slate-400 mt-1">
+                                          Nästa säsong: {SWEDISH_MONTH_NAMES[ms - 1]} {startYear} – {SWEDISH_MONTH_NAMES[me - 1]} {endYear}
+                                        </p>
+                                      )
+                                    })()}
                                   </motion.div>
                                 )}
                               </AnimatePresence>
