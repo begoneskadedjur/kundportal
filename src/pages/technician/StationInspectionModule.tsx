@@ -2124,7 +2124,7 @@ export default function StationInspectionModule() {
                   >
                     Stäng
                   </button>
-                  {session?.status !== 'scheduled' && (
+                  {session?.status !== 'completed' && (
                     <Button
                       size="sm"
                       onClick={handleSaveInspection}
