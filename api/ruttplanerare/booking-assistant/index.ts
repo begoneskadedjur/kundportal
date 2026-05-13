@@ -139,8 +139,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const nestedSuggestions = await Promise.all(suggestionPromises);
     let allSuggestions = nestedSuggestions.flat();
 
-    // Om flera tekniker: behåll bara tider där ALLA är lediga (intersection på start_time per dag)
-    if (staffToSearch.length > 1) {
+    // Om specifika tekniker valdes (t.ex. RevisitModal): behåll bara tider där ALLA är lediga
+    // Vid öppen sökning (CreateCaseModal utan val) ska alla individuella förslag visas
+    const requireAllAvailable = selectedTechnicianIds?.length > 0;
+    if (requireAllAvailable && staffToSearch.length > 1) {
       const requiredCount = staffToSearch.length;
       const grouped = allSuggestions.reduce((acc, s) => {
         // Avrunda till närmaste 5-min för att matcha tider som är nästan identiska
