@@ -7,7 +7,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 import {
     TechnicianDaySchedule, Suggestion, EventSlot,
-    getCompetentStaff, getAllActiveStaff, getSchedules, getAbsences, getTravelTimes, getTravelTimesFrom,
+    getCompetentStaff, getAllActiveStaff, getSchedules, getAbsences, getTravelTimes,
     buildDailySchedules, calculateEfficiencyScore, TIMEZONE, DEFAULT_TRAVEL_TIME
 } from '../assistant-utils';
 
@@ -16,17 +16,21 @@ const SEARCH_DAYS_LIMIT = 7;
 const MAX_SUGGESTIONS_TOTAL = 20;
 const LATE_JOB_THRESHOLD_MINUTES = 90;
 
-async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDuration: number, travelTimes: Map<string, number>, travelTimesFromJob: Map<string, number>, newCaseAddress: string): Promise<Suggestion[]> {
+const SUGGESTION_STRIDE_MINUTES = 60;
+const MAX_SUGGESTIONS_PER_TECH_DAY_HIGH_SCORE = 5;
+const MAX_SUGGESTIONS_PER_TECH_DAY_LOW_SCORE = 2;
+const HIGH_SCORE_THRESHOLD = 80;
+
+async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDuration: number, travelTimes: Map<string, number>, newCaseAddress: string): Promise<Suggestion[]> {
   const suggestions: Suggestion[] = [];
   const lastPossibleStartForJob = subMinutes(daySchedule.workEnd, timeSlotDuration);
   const virtualStartEvent: EventSlot = { start: subMinutes(daySchedule.workStart, 1), end: daySchedule.workStart, type: 'case', title: 'Hemadress', address: daySchedule.technician.address };
-  const allEvents = [ virtualStartEvent, ...daySchedule.existingCases, ...daySchedule.absences.map(a => ({ start: a.start, end: a.end, type: 'absence' as const, title: 'Frånvaro' })) ].sort((a, b) => a.start.getTime() - b.start.getTime());
-  
-  // Kontrollera om detta är dagens datum och sätt minimum starttid
+  const allEvents: EventSlot[] = [ virtualStartEvent, ...daySchedule.existingCases, ...daySchedule.absences.map(a => ({ start: a.start, end: a.end, type: 'absence' as const, title: 'Frånvaro' })) ].sort((a, b) => a.start.getTime() - b.start.getTime());
+
   const now = new Date();
   const isToday = daySchedule.date.toDateString() === now.toDateString();
-  const minStartTimeToday = isToday ? addMinutes(now, 15) : null; // 15 min buffert för förberedelse
-  
+  const minStartTimeToday = isToday ? addMinutes(now, 15) : null;
+
   for (let i = 0; i < allEvents.length; i++) {
     const currentEvent = allEvents[i]; const nextEvent = allEvents[i + 1];
     const gapStart = currentEvent.end; const gapEnd = nextEvent ? nextEvent.start : daySchedule.workEnd;
@@ -34,15 +38,11 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
 
     const travelTime = travelTimes.get(currentEvent.address || daySchedule.technician.address) || DEFAULT_TRAVEL_TIME;
     const isFirstJob = (currentEvent.title === 'Hemadress');
-    
-    // Justera starttid för att respektera aktuell tid för dagens datum
+    const isLastGap = !nextEvent;
+
     let baseStartTime = isFirstJob ? daySchedule.workStart : max([addMinutes(gapStart, travelTime), daySchedule.workStart]);
     let currentTry = minStartTimeToday ? max([baseStartTime, minStartTimeToday]) : baseStartTime;
-    
-    const isLastGap = !nextEvent;
-    // Restid från nya kunden till nästa befintliga ärendes adress — måste hinnas med
-    const travelTimeToNext = isLastGap ? 0 : (travelTimesFromJob.get(nextEvent!.address || daySchedule.technician.address) ?? DEFAULT_TRAVEL_TIME);
-    const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration + travelTimeToNext), lastPossibleStartForJob]);
+    const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration), lastPossibleStartForJob]);
 
     while (currentTry <= absoluteLatestStart) {
       const slotEnd = addMinutes(currentTry, timeSlotDuration);
@@ -54,7 +54,7 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
           const homeTravelTimes = await getTravelTimes([newCaseAddress], daySchedule.technician.address);
           travelTimeHome = homeTravelTimes.get(newCaseAddress);
       }
-      
+
       const arrivalTimeStr = formatInTimeZone(currentTry, TIMEZONE, 'HH:mm');
       if (isFirstJob) {
           originDescription = `Från hemadress (Ankomst beräknad kl. ${arrivalTimeStr})`;
@@ -66,26 +66,22 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
       if (travelTimeHome !== undefined) {
           originDescription += ` Sista jobbet för dagen (Beräknad hemresa: ${travelTimeHome} min).`;
       }
-      
+
       const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
       const usedDuration = timeSlotDuration + (isFirstJob ? 0 : travelTime);
       const gapUtilization = gapDuration > 0 ? Math.min(1, usedDuration / gapDuration) : 1;
-      
+
       suggestions.push({
         technician_id: daySchedule.technician.id, technician_name: daySchedule.technician.name,
         start_time: currentTry.toISOString(), end_time: slotEnd.toISOString(),
         travel_time_minutes: travelTime, origin_description: originDescription,
         efficiency_score: calculateEfficiencyScore(travelTime, isFirstJob, gapUtilization, travelTimeHome),
         is_first_job: isFirstJob, travel_time_home_minutes: travelTimeHome,
-        // Strukturerad origin-data för förbättrad UX
         origin_address: currentEvent.address || daySchedule.technician.address,
         origin_case_title: isFirstJob ? undefined : (currentEvent.title || undefined),
         origin_end_time: isFirstJob ? undefined : currentEvent.end.toISOString()
       });
-      // Ett naturligt förslag per gap — det tidigast möjliga.
-      // Hemstart = alltid workStart (teknikern ska inte sitta hemma halva dagen).
-      // Efter föregående ärende = gapStart + restid (inga konstgjorda stride-varianter).
-      break;
+      currentTry = addMinutes(currentTry, SUGGESTION_STRIDE_MINUTES);
     }
   }
   return suggestions;
@@ -127,44 +123,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const allAddresses = new Set<string>(staffToSearch.map(s => s.address).filter(Boolean));
     schedules.forEach(cases => cases.forEach(c => { if (c.address) allAddresses.add(c.address); }));
 
-    const [travelTimesToJob, travelTimesFromJob] = await Promise.all([
-      getTravelTimes(Array.from(allAddresses), newCaseAddress),
-      getTravelTimesFrom(newCaseAddress, Array.from(allAddresses))
-    ]);
-    
-    // Använder den nu korrigerade buildDailySchedules-funktionen
+    const travelTimesToJob = await getTravelTimes(Array.from(allAddresses), newCaseAddress);
+
     const dailySchedules = buildDailySchedules(staffToSearch, schedules, absences, searchStart, searchEnd);
 
-    const suggestionPromises = dailySchedules.map(daySchedule => findAvailableSlots(daySchedule, timeSlotDuration, travelTimesToJob, travelTimesFromJob, newCaseAddress));
+    const suggestionPromises = dailySchedules.map(daySchedule => findAvailableSlots(daySchedule, timeSlotDuration, travelTimesToJob, newCaseAddress));
     const nestedSuggestions = await Promise.all(suggestionPromises);
     let allSuggestions = nestedSuggestions.flat();
 
-    // Om specifika tekniker valdes (t.ex. RevisitModal): behåll bara tider där ALLA är lediga
-    // Vid öppen sökning (CreateCaseModal utan val) ska alla individuella förslag visas
+    // Om specifika tekniker valdes (t.ex. RevisitModal): behåll bara tider där ALLA är lediga samma tid
+    // Vid öppen sökning (CreateCaseModal utan specificerade tekniker) visas alla individuella förslag
     const requireAllAvailable = selectedTechnicianIds?.length > 0;
     if (requireAllAvailable && staffToSearch.length > 1) {
       const requiredCount = staffToSearch.length;
       const grouped = allSuggestions.reduce((acc, s) => {
-        // Avrunda till närmaste 5-min för att matcha tider som är nästan identiska
         const key = `${s.start_time.split('T')[0]}-${s.start_time}`;
         if (!acc[key]) acc[key] = [];
         acc[key].push(s);
         return acc;
       }, {} as Record<string, Suggestion[]>);
 
-      // Behåll bara slots där alla tekniker har ett förslag
       allSuggestions = Object.values(grouped)
         .filter(group => group.length >= requiredCount)
         .map(group => ({
           ...group[0],
-          // Kombinera teknikernamn och högsta restid för gruppen
           technician_name: group.map(s => s.technician_name).join(', '),
           travel_time_minutes: Math.max(...group.map(s => s.travel_time_minutes)),
           efficiency_score: Math.round(group.reduce((sum, s) => sum + s.efficiency_score, 0) / group.length),
         }));
     }
 
-    const sortedSuggestions = allSuggestions
+    const groupedByDayAndTech = allSuggestions.reduce((acc, sugg) => {
+      const day = sugg.start_time.split('T')[0];
+      const key = `${day}-${sugg.technician_id}`;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(sugg);
+      return acc;
+    }, {} as Record<string, Suggestion[]>);
+
+    let balancedSuggestions: Suggestion[] = [];
+    for (const key in groupedByDayAndTech) {
+      const group = groupedByDayAndTech[key].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+      const score = group[0].efficiency_score;
+      const limit = score >= HIGH_SCORE_THRESHOLD ? MAX_SUGGESTIONS_PER_TECH_DAY_HIGH_SCORE : MAX_SUGGESTIONS_PER_TECH_DAY_LOW_SCORE;
+      balancedSuggestions.push(...group.slice(0, limit));
+    }
+
+    const sortedSuggestions = balancedSuggestions
       .sort((a, b) => {
         const dateA = new Date(a.start_time).setHours(0,0,0,0);
         const dateB = new Date(b.start_time).setHours(0,0,0,0);
