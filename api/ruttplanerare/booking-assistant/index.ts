@@ -8,7 +8,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import {
     TechnicianDaySchedule, Suggestion, EventSlot,
     getCompetentStaff, getAllActiveStaff, getSchedules, getAbsences, getTravelTimes,
-    buildDailySchedules, calculateEfficiencyScore, TIMEZONE, DEFAULT_TRAVEL_TIME
+    buildDailySchedules, calculateEfficiencyScore, formatAddress, TIMEZONE, DEFAULT_TRAVEL_TIME
 } from '../assistant-utils';
 
 // --- Konfiguration (specifik för denna fil) ---
@@ -36,7 +36,7 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
     const gapStart = currentEvent.end; const gapEnd = nextEvent ? nextEvent.start : daySchedule.workEnd;
     if (gapEnd <= gapStart) continue;
 
-    const travelTime = travelTimes.get(currentEvent.address || daySchedule.technician.address) || DEFAULT_TRAVEL_TIME;
+    const travelTime = travelTimes.get(formatAddress(currentEvent.address || daySchedule.technician.address)) || DEFAULT_TRAVEL_TIME;
     const isFirstJob = (currentEvent.title === 'Hemadress');
     const isLastGap = !nextEvent;
 
@@ -120,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     console.log(`[booking-assistant] TOTALT: ${totalCasesFound} ärenden hittade för perioden`);
 
-    const allAddresses = new Set<string>(staffToSearch.map(s => s.address).filter(Boolean));
+    const allAddresses = new Set<string>(staffToSearch.map(s => formatAddress(s.address)).filter(Boolean));
     schedules.forEach(cases => cases.forEach(c => { if (c.address) allAddresses.add(c.address); }));
 
     const travelTimesToJob = await getTravelTimes(Array.from(allAddresses), newCaseAddress);
