@@ -199,6 +199,7 @@ export default function StationInspectionModule() {
     preparationId: string | null
     preparationName: string | null
     hasPhoto: boolean
+    photoPreview: string | null
     timestamp: string
   }>>({})
 
@@ -600,14 +601,15 @@ export default function StationInspectionModule() {
       setInspectionNotes(existing.findings || '')
       setMeasurementValue(existing.measurementValue !== null ? String(existing.measurementValue) : '')
       setSelectedPreparationId(existing.preparationId)
+      setPhotoPreview(existing.photoPreview || null)
     } else {
       setSelectedStatus('ok')
       setInspectionNotes('')
       setMeasurementValue('')
       setSelectedPreparationId(null)
+      setPhotoPreview(null)
     }
     setPhotoFile(null)
-    setPhotoPreview(null)
     setShowHistory(true) // Visa historik inline automatiskt
     setStationHistory([])
     setHistoryLoading(true)
@@ -1011,6 +1013,7 @@ export default function StationInspectionModule() {
           preparationId: selectedPreparationId,
           preparationName: selectedPrep?.name || null,
           hasPhoto: !!photoPath,
+          photoPreview: photoPreview || null,
           timestamp: new Date().toISOString()
         }
       }))

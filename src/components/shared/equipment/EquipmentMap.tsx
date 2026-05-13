@@ -73,6 +73,7 @@ export function EquipmentMap({
   const previewMarkerRef = useRef<google.maps.Marker | null>(null)
   const previewCircleRef = useRef<google.maps.Circle | null>(null)
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
+  const pulseOverlayRef = useRef<google.maps.OverlayView | null>(null)
 
   // State
   const [selectedEquipmentData, setSelectedEquipmentData] = useState<EquipmentPlacementWithRelations | null>(null)
@@ -350,6 +351,56 @@ export function EquipmentMap({
       }
     }
   }, [highlightedStationId, equipment])
+
+  // Puls-overlay för highlighted station i wizard-läge
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current) return
+
+    if (pulseOverlayRef.current) {
+      pulseOverlayRef.current.setMap(null)
+      pulseOverlayRef.current = null
+    }
+
+    if (!highlightedStationId) return
+
+    const station = equipment.find(e => e.id === highlightedStationId)
+    if (!station) return
+
+    const overlay = new google.maps.OverlayView()
+    overlay.onAdd = function() {
+      const div = document.createElement('div')
+      div.style.cssText = [
+        'position:absolute',
+        'width:36px',
+        'height:36px',
+        'margin-left:-18px',
+        'margin-top:-18px',
+        'border-radius:50%',
+        'border:3px solid #3b82f6',
+        'animation:equipment-pulse-highlight 1.2s ease-in-out infinite',
+        'pointer-events:none',
+      ].join(';')
+      this.getPanes()!.overlayLayer.appendChild(div)
+      ;(this as any)._div = div
+    }
+    overlay.draw = function() {
+      const proj = this.getProjection()
+      if (!proj) return
+      const pos = proj.fromLatLngToDivPixel(
+        new google.maps.LatLng(station.latitude, station.longitude)
+      )
+      if (!pos) return
+      const div = (this as any)._div as HTMLElement
+      div.style.left = pos.x + 'px'
+      div.style.top = pos.y + 'px'
+    }
+    overlay.onRemove = function() {
+      const div = (this as any)._div as HTMLElement
+      div.parentNode?.removeChild(div)
+    }
+    overlay.setMap(mapRef.current)
+    pulseOverlayRef.current = overlay
+  }, [highlightedStationId, equipment, isLoaded])
 
   // Preview-markör och GPS-cirkel
   useEffect(() => {
