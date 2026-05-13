@@ -52,7 +52,7 @@ export default function CaseSummaryCard({ technicianId }: Props) {
 
   const fetchCounts = async () => {
     try {
-      const selectFields = 'id, status, created_date'
+      const selectFields = 'id, status, created_at'
 
       const [privRes, bizRes] = await Promise.allSettled([
         supabase.from('private_cases').select(selectFields)
@@ -85,8 +85,8 @@ export default function CaseSummaryCard({ technicianId }: Props) {
           groups[wf]++
         }
         // Count stale cases (>30 days old)
-        if (c.created_date) {
-          const age = Math.floor((now - new Date(c.created_date).getTime()) / (1000 * 60 * 60 * 24))
+        if (c.created_at) {
+          const age = Math.floor((now - new Date(c.created_at).getTime()) / (1000 * 60 * 60 * 24))
           if (age > STALE_THRESHOLD_DAYS) stale++
         }
       }

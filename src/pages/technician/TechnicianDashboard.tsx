@@ -126,7 +126,7 @@ export default function TechnicianDashboard() {
         .from('leads')
         .select('id, status, follow_up_date')
         .eq('assigned_to', technicianId)
-        .in('status', ['new', 'contacted', 'meeting_booked', 'offer_sent', 'negotiation'])
+        .in('status', ['blue_cold', 'yellow_warm', 'orange_hot', 'green_deal'])
 
       if (leads) {
         const followupsToday = leads.filter(l => l.follow_up_date && l.follow_up_date.slice(0, 10) === today).length
