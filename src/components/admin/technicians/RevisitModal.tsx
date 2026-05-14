@@ -13,12 +13,13 @@ import {
   User,
   AlertCircle,
   Loader2,
-  Receipt
+  Receipt,
+  PenLine
 } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
-import { format } from 'date-fns'
+import { format, addMinutes } from 'date-fns'
 import Button from '../../ui/Button'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -96,15 +97,33 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [loadingSlots, setLoadingSlots] = useState(false)
 
+  // Alla tekniker på ärendet
+  const allTechnicianIds = [
+    caseData.primary_assignee_id,
+    caseData.secondary_assignee_id,
+    caseData.tertiary_assignee_id,
+  ].filter(Boolean) as string[]
+
+  const allTechnicianNames: { id: string; name: string }[] = [
+    caseData.primary_assignee_id && caseData.primary_assignee_name ? { id: caseData.primary_assignee_id, name: caseData.primary_assignee_name } : null,
+    caseData.secondary_assignee_id && caseData.secondary_assignee_name ? { id: caseData.secondary_assignee_id, name: caseData.secondary_assignee_name } : null,
+    caseData.tertiary_assignee_id && caseData.tertiary_assignee_name ? { id: caseData.tertiary_assignee_id, name: caseData.tertiary_assignee_name } : null,
+  ].filter(Boolean) as { id: string; name: string }[]
+
   // Steg 1: välj datum
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [durationMinutes, setDurationMinutes] = useState(60)
+  const [selectedTechIds, setSelectedTechIds] = useState<string[]>(allTechnicianIds)
 
   // Steg 2: smarta förslag
   const [suggestions, setSuggestions] = useState<SingleSuggestion[]>([])
   const [selectedSuggestion, setSelectedSuggestion] = useState<SingleSuggestion | null>(null)
   const [step, setStep] = useState<1 | 2>(1)
   const [noSuggestionsReason, setNoSuggestionsReason] = useState<string | null>(null)
+
+  // Manuell tid
+  const [manualMode, setManualMode] = useState(false)
+  const [manualStart, setManualStart] = useState<Date | null>(null)
 
   // Anteckning
   const [revisitNote, setRevisitNote] = useState('')
@@ -160,17 +179,12 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
     if (!selectedDate) return
 
     const address = formatAddress(caseData.adress)
-    const technicianIds = [
-      caseData.primary_assignee_id,
-      caseData.secondary_assignee_id,
-      caseData.tertiary_assignee_id,
-    ].filter(Boolean) as string[]
 
-    if (!address || technicianIds.length === 0) {
+    if (!address || selectedTechIds.length === 0) {
       setNoSuggestionsReason(
         !address
           ? 'Ärendet saknar adress — kan inte hämta smarta förslag.'
-          : 'Ingen tekniker kopplad — kan inte hämta schemaförslag.'
+          : 'Ingen tekniker vald — välj minst en tekniker.'
       )
       setSuggestions([])
       setSelectedSuggestion(null)
@@ -181,7 +195,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
     setLoadingSlots(true)
     setNoSuggestionsReason(null)
     try {
-      const response = await fetch('/api/ruttplanerare/booking-assistant', {
+      const response = await fetch('/api/ruttplanerare/revisit-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,7 +203,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
           pestType: caseData.skadedjur || '',
           timeSlotDuration: durationMinutes,
           searchStartDate: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`,
-          selectedTechnicianIds: technicianIds
+          selectedTechnicianIds: selectedTechIds
         })
       })
 
@@ -401,48 +415,151 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
             </div>
           </div>
 
-          {/* STEG 1: Datum + längd */}
+          {/* STEG 1: Datum + längd + tekniker */}
           {step === 1 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Datum för återbesök *</label>
-                <DatePicker
-                  selected={selectedDate}
-                  onChange={(date) => setSelectedDate(date)}
-                  dateFormat="EEEE d MMM yyyy"
-                  locale="sv"
-                  minDate={new Date()}
-                  filterDate={(date) => date.getDay() !== 0 && date.getDay() !== 6}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
-                  placeholderText="Välj datum"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Besökslängd</label>
-                <div className="flex gap-2 flex-wrap">
-                  {[30, 60, 90, 120].map(min => (
-                    <button
-                      key={min}
-                      type="button"
-                      onClick={() => setDurationMinutes(min)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        durationMinutes === min
-                          ? 'bg-teal-500 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                    >
-                      {min < 60 ? `${min} min` : `${min / 60} tim`}
-                    </button>
-                  ))}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Datum för återbesök *</label>
+                  <DatePicker
+                    selected={selectedDate}
+                    onChange={(date) => setSelectedDate(date)}
+                    dateFormat="EEEE d MMM yyyy"
+                    locale="sv"
+                    minDate={new Date()}
+                    filterDate={(date) => date.getDay() !== 0 && date.getDay() !== 6}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+                    placeholderText="Välj datum"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Besökslängd</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {[30, 60, 90, 120].map(min => (
+                      <button
+                        key={min}
+                        type="button"
+                        onClick={() => setDurationMinutes(min)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          durationMinutes === min
+                            ? 'bg-teal-500 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        {min < 60 ? `${min} min` : `${min / 60} tim`}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+
+              {/* Tekniker-väljare (bara om ärendet har > 1 tekniker) */}
+              {allTechnicianNames.length > 1 && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Tekniker för återbesök</label>
+                  <div className="space-y-2">
+                    {allTechnicianNames.map(tech => (
+                      <label key={tech.id} className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={selectedTechIds.includes(tech.id)}
+                          onChange={() => {
+                            setSelectedTechIds(prev =>
+                              prev.includes(tech.id)
+                                ? prev.filter(id => id !== tech.id)
+                                : [...prev, tech.id]
+                            )
+                          }}
+                          className="w-4 h-4 rounded border-slate-600 text-[#20c58f] focus:ring-[#20c58f] bg-slate-800"
+                        />
+                        <span className="text-sm text-slate-300 flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-slate-500" />
+                          {tech.name}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedTechIds.length > 1 && (
+                    <p className="text-xs text-slate-500 mt-2">Visar tider där alla valda tekniker är lediga samtidigt.</p>
+                  )}
+                  {selectedTechIds.length === 0 && (
+                    <p className="text-xs text-amber-400 mt-2">Välj minst en tekniker.</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           {/* STEG 2: Smarta förslag */}
           {step === 2 && (
             <div className="space-y-3">
-              {loadingSlots ? (
+              {/* Toggle: smarta förslag / manuell tid */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setManualMode(false); setManualStart(null); setSelectedSuggestion(null) }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    !manualMode ? 'bg-teal-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  Smarta förslag
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setManualMode(true); setSelectedSuggestion(null) }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    manualMode ? 'bg-teal-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  <PenLine className="w-3.5 h-3.5" />
+                  Ange tid manuellt
+                </button>
+              </div>
+
+              {manualMode ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Välj starttid *</label>
+                    <DatePicker
+                      selected={manualStart}
+                      onChange={(date) => {
+                        setManualStart(date)
+                        if (date) {
+                          const techName = selectedTechIds.length === 1
+                            ? (allTechnicianNames.find(t => t.id === selectedTechIds[0])?.name || 'Tekniker')
+                            : selectedTechIds.map(id => allTechnicianNames.find(t => t.id === id)?.name || id).join(', ')
+                          setSelectedSuggestion({
+                            technician_id: selectedTechIds[0] || '',
+                            technician_name: techName,
+                            start_time: date.toISOString(),
+                            end_time: addMinutes(date, durationMinutes).toISOString(),
+                            travel_time_minutes: 0,
+                            efficiency_score: 0,
+                            origin_description: 'Manuellt inlagd tid',
+                            is_first_job: false,
+                          })
+                        } else {
+                          setSelectedSuggestion(null)
+                        }
+                      }}
+                      showTimeSelect
+                      timeIntervals={15}
+                      dateFormat="EEEE d MMM yyyy HH:mm"
+                      locale="sv"
+                      minDate={new Date()}
+                      filterDate={(date) => date.getDay() !== 0 && date.getDay() !== 6}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+                      placeholderText="Välj datum och tid"
+                    />
+                  </div>
+                  {manualStart && (
+                    <div className="bg-teal-500/10 border border-teal-500/30 rounded-lg p-3 text-sm text-teal-300">
+                      Vald tid: {format(manualStart, 'EEEE d MMM HH:mm', { locale: sv })} – {format(addMinutes(manualStart, durationMinutes), 'HH:mm', { locale: sv })}
+                    </div>
+                  )}
+                </div>
+              ) : loadingSlots ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
                   <Loader2 className="w-7 h-7 text-teal-400 animate-spin" />
                   <p className="text-sm text-slate-400">Hämtar schemaförslag...</p>
@@ -451,6 +568,13 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                 <div className="text-center py-8 text-slate-400">
                   <AlertCircle className="w-8 h-8 mx-auto mb-2 text-amber-400" />
                   <p>{noSuggestionsReason}</p>
+                  <button
+                    type="button"
+                    onClick={() => setManualMode(true)}
+                    className="mt-3 text-sm text-teal-400 hover:text-teal-300 underline"
+                  >
+                    Ange tid manuellt istället
+                  </button>
                 </div>
               ) : (
                 <BookingSuggestionList
@@ -459,7 +583,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                 />
               )}
 
-              {selectedSuggestion && (
+              {!manualMode && selectedSuggestion && (
                 <div className="bg-teal-500/10 border border-teal-500/30 rounded-lg p-3 text-sm text-teal-300">
                   Vald tid: {format(new Date(selectedSuggestion.start_time), 'EEEE d MMM HH:mm', { locale: sv })} – {format(new Date(selectedSuggestion.end_time), 'HH:mm', { locale: sv })}
                 </div>
@@ -570,7 +694,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
             {step === 2 && (
               <button
                 type="button"
-                onClick={() => { setStep(1); setSelectedSuggestion(null); setSuggestions([]) }}
+                onClick={() => { setStep(1); setSelectedSuggestion(null); setSuggestions([]); setManualMode(false); setManualStart(null) }}
                 className="text-sm text-slate-400 hover:text-white transition-colors"
               >
                 ← Byt datum
