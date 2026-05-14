@@ -2,7 +2,7 @@
 // ⭐ VERSION 2.0 - Top Picks-sortering och strukturerad origin-data ⭐
 
 import React, { useState } from 'react';
-import { Clock, MapPin, Home, Star, TrendingUp, ChevronDown, ChevronUp, Route, User } from 'lucide-react';
+import { Clock, MapPin, Home, Star, TrendingUp, ChevronDown, ChevronUp, Route, User, CheckCircle2 } from 'lucide-react';
 
 // --- Typer ---
 export interface SingleSuggestion {
@@ -83,6 +83,7 @@ interface BookingSuggestionCardProps {
   isTopPick?: boolean;
   rank?: number;
   isAccountManager?: boolean;
+  isSelected?: boolean;
 }
 
 export default function BookingSuggestionCard({
@@ -90,7 +91,8 @@ export default function BookingSuggestionCard({
   onClick,
   isTopPick = false,
   rank,
-  isAccountManager = false
+  isAccountManager = false,
+  isSelected = false
 }: BookingSuggestionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -104,9 +106,9 @@ export default function BookingSuggestionCard({
     <div
       className={`
         relative p-3 rounded-lg cursor-pointer transition-all duration-200
-        ${efficiencyInfo.bgColor} ${efficiencyInfo.borderColor} border
+        ${isSelected ? 'bg-teal-500/10 border-teal-400' : `${efficiencyInfo.bgColor} ${efficiencyInfo.borderColor}`} border
         hover:shadow-lg hover:shadow-slate-900/30 hover:scale-[1.01]
-        ${isTopPick ? 'ring-2 ring-emerald-500/50' : ''}
+        ${isSelected ? 'ring-2 ring-teal-400' : isTopPick ? 'ring-2 ring-emerald-500/50' : ''}
       `}
       onClick={onClick}
     >
@@ -121,8 +123,11 @@ export default function BookingSuggestionCard({
       {/* Header: Tekniker + Effektivitet */}
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
+          {/* Vald-indikator */}
+          {isSelected && <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0" />}
+
           {/* Rang-indikator */}
-          {rank && rank <= 3 && (
+          {!isSelected && rank && rank <= 3 && (
             <div className={`
               w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0
               ${rank === 1 ? 'bg-emerald-500/20 text-emerald-400' :
@@ -278,9 +283,10 @@ interface BookingSuggestionListProps {
   suggestions: SingleSuggestion[];
   onSelect: (suggestion: SingleSuggestion) => void;
   accountManagerTechId?: string | null;
+  selectedSuggestionId?: string | null;
 }
 
-export function BookingSuggestionList({ suggestions, onSelect, accountManagerTechId }: BookingSuggestionListProps) {
+export function BookingSuggestionList({ suggestions, onSelect, accountManagerTechId, selectedSuggestionId }: BookingSuggestionListProps) {
   // Sortera alla förslag efter effektivitet (bäst först)
   const sortedByEfficiency = React.useMemo(() =>
     [...suggestions].sort((a, b) => b.efficiency_score - a.efficiency_score),
@@ -365,6 +371,7 @@ export function BookingSuggestionList({ suggestions, onSelect, accountManagerTec
               isTopPick={index === 0}
               rank={index + 1}
               isAccountManager={!!accountManagerTechId && sugg.technician_id === accountManagerTechId}
+              isSelected={selectedSuggestionId === `${sugg.technician_id}-${sugg.start_time}`}
             />
           ))}
         </div>
@@ -400,6 +407,7 @@ export function BookingSuggestionList({ suggestions, onSelect, accountManagerTec
                     suggestion={sugg}
                     onClick={() => onSelect(sugg)}
                     isAccountManager={!!accountManagerTechId && sugg.technician_id === accountManagerTechId}
+                    isSelected={selectedSuggestionId === `${sugg.technician_id}-${sugg.start_time}`}
                   />
                 ))}
               </div>

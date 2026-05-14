@@ -42,8 +42,11 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
     let baseStartTime = isFirstJob ? daySchedule.workStart : max([addMinutes(gapStart, travelTime), daySchedule.workStart]);
     let currentTry = minStartTimeToday ? max([baseStartTime, minStartTimeToday]) : baseStartTime;
 
-    const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration), lastPossibleStartForJob]);
     const isLastGap = !nextEvent;
+    const travelToNext = (!isLastGap && nextEvent)
+      ? (travelTimes.get(nextEvent.address || daySchedule.technician.address) || DEFAULT_TRAVEL_TIME)
+      : 0;
+    const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration + travelToNext), lastPossibleStartForJob]);
 
     while (currentTry <= absoluteLatestStart) {
       const slotEnd = addMinutes(currentTry, timeSlotDuration);

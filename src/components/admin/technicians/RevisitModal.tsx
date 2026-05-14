@@ -581,6 +581,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                 <BookingSuggestionList
                   suggestions={suggestions}
                   onSelect={(s) => setSelectedSuggestion(s)}
+                  selectedSuggestionId={selectedSuggestion ? `${selectedSuggestion.technician_id}-${selectedSuggestion.start_time}` : null}
                 />
               )}
 
