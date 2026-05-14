@@ -48,44 +48,68 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
       : 0;
     const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration + travelToNext), lastPossibleStartForJob]);
 
-    while (currentTry <= absoluteLatestStart) {
-      const slotEnd = addMinutes(currentTry, timeSlotDuration);
-      let travelTimeHome: number | undefined = undefined;
-      let originDescription = '';
-      const isLateJob = slotEnd >= subMinutes(daySchedule.workEnd, LATE_JOB_THRESHOLD_MINUTES);
-
-      if (isLastGap && isLateJob) {
+    if (isFirstJob) {
+      // Hemstart: bara ett förslag vid workStart — teknikern åker hemifrån innan arbetsdagen börjar
+      const slotStart = minStartTimeToday ? max([daySchedule.workStart, minStartTimeToday]) : daySchedule.workStart;
+      if (slotStart <= absoluteLatestStart) {
+        const slotEnd = addMinutes(slotStart, timeSlotDuration);
+        let travelTimeHome: number | undefined = undefined;
+        const isLateJob = slotEnd >= subMinutes(daySchedule.workEnd, LATE_JOB_THRESHOLD_MINUTES);
+        if (isLastGap && isLateJob) {
           const homeTravelTimes = await getTravelTimes([newCaseAddress], daySchedule.technician.address);
           travelTimeHome = homeTravelTimes.get(newCaseAddress);
+        }
+        const arrivalTimeStr = formatInTimeZone(slotStart, TIMEZONE, 'HH:mm');
+        const originDescription = `Från hemadress (Ankomst beräknad kl. ${arrivalTimeStr})` +
+          (travelTimeHome !== undefined ? ` Sista jobbet för dagen (Beräknad hemresa: ${travelTimeHome} min).` : '');
+        const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
+        const gapUtilization = gapDuration > 0 ? Math.min(1, timeSlotDuration / gapDuration) : 1;
+        suggestions.push({
+          technician_id: daySchedule.technician.id, technician_name: daySchedule.technician.name,
+          start_time: slotStart.toISOString(), end_time: slotEnd.toISOString(),
+          travel_time_minutes: travelTime, origin_description: originDescription,
+          efficiency_score: calculateEfficiencyScore(travelTime, true, gapUtilization, travelTimeHome),
+          is_first_job: true, travel_time_home_minutes: travelTimeHome,
+          origin_address: daySchedule.technician.address,
+          origin_case_title: undefined, origin_end_time: undefined
+        });
       }
+    } else {
+      while (currentTry <= absoluteLatestStart) {
+        const slotEnd = addMinutes(currentTry, timeSlotDuration);
+        let travelTimeHome: number | undefined = undefined;
+        let originDescription = '';
+        const isLateJob = slotEnd >= subMinutes(daySchedule.workEnd, LATE_JOB_THRESHOLD_MINUTES);
 
-      const arrivalTimeStr = formatInTimeZone(currentTry, TIMEZONE, 'HH:mm');
-      if (isFirstJob) {
-          originDescription = `Från hemadress (Ankomst beräknad kl. ${arrivalTimeStr})`;
-      } else {
-          const prevEndTimeStr = formatInTimeZone(currentEvent.end, TIMEZONE, 'HH:mm');
-          const prevEventTitle = currentEvent.title ? `"${currentEvent.title.substring(0, 20)}..."` : "föregående ärende";
-          originDescription = `Efter ${prevEventTitle} (slutar ${prevEndTimeStr}). Ankomst beräknad kl. ${arrivalTimeStr} (+${travelTime} min restid).`;
+        if (isLastGap && isLateJob) {
+            const homeTravelTimes = await getTravelTimes([newCaseAddress], daySchedule.technician.address);
+            travelTimeHome = homeTravelTimes.get(newCaseAddress);
+        }
+
+        const arrivalTimeStr = formatInTimeZone(currentTry, TIMEZONE, 'HH:mm');
+        const prevEndTimeStr = formatInTimeZone(currentEvent.end, TIMEZONE, 'HH:mm');
+        const prevEventTitle = currentEvent.title ? `"${currentEvent.title.substring(0, 20)}..."` : "föregående ärende";
+        originDescription = `Efter ${prevEventTitle} (slutar ${prevEndTimeStr}). Ankomst beräknad kl. ${arrivalTimeStr} (+${travelTime} min restid).`;
+        if (travelTimeHome !== undefined) {
+            originDescription += ` Sista jobbet för dagen (Beräknad hemresa: ${travelTimeHome} min).`;
+        }
+
+        const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
+        const usedDuration = timeSlotDuration + travelTime;
+        const gapUtilization = gapDuration > 0 ? Math.min(1, usedDuration / gapDuration) : 1;
+
+        suggestions.push({
+          technician_id: daySchedule.technician.id, technician_name: daySchedule.technician.name,
+          start_time: currentTry.toISOString(), end_time: slotEnd.toISOString(),
+          travel_time_minutes: travelTime, origin_description: originDescription,
+          efficiency_score: calculateEfficiencyScore(travelTime, false, gapUtilization, travelTimeHome),
+          is_first_job: false, travel_time_home_minutes: travelTimeHome,
+          origin_address: currentEvent.address || daySchedule.technician.address,
+          origin_case_title: currentEvent.title || undefined,
+          origin_end_time: currentEvent.end.toISOString()
+        });
+        currentTry = addMinutes(currentTry, SUGGESTION_STRIDE_MINUTES);
       }
-      if (travelTimeHome !== undefined) {
-          originDescription += ` Sista jobbet för dagen (Beräknad hemresa: ${travelTimeHome} min).`;
-      }
-
-      const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
-      const usedDuration = timeSlotDuration + (isFirstJob ? 0 : travelTime);
-      const gapUtilization = gapDuration > 0 ? Math.min(1, usedDuration / gapDuration) : 1;
-
-      suggestions.push({
-        technician_id: daySchedule.technician.id, technician_name: daySchedule.technician.name,
-        start_time: currentTry.toISOString(), end_time: slotEnd.toISOString(),
-        travel_time_minutes: travelTime, origin_description: originDescription,
-        efficiency_score: calculateEfficiencyScore(travelTime, isFirstJob, gapUtilization, travelTimeHome),
-        is_first_job: isFirstJob, travel_time_home_minutes: travelTimeHome,
-        origin_address: currentEvent.address || daySchedule.technician.address,
-        origin_case_title: isFirstJob ? undefined : (currentEvent.title || undefined),
-        origin_end_time: isFirstJob ? undefined : currentEvent.end.toISOString()
-      });
-      currentTry = addMinutes(currentTry, SUGGESTION_STRIDE_MINUTES);
     }
   }
   return suggestions;
