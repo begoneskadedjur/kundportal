@@ -91,7 +91,7 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Endast POST är tillåtet' }); }
   try {
-    const { newCaseAddress, pestType, timeSlotDuration = 60, searchStartDate, selectedTechnicianIds } = req.body;
+    const { newCaseAddress, pestType, timeSlotDuration = 60, searchStartDate, selectedTechnicianIds, excludeCaseId } = req.body;
     if (!newCaseAddress) { return res.status(400).json({ error: 'Adress måste anges.' }); }
     if (!selectedTechnicianIds || selectedTechnicianIds.length === 0) { return res.status(400).json({ error: 'Minst en tekniker måste anges.' }); }
     if (timeSlotDuration < 30 || timeSlotDuration > 480) { return res.status(400).json({ error: 'Arbetstid måste vara mellan 30 minuter och 8 timmar.' }); }
@@ -115,6 +115,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`[revisit-assistant] Datumintervall: ${searchStart.toISOString()} - ${searchEnd.toISOString()}`);
 
     const [schedules, absences] = await Promise.all([ getSchedules(finalStaff, searchStart, searchEnd), getAbsences(staffIds, searchStart, searchEnd) ]);
+
+    // Exkludera originalärendet från schemaberäkningen så det inte blockerar sin egen tid
+    if (excludeCaseId) {
+      schedules.forEach((cases, techId) => {
+        schedules.set(techId, cases.filter(c => c.caseId !== excludeCaseId));
+      });
+    }
 
     let totalCasesFound = 0;
     schedules.forEach((cases, techId) => {

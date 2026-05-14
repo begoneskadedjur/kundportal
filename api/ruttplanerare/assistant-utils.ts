@@ -18,7 +18,7 @@ export const DEFAULT_TRAVEL_TIME = 30;
 export type DaySchedule = { start: string; end: string; active: boolean; };
 export type WorkSchedule = { monday: DaySchedule; tuesday: DaySchedule; wednesday: DaySchedule; thursday: DaySchedule; friday: DaySchedule; saturday: DaySchedule; sunday: DaySchedule; };
 export interface StaffMember { id: string; name: string; address: string; work_schedule: WorkSchedule | null; }
-export interface EventSlot { start: Date; end: Date; type: 'case' | 'absence'; title?: string; address?: string; }
+export interface EventSlot { start: Date; end: Date; type: 'case' | 'absence'; title?: string; address?: string; caseId?: string; }
 export interface AbsencePeriod { start: Date; end: Date; }
 export interface TechnicianDaySchedule { technician: StaffMember; date: Date; workStart: Date; workEnd: Date; absences: AbsencePeriod[]; existingCases: EventSlot[]; }
 export interface Suggestion {
@@ -103,7 +103,7 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   // Exkludera stängda/avslutade statusar
   const { data: privateCases, error: privateError } = await supabase
     .from('private_cases')
-    .select('start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title, status')
+    .select('id, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title, status')
     .or(`primary_assignee_id.in.(${staffIds.join(',')}),secondary_assignee_id.in.(${staffIds.join(',')}),tertiary_assignee_id.in.(${staffIds.join(',')})`)
     .gte('start_date', from.toISOString())
     .lte('start_date', to.toISOString())
@@ -128,7 +128,8 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
           end,
           title: c.title || 'Privat ärende',
           address: formatAddress(c.adress),
-          type: 'case'
+          type: 'case',
+          caseId: c.id
         };
         addToSchedule(c.primary_assignee_id, eventSlot);
         addToSchedule(c.secondary_assignee_id, eventSlot);
@@ -141,7 +142,7 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   // Exkludera stängda/avslutade statusar
   const { data: businessCases, error: businessError } = await supabase
     .from('business_cases')
-    .select('start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title, status')
+    .select('id, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title, status')
     .or(`primary_assignee_id.in.(${staffIds.join(',')}),secondary_assignee_id.in.(${staffIds.join(',')}),tertiary_assignee_id.in.(${staffIds.join(',')})`)
     .gte('start_date', from.toISOString())
     .lte('start_date', to.toISOString())
@@ -166,7 +167,8 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
           end,
           title: c.title || 'Företagsärende',
           address: formatAddress(c.adress),
-          type: 'case'
+          type: 'case',
+          caseId: c.id
         };
         addToSchedule(c.primary_assignee_id, eventSlot);
         addToSchedule(c.secondary_assignee_id, eventSlot);
