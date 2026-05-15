@@ -7,6 +7,8 @@ import { TechnicianRowHeader } from './TechnicianRowHeader'
 import { TimeGridHeader } from './TimeGridHeader'
 import { TimeGridRow } from './TimeGridRow'
 import { NowIndicator } from './NowIndicator'
+import { WeekGridView } from './WeekGridView'
+import { MonthGridView } from './MonthGridView'
 import type { Absence } from './AbsenceBlock'
 import type { ViewMode } from './ScheduleHeader'
 
@@ -18,6 +20,8 @@ interface ScheduleGridProps {
   viewMode: ViewMode
   onCaseClick: (caseData: BeGoneCaseRow) => void
   onAbsenceClick?: (absence: Absence) => void
+  onChangeView?: (mode: ViewMode) => void
+  onChangeDate?: (date: Date) => void
 }
 
 export function ScheduleGrid({
@@ -28,6 +32,8 @@ export function ScheduleGrid({
   viewMode,
   onCaseClick,
   onAbsenceClick,
+  onChangeView,
+  onChangeDate,
 }: ScheduleGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const weekStart = useMemo(() => getWeekStart(currentDate), [currentDate])
@@ -52,6 +58,10 @@ export function ScheduleGrid({
       if (!dateField) return false
       const caseDate = new Date(dateField)
       if (viewMode === 'day') return isSameDay(caseDate, currentDate)
+      if (viewMode === 'month') {
+        return caseDate.getFullYear() === currentDate.getFullYear() &&
+               caseDate.getMonth() === currentDate.getMonth()
+      }
       return isInWeek(caseDate, weekStart)
     })
   }, [cases, currentDate, viewMode, weekStart])
@@ -101,6 +111,36 @@ export function ScheduleGrid({
     }
     return map
   }, [technicians, absences, currentDate, viewMode, weekStart])
+
+  const handleDayClick = (date: Date) => {
+    onChangeDate?.(date)
+    onChangeView?.('day')
+  }
+
+  // Vecko- och månadsvy — nya grid-komponenter
+  if (viewMode === 'week') {
+    return (
+      <WeekGridView
+        technicians={technicians}
+        cases={cases}
+        currentDate={currentDate}
+        onCaseClick={onCaseClick}
+        onDayClick={handleDayClick}
+      />
+    )
+  }
+
+  if (viewMode === 'month') {
+    return (
+      <MonthGridView
+        technicians={technicians}
+        cases={cases}
+        currentDate={currentDate}
+        onCaseClick={onCaseClick}
+        onDayClick={handleDayClick}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-1 overflow-hidden">

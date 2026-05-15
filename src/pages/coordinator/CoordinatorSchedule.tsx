@@ -448,6 +448,8 @@ export default function CoordinatorSchedule() {
             viewMode={viewMode}
             onCaseClick={handleOpenCaseModal}
             onAbsenceClick={handleAbsenceClick}
+            onChangeView={setViewMode}
+            onChangeDate={setCurrentDate}
           />
         )}
       </div>

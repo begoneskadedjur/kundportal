@@ -10,7 +10,7 @@ import { FILTER_STATUSES } from './scheduleConstants'
 import { ScheduleFilterPopover } from './ScheduleFilterPopover'
 import type { Technician } from '../../../types/database'
 
-export type ViewMode = 'day' | 'week'
+export type ViewMode = 'day' | 'week' | 'month'
 export type CaseType = 'private' | 'business' | 'contract' | 'inspection'
 
 interface ScheduleHeaderProps {
@@ -108,7 +108,8 @@ export function ScheduleHeader({
   const navigateDate = (delta: number) => {
     const d = new Date(currentDate)
     if (viewMode === 'day') d.setDate(d.getDate() + delta)
-    else d.setDate(d.getDate() + delta * 7)
+    else if (viewMode === 'week') d.setDate(d.getDate() + delta * 7)
+    else d.setMonth(d.getMonth() + delta)
     onChangeDate(d)
   }
 
@@ -116,6 +117,8 @@ export function ScheduleHeader({
 
   const dateLabel = viewMode === 'day'
     ? currentDate.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : viewMode === 'month'
+    ? currentDate.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
     : `Vecka ${weekNum}`
 
   const dateSubLabel = viewMode === 'week'
@@ -182,7 +185,7 @@ export function ScheduleHeader({
 
         {/* Vy-växlare */}
         <div className="flex rounded-lg bg-slate-800/50 border border-slate-700/50 p-0.5 ml-2">
-          {(['day', 'week'] as const).map(mode => (
+          {(['day', 'week', 'month'] as const).map(mode => (
             <button
               key={mode}
               onClick={() => onChangeView(mode)}
@@ -192,7 +195,7 @@ export function ScheduleHeader({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              {mode === 'day' ? 'Dag' : 'Vecka'}
+              {mode === 'day' ? 'Dag' : mode === 'week' ? 'Vecka' : 'Månad'}
             </button>
           ))}
         </div>
