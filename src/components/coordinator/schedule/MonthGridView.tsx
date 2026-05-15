@@ -92,8 +92,8 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                 <div
                   key={di}
                   className={`
-                    p-1.5 cursor-pointer transition-colors
-                    ${isToday ? 'bg-[#20c58f]/5' : isCurrentMonth ? 'bg-slate-900/20' : 'bg-slate-900/60'}
+                    p-1.5 cursor-pointer transition-colors border-t-2
+                    ${isToday ? 'bg-[#20c58f]/5 border-t-red-500' : isCurrentMonth ? 'bg-slate-900/20 border-t-transparent' : 'bg-slate-900/60 border-t-transparent'}
                     hover:bg-slate-800/30
                   `}
                   onClick={() => onDayClick(day)}
@@ -118,10 +118,7 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                         <GridEventCard
                           key={c.id}
                           caseData={c}
-                          onClick={(e?: React.MouseEvent) => {
-                            e?.stopPropagation()
-                            onCaseClick(c)
-                          }}
+                          onClick={() => onCaseClick(c)}
                           techColor={techColor}
                           compact
                         />

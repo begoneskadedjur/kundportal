@@ -65,19 +65,27 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
           return (
             <div
               key={i}
-              className="border-r border-slate-700/50 last:border-r-0 px-3 py-2 cursor-pointer hover:bg-slate-800/30 transition-colors"
+              className={`border-r border-slate-700/50 last:border-r-0 cursor-pointer hover:bg-slate-800/30 transition-colors border-t-2 ${isToday ? 'border-t-red-500' : 'border-t-transparent'}`}
               onClick={() => onDayClick(day)}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-400">{dayNames[i]}</span>
-                <span className={`text-sm font-bold ${isToday ? 'text-[#20c58f]' : 'text-white'}`}>
-                  {day.getDate()}
-                </span>
-                {isToday && <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f]" />}
+              <div className="px-3 pt-2 pb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-400">{dayNames[i]}</span>
+                  <span className={`text-sm font-bold ${isToday ? 'text-[#20c58f]' : 'text-white'}`}>
+                    {day.getDate()}
+                  </span>
+                  {isToday && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {count} {count === 1 ? 'ärende' : 'ärenden'}
+                </p>
               </div>
-              <p className="text-[10px] text-slate-500 mt-0.5">
-                {count} {count === 1 ? 'ärende' : 'ärenden'}
-              </p>
+              {/* Tidsskala */}
+              <div className="flex justify-between px-2 pb-1">
+                {[8, 10, 12, 14, 16].map(h => (
+                  <span key={h} className="text-[8px] text-slate-700">{h}</span>
+                ))}
+              </div>
             </div>
           )
         })}
