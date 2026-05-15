@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { BeGoneCaseRow, Technician, isScheduledCase, ALL_VALID_STATUSES } from '../../types/database'
 import { Case } from '../../types/cases'
 import { AnimatePresence } from 'framer-motion'
+import toast from 'react-hot-toast'
 
 // Schema-komponenter
 import { ScheduleHeader, type ViewMode, type CaseType } from '../../components/coordinator/schedule/ScheduleHeader'
@@ -368,6 +369,35 @@ export default function CoordinatorSchedule() {
     fetchData()
   }
 
+  const handleCaseMoved = useCallback(async (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => {
+    const startRaw = caseData.start_date || caseData.due_date
+    const endRaw = caseData.due_date || caseData.start_date
+    const duration = startRaw && endRaw
+      ? new Date(endRaw).getTime() - new Date(startRaw).getTime()
+      : 60 * 60 * 1000
+    const newEnd = new Date(newStart.getTime() + Math.abs(duration))
+
+    // Optimistisk uppdatering
+    setAllCases(prev => prev.map(c =>
+      c.id === caseId
+        ? { ...c, start_date: newStart.toISOString(), due_date: newEnd.toISOString() }
+        : c
+    ))
+
+    try {
+      const table = caseData.case_type === 'contract' ? 'cases'
+        : caseData.case_type === 'business' ? 'business_cases' : 'private_cases'
+      const { error } = await supabase.from(table).update({
+        start_date: newStart.toISOString(),
+        due_date: newEnd.toISOString(),
+      }).eq('id', caseId)
+      if (error) throw error
+    } catch {
+      toast.error('Kunde inte flytta ärendet')
+      fetchData()
+    }
+  }, [fetchData])
+
   const handleAbsenceClick = useCallback((a: Absence) => {
     setSelectedAbsence(a); setIsAbsenceDetailsModalOpen(true)
   }, [])
@@ -450,6 +480,7 @@ export default function CoordinatorSchedule() {
             onAbsenceClick={handleAbsenceClick}
             onChangeView={setViewMode}
             onChangeDate={setCurrentDate}
+            onCaseMoved={handleCaseMoved}
           />
         )}
       </div>

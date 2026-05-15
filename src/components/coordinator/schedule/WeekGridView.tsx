@@ -1,8 +1,8 @@
 // WeekGridView.tsx — Vertikal tidsgrid, Google Calendar-stil
-import { useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
 import { isSameDay, getWeekStart, getWeekDays } from './scheduleUtils'
-import { TECH_COLORS, WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT } from './scheduleConstants'
+import { TECH_COLORS, WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT, SNAP_MINUTES } from './scheduleConstants'
 import { GridEventCard } from './GridEventCard'
 
 interface WeekGridViewProps {
@@ -11,6 +11,7 @@ interface WeekGridViewProps {
   currentDate: Date
   onCaseClick: (caseData: BeGoneCaseRow) => void
   onDayClick: (date: Date) => void
+  onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => void
 }
 
 function timeToY(date: Date): number {
@@ -48,11 +49,25 @@ function assignLanes(events: BeGoneCaseRow[]): Map<string, LaneInfo> {
   return result
 }
 
-export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onDayClick }: WeekGridViewProps) {
+export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onDayClick, onCaseMoved }: WeekGridViewProps) {
   const weekStart = useMemo(() => getWeekStart(currentDate), [currentDate])
   const weekDays = useMemo(() => getWeekDays(weekStart), [weekStart])
   const today = new Date()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [dragOverDayIdx, setDragOverDayIdx] = useState<number | null>(null)
+  const colRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  function yToTime(clientY: number, colEl: HTMLElement, day: Date): Date {
+    const rect = colEl.getBoundingClientRect()
+    const scrollTop = scrollRef.current?.scrollTop ?? 0
+    const relY = clientY - rect.top + scrollTop
+    const totalMinutes = (relY / WEEK_HOUR_HEIGHT) * 60 + WEEK_DAY_START * 60
+    const snapped = Math.round(totalMinutes / SNAP_MINUTES) * SNAP_MINUTES
+    const clamped = Math.max(WEEK_DAY_START * 60, Math.min((WEEK_DAY_END - 0.25) * 60, snapped))
+    const d = new Date(day)
+    d.setHours(Math.floor(clamped / 60), clamped % 60, 0, 0)
+    return d
+  }
 
   // Bygg techId → index map för färger
   const techIndexMap = useMemo(() => {
@@ -193,12 +208,32 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
           {weekDays.map((day, dayIdx) => {
             const dayCases = casesByDay[dayIdx]
             const isToday = isSameDay(day, today)
+            const isDragTarget = dragOverDayIdx === dayIdx
             const lanes = assignLanes(dayCases)
 
             return (
               <div
                 key={dayIdx}
-                className={`flex-1 relative border-r border-slate-700/40 last:border-r-0 ${isToday ? 'bg-[#20c58f]/5' : ''}`}
+                ref={el => { colRefs.current[dayIdx] = el }}
+                className={`flex-1 relative border-r border-slate-700/40 last:border-r-0 transition-colors
+                  ${isToday ? 'bg-[#20c58f]/5' : ''}
+                  ${isDragTarget ? 'bg-blue-500/8' : ''}
+                `}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDayIdx(dayIdx) }}
+                onDragLeave={e => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverDayIdx(null)
+                }}
+                onDrop={e => {
+                  e.preventDefault()
+                  setDragOverDayIdx(null)
+                  const caseId = e.dataTransfer.getData('caseId')
+                  if (!caseId || !onCaseMoved) return
+                  const caseData = cases.find(c => c.id === caseId)
+                  if (!caseData) return
+                  const colEl = colRefs.current[dayIdx]
+                  if (!colEl) return
+                  onCaseMoved(caseId, yToTime(e.clientY, colEl, day), caseData)
+                }}
               >
                 {dayCases.map(c => {
                   const startRaw = c.start_date || c.due_date
@@ -222,12 +257,24 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   return (
                     <div
                       key={c.id}
-                      className="absolute px-0.5 py-0"
+                      draggable
+                      className="absolute px-0.5 py-0 cursor-grab active:cursor-grabbing"
                       style={{
                         top,
                         height,
                         left: `${leftPct}%`,
                         width: `${widthPct}%`,
+                      }}
+                      onDragStart={e => {
+                        const duration = Math.abs(
+                          new Date(c.due_date || c.start_date!).getTime() -
+                          new Date(c.start_date || c.due_date!).getTime()
+                        )
+                        e.dataTransfer.setData('caseId', c.id)
+                        e.dataTransfer.setData('duration', String(duration))
+                        e.dataTransfer.setData('case_type', c.case_type || 'private')
+                        e.dataTransfer.effectAllowed = 'move'
+                        e.stopPropagation()
                       }}
                     >
                       <GridEventCard

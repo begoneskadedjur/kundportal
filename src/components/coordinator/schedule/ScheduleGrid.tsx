@@ -22,6 +22,7 @@ interface ScheduleGridProps {
   onAbsenceClick?: (absence: Absence) => void
   onChangeView?: (mode: ViewMode) => void
   onChangeDate?: (date: Date) => void
+  onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => void
 }
 
 export function ScheduleGrid({
@@ -34,6 +35,7 @@ export function ScheduleGrid({
   onAbsenceClick,
   onChangeView,
   onChangeDate,
+  onCaseMoved,
 }: ScheduleGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const weekStart = useMemo(() => getWeekStart(currentDate), [currentDate])
@@ -126,6 +128,7 @@ export function ScheduleGrid({
         currentDate={currentDate}
         onCaseClick={onCaseClick}
         onDayClick={handleDayClick}
+        onCaseMoved={onCaseMoved}
       />
     )
   }
@@ -185,8 +188,10 @@ export function ScheduleGrid({
               currentDate={currentDate}
               onCaseClick={onCaseClick}
               onAbsenceClick={onAbsenceClick}
+              onCaseMoved={onCaseMoved}
               viewMode={viewMode}
               weekStart={weekStart}
+              allCases={dateCases}
             />
           ))}
         </div>

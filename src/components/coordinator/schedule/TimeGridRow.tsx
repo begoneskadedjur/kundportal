@@ -1,7 +1,7 @@
 // TimeGridRow.tsx — En teknikers tidsrad med events och frånvaro
-import { useMemo, memo } from 'react'
+import { useMemo, memo, useState, useRef } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { HOUR_WIDTH, DAY_START_HOUR, TOTAL_HOURS, WEEK_DAY_COL_WIDTH, WEEK_HOUR_WIDTH, ROW_HEIGHT, getGridWidth } from './scheduleConstants'
+import { HOUR_WIDTH, DAY_START_HOUR, TOTAL_HOURS, WEEK_DAY_COL_WIDTH, WEEK_HOUR_WIDTH, ROW_HEIGHT, getGridWidth, SNAP_MINUTES } from './scheduleConstants'
 import { assignLanes } from './scheduleUtils'
 import { EventBlock } from './EventBlock'
 import { AbsenceBlock, type Absence } from './AbsenceBlock'
@@ -14,15 +14,31 @@ interface TimeGridRowProps {
   currentDate: Date
   onCaseClick: (caseData: BeGoneCaseRow) => void
   onAbsenceClick?: (absence: Absence) => void
+  onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => void
   viewMode: ViewMode
   weekStart: Date
+  allCases: BeGoneCaseRow[]
 }
 
-export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absences, currentDate, onCaseClick, onAbsenceClick, viewMode, weekStart }: TimeGridRowProps) {
+export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absences, currentDate, onCaseClick, onAbsenceClick, onCaseMoved, viewMode, weekStart, allCases }: TimeGridRowProps) {
   const gridWidth = getGridWidth(viewMode)
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [dragOver, setDragOver] = useState(false)
 
   // Beräkna lanes för överlappande events
   const laneMap = useMemo(() => assignLanes(cases), [cases])
+
+  function xToTime(clientX: number): Date {
+    if (!rowRef.current) return new Date(currentDate)
+    const rect = rowRef.current.getBoundingClientRect()
+    const relX = clientX - rect.left
+    const totalMinutes = (relX / HOUR_WIDTH) * 60 + DAY_START_HOUR * 60
+    const snapped = Math.round(totalMinutes / SNAP_MINUTES) * SNAP_MINUTES
+    const clamped = Math.max(DAY_START_HOUR * 60, Math.min(23 * 60 + 45, snapped))
+    const d = new Date(currentDate)
+    d.setHours(Math.floor(clamped / 60), clamped % 60, 0, 0)
+    return d
+  }
 
   // Arbetstidsbakgrund (dagvy)
   const workBg = useMemo(() => {
@@ -82,7 +98,22 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i)
 
   return (
-    <div className="relative border-b border-slate-800/60" style={{ width: gridWidth, height: ROW_HEIGHT }}>
+    <div
+      ref={rowRef}
+      className={`relative border-b border-slate-800/60 transition-colors ${dragOver ? 'bg-blue-500/5' : ''}`}
+      style={{ width: gridWidth, height: ROW_HEIGHT }}
+      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOver(true) }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={e => {
+        e.preventDefault()
+        setDragOver(false)
+        const caseId = e.dataTransfer.getData('caseId')
+        if (!caseId || !onCaseMoved) return
+        const caseData = allCases.find(c => c.id === caseId)
+        if (!caseData) return
+        onCaseMoved(caseId, xToTime(e.clientX), caseData)
+      }}
+    >
       {/* Arbetstids-bakgrund */}
       {workBg && (
         <div

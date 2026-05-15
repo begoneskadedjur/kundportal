@@ -14,10 +14,12 @@ interface EventBlockProps {
   weekStart: Date
   lane?: number
   totalLanes?: number
+  onDragStart?: (e: React.DragEvent, caseData: BeGoneCaseRow) => void
 }
 
-export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode, weekStart, lane = 0, totalLanes = 1 }: EventBlockProps) {
+export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode, weekStart, lane = 0, totalLanes = 1, onDragStart }: EventBlockProps) {
   const [hovered, setHovered] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const blockRef = useRef<HTMLDivElement>(null)
 
   const startRaw = caseData.start_date || caseData.due_date
@@ -47,12 +49,26 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
   const isWeek = viewMode === 'week'
   const showSecondLine = !isWeek && !isCompact && width > 150
 
+  const handleDragStart = (e: React.DragEvent) => {
+    setDragging(true)
+    setHovered(false)
+    const duration = new Date(caseData.due_date || caseData.start_date!).getTime() -
+                     new Date(caseData.start_date || caseData.due_date!).getTime()
+    e.dataTransfer.setData('caseId', caseData.id)
+    e.dataTransfer.setData('duration', String(Math.abs(duration)))
+    e.dataTransfer.setData('case_type', caseData.case_type || 'private')
+    e.dataTransfer.effectAllowed = 'move'
+    onDragStart?.(e, caseData)
+  }
+
   return (
     <div
       ref={blockRef}
+      draggable
       className={`
-        absolute cursor-pointer rounded-md border-l-4 transition-all duration-150
+        absolute cursor-grab rounded-md border-l-4 transition-all duration-150
         hover:brightness-110 hover:shadow-lg hover:z-30
+        ${dragging ? 'opacity-40 ring-2 ring-white/30 cursor-grabbing' : ''}
         ${style.bg} ${style.border}
         ${isContract ? 'ring-1 ring-purple-400/20' : ''}
       `}
@@ -60,11 +76,13 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
         left: x,
         width,
         top: topOffset,
-        height: eventHeight - 2, // 2px gap mellan lanes
+        height: eventHeight - 2,
       }}
       onClick={() => onClick(caseData)}
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={() => !dragging && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onDragStart={handleDragStart}
+      onDragEnd={() => setDragging(false)}
     >
       <div className="px-1.5 py-0.5 h-full flex flex-col justify-center overflow-hidden">
         {/* Rad 1: kundnamn + tidsspan */}
