@@ -2,7 +2,7 @@
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
 import { isSameDay, getWeekStart, getWeekDays, formatTime } from './scheduleUtils'
-import { TECH_COLORS, WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT, SNAP_MINUTES } from './scheduleConstants'
+import { WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT, SNAP_MINUTES } from './scheduleConstants'
 import { GridEventCard } from './GridEventCard'
 
 interface WeekGridViewProps {
@@ -190,7 +190,6 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
       {activeTechs.length > 0 && (
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-700/50 bg-slate-900/80 flex-shrink-0 flex-wrap">
           {activeTechs.map(t => {
-            const color = TECH_COLORS[t.idx % TECH_COLORS.length]
             const initials = t.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
             const shortName = t.name.split(' ')[0]
             const isFiltering = highlightedTechIds.size > 0
@@ -201,10 +200,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                 className={`flex items-center gap-1.5 cursor-pointer select-none transition-opacity ${isActive ? 'opacity-100' : 'opacity-35'}`}
                 onClick={() => toggleHighlight(t.id)}
               >
-                <span
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold border-2 leading-none"
-                  style={{ backgroundColor: color + '33', borderColor: color, color }}
-                >
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold border-2 border-[#20c58f] bg-[#20c58f]/20 text-[#20c58f] leading-none">
                   {initials}
                 </span>
                 <span className="text-[10px] text-slate-300">{shortName}</span>
@@ -320,7 +316,6 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
 
                   const techId = c.primary_assignee_id
                   const techIdx = techId ? (techIndexMap.get(techId) ?? 0) : 0
-                  const techColor = TECH_COLORS[techIdx % TECH_COLORS.length]
                   const techName = techId ? (technicians[techIdx]?.name ?? '') : ''
                   const isFaded = highlightedTechIds.size > 0 && !highlightedTechIds.has(techId ?? '')
 
@@ -352,7 +347,6 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                       <GridEventCard
                         caseData={c}
                         onClick={() => onCaseClick(c)}
-                        techColor={techColor}
                         technicianName={techName}
                         isDragging={draggingCaseId === c.id}
                       />

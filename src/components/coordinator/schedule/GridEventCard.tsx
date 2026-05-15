@@ -81,7 +81,6 @@ export const GridEventCard = memo(function GridEventCard({
           ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'}
           ${isDragging ? 'opacity-40 pointer-events-none' : ''}
         `}
-        style={techColor ? { borderLeftColor: techColor } : undefined}
       >
         {/* Rad 1: ärendenummer + initialer-badge */}
         <div className="flex items-center justify-between gap-1 min-w-0">
@@ -92,14 +91,7 @@ export const GridEventCard = memo(function GridEventCard({
             </p>
           )}
           {initials && (
-            <span
-              className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold leading-none border-2"
-              style={{
-                backgroundColor: techColor ? techColor + '33' : 'rgba(255,255,255,0.1)',
-                borderColor: techColor ?? '#94a3b8',
-                color: techColor ?? '#94a3b8',
-              }}
-            >
+            <span className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold leading-none border-2 border-[#20c58f] bg-[#20c58f]/20 text-[#20c58f]">
               {initials}
             </span>
           )}
