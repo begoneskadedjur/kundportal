@@ -131,7 +131,7 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
         }
       }
       const s = Math.round(scheduled * 10) / 10
-      const pct = cap > 0 ? Math.round((scheduled / cap) * 100) : 0
+      const pct = cap > 0 ? Math.round((scheduled / cap) * 10000) / 100 : 0
       const colorClass = cap === 0 || pct === 0
         ? 'text-slate-500'
         : pct < 70 ? 'text-emerald-400'
@@ -191,15 +191,17 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
               <button
                 key={t.id}
                 onClick={e => { e.stopPropagation(); toggleHighlight(t.id) }}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all select-none
+                className={`flex flex-col px-2 py-1 rounded text-xs transition-all select-none
                   ${isActive ? 'bg-slate-700/60 text-white border border-slate-600' : 'bg-transparent text-slate-500 border border-transparent'}`}
               >
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                {shortName}
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                  <span className="font-medium">{shortName}</span>
+                </div>
                 {cap && (
-                  <span className={`font-normal ${cap.colorClass}`}>
-                    · {cap.scheduled}h / {cap.capacity}h ({cap.pct}%)
-                  </span>
+                  <div className={`text-[10px] font-normal pl-3.5 mt-0.5 ${cap.colorClass}`}>
+                    {cap.scheduled}h / {cap.capacity}h · {cap.pct}%
+                  </div>
                 )}
               </button>
             )

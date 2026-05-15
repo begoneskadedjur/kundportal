@@ -29,7 +29,7 @@ export const TechnicianRowHeader = memo(function TechnicianRowHeader({ technicia
       scheduledHours: Math.round(hours * 10) / 10,
       capacity: cap,
       ratio: cap > 0 ? hours / cap : 0,
-      pct: cap > 0 ? Math.round((hours / cap) * 100) : 0,
+      pct: cap > 0 ? Math.round((hours / cap) * 10000) / 100 : 0,
     }
   }, [cases, technician.work_schedule, currentDate])
 
