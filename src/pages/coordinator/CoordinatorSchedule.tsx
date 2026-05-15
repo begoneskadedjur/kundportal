@@ -2,7 +2,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { BeGoneCaseRow, Technician, isScheduledCase, ALL_VALID_STATUSES } from '../../types/database'
+import { BeGoneCaseRow, Technician, WorkSchedule, isScheduledCase, ALL_VALID_STATUSES } from '../../types/database'
+import { isTechWorkingAt, formatTime } from '../../components/coordinator/schedule/scheduleUtils'
 import { Case } from '../../types/cases'
 import { AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -385,6 +386,15 @@ export default function CoordinatorSchedule() {
     const newTech = (shouldChangeTech && newTechnicianId)
       ? technicians.find(t => t.id === newTechnicianId)
       : undefined
+
+    // Schemavalidering — avvisa drop utanför arbetstid
+    const techForCheck = shouldChangeTech ? newTech : technicians.find(t => t.id === caseData.primary_assignee_id)
+    if (techForCheck?.work_schedule) {
+      if (!isTechWorkingAt(techForCheck.work_schedule as WorkSchedule, newStart)) {
+        toast.error(`${techForCheck.name} arbetar inte ${formatTime(newStart)} den dagen`)
+        return
+      }
+    }
 
     // Optimistisk uppdatering
     setAllCases(prev => prev.map(c =>

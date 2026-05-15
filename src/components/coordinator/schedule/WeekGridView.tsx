@@ -1,7 +1,8 @@
 // WeekGridView.tsx — Vertikal tidsgrid, Google Calendar-stil
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { isSameDay, getWeekStart, getWeekDays, formatTime } from './scheduleUtils'
+import { isSameDay, getWeekStart, getWeekDays, formatTime, isTechWorkingAt } from './scheduleUtils'
+import type { WorkSchedule } from '../../../types/database'
 import { TECH_COLORS, WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT, SNAP_MINUTES } from './scheduleConstants'
 import { GridEventCard } from './GridEventCard'
 
@@ -57,6 +58,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
   const [dragOverDayIdx, setDragOverDayIdx] = useState<number | null>(null)
   const [dropPreview, setDropPreview] = useState<{ dayIdx: number; y: number; time: Date } | null>(null)
   const [draggingCaseId, setDraggingCaseId] = useState<string | null>(null)
+  const [dropBlocked, setDropBlocked] = useState(false)
   const [highlightedTechIds, setHighlightedTechIds] = useState<Set<string>>(new Set())
 
   function toggleHighlight(techId: string) {
@@ -275,11 +277,15 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                 `}
                 onDragOver={e => {
                   e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
                   setDragOverDayIdx(dayIdx)
                   const colEl = colRefs.current[dayIdx]
                   if (!colEl) return
                   const snappedTime = yToTime(e.clientY, colEl, day)
+                  const draggingCase = draggingCaseId ? cases.find(c => c.id === draggingCaseId) : null
+                  const tech = draggingCase ? technicians.find(t => t.id === draggingCase.primary_assignee_id) : null
+                  const blocked = tech ? !isTechWorkingAt(tech.work_schedule as WorkSchedule, snappedTime) : false
+                  setDropBlocked(blocked)
+                  e.dataTransfer.dropEffect = blocked ? 'none' : 'move'
                   setDropPreview({ dayIdx, y: timeToY(snappedTime), time: snappedTime })
                 }}
                 onDragLeave={e => {
@@ -292,13 +298,17 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   e.preventDefault()
                   setDragOverDayIdx(null)
                   setDropPreview(null)
+                  setDropBlocked(false)
                   const caseId = e.dataTransfer.getData('caseId')
                   if (!caseId || !onCaseMoved) return
                   const caseData = cases.find(c => c.id === caseId)
                   if (!caseData) return
                   const colEl = colRefs.current[dayIdx]
                   if (!colEl) return
-                  onCaseMoved(caseId, yToTime(e.clientY, colEl, day), caseData)
+                  const newStart = yToTime(e.clientY, colEl, day)
+                  const tech = technicians.find(t => t.id === caseData.primary_assignee_id)
+                  if (tech && !isTechWorkingAt(tech.work_schedule as WorkSchedule, newStart)) return
+                  onCaseMoved(caseId, newStart, caseData)
                 }}
               >
                 {dayCases.map(c => {
@@ -360,16 +370,16 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   )
                 })}
 
-                {/* Drop-preview linje — renderas sist för att ligga ovanpå korten */}
+                {/* Drop-preview linje — röd om blockerat, blå om ok */}
                 {dropPreview?.dayIdx === dayIdx && (
                   <div
-                    className="absolute left-0 right-0 h-[2px] bg-blue-400 pointer-events-none z-30"
+                    className={`absolute left-0 right-0 h-[2px] pointer-events-none z-30 ${dropBlocked ? 'bg-red-400' : 'bg-blue-400'}`}
                     style={{ top: dropPreview.y }}
                   >
-                    <span className="absolute left-1 -top-5 text-[10px] text-blue-300 bg-slate-900/90 px-1.5 py-0.5 rounded whitespace-nowrap font-mono">
-                      {formatTime(dropPreview.time)}
+                    <span className={`absolute left-1 -top-5 text-[10px] bg-slate-900/90 px-1.5 py-0.5 rounded whitespace-nowrap font-mono ${dropBlocked ? 'text-red-300' : 'text-blue-300'}`}>
+                      {dropBlocked ? 'Ej arbetstid' : formatTime(dropPreview.time)}
                     </span>
-                    <div className="absolute -left-1 -top-[3px] w-2 h-2 rounded-full bg-blue-400" />
+                    <div className={`absolute -left-1 -top-[3px] w-2 h-2 rounded-full ${dropBlocked ? 'bg-red-400' : 'bg-blue-400'}`} />
                   </div>
                 )}
               </div>

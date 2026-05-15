@@ -2,6 +2,33 @@
 
 import { HOUR_WIDTH, DAY_START_HOUR, DAY_GRID_WIDTH, WEEK_DAY_COL_WIDTH, WEEK_HOUR_WIDTH, WEEK_GRID_WIDTH } from './scheduleConstants'
 import type { ViewMode } from './ScheduleHeader'
+import type { WorkSchedule } from '../../../types/database'
+
+const WEEK_DAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'] as const
+
+/** Kolla om en tekniker är aktiv (arbetar) en specifik dag */
+export function isTechWorkingDay(
+  workSchedule: WorkSchedule | null | undefined,
+  date: Date
+): boolean {
+  if (!workSchedule) return true
+  const day = workSchedule[WEEK_DAYS[date.getDay()] as keyof WorkSchedule]
+  return !!day?.active
+}
+
+/** Kolla om en tekniker arbetar vid en specifik tidpunkt (dag + klockslag) */
+export function isTechWorkingAt(
+  workSchedule: WorkSchedule | null | undefined,
+  dateTime: Date
+): boolean {
+  if (!workSchedule) return true
+  const day = workSchedule[WEEK_DAYS[dateTime.getDay()] as keyof WorkSchedule]
+  if (!day?.active) return false
+  const [sh, sm] = day.start.split(':').map(Number)
+  const [eh, em] = day.end.split(':').map(Number)
+  const cur = dateTime.getHours() * 60 + dateTime.getMinutes()
+  return cur >= sh * 60 + sm && cur < eh * 60 + em
+}
 
 // ─── Dagvy-positionering ───
 

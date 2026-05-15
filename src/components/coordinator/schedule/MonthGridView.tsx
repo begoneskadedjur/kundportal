@@ -1,8 +1,9 @@
 // MonthGridView.tsx — Månadsvy med 4-6 veckors grid
 import { useMemo, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { isSameDay, formatTime } from './scheduleUtils'
+import { isSameDay, formatTime, isTechWorkingDay, isTechWorkingAt } from './scheduleUtils'
 import { TECH_COLORS, WEEK_DAY_START, WEEK_DAY_END, SNAP_MINUTES } from './scheduleConstants'
+import type { WorkSchedule } from '../../../types/database'
 import { GridEventCard } from './GridEventCard'
 
 const MONTH_MAX_EVENTS = 3
@@ -21,7 +22,12 @@ type TimelineItem =
   | { kind: 'slot'; time: string; startMs: number }
 
 // Bygg kronologisk lista av ärenden + lediga 15-min slots
-function buildTimeline(day: Date, dayCases: BeGoneCaseRow[], excludeId: string | null): TimelineItem[] {
+function buildTimeline(
+  day: Date,
+  dayCases: BeGoneCaseRow[],
+  excludeId: string | null,
+  workSchedule?: WorkSchedule | null
+): TimelineItem[] {
   const items: TimelineItem[] = []
   const relevant = dayCases.filter(c => c.id !== excludeId)
 
@@ -31,10 +37,29 @@ function buildTimeline(day: Date, dayCases: BeGoneCaseRow[], excludeId: string |
     items.push({ kind: 'case', caseData: c, startMs })
   }
 
-  // Lägg till lediga 15-min slots
+  // Arbetstidsgränser (om schema finns)
+  let workStartMins = WEEK_DAY_START * 60
+  let workEndMins = WEEK_DAY_END * 60
+  if (workSchedule) {
+    const DAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'] as const
+    const dayKey = DAYS[day.getDay()] as keyof WorkSchedule
+    const ds = workSchedule[dayKey]
+    if (ds?.active) {
+      const [sh, sm] = ds.start.split(':').map(Number)
+      const [eh, em] = ds.end.split(':').map(Number)
+      workStartMins = sh * 60 + sm
+      workEndMins = eh * 60 + em
+    } else {
+      return items.sort((a, b) => a.startMs - b.startMs) // Ej arbetsdag — inga slots
+    }
+  }
+
+  // Lägg till lediga 15-min slots inom arbetstid
   const totalSlots = ((WEEK_DAY_END - WEEK_DAY_START) * 60) / SNAP_MINUTES
   for (let i = 0; i < totalSlots; i++) {
     const mins = WEEK_DAY_START * 60 + i * SNAP_MINUTES
+    if (mins < workStartMins || mins >= workEndMins) continue
+
     const h = Math.floor(mins / 60)
     const m = mins % 60
     const slotStart = new Date(day)
@@ -173,8 +198,13 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
               const visible = filtered.slice(0, MONTH_MAX_EVENTS)
               const overflow = filtered.length - visible.length
 
-              // Kronologisk timeline för expanderad vy
-              const timeline = isExpanded ? buildTimeline(day, dayCases, draggingCaseId) : []
+              // Teknikern som dras — för schemavalidering
+              const draggingCase = draggingCaseId ? cases.find(c => c.id === draggingCaseId) : null
+              const draggingTech = draggingCase ? technicians.find(t => t.id === draggingCase.primary_assignee_id) : null
+              const dayBlocked = draggingTech ? !isTechWorkingDay(draggingTech.work_schedule as WorkSchedule, day) : false
+
+              // Kronologisk timeline för expanderad vy (med arbetstidsfiltrering)
+              const timeline = isExpanded ? buildTimeline(day, dayCases, draggingCaseId, draggingTech?.work_schedule as WorkSchedule) : []
 
               return (
                 <div
@@ -182,16 +212,17 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                   className={`
                     p-1.5 cursor-pointer transition-all border-t-2
                     ${isToday ? 'bg-[#20c58f]/5 border-t-red-500' : isCurrentMonth ? 'bg-slate-900/20 border-t-transparent' : 'bg-slate-900/60 border-t-transparent'}
-                    ${isDragOver && !isExpanded ? 'bg-blue-500/10 ring-1 ring-inset ring-blue-500/40' : ''}
+                    ${isDragOver && dayBlocked ? 'bg-red-500/5 ring-1 ring-inset ring-red-500/40' : ''}
+                    ${isDragOver && !dayBlocked && !isExpanded ? 'bg-blue-500/10 ring-1 ring-inset ring-blue-500/40' : ''}
                     ${!isDragOver ? 'hover:bg-slate-800/30' : ''}
                     ${isExpanded ? 'z-10 relative' : ''}
                   `}
                   onClick={() => onDayClick(day)}
                   onDragOver={e => {
                     e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
+                    e.dataTransfer.dropEffect = dayBlocked ? 'none' : 'move'
                     setDragOverDay(dayKey)
-                    setExpandedDayKey(dayKey)
+                    if (!dayBlocked) setExpandedDayKey(dayKey)
                   }}
                   onDragLeave={e => {
                     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
@@ -201,11 +232,11 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                     }
                   }}
                   onDrop={e => {
-                    // Fallback: drop på dagcell utan slot → bevara originaltid
                     e.preventDefault()
                     setDragOverDay(null)
                     setExpandedDayKey(null)
                     setDragOverSlot(null)
+                    if (dayBlocked) return
                     const caseId = e.dataTransfer.getData('caseId')
                     if (!caseId || !onCaseMoved) return
                     const caseData = cases.find(c => c.id === caseId)
@@ -213,6 +244,9 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                     const orig = new Date(caseData.start_date || caseData.due_date || '')
                     const newStart = new Date(day)
                     newStart.setHours(orig.getHours(), orig.getMinutes(), 0, 0)
+                    // Kontrollera att originaltiden är inom arbetstid
+                    const tech = technicians.find(t => t.id === caseData.primary_assignee_id)
+                    if (tech && !isTechWorkingAt(tech.work_schedule as WorkSchedule, newStart)) return
                     onCaseMoved(caseId, newStart, caseData)
                   }}
                 >
