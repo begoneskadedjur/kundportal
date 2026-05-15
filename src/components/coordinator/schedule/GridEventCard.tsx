@@ -3,7 +3,7 @@ import { useState, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { BeGoneCaseRow } from '../../../types/database'
 import { getStatusStyle } from './scheduleConstants'
-import { formatTime } from './scheduleUtils'
+import { formatTime, shortAddress } from './scheduleUtils'
 import { EventHoverCard } from './EventHoverCard'
 
 interface GridEventCardProps {
@@ -46,6 +46,13 @@ export const GridEventCard = memo(function GridEventCard({
 
   // Tjänst
   const service = caseData.service?.name || (caseData as any).skadedjur || ''
+  const addr = shortAddress((caseData as any).adress)
+  const serviceAndAddr = [service, addr].filter(Boolean).join(' · ')
+
+  // Initialer
+  const initials = technicianName
+    ? technicianName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+    : ''
 
   const handleMouseEnter = () => {
     if (!blockRef.current) return
@@ -76,13 +83,26 @@ export const GridEventCard = memo(function GridEventCard({
         `}
         style={techColor ? { borderLeftColor: techColor } : undefined}
       >
-        {/* Ärendenummer */}
-        {caseNumber && (
-          <p className={`font-mono font-semibold truncate leading-tight ${style.text} ${compact ? 'text-[9px]' : 'text-[10px]'}`}>
-            {isContract && <span className="mr-0.5 opacity-70">★</span>}
-            {caseNumber}
-          </p>
-        )}
+        {/* Rad 1: ärendenummer + initialer-badge */}
+        <div className="flex items-center justify-between gap-1 min-w-0">
+          {caseNumber && (
+            <p className={`font-mono font-semibold truncate leading-tight ${style.text} ${compact ? 'text-[9px]' : 'text-[10px]'}`}>
+              {isContract && <span className="mr-0.5 opacity-70">★</span>}
+              {caseNumber}
+            </p>
+          )}
+          {initials && (
+            <span
+              className="shrink-0 rounded-sm px-1 py-0.5 text-[9px] font-bold leading-none"
+              style={{
+                backgroundColor: techColor ? techColor + '33' : 'rgba(255,255,255,0.1)',
+                color: techColor ?? '#94a3b8',
+              }}
+            >
+              {initials}
+            </span>
+          )}
+        </div>
 
         {/* Kundnamn */}
         {customerName && (
@@ -91,17 +111,10 @@ export const GridEventCard = memo(function GridEventCard({
           </p>
         )}
 
-        {/* Teknikernamn (ej compact) */}
-        {!compact && technicianName && (
-          <p className="text-[10px] text-slate-400 truncate leading-tight mt-0.5">
-            {technicianName}
-          </p>
-        )}
-
-        {/* Tjänst (ej compact) */}
-        {!compact && service && (
+        {/* Tjänst + adress (ej compact) */}
+        {!compact && serviceAndAddr && (
           <p className="text-[10px] text-slate-500 truncate leading-tight">
-            {service}
+            {serviceAndAddr}
           </p>
         )}
 
