@@ -16,11 +16,23 @@ interface MonthGridViewProps {
   onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => void
 }
 
-// Bygg lista av lediga 15-min slots för en dag givet befintliga ärenden
-function buildSlots(day: Date, dayCases: BeGoneCaseRow[], excludeId: string | null): string[] {
-  const slots: string[] = []
-  const totalSlots = ((WEEK_DAY_END - WEEK_DAY_START) * 60) / SNAP_MINUTES
+type TimelineItem =
+  | { kind: 'case'; caseData: BeGoneCaseRow; startMs: number }
+  | { kind: 'slot'; time: string; startMs: number }
 
+// Bygg kronologisk lista av ärenden + lediga 15-min slots
+function buildTimeline(day: Date, dayCases: BeGoneCaseRow[], excludeId: string | null): TimelineItem[] {
+  const items: TimelineItem[] = []
+  const relevant = dayCases.filter(c => c.id !== excludeId)
+
+  // Lägg till befintliga ärenden
+  for (const c of relevant) {
+    const startMs = new Date(c.start_date || c.due_date!).getTime()
+    items.push({ kind: 'case', caseData: c, startMs })
+  }
+
+  // Lägg till lediga 15-min slots
+  const totalSlots = ((WEEK_DAY_END - WEEK_DAY_START) * 60) / SNAP_MINUTES
   for (let i = 0; i < totalSlots; i++) {
     const mins = WEEK_DAY_START * 60 + i * SNAP_MINUTES
     const h = Math.floor(mins / 60)
@@ -29,19 +41,22 @@ function buildSlots(day: Date, dayCases: BeGoneCaseRow[], excludeId: string | nu
     slotStart.setHours(h, m, 0, 0)
     const slotEnd = new Date(slotStart.getTime() + SNAP_MINUTES * 60000)
 
-    // Hoppa över slots som överlappar med befintliga ärenden (exkl. det som dras)
-    const overlaps = dayCases.some(c => {
-      if (c.id === excludeId) return false
+    const overlaps = relevant.some(c => {
       const cStart = new Date(c.start_date || c.due_date!).getTime()
       const cEnd = new Date(c.due_date || c.start_date!).getTime()
       return slotStart.getTime() < cEnd && slotEnd.getTime() > cStart
     })
 
     if (!overlaps) {
-      slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+      items.push({
+        kind: 'slot',
+        time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+        startMs: slotStart.getTime(),
+      })
     }
   }
-  return slots
+
+  return items.sort((a, b) => a.startMs - b.startMs)
 }
 
 export function MonthGridView({ technicians, cases, currentDate, onCaseClick, onDayClick, onCaseMoved }: MonthGridViewProps) {
@@ -158,8 +173,8 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
               const visible = filtered.slice(0, MONTH_MAX_EVENTS)
               const overflow = filtered.length - visible.length
 
-              // Slots för expanderad vy — bara lediga 15-min intervaller
-              const freeSlots = isExpanded ? buildSlots(day, dayCases, draggingCaseId) : []
+              // Kronologisk timeline för expanderad vy
+              const timeline = isExpanded ? buildTimeline(day, dayCases, draggingCaseId) : []
 
               return (
                 <div
@@ -211,30 +226,30 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                     </span>
                   </div>
 
-                  {/* Expanderad tidsgrid vid drag-hover */}
+                  {/* Expanderad tidsgrid vid drag-hover — ärenden och slots i tidsordning */}
                   {isExpanded ? (
                     <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5">
-                      {/* Befintliga ärenden (exkl. det som dras) */}
-                      {dayCases.filter(c => c.id !== draggingCaseId).map(c => {
-                        const s = c.start_date || c.due_date
-                        const e2 = c.due_date || c.start_date
-                        const name = c.company_name || (c as any).bestallare || (c as any).kontaktperson || c.case_number || ''
-                        const timeStr = s && e2 ? `${formatTime(new Date(s))}–${formatTime(new Date(e2))}` : ''
-                        return (
-                          <div key={c.id} className="text-[9px] px-1.5 py-1 rounded bg-slate-700/60 text-slate-300 truncate pointer-events-none border-l-2 border-slate-500">
-                            {name} {timeStr}
-                          </div>
-                        )
-                      })}
-                      {/* Lediga 15-min slots */}
-                      {freeSlots.map(slotTime => {
-                        const slotKey = `${dayKey}:${slotTime}`
+                      {timeline.map(item => {
+                        if (item.kind === 'case') {
+                          const c = item.caseData
+                          const s = c.start_date || c.due_date
+                          const e2 = c.due_date || c.start_date
+                          const name = c.company_name || (c as any).bestallare || (c as any).kontaktperson || c.case_number || ''
+                          const timeStr = s && e2 ? `${formatTime(new Date(s))}–${formatTime(new Date(e2))}` : ''
+                          return (
+                            <div key={c.id} className="text-[9px] px-1.5 py-1 rounded bg-slate-700/50 border-l-2 border-slate-400 pointer-events-none flex gap-1 min-w-0">
+                              <span className="font-mono text-slate-300 shrink-0">{timeStr}</span>
+                              <span className="text-slate-400 truncate">{name}</span>
+                            </div>
+                          )
+                        }
+                        const slotKey = `${dayKey}:${item.time}`
                         const isSlotOver = dragOverSlot === slotKey
                         return (
                           <div
                             key={slotKey}
-                            className={`text-[9px] px-1.5 py-0.5 rounded transition-colors font-mono
-                              ${isSlotOver ? 'bg-blue-500/30 text-blue-300 ring-1 ring-blue-400/50' : 'text-slate-500 hover:bg-slate-700/40 hover:text-slate-300'}`}
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-mono transition-colors
+                              ${isSlotOver ? 'bg-blue-500/30 text-blue-200 ring-1 ring-blue-400/50' : 'text-slate-500 hover:bg-slate-700/30 hover:text-slate-300'}`}
                             onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverSlot(slotKey) }}
                             onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverSlot(null) }}
                             onDrop={e => {
@@ -247,13 +262,13 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                               if (!caseId || !onCaseMoved) return
                               const caseData = cases.find(c => c.id === caseId)
                               if (!caseData) return
-                              const [hh, mm] = slotTime.split(':').map(Number)
+                              const [hh, mm] = item.time.split(':').map(Number)
                               const newStart = new Date(day)
                               newStart.setHours(hh, mm, 0, 0)
                               onCaseMoved(caseId, newStart, caseData)
                             }}
                           >
-                            {slotTime}
+                            {item.time}
                           </div>
                         )
                       })}
