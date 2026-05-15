@@ -22,7 +22,7 @@ interface ScheduleGridProps {
   onAbsenceClick?: (absence: Absence) => void
   onChangeView?: (mode: ViewMode) => void
   onChangeDate?: (date: Date) => void
-  onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => void
+  onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow, newTechnicianId?: string) => void
 }
 
 export function ScheduleGrid({

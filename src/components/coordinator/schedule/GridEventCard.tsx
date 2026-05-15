@@ -12,6 +12,7 @@ interface GridEventCardProps {
   technicianName?: string
   techColor?: string
   compact?: boolean
+  isDragging?: boolean
 }
 
 export const GridEventCard = memo(function GridEventCard({
@@ -20,6 +21,7 @@ export const GridEventCard = memo(function GridEventCard({
   technicianName,
   techColor,
   compact = false,
+  isDragging = false,
 }: GridEventCardProps) {
   const [hovered, setHovered] = useState(false)
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0, above: false })
@@ -62,7 +64,7 @@ export const GridEventCard = memo(function GridEventCard({
       <div
         ref={blockRef}
         onClick={onClick}
-        onMouseEnter={handleMouseEnter}
+        onMouseEnter={isDragging ? undefined : handleMouseEnter}
         onMouseLeave={() => setHovered(false)}
         className={`
           rounded-md border-l-4 cursor-pointer select-none
@@ -70,6 +72,7 @@ export const GridEventCard = memo(function GridEventCard({
           ${style.bg} ${style.border}
           ${isContract ? 'ring-1 ring-purple-400/20' : ''}
           ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'}
+          ${isDragging ? 'opacity-40 pointer-events-none' : ''}
         `}
         style={techColor ? { borderLeftColor: techColor } : undefined}
       >

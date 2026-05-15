@@ -1,7 +1,7 @@
 // WeekGridView.tsx — Vertikal tidsgrid, Google Calendar-stil
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { isSameDay, getWeekStart, getWeekDays } from './scheduleUtils'
+import { isSameDay, getWeekStart, getWeekDays, formatTime } from './scheduleUtils'
 import { TECH_COLORS, WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT, SNAP_MINUTES } from './scheduleConstants'
 import { GridEventCard } from './GridEventCard'
 
@@ -55,6 +55,8 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
   const today = new Date()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [dragOverDayIdx, setDragOverDayIdx] = useState<number | null>(null)
+  const [dropPreview, setDropPreview] = useState<{ dayIdx: number; y: number; time: Date } | null>(null)
+  const [draggingCaseId, setDraggingCaseId] = useState<string | null>(null)
   const colRefs = useRef<(HTMLDivElement | null)[]>([])
 
   function yToTime(clientY: number, colEl: HTMLElement, day: Date): Date {
@@ -219,13 +221,25 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   ${isToday ? 'bg-[#20c58f]/5' : ''}
                   ${isDragTarget ? 'bg-blue-500/8' : ''}
                 `}
-                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDayIdx(dayIdx) }}
+                onDragOver={e => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setDragOverDayIdx(dayIdx)
+                  const colEl = colRefs.current[dayIdx]
+                  if (!colEl) return
+                  const snappedTime = yToTime(e.clientY, colEl, day)
+                  setDropPreview({ dayIdx, y: timeToY(snappedTime), time: snappedTime })
+                }}
                 onDragLeave={e => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverDayIdx(null)
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setDragOverDayIdx(null)
+                    setDropPreview(null)
+                  }
                 }}
                 onDrop={e => {
                   e.preventDefault()
                   setDragOverDayIdx(null)
+                  setDropPreview(null)
                   const caseId = e.dataTransfer.getData('caseId')
                   if (!caseId || !onCaseMoved) return
                   const caseData = cases.find(c => c.id === caseId)
@@ -235,6 +249,19 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   onCaseMoved(caseId, yToTime(e.clientY, colEl, day), caseData)
                 }}
               >
+                {/* Drop-preview linje */}
+                {dropPreview?.dayIdx === dayIdx && (
+                  <div
+                    className="absolute left-0 right-0 h-[2px] bg-blue-400 pointer-events-none z-20"
+                    style={{ top: dropPreview.y }}
+                  >
+                    <span className="absolute left-1 -top-5 text-[10px] text-blue-300 bg-slate-900/90 px-1.5 py-0.5 rounded whitespace-nowrap font-mono">
+                      {formatTime(dropPreview.time)}
+                    </span>
+                    <div className="absolute -left-1 -top-[3px] w-2 h-2 rounded-full bg-blue-400" />
+                  </div>
+                )}
+
                 {dayCases.map(c => {
                   const startRaw = c.start_date || c.due_date
                   const endRaw = c.due_date || c.start_date
@@ -266,6 +293,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                         width: `${widthPct}%`,
                       }}
                       onDragStart={e => {
+                        setDraggingCaseId(c.id)
                         const duration = Math.abs(
                           new Date(c.due_date || c.start_date!).getTime() -
                           new Date(c.start_date || c.due_date!).getTime()
@@ -276,11 +304,13 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                         e.dataTransfer.effectAllowed = 'move'
                         e.stopPropagation()
                       }}
+                      onDragEnd={() => setDraggingCaseId(null)}
                     >
                       <GridEventCard
                         caseData={c}
                         onClick={() => onCaseClick(c)}
                         techColor={techColor}
+                        isDragging={draggingCaseId === c.id}
                       />
                     </div>
                   )

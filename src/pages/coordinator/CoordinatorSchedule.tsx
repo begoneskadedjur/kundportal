@@ -369,28 +369,41 @@ export default function CoordinatorSchedule() {
     fetchData()
   }
 
-  const handleCaseMoved = useCallback(async (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => {
+  const handleCaseMoved = useCallback(async (
+    caseId: string,
+    newStart: Date,
+    caseData: BeGoneCaseRow,
+    newTechnicianId?: string
+  ) => {
     const startRaw = caseData.start_date || caseData.due_date
     const endRaw = caseData.due_date || caseData.start_date
     const duration = startRaw && endRaw
       ? new Date(endRaw).getTime() - new Date(startRaw).getTime()
       : 60 * 60 * 1000
     const newEnd = new Date(newStart.getTime() + Math.abs(duration))
+    const shouldChangeTech = newTechnicianId && newTechnicianId !== caseData.primary_assignee_id
 
     // Optimistisk uppdatering
     setAllCases(prev => prev.map(c =>
       c.id === caseId
-        ? { ...c, start_date: newStart.toISOString(), due_date: newEnd.toISOString() }
+        ? {
+            ...c,
+            start_date: newStart.toISOString(),
+            due_date: newEnd.toISOString(),
+            ...(shouldChangeTech ? { primary_assignee_id: newTechnicianId } : {}),
+          }
         : c
     ))
 
     try {
       const table = caseData.case_type === 'contract' ? 'cases'
         : caseData.case_type === 'business' ? 'business_cases' : 'private_cases'
-      const { error } = await supabase.from(table).update({
+      const updateData: Record<string, string> = {
         start_date: newStart.toISOString(),
         due_date: newEnd.toISOString(),
-      }).eq('id', caseId)
+      }
+      if (shouldChangeTech) updateData.primary_assignee_id = newTechnicianId!
+      const { error } = await supabase.from(table).update(updateData).eq('id', caseId)
       if (error) throw error
     } catch {
       toast.error('Kunde inte flytta ärendet')
