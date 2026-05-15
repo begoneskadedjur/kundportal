@@ -83,6 +83,7 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
       onMouseLeave={() => setHovered(false)}
       onDragStart={handleDragStart}
       onDragEnd={() => setDragging(false)}
+      onDragOver={e => e.preventDefault()}
     >
       <div className="px-1.5 py-0.5 h-full flex flex-col justify-center overflow-hidden">
         {/* Rad 1: kundnamn + tidsspan */}
