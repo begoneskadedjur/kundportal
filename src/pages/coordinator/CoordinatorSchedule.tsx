@@ -408,14 +408,17 @@ export default function CoordinatorSchedule() {
         start_date: newStart.toISOString(),
         due_date: newEnd.toISOString(),
       }
-      if (shouldChangeTech) updateData.primary_assignee_id = newTechnicianId!
+      if (shouldChangeTech && newTech) {
+        updateData.primary_assignee_id = newTechnicianId!
+        updateData.primary_assignee_name = newTech.name || ''
+      }
       const { error } = await supabase.from(table).update(updateData).eq('id', caseId)
       if (error) throw error
     } catch {
       toast.error('Kunde inte flytta ärendet')
       fetchData()
     }
-  }, [fetchData])
+  }, [fetchData, technicians])
 
   const handleAbsenceClick = useCallback((a: Absence) => {
     setSelectedAbsence(a); setIsAbsenceDetailsModalOpen(true)
