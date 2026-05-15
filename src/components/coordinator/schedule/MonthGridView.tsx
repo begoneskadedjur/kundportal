@@ -1,7 +1,7 @@
 // MonthGridView.tsx — Månadsvy med 4-6 veckors grid
 import { useMemo, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { isSameDay, formatTime, isTechWorkingDay, isTechWorkingAt } from './scheduleUtils'
+import { isSameDay, formatTime, isTechWorkingDay, isTechWorkingAt, getTechMonthCapacity } from './scheduleUtils'
 import { TECH_COLORS, WEEK_DAY_START, WEEK_DAY_END, SNAP_MINUTES } from './scheduleConstants'
 import type { WorkSchedule } from '../../../types/database'
 import { GridEventCard } from './GridEventCard'
@@ -112,6 +112,36 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
     return technicians.map((t, i) => ({ ...t, idx: i })).filter(t => ids.has(t.id))
   }, [technicians, cases])
 
+  // Beläggning per tekniker denna månad
+  const techCapacityMap = useMemo(() => {
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const map = new Map<string, { scheduled: number; capacity: number; pct: number; colorClass: string }>()
+    for (const t of activeTechs) {
+      const cap = getTechMonthCapacity(t.work_schedule as any, year, month)
+      let scheduled = 0
+      for (const c of cases) {
+        if (c.primary_assignee_id !== t.id) continue
+        const d = c.start_date || c.due_date
+        if (!d) continue
+        const cDate = new Date(d)
+        if (cDate.getFullYear() !== year || cDate.getMonth() !== month) continue
+        if (c.start_date && c.due_date) {
+          scheduled += (new Date(c.due_date).getTime() - new Date(c.start_date).getTime()) / 3_600_000
+        }
+      }
+      const s = Math.round(scheduled * 10) / 10
+      const pct = cap > 0 ? Math.round((scheduled / cap) * 100) : 0
+      const colorClass = cap === 0 || pct === 0
+        ? 'text-slate-500'
+        : pct < 70 ? 'text-emerald-400'
+        : pct < 90 ? 'text-amber-400'
+        : 'text-red-400'
+      map.set(t.id, { scheduled: s, capacity: cap, pct, colorClass })
+    }
+    return map
+  }, [activeTechs, cases, currentDate])
+
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
@@ -156,6 +186,7 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
             const shortName = t.name.split(' ')[0]
             const isFiltering = highlightedTechIds.size > 0
             const isActive = !isFiltering || highlightedTechIds.has(t.id)
+            const cap = techCapacityMap.get(t.id)
             return (
               <button
                 key={t.id}
@@ -165,6 +196,11 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
               >
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                 {shortName}
+                {cap && (
+                  <span className={`font-normal ${cap.colorClass}`}>
+                    · {cap.scheduled}h / {cap.capacity}h ({cap.pct}%)
+                  </span>
+                )}
               </button>
             )
           })}

@@ -275,3 +275,28 @@ export function getWeekDays(start: Date): Date[] {
     return d
   })
 }
+
+/** Veckans totala arbetstid i timmar för en tekniker */
+export function getTechWeekCapacity(
+  workSchedule: Record<string, { start: string; end: string; active: boolean }> | null,
+  weekStart: Date
+): number {
+  return getWeekDays(weekStart).reduce(
+    (sum, day) => sum + getTechWorkHours(workSchedule, day),
+    0
+  )
+}
+
+/** Månadskapacitet i timmar (month = JS-konvention, 0-indexed) */
+export function getTechMonthCapacity(
+  workSchedule: Record<string, { start: string; end: string; active: boolean }> | null,
+  year: number,
+  month: number
+): number {
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  let total = 0
+  for (let d = 1; d <= daysInMonth; d++) {
+    total += getTechWorkHours(workSchedule, new Date(year, month, d))
+  }
+  return total
+}

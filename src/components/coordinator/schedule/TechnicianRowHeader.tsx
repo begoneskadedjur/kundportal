@@ -14,7 +14,7 @@ interface TechnicianRowHeaderProps {
 export const TechnicianRowHeader = memo(function TechnicianRowHeader({ technician, cases, index, currentDate }: TechnicianRowHeaderProps) {
   const color = TECH_COLORS[index % TECH_COLORS.length]
 
-  const { caseCount, scheduledHours, capacity, ratio } = useMemo(() => {
+  const { caseCount, scheduledHours, capacity, ratio, pct } = useMemo(() => {
     const count = cases.length
     let hours = 0
     for (const c of cases) {
@@ -29,6 +29,7 @@ export const TechnicianRowHeader = memo(function TechnicianRowHeader({ technicia
       scheduledHours: Math.round(hours * 10) / 10,
       capacity: cap,
       ratio: cap > 0 ? hours / cap : 0,
+      pct: cap > 0 ? Math.round((hours / cap) * 100) : 0,
     }
   }, [cases, technician.work_schedule, currentDate])
 
@@ -45,7 +46,7 @@ export const TechnicianRowHeader = memo(function TechnicianRowHeader({ technicia
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-white truncate">{technician.name}</p>
         <p className="text-[10px] text-slate-400 mt-0.5">
-          {caseCount} ärenden · {scheduledHours}h / {capacity}h
+          {caseCount} ärenden · {scheduledHours}h / {capacity}h · {pct}%
         </p>
         {/* Kapacitetsbar */}
         <div className="mt-1 h-1 w-full rounded-full bg-slate-700/50 overflow-hidden">

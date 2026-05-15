@@ -1,7 +1,7 @@
 // WeekGridView.tsx — Vertikal tidsgrid, Google Calendar-stil
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { isSameDay, getWeekStart, getWeekDays, formatTime, isTechWorkingAt } from './scheduleUtils'
+import { isSameDay, getWeekStart, getWeekDays, formatTime, isTechWorkingAt, getTechWeekCapacity } from './scheduleUtils'
 import type { WorkSchedule } from '../../../types/database'
 import { TECH_COLORS, WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT, SNAP_MINUTES } from './scheduleConstants'
 import { GridEventCard } from './GridEventCard'
@@ -106,6 +106,32 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
       .filter(t => techIdsThisWeek.has(t.id))
   }, [technicians, cases, weekDays])
 
+  // Beläggning per tekniker denna vecka
+  const techCapacityMap = useMemo(() => {
+    const map = new Map<string, { scheduled: number; capacity: number; pct: number; colorClass: string }>()
+    for (const t of activeTechs) {
+      const cap = getTechWeekCapacity(t.work_schedule as any, weekStart)
+      let scheduled = 0
+      for (const c of cases) {
+        if (c.primary_assignee_id !== t.id) continue
+        const d = c.start_date || c.due_date
+        if (!d || !weekDays.some(w => isSameDay(new Date(d), w))) continue
+        if (c.start_date && c.due_date) {
+          scheduled += (new Date(c.due_date).getTime() - new Date(c.start_date).getTime()) / 3_600_000
+        }
+      }
+      const s = Math.round(scheduled * 10) / 10
+      const pct = cap > 0 ? Math.round((scheduled / cap) * 100) : 0
+      const colorClass = cap === 0 || pct === 0
+        ? 'text-slate-500'
+        : pct < 70 ? 'text-emerald-400'
+        : pct < 90 ? 'text-amber-400'
+        : 'text-red-400'
+      map.set(t.id, { scheduled: s, capacity: cap, pct, colorClass })
+    }
+    return map
+  }, [activeTechs, cases, weekStart, weekDays])
+
   // Ärenden per dag
   const casesByDay = useMemo(() => {
     return weekDays.map(day =>
@@ -196,6 +222,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
             const shortName = t.name.split(' ')[0]
             const isFiltering = highlightedTechIds.size > 0
             const isActive = !isFiltering || highlightedTechIds.has(t.id)
+            const cap = techCapacityMap.get(t.id)
             return (
               <button
                 key={t.id}
@@ -208,6 +235,11 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
               >
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                 {shortName}
+                {cap && (
+                  <span className={`font-normal ${cap.colorClass}`}>
+                    · {cap.scheduled}h / {cap.capacity}h ({cap.pct}%)
+                  </span>
+                )}
               </button>
             )
           })}
