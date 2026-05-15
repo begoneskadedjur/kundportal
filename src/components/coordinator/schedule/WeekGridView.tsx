@@ -262,7 +262,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
               style={{ top: slot.y }}
             >
               {slot.label && (
-                <span className="absolute right-2 -translate-y-1/2 text-[10px] text-slate-500 whitespace-nowrap">
+                <span className={`absolute right-2 text-[10px] text-slate-500 whitespace-nowrap ${i === 0 ? 'top-0' : '-translate-y-1/2'}`}>
                   {slot.label}
                 </span>
               )}
