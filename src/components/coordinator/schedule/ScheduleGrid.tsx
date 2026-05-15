@@ -141,6 +141,7 @@ export function ScheduleGrid({
         currentDate={currentDate}
         onCaseClick={onCaseClick}
         onDayClick={handleDayClick}
+        onCaseMoved={onCaseMoved}
       />
     )
   }

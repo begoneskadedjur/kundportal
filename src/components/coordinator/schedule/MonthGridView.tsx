@@ -13,11 +13,14 @@ interface MonthGridViewProps {
   currentDate: Date
   onCaseClick: (caseData: BeGoneCaseRow) => void
   onDayClick: (date: Date) => void
+  onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => void
 }
 
-export function MonthGridView({ technicians, cases, currentDate, onCaseClick, onDayClick }: MonthGridViewProps) {
+export function MonthGridView({ technicians, cases, currentDate, onCaseClick, onDayClick, onCaseMoved }: MonthGridViewProps) {
   const today = new Date()
   const [highlightedTechIds, setHighlightedTechIds] = useState<Set<string>>(new Set())
+  const [draggingCaseId, setDraggingCaseId] = useState<string | null>(null)
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null)
 
   function toggleHighlight(techId: string) {
     setHighlightedTechIds(prev => {
@@ -131,15 +134,39 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
               const visible = filtered.slice(0, MONTH_MAX_EVENTS)
               const overflow = filtered.length - visible.length
 
+              const dayKey = day.toISOString()
+              const isDragOver = dragOverDay === dayKey
+
               return (
                 <div
                   key={di}
                   className={`
                     p-1.5 cursor-pointer transition-colors border-t-2
                     ${isToday ? 'bg-[#20c58f]/5 border-t-red-500' : isCurrentMonth ? 'bg-slate-900/20 border-t-transparent' : 'bg-slate-900/60 border-t-transparent'}
-                    hover:bg-slate-800/30
+                    ${isDragOver ? 'bg-blue-500/10 ring-1 ring-inset ring-blue-500/40' : 'hover:bg-slate-800/30'}
                   `}
                   onClick={() => onDayClick(day)}
+                  onDragOver={e => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                    setDragOverDay(dayKey)
+                  }}
+                  onDragLeave={e => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node))
+                      setDragOverDay(null)
+                  }}
+                  onDrop={e => {
+                    e.preventDefault()
+                    setDragOverDay(null)
+                    const caseId = e.dataTransfer.getData('caseId')
+                    if (!caseId || !onCaseMoved) return
+                    const caseData = cases.find(c => c.id === caseId)
+                    if (!caseData) return
+                    const orig = new Date(caseData.start_date || caseData.due_date || '')
+                    const newStart = new Date(day)
+                    newStart.setHours(orig.getHours(), orig.getMinutes(), 0, 0)
+                    onCaseMoved(caseId, newStart, caseData)
+                  }}
                 >
                   {/* Dagnummer */}
                   <div className="flex items-center justify-between mb-1">
@@ -158,13 +185,26 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                       const techIdx = techId ? (techIndexMap.get(techId) ?? 0) : 0
                       const techColor = TECH_COLORS[techIdx % TECH_COLORS.length]
                       return (
-                        <GridEventCard
+                        <div
                           key={c.id}
-                          caseData={c}
-                          onClick={() => onCaseClick(c)}
-                          techColor={techColor}
-                          compact
-                        />
+                          draggable
+                          className={`transition-opacity ${draggingCaseId === c.id ? 'opacity-40' : 'opacity-100'}`}
+                          onDragStart={e => {
+                            setDraggingCaseId(c.id)
+                            e.dataTransfer.setData('caseId', c.id)
+                            e.dataTransfer.effectAllowed = 'move'
+                            e.stopPropagation()
+                          }}
+                          onDragEnd={() => { setDraggingCaseId(null); setDragOverDay(null) }}
+                        >
+                          <GridEventCard
+                            caseData={c}
+                            onClick={() => onCaseClick(c)}
+                            techColor={techColor}
+                            compact
+                            isDragging={draggingCaseId === c.id}
+                          />
+                        </div>
                       )
                     })}
 
