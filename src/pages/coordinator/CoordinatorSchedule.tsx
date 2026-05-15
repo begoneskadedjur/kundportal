@@ -382,6 +382,9 @@ export default function CoordinatorSchedule() {
       : 60 * 60 * 1000
     const newEnd = new Date(newStart.getTime() + Math.abs(duration))
     const shouldChangeTech = newTechnicianId && newTechnicianId !== caseData.primary_assignee_id
+    const newTech = (shouldChangeTech && newTechnicianId)
+      ? technicians.find(t => t.id === newTechnicianId)
+      : undefined
 
     // Optimistisk uppdatering
     setAllCases(prev => prev.map(c =>
@@ -390,7 +393,10 @@ export default function CoordinatorSchedule() {
             ...c,
             start_date: newStart.toISOString(),
             due_date: newEnd.toISOString(),
-            ...(shouldChangeTech ? { primary_assignee_id: newTechnicianId } : {}),
+            ...(shouldChangeTech ? {
+              primary_assignee_id: newTechnicianId,
+              ...(newTech ? { primary_assignee_name: newTech.name } : {}),
+            } : {}),
           }
         : c
     ))

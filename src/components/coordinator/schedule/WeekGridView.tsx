@@ -249,19 +249,6 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   onCaseMoved(caseId, yToTime(e.clientY, colEl, day), caseData)
                 }}
               >
-                {/* Drop-preview linje */}
-                {dropPreview?.dayIdx === dayIdx && (
-                  <div
-                    className="absolute left-0 right-0 h-[2px] bg-blue-400 pointer-events-none z-20"
-                    style={{ top: dropPreview.y }}
-                  >
-                    <span className="absolute left-1 -top-5 text-[10px] text-blue-300 bg-slate-900/90 px-1.5 py-0.5 rounded whitespace-nowrap font-mono">
-                      {formatTime(dropPreview.time)}
-                    </span>
-                    <div className="absolute -left-1 -top-[3px] w-2 h-2 rounded-full bg-blue-400" />
-                  </div>
-                )}
-
                 {dayCases.map(c => {
                   const startRaw = c.start_date || c.due_date
                   const endRaw = c.due_date || c.start_date
@@ -315,6 +302,19 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                     </div>
                   )
                 })}
+
+                {/* Drop-preview linje — renderas sist för att ligga ovanpå korten */}
+                {dropPreview?.dayIdx === dayIdx && (
+                  <div
+                    className="absolute left-0 right-0 h-[2px] bg-blue-400 pointer-events-none z-30"
+                    style={{ top: dropPreview.y }}
+                  >
+                    <span className="absolute left-1 -top-5 text-[10px] text-blue-300 bg-slate-900/90 px-1.5 py-0.5 rounded whitespace-nowrap font-mono">
+                      {formatTime(dropPreview.time)}
+                    </span>
+                    <div className="absolute -left-1 -top-[3px] w-2 h-2 rounded-full bg-blue-400" />
+                  </div>
+                )}
               </div>
             )
           })}
