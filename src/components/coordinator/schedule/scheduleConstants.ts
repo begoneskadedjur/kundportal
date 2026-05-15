@@ -12,10 +12,16 @@ export const SNAP_MINUTES = 15
 export const TOTAL_HOURS = DAY_END_HOUR - DAY_START_HOUR // 14h
 export const DAY_GRID_WIDTH = TOTAL_HOURS * HOUR_WIDTH    // 1680px
 
-// ─── Veckovy ───
-export const WEEK_DAY_COL_WIDTH = 240  // px per dagkolumn
-export const WEEK_GRID_WIDTH = WEEK_DAY_COL_WIDTH * 7 // 1680px
-export const WEEK_HOUR_WIDTH = WEEK_DAY_COL_WIDTH / TOTAL_HOURS // ~17.14px per timme
+// ─── Veckovy (vertikal tidsgrid) ───
+export const WEEK_DAY_COL_WIDTH = 240  // px per dagkolumn (används ej i ny veckovy, behålls för kompatibilitet)
+export const WEEK_GRID_WIDTH = WEEK_DAY_COL_WIDTH * 7
+export const WEEK_HOUR_WIDTH = WEEK_DAY_COL_WIDTH / TOTAL_HOURS
+export const WEEK_HOUR_HEIGHT = 64     // px per timme i vertikal grid
+export const WEEK_TIME_COL_WIDTH = 48  // px för tidskolumnen till vänster
+export const WEEK_DAY_START = 7        // 07:00
+export const WEEK_DAY_END = 19         // 19:00
+export const WEEK_TOTAL_HOURS = WEEK_DAY_END - WEEK_DAY_START  // 12h
+export const WEEK_GRID_HEIGHT = WEEK_TOTAL_HOURS * WEEK_HOUR_HEIGHT  // 768px
 
 /** Returnera grid-bredd baserat på vyläge */
 export function getGridWidth(viewMode: ViewMode): number {
