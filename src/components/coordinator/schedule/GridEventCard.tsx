@@ -77,7 +77,7 @@ export const GridEventCard = memo(function GridEventCard({
         onMouseEnter={isDragging ? undefined : handleMouseEnter}
         onMouseLeave={() => setHovered(false)}
         className={`
-          rounded-md border-l-4 cursor-pointer select-none
+          h-full rounded-md border-l-4 cursor-pointer select-none overflow-hidden
           hover:brightness-110 hover:shadow-md transition-all duration-100
           ${style.bg} ${style.border}
           ${isContract ? 'ring-1 ring-purple-400/20' : ''}
