@@ -196,16 +196,15 @@ export function cityAddress(address: unknown): string {
   if (!address) return ''
   if (typeof address === 'object' && address !== null) {
     const a = address as Record<string, unknown>
-    if (a.city) return String(a.city).slice(0, 20)
+    if (a.postal_code && a.city) return `${a.postal_code} ${a.city}`.slice(0, 25)
+    if (a.city) return String(a.city).slice(0, 25)
   }
   const full = formatAddress(address)
   if (!full) return ''
-  const parts = full.split(',')
-  if (parts.length >= 2) {
-    const cityPart = parts[parts.length - 1].trim()
-    return cityPart.replace(/^\d{3}\s?\d{2}\s*/, '').trim().slice(0, 20)
-  }
-  return full.slice(0, 20)
+  const parts = full.split(',').map(p => p.trim()).filter(Boolean)
+  const filtered = parts.filter(p => !/^(sverige|sweden)$/i.test(p))
+  if (filtered.length >= 2) return filtered[filtered.length - 1].slice(0, 25)
+  return (filtered[0] ?? '').slice(0, 25)
 }
 
 /** Beräkna kapacitet i timmar baserat på work_schedule */

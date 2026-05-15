@@ -93,9 +93,10 @@ export const GridEventCard = memo(function GridEventCard({
           )}
           {initials && (
             <span
-              className="shrink-0 rounded-sm px-1 py-0.5 text-[9px] font-bold leading-none"
+              className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold leading-none border-2"
               style={{
                 backgroundColor: techColor ? techColor + '33' : 'rgba(255,255,255,0.1)',
+                borderColor: techColor ?? '#94a3b8',
                 color: techColor ?? '#94a3b8',
               }}
             >

@@ -57,6 +57,16 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
   const [dragOverDayIdx, setDragOverDayIdx] = useState<number | null>(null)
   const [dropPreview, setDropPreview] = useState<{ dayIdx: number; y: number; time: Date } | null>(null)
   const [draggingCaseId, setDraggingCaseId] = useState<string | null>(null)
+  const [highlightedTechIds, setHighlightedTechIds] = useState<Set<string>>(new Set())
+
+  function toggleHighlight(techId: string) {
+    setHighlightedTechIds(prev => {
+      const next = new Set(prev)
+      if (next.has(techId)) next.delete(techId)
+      else next.add(techId)
+      return next
+    })
+  }
   const colRefs = useRef<(HTMLDivElement | null)[]>([])
 
   function yToTime(clientY: number, colEl: HTMLElement, day: Date): Date {
@@ -178,20 +188,26 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
 
       {/* Teknikerlegende */}
       {activeTechs.length > 0 && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-slate-700/50 bg-slate-900/80 flex-shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-700/50 bg-slate-900/80 flex-shrink-0 flex-wrap">
           {activeTechs.map(t => {
             const color = TECH_COLORS[t.idx % TECH_COLORS.length]
             const initials = t.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
             const shortName = t.name.split(' ')[0]
+            const isFiltering = highlightedTechIds.size > 0
+            const isActive = !isFiltering || highlightedTechIds.has(t.id)
             return (
-              <div key={t.id} className="flex items-center gap-1">
+              <div
+                key={t.id}
+                className={`flex items-center gap-1.5 cursor-pointer select-none transition-opacity ${isActive ? 'opacity-100' : 'opacity-35'}`}
+                onClick={() => toggleHighlight(t.id)}
+              >
                 <span
-                  className="rounded-sm px-1 py-0.5 text-[9px] font-bold leading-none"
-                  style={{ backgroundColor: color + '33', color }}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold border-2 leading-none"
+                  style={{ backgroundColor: color + '33', borderColor: color, color }}
                 >
                   {initials}
                 </span>
-                <span className="text-[10px] text-slate-400">{shortName}</span>
+                <span className="text-[10px] text-slate-300">{shortName}</span>
               </div>
             )
           })}
@@ -306,12 +322,13 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   const techIdx = techId ? (techIndexMap.get(techId) ?? 0) : 0
                   const techColor = TECH_COLORS[techIdx % TECH_COLORS.length]
                   const techName = techId ? (technicians[techIdx]?.name ?? '') : ''
+                  const isFaded = highlightedTechIds.size > 0 && !highlightedTechIds.has(techId ?? '')
 
                   return (
                     <div
                       key={c.id}
                       draggable
-                      className="absolute px-0.5 py-0 cursor-grab active:cursor-grabbing"
+                      className={`absolute px-0.5 py-0 cursor-grab active:cursor-grabbing transition-opacity ${isFaded ? 'opacity-20' : 'opacity-100'}`}
                       style={{
                         top,
                         height,
