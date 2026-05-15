@@ -1,8 +1,8 @@
 // MonthGridView.tsx — Månadsvy med 4-6 veckors grid
 import { useMemo, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { isSameDay } from './scheduleUtils'
-import { TECH_COLORS } from './scheduleConstants'
+import { isSameDay, formatTime } from './scheduleUtils'
+import { TECH_COLORS, WEEK_DAY_START, WEEK_DAY_END, SNAP_MINUTES } from './scheduleConstants'
 import { GridEventCard } from './GridEventCard'
 
 const MONTH_MAX_EVENTS = 3
@@ -16,11 +16,41 @@ interface MonthGridViewProps {
   onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => void
 }
 
+// Bygg lista av lediga 15-min slots för en dag givet befintliga ärenden
+function buildSlots(day: Date, dayCases: BeGoneCaseRow[], excludeId: string | null): string[] {
+  const slots: string[] = []
+  const totalSlots = ((WEEK_DAY_END - WEEK_DAY_START) * 60) / SNAP_MINUTES
+
+  for (let i = 0; i < totalSlots; i++) {
+    const mins = WEEK_DAY_START * 60 + i * SNAP_MINUTES
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    const slotStart = new Date(day)
+    slotStart.setHours(h, m, 0, 0)
+    const slotEnd = new Date(slotStart.getTime() + SNAP_MINUTES * 60000)
+
+    // Hoppa över slots som överlappar med befintliga ärenden (exkl. det som dras)
+    const overlaps = dayCases.some(c => {
+      if (c.id === excludeId) return false
+      const cStart = new Date(c.start_date || c.due_date!).getTime()
+      const cEnd = new Date(c.due_date || c.start_date!).getTime()
+      return slotStart.getTime() < cEnd && slotEnd.getTime() > cStart
+    })
+
+    if (!overlaps) {
+      slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+    }
+  }
+  return slots
+}
+
 export function MonthGridView({ technicians, cases, currentDate, onCaseClick, onDayClick, onCaseMoved }: MonthGridViewProps) {
   const today = new Date()
   const [highlightedTechIds, setHighlightedTechIds] = useState<Set<string>>(new Set())
   const [draggingCaseId, setDraggingCaseId] = useState<string | null>(null)
   const [dragOverDay, setDragOverDay] = useState<string | null>(null)
+  const [expandedDayKey, setExpandedDayKey] = useState<string | null>(null)
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null)
 
   function toggleHighlight(techId: string) {
     setHighlightedTechIds(prev => {
@@ -31,33 +61,24 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
     })
   }
 
-  // Bygg techId → index map för färger
   const techIndexMap = useMemo(() => {
     const m = new Map<string, number>()
     technicians.forEach((t, i) => m.set(t.id, i))
     return m
   }, [technicians])
 
-  // Tekniker med ärenden denna månad (för filter-UI)
   const activeTechs = useMemo(() => {
     const ids = new Set(cases.map(c => c.primary_assignee_id).filter(Boolean))
     return technicians.map((t, i) => ({ ...t, idx: i })).filter(t => ids.has(t.id))
   }, [technicians, cases])
 
-  // Alla dagar som ska visas (fyller ut månaden med dagar från angränsande månader)
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
-
-    // Första dagen i månaden
     const firstDay = new Date(year, month, 1)
-    // Måndag = 1, Söndag = 0 → vi vill att måndag ska vara index 0
     const startOffset = (firstDay.getDay() || 7) - 1
-
-    // Sista dagen i månaden
     const lastDay = new Date(year, month + 1, 0)
     const endOffset = 6 - ((lastDay.getDay() || 7) - 1)
-
     const days: Date[] = []
     for (let i = -startOffset; i <= lastDay.getDate() - 1 + endOffset; i++) {
       days.push(new Date(year, month, 1 + i))
@@ -117,6 +138,9 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
             {week.map((day, di) => {
               const isCurrentMonth = day.getMonth() === currentMonth
               const isToday = isSameDay(day, today)
+              const dayKey = day.toISOString()
+              const isDragOver = dragOverDay === dayKey
+              const isExpanded = expandedDayKey === dayKey
 
               const dayCases = cases.filter(c => {
                 const d = c.start_date || c.due_date
@@ -134,30 +158,39 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
               const visible = filtered.slice(0, MONTH_MAX_EVENTS)
               const overflow = filtered.length - visible.length
 
-              const dayKey = day.toISOString()
-              const isDragOver = dragOverDay === dayKey
+              // Slots för expanderad vy — bara lediga 15-min intervaller
+              const freeSlots = isExpanded ? buildSlots(day, dayCases, draggingCaseId) : []
 
               return (
                 <div
                   key={di}
                   className={`
-                    p-1.5 cursor-pointer transition-colors border-t-2
+                    p-1.5 cursor-pointer transition-all border-t-2
                     ${isToday ? 'bg-[#20c58f]/5 border-t-red-500' : isCurrentMonth ? 'bg-slate-900/20 border-t-transparent' : 'bg-slate-900/60 border-t-transparent'}
-                    ${isDragOver ? 'bg-blue-500/10 ring-1 ring-inset ring-blue-500/40' : 'hover:bg-slate-800/30'}
+                    ${isDragOver && !isExpanded ? 'bg-blue-500/10 ring-1 ring-inset ring-blue-500/40' : ''}
+                    ${!isDragOver ? 'hover:bg-slate-800/30' : ''}
+                    ${isExpanded ? 'z-10 relative' : ''}
                   `}
                   onClick={() => onDayClick(day)}
                   onDragOver={e => {
                     e.preventDefault()
                     e.dataTransfer.dropEffect = 'move'
                     setDragOverDay(dayKey)
+                    setExpandedDayKey(dayKey)
                   }}
                   onDragLeave={e => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node))
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                       setDragOverDay(null)
+                      setExpandedDayKey(null)
+                      setDragOverSlot(null)
+                    }
                   }}
                   onDrop={e => {
+                    // Fallback: drop på dagcell utan slot → bevara originaltid
                     e.preventDefault()
                     setDragOverDay(null)
+                    setExpandedDayKey(null)
+                    setDragOverSlot(null)
                     const caseId = e.dataTransfer.getData('caseId')
                     if (!caseId || !onCaseMoved) return
                     const caseData = cases.find(c => c.id === caseId)
@@ -178,42 +211,99 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                     </span>
                   </div>
 
-                  {/* Ärenden */}
-                  <div className="space-y-0.5">
-                    {visible.map(c => {
-                      const techId = c.primary_assignee_id
-                      const techIdx = techId ? (techIndexMap.get(techId) ?? 0) : 0
-                      const techColor = TECH_COLORS[techIdx % TECH_COLORS.length]
-                      return (
-                        <div
-                          key={c.id}
-                          draggable
-                          className={`transition-opacity ${draggingCaseId === c.id ? 'opacity-40' : 'opacity-100'}`}
-                          onDragStart={e => {
-                            setDraggingCaseId(c.id)
-                            e.dataTransfer.setData('caseId', c.id)
-                            e.dataTransfer.effectAllowed = 'move'
-                            e.stopPropagation()
-                          }}
-                          onDragEnd={() => { setDraggingCaseId(null); setDragOverDay(null) }}
-                        >
-                          <GridEventCard
-                            caseData={c}
-                            onClick={() => onCaseClick(c)}
-                            techColor={techColor}
-                            compact
-                            isDragging={draggingCaseId === c.id}
-                          />
-                        </div>
-                      )
-                    })}
+                  {/* Expanderad tidsgrid vid drag-hover */}
+                  {isExpanded ? (
+                    <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5">
+                      {/* Befintliga ärenden (exkl. det som dras) */}
+                      {dayCases.filter(c => c.id !== draggingCaseId).map(c => {
+                        const s = c.start_date || c.due_date
+                        const e2 = c.due_date || c.start_date
+                        const name = c.company_name || (c as any).bestallare || (c as any).kontaktperson || c.case_number || ''
+                        const timeStr = s && e2 ? `${formatTime(new Date(s))}–${formatTime(new Date(e2))}` : ''
+                        return (
+                          <div key={c.id} className="text-[9px] px-1.5 py-1 rounded bg-slate-700/60 text-slate-300 truncate pointer-events-none border-l-2 border-slate-500">
+                            {name} {timeStr}
+                          </div>
+                        )
+                      })}
+                      {/* Lediga 15-min slots */}
+                      {freeSlots.map(slotTime => {
+                        const slotKey = `${dayKey}:${slotTime}`
+                        const isSlotOver = dragOverSlot === slotKey
+                        return (
+                          <div
+                            key={slotKey}
+                            className={`text-[9px] px-1.5 py-0.5 rounded transition-colors font-mono
+                              ${isSlotOver ? 'bg-blue-500/30 text-blue-300 ring-1 ring-blue-400/50' : 'text-slate-500 hover:bg-slate-700/40 hover:text-slate-300'}`}
+                            onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverSlot(slotKey) }}
+                            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverSlot(null) }}
+                            onDrop={e => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setDragOverSlot(null)
+                              setExpandedDayKey(null)
+                              setDragOverDay(null)
+                              const caseId = e.dataTransfer.getData('caseId')
+                              if (!caseId || !onCaseMoved) return
+                              const caseData = cases.find(c => c.id === caseId)
+                              if (!caseData) return
+                              const [hh, mm] = slotTime.split(':').map(Number)
+                              const newStart = new Date(day)
+                              newStart.setHours(hh, mm, 0, 0)
+                              onCaseMoved(caseId, newStart, caseData)
+                            }}
+                          >
+                            {slotTime}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    /* Normal vy */
+                    <div className="space-y-0.5">
+                      {visible.map(c => {
+                        const techId = c.primary_assignee_id
+                        const techIdx = techId ? (techIndexMap.get(techId) ?? 0) : 0
+                        const techColor = TECH_COLORS[techIdx % TECH_COLORS.length]
+                        return (
+                          <div
+                            key={c.id}
+                            draggable
+                            className={`transition-opacity ${draggingCaseId === c.id ? 'opacity-40' : 'opacity-100'}`}
+                            onDragStart={e => {
+                              setDraggingCaseId(c.id)
+                              e.dataTransfer.setData('caseId', c.id)
+                              const startMs = new Date(c.start_date || c.due_date!).getTime()
+                              const endMs = new Date(c.due_date || c.start_date!).getTime()
+                              e.dataTransfer.setData('duration', String(Math.abs(endMs - startMs) || 3600000))
+                              e.dataTransfer.effectAllowed = 'move'
+                              e.stopPropagation()
+                            }}
+                            onDragEnd={() => {
+                              setDraggingCaseId(null)
+                              setDragOverDay(null)
+                              setExpandedDayKey(null)
+                              setDragOverSlot(null)
+                            }}
+                          >
+                            <GridEventCard
+                              caseData={c}
+                              onClick={() => onCaseClick(c)}
+                              techColor={techColor}
+                              compact
+                              isDragging={draggingCaseId === c.id}
+                            />
+                          </div>
+                        )
+                      })}
 
-                    {overflow > 0 && (
-                      <p className="text-[10px] text-slate-500 hover:text-slate-300 px-1">
-                        +{overflow} fler
-                      </p>
-                    )}
-                  </div>
+                      {overflow > 0 && (
+                        <p className="text-[10px] text-slate-500 hover:text-slate-300 px-1">
+                          +{overflow} fler
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}
