@@ -53,7 +53,7 @@ export function getStatusStyle(status: string, caseType?: string) {
   if (ls.includes('avslutat'))   return { bg: 'bg-emerald-600/20', border: 'border-l-emerald-500', text: 'text-emerald-200' }
   if (ls.startsWith('återbesök'))return { bg: 'bg-blue-500/20', border: 'border-l-blue-500', text: 'text-blue-200' }
   if (ls.includes('signerad'))   return { bg: 'bg-[#20c58f]/20', border: 'border-l-[#20c58f]', text: 'text-emerald-200' }
-  if (ls.includes('offert'))     return { bg: 'bg-orange-500/20', border: 'border-l-orange-500', text: 'text-orange-200' }
+  if (ls.includes('offert'))     return { bg: 'bg-cyan-500/20', border: 'border-l-cyan-500', text: 'text-cyan-200' }
   if (ls.includes('bokad') || ls.includes('bokat'))
     return { bg: 'bg-amber-500/20', border: 'border-l-amber-500', text: 'text-amber-200' }
   if (ls.includes('review'))     return { bg: 'bg-violet-500/20', border: 'border-l-violet-500', text: 'text-violet-200' }
@@ -66,7 +66,7 @@ export function getStatusStyle(status: string, caseType?: string) {
 export const STATUS_LEGEND = [
   { label: 'Öppen',      color: 'bg-sky-500' },
   { label: 'Bokad',      color: 'bg-amber-500' },
-  { label: 'Offert',     color: 'bg-orange-500' },
+  { label: 'Offert',     color: 'bg-cyan-500' },
   { label: 'Signerad',   color: 'bg-[#20c58f]' },
   { label: 'Återbesök',  color: 'bg-blue-500' },
   { label: 'Avtal',      color: 'bg-purple-500' },
@@ -84,7 +84,7 @@ export interface FilterStatus {
 export const FILTER_STATUSES: FilterStatus[] = [
   { key: 'Öppen', label: 'Öppen', dot: 'bg-sky-500' },
   { key: 'Bokad', label: 'Bokad', dot: 'bg-amber-500' },
-  { key: 'Offert skickad', label: 'Offert', dot: 'bg-orange-500' },
+  { key: 'Offert skickad', label: 'Offert', dot: 'bg-cyan-500' },
   { key: 'Offert signerad - boka in', label: 'Signerad', dot: 'bg-[#20c58f]' },
   { key: 'Återbesök', label: 'Återbesök', dot: 'bg-blue-500' },
   { key: 'Borttaget', label: 'Borttaget', dot: 'bg-red-500' },

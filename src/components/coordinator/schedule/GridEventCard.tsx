@@ -18,7 +18,7 @@ interface GridEventCardProps {
 export const GridEventCard = memo(function GridEventCard({
   caseData,
   onClick,
-  technicianName,
+  technicianName: _technicianName,
   techColor,
   compact = false,
   isDragging = false,
@@ -35,24 +35,27 @@ export const GridEventCard = memo(function GridEventCard({
 
   const isContract = caseData.case_type === 'contract'
 
-  // Ärendenummer: case_number eller title om det ser ut som ett ärendenummer
   const caseNumber = caseData.case_number || caseData.title || ''
 
-  // Kundnamn: company_name (business/contract) || bestallare || kontaktperson
   const customerName = caseData.company_name ||
     (caseData as any).bestallare ||
     (caseData as any).kontaktperson ||
     ''
 
-  // Tjänst
   const service = caseData.service?.name || (caseData as any).skadedjur || ''
   const addr = cityAddress((caseData as any).adress)
   const serviceAndAddr = [service, addr].filter(Boolean).join(' · ')
 
-  // Initialer
-  const initials = technicianName
-    ? technicianName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-    : ''
+  const categoryLabel = caseData.case_type === 'private' ? 'Privatperson'
+    : caseData.case_type === 'business' ? 'Företag'
+    : caseData.case_type === 'inspection' ? 'Inspektion'
+    : null
+
+  const assigneeNames = [
+    caseData.primary_assignee_name,
+    caseData.secondary_assignee_name,
+    caseData.tertiary_assignee_name,
+  ].filter(Boolean) as string[]
 
   const handleMouseEnter = () => {
     if (!blockRef.current) return
@@ -81,8 +84,14 @@ export const GridEventCard = memo(function GridEventCard({
           ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'}
           ${isDragging ? 'opacity-40 pointer-events-none' : ''}
         `}
+        style={techColor ? { borderLeftColor: techColor } : undefined}
       >
-        {/* Rad 1: ärendenummer + initialer-badge */}
+        {/* Kategori-label (ej compact, ej contract) */}
+        {!compact && categoryLabel && (
+          <p className="text-[9px] text-slate-500 leading-tight truncate">{categoryLabel}</p>
+        )}
+
+        {/* Rad 1: ärendenummer + tekniker-avatarer */}
         <div className="flex items-center justify-between gap-1 min-w-0">
           {caseNumber && (
             <p className={`font-mono font-semibold truncate leading-tight ${style.text} ${compact ? 'text-[9px]' : 'text-[10px]'}`}>
@@ -90,10 +99,17 @@ export const GridEventCard = memo(function GridEventCard({
               {caseNumber}
             </p>
           )}
-          {initials && (
-            <span className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold leading-none border-2 border-[#20c58f] bg-[#20c58f]/20 text-[#20c58f]">
-              {initials}
-            </span>
+          {assigneeNames.length > 0 && (
+            <div className="flex -space-x-1.5 shrink-0">
+              {assigneeNames.map((name, i) => (
+                <span
+                  key={i}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold border-2 border-[#20c58f] bg-[#20c58f]/20 text-[#20c58f] leading-none"
+                >
+                  {name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                </span>
+              ))}
+            </div>
           )}
         </div>
 
