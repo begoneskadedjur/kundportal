@@ -1,5 +1,5 @@
 // MonthGridView.tsx — Månadsvy med 4-6 veckors grid
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
 import { isSameDay } from './scheduleUtils'
 import { TECH_COLORS } from './scheduleConstants'
@@ -17,6 +17,16 @@ interface MonthGridViewProps {
 
 export function MonthGridView({ technicians, cases, currentDate, onCaseClick, onDayClick }: MonthGridViewProps) {
   const today = new Date()
+  const [highlightedTechIds, setHighlightedTechIds] = useState<Set<string>>(new Set())
+
+  function toggleHighlight(techId: string) {
+    setHighlightedTechIds(prev => {
+      const next = new Set(prev)
+      if (next.has(techId)) next.delete(techId)
+      else next.add(techId)
+      return next
+    })
+  }
 
   // Bygg techId → index map för färger
   const techIndexMap = useMemo(() => {
@@ -24,6 +34,12 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
     technicians.forEach((t, i) => m.set(t.id, i))
     return m
   }, [technicians])
+
+  // Tekniker med ärenden denna månad (för filter-UI)
+  const activeTechs = useMemo(() => {
+    const ids = new Set(cases.map(c => c.primary_assignee_id).filter(Boolean))
+    return technicians.map((t, i) => ({ ...t, idx: i })).filter(t => ids.has(t.id))
+  }, [technicians, cases])
 
   // Alla dagar som ska visas (fyller ut månaden med dagar från angränsande månader)
   const calendarDays = useMemo(() => {
@@ -68,6 +84,29 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
         ))}
       </div>
 
+      {/* Teknikerfilter */}
+      {activeTechs.length > 0 && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-slate-700/50 bg-slate-900/80 flex-shrink-0 flex-wrap">
+          {activeTechs.map(t => {
+            const color = TECH_COLORS[t.idx % TECH_COLORS.length]
+            const shortName = t.name.split(' ')[0]
+            const isFiltering = highlightedTechIds.size > 0
+            const isActive = !isFiltering || highlightedTechIds.has(t.id)
+            return (
+              <button
+                key={t.id}
+                onClick={e => { e.stopPropagation(); toggleHighlight(t.id) }}
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all select-none
+                  ${isActive ? 'bg-slate-700/60 text-white border border-slate-600' : 'bg-transparent text-slate-500 border border-transparent'}`}
+              >
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                {shortName}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Veckorader */}
       <div className="flex flex-col flex-1 overflow-y-auto divide-y divide-slate-700/50">
         {weeks.map((week, wi) => (
@@ -85,8 +124,12 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                 return aT.localeCompare(bT)
               })
 
-              const visible = dayCases.slice(0, MONTH_MAX_EVENTS)
-              const overflow = dayCases.length - visible.length
+              const filtered = highlightedTechIds.size === 0
+                ? dayCases
+                : dayCases.filter(c => highlightedTechIds.has(c.primary_assignee_id ?? ''))
+
+              const visible = filtered.slice(0, MONTH_MAX_EVENTS)
+              const overflow = filtered.length - visible.length
 
               return (
                 <div
