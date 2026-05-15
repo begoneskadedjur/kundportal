@@ -186,27 +186,27 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
         })}
       </div>
 
-      {/* Teknikerlegende */}
+      {/* Teknikerlegende — samma stil som statusfiltret */}
       {activeTechs.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-700/50 bg-slate-900/80 flex-shrink-0 flex-wrap">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-slate-700/50 bg-slate-900/80 flex-shrink-0 flex-wrap">
           {activeTechs.map(t => {
             const color = TECH_COLORS[t.idx % TECH_COLORS.length]
             const shortName = t.name.split(' ')[0]
             const isFiltering = highlightedTechIds.size > 0
             const isActive = !isFiltering || highlightedTechIds.has(t.id)
             return (
-              <div
+              <button
                 key={t.id}
-                className={`cursor-pointer select-none transition-opacity ${isActive ? 'opacity-100' : 'opacity-35'}`}
                 onClick={() => toggleHighlight(t.id)}
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all select-none
+                  ${isActive
+                    ? 'bg-slate-700/60 text-white border border-slate-600'
+                    : 'bg-transparent text-slate-500 border border-transparent'
+                  }`}
               >
-                <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight"
-                  style={{ backgroundColor: color + '33', color, border: `1px solid ${color}55` }}
-                >
-                  {shortName}
-                </span>
-              </div>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                {shortName}
+              </button>
             )
           })}
         </div>
@@ -353,6 +353,8 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                         techColor={techColor}
                         technicianName={techName}
                         isDragging={draggingCaseId === c.id}
+                        heightPx={height}
+                        widthPct={widthPct}
                       />
                     </div>
                   )

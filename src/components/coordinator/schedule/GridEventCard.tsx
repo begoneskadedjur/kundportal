@@ -13,6 +13,8 @@ interface GridEventCardProps {
   techColor?: string
   compact?: boolean
   isDragging?: boolean
+  heightPx?: number   // faktisk höjd på wrappern — styr vilka rader som visas
+  widthPct?: number   // procentuell bredd (100 / totalLanes) — styr kompakthet vid smala lanes
 }
 
 export const GridEventCard = memo(function GridEventCard({
@@ -22,18 +24,20 @@ export const GridEventCard = memo(function GridEventCard({
   techColor,
   compact = false,
   isDragging = false,
+  heightPx = 999,
+  widthPct = 100,
 }: GridEventCardProps) {
   const [hovered, setHovered] = useState(false)
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0, above: false })
   const blockRef = useRef<HTMLDivElement>(null)
 
-  const style = getStatusStyle(caseData.status, caseData.case_type)
+  const style = getStatusStyle(caseData.status, (caseData as any).case_type)
   const startRaw = caseData.start_date || caseData.due_date
   const endRaw = caseData.due_date || caseData.start_date
   const start = startRaw ? new Date(startRaw) : null
   const end = endRaw ? new Date(endRaw) : null
 
-  const isContract = caseData.case_type === 'contract'
+  const isContract = (caseData as any).case_type === 'contract'
 
   const caseNumber = caseData.case_number || caseData.title || ''
 
@@ -46,16 +50,16 @@ export const GridEventCard = memo(function GridEventCard({
   const addr = cityAddress((caseData as any).adress)
   const serviceAndAddr = [service, addr].filter(Boolean).join(' · ')
 
-  const categoryLabel = caseData.case_type === 'private' ? 'Privatperson'
-    : caseData.case_type === 'business' ? 'Företag'
-    : caseData.case_type === 'inspection' ? 'Inspektion'
+  const categoryLabel = (caseData as any).case_type === 'private' ? 'Privatperson'
+    : (caseData as any).case_type === 'business' ? 'Företag'
+    : (caseData as any).case_type === 'inspection' ? 'Inspektion'
     : null
 
-  const assigneeNames = [
-    caseData.primary_assignee_name,
-    caseData.secondary_assignee_name,
-    caseData.tertiary_assignee_name,
-  ].filter(Boolean) as string[]
+  // Bestäm vad som ska visas baserat på tillgänglig höjd och bredd
+  const isNarrow = widthPct < 40          // smal lane — bara det allra viktigaste
+  const isTiny = heightPx < 36            // under ~30 min — bara en rad
+  const isShort = heightPx < 56           // under ~50 min — hoppa över adress+tjänst
+  const effectiveCompact = compact || isNarrow
 
   const handleMouseEnter = () => {
     if (!blockRef.current) return
@@ -81,59 +85,45 @@ export const GridEventCard = memo(function GridEventCard({
           hover:brightness-110 hover:shadow-md transition-all duration-100
           ${style.bg} ${style.border}
           ${isContract ? 'ring-1 ring-purple-400/20' : ''}
-          ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'}
+          ${effectiveCompact ? 'px-1.5 py-0.5' : 'px-2 py-1'}
           ${isDragging ? 'opacity-40 pointer-events-none' : ''}
         `}
         style={techColor ? { borderLeftColor: techColor } : undefined}
       >
-        {/* Kategori-label (ej compact, ej contract) */}
-        {!compact && categoryLabel && (
+        {/* Kategori-label — bara om tillräckligt högt och inte smal/compact */}
+        {!effectiveCompact && !isShort && categoryLabel && (
           <p className="text-[9px] text-slate-500 leading-tight truncate">{categoryLabel}</p>
         )}
 
-        {/* Rad 1: ärendenummer + tekniker-avatarer */}
-        <div className="flex items-center justify-between gap-1 min-w-0">
-          {caseNumber && (
-            <p className={`font-mono font-semibold truncate leading-tight ${style.text} ${compact ? 'text-[9px]' : 'text-[10px]'}`}>
-              {isContract && <span className="mr-0.5 opacity-70">★</span>}
-              {caseNumber}
-            </p>
-          )}
-          {assigneeNames.length > 0 && (
-            <div className="flex -space-x-1.5 shrink-0">
-              {assigneeNames.map((name, i) => (
-                <span
-                  key={i}
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold border-2 border-[#20c58f] bg-[#20c58f]/20 text-[#20c58f] leading-none"
-                >
-                  {name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Rad 1: ärendenummer (ingen avatar) */}
+        {caseNumber && (
+          <p className={`font-mono font-semibold truncate leading-tight ${style.text} ${effectiveCompact ? 'text-[9px]' : 'text-[10px]'}`}>
+            {isContract && <span className="mr-0.5 opacity-70">★</span>}
+            {caseNumber}
+          </p>
+        )}
 
-        {/* Kundnamn */}
-        {customerName && (
-          <p className={`truncate leading-tight text-white ${compact ? 'text-[9px]' : 'text-xs'}`}>
+        {/* Kundnamn — alltid om det finns plats för minst en rad till */}
+        {!isTiny && customerName && (
+          <p className={`truncate leading-tight text-white ${effectiveCompact ? 'text-[9px]' : 'text-xs'}`}>
             {customerName}
           </p>
         )}
 
-        {/* Tjänst + adress (ej compact) */}
-        {!compact && serviceAndAddr && (
+        {/* Tjänst + adress — bara om inte för kort/smal */}
+        {!effectiveCompact && !isShort && serviceAndAddr && (
           <p className="text-[10px] text-slate-500 truncate leading-tight">
             {serviceAndAddr}
           </p>
         )}
 
-        {/* Tid */}
-        {!compact && start && end && (
+        {/* Tid — bara om tillräckligt högt och inte smal */}
+        {!isNarrow && !isShort && start && end && (
           <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
             {formatTime(start)}–{formatTime(end)}
           </p>
         )}
-        {compact && start && (
+        {effectiveCompact && !isTiny && start && (
           <p className="text-[9px] text-slate-500 leading-tight">
             {formatTime(start)}
           </p>
