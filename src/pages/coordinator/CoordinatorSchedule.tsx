@@ -418,7 +418,7 @@ export default function CoordinatorSchedule() {
       toast.error('Kunde inte flytta ärendet')
       fetchData()
     }
-  }, [fetchData])
+  }, [fetchData, technicians])
 
   const handleAbsenceClick = useCallback((a: Absence) => {
     setSelectedAbsence(a); setIsAbsenceDetailsModalOpen(true)
