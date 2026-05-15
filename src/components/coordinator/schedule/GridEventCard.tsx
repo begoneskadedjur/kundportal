@@ -3,7 +3,7 @@ import { useState, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { BeGoneCaseRow } from '../../../types/database'
 import { getStatusStyle } from './scheduleConstants'
-import { formatTime, shortAddress } from './scheduleUtils'
+import { formatTime, cityAddress } from './scheduleUtils'
 import { EventHoverCard } from './EventHoverCard'
 
 interface GridEventCardProps {
@@ -46,7 +46,7 @@ export const GridEventCard = memo(function GridEventCard({
 
   // Tjänst
   const service = caseData.service?.name || (caseData as any).skadedjur || ''
-  const addr = shortAddress((caseData as any).adress)
+  const addr = cityAddress((caseData as any).adress)
   const serviceAndAddr = [service, addr].filter(Boolean).join(' · ')
 
   // Initialer

@@ -78,6 +78,22 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
     return m
   }, [technicians])
 
+  // Tekniker med ärenden denna vecka (för legende)
+  const activeTechs = useMemo(() => {
+    const techIdsThisWeek = new Set(
+      cases
+        .filter(c => {
+          const d = c.start_date || c.due_date
+          return d && weekDays.some(w => isSameDay(new Date(d), w))
+        })
+        .map(c => c.primary_assignee_id)
+        .filter(Boolean)
+    )
+    return technicians
+      .map((t, i) => ({ ...t, idx: i }))
+      .filter(t => techIdsThisWeek.has(t.id))
+  }, [technicians, cases, weekDays])
+
   // Ärenden per dag
   const casesByDay = useMemo(() => {
     return weekDays.map(day =>
@@ -159,6 +175,28 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
           )
         })}
       </div>
+
+      {/* Teknikerlegende */}
+      {activeTechs.length > 0 && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-slate-700/50 bg-slate-900/80 flex-shrink-0 flex-wrap">
+          {activeTechs.map(t => {
+            const color = TECH_COLORS[t.idx % TECH_COLORS.length]
+            const initials = t.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+            const shortName = t.name.split(' ')[0]
+            return (
+              <div key={t.id} className="flex items-center gap-1">
+                <span
+                  className="rounded-sm px-1 py-0.5 text-[9px] font-bold leading-none"
+                  style={{ backgroundColor: color + '33', color }}
+                >
+                  {initials}
+                </span>
+                <span className="text-[10px] text-slate-400">{shortName}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Scrollbar body */}
       <div ref={scrollRef} className="flex flex-1 overflow-y-auto overflow-x-hidden">
@@ -267,6 +305,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   const techId = c.primary_assignee_id
                   const techIdx = techId ? (techIndexMap.get(techId) ?? 0) : 0
                   const techColor = TECH_COLORS[techIdx % TECH_COLORS.length]
+                  const techName = techId ? (technicians[techIdx]?.name ?? '') : ''
 
                   return (
                     <div
@@ -297,6 +336,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                         caseData={c}
                         onClick={() => onCaseClick(c)}
                         techColor={techColor}
+                        technicianName={techName}
                         isDragging={draggingCaseId === c.id}
                       />
                     </div>

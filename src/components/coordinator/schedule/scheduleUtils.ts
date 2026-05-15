@@ -191,6 +191,23 @@ export function shortAddress(address: unknown): string {
   return parts[0].trim().slice(0, 30)
 }
 
+/** Stad/ort ur adress — för kompakta event-kort */
+export function cityAddress(address: unknown): string {
+  if (!address) return ''
+  if (typeof address === 'object' && address !== null) {
+    const a = address as Record<string, unknown>
+    if (a.city) return String(a.city).slice(0, 20)
+  }
+  const full = formatAddress(address)
+  if (!full) return ''
+  const parts = full.split(',')
+  if (parts.length >= 2) {
+    const cityPart = parts[parts.length - 1].trim()
+    return cityPart.replace(/^\d{3}\s?\d{2}\s*/, '').trim().slice(0, 20)
+  }
+  return full.slice(0, 20)
+}
+
 /** Beräkna kapacitet i timmar baserat på work_schedule */
 export function getTechWorkHours(
   workSchedule: Record<string, { start: string; end: string; active: boolean }> | null,
