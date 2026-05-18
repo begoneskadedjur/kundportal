@@ -1,5 +1,5 @@
 // src/hooks/useGoogleMaps.ts
-// Hook för att ladda Google Maps API — singleton-mönster förhindrar dubbelladding
+// Hook för att ladda Google Maps API
 
 import { useState, useEffect } from 'react';
 
@@ -8,72 +8,75 @@ interface GoogleMapsConfig {
   libraries?: string[];
 }
 
-// Module-level singleton — delas av alla instanser av hooken
-let mapsScriptState: 'idle' | 'loading' | 'loaded' | 'error' = 'idle'
-const mapsLoadCallbacks: Array<() => void> = []
+// Global flagga — förhindrar att scriptet läggs till mer än en gång
+let scriptAppended = false;
 
 export function useGoogleMaps(config: GoogleMapsConfig = {}) {
-  const [isLoaded, setIsLoaded] = useState(
-    typeof window !== 'undefined' && !!window.google?.maps
-  )
-  const [error, setError] = useState<string | null>(null)
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Redan laddat i denna instans eller globalt
-    if (isLoaded) return
-    if (mapsScriptState === 'loaded') {
-      setIsLoaded(true)
-      return
+    // Om redan laddat
+    if (window.google && window.google.maps) {
+      setIsLoaded(true);
+      return;
     }
 
-    const onLoaded = () => setIsLoaded(true)
-    const onError = () => setError('Kunde inte ladda Google Maps API. Kontrollera API-nyckel och internet.')
+    // Om scriptet redan lagts till (av en annan instans) — vänta
+    if (scriptAppended) return;
 
-    // Laddning pågår redan — registrera callback och vänta
-    if (mapsScriptState === 'loading') {
-      mapsLoadCallbacks.push(onLoaded)
-      return
-    }
+    // Om redan laddning pågår i denna instans
+    if (isLoading) return;
 
-    // Första anropet — starta laddning
-    const apiKey = config.apiKey || import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-    console.log('[useGoogleMaps] API key tillgänglig:', !!apiKey)
+    // Försök hitta API-nyckel från olika källor
+    const apiKey = config.apiKey ||
+      import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+      import.meta.env.GOOGLE_MAPS_API_KEY;
+
+    console.log('[useGoogleMaps] API key tillgänglig:', !!apiKey);
 
     if (!apiKey) {
-      console.error('[useGoogleMaps] Ingen Google Maps API key hittad')
-      setError('Google Maps API key saknas. Kontrollera miljövariabler.')
-      return
+      console.error('[useGoogleMaps] Ingen Google Maps API key hittad');
+      setError('Google Maps API key saknas. Kontrollera miljövariabler.');
+      return;
     }
 
-    mapsScriptState = 'loading'
-    const libraries = config.libraries?.join(',') || 'geometry'
+    scriptAppended = true;
+    setIsLoading(true);
+    setError(null);
 
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=${libraries}&loading=async`
-    script.async = true
-    script.defer = true
+    // Skapa script element
+    const script = document.createElement('script');
+    const libraries = config.libraries?.join(',') || 'geometry';
 
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=${libraries}`;
+    script.async = true;
+    script.defer = true;
+
+    // Hantera success
     script.onload = () => {
-      console.log('[useGoogleMaps] Google Maps API laddad framgångsrikt')
-      mapsScriptState = 'loaded'
-      setIsLoaded(true)
-      mapsLoadCallbacks.forEach(cb => cb())
-      mapsLoadCallbacks.length = 0
-    }
+      console.log('[useGoogleMaps] Google Maps API laddad framgångsrikt');
+      setIsLoaded(true);
+      setIsLoading(false);
+    };
 
+    // Hantera fel
     script.onerror = (event) => {
-      console.error('[useGoogleMaps] Fel vid laddning av Google Maps API:', event)
-      mapsScriptState = 'error'
-      onError()
-    }
+      console.error('[useGoogleMaps] Fel vid laddning av Google Maps API:', event);
+      setError('Kunde inte ladda Google Maps API. Kontrollera API-nyckel och internet.');
+      setIsLoading(false);
+      scriptAppended = false; // Tillåt retry vid fel
+    };
 
-    // Lägg till script — tas INTE bort vid cleanup (Maps API ska leva kvar)
-    document.head.appendChild(script)
-  }, []) // Tom array — kör bara en gång per komponentinstans
+    // Lägg till script i head — tas INTE bort vid cleanup
+    document.head.appendChild(script);
+
+  }, [config.apiKey, isLoading]);
 
   return {
     isLoaded,
-    isLoading: mapsScriptState === 'loading',
+    isLoading,
     error
-  }
+  };
 }
