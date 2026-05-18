@@ -1212,7 +1212,14 @@ export default function OrganizationsPage() {
           convertingOrgId={convertingOrgId}
           onCancelConvert={handleCancelConvert}
           onConvertSuccess={handleConvertSuccess}
-          onViewAsCustomer={(org) => startImpersonation(org.id, org.name)}
+          onViewAsCustomer={(org) => startImpersonation({ type: 'customer', customerId: org.id, customerName: org.name })}
+          onViewAsUser={(org, user) => startImpersonation({
+            type: 'multisite',
+            organizationId: org.organization_id || org.id,
+            roleType: user.role_type as 'verksamhetschef' | 'regionchef' | 'platsansvarig',
+            siteIds: user.site_ids || null,
+            displayName: user.name || user.email || 'Okänd'
+          })}
         />
       )}
 

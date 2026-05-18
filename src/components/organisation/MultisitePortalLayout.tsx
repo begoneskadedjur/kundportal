@@ -97,6 +97,7 @@ interface MultisitePortalLayoutProps {
   showSiteSelector: boolean
   userRoleLabel: string
   children: React.ReactNode
+  isImpersonating?: boolean
 }
 
 export default function MultisitePortalLayout({
@@ -108,7 +109,8 @@ export default function MultisitePortalLayout({
   onSiteChange,
   showSiteSelector,
   userRoleLabel,
-  children
+  children,
+  isImpersonating = false
 }: MultisitePortalLayoutProps) {
   const { signOut } = useAuth()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -411,8 +413,8 @@ export default function MultisitePortalLayout({
       <main
         className={`
           min-h-screen
-          pt-14 pb-20 lg:pt-0 lg:pb-0
           transition-all duration-300
+          ${isImpersonating ? 'pt-24 lg:pt-10 pb-20 lg:pb-0' : 'pt-14 pb-20 lg:pt-0 lg:pb-0'}
           ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}
         `}
       >

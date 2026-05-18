@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
+import { useImpersonation } from './ImpersonationContext'
 import { 
   MultisiteOrganization, 
   OrganizationSite, 
@@ -86,6 +87,12 @@ interface MultisiteProviderProps {
 
 export function MultisiteProvider({ children }: MultisiteProviderProps) {
   const { profile } = useAuth()
+  const {
+    isImpersonating,
+    impersonatedOrganizationId,
+    impersonatedRoleType,
+    impersonatedSiteIds
+  } = useImpersonation()
   const [organization, setOrganization] = useState<MultisiteOrganization | null>(null)
   const [sites, setSites] = useState<OrganizationSite[]>([])
   const [userRole, setUserRole] = useState<MultisiteUserRole | null>(null)
@@ -93,6 +100,103 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
   const [currentCustomer, setCurrentCustomer] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Fetch multisite data for impersonation (loads org + sites for the impersonated role)
+  const fetchImpersonatedData = useCallback(async () => {
+    if (!impersonatedOrganizationId || !impersonatedRoleType) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Build a synthetic role object from impersonation state
+      const syntheticRole: MultisiteUserRole = {
+        id: 'impersonated',
+        user_id: 'impersonated',
+        organization_id: impersonatedOrganizationId,
+        role_type: impersonatedRoleType,
+        site_ids: impersonatedSiteIds,
+        region: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      setUserRole(syntheticRole)
+
+      // Fetch organization (huvudkontor)
+      const { data: orgData } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('organization_id', impersonatedOrganizationId)
+        .eq('site_type', 'huvudkontor')
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (orgData) {
+        setOrganization({
+          id: orgData.id,
+          organization_id: orgData.organization_id,
+          name: orgData.company_name,
+          organization_name: orgData.company_name,
+          organization_number: orgData.organization_number,
+          billing_type: 'consolidated' as const,
+          primary_contact_email: orgData.contact_email,
+          primary_contact_phone: orgData.contact_phone,
+          billing_address: orgData.billing_address,
+          is_active: orgData.is_active,
+          created_at: orgData.created_at,
+          updated_at: orgData.updated_at
+        })
+      }
+
+      // Fetch sites with role-based filtering (same logic as normal flow)
+      let sitesQuery = supabase
+        .from('customers')
+        .select('*')
+        .eq('organization_id', impersonatedOrganizationId)
+        .eq('site_type', 'enhet')
+        .eq('is_active', true)
+
+      if (impersonatedRoleType !== 'verksamhetschef' && impersonatedSiteIds && impersonatedSiteIds.length > 0) {
+        sitesQuery = sitesQuery.in('id', impersonatedSiteIds)
+      }
+
+      const { data: sitesData } = await sitesQuery
+        .order('region', { ascending: true })
+        .order('site_name', { ascending: true })
+
+      const mappedSites = (sitesData || []).map(customer => ({
+        id: customer.id,
+        organization_id: customer.organization_id,
+        site_name: customer.site_name || customer.company_name,
+        site_code: customer.site_code,
+        address: customer.contact_address,
+        region: customer.region,
+        contact_person: customer.contact_person,
+        contact_email: customer.contact_email,
+        contact_phone: customer.contact_phone,
+        customer_id: customer.id,
+        is_primary: false,
+        is_active: customer.is_active,
+        created_at: customer.created_at,
+        updated_at: customer.updated_at,
+        is_multisite: customer.is_multisite,
+        site_type: customer.site_type,
+        company_name: customer.company_name
+      }))
+
+      setSites(mappedSites)
+      if (mappedSites.length === 1) setCurrentSite(mappedSites[0])
+    } catch (err) {
+      console.error('Error fetching impersonated multisite data:', err)
+      setError('Kunde inte hämta organisationsdata')
+    } finally {
+      setLoading(false)
+    }
+  }, [impersonatedOrganizationId, impersonatedRoleType, impersonatedSiteIds])
 
   // Fetch multisite data
   const fetchMultisiteData = useCallback(async () => {
@@ -246,8 +350,17 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
   }, [profile?.user_id])
 
   useEffect(() => {
-    fetchMultisiteData()
-  }, [fetchMultisiteData])
+    if (isImpersonating && impersonatedOrganizationId) {
+      // Reset state before loading impersonated data
+      setOrganization(null)
+      setSites([])
+      setUserRole(null)
+      setCurrentSite(null)
+      fetchImpersonatedData()
+    } else if (!isImpersonating) {
+      fetchMultisiteData()
+    }
+  }, [isImpersonating, impersonatedOrganizationId, fetchImpersonatedData, fetchMultisiteData])
 
   // Fetch customer data when currentSite changes
   useEffect(() => {

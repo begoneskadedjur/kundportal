@@ -3,6 +3,7 @@ import React from 'react'
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMultisite } from '../../contexts/MultisiteContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import LoadingSpinner from './LoadingSpinner';
 
 type MultisiteProtectedRouteProps = {
@@ -12,6 +13,7 @@ type MultisiteProtectedRouteProps = {
 export default function MultisiteProtectedRoute({ children }: MultisiteProtectedRouteProps) {
   const { profile, loading: authLoading } = useAuth();
   const { userRole, loading: multisiteLoading, organization } = useMultisite();
+  const { isImpersonating, impersonatedOrganizationId } = useImpersonation();
 
   // Show loading while checking authentication and multisite access
   if (authLoading || multisiteLoading) {
@@ -25,6 +27,18 @@ export default function MultisiteProtectedRoute({ children }: MultisiteProtected
   // If no profile, redirect to login
   if (!profile) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Admin impersonating a multisite user — allow through
+  if (profile.role === 'admin' && isImpersonating && impersonatedOrganizationId) {
+    if (multisiteLoading) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <LoadingSpinner text="Laddar organisationsdata..." />
+        </div>
+      );
+    }
+    return <>{children}</>;
   }
 
   // Admins and koordinatorer can always access multisite (for management purposes)

@@ -121,6 +121,7 @@ interface CompactOrganizationTableProps {
   onCancelConvert?: () => void
   onConvertSuccess?: () => void
   onViewAsCustomer?: (org: Organization) => void
+  onViewAsUser?: (org: Organization, user: OrganizationUser) => void
 }
 
 const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
@@ -145,7 +146,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   convertingOrgId,
   onCancelConvert,
   onConvertSuccess,
-  onViewAsCustomer
+  onViewAsCustomer,
+  onViewAsUser
 }) => {
   const [hoveredOrgId, setHoveredOrgId] = useState<string | null>(null)
   const [showActionsForOrg, setShowActionsForOrg] = useState<string | null>(null)
@@ -793,6 +795,15 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                                 </span>
                               </div>
                               <div className="flex items-center gap-1">
+                                {onViewAsUser && (
+                                  <button
+                                    onClick={() => onViewAsUser(org, user)}
+                                    className="p-1 hover:bg-[#20c58f]/20 rounded transition-colors"
+                                    title="Visa som denna användare"
+                                  >
+                                    <Eye className="w-3 h-3 text-[#20c58f]" />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => onResetPassword(user.email || '', user.name || '')}
                                   className="p-1 hover:bg-[#20c58f]/20 rounded transition-colors"

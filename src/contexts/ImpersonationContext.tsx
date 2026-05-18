@@ -2,11 +2,23 @@ import { createContext, useContext, useState, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 
+type MultisiteRoleType = 'verksamhetschef' | 'regionchef' | 'platsansvarig'
+
+export type ImpersonationTarget =
+  | { type: 'customer'; customerId: string; customerName: string }
+  | { type: 'multisite'; organizationId: string; roleType: MultisiteRoleType; siteIds: string[] | null; displayName: string }
+
 type ImpersonationState = {
   isImpersonating: boolean
+  // Customer portal
   impersonatedCustomerId: string | null
   impersonatedCustomerName: string | null
-  startImpersonation: (customerId: string, customerName: string) => void
+  // Multisite portal
+  impersonatedOrganizationId: string | null
+  impersonatedRoleType: MultisiteRoleType | null
+  impersonatedSiteIds: string[] | null
+  impersonatedDisplayName: string | null
+  startImpersonation: (target: ImpersonationTarget) => void
   stopImpersonation: () => void
 }
 
@@ -14,6 +26,10 @@ const ImpersonationContext = createContext<ImpersonationState>({
   isImpersonating: false,
   impersonatedCustomerId: null,
   impersonatedCustomerName: null,
+  impersonatedOrganizationId: null,
+  impersonatedRoleType: null,
+  impersonatedSiteIds: null,
+  impersonatedDisplayName: null,
   startImpersonation: () => {},
   stopImpersonation: () => {}
 })
@@ -21,27 +37,30 @@ const ImpersonationContext = createContext<ImpersonationState>({
 export function ImpersonationProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const [impersonatedCustomerId, setImpersonatedCustomerId] = useState<string | null>(null)
-  const [impersonatedCustomerName, setImpersonatedCustomerName] = useState<string | null>(null)
+  const [target, setTarget] = useState<ImpersonationTarget | null>(null)
 
-  const startImpersonation = (customerId: string, customerName: string) => {
+  const startImpersonation = (t: ImpersonationTarget) => {
     if (!profile?.is_admin) return
-    setImpersonatedCustomerId(customerId)
-    setImpersonatedCustomerName(customerName)
-    navigate('/customer')
+    setTarget(t)
+    navigate(t.type === 'customer' ? '/customer' : '/organisation')
   }
 
   const stopImpersonation = () => {
-    setImpersonatedCustomerId(null)
-    setImpersonatedCustomerName(null)
+    setTarget(null)
     navigate('/admin/anvandarkonton-kund')
   }
 
+  const isImpersonating = target !== null
+
   return (
     <ImpersonationContext.Provider value={{
-      isImpersonating: impersonatedCustomerId !== null,
-      impersonatedCustomerId,
-      impersonatedCustomerName,
+      isImpersonating,
+      impersonatedCustomerId: target?.type === 'customer' ? target.customerId : null,
+      impersonatedCustomerName: target?.type === 'customer' ? target.customerName : null,
+      impersonatedOrganizationId: target?.type === 'multisite' ? target.organizationId : null,
+      impersonatedRoleType: target?.type === 'multisite' ? target.roleType : null,
+      impersonatedSiteIds: target?.type === 'multisite' ? target.siteIds : null,
+      impersonatedDisplayName: target?.type === 'multisite' ? target.displayName : null,
       startImpersonation,
       stopImpersonation
     }}>

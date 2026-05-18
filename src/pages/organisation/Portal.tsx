@@ -1,6 +1,7 @@
 // src/pages/organisation/Portal.tsx - Unified multisite portal (kundportal-stil)
 import React, { useState, useEffect } from 'react'
 import { useMultisite } from '../../contexts/MultisiteContext'
+import { useImpersonation } from '../../contexts/ImpersonationContext'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 
 // Layout
@@ -14,6 +15,12 @@ import MultisiteCasesView from '../../components/organisation/MultisiteCasesView
 import MultisiteReportsView from '../../components/organisation/MultisiteReportsView'
 import MultisiteQuotesView from '../../components/organisation/MultisiteQuotesView'
 
+const ROLE_LABELS: Record<string, string> = {
+  verksamhetschef: 'Verksamhetschef',
+  regionchef: 'Regionchef',
+  platsansvarig: 'Platsansvarig'
+}
+
 const OrganisationPortal: React.FC = () => {
   const {
     organization,
@@ -23,6 +30,7 @@ const OrganisationPortal: React.FC = () => {
     loading,
     error
   } = useMultisite()
+  const { isImpersonating, impersonatedDisplayName, impersonatedRoleType, stopImpersonation } = useImpersonation()
 
   const [currentView, setCurrentView] = useState<MultisitePortalView>('dashboard')
   const [selectedSiteId, setSelectedSiteId] = useState<string | 'all'>('all')
@@ -111,6 +119,24 @@ const OrganisationPortal: React.FC = () => {
   }
 
   return (
+    <>
+    {isImpersonating && impersonatedDisplayName && (
+      <div className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-between px-4 py-2 bg-amber-500/15 border-b border-amber-500/40 backdrop-blur-sm">
+        <p className="text-sm text-amber-300 font-medium">
+          Admin-vy: Du ser portalen som{' '}
+          <span className="font-semibold text-amber-200">{impersonatedDisplayName}</span>
+          {impersonatedRoleType && (
+            <span className="text-amber-400 font-normal"> ({ROLE_LABELS[impersonatedRoleType] || impersonatedRoleType})</span>
+          )}
+        </p>
+        <button
+          onClick={stopImpersonation}
+          className="text-xs text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-3 py-1 rounded-lg transition-colors"
+        >
+          Avsluta
+        </button>
+      </div>
+    )}
     <MultisitePortalLayout
       currentView={currentView}
       onViewChange={setCurrentView}
@@ -120,6 +146,7 @@ const OrganisationPortal: React.FC = () => {
       onSiteChange={setSelectedSiteId}
       showSiteSelector={showSiteSelector}
       userRoleLabel={getRoleLabel()}
+      isImpersonating={isImpersonating}
     >
       {currentView === 'dashboard' && (
         <MultisiteDashboardView
@@ -169,6 +196,7 @@ const OrganisationPortal: React.FC = () => {
         />
       )}
     </MultisitePortalLayout>
+    </>
   )
 }
 
