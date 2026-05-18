@@ -20,7 +20,6 @@ import Card from '../../components/ui/Card'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
 import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
-import EstablishmentCaseModal from '../../components/coordinator/EstablishmentCaseModal'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ReportModal from '../../components/admin/technicians/ReportModal'
 import { BeGoneCaseRow } from '../../types/database' // NYTT: Importerar den centrala typen
@@ -486,13 +485,14 @@ export default function TechnicianSchedule() {
         caseData={selectedInspectionCase}
       />
 
-      {/* Modal för etablering-ärenden */}
-      <EstablishmentCaseModal
+      {/* Modal för etablering-ärenden — återanvänder EditContractCaseModal */}
+      <EditContractCaseModal
         isOpen={isEstablishmentModalOpen}
         onClose={() => {
           setIsEstablishmentModalOpen(false);
           setSelectedEstablishmentCase(null);
         }}
+        onSuccess={handleUpdateSuccess}
         caseData={selectedEstablishmentCase}
       />
 
