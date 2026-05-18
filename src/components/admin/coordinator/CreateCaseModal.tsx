@@ -889,7 +889,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : customer;
         const customerName = customerForTitle?.company_name || 'Okänd kund';
 
-        const { error } = await supabase.from('cases').insert([{
+        const { data: createdEstCase, error } = await supabase.from('cases').insert([{
           customer_id: actualCustomerId!,
           contract_id: persistedContractId ?? null,
           site_id: customer?.is_multisite ? selectedSiteId : null,
@@ -909,8 +909,30 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           address: formData.adress ? { formatted_address: formData.adress } : null,
           case_number: caseNumber,
           send_booking_confirmation: formData.skicka_bokningsbekraftelse === 'Ja',
-        }]);
+        }]).select('id').single();
         if (error) throw error;
+
+        // Auto-populera billing-items från kundens avtalsprodukter
+        if (createdEstCase?.id) {
+          const { data: contractArticles } = await supabase
+            .from('customer_contract_articles')
+            .select('*, article:articles(id, name, default_price)')
+            .eq('customer_id', actualCustomerId!);
+
+          if (contractArticles && contractArticles.length > 0) {
+            await supabase.from('case_billing_items').insert(
+              contractArticles.map((ca: any) => ({
+                case_id: createdEstCase.id,
+                article_id: ca.article_id,
+                quantity: ca.quantity ?? 1,
+                unit_price: ca.article?.default_price ?? 0,
+                total_price: (ca.quantity ?? 1) * (ca.article?.default_price ?? 0),
+                name: ca.article?.name ?? '',
+                item_type: 'article',
+              }))
+            );
+          }
+        }
 
         toast.success(`Etablering inbokad för ${customerName}!`);
 

@@ -235,6 +235,9 @@ export default function EditContractCaseModal({
   // Kommunikations-panel state - ENDAST för intern användning (ALDRIG för kundvyer)
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
 
+  // Etableringsärende (service_type='establishment') — visas i denna modal men med lime-badge och låst billing
+  const isEstablishment = caseData?.service_type === 'establishment'
+
   // Multisite recipient logic
   const isMultisiteCustomer = customerData?.is_multisite === true
   
@@ -1322,15 +1325,15 @@ export default function EditContractCaseModal({
   // Modal title with enhanced design
   const modalTitle = (
     <div className="flex items-center gap-3">
-      <div className="p-2 bg-purple-500/10 rounded-lg">
-        <Crown className="w-6 h-6 text-purple-400" />
+      <div className={`p-2 rounded-lg ${isEstablishment ? 'bg-lime-500/10' : 'bg-purple-500/10'}`}>
+        <Crown className={`w-6 h-6 ${isEstablishment ? 'text-lime-400' : 'text-purple-400'}`} />
       </div>
       <div>
         <div className="flex items-center gap-3">
           <span className="text-2xl font-bold text-white">
-            {isCustomerView ? 'Serviceärende' : 'Avtalsärende'}
+            {isEstablishment ? 'Etablering' : isCustomerView ? 'Serviceärende' : 'Avtalsärende'}
           </span>
-          <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm font-medium">
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${isEstablishment ? 'bg-lime-500/20 text-lime-300' : 'bg-purple-500/20 text-purple-300'}`}>
             {formData.case_number || 'Genererar...'}
           </span>
           {visitNumber > 1 && (
@@ -1339,7 +1342,9 @@ export default function EditContractCaseModal({
             </span>
           )}
         </div>
-        <p className="text-sm text-purple-300">Premium kundsupport</p>
+        <p className={`text-sm ${isEstablishment ? 'text-lime-400' : 'text-purple-300'}`}>
+          {isEstablishment ? 'Utplacering av avtalsutrustning' : 'Premium kundsupport'}
+        </p>
       </div>
     </div>
   )
@@ -1883,6 +1888,7 @@ export default function EditContractCaseModal({
                     primaryServiceId={formData.service_id}
                     articleGroupId={articleGroupId}
                     onChange={handleBillingSummaryChange}
+                    readOnly={isEstablishment}
                   />
                 </div>
               )}
