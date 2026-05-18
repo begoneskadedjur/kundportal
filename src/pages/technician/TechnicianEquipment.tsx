@@ -592,6 +592,7 @@ export default function TechnicianEquipment() {
           onClose={() => setIsWizardOpen(false)}
           onComplete={handleWizardComplete}
           technicianId={technicianId}
+          preselectedCustomerId={wizardCustomerId}
           onIndoorFinished={(customerId) => {
             const name = allCustomers.find(c => c.customer_id === customerId)?.customer_name
               || customers.find(c => c.id === customerId)?.company_name
