@@ -1,7 +1,7 @@
 // src/components/shared/indoor/IndoorStationDetailSheet.tsx
 // Bottom-sheet med stationsdetaljer och åtgärder
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
@@ -37,6 +37,7 @@ import {
   INSPECTION_STATUS_CONFIG
 } from '../../../types/indoor'
 import { MeasurementStatusSection } from '../CalculatedStatusBadge'
+import { IndoorStationService } from '../../../services/indoorStationService'
 
 interface IndoorStationDetailSheetProps {
   station: IndoorStationWithRelations
@@ -59,6 +60,12 @@ export function IndoorStationDetailSheet({
 }: IndoorStationDetailSheetProps) {
   const [showAllInspections, setShowAllInspections] = useState(false)
   const [showLightbox, setShowLightbox] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (!station?.photo_path) { setPhotoUrl(undefined); return }
+    IndoorStationService.getStationPhotoUrl(station.photo_path).then(setPhotoUrl)
+  }, [station?.photo_path])
 
   const typeConfig = station.station_type_data
     ? { label: station.station_type_data.name, color: station.station_type_data.color, bgColor: '', requiresSerialNumber: false, prefix: '' }
@@ -119,13 +126,13 @@ export function IndoorStationDetailSheet({
       {/* Content - scrollable */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Foto */}
-        {station.photo_url && (
+        {photoUrl && (
           <button
             onClick={() => setShowLightbox(true)}
             className="w-full rounded-xl overflow-hidden bg-slate-900 relative group cursor-zoom-in"
           >
             <img
-              src={station.photo_url}
+              src={photoUrl}
               alt="Stationsfoto"
               className="w-full aspect-video object-cover transition-transform duration-300 group-hover:scale-105"
             />
@@ -271,9 +278,9 @@ export function IndoorStationDetailSheet({
         </div>
       </div>
     </div>
-    {station.photo_url && (
+    {photoUrl && (
       <ImageLightbox
-        images={[{ url: station.photo_url, alt: 'Stationsfoto' }]}
+        images={[{ url: photoUrl, alt: 'Stationsfoto' }]}
         initialIndex={0}
         isOpen={showLightbox}
         onClose={() => setShowLightbox(false)}
