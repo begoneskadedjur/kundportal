@@ -195,7 +195,7 @@ export default function TechnicianEquipment() {
   // Öppna kundmodal automatiskt om ?customer=<id> finns i URL
   useEffect(() => {
     const customerId = searchParams.get('customer')
-    if (!customerId || allCustomers.length === 0) return
+    if (!customerId || customers.length === 0) return
     const found = allCustomers.find(c => c.id === customerId)
     if (found) {
       setSelectedCustomerForModal(found)
@@ -204,7 +204,7 @@ export default function TechnicianEquipment() {
       setWizardCustomerId(customerId)
       setIsWizardOpen(true)
     }
-  }, [searchParams, allCustomers])
+  }, [searchParams, allCustomers, customers])
 
   // Uppdatera utrustning
   const refreshData = useCallback(async () => {
