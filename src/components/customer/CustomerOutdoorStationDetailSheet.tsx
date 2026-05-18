@@ -1,7 +1,7 @@
 // src/components/customer/CustomerOutdoorStationDetailSheet.tsx
 // Kundvänlig read-only vy av utomhusstationsdetaljer med inspektionshistorik
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -33,6 +33,7 @@ import {
 } from '../../types/database'
 import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
 import { formatCoordinates, openInMapsApp } from '../../utils/equipmentMapUtils'
+import { EquipmentService } from '../../services/equipmentService'
 
 interface CustomerOutdoorStationDetailSheetProps {
   station: EquipmentPlacementWithRelations
@@ -56,6 +57,12 @@ export function CustomerOutdoorStationDetailSheet({
 }: CustomerOutdoorStationDetailSheetProps) {
   const [showAllInspections, setShowAllInspections] = useState(false)
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!station?.photo_path) { setPhotoUrl(null); return }
+    EquipmentService.getEquipmentPhotoUrl(station.photo_path).then(setPhotoUrl)
+  }, [station?.photo_path])
 
   // Hämta typkonfiguration med fallback för dynamiska typer
   const getTypeConfig = () => {
@@ -166,13 +173,13 @@ export function CustomerOutdoorStationDetailSheet({
               {/* Content - scrollable */}
               <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
                 {/* Photo */}
-                {station.photo_url && (
+                {photoUrl && (
                   <button
-                    onClick={() => setLightboxPhoto(station.photo_url!)}
+                    onClick={() => setLightboxPhoto(photoUrl!)}
                     className="w-full rounded-xl overflow-hidden bg-slate-900 hover:ring-2 hover:ring-emerald-500/50 transition-all"
                   >
                     <img
-                      src={station.photo_url}
+                      src={photoUrl}
                       alt="Stationsfoto"
                       className="w-full h-48 object-cover"
                     />

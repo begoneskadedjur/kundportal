@@ -400,7 +400,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                             {item.comment || '-'}
                           </td>
                           <td className="px-4 py-2.5 text-center">
-                            {item.photo_url ? (
+                            {item.photo_path ? (
                               <Camera className="w-4 h-4 text-blue-400 mx-auto" />
                             ) : (
                               <span className="text-slate-600">-</span>
@@ -533,7 +533,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                               {station.comment || '-'}
                             </td>
                             <td className="px-4 py-2.5 text-center">
-                              {station.photo_url ? (
+                              {station.photo_path ? (
                                 <Camera className="w-4 h-4 text-blue-400 mx-auto" />
                               ) : (
                                 <span className="text-slate-600">-</span>
