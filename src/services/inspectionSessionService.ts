@@ -614,17 +614,20 @@ export async function getOutdoorInspectionsForSession(
   // Skapa map för snabb lookup på code
   const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
 
-  // Berika inspektioner med station_type_data baserat på equipment_type
-  return data.map(inspection => {
+  // Berika inspektioner med station_type_data och photo_url
+  return Promise.all(data.map(async inspection => {
     const station = inspection.station as any
     if (station && station.equipment_type) {
       const matchedType = typesByCode.get(station.equipment_type)
-      if (matchedType) {
-        station.station_type_data = matchedType
-      }
+      if (matchedType) station.station_type_data = matchedType
     }
-    return inspection as OutdoorInspectionWithRelations
-  })
+    return {
+      ...inspection,
+      photo_url: inspection.photo_path
+        ? (await getInspectionPhotoUrl(inspection.photo_path)) ?? undefined
+        : undefined
+    } as OutdoorInspectionWithRelations
+  }))
 }
 
 /**
@@ -774,17 +777,20 @@ export async function getOutdoorInspectionsByStation(
   // Skapa map för snabb lookup på code
   const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
 
-  // Berika inspektioner med station_type_data baserat på equipment_type
-  return data.map(inspection => {
+  // Berika inspektioner med station_type_data och photo_url
+  return Promise.all(data.map(async inspection => {
     const station = inspection.station as any
     if (station && station.equipment_type) {
       const matchedType = typesByCode.get(station.equipment_type)
-      if (matchedType) {
-        station.station_type_data = matchedType
-      }
+      if (matchedType) station.station_type_data = matchedType
     }
-    return inspection as OutdoorInspectionWithRelations
-  })
+    return {
+      ...inspection,
+      photo_url: inspection.photo_path
+        ? (await getInspectionPhotoUrl(inspection.photo_path)) ?? undefined
+        : undefined
+    } as OutdoorInspectionWithRelations
+  }))
 }
 
 // ============================================
@@ -838,17 +844,20 @@ export async function getIndoorInspectionsForSession(
   // Skapa map för snabb lookup på code
   const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
 
-  // Berika inspektioner med station_type_data baserat på station_type
-  return data.map(inspection => {
+  // Berika inspektioner med station_type_data och photo_url
+  return Promise.all(data.map(async inspection => {
     const station = inspection.station as any
     if (station && station.station_type) {
       const matchedType = typesByCode.get(station.station_type)
-      if (matchedType) {
-        station.station_type_data = matchedType
-      }
+      if (matchedType) station.station_type_data = matchedType
     }
-    return inspection as IndoorStationInspectionWithRelations
-  })
+    return {
+      ...inspection,
+      photo_url: inspection.photo_path
+        ? (await getInspectionPhotoUrl(inspection.photo_path)) ?? undefined
+        : undefined
+    } as IndoorStationInspectionWithRelations
+  }))
 }
 
 /**
