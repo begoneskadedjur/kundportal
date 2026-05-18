@@ -412,18 +412,30 @@ export default function CoordinatorSchedule() {
     ))
 
     try {
-      const table = caseData.case_type === 'contract' ? 'cases'
-        : caseData.case_type === 'business' ? 'business_cases' : 'private_cases'
-      const updateData: Record<string, string> = {
-        start_date: newStart.toISOString(),
-        due_date: newEnd.toISOString(),
+      if (caseData.case_type === 'contract') {
+        const updateData: Record<string, string> = {
+          scheduled_start: newStart.toISOString(),
+          scheduled_end: newEnd.toISOString(),
+        }
+        if (shouldChangeTech && newTech) {
+          updateData.primary_technician_id = newTechnicianId!
+          updateData.primary_technician_name = newTech.name || ''
+        }
+        const { error } = await supabase.from('cases').update(updateData).eq('id', caseId)
+        if (error) throw error
+      } else {
+        const table = caseData.case_type === 'business' ? 'business_cases' : 'private_cases'
+        const updateData: Record<string, string> = {
+          start_date: newStart.toISOString(),
+          due_date: newEnd.toISOString(),
+        }
+        if (shouldChangeTech && newTech) {
+          updateData.primary_assignee_id = newTechnicianId!
+          updateData.primary_assignee_name = newTech.name || ''
+        }
+        const { error } = await supabase.from(table).update(updateData).eq('id', caseId)
+        if (error) throw error
       }
-      if (shouldChangeTech && newTech) {
-        updateData.primary_assignee_id = newTechnicianId!
-        updateData.primary_assignee_name = newTech.name || ''
-      }
-      const { error } = await supabase.from(table).update(updateData).eq('id', caseId)
-      if (error) throw error
     } catch {
       toast.error('Kunde inte flytta ärendet')
       fetchData()
