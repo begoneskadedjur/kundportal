@@ -288,12 +288,14 @@ async function generateInspectionReportHTML(data: {
     }).join('')
 
     indoorSectionsArr.push(`
-      <div class="section">
+      <div class="floor-plan-block">
         <div class="section-header">
           <span class="section-icon">🏠</span>
           Inomhusstationer — ${sectionTitle}
         </div>
         ${floorPlanHtml}
+      </div>
+      <div class="table-block">
         <table>
           <thead>
             <tr>
@@ -462,6 +464,23 @@ async function generateInspectionReportHTML(data: {
     .section {
       margin-bottom: 20px;
       page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .floor-plan-block {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      break-after: avoid;
+      page-break-after: avoid;
+      margin-bottom: 0;
+    }
+
+    .table-block {
+      break-before: avoid;
+      page-break-before: avoid;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 20px;
     }
 
     .section-header {
