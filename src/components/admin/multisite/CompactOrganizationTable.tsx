@@ -21,7 +21,8 @@ import {
   Plus,
   CheckCircle,
   Clock,
-  Send
+  Send,
+  Eye
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsModal'
@@ -119,6 +120,7 @@ interface CompactOrganizationTableProps {
   convertingOrgId?: string | null
   onCancelConvert?: () => void
   onConvertSuccess?: () => void
+  onViewAsCustomer?: (org: Organization) => void
 }
 
 const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
@@ -142,7 +144,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   onConvertToMultisite,
   convertingOrgId,
   onCancelConvert,
-  onConvertSuccess
+  onConvertSuccess,
+  onViewAsCustomer
 }) => {
   const [hoveredOrgId, setHoveredOrgId] = useState<string | null>(null)
   const [showActionsForOrg, setShowActionsForOrg] = useState<string | null>(null)
@@ -529,6 +532,18 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         {/* Portal-specifika åtgärder */}
                         {org.organizationType === 'single' && (
                           <>
+                            {org.portalStatus === 'active' && onViewAsCustomer && (
+                              <button
+                                onClick={() => {
+                                  onViewAsCustomer(org)
+                                  setShowActionsForOrg(null)
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-[#20c58f] hover:bg-slate-700 flex items-center gap-2"
+                              >
+                                <Eye className="w-4 h-4" />
+                                Visa som kund
+                              </button>
+                            )}
                             {org.portalStatus === 'not_invited' && (
                               <>
                                 <button

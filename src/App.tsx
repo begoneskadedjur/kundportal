@@ -3,6 +3,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { MultisiteProvider } from './contexts/MultisiteContext';
+import { ImpersonationProvider, useImpersonation } from './contexts/ImpersonationContext';
+import { useAuth } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
 
 // Auth pages
@@ -111,10 +113,19 @@ import Larosate from './pages/shared/Larosate';
 // Global styles
 import './styles/globals.css';
 
+function ImpersonatedCustomerRoute({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth()
+  const { isImpersonating } = useImpersonation()
+  if (profile?.role === 'customer') return <>{children}</>
+  if (profile?.is_admin && isImpersonating) return <>{children}</>
+  return <Navigate to="/login" replace />
+}
+
 function App() {
   return (
     <Router>
       <AuthProvider>
+        <ImpersonationProvider>
         <MultisiteProvider>
           <AppLayout>
           <div className="min-h-screen bg-slate-950">
@@ -340,13 +351,13 @@ function App() {
             <Route path="/larosate/guides/equipment-placement" element={<Navigate to="/admin/larosate/guides/equipment-placement" replace />} />
 
             {/* Customer routes */}
-            <Route 
-              path="/customer" 
+            <Route
+              path="/customer"
               element={
-                <ProtectedRoute requiredRole="customer">
+                <ImpersonatedCustomerRoute>
                   <CustomerPortal />
-                </ProtectedRoute>
-              } 
+                </ImpersonatedCustomerRoute>
+              }
             />
             <Route 
               path="/customer/cases" 
@@ -417,6 +428,7 @@ function App() {
         </div>
         </AppLayout>
         </MultisiteProvider>
+        </ImpersonationProvider>
       </AuthProvider>
     </Router>
   );

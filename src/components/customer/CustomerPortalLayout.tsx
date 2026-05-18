@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
+import { useImpersonation } from '../../contexts/ImpersonationContext'
 
 export type CustomerPortalView = 'dashboard' | 'stations' | 'inspections' | 'cases' | 'reports' | 'quotes'
 
@@ -95,6 +96,7 @@ export function CustomerPortalLayout({
 }: CustomerPortalLayoutProps) {
   const { signOut } = useAuth()
   const { userRole: multisiteRole, organization } = useMultisite()
+  const { isImpersonating, impersonatedCustomerName, stopImpersonation } = useImpersonation()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -104,6 +106,20 @@ export function CustomerPortalLayout({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {/* Admin impersonation banner */}
+      {isImpersonating && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2 bg-amber-500/15 border-b border-amber-500/40 backdrop-blur-sm">
+          <p className="text-sm text-amber-300 font-medium">
+            Admin-vy: Du ser portalen som <span className="font-semibold text-amber-200">{impersonatedCustomerName}</span>
+          </p>
+          <button
+            onClick={stopImpersonation}
+            className="text-xs text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-3 py-1 rounded-lg transition-colors"
+          >
+            Avsluta
+          </button>
+        </div>
+      )}
       {/* ===== DESKTOP SIDEBAR (hidden on mobile) ===== */}
       <aside
         className={`
@@ -344,8 +360,8 @@ export function CustomerPortalLayout({
       <main
         className={`
           min-h-screen
-          pt-14 pb-20 lg:pt-0 lg:pb-0
           transition-all duration-300
+          ${isImpersonating ? 'pt-24 lg:pt-10 pb-20 lg:pb-0' : 'pt-14 pb-20 lg:pt-0 lg:pb-0'}
           ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}
         `}
       >

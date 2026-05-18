@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { LogOut, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
+import { useImpersonation } from '../../contexts/ImpersonationContext'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Button from '../../components/ui/Button'
@@ -58,6 +59,8 @@ type Customer = {
 const CustomerPortal: React.FC = () => {
   const { profile, signOut } = useAuth()
   const { userRole, organization, loading: multisiteLoading } = useMultisite()
+  const { isImpersonating, impersonatedCustomerId } = useImpersonation()
+  const effectiveCustomerId = isImpersonating ? impersonatedCustomerId : profile?.customer_id
   const navigate = useNavigate()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(true)
@@ -106,33 +109,26 @@ const CustomerPortal: React.FC = () => {
 
   // Check multisite access and redirect if needed - KRITISK: Måste köras först
   useEffect(() => {
+    if (isImpersonating) return
     // Vänta tills multisite-context har laddats
     if (!multisiteLoading && profile) {
       // Förbättrad multisite-detection: kolla både userRole OCH organization_id
       const isMultisiteUser = (userRole && organization) || profile.organization_id
       const hasTraditionalCustomerAccess = profile.customer_id
-      
+
       // Om användaren ENDAST har multisite-åtkomst och ingen traditionell kundåtkomst
       if (isMultisiteUser && !hasTraditionalCustomerAccess) {
-        console.log('Multisite user detected, redirecting to organisation portal:', {
-          userRole: userRole?.role_type,
-          organizationId: profile.organization_id,
-          hasCustomerId: !!profile.customer_id
-        })
         navigate('/organisation', { replace: true })
         return
       }
-      
-      // Om användaren har både multisite och vanlig kundtillgång, stanna här
-      // men visa tydlig navigation till multisite
     }
-  }, [multisiteLoading, userRole, organization, profile, navigate])
+  }, [multisiteLoading, userRole, organization, profile, navigate, isImpersonating])
 
   // Early return för multisite-användare som inte ska vara här
-  if (!multisiteLoading && profile) {
+  if (!isImpersonating && !multisiteLoading && profile) {
     const isMultisiteUser = (userRole && organization) || profile.organization_id
     const hasTraditionalCustomerAccess = profile.customer_id
-    
+
     if (isMultisiteUser && !hasTraditionalCustomerAccess) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
@@ -147,18 +143,16 @@ const CustomerPortal: React.FC = () => {
 
   // Fetch customer data
   useEffect(() => {
-    if (profile?.customer_id) {
+    if (effectiveCustomerId) {
       fetchCustomerData()
       fetchPendingQuotes()
-    } else if (profile && !multisiteLoading && !userRole && !profile.organization_id) {
-      // Endast visa fel om användaren inte har multisite heller OCH inte har organization_id
+    } else if (!isImpersonating && profile && !multisiteLoading && !userRole && !profile.organization_id) {
       setError('Ingen kundkoppling hittades')
       setLoading(false)
-    } else if (profile && !multisiteLoading && !profile.customer_id && profile.organization_id) {
-      // Användare har organization_id men inte customer_id - denna är multisite-kund utan traditionell kundtillgång
+    } else if (!isImpersonating && profile && !multisiteLoading && !profile.customer_id && profile.organization_id) {
       setLoading(false)
     }
-  }, [profile, multisiteLoading, userRole])
+  }, [effectiveCustomerId, profile, multisiteLoading, userRole, isImpersonating])
 
   const fetchCustomerData = async () => {
     try {
@@ -167,7 +161,7 @@ const CustomerPortal: React.FC = () => {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .eq('id', profile!.customer_id)
+        .eq('id', effectiveCustomerId!)
         .single()
 
       if (error) throw error
@@ -188,7 +182,7 @@ const CustomerPortal: React.FC = () => {
       const { data, error } = await supabase
         .from('customer_pending_quotes')
         .select('quote_id, customer_id, case_number, title, quote_sent_at, oneflow_contract_id, source_type, created_at, company_name, products')
-        .eq('customer_id', profile!.customer_id)
+        .eq('customer_id', effectiveCustomerId!)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -338,7 +332,7 @@ const CustomerPortal: React.FC = () => {
 
   // Reports view component
   const renderReportsView = () => (
-    <SanitationReports />
+    <SanitationReports customerId={effectiveCustomerId || undefined} />
   )
 
   // Quotes view component

@@ -30,6 +30,7 @@ import MultisiteRegistrationWizard from '../../../components/admin/multisite/Mul
 import CreatePortalAccountModal from '../../../components/admin/multisite/CreatePortalAccountModal'
 import ConfirmModal from '../../../components/ui/ConfirmModal'
 import { useAuth } from '../../../contexts/AuthContext'
+import { useImpersonation } from '../../../contexts/ImpersonationContext'
 
 interface Organization {
   id: string
@@ -105,6 +106,7 @@ interface OrganizationSite {
 export default function OrganizationsPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
+  const { startImpersonation } = useImpersonation()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [filteredOrganizations, setFilteredOrganizations] = useState<Organization[]>([])
   const [organizationUsers, setOrganizationUsers] = useState<Record<string, OrganizationUser[]>>({})
@@ -1210,6 +1212,7 @@ export default function OrganizationsPage() {
           convertingOrgId={convertingOrgId}
           onCancelConvert={handleCancelConvert}
           onConvertSuccess={handleConvertSuccess}
+          onViewAsCustomer={(org) => startImpersonation(org.id, org.name)}
         />
       )}
 
