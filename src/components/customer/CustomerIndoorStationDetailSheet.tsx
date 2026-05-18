@@ -1,7 +1,7 @@
 // src/components/customer/CustomerIndoorStationDetailSheet.tsx
 // Kundvänlig read-only vy av stationsdetaljer med inspektionshistorik
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -33,6 +33,7 @@ import {
   INDOOR_STATION_STATUS_CONFIG,
   INSPECTION_STATUS_CONFIG
 } from '../../types/indoor'
+import { IndoorStationService } from '../../services/indoorStationService'
 
 interface CustomerIndoorStationDetailSheetProps {
   station: IndoorStationWithRelations
@@ -56,6 +57,12 @@ export function CustomerIndoorStationDetailSheet({
 }: CustomerIndoorStationDetailSheetProps) {
   const [showAllInspections, setShowAllInspections] = useState(false)
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (!station?.photo_path) { setPhotoUrl(undefined); return }
+    IndoorStationService.getStationPhotoUrl(station.photo_path).then(setPhotoUrl)
+  }, [station?.photo_path])
 
   // Prioritera station_type_data (dynamisk från databas), fallback till legacy config
   const dynamicTypeData = station.station_type_data
@@ -146,10 +153,10 @@ export function CustomerIndoorStationDetailSheet({
               {/* Content - scrollable */}
               <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
                 {/* Photo */}
-                {station.photo_url && (
+                {photoUrl && (
                   <div className="rounded-xl overflow-hidden bg-slate-900">
                     <img
-                      src={station.photo_url}
+                      src={photoUrl}
                       alt="Stationsfoto"
                       className="w-full h-48 object-cover"
                     />
