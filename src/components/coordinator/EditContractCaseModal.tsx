@@ -1470,6 +1470,20 @@ export default function EditContractCaseModal({
         <Button onClick={handleClose} variant="secondary" size="sm">
           Stäng
         </Button>
+        {isEstablishment && profile?.role === 'technician' && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              navigate(`/technician/equipment?customer=${caseData.customer_id}`)
+              onClose()
+            }}
+            className="flex items-center gap-2"
+          >
+            <MapPin className="w-4 h-4" />
+            Gå till utplacering
+          </Button>
+        )}
         {!isCustomerView && (
           <Button
             onClick={handleSubmit}
@@ -1894,7 +1908,7 @@ export default function EditContractCaseModal({
               )}
 
               {/* Provision sektion */}
-              {caseData?.id && !isCustomerView && (
+              {caseData?.id && !isCustomerView && !isEstablishment && (
                 <div className="pt-3 border-t border-slate-700/50">
                   <CommissionSection
                     isEligible={commissionEligible}
@@ -1926,8 +1940,8 @@ export default function EditContractCaseModal({
                 </div>
               )}
 
-              {/* Bedömning & Rekommendationer - Only for contract customers */}
-              {caseData.customer_id && (
+              {/* Bedömning & Rekommendationer - Only for contract customers, not establishment */}
+              {caseData.customer_id && !isEstablishment && (
                 <div className="space-y-2 pt-3 border-t border-slate-700/50">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
                     <AlertTriangle className="w-4 h-4 text-amber-400" />
