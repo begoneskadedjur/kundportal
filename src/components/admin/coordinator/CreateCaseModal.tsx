@@ -558,7 +558,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         if (!search) return true;
         return (
           c.company_name?.toLowerCase().includes(search) ||
-          c.customer_number?.toLowerCase().includes(search) ||
+          c.customer_number?.toString().toLowerCase().includes(search) ||
           c.organization_number?.toLowerCase().includes(search)
         );
       });
