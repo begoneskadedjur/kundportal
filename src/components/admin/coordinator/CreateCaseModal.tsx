@@ -912,23 +912,29 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         }]).select('id').single();
         if (error) throw error;
 
-        // Auto-populera billing-items från kundens avtalsprodukter
-        if (createdEstCase?.id) {
-          const { data: contractArticles } = await supabase
-            .from('customer_contract_articles')
-            .select('*, article:articles(id, name, default_price)')
-            .eq('customer_id', actualCustomerId!);
+        // Auto-populera billing-items från kontraktets billing-items (case_id = contract_id)
+        if (createdEstCase?.id && persistedContractId) {
+          const { data: contractItems } = await supabase
+            .from('case_billing_items')
+            .select('item_type, service_id, article_id, service_name, article_name, quantity, unit_price, discounted_price, total_price, mapped_service_id')
+            .eq('case_id', persistedContractId);
 
-          if (contractArticles && contractArticles.length > 0) {
+          if (contractItems && contractItems.length > 0) {
             await supabase.from('case_billing_items').insert(
-              contractArticles.map((ca: any) => ({
+              contractItems.map((ci: any) => ({
                 case_id: createdEstCase.id,
-                article_id: ca.article_id,
-                quantity: ca.quantity ?? 1,
-                unit_price: ca.article?.default_price ?? 0,
-                total_price: (ca.quantity ?? 1) * (ca.article?.default_price ?? 0),
-                name: ca.article?.name ?? '',
-                item_type: 'article',
+                case_type: 'contract',
+                item_type: ci.item_type,
+                service_id: ci.service_id,
+                article_id: ci.article_id,
+                service_name: ci.service_name,
+                article_name: ci.article_name,
+                quantity: ci.quantity,
+                unit_price: ci.unit_price,
+                discounted_price: ci.discounted_price,
+                total_price: ci.total_price,
+                mapped_service_id: ci.mapped_service_id,
+                status: 'pending',
               }))
             );
           }
