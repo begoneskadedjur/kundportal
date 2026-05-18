@@ -1,7 +1,7 @@
 // src/pages/technician/TechnicianEquipment.tsx
 // Omdesignad: Enhetlig vy utan utomhus/inomhus-tabbar
 // Visar kunder med utplacerade stationer (expanderbara rader)
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
@@ -109,6 +109,8 @@ export default function TechnicianEquipment() {
   // Hämta tekniker-ID från profil
   const technicianId = profile?.technician_id || ''
 
+  const customerParamHandled = useRef(false)
+
   // Beräkna statistik baserat på teknikerns placeringar
   const stats = useMemo(() => {
     const outdoorEquipment = allEquipment.filter(e => e.latitude && e.longitude)
@@ -196,6 +198,8 @@ export default function TechnicianEquipment() {
   useEffect(() => {
     const customerId = searchParams.get('customer')
     if (!customerId || customers.length === 0) return
+    if (customerParamHandled.current) return
+    customerParamHandled.current = true
     const found = allCustomers.find(c => c.id === customerId)
     if (found) {
       setSelectedCustomerForModal(found)
