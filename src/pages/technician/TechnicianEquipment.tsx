@@ -28,7 +28,7 @@ import {
   Check,
   Wrench
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import { AllCustomersList } from '../../components/technician/AllCustomersList'
 import { CustomerStationsModal } from '../../components/technician/CustomerStationsModal'
@@ -51,6 +51,7 @@ interface Customer {
 export default function TechnicianEquipment() {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   // State
   const [allEquipment, setAllEquipment] = useState<EquipmentPlacementWithRelations[]>([])
@@ -190,6 +191,20 @@ export default function TechnicianEquipment() {
     }
     fetchCustomers()
   }, [])
+
+  // Öppna kundmodal automatiskt om ?customer=<id> finns i URL
+  useEffect(() => {
+    const customerId = searchParams.get('customer')
+    if (!customerId || allCustomers.length === 0) return
+    const found = allCustomers.find(c => c.id === customerId)
+    if (found) {
+      setSelectedCustomerForModal(found)
+    } else {
+      // Kunden har inga stationer ännu — öppna wizard direkt
+      setWizardCustomerId(customerId)
+      setIsWizardOpen(true)
+    }
+  }, [searchParams, allCustomers])
 
   // Uppdatera utrustning
   const refreshData = useCallback(async () => {

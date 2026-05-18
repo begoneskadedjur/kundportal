@@ -20,6 +20,7 @@ import type { Absence } from '../../components/coordinator/schedule/AbsenceBlock
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
 import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
+import EstablishmentCaseModal from '../../components/coordinator/EstablishmentCaseModal'
 import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal'
 import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal'
 import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal'
@@ -88,9 +89,11 @@ export default function CoordinatorSchedule() {
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null)
   const [selectedContractCase, setSelectedContractCase] = useState<Case | null>(null)
   const [selectedInspectionCase, setSelectedInspectionCase] = useState<Case | null>(null)
+  const [selectedEstablishmentCase, setSelectedEstablishmentCase] = useState<Case | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false)
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false)
+  const [isEstablishmentModalOpen, setIsEstablishmentModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [caseTypeForCreate, setCaseTypeForCreate] = useState<CaseType | null>(null)
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false)
@@ -131,7 +134,7 @@ export default function CoordinatorSchedule() {
       tertiary_assignee_id: null,
       tertiary_assignee_name: null,
       tertiary_assignee_email: null,
-      case_type: 'contract' as const,
+      case_type: (contractCase.service_type === 'establishment' ? 'establishment' : 'contract') as any,
       description: contractCase.description,
       price: contractCase.price,
       created_at: contractCase.created_at,
@@ -336,6 +339,8 @@ export default function CoordinatorSchedule() {
       if (cc) {
         if (cc.service_type === 'inspection') {
           setSelectedInspectionCase(cc); setIsInspectionModalOpen(true)
+        } else if (cc.service_type === 'establishment') {
+          setSelectedEstablishmentCase(cc); setIsEstablishmentModalOpen(true)
         } else {
           setSelectedContractCase(cc); setIsEditContractModalOpen(true)
         }
@@ -549,6 +554,11 @@ export default function CoordinatorSchedule() {
         onClose={() => { setIsInspectionModalOpen(false); setSelectedInspectionCase(null) }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedInspectionCase}
+      />
+      <EstablishmentCaseModal
+        isOpen={isEstablishmentModalOpen}
+        onClose={() => { setIsEstablishmentModalOpen(false); setSelectedEstablishmentCase(null) }}
+        caseData={selectedEstablishmentCase}
       />
       <CreateCaseModal
         isOpen={isCreateModalOpen}

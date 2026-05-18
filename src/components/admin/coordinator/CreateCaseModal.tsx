@@ -58,12 +58,12 @@ const getTeamEfficiencyInfo = (score: number): { label: string; color: string } 
 interface CreateCaseModalProps {
   isOpen: boolean; onClose: () => void; onSuccess: () => void;
   technicians: Technician[]; initialCaseData?: BeGoneCaseRow | null;
-  initialCaseType?: 'private' | 'business' | 'contract' | 'inspection' | null;
+  initialCaseType?: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | null;
 }
 
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
-  const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | null>(null);
+  const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | 'establishment' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
   const [serviceGroupId, setServiceGroupId] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
@@ -551,6 +551,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     return contractCustomers
       .filter(c => {
         if (caseType === 'inspection') return customersWithStations.has(c.id);
+        if (caseType === 'establishment') return !c.parent_customer_id;
         if (c.parent_customer_id) return false;
         return true;
       })
@@ -566,7 +567,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
   // Account Manager: hitta vilken tekniker som är kundens AM
   const accountManagerTechId = useMemo(() => {
-    if (caseType !== 'contract' && caseType !== 'inspection') return null;
+    if (caseType !== 'contract' && caseType !== 'inspection' && caseType !== 'establishment') return null;
     const siteCustomer = selectedSiteId ? contractCustomers.find(c => c.id === selectedSiteId) : null;
     const parentCustomer = selectedContractCustomer ? contractCustomers.find(c => c.id === selectedContractCustomer) : null;
     // account_manager_email lagrar @begone.se-email, kan vara slash-separerad
@@ -583,9 +584,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     return siteCustomer?.assigned_account_manager || parentCustomer?.assigned_account_manager || null;
   }, [selectedContractCustomer, selectedSiteId, contractCustomers]);
 
-  const selectCaseType = (type: 'private' | 'business' | 'contract' | 'inspection') => {
+  const selectCaseType = (type: 'private' | 'business' | 'contract' | 'inspection' | 'establishment') => {
     setCaseType(type);
-    if ((type === 'contract' || type === 'inspection') && contractCustomers.length === 0) {
+    if ((type === 'contract' || type === 'inspection' || type === 'establishment') && contractCustomers.length === 0) {
       toast.error('Inga avtalskunder hittades');
       return;
     }
@@ -757,13 +758,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       return toast.error("Alla fält med * under 'Bokning & Detaljer' måste vara ifyllda.");
     }
 
-    if ((caseType === 'contract' || caseType === 'inspection') && !selectedContractCustomer) {
+    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment') && !selectedContractCustomer) {
       return toast.error('Du måste välja en avtalskund');
     }
 
     // Validera site för multisite-kunder
     const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
-    if ((caseType === 'contract' || caseType === 'inspection') && customer?.is_multisite && !selectedSiteId) {
+    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment') && customer?.is_multisite && !selectedSiteId) {
       return toast.error('Du måste välja en anläggning för denna multisite-kund');
     }
     
@@ -876,6 +877,42 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         }
 
         toast.success(`Stationskontroll inbokad för ${customerName}!`);
+
+      } else if (caseType === 'establishment') {
+        let actualCustomerId = selectedContractCustomer;
+        if (customer?.is_multisite && selectedSiteId) {
+          actualCustomerId = selectedSiteId;
+        }
+
+        const customerForTitle = selectedSiteId
+          ? contractCustomers.find(c => c.id === selectedSiteId)
+          : customer;
+        const customerName = customerForTitle?.company_name || 'Okänd kund';
+
+        const { error } = await supabase.from('cases').insert([{
+          customer_id: actualCustomerId!,
+          contract_id: persistedContractId ?? null,
+          site_id: customer?.is_multisite ? selectedSiteId : null,
+          title: caseNumber,
+          description: formData.description || null,
+          status: 'Bokad',
+          service_type: 'establishment' as const,
+          scheduled_start: formData.start_date,
+          scheduled_end: formData.due_date,
+          primary_technician_id: formData.primary_assignee_id || null,
+          primary_technician_name: formData.primary_assignee_name || null,
+          secondary_technician_id: formData.secondary_assignee_id || null,
+          tertiary_technician_id: formData.tertiary_assignee_id || null,
+          contact_person: formData.kontaktperson || customer?.contact_person || null,
+          contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
+          contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
+          address: formData.adress ? { formatted_address: formData.adress } : null,
+          case_number: caseNumber,
+          send_booking_confirmation: formData.skicka_bokningsbekraftelse === 'Ja',
+        }]);
+        if (error) throw error;
+
+        toast.success(`Etablering inbokad för ${customerName}!`);
 
       } else if (caseType === 'contract') {
         // Hantera avtalskundärenden
@@ -1181,6 +1218,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <p className="text-xs text-cyan-400 mt-1">{contractCustomers.length} kunder</p>
                       )}
                     </button>
+                    <button type="button" onClick={() => selectCaseType('establishment')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-lime-500/30 cursor-pointer">
+                      <MapPin className="w-6 h-6 mx-auto mb-1.5 text-lime-400" />
+                      <h3 className="text-sm font-semibold">Etablering</h3>
+                      <p className="text-xs text-slate-400 mt-1">Utplacering av stationer</p>
+                      {contractCustomers.length > 0 && (
+                        <p className="text-xs text-lime-400 mt-1">{contractCustomers.length} kunder</p>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1193,10 +1238,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-3 rounded-xl flex items-center gap-3"><AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" /><p className="text-sm text-red-400">{error}</p></div>)}
               
               {/* Avtalskund-väljare (för contract och inspection) — sökbar dropdown */}
-              {(caseType === 'contract' || caseType === 'inspection') && (
-                <div className={`p-3 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-xl`}>
+              {(caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment') && (
+                <div className={`p-3 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : caseType === 'establishment' ? 'bg-lime-500/10 border-lime-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-xl`}>
                   <label className="block text-xs font-medium text-slate-400 mb-1">
-                    {caseType === 'inspection' ? 'Välj kund med stationer *' : 'Välj avtalskund *'}
+                    {caseType === 'inspection' ? 'Välj kund med stationer *' : caseType === 'establishment' ? 'Välj avtalskund (nyetablering) *' : 'Välj avtalskund *'}
                   </label>
                   <div ref={customerDropdownRef} className="relative">
                     <button
@@ -1214,7 +1259,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         </span>
                       ) : (
                         <span className="text-slate-500 text-sm">
-                          {caseType === 'inspection' ? 'Sök och välj kund med stationer...' : 'Sök och välj kund...'}
+                          {caseType === 'inspection' ? 'Sök och välj kund med stationer...' : caseType === 'establishment' ? 'Sök och välj avtalskund...' : 'Sök och välj kund...'}
                         </span>
                       )}
                       <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${customerDropdownOpen ? 'rotate-180' : ''}`} />
@@ -1281,8 +1326,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 </div>
               )}
 
-              {/* Site-väljare för multisite-kunder (contract och inspection) */}
-              {(caseType === 'contract' || caseType === 'inspection') && selectedContractCustomer && (
+              {/* Site-väljare för multisite-kunder (contract, inspection, establishment) */}
+              {(caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment') && selectedContractCustomer && (
                 (() => {
                   const selectedCustomer = contractCustomers.find(c => c.id === selectedContractCustomer);
                   if (selectedCustomer?.is_multisite && selectedCustomer?.organization_id) {

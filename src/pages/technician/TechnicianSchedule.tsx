@@ -20,6 +20,7 @@ import Card from '../../components/ui/Card'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
 import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
+import EstablishmentCaseModal from '../../components/coordinator/EstablishmentCaseModal'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ReportModal from '../../components/admin/technicians/ReportModal'
 import { BeGoneCaseRow } from '../../types/database' // NYTT: Importerar den centrala typen
@@ -27,10 +28,10 @@ import '../../styles/FullCalendar.css'
 
 // Definiera en mer komplett typ för ärenden som används i denna komponent
 type ScheduleCaseType = BeGoneCaseRow & {
-    case_type: 'private' | 'business' | 'contract' | 'inspection';
+    case_type: 'private' | 'business' | 'contract' | 'inspection' | 'establishment';
     case_price?: number;
     technician_role?: 'primary' | 'secondary' | 'tertiary';
-    service_type?: string; // 'routine' | 'inspection' etc.
+    service_type?: string; // 'routine' | 'inspection' | 'establishment' etc.
 }
 
 const toDateString = (date: Date): string => date.toISOString().split('T')[0];
@@ -75,9 +76,16 @@ const openInMaps = (addressData: any) => {
     }
   }
 };
-const getCaseTypeIcon = (caseType: 'private' | 'business' | 'contract' | 'inspection') => { const props = { className: "w-4 h-4" }; switch (caseType) { case 'private': return <User {...props} color="#60a5fa" />; case 'business': return <Users {...props} color="#4ade80" />; case 'contract': return <span className="text-purple-400">👑</span>; case 'inspection': return <span className="text-cyan-400">📋</span>; default: return <Clock {...props} color="#c084fc" />; } };
+const getCaseTypeIcon = (caseType: 'private' | 'business' | 'contract' | 'inspection' | 'establishment') => { const props = { className: "w-4 h-4" }; switch (caseType) { case 'private': return <User {...props} color="#60a5fa" />; case 'business': return <Users {...props} color="#4ade80" />; case 'contract': return <span className="text-purple-400">👑</span>; case 'inspection': return <span className="text-cyan-400">📋</span>; case 'establishment': return <span className="text-lime-400">📦</span>; default: return <Clock {...props} color="#c084fc" />; } };
 const getStatusColor = (status: string, caseType?: string): { bg: string; text: string; border: string } => {
   const ls = status?.toLowerCase() || '';
+
+  // Lime färgschema för etablering
+  if (caseType === 'establishment') {
+    if (ls.includes('avslutat')) return { bg: 'bg-lime-900/50', text: 'text-lime-300', border: 'border-lime-700/50' };
+    if (ls.includes('pågående')) return { bg: 'bg-lime-800/50', text: 'text-lime-200', border: 'border-lime-600/50' };
+    return { bg: 'bg-lime-700/50', text: 'text-lime-100', border: 'border-lime-500/50' };
+  }
 
   // Cyan färgschema för stationskontroll
   if (caseType === 'inspection') {
@@ -168,8 +176,10 @@ export default function TechnicianSchedule() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false);
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
+  const [isEstablishmentModalOpen, setIsEstablishmentModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<ScheduleCaseType | null>(null);
   const [selectedInspectionCase, setSelectedInspectionCase] = useState<ScheduleCaseType | null>(null);
+  const [selectedEstablishmentCase, setSelectedEstablishmentCase] = useState<ScheduleCaseType | null>(null);
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES));
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState<'agenda' | 'month'>('agenda');
@@ -210,7 +220,9 @@ export default function TechnicianSchedule() {
       const contractCases = (contractResult.data || []).map(c => {
         const customer = c.customer || {};
         // Bestäm case_type baserat på service_type
-        const caseType = c.service_type === 'inspection' ? 'inspection' as const : 'contract' as const;
+        const caseType = c.service_type === 'inspection' ? 'inspection' as const
+          : c.service_type === 'establishment' ? 'establishment' as const
+          : 'contract' as const;
         return {
           ...c,
           // Mappa fields korrekt från cases-tabellen
@@ -290,9 +302,11 @@ export default function TechnicianSchedule() {
 
   const handleOpenModal = (caseData: ScheduleCaseType) => {
     if (caseData.case_type === 'inspection') {
-      // Öppna InspectionCaseModal istället för direkt navigation
       setSelectedInspectionCase(caseData);
       setIsInspectionModalOpen(true);
+    } else if (caseData.case_type === 'establishment') {
+      setSelectedEstablishmentCase(caseData);
+      setIsEstablishmentModalOpen(true);
     } else if (caseData.case_type === 'contract') {
       setSelectedCase(caseData);
       setIsEditContractModalOpen(true);
@@ -305,14 +319,16 @@ export default function TechnicianSchedule() {
   const handleUpdateSuccess = (updatedCase?: any) => {
     // Om inget updatedCase skickades = ärendet har raderats
     // Ta bort det från listan och stäng modalen
-    if (!updatedCase && (selectedCase || selectedInspectionCase)) {
-      const caseIdToRemove = selectedCase?.id || selectedInspectionCase?.id;
+    if (!updatedCase && (selectedCase || selectedInspectionCase || selectedEstablishmentCase)) {
+      const caseIdToRemove = selectedCase?.id || selectedInspectionCase?.id || selectedEstablishmentCase?.id;
       setCases(prevCases => prevCases.filter(c => c.id !== caseIdToRemove));
       setIsEditModalOpen(false);
       setIsEditContractModalOpen(false);
       setIsInspectionModalOpen(false);
+      setIsEstablishmentModalOpen(false);
       setSelectedCase(null);
       setSelectedInspectionCase(null);
+      setSelectedEstablishmentCase(null);
       return;
     }
 
@@ -468,6 +484,16 @@ export default function TechnicianSchedule() {
         }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedInspectionCase}
+      />
+
+      {/* Modal för etablering-ärenden */}
+      <EstablishmentCaseModal
+        isOpen={isEstablishmentModalOpen}
+        onClose={() => {
+          setIsEstablishmentModalOpen(false);
+          setSelectedEstablishmentCase(null);
+        }}
+        caseData={selectedEstablishmentCase}
       />
 
       <FilterPanel isOpen={isFilterPanelOpen} onClose={() => setIsFilterPanelOpen(false)} activeStatuses={activeStatuses} setActiveStatuses={setActiveStatuses} />

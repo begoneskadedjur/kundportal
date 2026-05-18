@@ -44,6 +44,11 @@ export const TECH_COLORS = [
 export function getStatusStyle(status: string, caseType?: string) {
   const ls = (status || '').toLowerCase()
 
+  if (caseType === 'establishment') {
+    if (ls.includes('avslutat')) return { bg: 'bg-lime-700/25', border: 'border-l-lime-600', text: 'text-lime-200' }
+    return { bg: 'bg-lime-500/20', border: 'border-l-lime-500', text: 'text-lime-200' }
+  }
+
   if (ls.includes('avtalsärende') || caseType === 'contract') {
     if (ls.includes('avslutat')) return { bg: 'bg-purple-700/25', border: 'border-l-purple-600', text: 'text-purple-200' }
     if (ls.includes('pågående')) return { bg: 'bg-purple-500/20', border: 'border-l-purple-500', text: 'text-purple-200' }
