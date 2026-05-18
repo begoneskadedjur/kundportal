@@ -29,6 +29,7 @@ import {
   getEquipmentStatusLabel
 } from '../../../types/database'
 import { formatCoordinates, openInMapsApp } from '../../../utils/equipmentMapUtils'
+import { EquipmentService } from '../../../services/equipmentService'
 import ImageLightbox from '../ImageLightbox'
 import type { OutdoorInspectionWithRelations } from '../../../types/inspectionSession'
 import { INSPECTION_STATUS_CONFIG } from '../../../types/indoor'
@@ -91,6 +92,12 @@ export function EquipmentDetailSheet({
   const [showLightbox, setShowLightbox] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [showAllInspections, setShowAllInspections] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!equipment?.photo_path) { setPhotoUrl(null); return }
+    EquipmentService.getEquipmentPhotoUrl(equipment.photo_path).then(setPhotoUrl)
+  }, [equipment?.photo_path])
 
   // Detektera skarmstorlek
   useEffect(() => {
@@ -185,13 +192,13 @@ export function EquipmentDetailSheet({
       {/* Content - scrollable */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Foto */}
-        {equipment.photo_url && (
+        {photoUrl && (
           <button
             onClick={() => setShowLightbox(true)}
             className="w-full rounded-xl overflow-hidden bg-slate-900 relative group cursor-zoom-in"
           >
             <img
-              src={equipment.photo_url}
+              src={photoUrl}
               alt="Utrustningsfoto"
               className="w-full aspect-video object-cover transition-transform duration-300 group-hover:scale-105"
             />
@@ -357,9 +364,9 @@ export function EquipmentDetailSheet({
         <div className="bg-slate-800 rounded-t-2xl shadow-2xl max-h-[85vh] overflow-hidden flex flex-col">
           {sheetContent}
         </div>
-        {equipment.photo_url && (
+        {photoUrl && (
           <ImageLightbox
-            images={[{ url: equipment.photo_url, alt: 'Utrustningsfoto' }]}
+            images={[{ url: photoUrl, alt: 'Utrustningsfoto' }]}
             initialIndex={0}
             isOpen={showLightbox}
             onClose={() => setShowLightbox(false)}
@@ -419,9 +426,9 @@ export function EquipmentDetailSheet({
       </AnimatePresence>
 
       {/* Lightbox for foto */}
-      {equipment.photo_url && (
+      {photoUrl && (
         <ImageLightbox
-          images={[{ url: equipment.photo_url, alt: 'Utrustningsfoto' }]}
+          images={[{ url: photoUrl, alt: 'Utrustningsfoto' }]}
           initialIndex={0}
           isOpen={showLightbox}
           onClose={() => setShowLightbox(false)}

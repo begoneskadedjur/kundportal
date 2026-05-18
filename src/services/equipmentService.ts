@@ -1,6 +1,5 @@
 // src/services/equipmentService.ts - Service för utrustningsplacering
 import { supabase } from '../lib/supabase'
-import { IndoorStationService } from './indoorStationService'
 import {
   EquipmentPlacement,
   EquipmentPlacementInsert,
@@ -58,30 +57,18 @@ export class EquipmentService {
       // Skapa map för snabb lookup på code
       const typesByCode = new Map(allStationTypes?.map(t => [t.code, t]) || [])
 
-      // Lägg till signerade URLs för foton och fallback för station_type_data
-      const equipmentWithUrls = await Promise.all(
-        (data || []).map(async (equipment) => {
-          // Fallback: Om station_type_data saknas, matcha equipment_type mot station_types.code
-          let stationTypeData = equipment.station_type_data
-          if (!stationTypeData && equipment.equipment_type) {
-            const matchedType = typesByCode.get(equipment.equipment_type)
-            if (matchedType) {
-              stationTypeData = matchedType
-            }
-          }
+      // Fallback för station_type_data om station_type_id saknas
+      const equipmentWithFallback = (data || []).map((equipment) => {
+        let stationTypeData = equipment.station_type_data
+        if (!stationTypeData && equipment.equipment_type) {
+          const matchedType = typesByCode.get(equipment.equipment_type)
+          if (matchedType) stationTypeData = matchedType
+        }
+        return { ...equipment, station_type_data: stationTypeData }
+      })
 
-          return {
-            ...equipment,
-            station_type_data: stationTypeData,
-            photo_url: equipment.photo_path
-              ? await this.getEquipmentPhotoUrl(equipment.photo_path)
-              : undefined
-          }
-        })
-      )
-
-      console.log('Utrustning hämtad:', equipmentWithUrls.length)
-      return equipmentWithUrls
+      console.log('Utrustning hämtad:', equipmentWithFallback.length)
+      return equipmentWithFallback
 
     } catch (error) {
       console.error('EquipmentService.getEquipmentByCustomer fel:', error)
@@ -115,17 +102,7 @@ export class EquipmentService {
         throw new Error(`Databasfel: ${error.message}`)
       }
 
-      // Lägg till signerade URLs för foton
-      const equipmentWithUrls = await Promise.all(
-        (data || []).map(async (equipment) => ({
-          ...equipment,
-          photo_url: equipment.photo_path
-            ? await this.getEquipmentPhotoUrl(equipment.photo_path)
-            : undefined
-        }))
-      )
-
-      return equipmentWithUrls
+      return data || []
 
     } catch (error) {
       console.error('EquipmentService.getEquipmentByTechnician fel:', error)
@@ -909,31 +886,11 @@ export class EquipmentService {
         }
       }
 
-      // Lägg till signerade URLs för foton (utomhus)
-      const outdoorWithUrls = await Promise.all(
-        (outdoorData || []).map(async (equipment) => ({
-          ...equipment,
-          photo_url: equipment.photo_path
-            ? await this.getEquipmentPhotoUrl(equipment.photo_path)
-            : undefined
-        }))
-      )
-
-      // Lägg till signerade URLs för foton (inomhus)
-      const indoorWithUrls = await Promise.all(
-        indoorData.map(async (station: any) => ({
-          ...station,
-          photo_url: station.photo_path
-            ? await IndoorStationService.getStationPhotoUrl(station.photo_path)
-            : undefined
-        }))
-      )
-
-      console.log('Stationer hämtade - utomhus:', outdoorWithUrls.length, 'inomhus:', indoorWithUrls.length)
+      console.log('Stationer hämtade - utomhus:', (outdoorData || []).length, 'inomhus:', indoorData.length)
 
       return {
-        outdoor: outdoorWithUrls,
-        indoor: indoorWithUrls
+        outdoor: outdoorData || [],
+        indoor: indoorData
       }
 
     } catch (error) {
