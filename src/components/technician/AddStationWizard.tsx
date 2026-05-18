@@ -116,6 +116,13 @@ export function AddStationWizard({
     }
   }, [isOpen, preselectedCustomerId])
 
+  // Sätt kundnamn när customers-listan laddats och kund är förvald
+  useEffect(() => {
+    if (!preselectedCustomerId || customers.length === 0) return
+    const found = customers.find(c => c.id === preselectedCustomerId)
+    if (found) setSelectedCustomerName(found.company_name)
+  }, [preselectedCustomerId, customers])
+
   const loadCustomers = async () => {
     setLoadingCustomers(true)
     try {
