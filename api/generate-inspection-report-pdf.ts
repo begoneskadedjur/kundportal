@@ -139,6 +139,60 @@ async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): P
   }
 }
 
+// Rendera planritning + markörer som Puppeteer screenshot (löser sidbrytningsproblem)
+async function renderFloorPlanScreenshot(
+  browser: any,
+  imageBase64: string,
+  stations: Array<{ x: number; y: number; label: string; color: string }>
+): Promise<string | null> {
+  const markerHtml = stations.map(s => `
+    <div style="position:absolute;left:${s.x}%;top:${s.y}%;
+      transform:translate(-50%,-50%);width:22px;height:22px;
+      border-radius:50%;background:${s.color};color:white;
+      font-size:10px;font-weight:700;display:flex;
+      align-items:center;justify-content:center;
+      border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.4);">
+      ${s.label}
+    </div>`).join('')
+
+  const html = `<!DOCTYPE html><html><head>
+    <style>*{margin:0;padding:0;}
+    #container{position:relative;width:900px;}
+    img{width:100%;display:block;}
+    </style></head><body>
+    <div id="container">
+      <img id="img" src="${imageBase64}" />
+      ${markerHtml}
+    </div>
+    <script>
+      var img = document.getElementById('img');
+      function onLoad() {
+        document.getElementById('container').style.height = img.offsetHeight + 'px';
+        window.__HEIGHT = img.offsetHeight;
+        window.__READY = true;
+      }
+      if (img.complete) { onLoad(); } else { img.onload = onLoad; }
+    </script>
+  </body></html>`
+
+  let page: any = null
+  try {
+    page = await browser.newPage()
+    await page.setViewport({ width: 900, height: 900, deviceScaleFactor: 2 })
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 })
+    await page.waitForFunction('window.__READY === true', { timeout: 10000 })
+    const height = await page.evaluate(() => (window as any).__HEIGHT)
+    await page.setViewport({ width: 900, height: Math.max(1, Math.ceil(height)), deviceScaleFactor: 2 })
+    const screenshot = await page.screenshot({ type: 'png', fullPage: false })
+    await page.close()
+    return `data:image/png;base64,${Buffer.from(screenshot).toString('base64')}`
+  } catch (err) {
+    console.error('[FloorPlanScreenshot] Error:', err)
+    if (page) await page.close().catch(() => {})
+    return null
+  }
+}
+
 // Hämta planritningsbild som base64 data-URI
 async function fetchFloorPlanBase64(imagePath: string): Promise<string | null> {
   try {
@@ -229,43 +283,27 @@ async function generateInspectionReportHTML(data: {
       new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
     )
 
-    // Hämta planritningsbild som base64
+    // Rendera planritning + markörer som screenshot (markörer inbakade i bilden)
     let floorPlanHtml = ''
     if (group.imagePath) {
       const imageBase64 = await fetchFloorPlanBase64(group.imagePath)
       if (imageBase64) {
-        // Bygg markörer baserade på position_x_percent / position_y_percent
-        const markersHtml = sortedInGroup.map((insp: any, idx: number) => {
-          const station = insp.station
-          if (!station?.position_x_percent || !station?.position_y_percent) return ''
-          const statusColor = getStatusColor(insp.status)
-          return `<div style="
-            position: absolute;
-            left: ${station.position_x_percent}%;
-            top: ${station.position_y_percent}%;
-            transform: translate(-50%, -50%);
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            background: ${statusColor};
-            color: white;
-            font-size: 10px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-            z-index: 10;
-          ">${idx + 1}</div>`
-        }).join('')
-
-        floorPlanHtml = `
-          <div style="position: relative; margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
-            <img src="${imageBase64}" style="width: 100%; height: auto; display: block;" alt="${group.name}" />
-            ${markersHtml}
-          </div>
-        `
+        const stationMarkers = sortedInGroup
+          .filter((insp: any) => insp.station?.position_x_percent && insp.station?.position_y_percent)
+          .map((insp: any, idx: number) => ({
+            x: insp.station.position_x_percent,
+            y: insp.station.position_y_percent,
+            label: String(idx + 1),
+            color: getStatusColor(insp.status)
+          }))
+        const compositeBase64 = await renderFloorPlanScreenshot(browser, imageBase64, stationMarkers)
+        if (compositeBase64) {
+          floorPlanHtml = `
+            <div style="margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
+              <img src="${compositeBase64}" style="width: 100%; height: auto; max-height: 170mm; display: block;" alt="${group.name}" />
+            </div>
+          `
+        }
       }
     }
 
