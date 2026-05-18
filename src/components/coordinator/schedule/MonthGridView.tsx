@@ -274,6 +274,7 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                     setDragOverDay(null)
                     setExpandedDayKey(null)
                     setDragOverSlot(null)
+                    setDraggingCaseId(null)
                     if (dayBlocked) return
                     const caseId = e.dataTransfer.getData('caseId')
                     if (!caseId || !onCaseMoved) return
@@ -330,6 +331,7 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                               setDragOverSlot(null)
                               setExpandedDayKey(null)
                               setDragOverDay(null)
+                              setDraggingCaseId(null)
                               const caseId = e.dataTransfer.getData('caseId')
                               if (!caseId || !onCaseMoved) return
                               const caseData = cases.find(c => c.id === caseId)

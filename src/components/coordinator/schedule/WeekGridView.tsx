@@ -333,6 +333,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   setDragOverDayIdx(null)
                   setDropPreview(null)
                   setDropBlocked(false)
+                  setDraggingCaseId(null)
                   const caseId = e.dataTransfer.getData('caseId')
                   if (!caseId || !onCaseMoved) return
                   const caseData = cases.find(c => c.id === caseId)
