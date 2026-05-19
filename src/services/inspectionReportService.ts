@@ -314,12 +314,15 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
 
     sortedOutdoor.forEach((insp, index) => {
       const statusLabel = getStatusLabel(insp.status)
+      const matVal = insp.measurement_value !== null && insp.measurement_value !== undefined
+        ? Number(insp.measurement_value)
+        : ''
       const row = wsOut.addRow([
         index + 1,
         insp.station?.station_type_data?.name || (insp.station as any)?.equipment_type || '-',
         statusLabel,
         insp.station?.station_type_data?.measurement_label || '-',
-        insp.measurement_value ?? '',
+        matVal,
         insp.measurement_unit || insp.station?.station_type_data?.measurement_unit || '-',
         insp.findings || '',
         insp.preparation?.name || '',
@@ -328,8 +331,8 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       ])
       applyDataRow(row, index % 2 === 1)
       row.getCell(1).font = { bold: true, size: 9 }
-      const statusCell = row.getCell(3)
-      statusCell.font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
+      row.getCell(3).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
+      row.getCell(7).alignment = { wrapText: true, vertical: 'top' }
     })
   }
 
@@ -401,6 +404,9 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
         rowIdx = 0
       }
 
+      const indoorMatVal = insp.measurement_value !== null && insp.measurement_value !== undefined
+        ? Number(insp.measurement_value)
+        : ''
       const row = wsIn.addRow([
         numberMap.get(insp.id) ?? '-',
         station?.station_type_data?.name || station?.station_type || '-',
@@ -409,7 +415,7 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
         station?.location_description || '',
         statusLabel,
         station?.station_type_data?.measurement_label || '-',
-        insp.measurement_value ?? '',
+        indoorMatVal,
         insp.measurement_unit || station?.station_type_data?.measurement_unit || '-',
         insp.findings || '',
         insp.preparation?.name || '',
@@ -418,8 +424,8 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       ])
       applyDataRow(row, rowIdx % 2 === 1)
       row.getCell(1).font = { bold: true, size: 9 }
-      const statusCell = row.getCell(6)
-      statusCell.font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
+      row.getCell(6).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
+      row.getCell(10).alignment = { wrapText: true, vertical: 'top' }
       rowIdx++
     })
   }

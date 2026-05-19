@@ -819,6 +819,7 @@ export async function getIndoorInspectionsForSession(
         placed_at,
         position_x_percent,
         position_y_percent,
+        location_description,
         floor_plan:floor_plans(id, name, building_name, image_path)
       ),
       preparation:preparations!preparation_id(id, name, registration_number)
