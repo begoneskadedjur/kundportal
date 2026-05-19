@@ -290,9 +290,11 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
   // FLIK 2: Utomhusstationer
   // ============================================================
   if (outdoorInspections.length > 0) {
-    const sortedOutdoor = [...outdoorInspections].sort((a, b) =>
-      ((a.station as any)?.placed_at || '').localeCompare((b.station as any)?.placed_at || '')
-    )
+    const sortedOutdoor = [...outdoorInspections].sort((a, b) => {
+      const dateA = (a.station as any)?.placed_at || a.inspected_at || ''
+      const dateB = (b.station as any)?.placed_at || b.inspected_at || ''
+      return dateA.localeCompare(dateB)
+    })
 
     const wsOut = wb.addWorksheet('Utomhusstationer')
     wsOut.columns = [
@@ -367,8 +369,7 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       { key: 'nr', width: 6 },
       { key: 'typ', width: 20 },
       { key: 'planritning', width: 20 },
-      { key: 'byggnad', width: 16 },
-      { key: 'plats', width: 20 },
+      { key: 'plats', width: 22 },
       { key: 'status', width: 18 },
       { key: 'matLabel', width: 20 },
       { key: 'matValue', width: 12 },
@@ -379,8 +380,8 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       { key: 'inspected', width: 20 },
     ]
 
-    const headerRow = wsIn.addRow(['Nr', 'Typ', 'Planritning', 'Byggnad', 'Plats', 'Status', 'Mätvärde avser', 'Mätvärde', 'Enhet', 'Anteckning', 'Preparat', 'Reg.nr', 'Kontrollerad'])
-    applyHeaderRow(headerRow, 13)
+    const headerRow = wsIn.addRow(['Nr', 'Typ', 'Planritning', 'Plats', 'Status', 'Mätvärde avser', 'Mätvärde', 'Enhet', 'Anteckning', 'Preparat', 'Reg.nr', 'Kontrollerad'])
+    applyHeaderRow(headerRow, 12)
     wsIn.views = [{ state: 'frozen', ySplit: 1 }]
 
     let currentFp = ''
@@ -394,8 +395,8 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       if (fp !== currentFp) {
         // Grupprubrik per planritning
         if (currentFp !== '') wsIn.addRow([])
-        const fpRow = wsIn.addRow([fp, '', '', '', '', '', '', '', '', '', '', '', ''])
-        wsIn.mergeCells(`A${fpRow.number}:M${fpRow.number}`)
+        const fpRow = wsIn.addRow([fp, '', '', '', '', '', '', '', '', '', '', ''])
+        wsIn.mergeCells(`A${fpRow.number}:L${fpRow.number}`)
         fpRow.height = 20
         fpRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BG_DARK } }
         fpRow.getCell(1).font = { bold: true, size: 10, color: { argb: 'FF' + BG_WHITE } }
@@ -411,7 +412,6 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
         numberMap.get(insp.id) ?? '-',
         station?.station_type_data?.name || station?.station_type || '-',
         fp,
-        station?.floor_plan?.building_name || '',
         station?.location_description || '',
         statusLabel,
         station?.station_type_data?.measurement_label || '-',
@@ -424,8 +424,8 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       ])
       applyDataRow(row, rowIdx % 2 === 1)
       row.getCell(1).font = { bold: true, size: 9 }
-      row.getCell(6).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
-      row.getCell(10).alignment = { wrapText: true, vertical: 'top' }
+      row.getCell(5).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
+      row.getCell(9).alignment = { wrapText: true, vertical: 'top' }
       rowIdx++
     })
   }
