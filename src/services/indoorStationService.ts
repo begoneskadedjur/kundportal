@@ -44,7 +44,8 @@ export class IndoorStationService {
             measurement_label,
             threshold_warning,
             threshold_critical,
-            threshold_direction
+            threshold_direction,
+            threshold_source
           )
         `)
         .eq('floor_plan_id', floorPlanId)
@@ -58,7 +59,7 @@ export class IndoorStationService {
       // Hämta alla stationstyper för fallback-lookup (om station_type_id saknas)
       const { data: allStationTypes } = await supabase
         .from('station_types')
-        .select('id, code, name, color, icon, prefix, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction')
+        .select('id, code, name, color, icon, prefix, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
         .eq('is_active', true)
 
       // Skapa map för snabb lookup på code
@@ -142,7 +143,8 @@ export class IndoorStationService {
             measurement_label,
             threshold_warning,
             threshold_critical,
-            threshold_direction
+            threshold_direction,
+            threshold_source
           )
         `)
         .eq('id', id)
