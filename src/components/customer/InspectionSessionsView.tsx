@@ -49,10 +49,11 @@ import {
 import { useDebounce } from '../../hooks/useDebounce'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
 import type { FloorPlanWithRelations } from '../../services/floorPlanService'
-import type {
-  IndoorStationWithRelations,
-  IndoorStationInspectionWithRelations,
-  InspectionStatus
+import {
+  calculateInspectionStatus,
+  type IndoorStationWithRelations,
+  type IndoorStationInspectionWithRelations,
+  type InspectionStatus
 } from '../../types/indoor'
 import type { OutdoorInspectionWithRelations, InspectionSessionWithRelations } from '../../types/inspectionSession'
 import { useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
@@ -142,7 +143,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [lastInspectionDate, setLastInspectionDate] = useState<string | null>(null)
   const [lastTechnicianName, setLastTechnicianName] = useState<string | null>(null)
   const [totalStations, setTotalStations] = useState(0)
-  const [statusCounts, setStatusCounts] = useState({ ok: 0, warning: 0, critical: 0, noInspection: 0 })
+  const [statusCounts, setStatusCounts] = useState({ none: 0, low: 0, medium: 0, high: 0, noInspection: 0 })
 
   // Sessionsväljare — alla sessioner + vald session
   const [allSessions, setAllSessions] = useState<InspectionSessionWithRelations[]>([])
@@ -393,12 +394,23 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
       const allStationsList = builtSections.flatMap(s => s.stations)
       setTotalStations(allStationsList.length)
 
-      const counts = { ok: 0, warning: 0, critical: 0, noInspection: 0 }
+      const counts = { none: 0, low: 0, medium: 0, high: 0, noInspection: 0 }
       allStationsList.forEach(station => {
-        if (!station.latestInspection) counts.noInspection++
-        else if (station.calculatedStatus === 'critical') counts.critical++
-        else if (station.calculatedStatus === 'warning') counts.warning++
-        else counts.ok++
+        if (!station.latestInspection) {
+          counts.noInspection++
+        } else {
+          const prepThresholds = station.thresholdSource === 'preparation'
+            ? (station.latestInspection as any).preparation ?? null
+            : null
+          const lvl = calculateInspectionStatus(
+            station.latestInspection.measurementValue,
+            station.thresholdWarning,
+            station.thresholdCritical,
+            station.thresholdDirection,
+            prepThresholds
+          )
+          counts[lvl]++
+        }
       })
       setStatusCounts(counts)
 
@@ -980,31 +992,16 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               <span className="text-sm text-slate-400">Laddar kontrolldata...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-slate-900/50 rounded-lg p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-xs text-slate-500 uppercase">OK</span>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {(['none', 'low', 'medium', 'high'] as const).map(lvl => (
+                <div key={lvl} className="bg-slate-900/50 rounded-lg p-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: getStatusColor2(lvl) }} />
+                    <span className="text-xs text-slate-500 uppercase">{getStatusLabel(lvl)}</span>
+                  </div>
+                  <p className="font-bold text-lg" style={{ color: getStatusColor2(lvl) }}>{statusCounts[lvl]}</p>
                 </div>
-                <p className="text-emerald-400 font-bold text-lg">{statusCounts.ok}</p>
-              </div>
-
-              <div className="bg-slate-900/50 rounded-lg p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-xs text-slate-500 uppercase">Varning</span>
-                </div>
-                <p className="text-amber-400 font-bold text-lg">{statusCounts.warning}</p>
-              </div>
-
-              <div className="bg-slate-900/50 rounded-lg p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                  <span className="text-xs text-slate-500 uppercase">Kritisk</span>
-                </div>
-                <p className="text-red-400 font-bold text-lg">{statusCounts.critical}</p>
-              </div>
-
+              ))}
               <div className="bg-slate-900/50 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-1">
                   <ClipboardCheck className="w-3.5 h-3.5 text-slate-400" />
@@ -1389,22 +1386,8 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                 <>
                   {/* Sammanfattning med jämförelse mot senaste */}
                   {(() => {
-                    const histOk = selectedHistorySession.inspection_summary?.ok || 0
-                    const histWarning = selectedHistorySession.inspection_summary?.warning || 0
-                    const histCritical = selectedHistorySession.inspection_summary?.critical || 0
-                    const histTotal = selectedHistorySession.inspection_summary?.total || 0
-
-                    // Beräkna nuvarande statusar från comparisonData
-                    let currentOk = 0, currentWarning = 0, currentCritical = 0
-                    latestComparisonData.forEach(data => {
-                      if (data.status === 'ok') currentOk++
-                      else if (data.status === 'warning') currentWarning++
-                      else if (data.status === 'critical') currentCritical++
-                    })
-
-                    const okDiff = currentOk - histOk
-                    const warningDiff = currentWarning - histWarning
-                    const criticalDiff = currentCritical - histCritical
+                    const histSummary = selectedHistorySession.inspection_summary || { none: 0, low: 0, medium: 0, high: 0, total: 0 }
+                    const histTotal = histSummary.total || 0
 
                     const renderDiff = (diff: number, isGoodWhenPositive: boolean) => {
                       if (diff === 0) return null
@@ -1419,37 +1402,23 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                     }
 
                     return (
-                      <div className="grid grid-cols-4 gap-3 mb-6">
-                        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
-                          <div className="flex items-center justify-center gap-1 mb-1">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                            <span className="text-xs text-slate-500 uppercase">OK</span>
-                          </div>
-                          <div className="flex items-center justify-center gap-2">
-                            <p className="text-emerald-400 font-bold text-lg">{histOk}</p>
-                            {latestComparisonData.size > 0 && renderDiff(okDiff, true)}
-                          </div>
-                        </div>
-                        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
-                          <div className="flex items-center justify-center gap-1 mb-1">
-                            <AlertTriangle className="w-4 h-4 text-amber-400" />
-                            <span className="text-xs text-slate-500 uppercase">Varning</span>
-                          </div>
-                          <div className="flex items-center justify-center gap-2">
-                            <p className="text-amber-400 font-bold text-lg">{histWarning}</p>
-                            {latestComparisonData.size > 0 && renderDiff(warningDiff, false)}
-                          </div>
-                        </div>
-                        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
-                          <div className="flex items-center justify-center gap-1 mb-1">
-                            <AlertTriangle className="w-4 h-4 text-red-400" />
-                            <span className="text-xs text-slate-500 uppercase">Kritisk</span>
-                          </div>
-                          <div className="flex items-center justify-center gap-2">
-                            <p className="text-red-400 font-bold text-lg">{histCritical}</p>
-                            {latestComparisonData.size > 0 && renderDiff(criticalDiff, false)}
-                          </div>
-                        </div>
+                      <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mb-6">
+                        {(['none', 'low', 'medium', 'high'] as const).map(lvl => {
+                          const histVal = (histSummary as any)[lvl] || 0
+                          const isHigherBad = lvl === 'medium' || lvl === 'high'
+                          return (
+                            <div key={lvl} className="bg-slate-900/50 rounded-lg p-3 text-center">
+                              <div className="flex items-center justify-center gap-1 mb-1">
+                                <span className="w-3 h-3 rounded-full" style={{ background: getStatusColor2(lvl) }} />
+                                <span className="text-xs text-slate-500 uppercase">{getStatusLabel(lvl)}</span>
+                              </div>
+                              <div className="flex items-center justify-center gap-2">
+                                <p className="font-bold text-lg" style={{ color: getStatusColor2(lvl) }}>{histVal}</p>
+                                {latestComparisonData.size > 0 && renderDiff(0, !isHigherBad)}
+                              </div>
+                            </div>
+                          )
+                        })}
                         <div className="bg-slate-900/50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center gap-1 mb-1">
                             <ClipboardCheck className="w-4 h-4 text-slate-400" />

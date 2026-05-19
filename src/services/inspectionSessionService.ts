@@ -227,13 +227,15 @@ export async function getCompletedSessionsForCustomer(
   })) as InspectionSessionWithRelations[]
 }
 
+export type InspectionLevelSummary = { none: number; low: number; medium: number; high: number; total: number }
+
 /**
  * Hämta sammanfattning av inspektionsstatusar för en session
- * Beräknar ok/warning/critical baserat på tröskelvärden
+ * Beräknar none/low/medium/high baserat på tröskelvärden
  */
 export async function getSessionInspectionSummary(
   sessionId: string
-): Promise<{ ok: number; warning: number; critical: number; total: number }> {
+): Promise<InspectionLevelSummary> {
   // Hämta alla inspektioner för sessionen
   const [{ data: outdoorInspections }, { data: indoorInspections }] = await Promise.all([
     supabase
@@ -264,8 +266,7 @@ export async function getSessionInspectionSummary(
 
   const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
 
-  // Räkna statusar med tröskelvärdesberäkning
-  const counts = { ok: 0, warning: 0, critical: 0, total: 0 }
+  const counts: InspectionLevelSummary = { none: 0, low: 0, medium: 0, high: 0, total: 0 }
 
   // Räkna outdoor
   outdoorInspections?.forEach(insp => {
@@ -274,8 +275,8 @@ export async function getSessionInspectionSummary(
     const stationType = station?.equipment_type ? typesByCode.get(station.equipment_type) : null
     const measurementValue = insp.measurement_value
 
-    if (measurementValue === null || !stationType) {
-      counts.ok++
+    if (measurementValue === null || measurementValue === 0 || !stationType) {
+      counts.none++
       return
     }
 
@@ -300,8 +301,8 @@ export async function getSessionInspectionSummary(
     const stationType = station?.station_type ? typesByCode.get(station.station_type) : null
     const measurementValue = insp.measurement_value
 
-    if (measurementValue === null || !stationType) {
-      counts.ok++
+    if (measurementValue === null || measurementValue === 0 || !stationType) {
+      counts.none++
       return
     }
 
@@ -323,7 +324,7 @@ export async function getSessionInspectionSummary(
 }
 
 /**
- * Hjälpfunktion för att beräkna status från tröskelvärden.
+ * Hjälpfunktion för att beräkna aktivitetsnivå från tröskelvärden.
  * Om preparationThresholds anges och har värden tas de i första hand.
  */
 function calculateStatusFromThresholds(
@@ -332,8 +333,7 @@ function calculateStatusFromThresholds(
   criticalThreshold: number | null,
   direction: string | null,
   preparationThresholds?: { threshold_warning: number | null; threshold_critical: number | null; threshold_direction: string | null } | null
-): 'ok' | 'warning' | 'critical' {
-  // Använd preparatets trösklar om de är satta
+): 'none' | 'low' | 'medium' | 'high' {
   let w = warningThreshold
   let c = criticalThreshold
   let d = direction
@@ -348,18 +348,18 @@ function calculateStatusFromThresholds(
   }
 
   if (w === null && c === null) {
-    return 'ok'
+    return 'low'
   }
 
   if (d === 'above') {
-    if (c !== null && value >= c) return 'critical'
-    if (w !== null && value >= w) return 'warning'
+    if (c !== null && value >= c) return 'high'
+    if (w !== null && value >= w) return 'medium'
   } else {
-    if (c !== null && value <= c) return 'critical'
-    if (w !== null && value <= w) return 'warning'
+    if (c !== null && value <= c) return 'high'
+    if (w !== null && value <= w) return 'medium'
   }
 
-  return 'ok'
+  return 'low'
 }
 
 /**

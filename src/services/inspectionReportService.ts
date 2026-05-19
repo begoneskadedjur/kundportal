@@ -6,7 +6,8 @@ import {
   getInspectionSession,
   getOutdoorInspectionsForSession,
   getIndoorInspectionsForSession,
-  getSessionInspectionSummary
+  getSessionInspectionSummary,
+  type InspectionLevelSummary
 } from './inspectionSessionService'
 import type { OutdoorInspectionWithRelations } from '../types/inspectionSession'
 import type { IndoorStationInspectionWithRelations } from '../types/indoor'
@@ -21,7 +22,7 @@ interface InspectionReportData {
   session: any
   outdoorInspections: OutdoorInspectionWithRelations[]
   indoorInspections: IndoorStationInspectionWithRelations[]
-  summary: { ok: number; warning: number; critical: number; total: number }
+  summary: InspectionLevelSummary
 }
 
 // ============================================
@@ -237,16 +238,17 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
   statsHeaderRow.getCell(1).alignment = { indent: 1 }
   statsHeaderRow.height = 20
 
-  const statsColHeader = wsSummary.addRow(['', 'Totalt', 'OK', 'Varning / Kritisk'])
+  const statsColHeader = wsSummary.addRow(['', 'Totalt', 'Ingen/Låg aktivitet', 'Med/Hög aktivitet'])
   applyHeaderRow(statsColHeader, 4)
 
-  const statsRow = wsSummary.addRow(['Inspekterade stationer', summary.total, summary.ok, summary.warning + summary.critical])
+  const okCount = summary.none + summary.low
+  const issueCount = summary.medium + summary.high
+  const statsRow = wsSummary.addRow(['Inspekterade stationer', summary.total, okCount, issueCount])
   statsRow.height = 20
   statsRow.getCell(1).font = { size: 9, color: { argb: 'FF' + TEXT_DARK } }
   statsRow.getCell(2).font = { bold: true, size: 11 }
   statsRow.getCell(3).font = { bold: true, size: 11, color: { argb: 'FF' + STATUS_OK } }
-  const warnCritVal = summary.warning + summary.critical
-  statsRow.getCell(4).font = { bold: true, size: 11, color: { argb: 'FF' + (warnCritVal > 0 ? STATUS_ERROR : STATUS_OK) } }
+  statsRow.getCell(4).font = { bold: true, size: 11, color: { argb: 'FF' + (issueCount > 0 ? STATUS_ERROR : STATUS_OK) } }
 
   const outdoorRow = wsSummary.addRow(['Utomhusstationer', outdoorInspections.length, '', ''])
   outdoorRow.height = 18

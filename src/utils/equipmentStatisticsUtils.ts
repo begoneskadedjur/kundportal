@@ -92,15 +92,15 @@ export function calculateStatusDistributionOverTime(
   return sessions
     .filter(s => s.completed_at)
     .map(session => {
-      const summary = session.inspection_summary || { ok: 0, warning: 0, critical: 0, total: 0 }
+      const summary = session.inspection_summary || { none: 0, low: 0, medium: 0, high: 0, total: 0 }
       const date = new Date(session.completed_at!)
 
       return {
         date: session.completed_at!,
         dateFormatted: date.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }),
-        ok: summary.ok,
-        warning: summary.warning,
-        critical: summary.critical,
+        ok: ((summary as any).none || 0) + ((summary as any).low || 0),
+        warning: (summary as any).medium || 0,
+        critical: (summary as any).high || 0,
         total: summary.total
       }
     })

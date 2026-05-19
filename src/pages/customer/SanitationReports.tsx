@@ -5,6 +5,7 @@ import { getCompletedSessionsWithSummary } from '../../services/inspectionSessio
 import { generateInspectionPDF, generateInspectionExcel } from '../../services/inspectionReportService'
 import type { InspectionSessionWithRelations } from '../../types/inspectionSession'
 import { useAuth } from '../../contexts/AuthContext'
+import { useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Select from '../../components/ui/Select'
 import toast from 'react-hot-toast'
@@ -18,6 +19,7 @@ interface SanitationReportsProps {
 }
 
 const SanitationReports: React.FC<SanitationReportsProps> = ({ customerId: externalCustomerId }) => {
+  const { getLabel: getInspLabel, getColor: getInspColor } = useInspectionStatusLabels()
   const [activeTab, setActiveTab] = useState<ReportTab>('inspections')
 
   // Sanitation reports state
@@ -357,22 +359,16 @@ const SanitationReports: React.FC<SanitationReportsProps> = ({ customerId: exter
                       </div>
 
                       {/* Station counts */}
-                      <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center flex-wrap gap-3 text-sm">
                         {summary && (
                           <>
-                            <span className="flex items-center gap-1.5 text-emerald-400">
-                              <CheckCircle2 className="w-4 h-4" />
-                              {summary.ok} OK
-                            </span>
-                            <span className="flex items-center gap-1.5 text-amber-400">
-                              <AlertTriangle className="w-4 h-4" />
-                              {summary.warning} Varning
-                            </span>
-                            <span className="flex items-center gap-1.5 text-red-400">
-                              <AlertTriangle className="w-4 h-4" />
-                              {summary.critical} Kritisk
-                            </span>
-                            <span className="text-slate-400 ml-2">
+                            {(['none', 'low', 'medium', 'high'] as const).map(lvl => (
+                              <span key={lvl} className="flex items-center gap-1.5" style={{ color: getInspColor(lvl) }}>
+                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: getInspColor(lvl) }} />
+                                {summary[lvl]} {getInspLabel(lvl)}
+                              </span>
+                            ))}
+                            <span className="text-slate-400 ml-1">
                               Totalt: {summary.total} stationer
                             </span>
                           </>
