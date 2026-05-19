@@ -254,9 +254,9 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
                 <p className="text-sm text-blue-400 font-medium mb-1">För organisationskunder:</p>
                 <ul className="text-xs text-slate-400 space-y-1">
                   <li>• Ärendet skickas direkt till er koordinator</li>
-                  <li>• Normal svarstid: Inom 2-3 arbetsdagar</li>
-                  <li>• Brådskande ärenden: Inom 24 timmar</li>
-                  <li>• Ni får bekräftelse via e-post när ärendet är mottaget</li>
+                  <li>• Vi svarar samma dag på vardagar 08.00–17.00, annars nästföljande vardag</li>
+                  <li>• Normal inställelsetid är inom 3 arbetsdagar om inget annat avtalats</li>
+                  <li>• Akuta ärenden bokas in inom 24 timmar</li>
                 </ul>
               </div>
             </div>
