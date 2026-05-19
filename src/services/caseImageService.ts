@@ -1,13 +1,13 @@
 // src/services/caseImageService.ts - Service för ärendebilder
 import { supabase } from '../lib/supabase'
 import { CaseImage, CaseImageInsert, CaseImageTag } from '../types/database'
+import { compressToWebP } from '../utils/imageUtils'
 import {
   CASE_IMAGES_BUCKET,
   generateImagePath,
   isValidImageType,
   isValidImageSize,
-  MAX_IMAGE_SIZE,
-  MAX_IMAGE_DIMENSION
+  MAX_IMAGE_SIZE
 } from '../lib/setupCaseImagesStorage'
 
 // Legacy-typ för bakåtkompatibilitet
@@ -124,18 +124,20 @@ export class CaseImageService {
         }
       }
 
-      // Komprimera bilden om nödvändigt
-      const processedFile = await this.compressImage(file)
+      // Komprimera och konvertera till WebP
+      const processedFile = await compressToWebP(file)
 
-      // Generera unik filsökväg
-      const filePath = generateImagePath(caseId, caseType, file.name)
+      // Generera unik filsökväg med .webp-extension
+      const webpName = file.name.replace(/\.[^.]+$/, '.webp')
+      const filePath = generateImagePath(caseId, caseType, webpName)
 
       // Ladda upp till Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from(CASE_IMAGES_BUCKET)
         .upload(filePath, processedFile, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: 'image/webp'
         })
 
       if (uploadError) {
@@ -153,7 +155,7 @@ export class CaseImageService {
         file_path: uploadData.path,
         file_name: file.name,
         file_size: processedFile.size,
-        mime_type: file.type,
+        mime_type: 'image/webp',
         tags: tags.length > 0 ? tags : ['general'],
         description: description,
         uploaded_by: userId
@@ -454,65 +456,6 @@ export class CaseImageService {
     return this.updateImageTags(imageId, [category])
   }
 
-  /**
-   * Komprimera bild på klientsidan
-   * Returnerar original om komprimering inte behövs
-   */
-  private static async compressImage(file: File): Promise<Blob> {
-    return new Promise((resolve) => {
-      // Om filen redan är tillräckligt liten, returnera original
-      if (file.size < 500000) { // 500KB
-        resolve(file)
-        return
-      }
-
-      const img = new Image()
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-
-      img.onload = () => {
-        let { width, height } = img
-
-        // Beräkna nya dimensioner
-        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
-          if (width > height) {
-            height = (height / width) * MAX_IMAGE_DIMENSION
-            width = MAX_IMAGE_DIMENSION
-          } else {
-            width = (width / height) * MAX_IMAGE_DIMENSION
-            height = MAX_IMAGE_DIMENSION
-          }
-        }
-
-        canvas.width = width
-        canvas.height = height
-
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height)
-
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                resolve(blob)
-              } else {
-                resolve(file)
-              }
-            },
-            'image/jpeg',
-            0.85 // 85% kvalitet
-          )
-        } else {
-          resolve(file)
-        }
-      }
-
-      img.onerror = () => {
-        resolve(file)
-      }
-
-      img.src = URL.createObjectURL(file)
-    })
-  }
 }
 
 // Hjälpfunktioner för att formatera filstorlek
