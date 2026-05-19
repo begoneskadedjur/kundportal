@@ -3,12 +3,10 @@ import React, { useState, useMemo } from 'react'
 import { X, AlertCircle, Calendar, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Trash2 } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
-import Select from '../ui/Select'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
-import { PEST_TYPES } from '../../utils/clickupFieldMapper'
 import { CaseImageService } from '../../services/caseImageService'
 import { CaseNumberService } from '../../services/caseNumberService'
 
@@ -38,8 +36,6 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
   const [priority, setPriority] = useState<CasePriority>('normal')
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
-  const [pestType, setPestType] = useState('')
-  const [otherPestType, setOtherPestType] = useState('')
   const [contactMethod, setContactMethod] = useState<'email' | 'phone'>('email')
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -83,8 +79,6 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
           status: 'Öppen', // Alltid 'Öppen' för kundinitierade ärenden
           priority: priority,
           service_type: serviceType,
-          pest_type: pestType || null,
-          other_pest_type: pestType === 'Övrigt' ? otherPestType : null,
           contact_person: useAlternativeContact && alternativeContactPerson ? alternativeContactPerson : customer.contact_person,
           contact_email: useAlternativeContact && alternativeContactEmail ? alternativeContactEmail : customer.contact_email,
           contact_phone: useAlternativeContact && alternativeContactPhone ? alternativeContactPhone : customer.contact_phone,
@@ -127,8 +121,6 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
         setSubmitted(false)
         setSubject('')
         setDescription('')
-        setPestType('')
-        setOtherPestType('')
         setFiles([])
         if (onSuccess) onSuccess()
       }, 2000)
@@ -151,10 +143,6 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
     inspection: <Search className="w-5 h-5" />,
     other: <HelpCircle className="w-5 h-5" />
   }
-
-  // Använd standardiserad lista från clickupFieldMapper
-  // Detta säkerställer kompatibilitet med CreateCaseModal
-  const pestTypes = PEST_TYPES
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -288,34 +276,6 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                   <p className="text-xs mt-1 opacity-80">Inom 24 timmar</p>
                 </button>
               </div>
-            </div>
-
-            {/* Pest Type - samma som i CreateCaseModal */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Typ av skadedjur (om känt)
-              </label>
-              <Select
-                value={pestType}
-                onChange={(v) => {
-                  setPestType(v)
-                  if (v !== 'Övrigt') {
-                    setOtherPestType('')
-                  }
-                }}
-                placeholder="Välj skadedjur..."
-                options={pestTypes.map(p => ({ value: p, label: p }))}
-              />
-              
-              {pestType === 'Övrigt' && (
-                <Input
-                  type="text"
-                  value={otherPestType}
-                  onChange={(e) => setOtherPestType(e.target.value)}
-                  placeholder="Beskriv skadedjuret"
-                  className="mt-2"
-                />
-              )}
             </div>
 
             {/* Subject */}

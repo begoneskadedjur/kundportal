@@ -1,5 +1,6 @@
 // src/services/indoorStationService.ts - Service för inomhusstationer
 import { supabase } from '../lib/supabase'
+import { compressToWebP } from '../utils/imageUtils'
 import type {
   IndoorStation,
   IndoorStationWithRelations,
@@ -590,15 +591,16 @@ export class IndoorStationService {
    * Ladda upp stationsfoto
    */
   private static async uploadStationPhoto(file: File): Promise<string> {
+    const compressed = await compressToWebP(file)
     const timestamp = Date.now()
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const path = `stations/${timestamp}_${sanitizedName}`
+    const path = `stations/${timestamp}.webp`
 
     const { error } = await supabase.storage
       .from(INDOOR_STATION_PHOTOS_BUCKET)
-      .upload(path, file, {
+      .upload(path, compressed, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
+        contentType: 'image/webp'
       })
 
     if (error) {
@@ -612,15 +614,16 @@ export class IndoorStationService {
    * Ladda upp inspektionsfoto
    */
   private static async uploadInspectionPhoto(stationId: string, file: File): Promise<string> {
+    const compressed = await compressToWebP(file)
     const timestamp = Date.now()
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const path = `inspections/${stationId}/${timestamp}_${sanitizedName}`
+    const path = `inspections/${stationId}/${timestamp}.webp`
 
     const { error } = await supabase.storage
       .from(INDOOR_STATION_PHOTOS_BUCKET)
-      .upload(path, file, {
+      .upload(path, compressed, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
+        contentType: 'image/webp'
       })
 
     if (error) {

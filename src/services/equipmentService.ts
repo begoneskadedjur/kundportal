@@ -1,5 +1,6 @@
 // src/services/equipmentService.ts - Service för utrustningsplacering
 import { supabase } from '../lib/supabase'
+import { compressToWebP } from '../utils/imageUtils'
 import {
   EquipmentPlacement,
   EquipmentPlacementInsert,
@@ -360,16 +361,17 @@ export class EquipmentService {
       }
 
       // Generera unik sökväg
+      const compressed = await compressToWebP(file)
       const timestamp = Date.now()
-      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-      const filePath = `${equipmentId}/${timestamp}_${sanitizedName}`
+      const filePath = `${equipmentId}/${timestamp}.webp`
 
       // Ladda upp till storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from(EQUIPMENT_IMAGES_BUCKET)
-        .upload(filePath, file, {
+        .upload(filePath, compressed, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: 'image/webp'
         })
 
       if (uploadError) {

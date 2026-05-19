@@ -277,6 +277,31 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
                       )}
                     </div>
 
+                    {/* Alternativ kontaktperson */}
+                    {((caseItem as any).alternative_contact_person || (caseItem as any).alternative_contact_phone) && (
+                      <div className="flex flex-wrap gap-3 text-xs text-slate-400 mb-3 pl-3 border-l-2 border-slate-600">
+                        <span className="text-slate-500 w-full">Alternativ kontakt:</span>
+                        {(caseItem as any).alternative_contact_person && (
+                          <div className="flex items-center gap-1">
+                            <User className="w-3 h-3" />
+                            <span>{(caseItem as any).alternative_contact_person}</span>
+                          </div>
+                        )}
+                        {(caseItem as any).alternative_contact_phone && (
+                          <div className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            <span>{(caseItem as any).alternative_contact_phone}</span>
+                          </div>
+                        )}
+                        {(caseItem as any).alternative_contact_email && (
+                          <div className="flex items-center gap-1">
+                            <Mail className="w-3 h-3" />
+                            <span>{(caseItem as any).alternative_contact_email}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {caseItem.address?.formatted_address && (
                       <div className="flex items-start gap-1 text-xs text-slate-400 mb-3">
                         <MapPin className="w-3 h-3 mt-0.5" />

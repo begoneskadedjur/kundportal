@@ -119,7 +119,8 @@ export function InspectionPhotoLightbox({
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `station-${currentPhoto.stationNumber}-${new Date(currentPhoto.inspectedAt).toISOString().split('T')[0]}.jpg`
+      const ext = currentPhoto.url.split('?')[0].split('.').pop() || 'webp'
+      a.download = `station-${currentPhoto.stationNumber}-${new Date(currentPhoto.inspectedAt).toISOString().split('T')[0]}.${ext}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

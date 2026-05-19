@@ -9,7 +9,6 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
-import { PEST_TYPES } from '../../utils/clickupFieldMapper'
 import { CaseNumberService } from '../../services/caseNumberService'
 
 interface ServiceRequestModalProps {
@@ -31,8 +30,6 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
   const [priority, setPriority] = useState<CasePriority>('normal')
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
-  const [pestType, setPestType] = useState('')
-  const [otherPestType, setOtherPestType] = useState('')
   const [contactMethod, setContactMethod] = useState<'email' | 'phone'>('email')
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -143,8 +140,6 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
           status: 'Öppen', // Always 'Öppen' for customer-initiated cases
           priority: priority,
           service_type: serviceType,
-          pest_type: pestType || null,
-          other_pest_type: pestType === 'Övrigt' ? otherPestType : null,
           contact_person: useAlternativeContact && alternativeContactPerson 
             ? alternativeContactPerson 
             : siteCustomer?.contact_person || '',
@@ -179,8 +174,6 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
         setSubmitted(false)
         setSubject('')
         setDescription('')
-        setPestType('')
-        setOtherPestType('')
         setFiles([])
         setUseAlternativeContact(false)
         setAlternativeContactPerson('')
@@ -207,9 +200,6 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
     inspection: <Search className="w-5 h-5" />,
     other: <HelpCircle className="w-5 h-5" />
   }
-
-  // Use standardized list from clickupFieldMapper
-  const pestTypes = PEST_TYPES
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -379,34 +369,6 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
                   <p className="text-xs mt-1 opacity-80">Inom 24 timmar</p>
                 </button>
               </div>
-            </div>
-
-            {/* Pest Type */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Typ av skadedjur (om känt)
-              </label>
-              <Select
-                value={pestType}
-                onChange={(v) => {
-                  setPestType(v)
-                  if (v !== 'Övrigt') {
-                    setOtherPestType('')
-                  }
-                }}
-                placeholder="Välj skadedjur..."
-                options={pestTypes.map(p => ({ value: p, label: p }))}
-              />
-              
-              {pestType === 'Övrigt' && (
-                <Input
-                  type="text"
-                  value={otherPestType}
-                  onChange={(e) => setOtherPestType(e.target.value)}
-                  placeholder="Beskriv skadedjuret"
-                  className="mt-2"
-                />
-              )}
             </div>
 
             {/* Subject */}

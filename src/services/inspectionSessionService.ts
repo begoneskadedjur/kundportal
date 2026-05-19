@@ -2,6 +2,7 @@
 // Service för att hantera stationsinspektionssessioner (Fas 5)
 
 import { supabase } from '../lib/supabase'
+import { compressToWebP } from '../utils/imageUtils'
 import {
   StationInspectionSession,
   InspectionSessionWithRelations,
@@ -1212,13 +1213,13 @@ export async function uploadInspectionPhoto(
   stationId: string,
   stationType: 'indoor' | 'outdoor'
 ): Promise<string | null> {
+  const compressed = await compressToWebP(file)
   const timestamp = Date.now()
-  const fileExt = file.name.split('.').pop()
-  const fileName = `${stationType}/${stationId}/${timestamp}.${fileExt}`
+  const fileName = `${stationType}/${stationId}/${timestamp}.webp`
 
   const { error } = await supabase.storage
     .from('inspection-photos')
-    .upload(fileName, file)
+    .upload(fileName, compressed, { contentType: 'image/webp' })
 
   if (error) {
     console.error('Error uploading inspection photo:', error)
