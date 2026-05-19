@@ -1017,11 +1017,10 @@ export default function StationInspectionModule() {
       setInspectedStationIds(prev => new Set(prev).add(selectedStation.id))
 
       // Spara resultat till sammanställning
-      const selectedPrep = preparations.find(p => p.id === selectedPreparationId)
       setInspectionResults(prev => ({
         ...prev,
         [selectedStation.id]: {
-          status: selectedStatus,
+          status: autoStatus,
           findings: inspectionNotes || null,
           measurementValue: measurementValue !== '' ? parseFloat(measurementValue) : null,
           measurementUnit: measurementUnit || null,
