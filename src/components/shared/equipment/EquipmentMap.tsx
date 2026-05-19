@@ -73,7 +73,7 @@ export function EquipmentMap({
   const previewMarkerRef = useRef<google.maps.Marker | null>(null)
   const previewCircleRef = useRef<google.maps.Circle | null>(null)
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
-  const pulseOverlayRef = useRef<google.maps.OverlayView | null>(null)
+  const pulseOverlayRef = useRef<google.maps.Marker | null>(null)
 
   // State
   const [selectedEquipmentData, setSelectedEquipmentData] = useState<EquipmentPlacementWithRelations | null>(null)
@@ -352,7 +352,7 @@ export function EquipmentMap({
     }
   }, [highlightedStationId, equipment])
 
-  // Puls-overlay för highlighted station i wizard-läge
+  // Puls-markör för highlighted station i wizard-läge
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
 
@@ -366,40 +366,30 @@ export function EquipmentMap({
     const station = equipment.find(e => e.id === highlightedStationId)
     if (!station) return
 
-    const overlay = new google.maps.OverlayView()
-    overlay.onAdd = function() {
-      const div = document.createElement('div')
-      div.style.cssText = [
-        'position:absolute',
-        'width:36px',
-        'height:36px',
-        'margin-left:-18px',
-        'margin-top:-18px',
-        'border-radius:50%',
-        'border:3px solid #3b82f6',
-        'animation:equipment-pulse-highlight 1.2s ease-in-out infinite',
-        'pointer-events:none',
-      ].join(';')
-      this.getPanes()!.floatPane.appendChild(div)
-      ;(this as any)._div = div
-    }
-    overlay.draw = function() {
-      const proj = this.getProjection()
-      if (!proj) return
-      const pos = proj.fromLatLngToDivPixel(
-        new google.maps.LatLng(station.latitude, station.longitude)
-      )
-      if (!pos) return
-      const div = (this as any)._div as HTMLElement
-      div.style.left = pos.x + 'px'
-      div.style.top = pos.y + 'px'
-    }
-    overlay.onRemove = function() {
-      const div = (this as any)._div as HTMLElement
-      div.parentNode?.removeChild(div)
-    }
-    overlay.setMap(mapRef.current)
-    pulseOverlayRef.current = overlay
+    // Pulsande SVG-cirkel monterad som vanlig Marker — koordinatsystemet är identiskt
+    // med övriga markörer och kräver ingen manuell pixelberäkning
+    const pulseSize = 40
+    const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="${pulseSize}" height="${pulseSize}" viewBox="0 0 ${pulseSize} ${pulseSize}">
+      <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="16" fill="none" stroke="#3b82f6" stroke-width="3" opacity="0.9">
+        <animate attributeName="r" values="14;20;14" dur="1.2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.2s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="14" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.5"/>
+    </svg>`
+
+    const pulseMarker = new google.maps.Marker({
+      position: { lat: station.latitude, lng: station.longitude },
+      map: mapRef.current,
+      icon: {
+        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgIcon)}`,
+        scaledSize: new google.maps.Size(pulseSize, pulseSize),
+        anchor: new google.maps.Point(pulseSize / 2, pulseSize / 2),
+      },
+      zIndex: 999,
+      clickable: false,
+    })
+
+    pulseOverlayRef.current = pulseMarker
   }, [highlightedStationId, equipment, isLoaded])
 
   // Preview-markör och GPS-cirkel
