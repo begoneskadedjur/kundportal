@@ -34,7 +34,7 @@ export class EquipmentService {
           station_type_data:station_types!station_type_id(
             id, code, name, color, icon, prefix,
             measurement_unit, measurement_label,
-            threshold_warning, threshold_critical, threshold_direction
+            threshold_warning, threshold_critical, threshold_direction, threshold_source
           ),
           contract:contracts!equipment_placements_contract_id_fkey(
             id, address_label, contact_address, oneflow_contract_id
@@ -51,7 +51,7 @@ export class EquipmentService {
       // Hämta alla stationstyper för fallback-lookup (om station_type_id saknas)
       const { data: allStationTypes } = await supabase
         .from('station_types')
-        .select('id, code, name, color, icon, prefix, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction')
+        .select('id, code, name, color, icon, prefix, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
         .eq('is_active', true)
 
       // Skapa map för snabb lookup på code
