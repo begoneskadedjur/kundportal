@@ -60,7 +60,17 @@ function formatDateTime(dateStr: string | null): string {
 }
 
 function getStatusLabel(status: string): string {
-  return INSPECTION_STATUS_CONFIG[status as InspectionStatus]?.label || status || '-'
+  const labels: Record<string, string> = {
+    none: 'Ingen aktivitet',
+    low: 'Lite aktivitet',
+    medium: 'Medelhög aktivitet',
+    high: 'Betydande aktivitet',
+    ok: 'Ingen aktivitet',
+    activity: 'Aktivitet',
+    needs_service: 'Behöver service',
+    replaced: 'Utbytt',
+  }
+  return labels[status] || INSPECTION_STATUS_CONFIG[status as InspectionStatus]?.label || status || '-'
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -144,8 +154,12 @@ const ROW_ALT = 'F8FAFC'
 
 function statusFill(status: string): string {
   switch (status) {
+    case 'Ingen aktivitet':
     case 'OK': return STATUS_OK
+    case 'Lite aktivitet': return '86EFAC'
+    case 'Medelhög aktivitet':
     case 'Aktivitet': return STATUS_WARNING
+    case 'Betydande aktivitet':
     case 'Behöver service': return STATUS_ERROR
     case 'Utbytt': return STATUS_REPLACED
     default: return TEXT_MUTED

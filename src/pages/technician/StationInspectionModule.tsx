@@ -79,7 +79,7 @@ import type {
   SessionProgress
 } from '../../types/inspectionSession'
 import type { InspectionStatus } from '../../types/indoor'
-import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
+import { INSPECTION_STATUS_CONFIG, calculateInspectionStatus } from '../../types/indoor'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
 import type { IndoorStationWithRelations } from '../../types/indoor'
 
@@ -176,7 +176,7 @@ export default function StationInspectionModule() {
 
   // Inspektionsmodal state
   const [selectedStation, setSelectedStation] = useState<StationData | null>(null)
-  const [selectedStatus, setSelectedStatus] = useState<InspectionStatus>('ok')
+  const [selectedStatus, setSelectedStatus] = useState<InspectionStatus>('none')
   const [inspectionNotes, setInspectionNotes] = useState('')
   const [measurementValue, setMeasurementValue] = useState<string>('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -960,13 +960,28 @@ export default function StationInspectionModule() {
       const isOutdoor = outdoorStations.some(s => s.id === selectedStation.id)
       const measurementUnit = selectedStation.station_type_data?.measurement_unit || null
 
+      // Auto-beräkna status från mätvärde + tröskelvärden
+      const numMeasurement = measurementValue !== '' ? parseFloat(measurementValue) : null
+      const stType = selectedStation.station_type_data
+      const selectedPrep = preparations.find(p => p.id === selectedPreparationId) ?? null
+      const prepThresholds = (stType as any)?.threshold_source === 'preparation' && selectedPrep
+        ? { threshold_warning: (selectedPrep as any).threshold_warning ?? null, threshold_critical: (selectedPrep as any).threshold_critical ?? null, threshold_direction: (selectedPrep as any).threshold_direction ?? null }
+        : null
+      const autoStatus = calculateInspectionStatus(
+        numMeasurement,
+        stType?.threshold_warning,
+        stType?.threshold_critical,
+        stType?.threshold_direction,
+        prepThresholds
+      )
+
       const inspectionData = {
         station_id: selectedStation.id,
         session_id: currentSession.id,
-        status: selectedStatus,
+        status: autoStatus,
         findings: inspectionNotes || undefined,
         photo_path: photoPath || undefined,
-        measurement_value: measurementValue !== '' ? parseFloat(measurementValue) : undefined,
+        measurement_value: numMeasurement !== null ? numMeasurement : 0,
         measurement_unit: measurementUnit || undefined,
         preparation_id: selectedPreparationId || undefined
       }
@@ -1159,13 +1174,6 @@ export default function StationInspectionModule() {
     }
   }
 
-  // Statusval
-  const STATUS_OPTIONS = (Object.keys(INSPECTION_STATUS_CONFIG) as InspectionStatus[]).map(key => ({
-    key,
-    label: INSPECTION_STATUS_CONFIG[key].label,
-    icon: INSPECTION_STATUS_CONFIG[key].icon,
-    color: INSPECTION_STATUS_CONFIG[key].color
-  }))
 
   // Loading state
   if (loading) {
@@ -2237,26 +2245,6 @@ export default function StationInspectionModule() {
                 </div>
               ) : null}
 
-              {/* Status selector */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-300 mb-3">Status</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {STATUS_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.key}
-                      onClick={() => setSelectedStatus(opt.key)}
-                      className={`flex items-center gap-2 p-3 rounded-xl text-sm font-medium transition-all ${
-                        selectedStatus === opt.key
-                          ? 'bg-green-500/20 text-white border-2 border-green-500'
-                          : 'bg-slate-800 text-slate-300 border-2 border-transparent hover:bg-slate-700'
-                      }`}
-                    >
-                      <span className="text-lg">{opt.icon}</span>
-                      <span>{opt.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               {/* Measurement field - dynamic based on station type */}
               {selectedStation.station_type_data?.measurement_label && (() => {

@@ -55,7 +55,7 @@ import type {
   InspectionStatus
 } from '../../types/indoor'
 import type { OutdoorInspectionWithRelations, InspectionSessionWithRelations } from '../../types/inspectionSession'
-import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
+import { useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import { calculateStationStatus, CALCULATED_STATUS_CONFIG, MEASUREMENT_UNIT_CONFIG, type CalculatedStatus } from '../../types/stationTypes'
 import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
@@ -115,6 +115,7 @@ interface StationSection {
 }
 
 export function InspectionSessionsView({ customerId, companyName, onNavigateToStation }: InspectionSessionsViewProps) {
+  const { getLabel: getStatusLabel, getColor: getStatusColor2 } = useInspectionStatusLabels()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [sections, setSections] = useState<StationSection[]>([])
@@ -819,20 +820,15 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     }
   }
 
-  // Få status-ikon
+  // Få status-ikon baserat på nivå
   const getStatusIcon = (status: InspectionStatus) => {
-    switch (status) {
-      case 'ok':
-        return <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-      case 'activity':
-        return <AlertTriangle className="w-4 h-4 text-amber-400" />
-      case 'needs_service':
-        return <Wrench className="w-4 h-4 text-orange-400" />
-      case 'replaced':
-        return <RefreshCw className="w-4 h-4 text-blue-400" />
-      default:
-        return <CheckCircle2 className="w-4 h-4 text-slate-400" />
-    }
+    const color = getStatusColor2(status)
+    const isHigh = status === 'high' || status === 'activity' || status === 'needs_service'
+    const isMedium = status === 'medium'
+    const isReplaced = status === 'replaced'
+    if (isReplaced) return <RefreshCw className="w-4 h-4 text-blue-400" />
+    if (isHigh || isMedium) return <AlertTriangle className="w-4 h-4" style={{ color }} />
+    return <CheckCircle2 className="w-4 h-4" style={{ color }} />
   }
 
   if (loading) {
@@ -1136,12 +1132,12 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                       </thead>
                       <tbody className="divide-y divide-slate-700/30">
                         {section.stations.map((station, index) => {
-                          const inspectionStatusConfig = station.latestInspection
-                            ? INSPECTION_STATUS_CONFIG[station.latestInspection.status] || {
-                                label: station.latestInspection.status,
-                                bgColor: 'bg-slate-500/20'
-                              }
-                            : { label: 'Ej kontrollerad', bgColor: 'bg-slate-500/20' }
+                          const inspStatusLabel = station.latestInspection
+                            ? getStatusLabel(station.latestInspection.status)
+                            : 'Ej kontrollerad'
+                          const inspStatusColor = station.latestInspection
+                            ? getStatusColor2(station.latestInspection.status)
+                            : '#6b7280'
 
                           // Mätvärde med färgindikator
                           const measurementValue = station.latestInspection?.measurementValue
@@ -1172,8 +1168,8 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                                 {station.latestInspection ? (
                                   <div className="flex items-center gap-1.5">
                                     {getStatusIcon(station.latestInspection.status)}
-                                    <span className={`text-xs px-2 py-0.5 rounded ${inspectionStatusConfig.bgColor}`}>
-                                      {inspectionStatusConfig.label}
+                                    <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: `${inspStatusColor}20`, color: inspStatusColor }}>
+                                      {inspStatusLabel}
                                     </span>
                                   </div>
                                 ) : (

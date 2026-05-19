@@ -8,7 +8,10 @@
 // IndoorStationType är nu en dynamisk sträng som matchar 'code' från station_types tabellen
 export type IndoorStationType = string;
 export type IndoorStationStatus = 'active' | 'removed' | 'missing' | 'damaged';
-export type InspectionStatus = 'ok' | 'activity' | 'needs_service' | 'replaced';
+export type InspectionStatus = 'ok' | 'activity' | 'needs_service' | 'replaced' | 'none' | 'low' | 'medium' | 'high';
+
+// Aktivitetsnivåer (nya auto-beräknade statusar)
+export type ActivityLevel = 'none' | 'low' | 'medium' | 'high';
 
 // LEGACY: Hårdkodad konfiguration för bakåtkompatibilitet
 // OBS: Dessa används endast som fallback om inga dynamiska typer finns i databasen
@@ -82,6 +85,32 @@ export const INSPECTION_STATUS_CONFIG: Record<InspectionStatus, {
   bgColor: string;
   icon: string;
 }> = {
+  // Nya aktivitetsnivåer (auto-beräknade)
+  none: {
+    label: 'Ingen aktivitet',
+    color: 'green-500',
+    bgColor: 'bg-green-500/20',
+    icon: '✓'
+  },
+  low: {
+    label: 'Lite aktivitet',
+    color: 'green-300',
+    bgColor: 'bg-green-300/20',
+    icon: '↑'
+  },
+  medium: {
+    label: 'Medelhög aktivitet',
+    color: 'amber-500',
+    bgColor: 'bg-amber-500/20',
+    icon: '!'
+  },
+  high: {
+    label: 'Betydande aktivitet',
+    color: 'red-500',
+    bgColor: 'bg-red-500/20',
+    icon: '!!'
+  },
+  // Legacy-statusar (bakåtkompatibilitet)
   ok: {
     label: 'OK - Inga fynd',
     color: 'green-500',
@@ -107,6 +136,45 @@ export const INSPECTION_STATUS_CONFIG: Record<InspectionStatus, {
     icon: '↻'
   }
 };
+
+// Beräkna aktivitetsnivå baserat på mätvärde + tröskelvärden
+// Hanterar threshold_source: om preparationThresholds skickas in används dessa istället
+export function calculateInspectionStatus(
+  measurementValue: number | null | undefined,
+  warningThreshold: number | null | undefined,
+  criticalThreshold: number | null | undefined,
+  direction: string | null | undefined = 'above',
+  preparationThresholds?: { threshold_warning: number | null; threshold_critical: number | null; threshold_direction: string | null } | null
+): ActivityLevel {
+  // Inget mätvärde eller noll = ingen aktivitet
+  if (measurementValue === null || measurementValue === undefined || measurementValue === 0) {
+    return 'none'
+  }
+
+  // Välj trösklar: preparatets om de finns, annars stationens
+  let w = warningThreshold ?? null
+  let c = criticalThreshold ?? null
+  let d = direction ?? 'above'
+
+  if (preparationThresholds && (preparationThresholds.threshold_warning !== null || preparationThresholds.threshold_critical !== null)) {
+    w = preparationThresholds.threshold_warning
+    c = preparationThresholds.threshold_critical
+    d = preparationThresholds.threshold_direction ?? 'above'
+  }
+
+  // Inga trösklar konfigurerade: värde > 0 = low
+  if (w === null && c === null) return 'low'
+
+  if (d === 'above') {
+    if (c !== null && measurementValue >= c) return 'high'
+    if (w !== null && measurementValue >= w) return 'medium'
+    return 'low'
+  } else {
+    if (c !== null && measurementValue <= c) return 'high'
+    if (w !== null && measurementValue <= w) return 'medium'
+    return 'low'
+  }
+}
 
 // ============================================
 // DATABASE TYPES

@@ -44,17 +44,26 @@ const formatDateTime = (dateStr: string | null) => {
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'ok': return beGoneColors.success
-    case 'activity': return beGoneColors.warning
-    case 'needs_service': return beGoneColors.error
+    case 'none':
+    case 'ok': return '#22c55e'
+    case 'low': return '#86efac'
+    case 'medium':
+    case 'activity': return '#f59e0b'
+    case 'high':
+    case 'needs_service': return '#ef4444'
     case 'replaced': return '#3B82F6'
     default: return beGoneColors.mediumGray
   }
 }
 
-const getStatusLabel = (status: string) => {
+const getStatusLabel = (status: string, dynamicLabels?: Record<string, string>) => {
+  if (dynamicLabels?.[status]) return dynamicLabels[status]
   const labels: Record<string, string> = {
-    ok: 'OK',
+    none: 'Ingen aktivitet',
+    low: 'Lite aktivitet',
+    medium: 'Medelhög aktivitet',
+    high: 'Betydande aktivitet',
+    ok: 'Ingen aktivitet',
     activity: 'Aktivitet',
     needs_service: 'Behöver service',
     replaced: 'Utbytt',

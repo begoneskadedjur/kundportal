@@ -40,6 +40,7 @@ import CustomerGroupsPage from './pages/admin/settings/CustomerGroupsPage';
 import FortnoxPage from './pages/admin/settings/FortnoxPage';
 import SmsTemplatesPage from './pages/admin/settings/SmsTemplatesPage';
 import PaymentTermsPage from './pages/admin/settings/PaymentTermsPage';
+import InspectionStatusLabelsPage from './pages/admin/settings/InspectionStatusLabelsPage';
 import InvoicingPage from './pages/admin/invoicing';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
@@ -173,6 +174,7 @@ function App() {
               <Route path="installningar/fortnox" element={<ProtectedRoute requiredRole="admin"><FortnoxPage /></ProtectedRoute>} />
               <Route path="installningar/betalningsvillkor" element={<ProtectedRoute requiredRole="admin"><PaymentTermsPage /></ProtectedRoute>} />
               <Route path="sms-mallar" element={<ProtectedRoute requiredRole="admin"><SmsTemplatesPage /></ProtectedRoute>} />
+              <Route path="inspektionsstatus" element={<ProtectedRoute requiredRole="admin"><InspectionStatusLabelsPage /></ProtectedRoute>} />
               <Route path="oneflow-test" element={<Navigate to="/admin/skapa-avtal" replace />} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="admin"><InternAdministration /></ProtectedRoute>} />
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="admin"><IncidentsPage /></ProtectedRoute>} />

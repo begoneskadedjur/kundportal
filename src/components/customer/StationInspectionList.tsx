@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
 import type { IndoorStationInspectionWithRelations, InspectionStatus } from '../../types/indoor'
-import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
+import { useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
 import Select from '../ui/Select'
 
@@ -50,35 +50,20 @@ interface StationInspectionListProps {
   onStationClick?: (stationId: string, location: 'outdoor' | 'indoor', floorPlanId?: string) => void
 }
 
-// Hjälpfunktion för att få statusikon
-function StatusIcon({ status, className = "w-5 h-5" }: { status: InspectionStatus; className?: string }) {
-  switch (status) {
-    case 'ok':
-      return <CheckCircle2 className={`${className} text-emerald-400`} />
-    case 'activity':
-      return <AlertTriangle className={`${className} text-amber-400`} />
-    case 'needs_service':
-      return <Wrench className={`${className} text-orange-400`} />
-    case 'replaced':
-      return <RefreshCw className={`${className} text-blue-400`} />
-    default:
-      return <CheckCircle2 className={`${className} text-slate-400`} />
-  }
-}
+// Hjälpfunktion för att mappa status → ikon
+function StatusIcon({ status, color, className = "w-5 h-5" }: { status: InspectionStatus; color?: string; className?: string }) {
+  const isHigh = status === 'high' || status === 'activity' || status === 'needs_service'
+  const isMedium = status === 'medium'
+  const isLow = status === 'low'
+  const isNone = status === 'none' || status === 'ok'
+  const isReplaced = status === 'replaced'
 
-// Statusbadge-komponent
-function StatusBadge({ status }: { status: InspectionStatus }) {
-  const config = INSPECTION_STATUS_CONFIG[status] || {
-    label: 'Okänd',
-    bgColor: 'bg-slate-500/20',
-    color: 'slate-400'
-  }
-
-  return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${config.bgColor} text-${config.color}`}>
-      {config.label}
-    </span>
-  )
+  if (isReplaced) return <RefreshCw className={`${className} text-blue-400`} />
+  if (isHigh) return <AlertTriangle className={`${className}`} style={{ color: color || '#ef4444' }} />
+  if (isMedium) return <AlertTriangle className={`${className}`} style={{ color: color || '#f59e0b' }} />
+  if (isLow) return <CheckCircle2 className={`${className}`} style={{ color: color || '#86efac' }} />
+  if (isNone) return <CheckCircle2 className={`${className}`} style={{ color: color || '#22c55e' }} />
+  return <CheckCircle2 className={`${className} text-slate-400`} />
 }
 
 export function StationInspectionList({
@@ -86,6 +71,7 @@ export function StationInspectionList({
   indoorInspections,
   onStationClick
 }: StationInspectionListProps) {
+  const { getLabel, getColor } = useInspectionStatusLabels()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<InspectionStatus | 'all'>('all')
   const [filterLocation, setFilterLocation] = useState<'all' | 'outdoor' | 'indoor'>('all')
@@ -319,7 +305,8 @@ export function StationInspectionList({
         <AnimatePresence>
           {filteredInspections.map((item, index) => {
             const isExpanded = expandedId === item.id
-            const statusConfig = INSPECTION_STATUS_CONFIG[item.status]
+            const statusColor = getColor(item.status)
+            const statusLabel = getLabel(item.status)
 
             return (
               <motion.div
@@ -336,8 +323,8 @@ export function StationInspectionList({
                   className="w-full p-4 flex items-center gap-4 text-left"
                 >
                   {/* Statusikon */}
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${statusConfig?.bgColor || 'bg-slate-500/20'}`}>
-                    <StatusIcon status={item.status} />
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${statusColor}20` }}>
+                    <StatusIcon status={item.status} color={statusColor} />
                   </div>
 
                   {/* Info */}
@@ -346,7 +333,9 @@ export function StationInspectionList({
                       <h4 className="font-medium text-white">
                         {getStationDisplayName(item)}
                       </h4>
-                      <StatusBadge status={item.status} />
+                      <span className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: `${statusColor}20`, color: statusColor }}>
+                        {statusLabel}
+                      </span>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-slate-400">
                       <span className="flex items-center gap-1">

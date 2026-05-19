@@ -118,6 +118,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Fortnox', icon: Building2, path: '/admin/installningar/fortnox' },
       { label: 'Betalningsvillkor', icon: Calendar, path: '/admin/installningar/betalningsvillkor' },
       { label: 'SMS Mallar', icon: MessageSquareText, path: '/admin/sms-mallar' },
+      { label: 'Inspektionsstatus', icon: Activity, path: '/admin/inspektionsstatus' },
       { label: 'Webhook-config', icon: Wrench, path: '/admin/webhook-config' },
       { label: 'Avtalsdiagnostik', icon: AlertCircle, path: '/admin/avtalsdiagnostik' },
     ]
@@ -173,4 +174,5 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/installningar/betalningsvillkor': 'Betalningsvillkor',
   '/admin/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/admin/bug-reports': 'Buggrapporter',
+  '/admin/inspektionsstatus': 'Inspektionsstatus',
 }
