@@ -233,11 +233,25 @@ export class MeasurementService {
       // Hämta senaste mätning
       const latestMeasurement = await this.getLatestMeasurement(stationId, stationType)
 
-      // Beräkna ny status
+      // Hämta senaste inspektion för att få preparatets trösklar
+      const inspectionTable = stationType === 'indoor' ? 'indoor_station_inspections' : 'outdoor_station_inspections'
+      const stationIdField = stationType === 'indoor' ? 'station_id' : 'station_id'
+      const { data: latestInspection } = await supabase
+        .from(inspectionTable)
+        .select(`preparation:preparations!preparation_id(threshold_warning, threshold_critical, threshold_direction)`)
+        .eq(stationIdField, stationId)
+        .order('inspected_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const preparationThresholds = (latestInspection?.preparation as any) ?? null
+
+      // Beräkna ny status — preparatets trösklar har företräde
       const stationTypeData = station.station_types as StationType | null
       const newStatus = calculateStationStatus(
         stationTypeData,
-        latestMeasurement?.value ?? null
+        latestMeasurement?.value ?? null,
+        preparationThresholds
       )
 
       // Uppdatera stationens calculated_status

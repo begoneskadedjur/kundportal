@@ -311,24 +311,40 @@ export async function getSessionInspectionSummary(
 }
 
 /**
- * Hjälpfunktion för att beräkna status från tröskelvärden
+ * Hjälpfunktion för att beräkna status från tröskelvärden.
+ * Om preparationThresholds anges och har värden tas de i första hand.
  */
 function calculateStatusFromThresholds(
   value: number,
   warningThreshold: number | null,
   criticalThreshold: number | null,
-  direction: string | null
+  direction: string | null,
+  preparationThresholds?: { threshold_warning: number | null; threshold_critical: number | null; threshold_direction: string | null } | null
 ): 'ok' | 'warning' | 'critical' {
-  if (warningThreshold === null && criticalThreshold === null) {
+  // Använd preparatets trösklar om de är satta
+  let w = warningThreshold
+  let c = criticalThreshold
+  let d = direction
+
+  if (
+    preparationThresholds &&
+    (preparationThresholds.threshold_warning !== null || preparationThresholds.threshold_critical !== null)
+  ) {
+    w = preparationThresholds.threshold_warning
+    c = preparationThresholds.threshold_critical
+    d = preparationThresholds.threshold_direction
+  }
+
+  if (w === null && c === null) {
     return 'ok'
   }
 
-  if (direction === 'above') {
-    if (criticalThreshold !== null && value >= criticalThreshold) return 'critical'
-    if (warningThreshold !== null && value >= warningThreshold) return 'warning'
+  if (d === 'above') {
+    if (c !== null && value >= c) return 'critical'
+    if (w !== null && value >= w) return 'warning'
   } else {
-    if (criticalThreshold !== null && value <= criticalThreshold) return 'critical'
-    if (warningThreshold !== null && value <= warningThreshold) return 'warning'
+    if (c !== null && value <= c) return 'critical'
+    if (w !== null && value <= w) return 'warning'
   }
 
   return 'ok'
@@ -386,6 +402,7 @@ export async function getLatestInspectionValuesForCustomer(
     const station = insp.station as any
     if (station?.id) {
       const stationType = station.station_type_data
+      const preparation = (insp as any).preparation
       const value = insp.measurement_value
       let status: 'ok' | 'warning' | 'critical' = 'ok'
 
@@ -394,7 +411,8 @@ export async function getLatestInspectionValuesForCustomer(
           value,
           stationType.threshold_warning,
           stationType.threshold_critical,
-          stationType.threshold_direction
+          stationType.threshold_direction,
+          preparation
         )
       }
 
@@ -407,6 +425,7 @@ export async function getLatestInspectionValuesForCustomer(
     const station = insp.station as any
     if (station?.id) {
       const stationType = station.station_type_data
+      const preparation = (insp as any).preparation
       const value = insp.measurement_value
       let status: 'ok' | 'warning' | 'critical' = 'ok'
 
@@ -415,7 +434,8 @@ export async function getLatestInspectionValuesForCustomer(
           value,
           stationType.threshold_warning,
           stationType.threshold_critical,
-          stationType.threshold_direction
+          stationType.threshold_direction,
+          preparation
         )
       }
 
@@ -591,7 +611,7 @@ export async function getOutdoorInspectionsForSession(
         longitude
       ),
       technician:technicians(id, name),
-      preparation:preparations!preparation_id(id, name, registration_number)
+      preparation:preparations!preparation_id(id, name, registration_number, threshold_warning, threshold_critical, threshold_direction, measurement_unit, measurement_label)
     `)
     .eq('session_id', sessionId)
     .order('inspected_at', { ascending: false })
@@ -753,7 +773,7 @@ export async function getOutdoorInspectionsByStation(
         equipment_type
       ),
       technician:technicians(id, name),
-      preparation:preparations!preparation_id(id, name, registration_number)
+      preparation:preparations!preparation_id(id, name, registration_number, threshold_warning, threshold_critical, threshold_direction, measurement_unit, measurement_label)
     `)
     .eq('station_id', stationId)
     .order('inspected_at', { ascending: false })
@@ -822,7 +842,7 @@ export async function getIndoorInspectionsForSession(
         location_description,
         floor_plan:floor_plans(id, name, building_name, image_path)
       ),
-      preparation:preparations!preparation_id(id, name, registration_number)
+      preparation:preparations!preparation_id(id, name, registration_number, threshold_warning, threshold_critical, threshold_direction, measurement_unit, measurement_label)
     `)
     .eq('session_id', sessionId)
     .order('inspected_at', { ascending: false })

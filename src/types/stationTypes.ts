@@ -183,28 +183,52 @@ export const CALCULATED_STATUS_CONFIG: Record<CalculatedStatus, {
 }
 
 /**
- * Beräkna status baserat på stationstyp och senaste mätning
+ * Tröskelddata som kan komma från antingen preparat eller stationstyp
+ */
+export interface ThresholdSource {
+  threshold_warning: number | null
+  threshold_critical: number | null
+  threshold_direction: ThresholdDirection | null
+}
+
+/**
+ * Beräkna status baserat på stationstyp och senaste mätning.
+ * Om preparatThresholds anges och har värden tas de i första hand (fallback på stationstypen).
  */
 export function calculateStationStatus(
   stationType: StationType | null,
-  latestMeasurement: number | null
+  latestMeasurement: number | null,
+  preparationThresholds?: ThresholdSource | null
 ): CalculatedStatus {
   // Ingen mätning = OK
   if (latestMeasurement === null || latestMeasurement === undefined) {
     return 'ok'
   }
 
-  // Ingen stationstyp = OK
-  if (!stationType) {
+  // Välj tröskelkälla: preparat (om satt) → stationstyp
+  let threshold_warning: number | null = null
+  let threshold_critical: number | null = null
+  let threshold_direction: ThresholdDirection = 'above'
+
+  if (
+    preparationThresholds &&
+    (preparationThresholds.threshold_warning !== null || preparationThresholds.threshold_critical !== null)
+  ) {
+    threshold_warning = preparationThresholds.threshold_warning
+    threshold_critical = preparationThresholds.threshold_critical
+    threshold_direction = preparationThresholds.threshold_direction ?? 'above'
+  } else if (stationType) {
+    threshold_warning = stationType.threshold_warning
+    threshold_critical = stationType.threshold_critical
+    threshold_direction = stationType.threshold_direction
+  } else {
     return 'ok'
   }
 
   // Inga tröskelvärden konfigurerade = OK
-  if (stationType.threshold_warning === null && stationType.threshold_critical === null) {
+  if (threshold_warning === null && threshold_critical === null) {
     return 'ok'
   }
-
-  const { threshold_warning, threshold_critical, threshold_direction } = stationType
 
   if (threshold_direction === 'above') {
     // Värde ÖVERSTIGER tröskeln är dåligt (t.ex. förbrukning)
@@ -246,13 +270,19 @@ export function formatThreshold(
  * Generera förhandsgranskning av tröskelvärden
  */
 export function generateThresholdPreview(
-  stationType: Pick<StationType, 'threshold_warning' | 'threshold_critical' | 'threshold_direction' | 'measurement_unit'>
+  stationType: Pick<StationType, 'threshold_warning' | 'threshold_critical' | 'threshold_direction' | 'measurement_unit'> | {
+    threshold_warning: number | null
+    threshold_critical: number | null
+    threshold_direction: ThresholdDirection | null
+    measurement_unit: MeasurementUnit | null
+  }
 ): Array<{ range: string; status: CalculatedStatus; label: string }> {
   const { threshold_warning, threshold_critical, threshold_direction, measurement_unit } = stationType
-  const unit = MEASUREMENT_UNIT_CONFIG[measurement_unit]
+  const unit = MEASUREMENT_UNIT_CONFIG[measurement_unit ?? 'gram']
+  const direction = threshold_direction ?? 'above'
   const preview: Array<{ range: string; status: CalculatedStatus; label: string }> = []
 
-  if (threshold_direction === 'above') {
+  if (direction === 'above') {
     // OK: 0 till varning-1
     if (threshold_warning !== null) {
       preview.push({

@@ -3,10 +3,17 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { X, Loader2, Save, Beaker, Check } from 'lucide-react'
+import { X, Loader2, Save, Beaker, Check, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react'
 import { PreparationService } from '../../../services/preparationService'
 import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
+import {
+  MeasurementUnit,
+  ThresholdDirection,
+  MEASUREMENT_UNIT_CONFIG,
+  CALCULATED_STATUS_CONFIG,
+  generateThresholdPreview
+} from '../../../types/stationTypes'
 import {
   Preparation,
   PreparationCategory,
@@ -43,6 +50,12 @@ export function PreparationEditModal({
   const [stationTypeIds, setStationTypeIds] = useState<string[]>([])
   const [isActive, setIsActive] = useState(true)
   const [showOnWebsite, setShowOnWebsite] = useState(false)
+  const [thresholdWarning, setThresholdWarning] = useState<string>('')
+  const [thresholdCritical, setThresholdCritical] = useState<string>('')
+  const [thresholdDirection, setThresholdDirection] = useState<ThresholdDirection>('above')
+  const [measurementUnit, setMeasurementUnit] = useState<MeasurementUnit>('gram')
+  const [measurementLabel, setMeasurementLabel] = useState('')
+  const [thresholdErrors, setThresholdErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [stationTypes, setStationTypes] = useState<StationType[]>([])
 
@@ -65,6 +78,11 @@ export function PreparationEditModal({
       setDosage(preparation.dosage || '')
       setIsActive(preparation.is_active)
       setShowOnWebsite(preparation.show_on_website)
+      setThresholdWarning(preparation.threshold_warning?.toString() || '')
+      setThresholdCritical(preparation.threshold_critical?.toString() || '')
+      setThresholdDirection(preparation.threshold_direction || 'above')
+      setMeasurementUnit(preparation.measurement_unit || 'gram')
+      setMeasurementLabel(preparation.measurement_label || '')
     } else {
       // Reset för nytt preparat
       setName('')
@@ -76,7 +94,13 @@ export function PreparationEditModal({
       setDosage('')
       setIsActive(true)
       setShowOnWebsite(false)
+      setThresholdWarning('')
+      setThresholdCritical('')
+      setThresholdDirection('above')
+      setMeasurementUnit('gram')
+      setMeasurementLabel('')
     }
+    setThresholdErrors({})
   }, [preparation])
 
   // Toggle skadedjur
@@ -97,6 +121,28 @@ export function PreparationEditModal({
     }
   }
 
+  // Validera tröskelvärden
+  const validateThresholds = (): boolean => {
+    const errors: Record<string, string> = {}
+    const warningVal = thresholdWarning ? parseFloat(thresholdWarning) : null
+    const criticalVal = thresholdCritical ? parseFloat(thresholdCritical) : null
+
+    if (thresholdWarning && isNaN(warningVal!)) errors.warning = 'Ogiltigt nummer'
+    if (thresholdCritical && isNaN(criticalVal!)) errors.critical = 'Ogiltigt nummer'
+
+    if (warningVal !== null && criticalVal !== null) {
+      if (thresholdDirection === 'above' && warningVal >= criticalVal) {
+        errors.critical = 'Kritisk måste vara högre än varning'
+      }
+      if (thresholdDirection === 'below' && warningVal <= criticalVal) {
+        errors.critical = 'Kritisk måste vara lägre än varning'
+      }
+    }
+
+    setThresholdErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   // Spara
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -105,6 +151,8 @@ export function PreparationEditModal({
       toast.error('Produktnamn är obligatoriskt')
       return
     }
+
+    if (!validateThresholds()) return
 
     setSaving(true)
 
@@ -118,7 +166,12 @@ export function PreparationEditModal({
         active_substances: activeSubstances.trim() || null,
         dosage: dosage.trim() || null,
         is_active: isActive,
-        show_on_website: showOnWebsite
+        show_on_website: showOnWebsite,
+        threshold_warning: thresholdWarning ? parseFloat(thresholdWarning) : null,
+        threshold_critical: thresholdCritical ? parseFloat(thresholdCritical) : null,
+        threshold_direction: thresholdDirection,
+        measurement_unit: measurementUnit,
+        measurement_label: measurementLabel.trim() || null
       }
 
       if (isEditing && preparation) {
@@ -137,6 +190,16 @@ export function PreparationEditModal({
       setSaving(false)
     }
   }
+
+  // Förhandsgranskning tröskelvärden
+  const previewThresholds = (thresholdWarning || thresholdCritical)
+    ? generateThresholdPreview({
+        threshold_warning: thresholdWarning ? parseFloat(thresholdWarning) : null,
+        threshold_critical: thresholdCritical ? parseFloat(thresholdCritical) : null,
+        threshold_direction: thresholdDirection,
+        measurement_unit: measurementUnit
+      })
+    : []
 
   if (!isOpen) return null
 
@@ -313,6 +376,153 @@ export function PreparationEditModal({
               </p>
             </div>
           )}
+
+          {/* Tröskelvärden */}
+          <div className="space-y-4 pt-2 border-t border-slate-700">
+            <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider pt-2">
+              Tröskelvärden
+            </h3>
+            <p className="text-xs text-slate-500">
+              Preparatets tröskelvärden tar företräde framför stationstypens när detta preparat är i stationen.
+            </p>
+
+            {/* Mätenhet */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Mätenhet</label>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(MEASUREMENT_UNIT_CONFIG) as MeasurementUnit[]).map((unit) => (
+                  <button
+                    key={unit}
+                    type="button"
+                    onClick={() => setMeasurementUnit(unit)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      measurementUnit === unit
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {MEASUREMENT_UNIT_CONFIG[unit].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mätetikett */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                Etikett för mätning
+              </label>
+              <input
+                type="text"
+                value={measurementLabel}
+                onChange={(e) => setMeasurementLabel(e.target.value)}
+                placeholder={`T.ex. Förbrukning (${MEASUREMENT_UNIT_CONFIG[measurementUnit].shortLabel})`}
+                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            {/* Riktning */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Riktning</label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="prep-direction"
+                    checked={thresholdDirection === 'above'}
+                    onChange={() => setThresholdDirection('above')}
+                    className="w-4 h-4 bg-slate-900 border-slate-600 text-emerald-500 focus:ring-emerald-500"
+                  />
+                  <span className="text-white text-sm">Över tröskeln är dåligt</span>
+                  <span className="text-slate-500 text-xs">(t.ex. förbrukning ökar)</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="prep-direction"
+                    checked={thresholdDirection === 'below'}
+                    onChange={() => setThresholdDirection('below')}
+                    className="w-4 h-4 bg-slate-900 border-slate-600 text-emerald-500 focus:ring-emerald-500"
+                  />
+                  <span className="text-white text-sm">Under tröskeln är dåligt</span>
+                  <span className="text-slate-500 text-xs">(t.ex. bete minskar)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Tröskelvärden */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-amber-400 mb-1">
+                  Varningströskel (gul)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={thresholdWarning}
+                    onChange={(e) => setThresholdWarning(e.target.value)}
+                    placeholder="10"
+                    min="0"
+                    step="0.01"
+                    className={`w-full px-3 py-2 bg-slate-800/50 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 pr-10 ${
+                      thresholdErrors.warning ? 'border-red-500' : 'border-slate-700'
+                    }`}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+                    {MEASUREMENT_UNIT_CONFIG[measurementUnit].shortLabel}
+                  </span>
+                </div>
+                {thresholdErrors.warning && <p className="text-red-400 text-xs mt-1">{thresholdErrors.warning}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-red-400 mb-1">
+                  Kritisk tröskel (röd)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={thresholdCritical}
+                    onChange={(e) => setThresholdCritical(e.target.value)}
+                    placeholder="25"
+                    min="0"
+                    step="0.01"
+                    className={`w-full px-3 py-2 bg-slate-800/50 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-red-500 pr-10 ${
+                      thresholdErrors.critical ? 'border-red-500' : 'border-slate-700'
+                    }`}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+                    {MEASUREMENT_UNIT_CONFIG[measurementUnit].shortLabel}
+                  </span>
+                </div>
+                {thresholdErrors.critical && <p className="text-red-400 text-xs mt-1">{thresholdErrors.critical}</p>}
+              </div>
+            </div>
+
+            {/* Förhandsgranskning */}
+            {previewThresholds.length > 0 && (
+              <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
+                <p className="text-xs font-medium text-slate-400 mb-2">Förhandsgranskning</p>
+                <div className="space-y-1">
+                  {previewThresholds.map((item, i) => {
+                    const config = CALCULATED_STATUS_CONFIG[item.status]
+                    const StatusIcon = item.status === 'ok'
+                      ? CheckCircle2
+                      : item.status === 'warning'
+                        ? AlertTriangle
+                        : AlertCircle
+                    return (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <StatusIcon className={`w-4 h-4 ${config.color}`} />
+                        <span className={config.color}>{item.range}</span>
+                        <span className="text-slate-500">→</span>
+                        <span className={config.color}>{item.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Toggles */}
           <div className="flex items-center gap-6 p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">

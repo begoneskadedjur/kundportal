@@ -1,6 +1,8 @@
 // src/types/preparations.ts
 // TypeScript-typer för preparathantering
 
+import type { MeasurementUnit, ThresholdDirection } from './stationTypes'
+
 /**
  * Kategorier av preparat
  */
@@ -48,6 +50,11 @@ export interface Preparation {
   sort_order: number
   created_at: string
   updated_at: string
+  threshold_warning: number | null
+  threshold_critical: number | null
+  threshold_direction: ThresholdDirection | null
+  measurement_unit: MeasurementUnit | null
+  measurement_label: string | null
 }
 
 /**
@@ -64,6 +71,11 @@ export interface CreatePreparationInput {
   is_active?: boolean
   show_on_website?: boolean
   sort_order?: number
+  threshold_warning?: number | null
+  threshold_critical?: number | null
+  threshold_direction?: ThresholdDirection | null
+  measurement_unit?: MeasurementUnit | null
+  measurement_label?: string | null
 }
 
 /**
@@ -80,4 +92,9 @@ export interface UpdatePreparationInput {
   is_active?: boolean
   show_on_website?: boolean
   sort_order?: number
+  threshold_warning?: number | null
+  threshold_critical?: number | null
+  threshold_direction?: ThresholdDirection | null
+  measurement_unit?: MeasurementUnit | null
+  measurement_label?: string | null
 }

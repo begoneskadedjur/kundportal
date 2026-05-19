@@ -21,6 +21,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { PreparationService } from '../../../services/preparationService'
 import { Preparation, PREPARATION_CATEGORY_CONFIG, PreparationCategory } from '../../../types/preparations'
+import { MEASUREMENT_UNIT_CONFIG } from '../../../types/stationTypes'
 import { PreparationEditModal } from './PreparationEditModal'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
@@ -238,6 +239,7 @@ export function PreparationsSettings() {
                   <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Regnr</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Skadedjur</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Dosering</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Trösklar</th>
                   <th className="text-center py-3 px-4 text-sm font-medium text-slate-400">Status</th>
                   <th className="text-center py-3 px-4 text-sm font-medium text-slate-400">Webb</th>
                   <th className="text-right py-3 px-4 text-sm font-medium text-slate-400">Åtgärder</th>
@@ -295,6 +297,24 @@ export function PreparationsSettings() {
                         </td>
                         <td className="py-3 px-4 text-slate-300 text-sm">
                           {preparation.dosage || '-'}
+                        </td>
+                        <td className="py-3 px-4">
+                          {preparation.threshold_warning !== null || preparation.threshold_critical !== null ? (
+                            <div className="text-xs space-y-0.5">
+                              {preparation.threshold_warning !== null && (
+                                <p className="text-amber-400">
+                                  Varning: {preparation.threshold_warning}{preparation.measurement_unit ? MEASUREMENT_UNIT_CONFIG[preparation.measurement_unit as keyof typeof MEASUREMENT_UNIT_CONFIG]?.shortLabel : ''}
+                                </p>
+                              )}
+                              {preparation.threshold_critical !== null && (
+                                <p className="text-red-400">
+                                  Kritisk: {preparation.threshold_critical}{preparation.measurement_unit ? MEASUREMENT_UNIT_CONFIG[preparation.measurement_unit as keyof typeof MEASUREMENT_UNIT_CONFIG]?.shortLabel : ''}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-600 text-sm">-</span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <button

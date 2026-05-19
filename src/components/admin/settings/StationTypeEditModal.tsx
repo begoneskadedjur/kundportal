@@ -455,6 +455,10 @@ export function StationTypeEditModal({
               } />
             </div>
 
+            <p className="text-xs text-slate-500 bg-slate-900/50 rounded-lg px-3 py-2 border border-slate-700/50">
+              Preparatens tröskelvärden har företräde när ett preparat är kopplat till stationen. Dessa värden används som fallback om inget preparat har trösklar definierade.
+            </p>
+
             {/* Mätenhet */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-white mb-2">

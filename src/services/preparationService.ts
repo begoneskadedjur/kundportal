@@ -132,7 +132,12 @@ export class PreparationService {
           dosage: input.dosage || null,
           is_active: input.is_active ?? true,
           show_on_website: input.show_on_website ?? false,
-          sort_order: input.sort_order ?? 0
+          sort_order: input.sort_order ?? 0,
+          threshold_warning: input.threshold_warning ?? null,
+          threshold_critical: input.threshold_critical ?? null,
+          threshold_direction: input.threshold_direction ?? null,
+          measurement_unit: input.measurement_unit ?? null,
+          measurement_label: input.measurement_label ?? null
         })
         .select()
         .single()
@@ -169,6 +174,11 @@ export class PreparationService {
       if (input.is_active !== undefined) updateData.is_active = input.is_active
       if (input.show_on_website !== undefined) updateData.show_on_website = input.show_on_website
       if (input.sort_order !== undefined) updateData.sort_order = input.sort_order
+      if (input.threshold_warning !== undefined) updateData.threshold_warning = input.threshold_warning
+      if (input.threshold_critical !== undefined) updateData.threshold_critical = input.threshold_critical
+      if (input.threshold_direction !== undefined) updateData.threshold_direction = input.threshold_direction
+      if (input.measurement_unit !== undefined) updateData.measurement_unit = input.measurement_unit
+      if (input.measurement_label !== undefined) updateData.measurement_label = input.measurement_label
 
       const { data, error } = await supabase
         .from('preparations')
