@@ -80,6 +80,7 @@ interface StationWithLatestInspection {
   thresholdWarning: number | null
   thresholdCritical: number | null
   thresholdDirection: 'above' | 'below'
+  thresholdSource: 'station' | 'preparation'
   latestInspection: {
     id: string
     inspectedAt: string
@@ -259,12 +260,16 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         const insp = inspByStation.get(station.id)
         const stationType = station.station_type_data
         const measurementValue = insp?.measurement_value ?? null
+        const prepThresholds = (stationType as any)?.threshold_source === 'preparation'
+          ? (insp as any)?.preparation ?? null
+          : null
 
         let calculatedStatus: CalculatedStatus = 'ok'
         if (stationType && measurementValue !== null) {
           calculatedStatus = calculateStationStatus(
             { ...stationType, description: null, requires_serial_number: false, is_active: true, sort_order: 0, created_at: '', updated_at: '' } as any,
-            measurementValue
+            measurementValue,
+            prepThresholds
           )
         }
 
@@ -278,6 +283,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           thresholdWarning: stationType?.threshold_warning ?? null,
           thresholdCritical: stationType?.threshold_critical ?? null,
           thresholdDirection: (stationType?.threshold_direction || 'above') as 'above' | 'below',
+          thresholdSource: ((stationType as any)?.threshold_source || 'station') as 'station' | 'preparation',
           latestInspection: insp ? {
             id: insp.id,
             inspectedAt: insp.inspected_at,
@@ -321,12 +327,16 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           const insp = inspByIndoorStation.get(station.id)
           const stationType = station.station_type_data
           const measurementValue = insp?.measurement_value ?? null
+          const prepThresholds = (stationType as any)?.threshold_source === 'preparation'
+            ? (insp as any)?.preparation ?? null
+            : null
 
           let calculatedStatus: CalculatedStatus = 'ok'
           if (stationType && measurementValue !== null) {
             calculatedStatus = calculateStationStatus(
               { ...stationType, description: null, requires_serial_number: false, is_active: true, sort_order: 0, created_at: '', updated_at: '' } as any,
-              measurementValue
+              measurementValue,
+              prepThresholds
             )
           }
 
@@ -340,6 +350,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             thresholdWarning: stationType?.threshold_warning ?? null,
             thresholdCritical: stationType?.threshold_critical ?? null,
             thresholdDirection: (stationType?.threshold_direction || 'above') as 'above' | 'below',
+            thresholdSource: ((stationType as any)?.threshold_source || 'station') as 'station' | 'preparation',
             latestInspection: insp ? {
               id: insp.id,
               inspectedAt: insp.inspected_at,

@@ -35,6 +35,7 @@ export interface StationType {
   threshold_warning: number | null
   threshold_critical: number | null
   threshold_direction: ThresholdDirection
+  threshold_source: 'station' | 'preparation'
   is_active: boolean
   sort_order: number
   created_at: string
@@ -76,6 +77,7 @@ export interface UpdateStationTypeInput {
   threshold_warning?: number | null
   threshold_critical?: number | null
   threshold_direction?: ThresholdDirection
+  threshold_source?: 'station' | 'preparation'
   is_active?: boolean
   sort_order?: number
 }

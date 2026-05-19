@@ -88,6 +88,7 @@ export function StationTypeEditModal({
   const [thresholdWarning, setThresholdWarning] = useState<string>('')
   const [thresholdCritical, setThresholdCritical] = useState<string>('')
   const [thresholdDirection, setThresholdDirection] = useState<ThresholdDirection>('above')
+  const [thresholdSource, setThresholdSource] = useState<'station' | 'preparation'>('station')
   const [isActive, setIsActive] = useState(true)
 
   const [saving, setSaving] = useState(false)
@@ -108,6 +109,7 @@ export function StationTypeEditModal({
       setThresholdWarning(stationType.threshold_warning?.toString() || '')
       setThresholdCritical(stationType.threshold_critical?.toString() || '')
       setThresholdDirection(stationType.threshold_direction)
+      setThresholdSource(stationType.threshold_source || 'station')
       setIsActive(stationType.is_active)
     } else {
       // Återställ för ny
@@ -123,6 +125,7 @@ export function StationTypeEditModal({
       setThresholdWarning('')
       setThresholdCritical('')
       setThresholdDirection('above')
+      setThresholdSource('station')
       setIsActive(true)
     }
     setErrors({})
@@ -210,6 +213,7 @@ export function StationTypeEditModal({
         threshold_warning: thresholdWarning ? parseFloat(thresholdWarning) : null,
         threshold_critical: thresholdCritical ? parseFloat(thresholdCritical) : null,
         threshold_direction: thresholdDirection,
+        threshold_source: thresholdSource,
         is_active: isActive
       }
 
@@ -455,9 +459,40 @@ export function StationTypeEditModal({
               } />
             </div>
 
-            <p className="text-xs text-slate-500 bg-slate-900/50 rounded-lg px-3 py-2 border border-slate-700/50">
-              Preparatens tröskelvärden har företräde när ett preparat är kopplat till stationen. Dessa värden används som fallback om inget preparat har trösklar definierade.
-            </p>
+            {/* Tröskelkälla */}
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">Använd trösklar från</label>
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-slate-800/50 border-slate-700">
+                  <input
+                    type="radio"
+                    name="thresholdSource"
+                    value="station"
+                    checked={thresholdSource === 'station'}
+                    onChange={() => setThresholdSource('station')}
+                    className="mt-0.5 h-4 w-4 text-[#20c58f] focus:ring-[#20c58f] border-slate-600 bg-slate-900"
+                  />
+                  <div>
+                    <span className="text-sm text-white font-medium">Denna station</span>
+                    <p className="text-xs text-slate-400 mt-0.5">Stationstypens egna värden nedan används alltid (t.ex. mekaniska fällor, klisterfällor)</p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-slate-800/50 border-slate-700">
+                  <input
+                    type="radio"
+                    name="thresholdSource"
+                    value="preparation"
+                    checked={thresholdSource === 'preparation'}
+                    onChange={() => setThresholdSource('preparation')}
+                    className="mt-0.5 h-4 w-4 text-[#20c58f] focus:ring-[#20c58f] border-slate-600 bg-slate-900"
+                  />
+                  <div>
+                    <span className="text-sm text-white font-medium">Preparat i station</span>
+                    <p className="text-xs text-slate-400 mt-0.5">Preparatets trösklar gäller (t.ex. betesstation, betongstation). Stationens värden nedan används som fallback om preparatet saknar trösklar.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
 
             {/* Mätenhet */}
             <div>

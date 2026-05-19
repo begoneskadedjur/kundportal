@@ -628,7 +628,7 @@ export async function getOutdoorInspectionsForSession(
   // Hämta alla station_types för att matcha equipment_type → code (inkl tröskelvärden)
   const { data: stationTypes } = await supabase
     .from('station_types')
-    .select('id, code, name, color, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction')
+    .select('id, code, name, color, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
     .eq('is_active', true)
 
   // Skapa map för snabb lookup på code
@@ -859,7 +859,7 @@ export async function getIndoorInspectionsForSession(
   // Hämta alla station_types för att matcha station_type → code (inkl tröskelvärden)
   const { data: stationTypes } = await supabase
     .from('station_types')
-    .select('id, code, name, color, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction')
+    .select('id, code, name, color, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
     .eq('is_active', true)
 
   // Skapa map för snabb lookup på code

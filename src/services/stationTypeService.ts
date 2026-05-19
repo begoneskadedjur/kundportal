@@ -141,6 +141,7 @@ export class StationTypeService {
           threshold_warning: input.threshold_warning ?? null,
           threshold_critical: input.threshold_critical ?? null,
           threshold_direction: input.threshold_direction || 'above',
+          threshold_source: input.threshold_source || 'station',
           is_active: input.is_active ?? true,
           sort_order: input.sort_order ?? 0
         })
@@ -180,6 +181,7 @@ export class StationTypeService {
       if (input.threshold_warning !== undefined) updateData.threshold_warning = input.threshold_warning
       if (input.threshold_critical !== undefined) updateData.threshold_critical = input.threshold_critical
       if (input.threshold_direction !== undefined) updateData.threshold_direction = input.threshold_direction
+      if (input.threshold_source !== undefined) updateData.threshold_source = input.threshold_source
       if (input.is_active !== undefined) updateData.is_active = input.is_active
       if (input.sort_order !== undefined) updateData.sort_order = input.sort_order
 
