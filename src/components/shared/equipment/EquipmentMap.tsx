@@ -366,15 +366,18 @@ export function EquipmentMap({
     const station = equipment.find(e => e.id === highlightedStationId)
     if (!station) return
 
-    // Pulsande SVG-cirkel monterad som vanlig Marker — koordinatsystemet är identiskt
-    // med övriga markörer och kräver ingen manuell pixelberäkning
-    const pulseSize = 40
+    const pulseSize = 80
     const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="${pulseSize}" height="${pulseSize}" viewBox="0 0 ${pulseSize} ${pulseSize}">
-      <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="16" fill="none" stroke="#3b82f6" stroke-width="3" opacity="0.9">
-        <animate attributeName="r" values="14;20;14" dur="1.2s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.2s" repeatCount="indefinite"/>
+      <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="28" fill="#3b82f6" fill-opacity="0.15" stroke="none">
+        <animate attributeName="r" values="18;36;18" dur="1.4s" repeatCount="indefinite"/>
+        <animate attributeName="fill-opacity" values="0.3;0;0.3" dur="1.4s" repeatCount="indefinite"/>
       </circle>
-      <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="14" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.5"/>
+      <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="22" fill="none" stroke="#60a5fa" stroke-width="4" opacity="1">
+        <animate attributeName="r" values="16;26;16" dur="1.4s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="1;0.1;1" dur="1.4s" repeatCount="indefinite"/>
+        <animate attributeName="stroke-width" values="4;1;4" dur="1.4s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="16" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.9"/>
     </svg>`
 
     const pulseMarker = new google.maps.Marker({
