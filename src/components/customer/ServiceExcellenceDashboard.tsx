@@ -195,7 +195,7 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
     {
       title: 'Genomförda kontroller',
       value: animatedValues.inspections || completedInspectionsCount,
-      subtitle: completedInspectionsCount === 1 ? 'Stationskontroll' : 'Stationskontroller',
+      subtitle: completedInspectionsCount === 1 ? 'Avtalat servicebesök' : 'Avtalade servicebesök',
       icon: <CheckCircle className="w-5 h-5" />,
       color: 'emerald'
     },

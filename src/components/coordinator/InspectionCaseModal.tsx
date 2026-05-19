@@ -286,7 +286,7 @@ export default function InspectionCaseModal({
 
       if (error) throw error
 
-      toast.success('Stationskontroll uppdaterad!')
+      toast.success('Avtalat servicebesök uppdaterat!')
       if (onSuccess) onSuccess()
       handleClose()
     } catch (error) {
@@ -329,7 +329,7 @@ export default function InspectionCaseModal({
       begynnelsedag: new Date().toISOString().split('T')[0],
       caseNumber: formData.case_number,
       caseTitle: formData.title,
-      pestType: 'Stationskontroll',
+      pestType: 'Avtalat servicebesök',
       case_id: caseData?.id,
       is_multisite: customerData?.is_multisite || false,
       site_name: customerData?.site_name || '',
@@ -413,7 +413,7 @@ export default function InspectionCaseModal({
             </button>
           )}
         </div>
-        <p className="text-sm text-cyan-300">Stationskontroll</p>
+        <p className="text-sm text-cyan-300">Avtalat servicebesök</p>
       </div>
     </div>
   )

@@ -1250,7 +1250,7 @@ export default function StationInspectionModule() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-lg font-bold text-white">Stationskontroll</h1>
+                <h1 className="text-lg font-bold text-white">Avtalat servicebesök</h1>
                 <p className="text-slate-400 text-sm">{session?.customer?.company_name}</p>
               </div>
             </div>

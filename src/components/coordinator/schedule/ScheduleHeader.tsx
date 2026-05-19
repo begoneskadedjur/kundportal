@@ -294,7 +294,7 @@ export function ScheduleHeader({
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
               >
                 <ClipboardCheck className="w-4 h-4 text-cyan-400" />
-                Stationskontroll
+                Avtalat servicebesök
               </button>
               <button
                 onClick={() => { onCreateCase('establishment'); setCreateMenuOpen(false) }}

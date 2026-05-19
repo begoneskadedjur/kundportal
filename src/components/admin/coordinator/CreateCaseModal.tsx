@@ -545,6 +545,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     };
   }, [customerDropdownOpen]);
 
+  // Förvälj tjänst "Återbesök / Uppföljning" under grupp "Övrigt" för inspection-typ
+  useEffect(() => {
+    if (caseType === 'inspection' && !serviceGroupId && !serviceId) {
+      setServiceGroupId('43bda891-8b72-4d19-8dcd-5573ba71d84b');
+      setServiceId('4d84758a-f98c-4980-a7e7-ee59a374934a');
+    }
+  }, [caseType]);
+
   // Filtrerad kundlista för sökbar dropdown
   const filteredContractCustomers = useMemo(() => {
     const search = customerSearchTerm.toLowerCase().trim();
@@ -876,7 +884,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           // Fortsätt ändå - ärendet är skapat
         }
 
-        toast.success(`Stationskontroll inbokad för ${customerName}!`);
+        toast.success(`Avtalat servicebesök inbokat för ${customerName}!`);
 
       } else if (caseType === 'establishment') {
         let actualCustomerId = selectedContractCustomer;
@@ -1240,7 +1248,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     </button>
                     <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
                       <ClipboardCheck className="w-6 h-6 mx-auto mb-1.5 text-cyan-400" />
-                      <h3 className="text-sm font-semibold">Stationskontroll</h3>
+                      <h3 className="text-sm font-semibold">Avtalat servicebesök</h3>
                       <p className="text-xs text-slate-400 mt-1">Kontroll av fällor & stationer</p>
                       {contractCustomers.length > 0 && (
                         <p className="text-xs text-cyan-400 mt-1">{contractCustomers.length} kunder</p>
@@ -1598,8 +1606,20 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold text-white">Bokning & Detaljer</h3>
-                        <p className="text-xs text-slate-400">Verifiera kundinfo och välj tid för stationskontroll</p>
+                        <p className="text-xs text-slate-400">Verifiera kundinfo och välj tid för avtalat servicebesök</p>
                       </div>
+                    </div>
+
+                    {/* Tjänst */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Tjänst</label>
+                      <ServiceArticleSelector
+                        groupId={serviceGroupId}
+                        serviceId={serviceId}
+                        onGroupChange={(gid) => setServiceGroupId(gid)}
+                        onServiceChange={(sid, svc) => { setServiceId(sid); setSelectedService(svc); }}
+                        bookingOnly
+                      />
                     </div>
 
                     {/* Kund & Kontakt */}
@@ -1809,7 +1829,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     {/* Info-ruta */}
                     <div className="p-3 bg-slate-800/30 rounded-xl border border-slate-700">
                       <p className="text-xs text-slate-400">
-                        <span className="font-medium text-cyan-400">Tips:</span> Stationskontrollen kommer automatiskt visa alla stationer (utomhus och inomhus) för den valda kunden.
+                        <span className="font-medium text-cyan-400">Tips:</span> Det avtalade servicebesöket kommer automatiskt visa alla stationer (utomhus och inomhus) för den valda kunden.
                         Teknikern kan sedan gå igenom och kontrollera varje station i valfri ordning.
                       </p>
                     </div>
