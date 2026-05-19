@@ -375,6 +375,7 @@ function InspectionCard({
               src={inspection.photo_url}
               alt="Inspektionsfoto"
               className="w-full h-full object-cover"
+              loading="lazy"
             />
           </button>
         )}

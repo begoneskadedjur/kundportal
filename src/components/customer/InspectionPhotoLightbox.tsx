@@ -336,6 +336,7 @@ export function InspectionPhotoLightbox({
                   src={photo.url}
                   alt={`Station ${photo.stationNumber}`}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
                 <div className={`absolute bottom-0 left-0 right-0 h-1 ${getStatusColor(photo.status)}`} />
               </button>

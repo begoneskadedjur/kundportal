@@ -1245,6 +1245,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                                       src={station.latestInspection.photoUrl}
                                       alt="Inspektionsfoto"
                                       className="w-full h-full object-cover"
+                                      loading="lazy"
                                     />
                                   </button>
                                 ) : (
