@@ -334,6 +334,8 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       applyDataRow(row, index % 2 === 1)
       row.getCell(1).font = { bold: true, size: 9 }
       row.getCell(3).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
+      row.getCell(5).font = { bold: true, size: 10 }
+      row.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' }
       row.getCell(7).alignment = { wrapText: true, vertical: 'top' }
     })
   }
@@ -425,6 +427,8 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       applyDataRow(row, rowIdx % 2 === 1)
       row.getCell(1).font = { bold: true, size: 9 }
       row.getCell(5).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
+      row.getCell(7).font = { bold: true, size: 10 }
+      row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' }
       row.getCell(9).alignment = { wrapText: true, vertical: 'top' }
       rowIdx++
     })
