@@ -42,11 +42,12 @@ const formatDateTime = (dateStr: string | null) => {
   })
 }
 
-const getStatusColor = (status: string) => {
+const getStatusColor = (status: string, dynamicColors?: Record<string, string>) => {
+  if (dynamicColors?.[status]) return dynamicColors[status]
   switch (status) {
     case 'none':
     case 'ok': return '#22c55e'
-    case 'low': return '#86efac'
+    case 'low': return '#4ade80'
     case 'medium':
     case 'activity': return '#f59e0b'
     case 'high':
@@ -228,8 +229,10 @@ async function generateInspectionReportHTML(data: {
   outdoorInspections: any[]
   indoorInspections: any[]
   summary: { ok: number; warning: number; critical: number; total: number }
+  dynamicLabels: Record<string, string>
+  dynamicColors: Record<string, string>
 }, browser: any) {
-  const { session, customer, technician, outdoorInspections, indoorInspections, summary } = data
+  const { session, customer, technician, outdoorInspections, indoorInspections, dynamicLabels, dynamicColors } = data
 
   // Sortera utomhusinspektioner efter placed_at för korrekt numrering (samma som kundportalen)
   const sortedOutdoor = [...outdoorInspections].sort((a, b) =>
@@ -244,15 +247,23 @@ async function generateInspectionReportHTML(data: {
     </div>
   ` : ''
 
+  // Räkna per aktivitetsnivå för sammanfattningsfältet
+  const allInspections = [...outdoorInspections, ...indoorInspections]
+  const levelCounts = { none: 0, low: 0, medium: 0, high: 0 }
+  for (const insp of allInspections) {
+    const lvl = insp.status as keyof typeof levelCounts
+    if (lvl in levelCounts) levelCounts[lvl]++
+  }
+
   // Bygg nummermappning för utomhus (1, 2, 3... baserat på placed_at-order)
   const outdoorTableRows = sortedOutdoor.map((insp: any, index: number) => {
-    const statusColor = getStatusColor(insp.status)
+    const statusColor = getStatusColor(insp.status, dynamicColors)
     const stationNumber = index + 1
     return `
       <tr>
         <td><strong>${stationNumber}</strong></td>
         <td>${insp.station?.station_type_data?.name || insp.station?.equipment_type || '-'}</td>
-        <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status)}</span></td>
+        <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status, dynamicLabels)}</span></td>
         <td>${insp.station?.station_type_data?.measurement_label || '-'}</td>
         <td class="text-right">${insp.measurement_value !== null && insp.measurement_value !== undefined ? insp.measurement_value : '-'}</td>
         <td>${insp.measurement_unit || insp.station?.station_type_data?.measurement_unit || '-'}</td>
@@ -304,7 +315,7 @@ async function generateInspectionReportHTML(data: {
             x: insp.station.position_x_percent,
             y: insp.station.position_y_percent,
             label: String(idx + 1),
-            color: getStatusColor(insp.status)
+            color: getStatusColor(insp.status, dynamicColors)
           }))
         const compositeBase64 = await renderFloorPlanScreenshot(browser, imageBase64, stationMarkers)
         if (compositeBase64) {
@@ -318,13 +329,13 @@ async function generateInspectionReportHTML(data: {
     }
 
     const rows = sortedInGroup.map((insp: any, index: number) => {
-      const statusColor = getStatusColor(insp.status)
+      const statusColor = getStatusColor(insp.status, dynamicColors)
       const stationNumber = index + 1
       return `
         <tr>
           <td><strong>${stationNumber}</strong></td>
           <td>${insp.station?.station_type_data?.name || insp.station?.station_type || '-'}</td>
-          <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status)}</span></td>
+          <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status, dynamicLabels)}</span></td>
           <td>${insp.station?.station_type_data?.measurement_label || '-'}</td>
           <td class="text-right">${insp.measurement_value !== null && insp.measurement_value !== undefined ? insp.measurement_value : '-'}</td>
           <td>${insp.measurement_unit || insp.station?.station_type_data?.measurement_unit || '-'}</td>
@@ -683,10 +694,11 @@ async function generateInspectionReportHTML(data: {
     </div>
 
     <div class="summary-bar">
-      <span style="color: ${beGoneColors.primary};">Totalt: ${summary.total} stationer</span>
-      <div class="summary-item"><div class="summary-dot" style="background: ${beGoneColors.success};"></div> OK: ${summary.ok}</div>
-      <div class="summary-item"><div class="summary-dot" style="background: ${beGoneColors.warning};"></div> Varning: ${summary.warning}</div>
-      <div class="summary-item"><div class="summary-dot" style="background: ${beGoneColors.error};"></div> Kritisk: ${summary.critical}</div>
+      <span style="color: ${beGoneColors.primary};">Totalt: ${allInspections.length} stationer</span>
+      <div class="summary-item"><div class="summary-dot" style="background: ${getStatusColor('none', dynamicColors)};"></div> ${getStatusLabel('none', dynamicLabels)}: ${levelCounts.none}</div>
+      <div class="summary-item"><div class="summary-dot" style="background: ${getStatusColor('low', dynamicColors)};"></div> ${getStatusLabel('low', dynamicLabels)}: ${levelCounts.low}</div>
+      <div class="summary-item"><div class="summary-dot" style="background: ${getStatusColor('medium', dynamicColors)};"></div> ${getStatusLabel('medium', dynamicLabels)}: ${levelCounts.medium}</div>
+      <div class="summary-item"><div class="summary-dot" style="background: ${getStatusColor('high', dynamicColors)};"></div> ${getStatusLabel('high', dynamicLabels)}: ${levelCounts.high}</div>
     </div>
 
     ${session?.notes ? `
@@ -760,6 +772,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const dateStr = sessionDate ? new Date(sessionDate).toISOString().slice(0, 10) : 'okänt-datum'
     const filename = `Kontrollrapport_${customerName}_${dateStr}.pdf`
 
+    // Hämta dynamiska etiketter och färger från databasen
+    const { data: labelRows } = await supabase
+      .from('inspection_status_labels')
+      .select('level, label, color')
+    const dynamicLabels: Record<string, string> = {}
+    const dynamicColors: Record<string, string> = {}
+    for (const row of (labelRows || [])) {
+      dynamicLabels[row.level] = row.label
+      dynamicColors[row.level] = row.color
+    }
+
     // Starta browser FÖRE HTML-generering — behövs för satellitkartan
     const browser = await puppeteer.launch({
       args: chromium.args,
@@ -774,7 +797,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       technician,
       outdoorInspections: outdoorInspections || [],
       indoorInspections: indoorInspections || [],
-      summary
+      summary,
+      dynamicLabels,
+      dynamicColors
     }, browser)
 
     const page = await browser.newPage()
