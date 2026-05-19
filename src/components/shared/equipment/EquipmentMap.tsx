@@ -380,7 +380,7 @@ export function EquipmentMap({
         'animation:equipment-pulse-highlight 1.2s ease-in-out infinite',
         'pointer-events:none',
       ].join(';')
-      this.getPanes()!.overlayLayer.appendChild(div)
+      this.getPanes()!.floatPane.appendChild(div)
       ;(this as any)._div = div
     }
     overlay.draw = function() {
