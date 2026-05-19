@@ -62,6 +62,7 @@ import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
 import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import Select, { type SelectOptionGroup } from '../ui/Select'
 import { generateInspectionPDF, generateInspectionExcel } from '../../services/inspectionReportService'
 
 interface InspectionSessionsViewProps {
@@ -507,6 +508,22 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     return groups
   }, [allSessions])
 
+  const sessionSelectGroups = useMemo((): SelectOptionGroup[] =>
+    sessionsByMonth.map(group => ({
+      label: group.label.charAt(0).toUpperCase() + group.label.slice(1),
+      options: group.sessions.map((session, idx) => ({
+        value: session.id,
+        label: [
+          session.completed_at
+            ? format(new Date(session.completed_at), 'd MMM yyyy', { locale: sv })
+            : 'Okänt datum',
+          session.technician?.name ? ` — ${session.technician.name}` : '',
+          group.sessions.length > 1 ? ` (${idx + 1}/${group.sessions.length})` : ''
+        ].join('')
+      }))
+    }))
+  , [sessionsByMonth])
+
   // Ladda historiska sessioner (behålls för historikmodal)
   const loadHistorySessions = async () => {
     if (historyLoaded || loadingHistory) return
@@ -946,28 +963,14 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               </button>
 
               {/* Dropdown med alla sessioner grupperade per månad */}
-              <div className="relative">
-                <select
+              <div className="min-w-[240px]">
+                <Select
+                  groups={sessionSelectGroups}
                   value={selectedSessionId || ''}
-                  onChange={(e) => handleSelectSession(e.target.value)}
+                  onChange={handleSelectSession}
                   disabled={loadingSessionData}
-                  className="appearance-none bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white cursor-pointer hover:border-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-500/50 pr-8 disabled:opacity-50"
-                >
-                  {sessionsByMonth.map(group => (
-                    <optgroup key={group.label} label={group.label.charAt(0).toUpperCase() + group.label.slice(1)}>
-                      {group.sessions.map((session, idx) => (
-                        <option key={session.id} value={session.id}>
-                          {session.completed_at
-                            ? format(new Date(session.completed_at), "d MMM yyyy", { locale: sv })
-                            : 'Okänt datum'}
-                          {session.technician?.name ? ` — ${session.technician.name}` : ''}
-                          {group.sessions.length > 1 ? ` (${idx + 1}/${group.sessions.length})` : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  placeholder="Välj kontroll..."
+                />
               </div>
 
               <button
