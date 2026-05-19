@@ -249,6 +249,7 @@ async function generateInspectionReportHTML(data: {
         <td>${insp.measurement_unit || insp.station?.station_type_data?.measurement_unit || '-'}</td>
         <td>${insp.findings || '-'}</td>
         <td>${insp.preparation?.name || '-'}</td>
+        <td class="text-small">${insp.preparation?.registration_number || '-'}</td>
         <td class="text-small">${formatDateTime(insp.inspected_at)}</td>
       </tr>
     `
@@ -320,6 +321,7 @@ async function generateInspectionReportHTML(data: {
           <td>${insp.measurement_unit || insp.station?.station_type_data?.measurement_unit || '-'}</td>
           <td>${insp.findings || '-'}</td>
           <td>${insp.preparation?.name || '-'}</td>
+          <td class="text-small">${insp.preparation?.registration_number || '-'}</td>
           <td class="text-small">${formatDateTime(insp.inspected_at)}</td>
         </tr>
       `
@@ -345,6 +347,7 @@ async function generateInspectionReportHTML(data: {
               <th>Enhet</th>
               <th>Anteckning</th>
               <th>Preparat</th>
+              <th>Reg.nr</th>
               <th>Kontrollerad</th>
             </tr>
           </thead>
@@ -702,6 +705,7 @@ async function generateInspectionReportHTML(data: {
             <th>Enhet</th>
             <th>Anteckning</th>
             <th>Preparat</th>
+            <th>Reg.nr</th>
             <th>Kontrollerad</th>
           </tr>
         </thead>

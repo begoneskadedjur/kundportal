@@ -241,7 +241,8 @@ export async function getSessionInspectionSummary(
       .select(`
         id,
         measurement_value,
-        station:equipment_placements(equipment_type)
+        station:equipment_placements(equipment_type),
+        preparation:preparations!preparation_id(threshold_warning, threshold_critical, threshold_direction)
       `)
       .eq('session_id', sessionId),
     supabase
@@ -249,15 +250,16 @@ export async function getSessionInspectionSummary(
       .select(`
         id,
         measurement_value,
-        station:indoor_stations(station_type)
+        station:indoor_stations(station_type),
+        preparation:preparations!preparation_id(threshold_warning, threshold_critical, threshold_direction)
       `)
       .eq('session_id', sessionId)
   ])
 
-  // Hämta alla stationstyper med tröskelvärden
+  // Hämta alla stationstyper med tröskelvärden och threshold_source
   const { data: stationTypes } = await supabase
     .from('station_types')
-    .select('id, code, threshold_warning, threshold_critical, threshold_direction')
+    .select('id, code, threshold_warning, threshold_critical, threshold_direction, threshold_source')
     .eq('is_active', true)
 
   const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
@@ -277,11 +279,16 @@ export async function getSessionInspectionSummary(
       return
     }
 
+    const prepThresholds = stationType.threshold_source === 'preparation'
+      ? (insp as any).preparation ?? null
+      : null
+
     const status = calculateStatusFromThresholds(
       measurementValue,
       stationType.threshold_warning,
       stationType.threshold_critical,
-      stationType.threshold_direction
+      stationType.threshold_direction,
+      prepThresholds
     )
     counts[status]++
   })
@@ -298,11 +305,16 @@ export async function getSessionInspectionSummary(
       return
     }
 
+    const prepThresholds = stationType.threshold_source === 'preparation'
+      ? (insp as any).preparation ?? null
+      : null
+
     const status = calculateStatusFromThresholds(
       measurementValue,
       stationType.threshold_warning,
       stationType.threshold_critical,
-      stationType.threshold_direction
+      stationType.threshold_direction,
+      prepThresholds
     )
     counts[status]++
   })
