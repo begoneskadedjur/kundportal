@@ -1046,7 +1046,6 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         </div>
 
         {/* Sektioner med tabeller — paginerat */}
-        <>
         {allFilteredStations.length === 0 ? (
           <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-12 text-center">
             <ClipboardCheck className="w-12 h-12 text-slate-600 mx-auto mb-4" />
@@ -1276,28 +1275,27 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                 </button>
               </div>
             )}
-          </>
-        )
 
-        {/* Legend för tröskelvärden */}
-        <div className="bg-slate-800/30 rounded-lg p-4">
-          <p className="text-xs text-slate-500 mb-2">Mätvärdeindikatorer:</p>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span className="text-xs text-slate-400">OK - Inom normala värden</span>
+            {/* Legend för tröskelvärden */}
+            <div className="bg-slate-800/30 rounded-lg p-4">
+              <p className="text-xs text-slate-500 mb-2">Mätvärdeindikatorer:</p>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span className="text-xs text-slate-400">OK - Inom normala värden</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                  <span className="text-xs text-slate-400">Varning - Överstiger/understiger varningsnivå</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="text-xs text-slate-400">Kritisk - Överstiger/understiger kritisk nivå</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-amber-500" />
-              <span className="text-xs text-slate-400">Varning - Överstiger/understiger varningsnivå</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
-              <span className="text-xs text-slate-400">Kritisk - Överstiger/understiger kritisk nivå</span>
-            </div>
-          </div>
-        </div>
-        </>
+          </>
+        )}
       </div>
 
       {/* Photo Lightbox */}
