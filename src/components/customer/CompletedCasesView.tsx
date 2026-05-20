@@ -53,7 +53,7 @@ function getProblemRatingInfo(rating: number | null): { color: string; label: st
 function getServiceTypeInfo(serviceType: string | null): { label: string; color: string; bg: string } {
   switch (serviceType) {
     case 'routine': return { label: 'Servicebesök', color: '#20c58f', bg: '#20c58f20' }
-    case 'inspection': return { label: 'Kontroll', color: '#60a5fa', bg: '#60a5fa20' }
+    case 'inspection': return { label: 'Avtalat Servicebesök', color: '#60a5fa', bg: '#60a5fa20' }
     case 'establishment': return { label: 'Etablering', color: '#a78bfa', bg: '#a78bfa20' }
     case 'acute': return { label: 'Akut', color: '#f87171', bg: '#f8717120' }
     default: return { label: 'Övrigt', color: '#94a3b8', bg: '#94a3b820' }
@@ -252,7 +252,7 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
         >
           <option value="all">Alla typer</option>
           <option value="routine">Servicebesök</option>
-          <option value="inspection">Kontroll</option>
+          <option value="inspection">Avtalat Servicebesök</option>
           <option value="establishment">Etablering</option>
           <option value="acute">Akut</option>
           <option value="other">Övrigt</option>

@@ -21,7 +21,8 @@ import {
   Flag,
   Lightbulb,
   Package,
-  Wrench
+  Wrench,
+  ClipboardCheck
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -152,6 +153,19 @@ export default function CaseDetailsModal({
   const [loadingImages, setLoadingImages] = useState(false)
   const [showCloseWarning, setShowCloseWarning] = useState(false)
   const [revisitHistory, setRevisitHistory] = useState<RevisitHistoryEntry[]>([])
+  const [inspectionSession, setInspectionSession] = useState<{
+    id: string
+    status: string
+    completed_at: string | null
+    total_outdoor_stations: number
+    total_indoor_stations: number
+    inspected_outdoor_stations: number
+    inspected_indoor_stations: number
+    notes: string | null
+    technician?: { name: string } | null
+    activityCount?: number
+  } | null>(null)
+  const [loadingSession, setLoadingSession] = useState(false)
   const { profile } = useAuth()
 
   // Hook för läskvitton
@@ -221,6 +235,32 @@ export default function CaseDetailsModal({
       fetchCaseImages()
       // Hämta återbesökshistorik
       fetchRevisitHistory()
+
+      // Hämta inspektionssession om det är ett inspection-ärende
+      if (fallbackData?.service_type === 'inspection' && caseId) {
+        setLoadingSession(true)
+        setInspectionSession(null)
+        supabase
+          .from('station_inspection_sessions')
+          .select('id, status, completed_at, total_outdoor_stations, total_indoor_stations, inspected_outdoor_stations, inspected_indoor_stations, notes, technician:technicians(name)')
+          .eq('case_id', caseId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(async ({ data }) => {
+            if (data) {
+              const sessionId = (data as any).id as string
+              const [od, ind] = await Promise.all([
+                supabase.from('outdoor_station_inspections').select('id', { count: 'exact', head: true }).eq('session_id', sessionId).eq('status', 'activity'),
+                supabase.from('indoor_station_inspections').select('id', { count: 'exact', head: true }).eq('session_id', sessionId).eq('status', 'activity')
+              ])
+              setInspectionSession({ ...(data as any), activityCount: (od.count || 0) + (ind.count || 0) })
+            } else {
+              setInspectionSession(null)
+            }
+            setLoadingSession(false)
+          })
+      }
 
       // Om vi har clickupTaskId, försök hämta från ClickUp
       if (clickupTaskId) {
@@ -547,9 +587,15 @@ export default function CaseDetailsModal({
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         fallbackData.service_type === 'inspection'
                           ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          : fallbackData.service_type === 'establishment'
+                          ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                          : fallbackData.service_type === 'acute'
+                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                           : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                       }`}>
-                        {fallbackData.service_type === 'inspection' ? 'Inspektion' : 'Rutinbesök'}
+                        {fallbackData.service_type === 'inspection' ? 'Avtalat Servicebesök' :
+                         fallbackData.service_type === 'establishment' ? 'Etablering' :
+                         fallbackData.service_type === 'acute' ? 'Akut' : 'Servicebesök'}
                       </span>
                     )}
                   </div>
@@ -661,6 +707,104 @@ export default function CaseDetailsModal({
                     </h3>
                     <div className="p-3 bg-slate-800/50 rounded-lg">
                       <p className="text-sm text-slate-200 whitespace-pre-wrap">{fallbackData.work_report}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Avtalat Servicebesök — inspektionsutfall */}
+                {fallbackData.service_type === 'inspection' && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <ClipboardCheck className="w-4 h-4 text-blue-400" />
+                      Kontrollresultat
+                    </h3>
+                    {loadingSession ? (
+                      <div className="p-3 bg-slate-800/50 rounded-lg flex items-center gap-2 text-slate-400 text-sm">
+                        <div className="w-3 h-3 border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin" />
+                        Hämtar kontrolldata...
+                      </div>
+                    ) : inspectionSession ? (
+                      <div className="p-3 bg-slate-800/50 rounded-lg space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                            <span>Kontrollerade stationer</span>
+                            <span className="font-medium text-white">
+                              {inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations}
+                              {' / '}
+                              {inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations}
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-500 rounded-full transition-all"
+                              style={{
+                                width: `${Math.round(
+                                  ((inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations) /
+                                    Math.max(inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations, 1)) * 100
+                                )}%`
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            inspectionSession.status === 'completed'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : inspectionSession.status === 'in_progress'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-slate-500/20 text-slate-400'
+                          }`}>
+                            {inspectionSession.status === 'completed' ? 'Genomförd' :
+                             inspectionSession.status === 'in_progress' ? 'Pågår' : 'Schemalagd'}
+                          </span>
+                          {inspectionSession.activityCount !== undefined && inspectionSession.activityCount > 0 && (
+                            <span className="px-2 py-1 rounded text-xs font-medium bg-amber-500/20 text-amber-400">
+                              {inspectionSession.activityCount} station{inspectionSession.activityCount !== 1 ? 'er' : ''} med aktivitet
+                            </span>
+                          )}
+                          {inspectionSession.completed_at && (
+                            <span className="px-2 py-1 rounded text-xs font-medium bg-slate-700/50 text-slate-300">
+                              Avslutad {new Date(inspectionSession.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                        {inspectionSession.notes && (
+                          <p className="text-sm text-slate-300 border-t border-slate-700/50 pt-2">{inspectionSession.notes}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-slate-800/30 border border-dashed border-slate-700/50 rounded-lg">
+                        <p className="text-xs text-slate-500 mb-2">Kontrolldata fylls i efter genomfört servicebesök</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {['Kontrollerade stationer', 'Stationer med aktivitet', 'Genomförd datum', 'Teknikernotering'].map(label => (
+                            <div key={label} className="space-y-0.5">
+                              <p className="text-xs text-slate-500">{label}</p>
+                              <div className="h-4 bg-slate-700/40 rounded w-3/4" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Etablering — preview om arbetsrapport saknas */}
+                {fallbackData.service_type === 'establishment' && !fallbackData.work_report && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Package className="w-4 h-4 text-purple-400" />
+                      Etableringsrapport
+                    </h3>
+                    <div className="p-3 bg-slate-800/30 border border-dashed border-slate-700/50 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-2">Etableringsresultat fylls i efter genomfört besök</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Installerade stationer', 'Utrustningstyp', 'Rapport', 'Rekommendationer'].map(label => (
+                          <div key={label} className="space-y-0.5">
+                            <p className="text-xs text-slate-500">{label}</p>
+                            <div className="h-4 bg-slate-700/40 rounded w-3/4" />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
