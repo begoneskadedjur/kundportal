@@ -2247,12 +2247,33 @@ export default function StationInspectionModule() {
 
               {/* Measurement field - dynamic based on station type */}
               {selectedStation.station_type_data?.measurement_label && (() => {
+                const stType = selectedStation.station_type_data
+                const selectedPrep = selectedPreparationId
+                  ? preparations.find(p => p.id === selectedPreparationId) ?? null
+                  : null
+                const usePreparationThresholds =
+                  (stType as any)?.threshold_source === 'preparation' && selectedPrep
+                const activeThresholds = {
+                  warning: usePreparationThresholds
+                    ? (selectedPrep!.threshold_warning ?? stType?.threshold_warning ?? null)
+                    : stType?.threshold_warning ?? null,
+                  critical: usePreparationThresholds
+                    ? (selectedPrep!.threshold_critical ?? stType?.threshold_critical ?? null)
+                    : stType?.threshold_critical ?? null,
+                  direction: usePreparationThresholds
+                    ? (selectedPrep!.threshold_direction ?? stType?.threshold_direction ?? 'above')
+                    : stType?.threshold_direction ?? 'above',
+                  label: usePreparationThresholds
+                    ? (selectedPrep!.measurement_label ?? stType?.measurement_label ?? null)
+                    : stType?.measurement_label ?? null,
+                }
+
                 const numValue = measurementValue ? parseFloat(measurementValue) : null
                 const color = getMeasurementColor(
                   numValue,
-                  selectedStation.station_type_data?.threshold_warning,
-                  selectedStation.station_type_data?.threshold_critical,
-                  selectedStation.station_type_data?.threshold_direction
+                  activeThresholds.warning,
+                  activeThresholds.critical,
+                  activeThresholds.direction
                 )
                 const inputColorClass = {
                   green: 'border-green-500 text-green-400',
@@ -2264,7 +2285,7 @@ export default function StationInspectionModule() {
                 return (
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-slate-300 mb-2">
-                      {selectedStation.station_type_data.measurement_label}
+                      {activeThresholds.label ?? stType.measurement_label}
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -2283,16 +2304,16 @@ export default function StationInspectionModule() {
                       </span>
                     </div>
                     {/* Threshold indicators */}
-                    {(selectedStation.station_type_data.threshold_warning || selectedStation.station_type_data.threshold_critical) && (
+                    {(activeThresholds.warning != null || activeThresholds.critical != null) && (
                       <div className="mt-2 flex items-center gap-4 text-xs">
-                        {selectedStation.station_type_data.threshold_warning && (
+                        {activeThresholds.warning != null && (
                           <span className="text-amber-400">
-                            Varning: {selectedStation.station_type_data.threshold_warning}
+                            Varning: {activeThresholds.warning}
                           </span>
                         )}
-                        {selectedStation.station_type_data.threshold_critical && (
+                        {activeThresholds.critical != null && (
                           <span className="text-red-400">
-                            Kritisk: {selectedStation.station_type_data.threshold_critical}
+                            Kritisk: {activeThresholds.critical}
                           </span>
                         )}
                       </div>
