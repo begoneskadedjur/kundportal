@@ -3,7 +3,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch'
-import { ZoomIn, ZoomOut, Maximize, Move, Plus, X, Check } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize, Move, Plus, X, Check, Navigation } from 'lucide-react'
 import type { IndoorStationWithRelations, PlacementMode, IndoorStationType } from '../../../types/indoor'
 import { INDOOR_STATION_TYPE_CONFIG } from '../../../types/indoor'
 import { IndoorStationMarker } from './IndoorStationMarker'
@@ -26,6 +26,8 @@ interface FloorPlanViewerProps {
   showNumbers?: boolean // Visa stationsnummer (1, 2, 3...) baserat på placeringsordning
   inspectedStationIds?: Set<string> // IDs för inspekterade stationer (visas med grön bock)
   highlightedStationId?: string | null // ID för station att highlighta (wizard-läge)
+  relocatingStationId?: string | null // ID för station som ska kunna dras till ny position
+  relocatingStationName?: string | null
 }
 
 // Hämta typkonfiguration - prioriterar dynamisk data
@@ -65,7 +67,9 @@ export function FloorPlanViewer({
   height = 'calc(100vh - 200px)',
   showNumbers = false,
   inspectedStationIds,
-  highlightedStationId
+  highlightedStationId,
+  relocatingStationId,
+  relocatingStationName
 }: FloorPlanViewerProps) {
   const transformRef = useRef<ReactZoomPanPinchRef>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -78,6 +82,12 @@ export function FloorPlanViewer({
   const [pendingPosition, setPendingPosition] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef<{ pointerId: number; startX: number; startY: number } | null>(null)
+
+  // Drag-state för att flytta befintlig station
+  const [relocateDragPos, setRelocateDragPos] = useState<{ x: number; y: number } | null>(null)
+  const [pendingRelocatePos, setPendingRelocatePos] = useState<{ x: number; y: number } | null>(null)
+  const [isRelocateDragging, setIsRelocateDragging] = useState(false)
+  const relocateDragRef = useRef<{ pointerId: number } | null>(null)
 
   // Skapa mappning från station ID till nummer (1, 2, 3...)
   // Baserat på placed_at i stigande ordning (äldsta placering = nummer 1)
@@ -208,6 +218,45 @@ export function FloorPlanViewer({
     setTimeout(() => setIsDragging(false), 50)
   }, [])
 
+  // Drag-handlers för att flytta befintlig station (relocate)
+  const handleRelocatePointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const target = e.currentTarget as HTMLElement
+    target.setPointerCapture(e.pointerId)
+    relocateDragRef.current = { pointerId: e.pointerId }
+    setIsRelocateDragging(true)
+    setPendingRelocatePos(null)
+  }, [])
+
+  const handleRelocatePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!relocateDragRef.current || !imageRef.current) return
+    e.stopPropagation()
+    e.preventDefault()
+
+    const rect = imageRef.current.getBoundingClientRect()
+    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100))
+    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100))
+
+    setRelocateDragPos({ x, y })
+  }, [])
+
+  const handleRelocatePointerUp = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation()
+    relocateDragRef.current = null
+    if (relocateDragPos) {
+      setPendingRelocatePos(relocateDragPos)
+    }
+    setIsRelocateDragging(false)
+  }, [relocateDragPos])
+
+  // Nollställ relocate-state när relocatingStationId ändras
+  useEffect(() => {
+    setRelocateDragPos(null)
+    setPendingRelocatePos(null)
+    setIsRelocateDragging(false)
+  }, [relocatingStationId])
+
   // Nollställ pendingPosition när placement-läge ändras
   useEffect(() => {
     setPendingPosition(null)
@@ -249,6 +298,47 @@ export function FloorPlanViewer({
 
   return (
     <div className="relative w-full" style={{ height }} ref={containerRef}>
+      {/* Flytta befintlig station-banner */}
+      {relocatingStationId && !isPlacementActive && (
+        <div className="absolute top-0 left-0 right-0 z-30 bg-amber-600/95 backdrop-blur-sm px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Navigation className="w-5 h-5 text-white" />
+            <div>
+              <p className="text-white font-medium text-sm">
+                {pendingRelocatePos ? 'Ny position vald' : `Dra ${relocatingStationName || 'stationen'} till ny plats`}
+              </p>
+              <p className="text-amber-100 text-xs">
+                {pendingRelocatePos ? 'Bekräfta för att spara' : 'Håll och dra den gula markören'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {pendingRelocatePos && (
+              <button
+                onClick={() => {
+                  onImageClick?.(pendingRelocatePos.x, pendingRelocatePos.y)
+                  setPendingRelocatePos(null)
+                  setRelocateDragPos(null)
+                }}
+                className="px-3 py-1.5 bg-white text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition-colors"
+              >
+                Bekräfta
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setPendingRelocatePos(null)
+                setRelocateDragPos(null)
+                onCancelPlacement?.()
+              }}
+              className="px-3 py-1.5 text-white hover:bg-white/20 text-sm rounded-lg transition-colors"
+            >
+              Avbryt
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Placement mode header */}
       {isPlacementActive && (
         <div className="absolute top-0 left-0 right-0 z-20 bg-emerald-600/95 backdrop-blur-sm px-4 py-3">
@@ -328,8 +418,8 @@ export function FloorPlanViewer({
         maxScale={4}
         centerOnInit
         limitToBounds={false}
-        panning={{ disabled: isDragging }}
-        pinch={{ disabled: isDragging }}
+        panning={{ disabled: isDragging || isRelocateDragging }}
+        pinch={{ disabled: isDragging || isRelocateDragging }}
         doubleClick={{ disabled: isPlacementActive }}
       >
         <TransformComponent
@@ -366,17 +456,26 @@ export function FloorPlanViewer({
             />
 
             {/* Station markers */}
-            {imageLoaded && stations.map((station) => (
-              <IndoorStationMarker
-                key={station.id}
-                station={station}
-                isSelected={station.id === selectedStationId}
-                onClick={() => onStationClick?.(station)}
-                displayNumber={showNumbers ? stationNumberMap.get(station.id) : undefined}
-                isInspected={inspectedStationIds?.has(station.id)}
-                isHighlighted={station.id === highlightedStationId}
-              />
-            ))}
+            {imageLoaded && stations.map((station) => {
+              const isBeingRelocated = station.id === relocatingStationId
+              const currentPos = isBeingRelocated && relocateDragPos ? relocateDragPos : null
+              return (
+                <IndoorStationMarker
+                  key={station.id}
+                  station={station}
+                  isSelected={station.id === selectedStationId}
+                  onClick={() => onStationClick?.(station)}
+                  displayNumber={showNumbers ? stationNumberMap.get(station.id) : undefined}
+                  isInspected={inspectedStationIds?.has(station.id)}
+                  isHighlighted={station.id === highlightedStationId}
+                  isDraggable={isBeingRelocated}
+                  overridePosition={currentPos}
+                  onPointerDown={isBeingRelocated ? handleRelocatePointerDown : undefined}
+                  onPointerMove={isBeingRelocated ? handleRelocatePointerMove : undefined}
+                  onPointerUp={isBeingRelocated ? handleRelocatePointerUp : undefined}
+                />
+              )
+            })}
 
             {/* Draggbar pending-markör (tvåstegs-placering) */}
             {imageLoaded && pendingPosition && (

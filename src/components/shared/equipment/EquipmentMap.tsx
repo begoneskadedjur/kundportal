@@ -26,8 +26,8 @@ interface EquipmentMapProps {
   onEditEquipment?: (equipment: EquipmentPlacementWithRelations) => void
   onDeleteEquipment?: (equipment: EquipmentPlacementWithRelations) => void
   onMapClick?: (lat: number, lng: number) => void
-  onRelocateClick?: (lat: number, lng: number) => void // Används i flytta-läge, fungerar även i readOnly
-  relocateMode?: boolean // Visar banner för flytta-läge
+  onRelocateClick?: (lat: number, lng: number) => void // Anropas vid bekräftelse av ny position
+  relocatingStationId?: string | null // ID för station som ska vara draggbar
   relocatingStationName?: string | null
   onCancelRelocate?: () => void
   height?: string
@@ -62,7 +62,7 @@ export function EquipmentMap({
   onDeleteEquipment,
   onMapClick,
   onRelocateClick,
-  relocateMode = false,
+  relocatingStationId,
   relocatingStationName,
   onCancelRelocate,
   height = '400px',
@@ -81,13 +81,13 @@ export function EquipmentMap({
   const previewMarkerRef = useRef<google.maps.Marker | null>(null)
   const previewCircleRef = useRef<google.maps.Circle | null>(null)
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
-  const relocateClickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
   const pulseOverlayRef = useRef<google.maps.Marker | null>(null)
 
   // State
   const [selectedEquipmentData, setSelectedEquipmentData] = useState<EquipmentPlacementWithRelations | null>(null)
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
   const [stationTypes, setStationTypes] = useState<StationType[]>([])
+  const [pendingRelocatePos, setPendingRelocatePos] = useState<{ lat: number; lng: number } | null>(null)
 
   // Hämta stationstyper
   useEffect(() => {
@@ -252,30 +252,6 @@ export function EquipmentMap({
     }
   }, [onMapClick, readOnly])
 
-  // Relocate-klicklyssnare (fungerar även i readOnly)
-  useEffect(() => {
-    if (!mapRef.current) return
-
-    if (relocateClickListenerRef.current) {
-      google.maps.event.removeListener(relocateClickListenerRef.current)
-      relocateClickListenerRef.current = null
-    }
-
-    if (onRelocateClick && relocateMode) {
-      relocateClickListenerRef.current = mapRef.current.addListener('click', (e: google.maps.MapMouseEvent) => {
-        if (e.latLng) {
-          onRelocateClick(e.latLng.lat(), e.latLng.lng())
-        }
-      })
-    }
-
-    return () => {
-      if (relocateClickListenerRef.current) {
-        google.maps.event.removeListener(relocateClickListenerRef.current)
-      }
-    }
-  }, [onRelocateClick, relocateMode])
-
   // Uppdatera markörer när equipment ändras
   useEffect(() => {
     if (!mapRef.current || !isLoaded) return
@@ -333,28 +309,44 @@ export function EquipmentMap({
         labelText = number.toString()
       }
 
+      const isRelocating = item.id === relocatingStationId
+
       const marker = new google.maps.Marker({
         position: { lat: item.latitude, lng: item.longitude },
         map,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: isHighlighted ? 16 : 14,
-          fillColor: bgColor,
+          scale: isRelocating ? 18 : isHighlighted ? 16 : 14,
+          fillColor: isRelocating ? '#f59e0b' : bgColor,
           fillOpacity: opacity,
-          strokeColor,
-          strokeWeight
+          strokeColor: isRelocating ? '#ffffff' : strokeColor,
+          strokeWeight: isRelocating ? 3 : strokeWeight
         },
         label: labelText ? {
-          text: labelText,
+          text: isRelocating ? '✥' : labelText,
           color: '#ffffff',
           fontSize: number && number >= 100 ? '9px' : isHighlighted ? '13px' : '11px',
           fontWeight: 'bold'
-        } : undefined,
-        zIndex: isHighlighted ? 1000 : isInspected ? 500 : 100,
-        clickable: true
+        } : (isRelocating ? { text: '✥', color: '#ffffff', fontSize: '14px', fontWeight: 'bold' } : undefined),
+        zIndex: isRelocating ? 2000 : isHighlighted ? 1000 : isInspected ? 500 : 100,
+        clickable: true,
+        draggable: isRelocating,
+        cursor: isRelocating ? 'grab' : 'pointer'
       })
 
-      marker.addListener('click', () => handleMarkerClick(item))
+      if (isRelocating) {
+        marker.addListener('dragstart', () => {
+          setPendingRelocatePos(null)
+        })
+        marker.addListener('dragend', () => {
+          const pos = marker.getPosition()
+          if (pos) {
+            setPendingRelocatePos({ lat: pos.lat(), lng: pos.lng() })
+          }
+        })
+      } else {
+        marker.addListener('click', () => handleMarkerClick(item))
+      }
       markersRef.current.push(marker)
     })
 
@@ -369,7 +361,7 @@ export function EquipmentMap({
       map.setCenter({ lat: equipment[0].latitude, lng: equipment[0].longitude })
       map.setZoom(DETAIL_ZOOM)
     }
-  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick])
+  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick, relocatingStationId])
 
   // Panorera till highlighted station (wizard-läge)
   useEffect(() => {
@@ -521,25 +513,41 @@ export function EquipmentMap({
       <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} className="rounded-lg" />
 
       {/* Flytta-station-banner */}
-      {relocateMode && (
-        <div className="absolute top-0 left-0 right-0 z-40 bg-emerald-600/95 backdrop-blur-sm px-4 py-3 flex items-center justify-between rounded-t-lg">
+      {relocatingStationId && (
+        <div className="absolute top-0 left-0 right-0 z-40 bg-amber-600/95 backdrop-blur-sm px-4 py-3 flex items-center justify-between rounded-t-lg">
           <div className="flex items-center gap-2">
             <Navigation className="w-5 h-5 text-white" />
             <div>
               <p className="text-white font-medium text-sm">
-                Flytta {relocatingStationName || 'station'}
+                {pendingRelocatePos ? 'Ny position vald' : `Dra ${relocatingStationName || 'stationen'} till ny plats`}
               </p>
-              <p className="text-emerald-100 text-xs">Tryck på kartan för att välja ny position</p>
+              <p className="text-amber-100 text-xs">
+                {pendingRelocatePos ? 'Bekräfta för att spara' : 'Håll och dra den gula markören'}
+              </p>
             </div>
           </div>
-          {onCancelRelocate && (
+          <div className="flex items-center gap-2">
+            {pendingRelocatePos && (
+              <button
+                onClick={() => {
+                  onRelocateClick?.(pendingRelocatePos.lat, pendingRelocatePos.lng)
+                  setPendingRelocatePos(null)
+                }}
+                className="px-3 py-1.5 bg-white text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition-colors"
+              >
+                Bekräfta
+              </button>
+            )}
             <button
-              onClick={onCancelRelocate}
-              className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"
+              onClick={() => {
+                setPendingRelocatePos(null)
+                onCancelRelocate?.()
+              }}
+              className="px-3 py-1.5 text-white hover:bg-white/20 text-sm rounded-lg transition-colors"
             >
-              ✕
+              Avbryt
             </button>
-          )}
+          </div>
         </div>
       )}
 

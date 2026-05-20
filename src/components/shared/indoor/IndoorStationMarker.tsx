@@ -21,6 +21,11 @@ interface IndoorStationMarkerProps {
   displayNumber?: number // Visuellt nummer att visa i markören (1, 2, 3...)
   isInspected?: boolean // Om stationen är inspekterad under pågående session
   isHighlighted?: boolean // Om stationen är highlightad (wizard-läge)
+  isDraggable?: boolean // Om markören kan dras
+  overridePosition?: { x: number; y: number } | null // Åsidosätt position under drag
+  onPointerDown?: (e: React.PointerEvent) => void
+  onPointerMove?: (e: React.PointerEvent) => void
+  onPointerUp?: (e: React.PointerEvent) => void
 }
 
 // Hämta typ-konfiguration - prioritera dynamisk data från DB
@@ -61,7 +66,12 @@ export function IndoorStationMarker({
   size = 'medium',
   displayNumber,
   isInspected = false,
-  isHighlighted = false
+  isHighlighted = false,
+  isDraggable = false,
+  overridePosition = null,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp
 }: IndoorStationMarkerProps) {
   const typeConfig = getTypeConfig(station)
   const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
@@ -114,30 +124,43 @@ export function IndoorStationMarker({
 
   const statusSymbol = getStatusSymbol(station.status)
 
+  const posX = overridePosition ? overridePosition.x : station.position_x_percent
+  const posY = overridePosition ? overridePosition.y : station.position_y_percent
+
   return (
     <div
       className={`
-        absolute cursor-pointer transition-all duration-200 p-2
-        ${getOpacity(station.status)}
-        ${isHighlighted ? 'z-30 scale-125' : isSelected ? 'z-20 scale-125' : 'z-10 hover:scale-110'}
+        absolute p-2 touch-none
+        ${isDraggable ? 'cursor-grab active:cursor-grabbing z-50' : 'cursor-pointer transition-all duration-200'}
+        ${!isDraggable ? getOpacity(station.status) : ''}
+        ${!isDraggable ? (isHighlighted ? 'z-30 scale-125' : isSelected ? 'z-20 scale-125' : 'z-10 hover:scale-110') : ''}
       `}
       style={{
-        left: `${station.position_x_percent}%`,
-        top: `${station.position_y_percent}%`,
+        left: `${posX}%`,
+        top: `${posY}%`,
         transform: 'translate(-50%, -50%)'
       }}
       onClick={(e) => {
+        if (isDraggable) return
         e.stopPropagation()
         onClick?.()
       }}
+      onPointerDown={isDraggable ? (e) => { e.stopPropagation(); onPointerDown?.(e) } : undefined}
+      onPointerMove={isDraggable ? (e) => { e.stopPropagation(); onPointerMove?.(e) } : undefined}
+      onPointerUp={isDraggable ? (e) => { e.stopPropagation(); onPointerUp?.(e) } : undefined}
     >
+      {/* Draggbar ring */}
+      {isDraggable && (
+        <div className="absolute inset-0 -m-2 rounded-full border-4 border-amber-400 animate-pulse" />
+      )}
+
       {/* Selection ring */}
-      {isSelected && (
+      {isSelected && !isDraggable && (
         <div className="absolute inset-0 -m-1 rounded-full border-2 border-white animate-pulse" />
       )}
 
       {/* Highlighted ring (wizard-läge) - pulserar */}
-      {isHighlighted && (
+      {isHighlighted && !isDraggable && (
         <div className="absolute inset-0 -m-2 rounded-full border-4 border-blue-500 animate-ping" />
       )}
 

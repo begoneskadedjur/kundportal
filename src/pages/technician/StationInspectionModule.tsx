@@ -1679,7 +1679,7 @@ export default function StationInspectionModule() {
                       onEquipmentClick={handleOutdoorStationClick}
                       inspectedStationIds={inspectedStationIds}
                       highlightedStationId={wizardMode === 'outdoor' ? currentWizardStationId : null}
-                      relocateMode={!!relocatingStation && outdoorStations.some(s => s.id === relocatingStation?.id)}
+                      relocatingStationId={relocatingStation && outdoorStations.some(s => s.id === relocatingStation?.id) ? relocatingStation.id : null}
                       relocatingStationName={relocatingStation?.station_type_data?.name || relocatingStation?.equipment_type || null}
                       onRelocateClick={handleRelocateOutdoor}
                       onCancelRelocate={() => setRelocatingStation(null)}
@@ -1905,14 +1905,16 @@ export default function StationInspectionModule() {
                     imageUrl={floorPlanImageUrl}
                     stations={indoorStationsForViewer}
                     selectedStationId={null}
-                    placementMode={relocatingStation && indoorStations.some(s => s.id === relocatingStation?.id) ? 'move' : 'view'}
+                    placementMode="view"
                     onStationClick={handleIndoorStationClick}
-                    onImageClick={relocatingStation && indoorStations.some(s => s.id === relocatingStation?.id) ? handleRelocateIndoor : undefined}
+                    onImageClick={handleRelocateIndoor}
                     onCancelPlacement={() => setRelocatingStation(null)}
                     height="min(55vh, 450px)"
                     showNumbers={true}
                     inspectedStationIds={inspectedStationIds}
                     highlightedStationId={wizardMode === 'indoor' ? currentWizardStationId : null}
+                    relocatingStationId={relocatingStation && indoorStations.some(s => s.id === relocatingStation?.id) ? relocatingStation.id : null}
+                    relocatingStationName={relocatingStation?.station_type_data?.name || relocatingStation?.station_type || null}
                   />
                 </div>
               )}
