@@ -273,8 +273,8 @@ export default function CaseDetailsModal({
               const [odActivity, indActivity, outdoorData, indoorData] = await Promise.all([
                 supabase.from('outdoor_station_inspections').select('id', { count: 'exact', head: true }).eq('session_id', sessionId).eq('status', 'activity'),
                 supabase.from('indoor_station_inspections').select('id', { count: 'exact', head: true }).eq('session_id', sessionId).eq('status', 'activity'),
-                supabase.from('outdoor_station_inspections').select('id, status, findings, measurement_value, measurement_unit, photo_path, inspected_at, station:equipment_placements(id, serial_number, equipment_type, station_type_data:station_types(name, color, measurement_label, measurement_unit)), preparation:preparations(name)').eq('session_id', sessionId).order('inspected_at'),
-                supabase.from('indoor_station_inspections').select('id, status, findings, measurement_value, measurement_unit, photo_path, inspected_at, station:indoor_stations(id, station_number, station_type, floor_plan:floor_plans(name), station_type_data:station_types(name, color, measurement_label, measurement_unit)), preparation:preparations(name)').eq('session_id', sessionId).order('inspected_at')
+                supabase.from('outdoor_station_inspections').select('id, status, findings, measurement_value, measurement_unit, photo_path, inspected_at, station:equipment_placements(id, serial_number, equipment_type, station_type_data:station_types(name, color, measurement_label, measurement_unit)), preparation:preparations(name, registration_number)').eq('session_id', sessionId).order('inspected_at'),
+                supabase.from('indoor_station_inspections').select('id, status, findings, measurement_value, measurement_unit, photo_path, inspected_at, station:indoor_stations(id, station_number, station_type, floor_plan:floor_plans(name), station_type_data:station_types(name, color, measurement_label, measurement_unit)), preparation:preparations(name, registration_number)').eq('session_id', sessionId).order('inspected_at')
               ])
 
               setInspectionSession({ ...(data as any), activityCount: (odActivity.count || 0) + (indActivity.count || 0) })
@@ -791,7 +791,12 @@ export default function CaseDetailsModal({
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                       <ClipboardCheck className="w-4 h-4 text-blue-400" />
-                      Kontrollresultat
+                      Resultat av avtalat servicebesök
+                      {inspectionSession?.completed_at && (
+                        <span className="text-slate-400 font-normal">
+                          — {new Date(inspectionSession.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </span>
+                      )}
                     </h3>
                     {loadingSession ? (
                       <div className="p-3 bg-slate-800/50 rounded-lg flex items-center gap-2 text-slate-400 text-sm">
@@ -860,11 +865,6 @@ export default function CaseDetailsModal({
                                 </>
                               )
                             })()}
-                            {inspectionSession.completed_at && (
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-slate-700/50 text-slate-300">
-                                Avslutad {new Date(inspectionSession.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </span>
-                            )}
                           </div>
                           {inspectionSession.notes && (
                             <p className="text-sm text-slate-300 border-t border-slate-700/50 pt-2">{inspectionSession.notes}</p>
@@ -887,23 +887,32 @@ export default function CaseDetailsModal({
                                   ...stationInspections.outdoor.map((r: any) => ({
                                     ...r,
                                     _type: 'outdoor' as const,
-                                    _label: r.station?.serial_number || r.station?.equipment_type || 'Utomhus',
+                                    _label: r.station?.station_type_data?.name || r.station?.equipment_type || 'Utomhus',
                                     _color: r.station?.station_type_data?.color || '#6b7280'
                                   })),
                                   ...stationInspections.indoor.map((r: any) => ({
                                     ...r,
                                     _type: 'indoor' as const,
-                                    _label: r.station?.station_number || r.station?.station_type || 'Inomhus',
+                                    _label: r.station?.station_type_data?.name || r.station?.station_type || 'Inomhus',
                                     _color: r.station?.station_type_data?.color || '#6b7280'
                                   }))
                                 ].map((row: any) => {
                                   const statusChip: Record<string, { label: string; cls: string }> = {
-                                    ok: { label: 'OK', cls: 'bg-green-500/20 text-green-400' },
-                                    activity: { label: 'Aktivitet', cls: 'bg-amber-500/20 text-amber-400' },
-                                    needs_service: { label: 'Åtgärd', cls: 'bg-red-500/20 text-red-400' },
-                                    replaced: { label: 'Ersatt', cls: 'bg-blue-500/20 text-blue-400' }
+                                    ok: { label: 'OK – Inga fynd', cls: 'bg-green-500/20 text-green-400' },
+                                    activity: { label: 'Aktivitet upptäckt', cls: 'bg-amber-500/20 text-amber-400' },
+                                    needs_service: { label: 'Behöver service', cls: 'bg-red-500/20 text-red-400' },
+                                    replaced: { label: 'Utbytt', cls: 'bg-blue-500/20 text-blue-400' },
+                                    none: { label: 'Ingen aktivitet', cls: 'bg-green-500/20 text-green-400' },
+                                    low: { label: 'Lite aktivitet', cls: 'bg-amber-500/20 text-amber-400' },
+                                    medium: { label: 'Medelhög aktivitet', cls: 'bg-orange-500/20 text-orange-400' },
+                                    high: { label: 'Betydande aktivitet', cls: 'bg-red-500/20 text-red-400' },
                                   }
                                   const chip = statusChip[row.status] || { label: row.status, cls: 'bg-slate-500/20 text-slate-400' }
+                                  const unit = row.measurement_unit || row.station?.station_type_data?.measurement_unit || ''
+                                  const unitLabel: Record<string, string> = { gram: 'g', st: 'st', ml: 'ml', procent: '%', kg: 'kg' }
+                                  const prepLabel = row.preparation?.name
+                                    ? `${row.preparation.name}${row.preparation.registration_number ? ` (${row.preparation.registration_number})` : ''}`
+                                    : null
                                   return (
                                     <div key={row.id} className="px-3 py-2 hover:bg-slate-700/20">
                                       <div className="flex items-center gap-2">
@@ -911,15 +920,15 @@ export default function CaseDetailsModal({
                                         <span className="text-xs text-white flex-1 truncate">{row._label}</span>
                                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${chip.cls}`}>{chip.label}</span>
                                         {row.measurement_value != null && (
-                                          <span className="text-[10px] text-slate-400">{row.measurement_value}{row.measurement_unit || row.station?.station_type_data?.measurement_unit || ''}</span>
+                                          <span className="text-[10px] text-slate-400">{row.measurement_value} {unitLabel[unit] || unit}</span>
                                         )}
                                         {row.photo_path && <Camera className="w-3 h-3 text-slate-500" />}
                                       </div>
                                       {row.findings && (
                                         <p className="mt-0.5 ml-4 text-[10px] text-slate-400 line-clamp-1">{row.findings}</p>
                                       )}
-                                      {row.preparation?.name && (
-                                        <p className="mt-0.5 ml-4 text-[10px] text-blue-400">{row.preparation.name}</p>
+                                      {prepLabel && (
+                                        <p className="mt-0.5 ml-4 text-[10px] text-blue-400">{prepLabel}</p>
                                       )}
                                     </div>
                                   )
