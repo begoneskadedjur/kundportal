@@ -3,18 +3,17 @@ import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
   FileText,
-  Calendar,
   RefreshCw,
   Search,
   Filter,
   Eye,
-  Bug,
   User,
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Wrench
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDebounce } from '../../hooks/useDebounce'
@@ -22,6 +21,10 @@ import { formatCurrency } from '../../utils/formatters'
 import CaseDetailsModal from './CaseDetailsModal'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import type { Case } from '../../types/cases'
+
+interface CaseWithService extends Case {
+  service?: { id: string; name: string; group?: { name: string; color: string } | null } | null
+}
 
 const PAGE_SIZE = 50
 
@@ -47,6 +50,16 @@ function getProblemRatingInfo(rating: number | null): { color: string; label: st
   return { color: '#ef4444', label: 'Kritisk', status: 'critical' }
 }
 
+function getServiceTypeInfo(serviceType: string | null): { label: string; color: string; bg: string } {
+  switch (serviceType) {
+    case 'routine': return { label: 'Servicebesök', color: '#20c58f', bg: '#20c58f20' }
+    case 'inspection': return { label: 'Kontroll', color: '#60a5fa', bg: '#60a5fa20' }
+    case 'establishment': return { label: 'Etablering', color: '#a78bfa', bg: '#a78bfa20' }
+    case 'acute': return { label: 'Akut', color: '#f87171', bg: '#f8717120' }
+    default: return { label: 'Övrigt', color: '#94a3b8', bg: '#94a3b820' }
+  }
+}
+
 function hasIssue(caseItem: Case): boolean {
   return (caseItem.pest_level !== null && caseItem.pest_level >= 2) ||
          (caseItem.problem_rating !== null && caseItem.problem_rating >= 4)
@@ -58,23 +71,24 @@ type SortDir = 'asc' | 'desc'
 export function CompletedCasesView({ customerId, companyName }: CompletedCasesViewProps) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [cases, setCases] = useState<Case[]>([])
+  const [cases, setCases] = useState<CaseWithService[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedSearchQuery = useDebounce(searchQuery, 300)
   const [showOnlyIssues, setShowOnlyIssues] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
   const [sortField, setSortField] = useState<SortField>('created_at')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [currentPage, setCurrentPage] = useState(1)
 
-  const [selectedCase, setSelectedCase] = useState<Case | null>(null)
+  const [selectedCase, setSelectedCase] = useState<CaseWithService | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('cases')
-        .select('*')
+        .select('*, service:services!service_id(id, name, group:service_groups!group_id(name, color))')
         .eq('customer_id', customerId)
         .order('created_at', { ascending: false })
 
@@ -109,7 +123,7 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
       filtered = filtered.filter(c =>
         c.case_number?.toLowerCase().includes(q) ||
         c.title?.toLowerCase().includes(q) ||
-        c.pest_type?.toLowerCase().includes(q) ||
+        c.service?.name?.toLowerCase().includes(q) ||
         c.address?.formatted_address?.toLowerCase().includes(q)
       )
     }
@@ -118,6 +132,10 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(c => c.status === statusFilter)
+    }
+
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(c => (c.service_type ?? 'other') === typeFilter)
     }
 
     // Sort
@@ -145,13 +163,15 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
   }, [cases, debouncedSearchQuery, showOnlyIssues, statusFilter, sortField, sortDir])
 
   // Reset page on filter change
-  useEffect(() => { setCurrentPage(1) }, [debouncedSearchQuery, showOnlyIssues, statusFilter, sortField, sortDir])
+  useEffect(() => { setCurrentPage(1) }, [debouncedSearchQuery, showOnlyIssues, statusFilter, typeFilter, sortField, sortDir])
 
   const totalPages = Math.max(1, Math.ceil(filteredCases.length / PAGE_SIZE))
   const paginatedCases = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE
     return filteredCases.slice(start, start + PAGE_SIZE)
   }, [filteredCases, currentPage])
+
+  const hasRoutineCases = useMemo(() => filteredCases.some(c => c.service_type === 'routine'), [filteredCases])
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -218,12 +238,25 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
           <input
             type="text"
-            placeholder="Sök ärende eller skadedjur..."
+            placeholder="Sök ärende eller tjänst..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
           />
         </div>
+
+        <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+        >
+          <option value="all">Alla typer</option>
+          <option value="routine">Servicebesök</option>
+          <option value="inspection">Kontroll</option>
+          <option value="establishment">Etablering</option>
+          <option value="acute">Akut</option>
+          <option value="other">Övrigt</option>
+        </select>
 
         <select
           value={statusFilter}
@@ -270,19 +303,23 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                   >
                     Datum <SortIcon field="created_at" />
                   </th>
-                  <th
-                    className="text-center px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-white select-none"
-                    onClick={() => toggleSort('pest_level')}
-                  >
-                    Nivå <SortIcon field="pest_level" />
-                  </th>
-                  <th
-                    className="text-center px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-white select-none"
-                    onClick={() => toggleSort('problem_rating')}
-                  >
-                    Status <SortIcon field="problem_rating" />
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider">Skadedjur</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider">Tjänst</th>
+                  {hasRoutineCases && (
+                    <th
+                      className="text-center px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-white select-none"
+                      onClick={() => toggleSort('pest_level')}
+                    >
+                      Nivå <SortIcon field="pest_level" />
+                    </th>
+                  )}
+                  {hasRoutineCases && (
+                    <th
+                      className="text-center px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-white select-none"
+                      onClick={() => toggleSort('problem_rating')}
+                    >
+                      Övergripande <SortIcon field="problem_rating" />
+                    </th>
+                  )}
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider">Tekniker</th>
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider">Nästa besök</th>
                   <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider">Kostnad</th>
@@ -296,6 +333,7 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                   const displayDate = caseItem.completed_date || caseItem.scheduled_date || caseItem.created_at
                   const hasPestData = caseItem.pest_level !== null
                   const hasRatingData = caseItem.problem_rating !== null
+                  const typeInfo = getServiceTypeInfo(caseItem.service_type)
 
                   return (
                     <tr
@@ -313,49 +351,49 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                       </td>
 
                       <td className="px-4 py-2 text-slate-400 text-sm whitespace-nowrap">
-                        {displayDate ? format(new Date(displayDate), 'd MMM yyyy', { locale: sv }) : '-'}
-                      </td>
-
-                      <td className="px-4 py-2 text-center">
-                        {hasPestData ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
-                            style={{ backgroundColor: `${pestInfo.color}20`, color: pestInfo.color }}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: pestInfo.color }} />
-                            {pestInfo.label}
-                          </span>
-                        ) : (
-                          <span className="text-slate-600 text-xs">—</span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-2 text-center">
-                        {hasRatingData ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
-                            style={{ backgroundColor: `${ratingInfo.color}20`, color: ratingInfo.color }}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: ratingInfo.color }} />
-                            {ratingInfo.label}
-                          </span>
-                        ) : (
-                          <span className="text-slate-600 text-xs">—</span>
-                        )}
+                        {displayDate ? format(new Date(displayDate), 'd MMM yyyy', { locale: sv }) : '—'}
                       </td>
 
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-1.5">
-                          {caseItem.pest_type ? (
-                            <>
-                              <Bug className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                              <span className="text-slate-300 text-sm">{caseItem.pest_type}</span>
-                            </>
-                          ) : (
-                            <span className="text-slate-600 text-sm">—</span>
-                          )}
+                          <Wrench className="w-3 h-3 flex-shrink-0" style={{ color: typeInfo.color }} />
+                          <span className="text-xs font-medium" style={{ color: typeInfo.color }}>
+                            {caseItem.service?.name || typeInfo.label}
+                          </span>
                         </div>
                       </td>
+
+                      {hasRoutineCases && (
+                        <td className="px-4 py-2 text-center">
+                          {hasPestData ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                              style={{ backgroundColor: `${pestInfo.color}20`, color: pestInfo.color }}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: pestInfo.color }} />
+                              {pestInfo.label}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600 text-xs">—</span>
+                          )}
+                        </td>
+                      )}
+
+                      {hasRoutineCases && (
+                        <td className="px-4 py-2 text-center">
+                          {hasRatingData ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                              style={{ backgroundColor: `${ratingInfo.color}20`, color: ratingInfo.color }}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: ratingInfo.color }} />
+                              {ratingInfo.label}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600 text-xs">—</span>
+                          )}
+                        </td>
+                      )}
 
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-1.5">
@@ -468,21 +506,23 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
         </div>
       )}
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-          OK – Inom normala värden
+      {/* Legend — bara relevant för servicebesök */}
+      {hasRoutineCases && (
+        <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            OK – Inom normala värden
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+            Varning
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+            Kritisk
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
-          Varning
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-          Kritisk
-        </div>
-      </div>
+      )}
 
       {selectedCase && (
         <CaseDetailsModal
