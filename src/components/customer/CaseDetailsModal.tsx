@@ -715,9 +715,8 @@ export default function CaseDetailsModal({
                 />
               )}
 
-              {/* Situationsöversikt */}
-              {(fallbackData.pest_level !== null && fallbackData.pest_level !== undefined ||
-                fallbackData.problem_rating !== null && fallbackData.problem_rating !== undefined) && (
+              {/* Situationsöversikt — visa bara om minst ett värde är > 0 */}
+              {((fallbackData.pest_level ?? 0) > 0 || (fallbackData.problem_rating ?? 0) > 0) && (
                 <CustomerAssessmentPanel
                   pestLevel={fallbackData.pest_level ?? null}
                   problemRating={fallbackData.problem_rating ?? null}
@@ -822,7 +821,7 @@ export default function CaseDetailsModal({
                             {needsServiceCount > 0 && (
                               <span className="flex items-center gap-1.5 text-xs text-slate-300">
                                 <span className="w-2 h-2 rounded-full bg-blue-500" />
-                                {needsServiceCount} åtgärd noterad
+                                {needsServiceCount} behöver åtgärd
                               </span>
                             )}
                           </div>
