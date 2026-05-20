@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Maximize2 } from 'lucide-react'
 
-interface Photo {
+export interface Photo {
   url: string
   stationNumber: string
   stationType: 'outdoor' | 'indoor'

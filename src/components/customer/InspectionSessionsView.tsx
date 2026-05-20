@@ -58,7 +58,7 @@ import {
 import type { OutdoorInspectionWithRelations, InspectionSessionWithRelations } from '../../types/inspectionSession'
 import { useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import { calculateStationStatus, CALCULATED_STATUS_CONFIG, MEASUREMENT_UNIT_CONFIG, type CalculatedStatus } from '../../types/stationTypes'
-import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
+import { InspectionPhotoLightbox, Photo as LightboxPhoto } from './InspectionPhotoLightbox'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
 import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -126,7 +126,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [showOnlyIssues, setShowOnlyIssues] = useState(false)
 
   // Lightbox state
-  const [lightboxPhotos, setLightboxPhotos] = useState<{ url: string; caption: string }[]>([])
+  const [lightboxPhotos, setLightboxPhotos] = useState<LightboxPhoto[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
 
@@ -804,8 +804,8 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   }
 
   // Öppna lightbox
-  const openLightbox = (photoUrl: string, caption: string) => {
-    setLightboxPhotos([{ url: photoUrl, caption }])
+  const openLightbox = (photo: LightboxPhoto) => {
+    setLightboxPhotos([photo])
     setLightboxIndex(0)
     setIsLightboxOpen(true)
   }
@@ -1191,7 +1191,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                                   <td className="px-4 py-2 text-center">
                                     {station.latestInspection?.photoUrl ? (
                                       <button
-                                        onClick={(e) => { e.stopPropagation(); openLightbox(station.latestInspection!.photoUrl!, `${station.stationNumber || station.stationType} - ${formatDate(station.latestInspection!.inspectedAt)}`) }}
+                                        onClick={(e) => { e.stopPropagation(); openLightbox({ url: station.latestInspection!.photoUrl!, stationNumber: station.stationNumber || station.stationType, stationType: station.originalOutdoorStation ? 'outdoor' : 'indoor', status: station.latestInspection!.status, inspectedAt: station.latestInspection!.inspectedAt, findings: station.latestInspection!.findings ?? undefined }) }}
                                         className="w-7 h-7 rounded overflow-hidden bg-slate-700 mx-auto hover:ring-2 hover:ring-teal-500/50 transition-all"
                                       >
                                         <img src={station.latestInspection.photoUrl} alt="Inspektionsfoto" className="w-full h-full object-cover" loading="lazy" />
