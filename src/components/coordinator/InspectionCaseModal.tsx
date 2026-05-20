@@ -523,18 +523,18 @@ export default function InspectionCaseModal({
         footer={modalFooter}
         usePortal={true}
       >
-        <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+        <div className="p-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
           {headerActions}
 
-          <div className="space-y-6">
+          <div className="space-y-3">
             {/* Kundinformation */}
             {customerData && (
-              <div className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 rounded-xl p-6 border border-cyan-500/30">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Building className="w-5 h-5 text-cyan-400" />
+              <div className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 rounded-xl p-4 border border-cyan-500/30">
+                <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                  <Building className="w-4 h-4 text-cyan-400" />
                   Kundinformation
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-cyan-300 mb-1">Företag</label>
                     <p className="text-white font-medium">
@@ -576,27 +576,27 @@ export default function InspectionCaseModal({
             )}
 
             {/* Plats och typ */}
-            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-cyan-400" />
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-cyan-400" />
                 Plats och typ
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Adress</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Adress</label>
                   <input
                     type="text"
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
                     disabled={isCustomerView}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white disabled:opacity-60"
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white disabled:opacity-60"
                     placeholder="Fullständig adress..."
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Typ</label>
-                  <div className="px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-cyan-300 font-medium">
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Typ</label>
+                  <div className="px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-cyan-300 font-medium">
                     Kontroll av fällor & stationer
                   </div>
                 </div>
@@ -604,55 +604,55 @@ export default function InspectionCaseModal({
             </div>
 
             {/* Kontaktinformation */}
-            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-cyan-400" />
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                <User className="w-4 h-4 text-cyan-400" />
                 Kontaktinformation
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Kontaktperson</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Kontaktperson</label>
                   <input
                     type="text"
                     name="contact_person"
                     value={formData.contact_person}
                     onChange={handleChange}
                     disabled={isCustomerView}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white disabled:opacity-60"
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white disabled:opacity-60"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Telefon</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Telefon</label>
                   <input
                     type="tel"
                     name="contact_phone"
                     value={formData.contact_phone}
                     onChange={handleChange}
                     disabled={isCustomerView}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white disabled:opacity-60"
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white disabled:opacity-60"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">E-post</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">E-post</label>
                   <input
                     type="email"
                     name="contact_email"
                     value={formData.contact_email}
                     onChange={handleChange}
                     disabled={isCustomerView}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white disabled:opacity-60"
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white disabled:opacity-60"
                   />
                 </div>
               </div>
             </div>
 
             {/* Tilldelade tekniker */}
-            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5 text-cyan-400" />
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-cyan-400" />
                 Tilldelade tekniker
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <TechnicianDropdown
                   label="Primär tekniker"
                   value={formData.primary_technician_id}
@@ -683,15 +683,15 @@ export default function InspectionCaseModal({
             </div>
 
             {/* Schemaläggning */}
-            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-cyan-400" />
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-cyan-400" />
                 Schemaläggning - Ankomsttid
               </h3>
-              <p className="text-sm text-slate-400 mb-4">Tekniker anländer till kunden inom detta tidsintervall</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <p className="text-sm text-slate-400 mb-2">Tekniker anländer till kunden inom detta tidsintervall</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Från tid</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Från tid</label>
                   <DatePicker
                     selected={formData.scheduled_start}
                     onChange={(date) => setFormData(prev => ({ ...prev, scheduled_start: date }))}
@@ -701,13 +701,13 @@ export default function InspectionCaseModal({
                     dateFormat="yyyy-MM-dd HH:mm"
                     locale="sv"
                     disabled={isCustomerView}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white"
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white"
                     placeholderText="Välj starttid..."
                     isClearable
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Till tid</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Till tid</label>
                   <DatePicker
                     selected={formData.scheduled_end}
                     onChange={(date) => setFormData(prev => ({ ...prev, scheduled_end: date }))}
@@ -718,7 +718,7 @@ export default function InspectionCaseModal({
                     locale="sv"
                     disabled={isCustomerView}
                     minDate={formData.scheduled_start || undefined}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white"
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white"
                     placeholderText="Välj sluttid..."
                     isClearable
                   />
@@ -737,13 +737,13 @@ export default function InspectionCaseModal({
             </div>
 
             {/* Grundläggande information */}
-            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-cyan-400" />
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-cyan-400" />
                 Grundläggande information
               </h3>
               {editingTitle && !isCustomerView && (
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-3">
                   <input name="title" value={formData.title} onChange={handleChange}
                     className="flex-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
                     placeholder="Ärendenamn..."
@@ -753,9 +753,9 @@ export default function InspectionCaseModal({
                   />
                 </div>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Status</label>
                   <Select
                     value={formData.status}
                     onChange={(v) => setFormData(prev => ({ ...prev, status: v }))}
@@ -765,14 +765,14 @@ export default function InspectionCaseModal({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Beskrivning</label>
                 <textarea
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
                   disabled={isCustomerView}
-                  rows={3}
-                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white disabled:opacity-60"
+                  rows={2}
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white disabled:opacity-60"
                   placeholder="Anteckningar om ärendet..."
                 />
               </div>
@@ -780,12 +780,12 @@ export default function InspectionCaseModal({
 
             {/* Danger Zone - endast för admin/koordinator */}
             {!isCustomerView && (
-              <div className="bg-red-900/10 rounded-xl p-6 border border-red-500/30">
-                <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5" />
+              <div className="bg-red-900/10 rounded-xl p-4 border border-red-500/30">
+                <h3 className="text-sm font-semibold text-red-400 mb-2 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4" />
                   Danger Zone
                 </h3>
-                <p className="text-sm text-slate-400 mb-4">
+                <p className="text-sm text-slate-400 mb-2">
                   Permanenta åtgärder som inte kan ångras.
                 </p>
                 <Button

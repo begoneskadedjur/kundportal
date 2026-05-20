@@ -49,6 +49,11 @@ export function getStatusStyle(status: string, caseType?: string) {
     return { bg: 'bg-lime-500/20', border: 'border-l-lime-500', text: 'text-lime-200' }
   }
 
+  if (caseType === 'inspection') {
+    if (ls.includes('avslutat')) return { bg: 'bg-purple-700/25', border: 'border-l-purple-600', text: 'text-purple-200' }
+    return { bg: 'bg-purple-500/20', border: 'border-l-purple-500', text: 'text-purple-200' }
+  }
+
   if (ls.includes('avtalsärende') || caseType === 'contract') {
     if (ls.includes('avslutat')) return { bg: 'bg-purple-700/25', border: 'border-l-purple-600', text: 'text-purple-200' }
     if (ls.includes('pågående')) return { bg: 'bg-purple-500/20', border: 'border-l-purple-500', text: 'text-purple-200' }
