@@ -21,7 +21,6 @@ import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { DROPDOWN_STATUSES } from '../../types/database'
-import TechnicianDropdown from '../admin/TechnicianDropdown'
 import { toSwedishISOString } from '../../utils/dateHelpers'
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
 
@@ -527,160 +526,117 @@ export default function InspectionCaseModal({
           {headerActions}
 
           <div className="space-y-3">
-            {/* Kundinformation */}
-            {customerData && (
-              <div className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 rounded-xl p-4 border border-cyan-500/30">
-                <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-                  <Building className="w-4 h-4 text-cyan-400" />
-                  Kundinformation
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Kundinformation — samlad sektion */}
+            <div className="bg-gradient-to-r from-purple-900/20 to-violet-900/20 rounded-xl p-4 border border-purple-500/30">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
+                <Building className="w-4 h-4 text-purple-400" />
+                Kundinformation
+              </h3>
+
+              {customerData && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-0">
                   <div>
-                    <label className="block text-sm font-medium text-cyan-300 mb-1">Företag</label>
+                    <label className="block text-xs font-medium text-purple-300 mb-1">Företag</label>
                     <p className="text-white font-medium">
                       {customerData.is_multisite && customerData.site_name
                         ? `${customerData.company_name}${customerData.company_name.includes(customerData.site_name) ? '' : ` - ${customerData.site_name}`}`
                         : customerData.company_name}
                     </p>
+                    {(() => {
+                      const amName = customerData.assigned_account_manager
+                        || (customerData.is_multisite && organizationSites?.find((s: any) => s.site_type === 'huvudkontor')?.assigned_account_manager);
+                      return amName ? <p className="text-xs text-slate-400 mt-0.5">AM: {amName}</p> : null;
+                    })()}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-cyan-300 mb-1">Organisationsnummer</label>
-                    <p className="text-white font-medium">
-                      {customerData.organization_number || 'Ej angivet'}
-                    </p>
+                    <label className="block text-xs font-medium text-purple-300 mb-1">Organisationsnummer</label>
+                    <p className="text-white font-medium">{customerData.organization_number || 'Ej angivet'}</p>
                   </div>
                 </div>
-                {customerData.is_multisite && (
-                  <div className="mt-3 pt-3 border-t border-cyan-500/20">
-                    <span className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-full text-sm">
-                      <Building2 className="w-3 h-3" />
-                      Multisite-organisation
-                    </span>
+              )}
+
+              {formData.address && (
+                <div className="mt-3 pt-3 border-t border-purple-500/20">
+                  <label className="block text-xs font-medium text-purple-300 mb-1">Adress</label>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.address)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm text-white hover:text-[#20c58f] transition-colors"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                    {formData.address}
+                  </a>
+                </div>
+              )}
+
+              <div className="mt-3 pt-3 border-t border-purple-500/20">
+                <label className="block text-xs font-medium text-purple-300 mb-2">Kontaktperson vid besök</label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <input type="text" name="contact_person" value={formData.contact_person}
+                    onChange={handleChange} disabled={isCustomerView} placeholder="Namn"
+                    className="px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white text-sm disabled:opacity-60" />
+                  <input type="tel" name="contact_phone" value={formData.contact_phone}
+                    onChange={handleChange} disabled={isCustomerView} placeholder="Telefon"
+                    className="px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white text-sm disabled:opacity-60" />
+                  <input type="email" name="contact_email" value={formData.contact_email}
+                    onChange={handleChange} disabled={isCustomerView} placeholder="E-post"
+                    className="px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white text-sm disabled:opacity-60" />
+                </div>
+              </div>
+            </div>
+
+            {/* Tekniker + Status */}
+            {!isCustomerView && (
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-xs text-slate-400 mr-0.5">Tekniker</span>
+                    {([
+                      { key: 'primary_technician_id' as const, label: 'Primär' },
+                      { key: 'secondary_technician_id' as const, label: 'Sekundär' },
+                      { key: 'tertiary_technician_id' as const, label: 'Tertiär' },
+                    ]).map((slot) => {
+                      const techId = formData[slot.key] || ''
+                      const tech = technicians.find(t => t.id === techId)
+                      const initials = tech ? tech.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : ''
+                      return (
+                        <div key={slot.key} className="relative">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+                            tech ? 'bg-[#20c58f]/20 border-2 border-[#20c58f]'
+                                 : 'border-2 border-dashed border-slate-600 hover:border-slate-500'
+                          }`} title={tech ? `${tech.name} (${slot.label})` : `${slot.label} tekniker`}>
+                            {tech ? <span className="text-xs font-bold text-[#20c58f]">{initials}</span>
+                                   : <Plus className="w-3 h-3 text-slate-500" />}
+                          </div>
+                          <select
+                            value={techId}
+                            onChange={(e) => handleTechnicianChange(slot.key.replace('_technician_id', '') as 'primary' | 'secondary' | 'tertiary', e.target.value)}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          >
+                            <option value="">Ingen</option>
+                            {technicians
+                              .filter(t => t.id === techId || ![
+                                formData.primary_technician_id,
+                                formData.secondary_technician_id,
+                                formData.tertiary_technician_id
+                              ].filter(id => id !== techId).includes(t.id))
+                              .map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                        </div>
+                      )
+                    })}
                   </div>
-                )}
-                {(() => {
-                  const amName = customerData.assigned_account_manager
-                    || (customerData.is_multisite && organizationSites?.find((s: any) => s.site_type === 'huvudkontor')?.assigned_account_manager);
-                  if (!amName) return null;
-                  return (
-                    <div className="mt-3 pt-3 border-t border-cyan-500/20">
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20 w-fit">
-                        <Star size={12} className="text-amber-400 fill-amber-400" />
-                        <span className="text-xs text-slate-400">Account Manager:</span>
-                        <span className="text-xs text-amber-300 font-medium">{amName}</span>
-                      </div>
-                    </div>
-                  );
-                })()}
+                  <div className="flex-1 min-w-[140px]">
+                    <Select
+                      value={formData.status}
+                      onChange={(v) => setFormData(prev => ({ ...prev, status: v }))}
+                      disabled={isCustomerView}
+                      options={DROPDOWN_STATUSES.map(s => ({ value: s, label: s }))}
+                    />
+                  </div>
+                </div>
               </div>
             )}
-
-            {/* Plats och typ */}
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-cyan-400" />
-                Plats och typ
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Adress</label>
-                  <input
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    disabled={isCustomerView}
-                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white disabled:opacity-60"
-                    placeholder="Fullständig adress..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Typ</label>
-                  <div className="px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-cyan-300 font-medium">
-                    Kontroll av fällor & stationer
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Kontaktinformation */}
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-                <User className="w-4 h-4 text-cyan-400" />
-                Kontaktinformation
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Kontaktperson</label>
-                  <input
-                    type="text"
-                    name="contact_person"
-                    value={formData.contact_person}
-                    onChange={handleChange}
-                    disabled={isCustomerView}
-                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white disabled:opacity-60"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Telefon</label>
-                  <input
-                    type="tel"
-                    name="contact_phone"
-                    value={formData.contact_phone}
-                    onChange={handleChange}
-                    disabled={isCustomerView}
-                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white disabled:opacity-60"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">E-post</label>
-                  <input
-                    type="email"
-                    name="contact_email"
-                    value={formData.contact_email}
-                    onChange={handleChange}
-                    disabled={isCustomerView}
-                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white disabled:opacity-60"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Tilldelade tekniker */}
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-cyan-400" />
-                Tilldelade tekniker
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <TechnicianDropdown
-                  label="Primär tekniker"
-                  value={formData.primary_technician_id}
-                  onChange={(id) => handleTechnicianChange('primary', id)}
-                  technicians={technicians}
-                  disabled={isCustomerView}
-                  excludeIds={[formData.secondary_technician_id, formData.tertiary_technician_id].filter(Boolean)}
-                />
-                <TechnicianDropdown
-                  label="Sekundär tekniker"
-                  value={formData.secondary_technician_id}
-                  onChange={(id) => handleTechnicianChange('secondary', id)}
-                  technicians={technicians}
-                  disabled={isCustomerView}
-                  excludeIds={[formData.primary_technician_id, formData.tertiary_technician_id].filter(Boolean)}
-                  optional
-                />
-                <TechnicianDropdown
-                  label="Tertiär tekniker"
-                  value={formData.tertiary_technician_id}
-                  onChange={(id) => handleTechnicianChange('tertiary', id)}
-                  technicians={technicians}
-                  disabled={isCustomerView}
-                  excludeIds={[formData.primary_technician_id, formData.secondary_technician_id].filter(Boolean)}
-                  optional
-                />
-              </div>
-            </div>
 
             {/* Schemaläggning */}
             <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
@@ -753,17 +709,6 @@ export default function InspectionCaseModal({
                   />
                 </div>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Status</label>
-                  <Select
-                    value={formData.status}
-                    onChange={(v) => setFormData(prev => ({ ...prev, status: v }))}
-                    disabled={isCustomerView}
-                    options={DROPDOWN_STATUSES.map(s => ({ value: s, label: s }))}
-                  />
-                </div>
-              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">Beskrivning</label>
                 <textarea
