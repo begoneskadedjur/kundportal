@@ -244,6 +244,9 @@ export default function StationInspectionModule() {
   // Expanderad planritning för förhandsvisning på ankomstsidan
   const [expandedFloorPlan, setExpandedFloorPlan] = useState<any | null>(null)
 
+  // Flytta station-läge
+  const [relocatingStation, setRelocatingStation] = useState<StationData | null>(null)
+
   // Auto-dismiss återupptagande-banner efter 10 sekunder
   useEffect(() => {
     if (showResumeNotice) {
@@ -619,6 +622,22 @@ export default function StationInspectionModule() {
       const isOutdoor = outdoorStations.some(s => s.id === station.id)
       const tableName = isOutdoor ? 'outdoor_station_inspections' : 'indoor_station_inspections'
 
+      // Om stationen är inspekterad i denna session men saknar photoPreview (t.ex. efter sidomladdning),
+      // hämta foto-URL från DB för nuvarande session
+      if (existing?.hasPhoto && !existing?.photoPreview) {
+        const { data: currentSessionData } = await supabase
+          .from(tableName)
+          .select('photo_path, measurement_value, measurement_unit, findings, status, preparation_id')
+          .eq('station_id', station.id)
+          .eq('session_id', session.id)
+          .single()
+
+        if (currentSessionData?.photo_path) {
+          const url = await getInspectionPhotoUrl(currentSessionData.photo_path)
+          if (url) setPhotoPreview(url)
+        }
+      }
+
       const { data, error } = await supabase
         .from(tableName)
         .select(`
@@ -813,6 +832,52 @@ export default function StationInspectionModule() {
     setSelectedStation(null)
     toast('Kontrollrunda avslutad')
   }, [])
+
+  // Flytta utomhusstation till ny GPS-position
+  const handleRelocateOutdoor = useCallback(async (lat: number, lng: number) => {
+    if (!relocatingStation) return
+
+    try {
+      const { error } = await supabase
+        .from('equipment_placements')
+        .update({ latitude: lat, longitude: lng })
+        .eq('id', relocatingStation.id)
+
+      if (error) throw error
+
+      setOutdoorStations(prev => prev.map(s =>
+        s.id === relocatingStation.id ? { ...s, latitude: lat, longitude: lng } : s
+      ))
+      toast.success('Station flyttad')
+      setRelocatingStation(null)
+    } catch (err) {
+      console.error('Error relocating station:', err)
+      toast.error('Kunde inte flytta stationen')
+    }
+  }, [relocatingStation])
+
+  // Flytta inomhusstation till ny position på planritning
+  const handleRelocateIndoor = useCallback(async (x: number, y: number) => {
+    if (!relocatingStation) return
+
+    try {
+      const { error } = await supabase
+        .from('indoor_stations')
+        .update({ position_x_percent: x, position_y_percent: y })
+        .eq('id', relocatingStation.id)
+
+      if (error) throw error
+
+      setIndoorStations(prev => prev.map(s =>
+        s.id === relocatingStation.id ? { ...s, position_x_percent: x, position_y_percent: y } : s
+      ))
+      toast.success('Station flyttad')
+      setRelocatingStation(null)
+    } catch (err) {
+      console.error('Error relocating station:', err)
+      toast.error('Kunde inte flytta stationen')
+    }
+  }, [relocatingStation])
 
   // Auto-progress till nästa efter lyckad inspektion (om wizard är aktiv)
   useEffect(() => {
@@ -1576,7 +1641,7 @@ export default function StationInspectionModule() {
               )}
 
               {/* Knapp för att starta kontrollrunda utomhus */}
-              {wizardMode !== 'outdoor' && outdoorStations.length > 0 && (
+              {wizardMode !== 'outdoor' && outdoorStations.length > 0 && outdoorStations.some(s => !inspectedStationIds.has(s.id)) && (
                 <div className="flex justify-end">
                   <button
                     onClick={startOutdoorWizard}
@@ -1586,6 +1651,13 @@ export default function StationInspectionModule() {
                     Starta kontrollrunda
                   </button>
                 </div>
+              )}
+
+              {/* Redigeringstext när alla utomhusstationer är klara */}
+              {wizardMode !== 'outdoor' && outdoorStations.length > 0 && outdoorStations.every(s => inspectedStationIds.has(s.id)) && (
+                <p className="text-sm text-green-400 text-right">
+                  ✓ Alla stationer kontrollerade – klicka på en station för att redigera
+                </p>
               )}
 
               {outdoorStations.length === 0 ? (
@@ -1607,6 +1679,10 @@ export default function StationInspectionModule() {
                       onEquipmentClick={handleOutdoorStationClick}
                       inspectedStationIds={inspectedStationIds}
                       highlightedStationId={wizardMode === 'outdoor' ? currentWizardStationId : null}
+                      relocateMode={!!relocatingStation && outdoorStations.some(s => s.id === relocatingStation?.id)}
+                      relocatingStationName={relocatingStation?.station_type_data?.name || relocatingStation?.equipment_type || null}
+                      onRelocateClick={handleRelocateOutdoor}
+                      onCancelRelocate={() => setRelocatingStation(null)}
                     />
                   </div>
 
@@ -1741,7 +1817,7 @@ export default function StationInspectionModule() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-400">Planritningar</span>
                     {/* Knapp för att starta kontrollrunda inomhus */}
-                    {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && (
+                    {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && filteredIndoorStations.some(s => !inspectedStationIds.has(s.id)) && (
                       <button
                         onClick={startIndoorWizard}
                         className="flex items-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-white rounded-lg text-sm font-medium transition-colors"
@@ -1749,6 +1825,11 @@ export default function StationInspectionModule() {
                         <Navigation className="w-4 h-4" />
                         Starta kontrollrunda
                       </button>
+                    )}
+                    {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && filteredIndoorStations.every(s => inspectedStationIds.has(s.id)) && (
+                      <p className="text-sm text-green-400">
+                        ✓ Alla klara – klicka på en station för att redigera
+                      </p>
                     )}
                   </div>
                   <div className="flex gap-3 overflow-x-auto pb-2">
@@ -1824,8 +1905,10 @@ export default function StationInspectionModule() {
                     imageUrl={floorPlanImageUrl}
                     stations={indoorStationsForViewer}
                     selectedStationId={null}
-                    placementMode="view"
+                    placementMode={relocatingStation && indoorStations.some(s => s.id === relocatingStation?.id) ? 'move' : 'view'}
                     onStationClick={handleIndoorStationClick}
+                    onImageClick={relocatingStation && indoorStations.some(s => s.id === relocatingStation?.id) ? handleRelocateIndoor : undefined}
+                    onCancelPlacement={() => setRelocatingStation(null)}
                     height="min(55vh, 450px)"
                     showNumbers={true}
                     inspectedStationIds={inspectedStationIds}
@@ -2128,6 +2211,17 @@ export default function StationInspectionModule() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {session?.status !== 'completed' && (
+                    <button
+                      onClick={() => {
+                        setRelocatingStation(selectedStation)
+                        setSelectedStation(null)
+                      }}
+                      className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+                    >
+                      Flytta station
+                    </button>
+                  )}
                   <button
                     onClick={() => setSelectedStation(null)}
                     className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"

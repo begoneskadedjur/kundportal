@@ -220,16 +220,30 @@ export function FloorPlanViewer({
     }
   }, [])
 
-  // Återställ vy när highlighted station ändras (guidat läge)
-  // Ingen auto-zoom - låt den pulserande markören visa vägen istället
+  // Centrera vy på highlighted station när den ändras (guidat wizard-läge)
   useEffect(() => {
-    if (!highlightedStationId || !imageLoaded) return
+    if (!highlightedStationId || !imageLoaded || !transformRef.current || !containerRef.current) return
 
-    // Återställ till normalvy så alla stationer syns
-    if (transformRef.current) {
+    const station = stations.find(s => s.id === highlightedStationId)
+    if (!station?.position_x_percent || !station?.position_y_percent || !coverDimensions) {
       transformRef.current.resetTransform(300, 'easeOut')
+      return
     }
-  }, [highlightedStationId, imageLoaded])
+
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const containerW = containerRect.width
+    const containerH = containerRect.height
+
+    // Markörens absoluta position i bildkoordinater
+    const markerX = (station.position_x_percent / 100) * coverDimensions.width
+    const markerY = (station.position_y_percent / 100) * coverDimensions.height
+
+    // Offset för att centrera markören i containern (vid scale=1)
+    const offsetX = containerW / 2 - markerX
+    const offsetY = containerH / 2 - markerY
+
+    transformRef.current.setTransform(offsetX, offsetY, 1, 300, 'easeOut')
+  }, [highlightedStationId, imageLoaded, stations, coverDimensions])
 
   const isPlacementActive = placementMode === 'place' || placementMode === 'move'
 

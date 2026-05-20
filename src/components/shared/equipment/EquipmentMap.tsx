@@ -26,6 +26,10 @@ interface EquipmentMapProps {
   onEditEquipment?: (equipment: EquipmentPlacementWithRelations) => void
   onDeleteEquipment?: (equipment: EquipmentPlacementWithRelations) => void
   onMapClick?: (lat: number, lng: number) => void
+  onRelocateClick?: (lat: number, lng: number) => void // Används i flytta-läge, fungerar även i readOnly
+  relocateMode?: boolean // Visar banner för flytta-läge
+  relocatingStationName?: string | null
+  onCancelRelocate?: () => void
   height?: string
   showControls?: boolean
   readOnly?: boolean
@@ -57,6 +61,10 @@ export function EquipmentMap({
   onEditEquipment,
   onDeleteEquipment,
   onMapClick,
+  onRelocateClick,
+  relocateMode = false,
+  relocatingStationName,
+  onCancelRelocate,
   height = '400px',
   showControls = true,
   readOnly = false,
@@ -73,6 +81,7 @@ export function EquipmentMap({
   const previewMarkerRef = useRef<google.maps.Marker | null>(null)
   const previewCircleRef = useRef<google.maps.Circle | null>(null)
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
+  const relocateClickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
   const pulseOverlayRef = useRef<google.maps.Marker | null>(null)
 
   // State
@@ -242,6 +251,30 @@ export function EquipmentMap({
       }
     }
   }, [onMapClick, readOnly])
+
+  // Relocate-klicklyssnare (fungerar även i readOnly)
+  useEffect(() => {
+    if (!mapRef.current) return
+
+    if (relocateClickListenerRef.current) {
+      google.maps.event.removeListener(relocateClickListenerRef.current)
+      relocateClickListenerRef.current = null
+    }
+
+    if (onRelocateClick && relocateMode) {
+      relocateClickListenerRef.current = mapRef.current.addListener('click', (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) {
+          onRelocateClick(e.latLng.lat(), e.latLng.lng())
+        }
+      })
+    }
+
+    return () => {
+      if (relocateClickListenerRef.current) {
+        google.maps.event.removeListener(relocateClickListenerRef.current)
+      }
+    }
+  }, [onRelocateClick, relocateMode])
 
   // Uppdatera markörer när equipment ändras
   useEffect(() => {
@@ -486,6 +519,29 @@ export function EquipmentMap({
   return (
     <div className="relative" style={{ height }}>
       <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} className="rounded-lg" />
+
+      {/* Flytta-station-banner */}
+      {relocateMode && (
+        <div className="absolute top-0 left-0 right-0 z-40 bg-emerald-600/95 backdrop-blur-sm px-4 py-3 flex items-center justify-between rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <Navigation className="w-5 h-5 text-white" />
+            <div>
+              <p className="text-white font-medium text-sm">
+                Flytta {relocatingStationName || 'station'}
+              </p>
+              <p className="text-emerald-100 text-xs">Tryck på kartan för att välja ny position</p>
+            </div>
+          </div>
+          {onCancelRelocate && (
+            <button
+              onClick={onCancelRelocate}
+              className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Kontroller */}
       {showControls && (
