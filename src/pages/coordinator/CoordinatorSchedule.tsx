@@ -131,7 +131,11 @@ export default function CoordinatorSchedule() {
       tertiary_assignee_id: null,
       tertiary_assignee_name: null,
       tertiary_assignee_email: null,
-      case_type: (contractCase.service_type === 'establishment' ? 'establishment' : 'contract') as any,
+      case_type: (
+        contractCase.service_type === 'establishment' ? 'establishment' :
+        contractCase.service_type === 'inspection' ? 'inspection' :
+        'contract'
+      ) as any,
       description: contractCase.description,
       price: contractCase.price,
       created_at: contractCase.created_at,

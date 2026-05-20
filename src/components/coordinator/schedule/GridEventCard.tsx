@@ -52,8 +52,12 @@ export const GridEventCard = memo(function GridEventCard({
 
   const categoryLabel = (caseData as any).case_type === 'private' ? 'Privatperson'
     : (caseData as any).case_type === 'business' ? 'Företag'
-    : (caseData as any).case_type === 'inspection' ? 'Inspektion'
+    : (caseData as any).case_type === 'inspection' ? 'Avtalat Servicebesök'
     : null
+
+  const displayPrimary = (caseData as any).case_type === 'inspection'
+    ? (customerName || caseNumber)
+    : caseNumber
 
   // Bestäm vad som ska visas baserat på tillgänglig höjd och bredd
   const isNarrow = widthPct < 40          // smal lane — bara det allra viktigaste
@@ -95,11 +99,11 @@ export const GridEventCard = memo(function GridEventCard({
           <p className="text-[9px] text-slate-500 leading-tight truncate">{categoryLabel}</p>
         )}
 
-        {/* Rad 1: ärendenummer (ingen avatar) */}
-        {caseNumber && (
+        {/* Rad 1: kundnamn för inspection, annars ärendenummer */}
+        {displayPrimary && (
           <p className={`font-mono font-semibold truncate leading-tight ${style.text} ${effectiveCompact ? 'text-[9px]' : 'text-[10px]'}`}>
             {isContract && <span className="mr-0.5 opacity-70">★</span>}
-            {caseNumber}
+            {displayPrimary}
           </p>
         )}
 
