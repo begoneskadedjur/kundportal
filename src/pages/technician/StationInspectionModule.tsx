@@ -2198,7 +2198,7 @@ export default function StationInspectionModule() {
                                 }[histColor]
                                 return (
                                   <span className={`${histColorClass} font-mono`}>
-                                    {item.measurement_value}g
+                                    {item.measurement_value}{item.measurement_unit === 'gram' ? 'g' : item.measurement_unit === 'st' ? ' st' : item.measurement_unit === 'ml' ? ' ml' : item.measurement_unit === 'kg' ? ' kg' : item.measurement_unit === 'procent' ? '%' : item.measurement_unit ? ` ${item.measurement_unit}` : 'g'}
                                   </span>
                                 )
                               })()}
