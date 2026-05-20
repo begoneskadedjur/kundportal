@@ -1046,6 +1046,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         </div>
 
         {/* Sektioner med tabeller — paginerat */}
+        <>
         {allFilteredStations.length === 0 ? (
           <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-12 text-center">
             <ClipboardCheck className="w-12 h-12 text-slate-600 mx-auto mb-4" />
@@ -1279,7 +1280,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         )
 
         {/* Legend för tröskelvärden */}
-        <div className="mt-6 bg-slate-800/30 rounded-lg p-4">
+        <div className="bg-slate-800/30 rounded-lg p-4">
           <p className="text-xs text-slate-500 mb-2">Mätvärdeindikatorer:</p>
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-1.5">
@@ -1296,6 +1297,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             </div>
           </div>
         </div>
+        </>
       </div>
 
       {/* Photo Lightbox */}
