@@ -58,7 +58,7 @@ import {
 import type { OutdoorInspectionWithRelations, InspectionSessionWithRelations } from '../../types/inspectionSession'
 import { useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import { calculateStationStatus, CALCULATED_STATUS_CONFIG, MEASUREMENT_UNIT_CONFIG, type CalculatedStatus } from '../../types/stationTypes'
-import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
+import { InspectionPhotoLightbox, Photo as LightboxPhoto } from './InspectionPhotoLightbox'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
 import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -126,7 +126,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [showOnlyIssues, setShowOnlyIssues] = useState(false)
 
   // Lightbox state
-  const [lightboxPhotos, setLightboxPhotos] = useState<{ url: string; caption: string }[]>([])
+  const [lightboxPhotos, setLightboxPhotos] = useState<LightboxPhoto[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
 
@@ -757,7 +757,6 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     return sections.map(section => {
       let filteredStations = section.stations
 
-      // Sök
       if (debouncedSearchQuery) {
         const query = debouncedSearchQuery.toLowerCase()
         filteredStations = filteredStations.filter(s =>
@@ -767,7 +766,6 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         )
       }
 
-      // Endast avvikelser (warning/critical)
       if (showOnlyIssues) {
         filteredStations = filteredStations.filter(s =>
           s.calculatedStatus === 'warning' || s.calculatedStatus === 'critical'
@@ -778,9 +776,36 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
     }).filter(section => section.stations.length > 0)
   }, [sections, debouncedSearchQuery, showOnlyIssues])
 
+  // Pagination — flat array av alla filtrerade stationer med sektion-metadata
+  const PAGE_SIZE_INSPECTION = 50
+  const [currentPage, setCurrentPage] = useState(1)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+
+  // Reset page vid filter-ändring
+  useEffect(() => { setCurrentPage(1) }, [debouncedSearchQuery, showOnlyIssues, selectedSessionId])
+
+  const allFilteredStations = useMemo(() =>
+    filteredSections.flatMap(s => s.stations.map(st => ({ ...st, _sectionId: s.id, _sectionName: s.name, _sectionIcon: s.icon, _buildingName: s.buildingName }))),
+    [filteredSections]
+  )
+  const totalFilteredPages = Math.max(1, Math.ceil(allFilteredStations.length / PAGE_SIZE_INSPECTION))
+  const pagedStations = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE_INSPECTION
+    return allFilteredStations.slice(start, start + PAGE_SIZE_INSPECTION)
+  }, [allFilteredStations, currentPage])
+
+  const toggleSection = (sectionId: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(sectionId)) next.delete(sectionId)
+      else next.add(sectionId)
+      return next
+    })
+  }
+
   // Öppna lightbox
-  const openLightbox = (photoUrl: string, caption: string) => {
-    setLightboxPhotos([{ url: photoUrl, caption }])
+  const openLightbox = (photo: LightboxPhoto) => {
+    setLightboxPhotos([photo])
     setLightboxIndex(0)
     setIsLightboxOpen(true)
   }
@@ -862,7 +887,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <LoadingSpinner />
           <p className="text-slate-400 mt-4">Laddar inspektionshistorik...</p>
@@ -872,61 +897,40 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Kompakt Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-500/20 rounded-lg flex items-center justify-center">
-              <ClipboardCheck className="w-5 h-5 text-teal-400" />
-            </div>
+            <ClipboardCheck className="w-5 h-5 text-slate-400" />
             <div>
-              <h1 className="text-xl font-bold text-white">Genomförda kontroller</h1>
-              <p className="text-sm text-slate-400">
-                Senaste inspektionsresultat för {companyName}
-              </p>
+              <h1 className="text-xl font-semibold text-white">Genomförda kontroller</h1>
+              <p className="text-sm text-slate-500">Senaste inspektionsresultat för {companyName}</p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 rounded-lg text-slate-300 text-sm transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 inline mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
-              Uppdatera
-            </button>
-          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-white rounded-lg text-sm transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            Uppdatera
+          </button>
         </div>
 
-        {/* Kommande schemalagda kontroller */}
+        {/* Kommande schemalagda kontroller — horisontell scrollbar chip-rad */}
         {upcomingSessions.length > 0 && (
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="w-4 h-4 text-purple-400" />
-              <h3 className="text-sm font-medium text-purple-300">
-                Kommande kontroller ({upcomingSessions.length})
-              </h3>
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Kommande kontroller ({upcomingSessions.length})</span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700">
               {upcomingSessions.map(s => (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-2 bg-slate-800/50 rounded-lg px-3 py-1.5 text-sm"
-                >
-                  <span className="text-white font-medium">
-                    {format(new Date(s.scheduled_at), 'd MMM yyyy', { locale: sv })}
-                  </span>
-                  <span className="text-slate-400">
-                    {format(new Date(s.scheduled_at), 'HH:mm')}
-                    {s.scheduled_end && `–${format(new Date(s.scheduled_end), 'HH:mm')}`}
-                  </span>
-                  {s.technician_name && (
-                    <span className="text-slate-500 text-xs">
-                      {s.technician_name}
-                    </span>
-                  )}
+                <div key={s.id} className="flex-shrink-0 flex items-center gap-2 bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-1.5 text-sm whitespace-nowrap">
+                  <span className="text-white font-medium">{format(new Date(s.scheduled_at), 'd MMM', { locale: sv })}</span>
+                  <span className="text-slate-500 text-xs">{format(new Date(s.scheduled_at), 'HH:mm')}{s.scheduled_end ? `–${format(new Date(s.scheduled_end), 'HH:mm')}` : ''}</span>
+                  {s.technician_name && <span className="text-slate-500 text-xs">{s.technician_name}</span>}
                 </div>
               ))}
             </div>
@@ -934,36 +938,19 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         )}
 
         {/* Sessionsväljare + sammanfattning */}
-        <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-5 mb-6">
-          {/* Navigering mellan sessioner */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-teal-400" />
-              <h2 className="text-lg font-semibold text-white">
-                {lastInspectionDate ? formatDate(lastInspectionDate) : 'Ingen kontroll'}
-              </h2>
-              {lastTechnicianName && (
-                <span className="text-sm text-slate-400 hidden sm:inline">
-                  — {lastTechnicianName}
-                </span>
-              )}
-              {selectedSessionIndex === 0 && allSessions.length > 0 && (
-                <span className="text-xs bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded-full">Senaste</span>
-              )}
-            </div>
-
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-4">
+          {/* Sessionsnavigering */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1">
               <button
                 onClick={handlePreviousSession}
                 disabled={!hasPreviousSession || loadingSessionData}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1.5 rounded border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Äldre kontroll"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4" />
               </button>
-
-              {/* Dropdown med alla sessioner grupperade per månad */}
-              <div className="min-w-[240px]">
+              <div className="min-w-[220px]">
                 <Select
                   groups={sessionSelectGroups}
                   value={selectedSessionId || ''}
@@ -972,109 +959,86 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                   placeholder="Välj kontroll..."
                 />
               </div>
-
               <button
                 onClick={handleNextSession}
                 disabled={!hasNextSession || loadingSessionData}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1.5 rounded border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Nyare kontroll"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-4 h-4" />
               </button>
-
-              <span className="text-xs text-slate-500 ml-2 hidden sm:inline">
-                {allSessions.length} kontroller
-              </span>
+              {selectedSessionIndex === 0 && allSessions.length > 0 && (
+                <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">Senaste</span>
+              )}
             </div>
+            <span className="text-xs text-slate-500">{allSessions.length} kontroller totalt</span>
           </div>
 
-          {/* Statistik-kort */}
+          {/* KPI-rad */}
           {loadingSessionData ? (
-            <div className="flex items-center justify-center py-4">
-              <RefreshCw className="w-5 h-5 text-teal-400 animate-spin mr-2" />
+            <div className="flex items-center gap-2 py-2">
+              <RefreshCw className="w-4 h-4 text-slate-400 animate-spin" />
               <span className="text-sm text-slate-400">Laddar kontrolldata...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-5 divide-x divide-slate-700 bg-slate-900/30 rounded-lg overflow-hidden border border-slate-700/50">
               {(['none', 'low', 'medium', 'high'] as const).map(lvl => (
-                <div key={lvl} className="bg-slate-900/50 rounded-lg p-3">
+                <div key={lvl} className="px-4 py-3">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: getStatusColor2(lvl) }} />
-                    <span className="text-xs text-slate-500 uppercase">{getStatusLabel(lvl)}</span>
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: getStatusColor2(lvl) }} />
+                    <span className="text-xs text-slate-500">{getStatusLabel(lvl)}</span>
                   </div>
-                  <p className="font-bold text-lg" style={{ color: getStatusColor2(lvl) }}>{statusCounts[lvl]}</p>
+                  <p className="text-xl font-semibold" style={{ color: getStatusColor2(lvl) }}>{statusCounts[lvl]}</p>
                 </div>
               ))}
-              <div className="bg-slate-900/50 rounded-lg p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <ClipboardCheck className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-xs text-slate-500 uppercase">Totalt</span>
-                </div>
-                <p className="text-white font-bold text-lg">{totalStations}</p>
+              <div className="px-4 py-3">
+                <p className="text-xs text-slate-500 mb-1">Totalt</p>
+                <p className="text-xl font-semibold text-white">{totalStations}</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Filter och sök */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+        {/* Filter, sök och rapport */}
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
             <input
               type="text"
               placeholder="Sök station eller anteckning..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
-
           <button
             onClick={() => setShowOnlyIssues(!showOnlyIssues)}
-            className={`
-              flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all
-              ${showOnlyIssues
-                ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
-                : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
-              }
-            `}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
+              showOnlyIssues
+                ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+            }`}
           >
-            <Filter className="w-4 h-4" />
+            <Filter className="w-3.5 h-3.5" />
             Endast avvikelser
           </button>
-
           {latestSessionId && (
             <div className="relative">
               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setReportDropdownOpen(reportDropdownOpen === 'latest' ? null : 'latest')
-                }}
+                onClick={e => { e.stopPropagation(); setReportDropdownOpen(reportDropdownOpen === 'latest' ? null : 'latest') }}
                 disabled={downloadingReport === latestSessionId}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all bg-teal-600/20 border-teal-600/50 text-teal-400 hover:bg-teal-600/30 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm bg-slate-800 border-slate-700 text-slate-400 hover:text-white transition-colors disabled:opacity-50"
               >
-                {downloadingReport === latestSessionId ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
+                {downloadingReport === latestSessionId ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                 Rapport
               </button>
               {reportDropdownOpen === 'latest' && (
-                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 min-w-[160px]">
-                  <button
-                    onClick={() => handleDownloadReport(latestSessionId, 'pdf')}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-t-lg transition-colors"
-                  >
-                    <FileText className="w-4 h-4 text-red-400" />
-                    Ladda ned PDF
+                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 min-w-[150px]">
+                  <button onClick={() => handleDownloadReport(latestSessionId, 'pdf')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-t-lg transition-colors">
+                    <FileText className="w-3.5 h-3.5 text-red-400" />PDF
                   </button>
-                  <button
-                    onClick={() => handleDownloadReport(latestSessionId, 'excel')}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-b-lg transition-colors"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 text-green-400" />
-                    Ladda ned Excel
+                  <button onClick={() => handleDownloadReport(latestSessionId, 'excel')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700/50 rounded-b-lg transition-colors">
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-green-400" />Excel
                   </button>
                 </div>
               )}
@@ -1082,9 +1046,9 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           )}
         </div>
 
-        {/* Sektioner med tabeller */}
-        {filteredSections.length === 0 ? (
-          <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-12 text-center">
+        {/* Sektioner med tabeller — paginerat */}
+        {allFilteredStations.length === 0 ? (
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-12 text-center">
             <ClipboardCheck className="w-12 h-12 text-slate-600 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">
               {showOnlyIssues ? 'Inga avvikelser hittades' : 'Inga kontroller registrerade'}
@@ -1096,221 +1060,243 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             </p>
           </div>
         ) : (
-          <div className="space-y-8">
-            {filteredSections.map((section) => (
-              <section key={section.id}>
-                {/* Sektionsrubrik */}
-                <div className="flex items-center gap-2 mb-3">
-                  {section.icon === 'outdoor' ? (
-                    <MapPin className="w-5 h-5 text-emerald-400" />
-                  ) : (
-                    <Home className="w-5 h-5 text-blue-400" />
-                  )}
-                  <h2 className="text-lg font-semibold text-white">
-                    {section.buildingName ? `${section.buildingName} - ` : ''}{section.name}
-                  </h2>
-                  <span className="text-sm text-slate-400">({section.stations.length} stationer)</span>
-                </div>
+          <>
+            {/* Paginering info */}
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>
+                Visar {(currentPage - 1) * PAGE_SIZE_INSPECTION + 1}–{Math.min(currentPage * PAGE_SIZE_INSPECTION, allFilteredStations.length)} av {allFilteredStations.length} stationer
+              </span>
+              <span>{totalFilteredPages} {totalFilteredPages === 1 ? 'sida' : 'sidor'}</span>
+            </div>
 
-                {/* Tabell */}
-                <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-slate-900/50 border-b border-slate-700/50">
-                          <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Nr</th>
-                          <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Typ</th>
-                          <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
-                          <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Mätvärde avser</th>
-                          <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Mätvärde</th>
-                          <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Trend</th>
-                          <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Kontrollerad</th>
-                          <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Anteckning</th>
-                          <th className="text-center px-4 py-2.5 text-xs font-medium text-slate-400 uppercase tracking-wide">Foto</th>
-                          <th className="px-4 py-2.5"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-700/30">
-                        {section.stations.map((station, index) => {
-                          const inspStatusLabel = station.latestInspection
-                            ? getStatusLabel(station.latestInspection.status)
-                            : 'Ej kontrollerad'
-                          const inspStatusColor = station.latestInspection
-                            ? getStatusColor2(station.latestInspection.status)
-                            : '#6b7280'
+            {/* Sektioner — grupperade från pagedStations */}
+            {(() => {
+              const sectionMap = new Map<string, { id: string; name: string; buildingName: string | null; icon: string; stations: typeof pagedStations }>()
+              for (const st of pagedStations) {
+                if (!sectionMap.has(st._sectionId)) {
+                  sectionMap.set(st._sectionId, { id: st._sectionId, name: st._sectionName, buildingName: st._buildingName, icon: st._sectionIcon, stations: [] })
+                }
+                sectionMap.get(st._sectionId)!.stations.push(st)
+              }
+              return Array.from(sectionMap.values()).map(section => {
+                const isCollapsed = collapsedSections.has(section.id)
+                const fullSection = filteredSections.find(s => s.id === section.id)
+                const totalInSection = fullSection?.stations.length ?? section.stations.length
+                return (
+                  <div key={section.id} className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+                    {/* Kollapsibel sektionsrubrik */}
+                    <button
+                      onClick={() => toggleSection(section.id)}
+                      className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-700/30 transition-colors text-left"
+                    >
+                      {section.icon === 'outdoor' ? (
+                        <MapPin className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      ) : (
+                        <Home className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                      )}
+                      <span className="text-sm font-semibold text-white">
+                        {section.buildingName ? `${section.buildingName} – ` : ''}{section.name}
+                      </span>
+                      <span className="text-xs text-slate-500">({totalInSection} stationer)</span>
+                      <div className="ml-auto">
+                        {isCollapsed ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
+                      </div>
+                    </button>
 
-                          // Mätvärde med färgindikator
-                          const measurementValue = station.latestInspection?.measurementValue
-                          const hasThresholds = station.thresholdWarning !== null || station.thresholdCritical !== null
-                          const thresholdColor = getThresholdColor(station.calculatedStatus)
-
-                          return (
-                            <tr
-                              key={station.id}
-                              className="hover:bg-slate-700/30 transition-colors cursor-pointer"
-                              onClick={() => handleStationClick(station)}
-                            >
-                              <td className="px-4 py-2.5 text-white font-medium">
-                                {station.stationNumber || `#${index + 1}`}
-                              </td>
-                              <td className="px-4 py-2.5">
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: station.typeColor }}
-                                  />
-                                  <span className="text-slate-300">
-                                    {station.stationType}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-2.5">
-                                {station.latestInspection ? (
-                                  <div className="flex items-center gap-1.5">
-                                    {getStatusIcon(station.latestInspection.status)}
-                                    <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: `${inspStatusColor}20`, color: inspStatusColor }}>
-                                      {inspStatusLabel}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-xs text-slate-500 px-2 py-0.5 bg-slate-700/50 rounded">
-                                    Ej kontrollerad
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-4 py-2.5 text-slate-300">
-                                {station.measurementLabel || '-'}
-                              </td>
-                              <td className="px-4 py-2.5">
-                                {measurementValue !== null && measurementValue !== undefined ? (
-                                  <div className="flex items-center gap-2">
-                                    {/* Färgindikator baserat på tröskelvärde */}
-                                    {hasThresholds && (
-                                      <div
-                                        className="w-3 h-3 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: thresholdColor }}
-                                        title={CALCULATED_STATUS_CONFIG[station.calculatedStatus].label}
-                                      />
-                                    )}
-                                    <span className="text-white font-medium">
-                                      {measurementValue}
-                                    </span>
-                                    <span className="text-slate-400 text-xs">
-                                      {MEASUREMENT_UNIT_CONFIG[station.measurementUnit as keyof typeof MEASUREMENT_UNIT_CONFIG]?.shortLabel || station.measurementUnit}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-500">-</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-2.5 text-right">
-                                {station.trend !== null && station.trend !== undefined ? (
-                                  <div className={`flex items-center justify-end gap-1 ${
-                                    station.trendDirection === 'down' ? 'text-emerald-400' :
-                                    station.trendDirection === 'up' ? 'text-red-400' :
-                                    'text-slate-500'
-                                  }`}>
-                                    {station.trendDirection === 'down' && <TrendingDown className="w-4 h-4" />}
-                                    {station.trendDirection === 'up' && <TrendingUp className="w-4 h-4" />}
-                                    {station.trendDirection === 'stable' && <Minus className="w-4 h-4" />}
-                                    <span className="font-medium">
-                                      {station.trend > 0 ? '+' : ''}{station.trend}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-500">-</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-2.5 text-slate-400">
-                                {station.latestInspection
-                                  ? formatDate(station.latestInspection.inspectedAt)
-                                  : '-'}
-                              </td>
-                              <td className="px-4 py-2.5 text-slate-400 max-w-[200px] truncate">
-                                {station.latestInspection?.findings || '-'}
-                              </td>
-                              <td className="px-4 py-2.5 text-center">
-                                {station.latestInspection?.photoUrl ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      openLightbox(
-                                        station.latestInspection!.photoUrl!,
-                                        `${station.stationNumber || station.stationType} - ${formatDate(station.latestInspection!.inspectedAt)}`
-                                      )
-                                    }}
-                                    className="w-8 h-8 rounded-lg overflow-hidden bg-slate-700 mx-auto hover:ring-2 hover:ring-teal-500/50 transition-all"
-                                  >
-                                    <img
-                                      src={station.latestInspection.photoUrl}
-                                      alt="Inspektionsfoto"
-                                      className="w-full h-full object-cover"
-                                      loading="lazy"
-                                    />
-                                  </button>
-                                ) : (
-                                  <span className="text-slate-600">-</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-2.5">
-                                <div className="flex items-center gap-1">
-                                  {/* Visa på karta/planritning */}
-                                  {onNavigateToStation && (
-                                    <button
-                                      onClick={(e) => handleNavigateToStation(station, e)}
-                                      className="p-1.5 text-slate-500 hover:text-teal-400 hover:bg-teal-500/10 rounded-lg transition-all group"
-                                      title={station.originalOutdoorStation ? 'Visa på karta' : `Visa på ${station.floorPlanName || 'planritning'}`}
-                                    >
-                                      {station.originalOutdoorStation ? (
-                                        <MapPin className="w-4 h-4 group-hover:animate-pulse" />
-                                      ) : (
-                                        <Home className="w-4 h-4 group-hover:animate-pulse" />
-                                      )}
-                                    </button>
-                                  )}
-                                  {/* Öppna detaljer */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleStationClick(station)
-                                    }}
-                                    className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-600/50 rounded-lg transition-all"
-                                    title="Visa detaljer"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
+                    {/* Tabell */}
+                    {!isCollapsed && (
+                      <div className="overflow-x-auto border-t border-slate-700/50">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-slate-900/50 border-b border-slate-700/50">
+                              <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Nr</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Typ</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Mätvärde avser</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Mätvärde</th>
+                              <th className="text-right px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Trend</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Kontrollerad</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Anteckning</th>
+                              <th className="text-center px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Foto</th>
+                              <th className="px-4 py-2"></th>
                             </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
+                          </thead>
+                          <tbody className="divide-y divide-slate-700/30">
+                            {section.stations.map((station, index) => {
+                              const inspStatusLabel = station.latestInspection
+                                ? getStatusLabel(station.latestInspection.status)
+                                : 'Ej kontrollerad'
+                              const inspStatusColor = station.latestInspection
+                                ? getStatusColor2(station.latestInspection.status)
+                                : '#6b7280'
+                              const measurementValue = station.latestInspection?.measurementValue
+                              const hasThresholds = station.thresholdWarning !== null || station.thresholdCritical !== null
+                              const thresholdColor = getThresholdColor(station.calculatedStatus)
 
-        {/* Legend för tröskelvärden */}
-        <div className="mt-6 bg-slate-800/30 rounded-lg p-4">
-          <p className="text-xs text-slate-500 mb-2">Mätvärdeindikatorer:</p>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span className="text-xs text-slate-400">OK - Inom normala värden</span>
+                              return (
+                                <tr
+                                  key={station.id}
+                                  className="hover:bg-slate-700/20 transition-colors cursor-pointer"
+                                  onClick={() => handleStationClick(station)}
+                                >
+                                  <td className="px-4 py-2 text-white font-medium">
+                                    {station.stationNumber || `#${index + 1}`}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: station.typeColor }} />
+                                      <span className="text-slate-300">{station.stationType}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    {station.latestInspection ? (
+                                      <div className="flex items-center gap-1.5">
+                                        {getStatusIcon(station.latestInspection.status)}
+                                        <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${inspStatusColor}20`, color: inspStatusColor }}>
+                                          {inspStatusLabel}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs text-slate-500 px-1.5 py-0.5 bg-slate-700/50 rounded">Ej kontrollerad</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2 text-slate-300">{station.measurementLabel || '—'}</td>
+                                  <td className="px-4 py-2">
+                                    {measurementValue !== null && measurementValue !== undefined ? (
+                                      <div className="flex items-center gap-1.5">
+                                        {hasThresholds && (
+                                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: thresholdColor }} title={CALCULATED_STATUS_CONFIG[station.calculatedStatus].label} />
+                                        )}
+                                        <span className="text-white font-medium">{measurementValue}</span>
+                                        <span className="text-slate-400 text-xs">{MEASUREMENT_UNIT_CONFIG[station.measurementUnit as keyof typeof MEASUREMENT_UNIT_CONFIG]?.shortLabel || station.measurementUnit}</span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-500">—</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2 text-right">
+                                    {station.trend !== null && station.trend !== undefined ? (
+                                      <div className={`flex items-center justify-end gap-1 ${station.trendDirection === 'down' ? 'text-emerald-400' : station.trendDirection === 'up' ? 'text-red-400' : 'text-slate-500'}`}>
+                                        {station.trendDirection === 'down' && <TrendingDown className="w-3.5 h-3.5" />}
+                                        {station.trendDirection === 'up' && <TrendingUp className="w-3.5 h-3.5" />}
+                                        {station.trendDirection === 'stable' && <Minus className="w-3.5 h-3.5" />}
+                                        <span className="font-medium">{station.trend > 0 ? '+' : ''}{station.trend}</span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-500">—</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2 text-slate-400">{station.latestInspection ? formatDate(station.latestInspection.inspectedAt) : '—'}</td>
+                                  <td className="px-4 py-2 text-slate-400 max-w-[160px] truncate">{station.latestInspection?.findings || '—'}</td>
+                                  <td className="px-4 py-2 text-center">
+                                    {station.latestInspection?.photoUrl ? (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); openLightbox({ url: station.latestInspection!.photoUrl!, stationNumber: station.stationNumber || station.stationType, stationType: station.originalOutdoorStation ? 'outdoor' : 'indoor', status: station.latestInspection!.status, inspectedAt: station.latestInspection!.inspectedAt, findings: station.latestInspection!.findings ?? undefined }) }}
+                                        className="w-7 h-7 rounded overflow-hidden bg-slate-700 mx-auto hover:ring-2 hover:ring-teal-500/50 transition-all"
+                                      >
+                                        <img src={station.latestInspection.photoUrl} alt="Inspektionsfoto" className="w-full h-full object-cover" loading="lazy" />
+                                      </button>
+                                    ) : (
+                                      <span className="text-slate-600">—</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    <div className="flex items-center gap-1">
+                                      {onNavigateToStation && (
+                                        <button
+                                          onClick={(e) => handleNavigateToStation(station, e)}
+                                          className="p-1.5 text-slate-500 hover:text-teal-400 hover:bg-teal-500/10 rounded transition-all group"
+                                          title={station.originalOutdoorStation ? 'Visa på karta' : `Visa på ${station.floorPlanName || 'planritning'}`}
+                                        >
+                                          {station.originalOutdoorStation ? <MapPin className="w-3.5 h-3.5 group-hover:animate-pulse" /> : <Home className="w-3.5 h-3.5 group-hover:animate-pulse" />}
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleStationClick(station) }}
+                                        className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-600/50 rounded transition-all"
+                                        title="Visa detaljer"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            })()}
+
+            {/* Pagineringsnavigering */}
+            {totalFilteredPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Föregående
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(7, totalFilteredPages) }, (_, i) => {
+                    let page: number
+                    if (totalFilteredPages <= 7) {
+                      page = i + 1
+                    } else if (currentPage <= 4) {
+                      page = i + 1
+                    } else if (currentPage >= totalFilteredPages - 3) {
+                      page = totalFilteredPages - 6 + i
+                    } else {
+                      page = currentPage - 3 + i
+                    }
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 text-sm rounded-lg transition-colors ${currentPage === page ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalFilteredPages, p + 1))}
+                  disabled={currentPage === totalFilteredPages}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Nästa
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Legend för tröskelvärden */}
+            <div className="bg-slate-800/30 rounded-lg p-4">
+              <p className="text-xs text-slate-500 mb-2">Mätvärdeindikatorer:</p>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span className="text-xs text-slate-400">OK - Inom normala värden</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                  <span className="text-xs text-slate-400">Varning - Överstiger/understiger varningsnivå</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="text-xs text-slate-400">Kritisk - Överstiger/understiger kritisk nivå</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-amber-500" />
-              <span className="text-xs text-slate-400">Varning - Överstiger/understiger varningsnivå</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
-              <span className="text-xs text-slate-400">Kritisk - Överstiger/understiger kritisk nivå</span>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Photo Lightbox */}
@@ -1760,7 +1746,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 

@@ -42,6 +42,7 @@ type Customer = {
   contract_status: string | null
   contract_start_date: string | null
   contract_end_date: string | null
+  contract_length: string | null
   annual_value: number | null
   agreement_text: string | null
   products: any | null
@@ -382,7 +383,7 @@ const CustomerPortal: React.FC = () => {
           {/* Left Column - Service Hub (2/3 width) */}
           <div className="lg:col-span-2 space-y-6">
             {/* Contract Value Card */}
-            <ContractValueCard 
+            <ContractValueCard
               customer={customer}
             />
 
