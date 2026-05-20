@@ -2,11 +2,38 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { Calendar, Clock, AlertCircle, Eye, FileText, Flag } from 'lucide-react'
+import { Calendar, Clock, AlertCircle, Eye, FileText, Flag, User, ClipboardCheck } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import CaseDetailsModal from './CaseDetailsModal'
+
+function getStatusLabel(status: string, revisitCount?: number): string {
+  if (status === 'open') return 'Öppen'
+  if (status === 'Återbesök') {
+    const visitNumber = (revisitCount ?? 0) + 1
+    return visitNumber > 1 ? `Återbesök ${visitNumber}` : 'Återbesök'
+  }
+  const labels: Record<string, string> = {
+    'Öppen': 'Öppen',
+    'Bokad': 'Bokad',
+    'Avslutat': 'Genomförd',
+    'Borttaget': 'Avbokat',
+    'Offert skickad': 'Offert skickad',
+    'Offert signerad - boka in': 'Offert signerad',
+    'Bomkörning': 'Bomkörning',
+    'Ombokning': 'Ombokning',
+    'Reklamation': 'Reklamation',
+  }
+  return labels[status] ?? status
+}
+
+const SERVICE_TYPE_LABELS: Record<string, { label: string; cls: string }> = {
+  inspection: { label: 'Servicebesök', cls: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  establishment: { label: 'Etablering', cls: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+  acute: { label: 'Akut', cls: 'bg-red-500/20 text-red-400 border-red-500/30' },
+  service: { label: 'Service', cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' }
+}
 
 interface Case {
   id: string
@@ -22,6 +49,12 @@ interface Case {
   completed_date: string | null
   created_at: string
   updated_at: string
+  service_type?: string | null
+  primary_technician_name?: string | null
+  inspected_outdoor_stations?: number | null
+  total_outdoor_stations?: number | null
+  inspected_indoor_stations?: number | null
+  total_indoor_stations?: number | null
 }
 
 export default function CaseList() {
@@ -29,6 +62,7 @@ export default function CaseList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCase, setSelectedCase] = useState<Case | null>(null)
+  const [revisitCounts, setRevisitCounts] = useState<Record<string, number>>({})
   const { profile } = useAuth()
 
   useEffect(() => {
@@ -47,7 +81,27 @@ export default function CaseList() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setCases(data || [])
+      const fetchedCases = data || []
+      setCases(fetchedCases)
+
+      // Hämta återbesöksantal för ärenden med status 'Återbesök'
+      const revisitCaseIds = fetchedCases
+        .filter(c => c.status === 'Återbesök')
+        .map(c => c.id)
+
+      if (revisitCaseIds.length > 0) {
+        const { data: logData } = await supabase
+          .from('case_updates_log')
+          .select('case_id')
+          .in('case_id', revisitCaseIds)
+          .eq('update_type', 'revisit_scheduled')
+
+        const counts: Record<string, number> = {}
+        for (const row of logData || []) {
+          counts[row.case_id] = (counts[row.case_id] || 0) + 1
+        }
+        setRevisitCounts(counts)
+      }
     } catch (error) {
       console.error('Error fetching cases:', error)
       setError('Kunde inte ladda ärenden')
@@ -64,15 +118,15 @@ export default function CaseList() {
     })
   }
 
-  const getStatusColor = (status: string) => {
-    const statusColors: { [key: string]: string } = {
-      'open': 'text-blue-400 bg-blue-400/20',
-      'in_progress': 'text-yellow-400 bg-yellow-400/20',
-      'completed': 'text-green-400 bg-green-400/20',
-      'closed': 'text-gray-400 bg-gray-400/20',
-      'pending': 'text-orange-400 bg-orange-400/20'
-    }
-    return statusColors[status.toLowerCase()] || 'text-gray-400 bg-gray-400/20'
+  const getStatusColor = (status: string): string => {
+    if (status === 'open' || status === 'Öppen') return 'text-blue-400 bg-blue-400/20'
+    if (status === 'Bokad') return 'text-yellow-400 bg-yellow-400/20'
+    if (status === 'Avslutat') return 'text-green-400 bg-green-400/20'
+    if (status === 'Borttaget') return 'text-gray-400 bg-gray-400/20'
+    if (status === 'Återbesök') return 'text-purple-400 bg-purple-400/20'
+    if (status === 'Offert skickad' || status === 'Offert signerad - boka in') return 'text-orange-400 bg-orange-400/20'
+    if (status === 'Reklamation') return 'text-red-400 bg-red-400/20'
+    return 'text-slate-400 bg-slate-400/20'
   }
 
   const getPriorityColor = (priority: string) => {
@@ -164,89 +218,89 @@ export default function CaseList() {
 
   return (
     <>
-      <div className="space-y-4">
-        {cases.map((case_) => (
-          <Card key={case_.id} className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                {/* Header */}
-                <div className="flex items-center gap-3 mb-3">
-                  <h3 className="text-lg font-semibold text-white">
-                    {case_.title}
-                  </h3>
-                  <span className="text-sm text-slate-400">
-                    #{case_.case_number}
-                  </span>
-                </div>
+      <div className="space-y-2">
+        {cases.map((case_) => {
+          const serviceTypeCfg = case_.service_type ? SERVICE_TYPE_LABELS[case_.service_type] : null
+          const totalStations = (case_.total_outdoor_stations || 0) + (case_.total_indoor_stations || 0)
+          const inspectedStations = (case_.inspected_outdoor_stations || 0) + (case_.inspected_indoor_stations || 0)
+          const showProgress = case_.service_type === 'inspection' && totalStations > 0
 
-                {/* Status och prioritet */}
-                <div className="flex items-center gap-4 mb-3">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(case_.status)}`}>
-                    {case_.status}
-                  </span>
-                  
-                  {/* UPPDATERAD PRIORITETSVISNING: */}
-                  {case_.priority && getPriorityDisplay(case_.priority)}
-
-                  {case_.pest_type && (
-                    <span className="text-sm text-slate-400 bg-slate-700/50 px-2 py-1 rounded">
-                      {case_.pest_type}
-                    </span>
-                  )}
-                </div>
-
-                {/* Beskrivning */}
-                {case_.description && (
-                  <p className="text-slate-300 mb-3 line-clamp-2">
-                    {case_.description}
-                  </p>
-                )}
-
-                {/* Plats */}
-                {case_.location_details && (
-                  <p className="text-sm text-slate-400 mb-3">
-                    📍 {case_.location_details}
-                  </p>
-                )}
-
-                {/* Datum */}
-                <div className="flex items-center gap-4 text-sm text-slate-400">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>Skapad: {formatDate(case_.created_at)}</span>
+          return (
+            <Card key={case_.id} className="px-4 py-3">
+              <div className="flex items-center gap-3">
+                {/* Vänster: Titel + ärendenummer + badges */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-semibold text-white truncate">
+                      {case_.title}
+                    </h3>
+                    {case_.case_number && (
+                      <span className="text-xs text-slate-500 shrink-0">#{case_.case_number}</span>
+                    )}
+                    {serviceTypeCfg && (
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${serviceTypeCfg.cls}`}>
+                        {serviceTypeCfg.label}
+                      </span>
+                    )}
+                    {case_.pest_type && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-700/50 text-slate-400">
+                        {case_.pest_type}
+                      </span>
+                    )}
                   </div>
-                  
-                  {case_.scheduled_date && (
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>Schemalagd: {formatDate(case_.scheduled_date)}</span>
-                    </div>
-                  )}
-                  
-                  {case_.completed_date && (
-                    <div className="flex items-center gap-1 text-green-400">
-                      <Clock className="w-4 h-4" />
-                      <span>Slutförd: {formatDate(case_.completed_date)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Actions */}
-              <div className="ml-4">
+                  {/* Meta-rad */}
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>
+                      {getStatusLabel(case_.status, revisitCounts[case_.id])}
+                    </span>
+
+                    {case_.priority && getPriorityDisplay(case_.priority)}
+
+                    {showProgress && (
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
+                        <ClipboardCheck className="w-3 h-3" />
+                        {inspectedStations}/{totalStations}
+                        {inspectedStations === totalStations && totalStations > 0 && (
+                          <span className="text-green-400">✓</span>
+                        )}
+                      </span>
+                    )}
+
+                    {case_.primary_technician_name && (
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
+                        <User className="w-3 h-3" />
+                        {case_.primary_technician_name}
+                      </span>
+                    )}
+
+                    {(case_.completed_date || case_.scheduled_date || case_.created_at) && (
+                      <span className="flex items-center gap-1 text-xs text-slate-500">
+                        <Calendar className="w-3 h-3" />
+                        {case_.completed_date
+                          ? formatDate(case_.completed_date)
+                          : case_.scheduled_date
+                          ? formatDate(case_.scheduled_date)
+                          : formatDate(case_.created_at)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Höger: Visa-knapp */}
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => setSelectedCase(case_)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1.5 shrink-0"
                 >
-                  <Eye className="w-4 h-4" />
-                  Visa detaljer
+                  <Eye className="w-3.5 h-3.5" />
+                  Visa
                 </Button>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          )
+        })}
       </div>
 
       {/* Modal för ärendedetaljer */}

@@ -22,7 +22,10 @@ import {
   Lightbulb,
   Package,
   Wrench,
-  ClipboardCheck
+  ClipboardCheck,
+  ChevronDown,
+  ChevronUp,
+  Camera
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -34,7 +37,11 @@ import CloseWarningDialog from './CloseWarningDialog'
 import RevisitHistorySection, { RevisitHistoryEntry } from '../shared/RevisitHistorySection'
 import CaseJourneyTimeline from './CaseJourneyTimeline'
 import TrafficLightBadge from '../organisation/TrafficLightBadge'
+import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
+import type { Photo } from './InspectionPhotoLightbox'
 import { generatePDFReport } from '../../utils/pdfReportGenerator'
+import { generateInspectionPDF, generateInspectionExcel } from '../../services/inspectionReportService'
+import { getInspectionPhotoUrl } from '../../services/inspectionSessionService'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
@@ -166,6 +173,15 @@ export default function CaseDetailsModal({
     activityCount?: number
   } | null>(null)
   const [loadingSession, setLoadingSession] = useState(false)
+  const [stationInspections, setStationInspections] = useState<{
+    outdoor: any[]
+    indoor: any[]
+  } | null>(null)
+  const [showStationDetails, setShowStationDetails] = useState(false)
+  const [inspectionPhotos, setInspectionPhotos] = useState<Photo[]>([])
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [generatingReport, setGeneratingReport] = useState<'pdf' | 'excel' | null>(null)
   const { profile } = useAuth()
 
   // Hook för läskvitton
@@ -240,6 +256,8 @@ export default function CaseDetailsModal({
       if (fallbackData?.service_type === 'inspection' && caseId) {
         setLoadingSession(true)
         setInspectionSession(null)
+        setStationInspections(null)
+        setInspectionPhotos([])
         supabase
           .from('station_inspection_sessions')
           .select('id, status, completed_at, total_outdoor_stations, total_indoor_stations, inspected_outdoor_stations, inspected_indoor_stations, notes, technician:technicians(name)')
@@ -250,11 +268,44 @@ export default function CaseDetailsModal({
           .then(async ({ data }) => {
             if (data) {
               const sessionId = (data as any).id as string
-              const [od, ind] = await Promise.all([
+
+              // Hämta stationsinspektioner + aktivitetsräknare parallellt
+              const [odActivity, indActivity, outdoorData, indoorData] = await Promise.all([
                 supabase.from('outdoor_station_inspections').select('id', { count: 'exact', head: true }).eq('session_id', sessionId).eq('status', 'activity'),
-                supabase.from('indoor_station_inspections').select('id', { count: 'exact', head: true }).eq('session_id', sessionId).eq('status', 'activity')
+                supabase.from('indoor_station_inspections').select('id', { count: 'exact', head: true }).eq('session_id', sessionId).eq('status', 'activity'),
+                supabase.from('outdoor_station_inspections').select('id, status, findings, measurement_value, measurement_unit, photo_path, inspected_at, station:equipment_placements(id, serial_number, equipment_type, station_type_data:station_types(name, color, measurement_label, measurement_unit)), preparation:preparations(name)').eq('session_id', sessionId).order('inspected_at'),
+                supabase.from('indoor_station_inspections').select('id, status, findings, measurement_value, measurement_unit, photo_path, inspected_at, station:indoor_stations(id, station_number, station_type, floor_plan:floor_plans(name), station_type_data:station_types(name, color, measurement_label, measurement_unit)), preparation:preparations(name)').eq('session_id', sessionId).order('inspected_at')
               ])
-              setInspectionSession({ ...(data as any), activityCount: (od.count || 0) + (ind.count || 0) })
+
+              setInspectionSession({ ...(data as any), activityCount: (odActivity.count || 0) + (indActivity.count || 0) })
+              const outdoor = outdoorData.data || []
+              const indoor = indoorData.data || []
+              setStationInspections({ outdoor, indoor })
+
+              // Hämta signed URLs för foton
+              const allWithPhotos = [
+                ...outdoor.filter((r: any) => r.photo_path).map((r: any) => ({ ...r, stationType: 'outdoor' as const })),
+                ...indoor.filter((r: any) => r.photo_path).map((r: any) => ({ ...r, stationType: 'indoor' as const }))
+              ]
+              if (allWithPhotos.length > 0) {
+                const photoPromises = allWithPhotos.map(async (r) => {
+                  const url = await getInspectionPhotoUrl(r.photo_path)
+                  if (!url) return null
+                  const stationNumber = r.stationType === 'outdoor'
+                    ? (r.station?.serial_number || 'Utomhus')
+                    : (r.station?.station_number || 'Inomhus')
+                  return {
+                    url,
+                    stationNumber,
+                    stationType: r.stationType,
+                    status: r.status,
+                    inspectedAt: r.inspected_at,
+                    findings: r.findings || undefined
+                  } as Photo
+                })
+                const photos = (await Promise.all(photoPromises)).filter(Boolean) as Photo[]
+                setInspectionPhotos(photos)
+              }
             } else {
               setInspectionSession(null)
             }
@@ -474,6 +525,30 @@ export default function CaseDetailsModal({
     } catch (error) {
       console.error('Error generating PDF:', error)
       alert('Kunde inte generera PDF-rapport')
+    }
+  }
+
+  const handleInspectionPDF = async () => {
+    if (!inspectionSession) return
+    setGeneratingReport('pdf')
+    try {
+      await generateInspectionPDF(inspectionSession.id)
+    } catch (error) {
+      toast.error('Kunde inte generera PDF-rapport')
+    } finally {
+      setGeneratingReport(null)
+    }
+  }
+
+  const handleInspectionExcel = async () => {
+    if (!inspectionSession) return
+    setGeneratingReport('excel')
+    try {
+      await generateInspectionExcel(inspectionSession.id)
+    } catch (error) {
+      toast.error('Kunde inte generera Excel-rapport')
+    } finally {
+      setGeneratingReport(null)
     }
   }
 
@@ -724,53 +799,177 @@ export default function CaseDetailsModal({
                         Hämtar kontrolldata...
                       </div>
                     ) : inspectionSession ? (
-                      <div className="p-3 bg-slate-800/50 rounded-lg space-y-3">
-                        <div>
-                          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                            <span>Kontrollerade stationer</span>
-                            <span className="font-medium text-white">
-                              {inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations}
-                              {' / '}
-                              {inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations}
-                            </span>
+                      <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                        {/* Progress + status-chips */}
+                        <div className="p-3 space-y-3">
+                          <div>
+                            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                              <span>Kontrollerade stationer</span>
+                              <span className="font-medium text-white">
+                                {inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations}
+                                {' / '}
+                                {inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations}
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-blue-500 rounded-full transition-all"
+                                style={{
+                                  width: `${Math.round(
+                                    ((inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations) /
+                                      Math.max(inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations, 1)) * 100
+                                  )}%`
+                                }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-blue-500 rounded-full transition-all"
-                              style={{
-                                width: `${Math.round(
-                                  ((inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations) /
-                                    Math.max(inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations, 1)) * 100
-                                )}%`
-                              }}
-                            />
+                          <div className="flex flex-wrap gap-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              inspectionSession.status === 'completed'
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : inspectionSession.status === 'in_progress'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-slate-500/20 text-slate-400'
+                            }`}>
+                              {inspectionSession.status === 'completed' ? 'Genomförd' :
+                               inspectionSession.status === 'in_progress' ? 'Pågår' : 'Schemalagd'}
+                            </span>
+                            {/* OK-count */}
+                            {stationInspections && (() => {
+                              const all = [...stationInspections.outdoor, ...stationInspections.indoor]
+                              const okCount = all.filter(r => r.status === 'ok').length
+                              const activityCount = all.filter(r => r.status === 'activity').length
+                              const needsServiceCount = all.filter(r => r.status === 'needs_service').length
+                              return (
+                                <>
+                                  {okCount > 0 && (
+                                    <span className="px-2 py-1 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                                      {okCount} OK
+                                    </span>
+                                  )}
+                                  {activityCount > 0 && (
+                                    <span className="px-2 py-1 rounded text-xs font-medium bg-amber-500/20 text-amber-400">
+                                      {activityCount} med aktivitet
+                                    </span>
+                                  )}
+                                  {needsServiceCount > 0 && (
+                                    <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
+                                      {needsServiceCount} åtgärd krävs
+                                    </span>
+                                  )}
+                                </>
+                              )
+                            })()}
+                            {inspectionSession.completed_at && (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-slate-700/50 text-slate-300">
+                                Avslutad {new Date(inspectionSession.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                            )}
                           </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            inspectionSession.status === 'completed'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : inspectionSession.status === 'in_progress'
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-slate-500/20 text-slate-400'
-                          }`}>
-                            {inspectionSession.status === 'completed' ? 'Genomförd' :
-                             inspectionSession.status === 'in_progress' ? 'Pågår' : 'Schemalagd'}
-                          </span>
-                          {inspectionSession.activityCount !== undefined && inspectionSession.activityCount > 0 && (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-amber-500/20 text-amber-400">
-                              {inspectionSession.activityCount} station{inspectionSession.activityCount !== 1 ? 'er' : ''} med aktivitet
-                            </span>
-                          )}
-                          {inspectionSession.completed_at && (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-slate-700/50 text-slate-300">
-                              Avslutad {new Date(inspectionSession.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </span>
+                          {inspectionSession.notes && (
+                            <p className="text-sm text-slate-300 border-t border-slate-700/50 pt-2">{inspectionSession.notes}</p>
                           )}
                         </div>
-                        {inspectionSession.notes && (
-                          <p className="text-sm text-slate-300 border-t border-slate-700/50 pt-2">{inspectionSession.notes}</p>
+
+                        {/* Per-station-lista */}
+                        {stationInspections && (stationInspections.outdoor.length + stationInspections.indoor.length) > 0 && (
+                          <div className="border-t border-slate-700/50">
+                            <button
+                              onClick={() => setShowStationDetails(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/30 transition-colors"
+                            >
+                              <span>Stationsdetaljer ({stationInspections.outdoor.length + stationInspections.indoor.length} stationer)</span>
+                              {showStationDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </button>
+                            {showStationDetails && (
+                              <div className="divide-y divide-slate-700/40 max-h-72 overflow-y-auto">
+                                {[
+                                  ...stationInspections.outdoor.map((r: any) => ({
+                                    ...r,
+                                    _type: 'outdoor' as const,
+                                    _label: r.station?.serial_number || r.station?.equipment_type || 'Utomhus',
+                                    _color: r.station?.station_type_data?.color || '#6b7280'
+                                  })),
+                                  ...stationInspections.indoor.map((r: any) => ({
+                                    ...r,
+                                    _type: 'indoor' as const,
+                                    _label: r.station?.station_number || r.station?.station_type || 'Inomhus',
+                                    _color: r.station?.station_type_data?.color || '#6b7280'
+                                  }))
+                                ].map((row: any) => {
+                                  const statusChip: Record<string, { label: string; cls: string }> = {
+                                    ok: { label: 'OK', cls: 'bg-green-500/20 text-green-400' },
+                                    activity: { label: 'Aktivitet', cls: 'bg-amber-500/20 text-amber-400' },
+                                    needs_service: { label: 'Åtgärd', cls: 'bg-red-500/20 text-red-400' },
+                                    replaced: { label: 'Ersatt', cls: 'bg-blue-500/20 text-blue-400' }
+                                  }
+                                  const chip = statusChip[row.status] || { label: row.status, cls: 'bg-slate-500/20 text-slate-400' }
+                                  return (
+                                    <div key={row.id} className="px-3 py-2 hover:bg-slate-700/20">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row._color }} />
+                                        <span className="text-xs text-white flex-1 truncate">{row._label}</span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${chip.cls}`}>{chip.label}</span>
+                                        {row.measurement_value != null && (
+                                          <span className="text-[10px] text-slate-400">{row.measurement_value}{row.measurement_unit || row.station?.station_type_data?.measurement_unit || ''}</span>
+                                        )}
+                                        {row.photo_path && <Camera className="w-3 h-3 text-slate-500" />}
+                                      </div>
+                                      {row.findings && (
+                                        <p className="mt-0.5 ml-4 text-[10px] text-slate-400 line-clamp-1">{row.findings}</p>
+                                      )}
+                                      {row.preparation?.name && (
+                                        <p className="mt-0.5 ml-4 text-[10px] text-blue-400">{row.preparation.name}</p>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
                         )}
+
+                        {/* Foton */}
+                        {inspectionPhotos.length > 0 && (
+                          <div className="border-t border-slate-700/50 p-3 space-y-2">
+                            <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                              <Camera className="w-3.5 h-3.5" />
+                              Foton från kontrollen ({inspectionPhotos.length})
+                            </p>
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {inspectionPhotos.map((photo, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => { setLightboxIndex(i); setLightboxOpen(true) }}
+                                  className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-slate-700 hover:border-blue-500 transition-colors"
+                                >
+                                  <img src={photo.url} alt={photo.stationNumber} className="w-full h-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Rapport-nedladdning */}
+                        <div className="border-t border-slate-700/50 p-3 flex items-center gap-2">
+                          <span className="text-xs text-slate-400 mr-1">Ladda ner rapport:</span>
+                          <button
+                            onClick={handleInspectionPDF}
+                            disabled={generatingReport !== null}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <FileDown className="w-3.5 h-3.5" />
+                            {generatingReport === 'pdf' ? 'Genererar...' : 'PDF'}
+                          </button>
+                          <button
+                            onClick={handleInspectionExcel}
+                            disabled={generatingReport !== null}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            {generatingReport === 'excel' ? 'Genererar...' : 'Excel'}
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="p-3 bg-slate-800/30 border border-dashed border-slate-700/50 rounded-lg">
@@ -1343,6 +1542,14 @@ export default function CaseDetailsModal({
         onClose={() => setShowCloseWarning(false)}
         onConfirmClose={handleConfirmClose}
         onGoBack={handleGoBack}
+      />
+
+      {/* Foto-lightbox för inspektionsbilder */}
+      <InspectionPhotoLightbox
+        photos={inspectionPhotos}
+        initialIndex={lightboxIndex}
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
       />
     </div>,
     document.body
