@@ -1746,7 +1746,6 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           </div>
         </div>
       )}
-    </div>
     </>
   )
 }
