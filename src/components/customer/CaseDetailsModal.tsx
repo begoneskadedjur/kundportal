@@ -7,22 +7,16 @@ import {
   Clock,
   User,
   MapPin,
-  DollarSign,
   FileText,
   Images,
   AlertCircle,
-  Bug,
   Download,
   Eye,
   Play,
-  Mail,
-  Phone,
   FileDown,
   Flag,
   Lightbulb,
   Package,
-  Wrench,
-  ClipboardCheck,
   ChevronDown,
   ChevronUp,
   Camera
@@ -573,977 +567,851 @@ export default function CaseDetailsModal({
     ? fallbackData?.case_number
     : taskDetails?.task_id
 
-  // Använd Portal för att rendera modalen direkt på body
-  // Detta säkerställer att modalen alltid visas ovanför alla andra element
+  // Statusfärg som ren textfärg (ingen pill)
+  const getStatusDotColor = (status: string): string => {
+    if (status === 'open' || status === 'Öppen') return '#60a5fa'
+    if (status === 'Bokad') return '#facc15'
+    if (status === 'Avslutat') return '#34d399'
+    if (status === 'Borttaget') return '#94a3b8'
+    if (status === 'Återbesök') return '#a78bfa'
+    if (status === 'Offert skickad' || status === 'Offert signerad - boka in') return '#fb923c'
+    if (status === 'Reklamation') return '#f87171'
+    return '#94a3b8'
+  }
+
+  const getStatusDisplayLabel = (status: string): string => {
+    const map: Record<string, string> = {
+      'open': 'Öppen', 'Öppen': 'Öppen', 'Bokad': 'Bokad',
+      'Avslutat': 'Genomförd', 'Borttaget': 'Avbokat',
+      'Offert skickad': 'Offert skickad', 'Offert signerad - boka in': 'Offert signerad',
+      'Bomkörning': 'Bomkörning', 'Ombokning': 'Ombokning', 'Reklamation': 'Reklamation',
+      'Återbesök': 'Återbesök',
+    }
+    return map[status] ?? status
+  }
+
+  const serviceTypeLabel = (t?: string | null) => {
+    if (t === 'inspection') return 'Avtalat servicebesök'
+    if (t === 'establishment') return 'Etablering'
+    if (t === 'acute') return 'Akut'
+    if (t === 'service') return 'Servicebesök'
+    return t || ''
+  }
+
   return createPortal(
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <Card className="relative">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-            <div className="flex items-start gap-3">
-              {/* Trafikljusikon */}
-              {(fallbackData?.pest_level !== undefined || fallbackData?.problem_rating !== undefined) && (
-                <TrafficLightBadge
-                  pestLevel={fallbackData?.pest_level}
-                  problemRating={fallbackData?.problem_rating}
-                  size="large"
-                  showTooltip={true}
-                />
-              )}
-              <div>
-                <h2 className="text-xl font-bold text-white">
-                  {displayTitle}
-                </h2>
-                {displayCaseNumber && (
-                  <p className="text-slate-400 text-sm">
-                    Ärende #{displayCaseNumber}
-                  </p>
-                )}
-                {/* Visa kundinfo i header om tillgänglig */}
-                {customerInfo && (
-                  <p className="text-slate-300 text-sm">
-                    {customerInfo.company_name} • {customerInfo.org_number}
-                  </p>
-                )}
-              </div>
-            </div>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div className="w-full max-w-3xl max-h-[92vh] flex flex-col bg-slate-900 border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden">
 
-            <div className="flex items-center gap-2">
-              {/* PDF-rapport knapp med förbättrad loading state */}
-              {taskDetails && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleGeneratePDF}
-                  className="flex items-center gap-2"
-                  disabled={loading}
-                >
-                  <FileDown className="w-4 h-4" />
-                  {loading ? 'Genererar...' : 'Ladda ner rapport'}
-                </Button>
+        {/* ── HEADER ─────────────────────────────────────────── */}
+        <div className="px-6 py-5 border-b border-slate-700/50 flex items-start justify-between shrink-0">
+          <div className="flex-1 min-w-0 pr-4">
+            {displayCaseNumber && (
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                {useFallback ? `BE-${displayCaseNumber}` : `#${displayCaseNumber}`}
+              </p>
+            )}
+            <h2 className="text-lg font-semibold text-white leading-snug">
+              {displayTitle}
+            </h2>
+            <div className="flex items-center gap-4 mt-1.5 flex-wrap">
+              {/* Status som prick + text */}
+              {(fallbackData?.status || taskDetails?.task_info.status) && (() => {
+                const st = fallbackData?.status || taskDetails?.task_info.status || ''
+                const dot = getStatusDotColor(st)
+                return (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: dot }}>
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dot }} />
+                    {getStatusDisplayLabel(st)}
+                  </span>
+                )
+              })()}
+              {/* Servicetyp */}
+              {fallbackData?.service_type && (
+                <span className="text-xs text-slate-500">
+                  {serviceTypeLabel(fallbackData.service_type)}
+                </span>
               )}
-
-              <Button variant="ghost" size="sm" onClick={handleClose}>
-                <X className="w-5 h-5" />
-              </Button>
+              {/* Tekniker */}
+              {fallbackData?.primary_technician_name && (
+                <span className="text-xs text-slate-500 flex items-center gap-1">
+                  <User className="w-3 h-3" />
+                  {fallbackData.primary_technician_name}
+                </span>
+              )}
             </div>
           </div>
+          <button
+            onClick={handleClose}
+            className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
-          {/* Content */}
-          <div className="p-5">
-            {loading && (
-              <div className="flex items-center justify-center py-8">
-                <LoadingSpinner />
-              </div>
-            )}
+        {/* ── CONTENT ────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
-            {error && !useFallback && (
-              <div className="flex items-center justify-center py-8 text-red-400">
-                <AlertCircle className="w-5 h-5 mr-2" />
-                {error}
-              </div>
-            )}
+          {/* Loading */}
+          {loading && (
+            <div className="flex items-center justify-center py-10">
+              <LoadingSpinner />
+            </div>
+          )}
 
-            {/* Fallback-vy när ClickUp-data saknas */}
-            {useFallback && fallbackData && !error && (
-              <div className="space-y-4">
-                {/* Status och datum */}
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-center gap-4">
-                    {fallbackData.status && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-400">Status:</span>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium text-white ${getStatusColor(fallbackData.status)}`}>
-                          {fallbackData.status.toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    {/* Tjänstetyp */}
-                    {fallbackData.service_type && (
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        fallbackData.service_type === 'inspection'
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                          : fallbackData.service_type === 'establishment'
-                          ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                          : fallbackData.service_type === 'acute'
-                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      }`}>
-                        {fallbackData.service_type === 'inspection' ? 'Avtalat Servicebesök' :
-                         fallbackData.service_type === 'establishment' ? 'Etablering' :
-                         fallbackData.service_type === 'acute' ? 'Akut' : 'Servicebesök'}
-                      </span>
-                    )}
-                  </div>
+          {/* Error */}
+          {error && !useFallback && (
+            <div className="flex items-center justify-center py-10 text-red-400 gap-2 text-sm">
+              <AlertCircle className="w-4 h-4" />
+              {error}
+            </div>
+          )}
 
-                  {fallbackData.completed_date && (
-                    <div className="text-sm text-slate-400">
-                      Slutfört: {new Date(fallbackData.completed_date).toLocaleDateString('sv-SE', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
+          {/* ── FALLBACK-VY ────────────────────────────────── */}
+          {useFallback && fallbackData && !error && (
+            <>
+              {/* Bokad tid */}
+              {(fallbackData.start_date || fallbackData.scheduled_date) && (
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <Calendar className="w-4 h-4 shrink-0" />
+                  <span className="text-slate-500">Bokad:</span>
+                  {fallbackData.start_date ? (
+                    <span className="text-white">
+                      {new Date(fallbackData.start_date).toLocaleDateString('sv-SE', {
+                        weekday: 'long', day: 'numeric', month: 'long',
+                        timeZone: 'Europe/Stockholm'
                       })}
-                    </div>
+                      {' '}
+                      <span className="text-slate-400">
+                        {new Date(fallbackData.start_date).toLocaleTimeString('sv-SE', {
+                          hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm'
+                        })}
+                        {fallbackData.due_date && (
+                          <>
+                            {'–'}
+                            {new Date(fallbackData.due_date).toLocaleTimeString('sv-SE', {
+                              hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm'
+                            })}
+                          </>
+                        )}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-white">
+                      {new Date(fallbackData.scheduled_date!).toLocaleDateString('sv-SE', {
+                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                        timeZone: 'Europe/Stockholm'
+                      })}
+                    </span>
                   )}
                 </div>
+              )}
 
-                {/* Bokad tid */}
-                {(fallbackData.start_date || fallbackData.scheduled_date) && (
-                  <div className="flex items-center gap-2 text-sm bg-slate-800/50 px-3 py-2 rounded-lg">
-                    <Calendar className="w-4 h-4 text-blue-400" />
-                    <span className="text-slate-400">Bokad:</span>
-                    {fallbackData.start_date ? (
-                      // Privat/företag - har start och sluttid
-                      <span className="text-white font-medium">
-                        {new Date(fallbackData.start_date).toLocaleDateString('sv-SE', {
-                          weekday: 'short',
-                          day: 'numeric',
-                          month: 'short',
-                          timeZone: 'Europe/Stockholm'
-                        })}
-                        <span className="text-slate-400 mx-1">
-                          {new Date(fallbackData.start_date).toLocaleTimeString('sv-SE', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'Europe/Stockholm'
-                          })}
-                          {fallbackData.due_date && (
-                            <>
-                              {' - '}
-                              {new Date(fallbackData.due_date).toLocaleTimeString('sv-SE', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                timeZone: 'Europe/Stockholm'
-                              })}
-                            </>
-                          )}
-                        </span>
-                      </span>
-                    ) : (
-                      // Avtalskunder - endast datum
-                      <span className="text-white font-medium">
-                        {new Date(fallbackData.scheduled_date!).toLocaleDateString('sv-SE', {
-                          weekday: 'short',
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                          timeZone: 'Europe/Stockholm'
-                        })}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Situationsöversikt - Trafikljussystem */}
-                {(fallbackData.pest_level !== null || fallbackData.problem_rating !== null) && (
-                  <CustomerAssessmentPanel
-                    pestLevel={fallbackData.pest_level ?? null}
-                    problemRating={fallbackData.problem_rating ?? null}
-                  />
-                )}
-
-                {/* Läskvitto för kritiska ärenden */}
-                {needsAcknowledgment && (
-                  <CriticalAcknowledgmentBanner
-                    acknowledgment={acknowledgment}
-                    loading={acknowledgmentLoading}
-                    onAcknowledge={handleAcknowledge}
-                  />
-                )}
-
-                {/* Ärendets utveckling - Tidslinje med trafikljushistorik */}
-                <CaseJourneyTimeline
-                  caseId={caseId}
-                  currentPestLevel={fallbackData.pest_level}
-                  currentProblemRating={fallbackData.problem_rating}
-                  assessmentDate={fallbackData.assessment_date}
-                  assessedBy={fallbackData.assessed_by}
-                  defaultExpanded={true}
+              {/* Kritisk bekräftelse */}
+              {needsAcknowledgment && (
+                <CriticalAcknowledgmentBanner
+                  acknowledgment={acknowledgment}
+                  loading={acknowledgmentLoading}
+                  onAcknowledge={handleAcknowledge}
                 />
+              )}
 
-                {/* Beskrivning */}
-                {fallbackData.description && (
-                  <div className="space-y-1.5">
-                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-400" />
-                      Beskrivning
-                    </h3>
-                    <div className="p-3 bg-slate-800/50 rounded-lg">
-                      <p className="text-sm text-slate-200 whitespace-pre-wrap">{fallbackData.description}</p>
-                    </div>
-                  </div>
-                )}
+              {/* Situationsöversikt */}
+              {(fallbackData.pest_level !== null && fallbackData.pest_level !== undefined ||
+                fallbackData.problem_rating !== null && fallbackData.problem_rating !== undefined) && (
+                <CustomerAssessmentPanel
+                  pestLevel={fallbackData.pest_level ?? null}
+                  problemRating={fallbackData.problem_rating ?? null}
+                />
+              )}
 
-                {/* Arbetsrapport */}
-                {fallbackData.work_report && fallbackData.work_report.trim() !== '' && (
-                  <div className="space-y-1.5">
-                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <Wrench className="w-4 h-4 text-blue-400" />
-                      Arbetsrapport
-                    </h3>
-                    <div className="p-3 bg-slate-800/50 rounded-lg">
-                      <p className="text-sm text-slate-200 whitespace-pre-wrap">{fallbackData.work_report}</p>
-                    </div>
-                  </div>
-                )}
+              {/* Ärendets utveckling */}
+              <CaseJourneyTimeline
+                caseId={caseId}
+                currentPestLevel={fallbackData.pest_level}
+                currentProblemRating={fallbackData.problem_rating}
+                assessmentDate={fallbackData.assessment_date}
+                assessedBy={fallbackData.assessed_by}
+                defaultExpanded={true}
+              />
 
-                {/* Avtalat Servicebesök — inspektionsutfall */}
-                {fallbackData.service_type === 'inspection' && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <ClipboardCheck className="w-4 h-4 text-blue-400" />
+              {/* ── INSPEKTIONSRESULTAT ── */}
+              {fallbackData.service_type === 'inspection' && (
+                <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
+                  {/* Sektionsrubrik */}
+                  <div className="px-4 pt-4 pb-3 border-b border-slate-700/40">
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Resultat av avtalat servicebesök
                       {inspectionSession?.completed_at && (
-                        <span className="text-slate-400 font-normal">
-                          — {new Date(inspectionSession.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        <span className="ml-2 normal-case font-normal text-slate-500">
+                          {new Date(inspectionSession.completed_at).toLocaleDateString('sv-SE', {
+                            day: 'numeric', month: 'long', year: 'numeric'
+                          })}
                         </span>
                       )}
-                    </h3>
-                    {loadingSession ? (
-                      <div className="p-3 bg-slate-800/50 rounded-lg flex items-center gap-2 text-slate-400 text-sm">
-                        <div className="w-3 h-3 border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin" />
-                        Hämtar kontrolldata...
-                      </div>
-                    ) : inspectionSession ? (
-                      <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-                        {/* Progress + status-chips */}
-                        <div className="p-3 space-y-3">
+                    </p>
+                  </div>
+
+                  {loadingSession ? (
+                    <div className="px-4 py-6 flex items-center gap-2 text-slate-400 text-sm">
+                      <div className="w-4 h-4 border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin" />
+                      Hämtar kontrolldata...
+                    </div>
+                  ) : inspectionSession ? (
+                    <>
+                      {/* Sammanfattning */}
+                      <div className="px-4 py-4">
+                        <div className="grid grid-cols-3 gap-4 mb-4">
                           <div>
-                            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                              <span>Kontrollerade stationer</span>
-                              <span className="font-medium text-white">
-                                {inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations}
-                                {' / '}
-                                {inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations}
+                            <p className="text-xs text-slate-500 mb-0.5">Kontrollerade</p>
+                            <p className="text-2xl font-bold text-white leading-none">
+                              {inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations}
+                              <span className="text-sm font-normal text-slate-500 ml-1">
+                                / {inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations}
                               </span>
-                            </div>
-                            <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-blue-500 rounded-full transition-all"
-                                style={{
-                                  width: `${Math.round(
-                                    ((inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations) /
-                                      Math.max(inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations, 1)) * 100
-                                  )}%`
-                                }}
-                              />
-                            </div>
+                            </p>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              inspectionSession.status === 'completed'
-                                ? 'bg-emerald-500/20 text-emerald-400'
-                                : inspectionSession.status === 'in_progress'
-                                ? 'bg-amber-500/20 text-amber-400'
-                                : 'bg-slate-500/20 text-slate-400'
-                            }`}>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-0.5">Status</p>
+                            <p className="text-sm font-medium text-emerald-400">
                               {inspectionSession.status === 'completed' ? 'Genomförd' :
                                inspectionSession.status === 'in_progress' ? 'Pågår' : 'Schemalagd'}
-                            </span>
-                            {/* OK-count */}
-                            {stationInspections && (() => {
-                              const all = [...stationInspections.outdoor, ...stationInspections.indoor]
-                              const okCount = all.filter(r => r.status === 'ok').length
-                              const activityCount = all.filter(r => r.status === 'activity').length
-                              const needsServiceCount = all.filter(r => r.status === 'needs_service').length
-                              return (
-                                <>
-                                  {okCount > 0 && (
-                                    <span className="px-2 py-1 rounded text-xs font-medium bg-green-500/20 text-green-400">
-                                      {okCount} OK
-                                    </span>
-                                  )}
-                                  {activityCount > 0 && (
-                                    <span className="px-2 py-1 rounded text-xs font-medium bg-amber-500/20 text-amber-400">
-                                      {activityCount} med aktivitet
-                                    </span>
-                                  )}
-                                  {needsServiceCount > 0 && (
-                                    <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
-                                      {needsServiceCount} åtgärd krävs
-                                    </span>
-                                  )}
-                                </>
-                              )
-                            })()}
+                            </p>
                           </div>
-                          {inspectionSession.notes && (
-                            <p className="text-sm text-slate-300 border-t border-slate-700/50 pt-2">{inspectionSession.notes}</p>
+                          {inspectionSession.technician && (
+                            <div>
+                              <p className="text-xs text-slate-500 mb-0.5">Tekniker</p>
+                              <p className="text-sm text-white truncate">{(inspectionSession.technician as any).name}</p>
+                            </div>
                           )}
                         </div>
+                        {/* Progress bar */}
+                        <div className="h-px bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full transition-all"
+                            style={{
+                              width: `${Math.round(
+                                ((inspectionSession.inspected_outdoor_stations + inspectionSession.inspected_indoor_stations) /
+                                  Math.max(inspectionSession.total_outdoor_stations + inspectionSession.total_indoor_stations, 1)) * 100
+                              )}%`
+                            }}
+                          />
+                        </div>
+                      </div>
 
-                        {/* Per-station-lista */}
-                        {stationInspections && (stationInspections.outdoor.length + stationInspections.indoor.length) > 0 && (
-                          <div className="border-t border-slate-700/50">
-                            <button
-                              onClick={() => setShowStationDetails(v => !v)}
-                              className="w-full flex items-center justify-between px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/30 transition-colors"
-                            >
-                              <span>Stationsdetaljer ({stationInspections.outdoor.length + stationInspections.indoor.length} stationer)</span>
-                              {showStationDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                            </button>
-                            {showStationDetails && (
-                              <div className="divide-y divide-slate-700/40 max-h-72 overflow-y-auto">
-                                {[
-                                  ...stationInspections.outdoor.map((r: any) => ({
-                                    ...r,
-                                    _type: 'outdoor' as const,
-                                    _label: r.station?.station_type_data?.name || r.station?.equipment_type || 'Utomhus',
-                                    _color: r.station?.station_type_data?.color || '#6b7280'
-                                  })),
-                                  ...stationInspections.indoor.map((r: any) => ({
-                                    ...r,
-                                    _type: 'indoor' as const,
-                                    _label: r.station?.station_type_data?.name || r.station?.station_type || 'Inomhus',
-                                    _color: r.station?.station_type_data?.color || '#6b7280'
-                                  }))
-                                ].map((row: any) => {
-                                  const statusLabel = getInspStatusLabel(row.status)
-                                  const statusColor = getInspStatusColor(row.status)
-                                  const unit = row.measurement_unit || row.station?.station_type_data?.measurement_unit || ''
-                                  const unitLabel: Record<string, string> = { gram: 'g', st: 'st', ml: 'ml', procent: '%', kg: 'kg' }
-                                  const prepLabel = row.preparation?.name
-                                    ? `${row.preparation.name}${row.preparation.registration_number ? ` (${row.preparation.registration_number})` : ''}`
-                                    : null
-                                  return (
-                                    <div key={row.id} className="px-3 py-2 hover:bg-slate-700/20">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row._color }} />
-                                        <span className="text-xs text-white flex-1 truncate">{row._label}</span>
-                                        <span
-                                          className="px-1.5 py-0.5 rounded text-[10px] font-medium"
-                                          style={{ backgroundColor: `${statusColor}20`, color: statusColor }}
-                                        >
-                                          {statusLabel}
-                                        </span>
-                                        {row.measurement_value != null && (
-                                          <span className="text-[10px] text-slate-400">{row.measurement_value} {unitLabel[unit] || unit}</span>
-                                        )}
-                                        {row.photo_path && <Camera className="w-3 h-3 text-slate-500" />}
-                                      </div>
-                                      {row.findings && (
-                                        <p className="mt-0.5 ml-4 text-[10px] text-slate-400 line-clamp-1">{row.findings}</p>
-                                      )}
-                                      {prepLabel && (
-                                        <p className="mt-0.5 ml-4 text-[10px] text-blue-400">{prepLabel}</p>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
+                      {/* Aktivitetssummering */}
+                      {stationInspections && (() => {
+                        const all = [...stationInspections.outdoor, ...stationInspections.indoor]
+                        const okCount = all.filter(r => r.status === 'ok' || r.status === 'none').length
+                        const activityCount = all.filter(r => r.status === 'activity' || r.status === 'medium' || r.status === 'high').length
+                        const needsServiceCount = all.filter(r => r.status === 'needs_service' || r.status === 'low').length
+                        if (okCount + activityCount + needsServiceCount === 0) return null
+                        return (
+                          <div className="px-4 py-3 border-t border-slate-700/40 flex gap-6">
+                            {okCount > 0 && (
+                              <span className="flex items-center gap-1.5 text-xs text-slate-300">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                {okCount} utan aktivitet
+                              </span>
+                            )}
+                            {activityCount > 0 && (
+                              <span className="flex items-center gap-1.5 text-xs text-slate-300">
+                                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                {activityCount} med aktivitet
+                              </span>
+                            )}
+                            {needsServiceCount > 0 && (
+                              <span className="flex items-center gap-1.5 text-xs text-slate-300">
+                                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                {needsServiceCount} åtgärd noterad
+                              </span>
                             )}
                           </div>
-                        )}
+                        )
+                      })()}
 
-                        {/* Foton */}
-                        {inspectionPhotos.length > 0 && (
-                          <div className="border-t border-slate-700/50 p-3 space-y-2">
-                            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                              <Camera className="w-3.5 h-3.5" />
-                              Foton från kontrollen ({inspectionPhotos.length})
-                            </p>
-                            <div className="flex gap-2 overflow-x-auto pb-1">
-                              {inspectionPhotos.map((photo, i) => (
-                                <button
-                                  key={i}
-                                  onClick={() => { setLightboxIndex(i); setLightboxOpen(true) }}
-                                  className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-slate-700 hover:border-blue-500 transition-colors"
-                                >
-                                  <img src={photo.url} alt={photo.stationNumber} className="w-full h-full object-cover" />
-                                </button>
-                              ))}
-                            </div>
+                      {/* Stationstabell */}
+                      {stationInspections && (stationInspections.outdoor.length + stationInspections.indoor.length) > 0 && (
+                        <div className="border-t border-slate-700/40">
+                          <button
+                            onClick={() => setShowStationDetails(v => !v)}
+                            className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800/40 transition-colors"
+                          >
+                            <span className="uppercase tracking-wider font-medium">
+                              Stationer ({stationInspections.outdoor.length + stationInspections.indoor.length})
+                            </span>
+                            {showStationDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </button>
+
+                          {showStationDetails && (() => {
+                            const unitLabel: Record<string, string> = { gram: 'g', st: 'st', ml: 'ml', procent: '%', kg: 'kg' }
+                            const rows = [
+                              ...stationInspections.outdoor.map((r: any) => ({
+                                ...r, _label: r.station?.station_type_data?.name || r.station?.equipment_type || 'Utomhus',
+                                _color: r.station?.station_type_data?.color || '#6b7280'
+                              })),
+                              ...stationInspections.indoor.map((r: any) => ({
+                                ...r, _label: r.station?.station_type_data?.name || r.station?.station_type || 'Inomhus',
+                                _color: r.station?.station_type_data?.color || '#6b7280'
+                              }))
+                            ]
+                            return (
+                              <>
+                                {/* Kolumnhuvud */}
+                                <div className="px-4 py-2 bg-slate-900/40 flex items-center gap-3 text-[10px] text-slate-500 uppercase tracking-wider border-t border-slate-700/30">
+                                  <span className="flex-1">Station</span>
+                                  <span className="w-28 text-right">Status</span>
+                                  <span className="w-16 text-right">Mätvärde</span>
+                                  <span className="w-5" />
+                                </div>
+                                <div className="divide-y divide-slate-700/30 max-h-80 overflow-y-auto">
+                                  {rows.map((row: any) => {
+                                    const statusLabel = getInspStatusLabel(row.status)
+                                    const statusColor = getInspStatusColor(row.status)
+                                    const unit = row.measurement_unit || row.station?.station_type_data?.measurement_unit || ''
+                                    const prepText = row.preparation?.name
+                                      ? `${row.preparation.name}${row.preparation.registration_number ? ` · Reg.nr: ${row.preparation.registration_number}` : ''}`
+                                      : null
+                                    return (
+                                      <div key={row.id} className="px-4 py-3 hover:bg-slate-800/40 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: row._color }} />
+                                          <span className="flex-1 text-sm text-white truncate">{row._label}</span>
+                                          <span
+                                            className="w-28 text-right text-xs font-medium shrink-0"
+                                            style={{ color: statusColor }}
+                                          >
+                                            {statusLabel}
+                                          </span>
+                                          <span className="w-16 text-right text-xs text-slate-500 shrink-0">
+                                            {row.measurement_value != null ? `${row.measurement_value} ${unitLabel[unit] || unit}` : ''}
+                                          </span>
+                                          <div className="w-5 shrink-0 flex justify-end">
+                                            {row.photo_path && <Camera className="w-3.5 h-3.5 text-slate-500" />}
+                                          </div>
+                                        </div>
+                                        {row.findings && (
+                                          <p className="mt-1 ml-[22px] text-xs text-slate-500 line-clamp-2">{row.findings}</p>
+                                        )}
+                                        {prepText && (
+                                          <p className="mt-0.5 ml-[22px] text-xs text-slate-400">{prepText}</p>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </>
+                            )
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Foton */}
+                      {inspectionPhotos.length > 0 && (
+                        <div className="border-t border-slate-700/40 px-4 py-3">
+                          <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                            Foton ({inspectionPhotos.length})
+                          </p>
+                          <div className="flex gap-2 overflow-x-auto pb-1">
+                            {inspectionPhotos.map((photo, i) => (
+                              <button
+                                key={i}
+                                onClick={() => { setLightboxIndex(i); setLightboxOpen(true) }}
+                                className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-slate-700 hover:border-slate-500 transition-colors"
+                              >
+                                <img src={photo.url} alt={photo.stationNumber} className="w-full h-full object-cover" />
+                              </button>
+                            ))}
                           </div>
-                        )}
-
-                        {/* Rapport-nedladdning */}
-                        <div className="border-t border-slate-700/50 p-3 flex items-center gap-2">
-                          <span className="text-xs text-slate-400 mr-1">Ladda ner rapport:</span>
-                          <button
-                            onClick={handleInspectionPDF}
-                            disabled={generatingReport !== null}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            <FileDown className="w-3.5 h-3.5" />
-                            {generatingReport === 'pdf' ? 'Genererar...' : 'PDF'}
-                          </button>
-                          <button
-                            onClick={handleInspectionExcel}
-                            disabled={generatingReport !== null}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            {generatingReport === 'excel' ? 'Genererar...' : 'Excel'}
-                          </button>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-slate-800/30 border border-dashed border-slate-700/50 rounded-lg">
-                        <p className="text-xs text-slate-500 mb-2">Kontrolldata fylls i efter genomfört servicebesök</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {['Kontrollerade stationer', 'Stationer med aktivitet', 'Genomförd datum', 'Teknikernotering'].map(label => (
-                            <div key={label} className="space-y-0.5">
-                              <p className="text-xs text-slate-500">{label}</p>
-                              <div className="h-4 bg-slate-700/40 rounded w-3/4" />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
 
-                {/* Etablering — preview om arbetsrapport saknas */}
-                {fallbackData.service_type === 'establishment' && !fallbackData.work_report && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <Package className="w-4 h-4 text-purple-400" />
-                      Etableringsrapport
-                    </h3>
-                    <div className="p-3 bg-slate-800/30 border border-dashed border-slate-700/50 rounded-lg">
-                      <p className="text-xs text-slate-500 mb-2">Etableringsresultat fylls i efter genomfört besök</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {['Installerade stationer', 'Utrustningstyp', 'Rapport', 'Rekommendationer'].map(label => (
-                          <div key={label} className="space-y-0.5">
-                            <p className="text-xs text-slate-500">{label}</p>
-                            <div className="h-4 bg-slate-700/40 rounded w-3/4" />
+                      {/* Rapport-nedladdning */}
+                      <div className="border-t border-slate-700/40 px-4 py-3 flex items-center gap-3">
+                        <span className="text-xs text-slate-500 mr-1">Ladda ner rapport</span>
+                        <button
+                          onClick={handleInspectionPDF}
+                          disabled={generatingReport !== null}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-300 transition-colors disabled:opacity-50"
+                        >
+                          <FileDown className="w-3.5 h-3.5" />
+                          {generatingReport === 'pdf' ? 'Genererar...' : 'PDF'}
+                        </button>
+                        <button
+                          onClick={handleInspectionExcel}
+                          disabled={generatingReport !== null}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-300 transition-colors disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          {generatingReport === 'excel' ? 'Genererar...' : 'Excel'}
+                        </button>
+                      </div>
+
+                      {/* Sessionnotering */}
+                      {inspectionSession.notes && (
+                        <div className="border-t border-slate-700/40 px-4 py-3">
+                          <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Teknikernotering</p>
+                          <p className="text-sm text-slate-300">{inspectionSession.notes}</p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="px-4 py-6">
+                      <p className="text-xs text-slate-500 mb-3">Kontrolldata fylls i efter genomfört servicebesök</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {['Kontrollerade stationer', 'Stationer med aktivitet', 'Genomförd datum', 'Teknikernotering'].map(label => (
+                          <div key={label}>
+                            <p className="text-xs text-slate-500 mb-1">{label}</p>
+                            <div className="h-3 bg-slate-700/40 rounded w-3/4" />
                           </div>
                         ))}
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Snabbinfo - professionella chips med textlabels */}
-                <div className="flex flex-wrap gap-2">
-                  {fallbackData.pest_type && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <span className="text-xs text-slate-400">Skadedjur:</span>
-                      <span className="text-sm text-white">{fallbackData.pest_type}</span>
-                    </div>
-                  )}
-                  {fallbackData.price && fallbackData.price > 0 && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <span className="text-xs text-slate-400">Pris:</span>
-                      <span className="text-sm text-white font-medium">{fallbackData.price} kr</span>
-                    </div>
-                  )}
-                  {fallbackData.time_spent_minutes !== undefined && fallbackData.time_spent_minutes > 0 && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                      <span className="text-xs text-slate-400">Tid:</span>
-                      <span className="text-sm text-white">
-                        {Math.floor(fallbackData.time_spent_minutes / 60) > 0
-                          ? `${Math.floor(fallbackData.time_spent_minutes / 60)}h ${fallbackData.time_spent_minutes % 60}min`
-                          : `${fallbackData.time_spent_minutes} min`
-                        }
-                      </span>
-                    </div>
                   )}
                 </div>
+              )}
 
-                {/* Adress med kartknapp */}
-                {fallbackData.address?.formatted_address && (
-                  <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
-                    <MapPin className="w-5 h-5 text-red-400 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-slate-400 mb-1">Adress</p>
-                      <p className="text-white font-medium">
-                        {fallbackData.address.formatted_address}
-                      </p>
-                      {fallbackData.location && (
-                        <button
-                          className="mt-2 text-blue-400 hover:text-blue-300 text-sm"
-                          onClick={() => {
-                            const { lat, lng } = fallbackData.location!;
-                            window.open(`https://maps.google.com?q=${lat},${lng}`, '_blank');
-                          }}
-                        >
-                          Visa på karta
-                        </button>
-                      )}
+              {/* Etablering — placeholder */}
+              {fallbackData.service_type === 'establishment' && !fallbackData.work_report && (
+                <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
+                  <div className="px-4 pt-4 pb-3 border-b border-slate-700/40">
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Etableringsrapport</p>
+                  </div>
+                  <div className="px-4 py-6">
+                    <p className="text-xs text-slate-500 mb-3">Etableringsresultat fylls i efter genomfört besök</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {['Installerade stationer', 'Utrustningstyp', 'Rapport', 'Rekommendationer'].map(label => (
+                        <div key={label}>
+                          <p className="text-xs text-slate-500 mb-1">{label}</p>
+                          <div className="h-3 bg-slate-700/40 rounded w-3/4" />
+                        </div>
+                      ))}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Beskrivning */}
+              {fallbackData.description && (
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Beskrivning</p>
+                  <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.description}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Arbetsrapport */}
+              {fallbackData.work_report && fallbackData.work_report.trim() !== '' && (
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Arbetsrapport</p>
+                  <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.work_report}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Rekommendationer */}
+              {fallbackData.recommendations && (
+                <div>
+                  <p className="text-xs font-medium text-amber-500/80 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Lightbulb className="w-3.5 h-3.5" />
+                    Teknikerns rekommendationer
+                  </p>
+                  <div className="bg-amber-500/5 border-l-2 border-amber-500/40 rounded-r-xl px-4 py-3">
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.recommendations}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Info-grid: Adress + Tekniker + Kontaktperson + Snabbinfo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Adress */}
+                {fallbackData.address?.formatted_address && (
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                      Adress
+                    </p>
+                    <p className="text-sm text-white">{fallbackData.address.formatted_address}</p>
+                    {fallbackData.location && (
+                      <button
+                        className="mt-2 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                        onClick={() => {
+                          const { lat, lng } = fallbackData.location!
+                          window.open(`https://maps.google.com?q=${lat},${lng}`, '_blank')
+                        }}
+                      >
+                        Visa på karta
+                      </button>
+                    )}
                   </div>
                 )}
 
-                {/* Kontaktperson och Tekniker i grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Kontaktperson */}
-                  {fallbackData.contact_person && (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                        <User className="w-4 h-4 text-blue-400" />
-                        Kontaktperson
-                      </h4>
-                      <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                          {fallbackData.contact_person.split(' ').map(n => n[0]).join('').slice(0,2)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium truncate">{fallbackData.contact_person}</p>
-                          {fallbackData.contact_email && (
-                            <p className="text-sm text-slate-400 truncate">{fallbackData.contact_email}</p>
-                          )}
-                          {fallbackData.contact_phone && (
-                            <p className="text-sm text-slate-400">{fallbackData.contact_phone}</p>
-                          )}
-                        </div>
-                        <div className="flex gap-1">
-                          {fallbackData.contact_email && (
-                            <button
-                              onClick={() => window.open(`mailto:${fallbackData.contact_email}`, '_blank')}
-                              className="p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-lg transition-colors"
-                              title="Skicka e-post"
-                            >
-                              <Mail className="w-4 h-4" />
-                            </button>
-                          )}
-                          {fallbackData.contact_phone && (
-                            <button
-                              onClick={() => window.open(`tel:${fallbackData.contact_phone}`, '_blank')}
-                              className="p-2 text-slate-400 hover:text-green-400 hover:bg-slate-700/50 rounded-lg transition-colors"
-                              title="Ring"
-                            >
-                              <Phone className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
+                {/* Tekniker */}
+                {fallbackData.primary_technician_name && (
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Tekniker</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-slate-300 text-xs font-semibold shrink-0">
+                        {fallbackData.primary_technician_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Ansvarig tekniker */}
-                  {fallbackData.primary_technician_name && (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                        <User className="w-4 h-4 text-green-400" />
-                        Ansvarig tekniker
-                      </h4>
-                      <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                          {fallbackData.primary_technician_name.split(' ').map(n => n[0]).join('').slice(0,2)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium truncate">{fallbackData.primary_technician_name}</p>
-                          {fallbackData.primary_technician_email && (
-                            <p className="text-sm text-slate-400 truncate">{fallbackData.primary_technician_email}</p>
-                          )}
-                        </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white font-medium truncate">{fallbackData.primary_technician_name}</p>
                         {fallbackData.primary_technician_email && (
-                          <button
-                            onClick={() => window.open(`mailto:${fallbackData.primary_technician_email}?subject=Fråga om ärende ${fallbackData.title || fallbackData.case_number}`, '_blank')}
-                            className="p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-lg transition-colors"
-                            title={`Skicka e-post till ${fallbackData.primary_technician_name}`}
+                          <a
+                            href={`mailto:${fallbackData.primary_technician_email}?subject=Fråga om ärende ${fallbackData.title || fallbackData.case_number}`}
+                            className="text-xs text-slate-400 hover:text-slate-200 transition-colors truncate block"
                           >
-                            <Mail className="w-4 h-4" />
-                          </button>
+                            {fallbackData.primary_technician_email}
+                          </a>
                         )}
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {/* Grid med resterande information */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Vänster kolumn */}
-                  <div className="space-y-3">
-                    {/* Material använt */}
-                    {fallbackData.materials_used && fallbackData.materials_used.trim() !== '' && (
-                      <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg">
-                        <Package className="w-4 h-4 text-purple-400" />
-                        <div>
-                          <p className="text-xs text-slate-400">Material</p>
-                          <p className="text-sm text-white">{fallbackData.materials_used}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Använda preparat */}
-                    {caseId && fallbackData?.service_type !== 'inspection' && (
-                      <CasePreparationsSection
-                        caseId={caseId}
-                        caseType="contract"
-                        pestType={fallbackData?.pest_type || null}
-                        isReadOnly={true}
-                      />
-                    )}
                   </div>
+                )}
 
-                  {/* Höger kolumn */}
-                  <div className="space-y-3">
-
-                    {/* Bilder från case_images (teknikerns bilder) */}
-                    {caseImages.length > 0 && (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                          <Images className="w-4 h-4 text-indigo-400" />
-                          Bilder ({caseImages.length})
-                        </h4>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                          {caseImages.map((image) => (
-                            <div
-                              key={image.id}
-                              className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square"
-                            >
-                              <img
-                                src={image.url}
-                                alt={image.original_name}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                                <a
-                                  href={image.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 bg-white/20 rounded-full hover:bg-white/30"
-                                >
-                                  <Eye className="w-3 h-3 text-white" />
-                                </a>
-                                <a
-                                  href={image.url}
-                                  download={image.original_name}
-                                  className="p-1.5 bg-white/20 rounded-full hover:bg-white/30"
-                                >
-                                  <Download className="w-3 h-3 text-white" />
-                                </a>
-                              </div>
-                              {image.tags && image.tags.length > 0 && (
-                                <span className="absolute top-1 left-1 px-1.5 py-0.5 text-[10px] bg-black/60 text-white rounded">
-                                  {image.tags[0] === 'before' ? 'Före' : image.tags[0] === 'after' ? 'Efter' : 'Övrigt'}
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                {/* Kontaktperson */}
+                {fallbackData.contact_person && (
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Kontaktperson</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-slate-300 text-xs font-semibold shrink-0">
+                        {fallbackData.contact_person.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </div>
-                    )}
-
-                    {/* Filer och bilder från fallback (om inga case_images) */}
-                    {caseImages.length === 0 && fallbackData.files && fallbackData.files.length > 0 && (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                          <Images className="w-4 h-4 text-indigo-400" />
-                          Bilder & Filer ({fallbackData.files.length})
-                        </h4>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                          {fallbackData.files.map((file, index) => {
-                            const isImage = file.type.startsWith('image/')
-                            return (
-                              <div
-                                key={index}
-                                className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square"
-                              >
-                                {isImage ? (
-                                  <img
-                                    src={file.url}
-                                    alt={file.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <FileText className="w-6 h-6 text-slate-400" />
-                                  </div>
-                                )}
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                                  <a
-                                    href={file.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1.5 bg-white/20 rounded-full hover:bg-white/30"
-                                  >
-                                    <Eye className="w-3 h-3 text-white" />
-                                  </a>
-                                  <a
-                                    href={file.url}
-                                    download={file.name}
-                                    className="p-1.5 bg-white/20 rounded-full hover:bg-white/30"
-                                  >
-                                    <Download className="w-3 h-3 text-white" />
-                                  </a>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white font-medium truncate">{fallbackData.contact_person}</p>
+                        {fallbackData.contact_email && (
+                          <a
+                            href={`mailto:${fallbackData.contact_email}`}
+                            className="text-xs text-slate-400 hover:text-slate-200 transition-colors truncate block"
+                          >
+                            {fallbackData.contact_email}
+                          </a>
+                        )}
+                        {fallbackData.contact_phone && (
+                          <a
+                            href={`tel:${fallbackData.contact_phone}`}
+                            className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                          >
+                            {fallbackData.contact_phone}
+                          </a>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {taskDetails && (
-              <div className="space-y-4">
-                {/* Status, prioritet och datum */}
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-400">Status:</span>
-                      <span 
-                        className={`px-3 py-1 rounded-full text-sm font-medium text-white ${
-                          getStatusColor(taskDetails.task_info.status)
-                        }`}
-                      >
-                        {taskDetails.task_info.status.toUpperCase()}
-                      </span>
-                    </div>
-                    
-                    {/* PRIORITET TILL HÖGER OM STATUS */}
-                    {taskDetails.priority && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-400">Prioritet:</span>
-                        {getPriorityDisplay(taskDetails.priority.priority)}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="text-sm text-slate-400">
-                    Skapat: {formatDate(taskDetails.task_info.created)}
-                    {taskDetails.task_info.updated !== taskDetails.task_info.created && (
-                      <span className="ml-4">
-                        Uppdaterat: {formatDate(taskDetails.task_info.updated)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Beskrivning */}
-                {taskDetails.task_info.description && (
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-semibold text-white">Beskrivning</h3>
-                    <div className="p-4 bg-slate-800/50 rounded-lg">
-                      <p className="text-white whitespace-pre-wrap">
-                        {taskDetails.task_info.description}
-                      </p>
                     </div>
                   </div>
                 )}
 
-                {/* Grid med information */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Vänster kolumn */}
-                  <div className="space-y-4">
-                    {/* Adress */}
-                    {addressField && (
-                      <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <MapPin className="w-5 h-5 text-red-400 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-sm text-slate-400 mb-1">Adress</p>
-                          <p className="text-white font-medium">
-                            {addressField.value.formatted_address}
-                          </p>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="mt-2 text-blue-400 hover:text-blue-300 p-0"
-                            onClick={() => {
-                              const { lat, lng } = addressField.value.location
-                              window.open(`https://maps.google.com?q=${lat},${lng}`, '_blank')
-                            }}
-                          >
-                            Visa på karta
-                          </Button>
-                        </div>
+                {/* Snabbinfo */}
+                {(fallbackData.pest_type || (fallbackData.price && fallbackData.price > 0) || (fallbackData.time_spent_minutes && fallbackData.time_spent_minutes > 0)) && (
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3 space-y-2">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Ärendeinfo</p>
+                    {fallbackData.pest_type && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">Skadedjur</span>
+                        <span className="text-xs text-white">{fallbackData.pest_type}</span>
                       </div>
                     )}
-
-                    {/* Skadedjur och ärendetype */}
-                    <div className="grid grid-cols-1 gap-4">
-                      {pestField && (
-                        <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                          <Bug className="w-5 h-5 text-orange-400" />
-                          <div>
-                            <p className="text-sm text-slate-400">Skadedjur</p>
-                            <p className="text-white font-medium">
-                              {getDropdownText(pestField)}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {caseTypeField && (
-                        <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                          <FileText className="w-5 h-5 text-blue-400" />
-                          <div>
-                            <p className="text-sm text-slate-400">Typ av ärende</p>
-                            <p className="text-white font-medium">
-                              {getDropdownText(caseTypeField)}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Pris - Only show if price > 0 */}
-                    {priceField && priceField.has_value && priceField.value > 0 && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                        <DollarSign className="w-5 h-5 text-green-400" />
-                        <div>
-                          <p className="text-sm text-slate-400">Kostnad</p>
-                          <p className="text-white font-medium text-xl">
-                            {priceField.value} kr
-                          </p>
-                        </div>
+                    {fallbackData.price && fallbackData.price > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">Pris</span>
+                        <span className="text-xs text-white font-medium">{fallbackData.price} kr</span>
                       </div>
                     )}
-
-                    {/* Ansvarig tekniker */}
-                    {taskDetails.assignees.length > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          Ansvarig tekniker
-                        </h4>
-                        <div className="space-y-2">
-                          {taskDetails.assignees.map((assignee, index) => (
-                            <div 
-                              key={index}
-                              className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg"
-                            >
-                              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                                {assignee.name.split(' ').map(n => n[0]).join('')}
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-white font-medium">{assignee.name}</p>
-                                <p className="text-sm text-slate-400">{assignee.email}</p>
-                              </div>
-                              <button
-                                onClick={() => window.open(`mailto:${assignee.email}?subject=Fråga om ärende ${taskDetails.task_info.name}`, '_blank')}
-                                className="p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-lg transition-colors"
-                                title={`Skicka e-post till ${assignee.name}`}
-                              >
-                                <Mail className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                    {fallbackData.time_spent_minutes !== undefined && fallbackData.time_spent_minutes > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">Tid</span>
+                        <span className="text-xs text-white">
+                          {Math.floor(fallbackData.time_spent_minutes / 60) > 0
+                            ? `${Math.floor(fallbackData.time_spent_minutes / 60)}h ${fallbackData.time_spent_minutes % 60}min`
+                            : `${fallbackData.time_spent_minutes} min`}
+                        </span>
                       </div>
                     )}
                   </div>
+                )}
+              </div>
 
-                  {/* Höger kolumn */}
-                  <div className="space-y-4">
-                    {/* Teknikerrapport */}
-                    {reportField && (
-                      <div className="space-y-3">
-                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          Teknikerrapport
-                        </h4>
-                        <div className="p-4 bg-slate-800/50 rounded-lg">
-                          <p className="text-white whitespace-pre-wrap">
-                            {reportField.value}
-                          </p>
-                        </div>
+              {/* Material / preparat (ej inspection) */}
+              {fallbackData.service_type !== 'inspection' && (
+                <>
+                  {fallbackData.materials_used && fallbackData.materials_used.trim() !== '' && (
+                    <div>
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Package className="w-3.5 h-3.5" />
+                        Material
+                      </p>
+                      <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
+                        <p className="text-sm text-slate-300">{fallbackData.materials_used}</p>
                       </div>
-                    )}
+                    </div>
+                  )}
+                  {caseId && (
+                    <CasePreparationsSection
+                      caseId={caseId}
+                      caseType="contract"
+                      pestType={fallbackData?.pest_type || null}
+                      isReadOnly={true}
+                    />
+                  )}
+                </>
+              )}
 
-                    {/* Rekommendationer från tekniker */}
-                    {fallbackData?.recommendations && (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-semibold text-amber-400 flex items-center gap-2">
-                          <Lightbulb className="w-4 h-4" />
-                          Teknikerns rekommendationer
-                        </h4>
-                        <div className="p-3 bg-amber-500/10 border-l-4 border-amber-500 rounded-r-lg">
-                          <p className="text-white text-sm whitespace-pre-wrap leading-relaxed">
-                            {fallbackData.recommendations}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Använda preparat - endast läsläge för kunder */}
-                    {caseId && fallbackData?.pest_type !== 'Inspektion' && (
-                      <CasePreparationsSection
-                        caseId={caseId}
-                        caseType="contract"
-                        pestType={fallbackData?.pest_type || null}
-                        isReadOnly={true}
-                      />
-                    )}
-
-                    {/* Filer och bilder */}
-                    {filesField && filesField.value && Array.isArray(filesField.value) && (
-                      <div className="space-y-3">
-                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                          <Images className="w-4 h-4" />
-                          Filer ({filesField.value.length})
-                        </h4>
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {filesField.value.map((file: any, index: number) => (
-                            <div 
-                              key={file.id} 
-                              className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg hover:bg-slate-800/70 transition-colors"
-                            >
-                              <div className="text-slate-400">
-                                {getFileIcon(file.mimetype)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-white font-medium truncate">
-                                  {file.title}
-                                </p>
-                                <p className="text-slate-400 text-sm">
-                                  {(file.size / 1024 / 1024).toFixed(1)} MB • {file.extension.toUpperCase()}
-                                </p>
-                              </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => window.open(file.url_w_query, '_blank')}
-                                  className="p-2"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    const link = document.createElement('a')
-                                    link.href = file.url_w_host
-                                    link.download = file.title
-                                    document.body.appendChild(link)
-                                    link.click()
-                                    document.body.removeChild(link)
-                                  }}
-                                  className="p-2"
-                                >
-                                  <Download className="w-4 h-4" />
-                                </Button>
+              {/* Bilder */}
+              {(caseImages.length > 0 || (fallbackData.files && fallbackData.files.length > 0)) && (
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Images className="w-3.5 h-3.5" />
+                    Bilder {caseImages.length > 0 ? `(${caseImages.length})` : `(${fallbackData.files?.length})`}
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {caseImages.length > 0
+                      ? caseImages.map((image) => (
+                          <div
+                            key={image.id}
+                            className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square"
+                          >
+                            <img src={image.url} alt={image.original_name} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                              <a href={image.url} target="_blank" rel="noopener noreferrer"
+                                className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
+                                <Eye className="w-3 h-3 text-white" />
+                              </a>
+                              <a href={image.url} download={image.original_name}
+                                className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
+                                <Download className="w-3 h-3 text-white" />
+                              </a>
+                            </div>
+                            {image.tags && image.tags.length > 0 && (
+                              <span className="absolute top-1 left-1 px-1.5 py-0.5 text-[10px] bg-black/60 text-white rounded">
+                                {image.tags[0] === 'before' ? 'Före' : image.tags[0] === 'after' ? 'Efter' : 'Övrigt'}
+                              </span>
+                            )}
+                          </div>
+                        ))
+                      : (fallbackData.files || []).map((file, index) => {
+                          const isImage = file.type.startsWith('image/')
+                          return (
+                            <div key={index}
+                              className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square">
+                              {isImage
+                                ? <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
+                                : <div className="w-full h-full flex items-center justify-center"><FileText className="w-6 h-6 text-slate-400" /></div>
+                              }
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                <a href={file.url} target="_blank" rel="noopener noreferrer"
+                                  className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
+                                  <Eye className="w-3 h-3 text-white" />
+                                </a>
+                                <a href={file.url} download={file.name}
+                                  className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
+                                  <Download className="w-3 h-3 text-white" />
+                                </a>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          )
+                        })
+                    }
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </>
+          )}
 
-          {/* Footer */}
-          <div className="px-5 py-4 border-t border-white/10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Phone className="w-4 h-4" />
-                <span>Har du frågor? Ring oss på <a href="tel:010-280-44-10" className="text-blue-400 hover:text-blue-300">010 280 44 10</a></span>
+          {/* ── CLICKUP-VY (taskDetails) ────────────────────── */}
+          {taskDetails && (
+            <>
+              {/* Status + datum */}
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-4 flex-wrap">
+                  {(() => {
+                    const st = taskDetails.task_info.status
+                    const dot = getStatusDotColor(st)
+                    return (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: dot }}>
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: dot }} />
+                        {st}
+                      </span>
+                    )
+                  })()}
+                  {taskDetails.priority && getPriorityDisplay(taskDetails.priority.priority)}
+                </div>
+                <span className="text-xs text-slate-500">
+                  Skapat {formatDate(taskDetails.task_info.created)}
+                </span>
               </div>
 
-              <Button
-                variant="secondary"
-                onClick={handleClose}
-                size="sm"
-              >
-                Stäng
-              </Button>
-            </div>
-          </div>
-        </Card>
+              {/* Beskrivning */}
+              {taskDetails.task_info.description && (
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Beskrivning</p>
+                  <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{taskDetails.task_info.description}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Teknikerrapport */}
+              {reportField && (
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Teknikerrapport</p>
+                  <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{reportField.value}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Rekommendationer */}
+              {fallbackData?.recommendations && (
+                <div>
+                  <p className="text-xs font-medium text-amber-500/80 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Lightbulb className="w-3.5 h-3.5" />
+                    Teknikerns rekommendationer
+                  </p>
+                  <div className="bg-amber-500/5 border-l-2 border-amber-500/40 rounded-r-xl px-4 py-3">
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.recommendations}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Grid: Adress + Tekniker + Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {addressField && (
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                      Adress
+                    </p>
+                    <p className="text-sm text-white">{addressField.value.formatted_address}</p>
+                    <button
+                      className="mt-2 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                      onClick={() => {
+                        const { lat, lng } = addressField.value.location
+                        window.open(`https://maps.google.com?q=${lat},${lng}`, '_blank')
+                      }}
+                    >
+                      Visa på karta
+                    </button>
+                  </div>
+                )}
+
+                {taskDetails.assignees.length > 0 && (
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Tekniker</p>
+                    {taskDetails.assignees.map((assignee, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-slate-300 text-xs font-semibold shrink-0">
+                          {assignee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white font-medium">{assignee.name}</p>
+                          <a
+                            href={`mailto:${assignee.email}?subject=Fråga om ärende ${taskDetails.task_info.name}`}
+                            className="text-xs text-slate-400 hover:text-slate-200 transition-colors truncate block"
+                          >
+                            {assignee.email}
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {(pestField || caseTypeField || (priceField && priceField.has_value && priceField.value > 0)) && (
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3 space-y-2">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Ärendeinfo</p>
+                    {pestField && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">Skadedjur</span>
+                        <span className="text-xs text-white">{getDropdownText(pestField)}</span>
+                      </div>
+                    )}
+                    {caseTypeField && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">Ärendetyp</span>
+                        <span className="text-xs text-white">{getDropdownText(caseTypeField)}</span>
+                      </div>
+                    )}
+                    {priceField && priceField.has_value && priceField.value > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">Kostnad</span>
+                        <span className="text-xs text-white font-medium">{priceField.value} kr</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Preparat */}
+              {caseId && fallbackData?.pest_type !== 'Inspektion' && (
+                <CasePreparationsSection
+                  caseId={caseId}
+                  caseType="contract"
+                  pestType={fallbackData?.pest_type || null}
+                  isReadOnly={true}
+                />
+              )}
+
+              {/* Filer från ClickUp */}
+              {filesField && filesField.value && Array.isArray(filesField.value) && (
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Images className="w-3.5 h-3.5" />
+                    Filer ({filesField.value.length})
+                  </p>
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {filesField.value.map((file: any) => (
+                      <div key={file.id}
+                        className="flex items-center gap-3 px-3 py-2.5 bg-slate-800/40 rounded-lg hover:bg-slate-800/60 transition-colors border border-slate-700/40">
+                        <div className="text-slate-500">{getFileIcon(file.mimetype)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white truncate">{file.title}</p>
+                          <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => window.open(file.url_w_query, '_blank')}
+                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              const link = document.createElement('a')
+                              link.href = file.url_w_host
+                              link.download = file.title
+                              document.body.appendChild(link)
+                              link.click()
+                              document.body.removeChild(link)
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ── FOOTER ─────────────────────────────────────────── */}
+        <div className="px-6 py-4 border-t border-slate-700/50 flex items-center justify-between shrink-0">
+          <a href="tel:010-280-44-10" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
+            010 280 44 10
+          </a>
+          <button
+            onClick={handleClose}
+            className="px-4 py-1.5 text-sm font-medium bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-300 transition-colors"
+          >
+            Stäng
+          </button>
+        </div>
       </div>
 
-      {/* Close Warning Dialog - visas när användaren försöker stänga utan bekräftelse */}
+      {/* Close Warning Dialog */}
       <CloseWarningDialog
         isOpen={showCloseWarning}
         onClose={() => setShowCloseWarning(false)}
@@ -1551,7 +1419,7 @@ export default function CaseDetailsModal({
         onGoBack={handleGoBack}
       />
 
-      {/* Foto-lightbox för inspektionsbilder */}
+      {/* Foto-lightbox */}
       <InspectionPhotoLightbox
         photos={inspectionPhotos}
         initialIndex={lightboxIndex}
