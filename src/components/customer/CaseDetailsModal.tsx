@@ -42,6 +42,7 @@ import type { Photo } from './InspectionPhotoLightbox'
 import { generatePDFReport } from '../../utils/pdfReportGenerator'
 import { generateInspectionPDF, generateInspectionExcel } from '../../services/inspectionReportService'
 import { getInspectionPhotoUrl } from '../../services/inspectionSessionService'
+import { useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
@@ -183,6 +184,7 @@ export default function CaseDetailsModal({
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [generatingReport, setGeneratingReport] = useState<'pdf' | 'excel' | null>(null)
   const { profile } = useAuth()
+  const { getLabel: getInspStatusLabel, getColor: getInspStatusColor } = useInspectionStatusLabels()
 
   // Hook för läskvitton
   const {
@@ -897,17 +899,8 @@ export default function CaseDetailsModal({
                                     _color: r.station?.station_type_data?.color || '#6b7280'
                                   }))
                                 ].map((row: any) => {
-                                  const statusChip: Record<string, { label: string; cls: string }> = {
-                                    ok: { label: 'OK – Inga fynd', cls: 'bg-green-500/20 text-green-400' },
-                                    activity: { label: 'Aktivitet upptäckt', cls: 'bg-amber-500/20 text-amber-400' },
-                                    needs_service: { label: 'Behöver service', cls: 'bg-red-500/20 text-red-400' },
-                                    replaced: { label: 'Utbytt', cls: 'bg-blue-500/20 text-blue-400' },
-                                    none: { label: 'Ingen aktivitet', cls: 'bg-green-500/20 text-green-400' },
-                                    low: { label: 'Lite aktivitet', cls: 'bg-amber-500/20 text-amber-400' },
-                                    medium: { label: 'Medelhög aktivitet', cls: 'bg-orange-500/20 text-orange-400' },
-                                    high: { label: 'Betydande aktivitet', cls: 'bg-red-500/20 text-red-400' },
-                                  }
-                                  const chip = statusChip[row.status] || { label: row.status, cls: 'bg-slate-500/20 text-slate-400' }
+                                  const statusLabel = getInspStatusLabel(row.status)
+                                  const statusColor = getInspStatusColor(row.status)
                                   const unit = row.measurement_unit || row.station?.station_type_data?.measurement_unit || ''
                                   const unitLabel: Record<string, string> = { gram: 'g', st: 'st', ml: 'ml', procent: '%', kg: 'kg' }
                                   const prepLabel = row.preparation?.name
@@ -918,7 +911,12 @@ export default function CaseDetailsModal({
                                       <div className="flex items-center gap-2">
                                         <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row._color }} />
                                         <span className="text-xs text-white flex-1 truncate">{row._label}</span>
-                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${chip.cls}`}>{chip.label}</span>
+                                        <span
+                                          className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                          style={{ backgroundColor: `${statusColor}20`, color: statusColor }}
+                                        >
+                                          {statusLabel}
+                                        </span>
                                         {row.measurement_value != null && (
                                           <span className="text-[10px] text-slate-400">{row.measurement_value} {unitLabel[unit] || unit}</span>
                                         )}
