@@ -715,23 +715,25 @@ export default function CaseDetailsModal({
                 />
               )}
 
-              {/* Situationsöversikt — visa bara om minst ett värde är > 0 */}
-              {((fallbackData.pest_level ?? 0) > 0 || (fallbackData.problem_rating ?? 0) > 0) && (
-                <CustomerAssessmentPanel
-                  pestLevel={fallbackData.pest_level ?? null}
-                  problemRating={fallbackData.problem_rating ?? null}
-                />
+              {/* Situationsöversikt + tidslinje — ej relevant för avtalade servicebesök */}
+              {fallbackData.service_type !== 'inspection' && (
+                <>
+                  {((fallbackData.pest_level ?? 0) > 0 || (fallbackData.problem_rating ?? 0) > 0) && (
+                    <CustomerAssessmentPanel
+                      pestLevel={fallbackData.pest_level ?? null}
+                      problemRating={fallbackData.problem_rating ?? null}
+                    />
+                  )}
+                  <CaseJourneyTimeline
+                    caseId={caseId}
+                    currentPestLevel={fallbackData.pest_level}
+                    currentProblemRating={fallbackData.problem_rating}
+                    assessmentDate={fallbackData.assessment_date}
+                    assessedBy={fallbackData.assessed_by}
+                    defaultExpanded={true}
+                  />
+                </>
               )}
-
-              {/* Ärendets utveckling */}
-              <CaseJourneyTimeline
-                caseId={caseId}
-                currentPestLevel={fallbackData.pest_level}
-                currentProblemRating={fallbackData.problem_rating}
-                assessmentDate={fallbackData.assessment_date}
-                assessedBy={fallbackData.assessed_by}
-                defaultExpanded={true}
-              />
 
               {/* ── INSPEKTIONSRESULTAT ── */}
               {fallbackData.service_type === 'inspection' && (
