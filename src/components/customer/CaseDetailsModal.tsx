@@ -42,6 +42,7 @@ import { supabase } from '../../lib/supabase'
 import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
 import { useAcknowledgment } from '../../hooks/useAcknowledgment'
 import { requiresAcknowledgment } from '../../types/acknowledgment'
+import { serviceTypeConfig } from '../../types/cases'
 import toast from 'react-hot-toast'
 
 interface CaseDetailsModalProps {
@@ -646,12 +647,11 @@ export default function CaseDetailsModal({
   }
 
   const serviceTypeLabel = (t?: string | null) => {
+    if (!t) return ''
     if (t === 'inspection') return 'Avtalat servicebesök'
     if (t === 'establishment') return 'Etablering'
-    if (t === 'acute') return 'Akut'
-    if (t === 'service') return 'Servicebesök'
-    if (t === 'routine') return 'Rutinbesök'
-    return t || ''
+    const config = serviceTypeConfig[t as keyof typeof serviceTypeConfig]
+    return config?.label ?? t
   }
 
   return createPortal(

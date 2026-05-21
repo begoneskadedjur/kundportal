@@ -89,7 +89,7 @@ const CustomerPortal: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('cases')
-        .select('*')
+        .select('*, service:services(name, group:service_groups(name))')
         .eq('id', caseId)
         .single()
 
@@ -437,7 +437,7 @@ const CustomerPortal: React.FC = () => {
             description: selectedCaseForModal.description,
             status: selectedCaseForModal.status,
             service_type: selectedCaseForModal.service_type,
-            pest_type: selectedCaseForModal.pest_type,
+            pest_type: (selectedCaseForModal as any).service?.name ?? selectedCaseForModal.pest_type,
             price: selectedCaseForModal.price,
             technician_name: selectedCaseForModal.technician_name,
             primary_technician_name: selectedCaseForModal.primary_technician_name,

@@ -84,6 +84,11 @@ export interface Case {
   // Oneflow integration
   oneflow_contract_id: string | null
   quote_status: 'pending' | 'sent' | 'signed' | 'rejected' | 'expired' | null
+
+  // Joinad tjänst (via service_id → services-tabellen)
+  service_id: string | null
+  service?: { name: string; group?: { name: string } } | null
+  materials_used: string | null
 }
 
 // Create case input type (for customer requests)

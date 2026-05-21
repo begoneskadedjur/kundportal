@@ -533,7 +533,7 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
           fallbackData={{
             case_number: selectedCase.case_number,
             title: selectedCase.title,
-            pest_type: selectedCase.pest_type,
+            pest_type: (selectedCase as any).service?.name ?? selectedCase.pest_type,
             status: selectedCase.status,
             pest_level: selectedCase.pest_level,
             problem_rating: selectedCase.problem_rating,

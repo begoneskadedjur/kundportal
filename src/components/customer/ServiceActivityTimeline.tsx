@@ -61,7 +61,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
     try {
       const { data, error } = await supabase
         .from('cases')
-        .select('*')
+        .select('*, service:services(name, group:service_groups(name))')
         .eq('customer_id', profile.customer_id)
         .order('created_at', { ascending: false })
 
@@ -298,9 +298,9 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                             Brådskande
                           </span>
                         )}
-                        {caseItem.pest_type && (
+                        {(caseItem.service?.name ?? caseItem.pest_type) && (
                           <span className="text-xs bg-purple-500/10 text-purple-400 px-2 py-1 rounded">
-                            {caseItem.pest_type}
+                            {caseItem.service?.name ?? caseItem.pest_type}
                           </span>
                         )}
                       </div>
@@ -359,7 +359,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
         fallbackData={{
           case_number: selectedCase.case_number,
           title: selectedCase.title,
-          pest_type: selectedCase.pest_type,
+          pest_type: selectedCase.service?.name ?? selectedCase.pest_type,
           status: selectedCase.status,
           pest_level: selectedCase.pest_level,
           problem_rating: selectedCase.problem_rating,
