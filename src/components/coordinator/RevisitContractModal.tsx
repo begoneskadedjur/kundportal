@@ -40,7 +40,16 @@ interface ContractCase {
   address?: string
   scheduled_start?: Date | string | null
   scheduled_end?: Date | string | null
-  work_report?: string
+  work_report?: string | null
+  time_spent_minutes?: number | null
+  materials_used?: string | null
+  pest_level?: number | null
+  problem_rating?: number | null
+  recommendations?: string | null
+  assessment_date?: string | null
+  assessed_by?: string | null
+  primary_technician_id?: string | null
+  primary_technician_name?: string | null
 }
 
 interface RevisitHistoryEntry {
@@ -141,13 +150,60 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
       const newScheduledStart = toSwedishISOString(startDate)
       const newScheduledEnd = endDate ? toSwedishISOString(endDate) : newScheduledStart
 
-      // 1. Uppdatera ärendet med nya datum
+      // 0. Spara snapshot av nuvarande besök om det finns besöksdata
+      const hasVisitData = caseData.work_report || caseData.time_spent_minutes ||
+                           caseData.pest_level != null || caseData.materials_used
+
+      if (hasVisitData) {
+        // Räkna befintliga besök för att sätta visit_number
+        const { count: existingCount } = await supabase
+          .from('visits')
+          .select('id', { count: 'exact', head: true })
+          .eq('case_id', caseData.id)
+
+        const visitNumber = (existingCount ?? 0) + 1
+
+        const { error: visitError } = await supabase.from('visits').insert({
+          case_id: caseData.id,
+          visit_date: (caseData.scheduled_start as string) ?? new Date().toISOString(),
+          technician_id: caseData.primary_technician_id ?? null,
+          technician_name: caseData.primary_technician_name ?? null,
+          work_performed: caseData.work_report ?? null,
+          recommendations: caseData.recommendations ?? null,
+          findings: caseData.pest_level != null ? `Skadedjursnivå: ${caseData.pest_level}` : null,
+          time_spent_minutes: caseData.time_spent_minutes ?? null,
+          materials_used: caseData.materials_used ?? null,
+          pest_level: caseData.pest_level ?? null,
+          problem_rating: caseData.problem_rating ?? null,
+          visit_number: visitNumber,
+          status: caseData.status ?? null,
+        })
+        if (visitError) console.error('[RevisitContractModal] Failed to save visit snapshot:', visitError)
+
+        // Stämpla billing-items utan visit_number med detta besöks visit_number
+        const { error: billingError } = await supabase
+          .from('case_billing_items')
+          .update({ visit_number: visitNumber })
+          .eq('case_id', caseData.id)
+          .is('visit_number', null)
+        if (billingError) console.error('[RevisitContractModal] Failed to stamp billing items:', billingError)
+      }
+
+      // 1. Uppdatera ärendet med nya datum + nollställ besöksdata
       const { data: updatedCase, error } = await supabase
         .from('cases')
         .update({
           scheduled_start: newScheduledStart,
           scheduled_end: newScheduledEnd,
           status: 'Återbesök',
+          work_report: null,
+          time_spent_minutes: null,
+          materials_used: null,
+          pest_level: null,
+          problem_rating: null,
+          recommendations: null,
+          assessment_date: null,
+          assessed_by: null,
         })
         .eq('id', caseData.id)
         .select()

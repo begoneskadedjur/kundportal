@@ -10,7 +10,7 @@ import {
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
   FileSignature, ChevronDown, Download, Send, ChevronRight, Receipt, Lightbulb,
   Building, Building2, Image as ImageIcon, Trash2, Plus, AlertTriangle, MessageSquare,
-  Footprints, Copy
+  Footprints, Copy, History
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -48,6 +48,9 @@ import { CaseType } from '../../types/communication'
 
 // Återbesök-modal
 import RevisitContractModal from './RevisitContractModal'
+
+// Besökshistorik-panel
+import VisitHistoryPanel from './VisitHistoryPanel'
 
 // Provision
 import CommissionSection from '../shared/CommissionSection'
@@ -234,6 +237,9 @@ export default function EditContractCaseModal({
 
   // Kommunikations-panel state - ENDAST för intern användning (ALDRIG för kundvyer)
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
+
+  // Besökshistorik-panel state
+  const [showVisitHistoryPanel, setShowVisitHistoryPanel] = useState(false)
 
   // Etableringsärende (service_type='establishment') — visas i denna modal men med lime-badge och låst billing
   const isEstablishment = caseData?.service_type === 'establishment'
@@ -1529,6 +1535,15 @@ export default function EditContractCaseModal({
           >
             <Footprints className="w-5 h-5" />
           </button>
+          {/* Besökshistorik */}
+          <button
+            type="button"
+            onClick={() => setShowVisitHistoryPanel(true)}
+            className="p-2 text-slate-400 hover:text-teal-400 hover:bg-teal-500/20 rounded-lg transition-all duration-200"
+            title="Visa besökshistorik"
+          >
+            <History className="w-5 h-5" />
+          </button>
           {/* Kommunikation */}
           {showCommunication && (
             <button
@@ -2555,6 +2570,15 @@ export default function EditContractCaseModal({
           caseTitle={formData.title || caseData?.title || 'Avtalsärende'}
           oneflowContractId={caseData?.oneflow_contract_id || undefined}
           senderEmail={profile?.technicians?.email || undefined}
+        />
+      )}
+
+      {/* Besökshistorik-panel */}
+      {showVisitHistoryPanel && (
+        <VisitHistoryPanel
+          caseId={caseData?.id || ''}
+          caseTitle={formData.title || caseData?.title || 'Avtalsärende'}
+          onClose={() => setShowVisitHistoryPanel(false)}
         />
       )}
 

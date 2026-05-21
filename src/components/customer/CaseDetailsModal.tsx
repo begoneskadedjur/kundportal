@@ -155,6 +155,17 @@ export default function CaseDetailsModal({
   const [loadingImages, setLoadingImages] = useState(false)
   const [showCloseWarning, setShowCloseWarning] = useState(false)
   const [revisitHistory, setRevisitHistory] = useState<RevisitHistoryEntry[]>([])
+  const [visitHistory, setVisitHistory] = useState<Array<{
+    id: string
+    visit_date: string
+    visit_number: number | null
+    technician_name: string | null
+    work_performed: string | null
+    recommendations: string | null
+    pest_level: number | null
+    time_spent_minutes: number | null
+  }>>([])
+
   const [inspectionSession, setInspectionSession] = useState<{
     id: string
     status: string
@@ -247,6 +258,8 @@ export default function CaseDetailsModal({
       fetchCaseImages()
       // Hämta återbesökshistorik
       fetchRevisitHistory()
+      // Hämta per-besökshistorik
+      fetchVisitHistory()
 
       // Hämta inspektionssession om det är ett inspection-ärende
       if (fallbackData?.service_type === 'inspection' && caseId) {
@@ -412,6 +425,21 @@ export default function CaseDetailsModal({
       }
     } catch (error) {
       console.error('Error fetching revisit history:', error)
+    }
+  }
+
+  // Hämta per-besökshistorik från visits-tabellen
+  const fetchVisitHistory = async () => {
+    if (!caseId) return
+    try {
+      const { data } = await supabase
+        .from('visits')
+        .select('id, visit_date, visit_number, technician_name, work_performed, recommendations, pest_level, time_spent_minutes')
+        .eq('case_id', caseId)
+        .order('visit_date', { ascending: false })
+      setVisitHistory(data || [])
+    } catch (error) {
+      console.error('Error fetching visit history:', error)
     }
   }
 
@@ -715,6 +743,16 @@ export default function CaseDetailsModal({
                 />
               )}
 
+              {/* Beskrivning — tidigt så kunden förstår ärendet direkt */}
+              {fallbackData.description && (
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Beskrivning</p>
+                  <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.description}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Situationsöversikt + tidslinje — ej relevant för avtalade servicebesök */}
               {fallbackData.service_type !== 'inspection' && (
                 <>
@@ -730,7 +768,7 @@ export default function CaseDetailsModal({
                     currentProblemRating={fallbackData.problem_rating}
                     assessmentDate={fallbackData.assessment_date}
                     assessedBy={fallbackData.assessed_by}
-                    defaultExpanded={true}
+                    defaultExpanded={false}
                   />
                 </>
               )}
@@ -984,16 +1022,6 @@ export default function CaseDetailsModal({
                 </div>
               )}
 
-              {/* Beskrivning */}
-              {fallbackData.description && (
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Beskrivning</p>
-                  <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.description}</p>
-                  </div>
-                </div>
-              )}
-
               {/* Arbetsrapport */}
               {fallbackData.work_report && fallbackData.work_report.trim() !== '' && (
                 <div>
@@ -1004,15 +1032,36 @@ export default function CaseDetailsModal({
                 </div>
               )}
 
-              {/* Rekommendationer */}
-              {fallbackData.recommendations && (
+              {/* Tidigare besök */}
+              {visitHistory.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-amber-500/80 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Lightbulb className="w-3.5 h-3.5" />
-                    Teknikerns rekommendationer
-                  </p>
-                  <div className="bg-amber-500/5 border-l-2 border-amber-500/40 rounded-r-xl px-4 py-3">
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.recommendations}</p>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Tidigare besök</p>
+                  <div className="space-y-2">
+                    {visitHistory.map((visit) => (
+                      <div key={visit.id} className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-slate-500">
+                            {visit.visit_number ? `Besök #${visit.visit_number} · ` : ''}
+                            {new Date(visit.visit_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                          {visit.pest_level != null && visit.pest_level > 0 && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                              visit.pest_level >= 3 ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                              visit.pest_level === 2 ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                              'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                            }`}>
+                              Nivå {visit.pest_level}
+                            </span>
+                          )}
+                        </div>
+                        {visit.work_performed && (
+                          <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{visit.work_performed}</p>
+                        )}
+                        {visit.recommendations && (
+                          <p className="text-xs text-amber-400 mt-1 italic">{visit.recommendations}</p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

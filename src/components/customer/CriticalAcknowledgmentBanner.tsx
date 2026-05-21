@@ -79,16 +79,16 @@ const CriticalAcknowledgmentBanner: React.FC<CriticalAcknowledgmentBannerProps> 
 
   // Ej bekräftad - visa formulär
   return (
-    <div className="rounded-xl border border-red-500/30 bg-gradient-to-br from-red-500/10 via-red-500/5 to-transparent overflow-hidden">
+    <div className="rounded-xl border border-amber-500/40 bg-slate-800/80 overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-red-500/20 bg-red-500/5">
+      <div className="p-4 border-b border-amber-500/20 bg-amber-500/5">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-red-500/20 rounded-lg">
-            <AlertCircle className="w-5 h-5 text-red-400" />
+          <div className="p-2 bg-amber-500/20 rounded-lg">
+            <AlertCircle className="w-5 h-5 text-amber-400" />
           </div>
           <div>
-            <h4 className="text-red-400 font-semibold">Kritisk situation - bekräftelse krävs</h4>
-            <p className="text-sm text-blue-300">Vi har en plan och arbetar aktivt med ärendet</p>
+            <h4 className="text-amber-400 font-semibold">Bekräftelse krävs</h4>
+            <p className="text-sm text-slate-400">Vi har en plan och arbetar aktivt med ärendet</p>
           </div>
         </div>
       </div>
@@ -106,8 +106,8 @@ const CriticalAcknowledgmentBanner: React.FC<CriticalAcknowledgmentBannerProps> 
             />
             <div className={`w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center ${
               isChecked
-                ? 'bg-red-500 border-red-500'
-                : 'border-slate-500 group-hover:border-red-400'
+                ? 'bg-[#20c58f] border-[#20c58f]'
+                : 'border-slate-500 group-hover:border-amber-400'
             }`}>
               {isChecked && (
                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -128,7 +128,7 @@ const CriticalAcknowledgmentBanner: React.FC<CriticalAcknowledgmentBannerProps> 
           disabled={!isChecked || isSubmitting}
           className={`w-full justify-center transition-all duration-200 ${
             isChecked && !isSubmitting
-              ? 'bg-red-500 hover:bg-red-600 text-white'
+              ? 'bg-[#20c58f] hover:bg-[#1aad7d] text-white'
               : 'bg-slate-700 text-slate-400 cursor-not-allowed'
           }`}
         >

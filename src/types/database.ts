@@ -586,7 +586,12 @@ export type Database = {
           status: string | null
           created_at: string
           updated_at: string
-          technician_id: string | null // FK till technicians
+          technician_id: string | null
+          time_spent_minutes: number | null
+          materials_used: string | null
+          pest_level: number | null
+          problem_rating: number | null
+          visit_number: number | null
         }
         Insert: Omit<Database['public']['Tables']['visits']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['visits']['Insert']>
