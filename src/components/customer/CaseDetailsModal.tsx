@@ -165,6 +165,11 @@ export default function CaseDetailsModal({
     pest_level: number | null
     time_spent_minutes: number | null
   }>>([])
+  const [visitBillingItems, setVisitBillingItems] = useState<Array<{
+    visit_number: number
+    description: string
+    quantity: number
+  }>>([])
 
   const [inspectionSession, setInspectionSession] = useState<{
     id: string
@@ -428,16 +433,25 @@ export default function CaseDetailsModal({
     }
   }
 
-  // Hämta per-besökshistorik från visits-tabellen
+  // Hämta per-besökshistorik från visits-tabellen + billing items per besök (utan priser för kunden)
   const fetchVisitHistory = async () => {
     if (!caseId) return
     try {
-      const { data } = await supabase
-        .from('visits')
-        .select('id, visit_date, visit_number, technician_name, work_performed, recommendations, pest_level, time_spent_minutes')
-        .eq('case_id', caseId)
-        .order('visit_date', { ascending: false })
-      setVisitHistory(data || [])
+      const [visitsRes, billingRes] = await Promise.all([
+        supabase
+          .from('visits')
+          .select('id, visit_date, visit_number, technician_name, work_performed, recommendations, pest_level, time_spent_minutes')
+          .eq('case_id', caseId)
+          .order('visit_date', { ascending: false }),
+        supabase
+          .from('case_billing_items')
+          .select('visit_number, description, quantity')
+          .eq('case_id', caseId)
+          .eq('item_type', 'service')
+          .not('visit_number', 'is', null)
+      ])
+      setVisitHistory(visitsRes.data || [])
+      setVisitBillingItems((billingRes.data || []).filter(i => i.visit_number != null) as Array<{ visit_number: number; description: string; quantity: number }>)
     } catch (error) {
       console.error('Error fetching visit history:', error)
     }
@@ -1037,31 +1051,46 @@ export default function CaseDetailsModal({
                 <div>
                   <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Tidigare besök</p>
                   <div className="space-y-2">
-                    {visitHistory.map((visit) => (
-                      <div key={visit.id} className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-slate-500">
-                            {visit.visit_number ? `Besök #${visit.visit_number} · ` : ''}
-                            {new Date(visit.visit_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </span>
-                          {visit.pest_level != null && visit.pest_level > 0 && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                              visit.pest_level >= 3 ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                              visit.pest_level === 2 ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
-                              'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                            }`}>
-                              Nivå {visit.pest_level}
+                    {visitHistory.map((visit) => {
+                      const itemsForVisit = visitBillingItems.filter(b => b.visit_number === visit.visit_number)
+                      return (
+                        <div key={visit.id} className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-slate-500">
+                              {visit.visit_number ? `Besök #${visit.visit_number} · ` : ''}
+                              {new Date(visit.visit_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
+                            {visit.pest_level != null && visit.pest_level > 0 && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                                visit.pest_level >= 3 ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                                visit.pest_level === 2 ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                                'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                              }`}>
+                                Nivå {visit.pest_level}
+                              </span>
+                            )}
+                          </div>
+                          {visit.work_performed && (
+                            <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{visit.work_performed}</p>
+                          )}
+                          {visit.recommendations && (
+                            <p className="text-xs text-amber-400 mt-1 italic">{visit.recommendations}</p>
+                          )}
+                          {itemsForVisit.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-700/40">
+                              <p className="text-xs text-slate-500 mb-1">Utförda tjänster</p>
+                              <div className="space-y-0.5">
+                                {itemsForVisit.map((item, i) => (
+                                  <p key={i} className="text-xs text-slate-400">
+                                    {item.description}{item.quantity !== 1 ? ` × ${item.quantity}` : ''}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
-                        {visit.work_performed && (
-                          <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{visit.work_performed}</p>
-                        )}
-                        {visit.recommendations && (
-                          <p className="text-xs text-amber-400 mt-1 italic">{visit.recommendations}</p>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}

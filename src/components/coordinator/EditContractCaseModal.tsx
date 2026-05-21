@@ -2517,6 +2517,7 @@ export default function EditContractCaseModal({
             scheduled_start: formData.scheduled_start,
             scheduled_end: formData.scheduled_end,
             work_report: formData.work_report,
+            customer_id: formData.customer_id,
             id: localCaseData.id
           }}
           onSuccess={async (updatedCase) => {

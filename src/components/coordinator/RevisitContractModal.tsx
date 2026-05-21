@@ -11,7 +11,8 @@ import {
   FileText,
   Clock,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Receipt
 } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
@@ -21,6 +22,8 @@ import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { toSwedishISOString } from '../../utils/dateHelpers'
+import { ContractBillingService } from '../../services/contractBillingService'
+import { CaseBillingService } from '../../services/caseBillingService'
 import toast from 'react-hot-toast'
 import "react-datepicker/dist/react-datepicker.css"
 
@@ -50,6 +53,14 @@ interface ContractCase {
   assessed_by?: string | null
   primary_technician_id?: string | null
   primary_technician_name?: string | null
+  customer_id?: string | null
+}
+
+interface PendingBillingItem {
+  id: string
+  description: string
+  quantity: number
+  item_type: string
 }
 
 interface RevisitHistoryEntry {
@@ -105,9 +116,31 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
   // Anteckning
   const [revisitNote, setRevisitNote] = useState('')
 
+  // Delfakturering
+  const [pendingBillingItems, setPendingBillingItems] = useState<PendingBillingItem[]>([])
+  const [invoiceNow, setInvoiceNow] = useState(false)
+
   // Historik
   const [revisitHistory, setRevisitHistory] = useState<RevisitHistoryEntry[]>([])
   const [showFullHistory, setShowFullHistory] = useState(false)
+
+  // Hämta pending billing items vid mount
+  useEffect(() => {
+    async function fetchPendingItems() {
+      try {
+        const { data } = await supabase
+          .from('case_billing_items')
+          .select('id, description, quantity, item_type')
+          .eq('case_id', caseData.id)
+          .eq('status', 'pending')
+          .eq('item_type', 'service')
+        setPendingBillingItems(data || [])
+      } catch (e) {
+        console.error('[RevisitContractModal] Failed to fetch pending billing items:', e)
+      }
+    }
+    fetchPendingItems()
+  }, [caseData.id])
 
   // Funktion för att hämta återbesökshistorik
   const fetchHistory = async () => {
@@ -187,6 +220,21 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           .eq('case_id', caseData.id)
           .is('visit_number', null)
         if (billingError) console.error('[RevisitContractModal] Failed to stamp billing items:', billingError)
+
+        // Delfakturering: kopiera service-items till contract_billing_items och markera som billed
+        if (invoiceNow && caseData.customer_id && pendingBillingItems.length > 0) {
+          try {
+            await ContractBillingService.createAdHocItemsFromCase(
+              caseData.id,
+              caseData.customer_id,
+              new Date()
+            )
+            toast.success(`${pendingBillingItems.length} artikel(er) skickade till fakturering.`)
+          } catch (e: any) {
+            console.error('[RevisitContractModal] Delfakturering misslyckades:', e)
+            toast.error(`Delfakturering misslyckades: ${e.message}`)
+          }
+        }
       }
 
       // 1. Uppdatera ärendet med nya datum + nollställ besöksdata
@@ -418,6 +466,53 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
                     )
                   })}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Delfakturering — visas om det finns pending service-artiklar */}
+          {pendingBillingItems.length > 0 && (
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-slate-500" />
+                Tillagda artiklar ({pendingBillingItems.length})
+              </h3>
+              <div className="space-y-1.5 mb-4">
+                {pendingBillingItems.map(item => (
+                  <div key={item.id} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300">{item.description}</span>
+                    {item.quantity !== 1 && (
+                      <span className="text-slate-500 text-xs ml-2">× {item.quantity}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={invoiceNow}
+                    onChange={(e) => setInvoiceNow(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center ${
+                    invoiceNow ? 'bg-[#20c58f] border-[#20c58f]' : 'border-slate-500 group-hover:border-[#20c58f]'
+                  }`}>
+                    {invoiceNow && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <span className="text-sm text-slate-300 group-hover:text-white transition-colors">
+                  Delfakturera dessa artiklar nu
+                </span>
+              </label>
+              {invoiceNow && (
+                <p className="text-xs text-slate-500 mt-2 ml-8">
+                  Artiklarna skickas till fakturering och rensas från ärendet. Nya artiklar kan läggas till vid nästa besök.
+                </p>
               )}
             </div>
           )}
