@@ -1,7 +1,7 @@
 // src/components/customer/CustomerAssessmentPanel.tsx - Trafikljussystem för kundbedömning
 
 import React from 'react'
-import { Activity, AlertTriangle, CheckCircle, Info, AlertCircle } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react'
 import { getOverallAssessmentLevel } from '../../types/acknowledgment'
 import AssessmentScaleBar from '../shared/AssessmentScaleBar'
 import TrafficLightBadge from '../organisation/TrafficLightBadge'
@@ -118,15 +118,6 @@ const CustomerAssessmentPanel: React.FC<CustomerAssessmentPanelProps> = ({
           )}
         </div>
 
-        {/* Kortfattad statustext */}
-        <div className={`p-2 rounded-lg bg-slate-800/50 border border-slate-700/50`}>
-          <div className="flex items-center gap-2">
-            <Info className={`w-3.5 h-3.5 flex-shrink-0 ${overallConfig.textColor}`} />
-            <p className={`text-xs ${overallConfig.textColor}`}>
-              {overallConfig.label}
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   )

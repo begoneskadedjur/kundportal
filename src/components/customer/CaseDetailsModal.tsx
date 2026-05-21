@@ -170,6 +170,11 @@ export default function CaseDetailsModal({
     description: string
     quantity: number
   }>>([])
+  const [currentBillingItems, setCurrentBillingItems] = useState<Array<{
+    id: string
+    description: string
+    quantity: number
+  }>>([])
 
   const [inspectionSession, setInspectionSession] = useState<{
     id: string
@@ -433,11 +438,11 @@ export default function CaseDetailsModal({
     }
   }
 
-  // Hämta per-besökshistorik från visits-tabellen + billing items per besök (utan priser för kunden)
+  // Hämta per-besökshistorik + nuvarande billing items (utan priser för kunden)
   const fetchVisitHistory = async () => {
     if (!caseId) return
     try {
-      const [visitsRes, billingRes] = await Promise.all([
+      const [visitsRes, billingRes, currentRes] = await Promise.all([
         supabase
           .from('visits')
           .select('id, visit_date, visit_number, technician_name, work_performed, recommendations, pest_level, time_spent_minutes')
@@ -448,10 +453,18 @@ export default function CaseDetailsModal({
           .select('visit_number, description, quantity')
           .eq('case_id', caseId)
           .eq('item_type', 'service')
-          .not('visit_number', 'is', null)
+          .not('visit_number', 'is', null),
+        supabase
+          .from('case_billing_items')
+          .select('id, description, quantity')
+          .eq('case_id', caseId)
+          .eq('item_type', 'service')
+          .eq('status', 'pending')
+          .is('visit_number', null)
       ])
       setVisitHistory(visitsRes.data || [])
       setVisitBillingItems((billingRes.data || []).filter(i => i.visit_number != null) as Array<{ visit_number: number; description: string; quantity: number }>)
+      setCurrentBillingItems(currentRes.data || [])
     } catch (error) {
       console.error('Error fetching visit history:', error)
     }
@@ -637,6 +650,7 @@ export default function CaseDetailsModal({
     if (t === 'establishment') return 'Etablering'
     if (t === 'acute') return 'Akut'
     if (t === 'service') return 'Servicebesök'
+    if (t === 'routine') return 'Rutinbesök'
     return t || ''
   }
 
@@ -649,7 +663,9 @@ export default function CaseDetailsModal({
           <div className="flex-1 min-w-0 pr-4">
             {displayCaseNumber && (
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
-                {useFallback ? `BE-${displayCaseNumber}` : `#${displayCaseNumber}`}
+                {useFallback
+                  ? (String(displayCaseNumber).startsWith('BE-') ? String(displayCaseNumber) : `BE-${displayCaseNumber}`)
+                  : `#${displayCaseNumber}`}
               </p>
             )}
             <h2 className="text-lg font-semibold text-white leading-snug">
@@ -767,7 +783,7 @@ export default function CaseDetailsModal({
                 </div>
               )}
 
-              {/* Situationsöversikt + tidslinje — ej relevant för avtalade servicebesök */}
+              {/* Situationsöversikt — ej relevant för avtalade servicebesök */}
               {fallbackData.service_type !== 'inspection' && (
                 <>
                   {((fallbackData.pest_level ?? 0) > 0 || (fallbackData.problem_rating ?? 0) > 0) && (
@@ -776,14 +792,18 @@ export default function CaseDetailsModal({
                       problemRating={fallbackData.problem_rating ?? null}
                     />
                   )}
-                  <CaseJourneyTimeline
-                    caseId={caseId}
-                    currentPestLevel={fallbackData.pest_level}
-                    currentProblemRating={fallbackData.problem_rating}
-                    assessmentDate={fallbackData.assessment_date}
-                    assessedBy={fallbackData.assessed_by}
-                    defaultExpanded={false}
-                  />
+                  {/* Ärendehistorik — visas bara om det finns återbesök */}
+                  {visitHistory.length > 0 && (
+                    <CaseJourneyTimeline
+                      caseId={caseId}
+                      currentPestLevel={fallbackData.pest_level}
+                      currentProblemRating={fallbackData.problem_rating}
+                      assessmentDate={fallbackData.assessment_date}
+                      assessedBy={fallbackData.assessed_by}
+                      defaultExpanded={false}
+                      title="Ärendehistorik"
+                    />
+                  )}
                 </>
               )}
 
@@ -1046,6 +1066,23 @@ export default function CaseDetailsModal({
                 </div>
               )}
 
+              {/* Utförda tjänster — nuvarande besök (pending, ej historiska) */}
+              {currentBillingItems.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Utförda tjänster</p>
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3 space-y-1.5">
+                    {currentBillingItems.map(item => (
+                      <div key={item.id} className="flex items-center justify-between text-sm">
+                        <span className="text-slate-300">{item.description}</span>
+                        {item.quantity !== 1 && (
+                          <span className="text-slate-500 text-xs ml-2 flex-shrink-0">× {item.quantity}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Tidigare besök */}
               {visitHistory.length > 0 && (
                 <div>
@@ -1179,7 +1216,7 @@ export default function CaseDetailsModal({
                     <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Ärendeinfo</p>
                     {fallbackData.pest_type && (
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Skadedjur</span>
+                        <span className="text-xs text-slate-500">Tjänst</span>
                         <span className="text-xs text-white">{fallbackData.pest_type}</span>
                       </div>
                     )}

@@ -32,6 +32,7 @@ interface CaseJourneyTimelineProps {
   assessmentDate?: string | null
   assessedBy?: string | null
   defaultExpanded?: boolean
+  title?: string
 }
 
 // Beräkna trafikljusstatus
@@ -81,7 +82,8 @@ const CaseJourneyTimeline: React.FC<CaseJourneyTimelineProps> = ({
   currentPestLevel,
   currentProblemRating,
   // assessmentDate och assessedBy behålls i interfacet för bakåtkompatibilitet men används inte längre
-  defaultExpanded = true
+  defaultExpanded = true,
+  title = 'Ärendets utveckling'
 }) => {
   const [updates, setUpdates] = useState<TrafficLightUpdate[]>([])
   const [loading, setLoading] = useState(true)
@@ -207,7 +209,7 @@ const CaseJourneyTimeline: React.FC<CaseJourneyTimelineProps> = ({
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-teal-400" />
           <span className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-            Ärendets utveckling
+            {title}
           </span>
           {timeline.length > 0 && (
             <span className="text-xs text-slate-500">
