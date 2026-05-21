@@ -38,6 +38,7 @@ export const GridEventCard = memo(function GridEventCard({
   const end = endRaw ? new Date(endRaw) : null
 
   const isContract = (caseData as any).case_type === 'contract'
+  const isEstablishment = (caseData as any).case_type === 'establishment'
 
   const caseNumber = caseData.case_number || caseData.title || ''
 
@@ -53,6 +54,7 @@ export const GridEventCard = memo(function GridEventCard({
   const categoryLabel = (caseData as any).case_type === 'private' ? 'Privatperson'
     : (caseData as any).case_type === 'business' ? 'Företag'
     : (caseData as any).case_type === 'inspection' ? 'Avtalat Servicebesök'
+    : (caseData as any).case_type === 'establishment' ? 'Etablering'
     : null
 
   const displayPrimary = (caseData as any).case_type === 'inspection'
@@ -103,6 +105,7 @@ export const GridEventCard = memo(function GridEventCard({
         {displayPrimary && (
           <p className={`font-mono font-semibold truncate leading-tight ${style.text} ${effectiveCompact ? 'text-[9px]' : 'text-[10px]'}`}>
             {isContract && <span className="mr-0.5 opacity-70">★</span>}
+            {isEstablishment && <span className="mr-0.5 text-lime-400 opacity-70">⬡</span>}
             {displayPrimary}
           </p>
         )}

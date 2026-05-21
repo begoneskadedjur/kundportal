@@ -2,7 +2,7 @@
 import { BeGoneCaseRow } from '../../../types/database'
 import { formatAddress, formatTime } from './scheduleUtils'
 import { getStatusStyle } from './scheduleConstants'
-import { MapPin, Users, Bug, Clock, Footprints } from 'lucide-react'
+import { MapPin, Users, Bug, Clock, Footprints, Building2 } from 'lucide-react'
 
 interface EventHoverCardProps {
   caseData: BeGoneCaseRow
@@ -14,6 +14,7 @@ export function EventHoverCard({ caseData }: EventHoverCardProps) {
   const startTime = caseData.start_date ? formatTime(new Date(caseData.start_date)) : ''
   const endTime = caseData.due_date ? formatTime(new Date(caseData.due_date)) : ''
   const isContract = caseData.case_type === 'contract'
+  const isEstablishment = caseData.case_type === 'establishment'
 
   const technicians = [
     caseData.primary_assignee_name,
@@ -28,6 +29,7 @@ export function EventHoverCard({ caseData }: EventHoverCardProps) {
         <div>
           <p className="font-semibold text-white leading-tight">
             {isContract && <span className="text-purple-400 mr-1">★</span>}
+            {isEstablishment && <Building2 className="inline w-3.5 h-3.5 text-lime-400 mr-1 mb-0.5" />}
             {caseData.company_name || caseData.bestallare || caseData.kontaktperson || caseData.title}
           </p>
           {caseData.case_number && (

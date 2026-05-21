@@ -43,6 +43,7 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
   const startStr = formatTime(start)
   const endStr = formatTime(end)
   const isContract = caseData.case_type === 'contract'
+  const isEstablishment = caseData.case_type === 'establishment'
   const displayName = caseData.company_name || caseData.bestallare || caseData.kontaktperson || caseData.title || ''
   const caseNum = caseData.case_number
   const addr = shortAddress(caseData.adress)
@@ -89,6 +90,7 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
         <div className="flex items-center justify-between gap-0.5 min-w-0">
           <span className={`${isWeek || isCompact ? 'text-[9px]' : 'text-xs'} font-semibold truncate ${style.text}`}>
             {isContract && <span className="text-purple-400 mr-0.5">★</span>}
+            {isEstablishment && <span className="text-lime-400 mr-0.5">⬡</span>}
             {displayName}
           </span>
           {!isWeek && (

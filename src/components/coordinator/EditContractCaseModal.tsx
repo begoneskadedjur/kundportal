@@ -1331,6 +1331,12 @@ export default function EditContractCaseModal({
   const modalTitle = (
     <div className="flex items-center gap-2">
       <span>Ärende: {formData.case_number || 'Genererar...'}</span>
+      {isEstablishment && (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-lime-500/20 text-lime-300 border border-lime-500/30 flex items-center gap-1">
+          <Building2 className="w-3 h-3" />
+          Etablering
+        </span>
+      )}
       {visitNumber > 1 && (
         <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
           Besök {visitNumber}
@@ -1736,7 +1742,7 @@ export default function EditContractCaseModal({
                     setServiceArticle(svc)
                   }}
                   disabled={isCustomerView}
-                  bookingOnly
+                  bookingOnly={!isEstablishment}
                 />
                 {!formData.service_id && formData.pest_type && (
                   <p className="mt-1 text-xs text-slate-500">Befintlig: {formData.pest_type}</p>
