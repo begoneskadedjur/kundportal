@@ -793,10 +793,10 @@ export default function CaseDetailsModal({
                 />
               )}
 
-              {/* Beskrivning — tidigt så kunden förstår ärendet direkt */}
+              {/* Ärendebeskrivning — tidigt så kunden förstår ärendet direkt */}
               {fallbackData.description && (
                 <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Beskrivning</p>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Ärendebeskrivning</p>
                   <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
                     <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.description}</p>
                   </div>
@@ -1206,13 +1206,9 @@ export default function CaseDetailsModal({
 
                   {/* Tekniker-signatur i botten av besöksblocket */}
                   {fallbackData.primary_technician_name && (
-                    <div className="px-4 py-2.5 border-t border-slate-700/40 flex items-center gap-2">
-                      <div className="w-5 h-5 bg-slate-700 rounded-full flex items-center justify-center text-[10px] font-semibold text-slate-300 shrink-0">
-                        {fallbackData.primary_technician_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </div>
-                      <span className="text-xs text-slate-500">
-                        Utfört av <span className="text-slate-300">{fallbackData.primary_technician_name}</span>
-                      </span>
+                    <div className="px-4 py-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-xs text-slate-500">
+                      <User className="w-3.5 h-3.5 shrink-0" />
+                      <span>Utfört av <span className="text-slate-300">{fallbackData.primary_technician_name}</span></span>
                     </div>
                   )}
                 </div>
