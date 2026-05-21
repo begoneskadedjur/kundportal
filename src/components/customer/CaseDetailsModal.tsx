@@ -806,22 +806,24 @@ export default function CaseDetailsModal({
               {/* Situationsöversikt — ej relevant för avtalade servicebesök */}
               {fallbackData.service_type !== 'inspection' && (
                 <>
-                  {((fallbackData.pest_level ?? 0) > 0 || (fallbackData.problem_rating ?? 0) > 0) && (
-                    <CustomerAssessmentPanel
-                      pestLevel={fallbackData.pest_level ?? null}
-                      problemRating={fallbackData.problem_rating ?? null}
-                    />
-                  )}
-                  {/* Rekommendationer — direkt under bedömningen som kontext */}
-                  {fallbackData.recommendations && (
-                    <div>
-                      <p className="text-xs font-medium text-amber-500/80 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <Lightbulb className="w-3.5 h-3.5" />
-                        Teknikerns rekommendationer
-                      </p>
-                      <div className="bg-amber-500/5 border-l-2 border-amber-500/40 rounded-r-xl px-4 py-3">
-                        <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.recommendations}</p>
-                      </div>
+                  {/* Situationsblock: bedömning + rekommendationer i samma container */}
+                  {(((fallbackData.pest_level ?? 0) > 0 || (fallbackData.problem_rating ?? 0) > 0) || fallbackData.recommendations) && (
+                    <div className="rounded-xl border border-slate-700/60 overflow-hidden">
+                      {((fallbackData.pest_level ?? 0) > 0 || (fallbackData.problem_rating ?? 0) > 0) && (
+                        <CustomerAssessmentPanel
+                          pestLevel={fallbackData.pest_level ?? null}
+                          problemRating={fallbackData.problem_rating ?? null}
+                        />
+                      )}
+                      {fallbackData.recommendations && (
+                        <div className="px-4 py-3 border-t border-slate-700/40 bg-amber-500/5">
+                          <p className="text-xs font-medium text-amber-500/80 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                            <Lightbulb className="w-3.5 h-3.5" />
+                            Teknikerns rekommendationer
+                          </p>
+                          <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.recommendations}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                   {/* Ärendehistorik — visas bara om det finns återbesök */}
@@ -1088,56 +1090,131 @@ export default function CaseDetailsModal({
                 </div>
               )}
 
-              {/* Arbetsrapport */}
-              {fallbackData.work_report && fallbackData.work_report.trim() !== '' && (
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Arbetsrapport</p>
-                  <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.work_report}</p>
+              {/* ── BESÖKSBLOCK: arbetsrapport + tjänster + bilder + tekniker ── */}
+              {(fallbackData.work_report?.trim() || currentBillingItems.length > 0 || currentArticleItems.length > 0 || caseImages.length > 0 || (fallbackData.files?.length ?? 0) > 0) && (
+                <div className="rounded-xl border border-slate-700/60 overflow-hidden">
+                  <div className="px-4 pt-3 pb-2 border-b border-slate-700/40">
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Besöksrapport</p>
                   </div>
-                </div>
-              )}
 
-              {/* Utförda tjänster — nuvarande besök (pending, ej historiska) */}
-              {(currentBillingItems.length > 0 || currentArticleItems.length > 0) && (
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Utförda tjänster</p>
-                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3 space-y-3">
-                    {currentBillingItems.map(item => {
-                      const mappedArticles = currentArticleItems.filter(a => a.mapped_service_id === item.id)
-                      return (
-                        <div key={item.id}>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-white font-medium">{item.description}</span>
-                            {item.quantity !== 1 && (
-                              <span className="text-slate-500 text-xs ml-2 flex-shrink-0">× {item.quantity}</span>
-                            )}
-                          </div>
-                          {mappedArticles.length > 0 && (
-                            <div className="mt-1.5 pl-3 border-l border-slate-700 space-y-0.5">
-                              {mappedArticles.map(a => (
-                                <div key={a.id} className="flex items-center gap-2 text-xs text-slate-400">
-                                  <span>{a.article_name ?? a.article_code ?? '–'}</span>
-                                  {a.quantity !== 1 && (
-                                    <span className="text-slate-500">× {a.quantity}</span>
+                  <div className="px-4 py-3 space-y-4">
+                    {/* Arbetsrapport */}
+                    {fallbackData.work_report && fallbackData.work_report.trim() !== '' && (
+                      <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.work_report}</p>
+                    )}
+
+                    {/* Utförda tjänster */}
+                    {(currentBillingItems.length > 0 || currentArticleItems.length > 0) && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Utförda tjänster</p>
+                        <div className="space-y-3">
+                          {currentBillingItems.map(item => {
+                            const mappedArticles = currentArticleItems.filter(a => a.mapped_service_id === item.id)
+                            return (
+                              <div key={item.id}>
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-white font-medium">{item.description}</span>
+                                  {item.quantity !== 1 && (
+                                    <span className="text-slate-500 text-xs ml-2 flex-shrink-0">× {item.quantity}</span>
                                   )}
                                 </div>
-                              ))}
+                                {mappedArticles.length > 0 && (
+                                  <div className="mt-1.5 pl-3 border-l border-slate-700 space-y-0.5">
+                                    {mappedArticles.map(a => (
+                                      <div key={a.id} className="flex items-center gap-2 text-xs text-slate-400">
+                                        <span>{a.article_name ?? a.article_code ?? '–'}</span>
+                                        {a.quantity !== 1 && (
+                                          <span className="text-slate-500">× {a.quantity}</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                          {currentBillingItems.length === 0 && currentArticleItems.filter(a => !a.mapped_service_id).map(a => (
+                            <div key={a.id} className="flex items-center gap-2 text-sm text-slate-300">
+                              <span>{a.article_name ?? a.article_code ?? '–'}</span>
+                              {a.quantity !== 1 && (
+                                <span className="text-slate-500 text-xs">× {a.quantity}</span>
+                              )}
                             </div>
-                          )}
+                          ))}
                         </div>
-                      )
-                    })}
-                    {/* Omappade artiklar — visas direkt om inga service-rader finns */}
-                    {currentBillingItems.length === 0 && currentArticleItems.filter(a => !a.mapped_service_id).map(a => (
-                      <div key={a.id} className="flex items-center gap-2 text-sm text-slate-300">
-                        <span>{a.article_name ?? a.article_code ?? '–'}</span>
-                        {a.quantity !== 1 && (
-                          <span className="text-slate-500 text-xs">× {a.quantity}</span>
-                        )}
                       </div>
-                    ))}
+                    )}
+
+                    {/* Bilder */}
+                    {(caseImages.length > 0 || (fallbackData.files?.length ?? 0) > 0) && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                          Bilder {caseImages.length > 0 ? `(${caseImages.length})` : `(${fallbackData.files?.length})`}
+                        </p>
+                        <div className="grid grid-cols-4 gap-2">
+                          {caseImages.length > 0
+                            ? caseImages.map((image) => (
+                                <div
+                                  key={image.id}
+                                  className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square"
+                                >
+                                  <img src={image.url} alt={image.original_name} className="w-full h-full object-cover" />
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                    <a href={image.url} target="_blank" rel="noopener noreferrer"
+                                      className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
+                                      <Eye className="w-3 h-3 text-white" />
+                                    </a>
+                                    <a href={image.url} download={image.original_name}
+                                      className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
+                                      <Download className="w-3 h-3 text-white" />
+                                    </a>
+                                  </div>
+                                  {image.tags && image.tags.length > 0 && (
+                                    <span className="absolute top-1 left-1 px-1.5 py-0.5 text-[10px] bg-black/60 text-white rounded">
+                                      {image.tags[0] === 'before' ? 'Före' : image.tags[0] === 'after' ? 'Efter' : 'Övrigt'}
+                                    </span>
+                                  )}
+                                </div>
+                              ))
+                            : (fallbackData.files || []).map((file, index) => {
+                                const isImage = file.type.startsWith('image/')
+                                return (
+                                  <div key={index}
+                                    className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square">
+                                    {isImage
+                                      ? <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
+                                      : <div className="w-full h-full flex items-center justify-center"><FileText className="w-6 h-6 text-slate-400" /></div>
+                                    }
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                      <a href={file.url} target="_blank" rel="noopener noreferrer"
+                                        className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
+                                        <Eye className="w-3 h-3 text-white" />
+                                      </a>
+                                      <a href={file.url} download={file.name}
+                                        className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
+                                        <Download className="w-3 h-3 text-white" />
+                                      </a>
+                                    </div>
+                                  </div>
+                                )
+                              })
+                          }
+                        </div>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Tekniker-signatur i botten av besöksblocket */}
+                  {fallbackData.primary_technician_name && (
+                    <div className="px-4 py-2.5 border-t border-slate-700/40 flex items-center gap-2">
+                      <div className="w-5 h-5 bg-slate-700 rounded-full flex items-center justify-center text-[10px] font-semibold text-slate-300 shrink-0">
+                        {fallbackData.primary_technician_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </div>
+                      <span className="text-xs text-slate-500">
+                        Utfört av <span className="text-slate-300">{fallbackData.primary_technician_name}</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1190,86 +1267,6 @@ export default function CaseDetailsModal({
                 </div>
               )}
 
-              {/* Info-grid: Adress + Tekniker + Kontaktperson + Snabbinfo */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Adress */}
-                {fallbackData.address?.formatted_address && (
-                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5" />
-                      Adress
-                    </p>
-                    <p className="text-sm text-white">{fallbackData.address.formatted_address}</p>
-                    {fallbackData.location && (
-                      <button
-                        className="mt-2 text-xs text-slate-400 hover:text-slate-200 transition-colors"
-                        onClick={() => {
-                          const { lat, lng } = fallbackData.location!
-                          window.open(`https://maps.google.com?q=${lat},${lng}`, '_blank')
-                        }}
-                      >
-                        Visa på karta
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Tekniker */}
-                {fallbackData.primary_technician_name && (
-                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Tekniker</p>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-slate-300 text-xs font-semibold shrink-0">
-                        {fallbackData.primary_technician_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white font-medium truncate">{fallbackData.primary_technician_name}</p>
-                        {fallbackData.primary_technician_email && (
-                          <a
-                            href={`mailto:${fallbackData.primary_technician_email}?subject=Fråga om ärende ${fallbackData.title || fallbackData.case_number}`}
-                            className="text-xs text-slate-400 hover:text-slate-200 transition-colors truncate block"
-                          >
-                            {fallbackData.primary_technician_email}
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Kontaktperson */}
-                {fallbackData.contact_person && (
-                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Kontaktperson</p>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-slate-300 text-xs font-semibold shrink-0">
-                        {fallbackData.contact_person.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white font-medium truncate">{fallbackData.contact_person}</p>
-                        {fallbackData.contact_email && (
-                          <a
-                            href={`mailto:${fallbackData.contact_email}`}
-                            className="text-xs text-slate-400 hover:text-slate-200 transition-colors truncate block"
-                          >
-                            {fallbackData.contact_email}
-                          </a>
-                        )}
-                        {fallbackData.contact_phone && (
-                          <a
-                            href={`tel:${fallbackData.contact_phone}`}
-                            className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
-                          >
-                            {fallbackData.contact_phone}
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-
               {/* Material / preparat (ej inspection) */}
               {fallbackData.service_type !== 'inspection' && (
                 <>
@@ -1294,62 +1291,43 @@ export default function CaseDetailsModal({
                 </>
               )}
 
-              {/* Bilder */}
-              {(caseImages.length > 0 || ((fallbackData.files?.length ?? 0) > 0)) && (
-                <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Images className="w-3.5 h-3.5" />
-                    Bilder {caseImages.length > 0 ? `(${caseImages.length})` : `(${fallbackData.files?.length})`}
-                  </p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {caseImages.length > 0
-                      ? caseImages.map((image) => (
-                          <div
-                            key={image.id}
-                            className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square"
-                          >
-                            <img src={image.url} alt={image.original_name} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                              <a href={image.url} target="_blank" rel="noopener noreferrer"
-                                className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
-                                <Eye className="w-3 h-3 text-white" />
-                              </a>
-                              <a href={image.url} download={image.original_name}
-                                className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
-                                <Download className="w-3 h-3 text-white" />
-                              </a>
-                            </div>
-                            {image.tags && image.tags.length > 0 && (
-                              <span className="absolute top-1 left-1 px-1.5 py-0.5 text-[10px] bg-black/60 text-white rounded">
-                                {image.tags[0] === 'before' ? 'Före' : image.tags[0] === 'after' ? 'Efter' : 'Övrigt'}
-                              </span>
-                            )}
-                          </div>
-                        ))
-                      : (fallbackData.files || []).map((file, index) => {
-                          const isImage = file.type.startsWith('image/')
-                          return (
-                            <div key={index}
-                              className="relative group rounded-lg overflow-hidden bg-slate-800/50 border border-slate-700 aspect-square">
-                              {isImage
-                                ? <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
-                                : <div className="w-full h-full flex items-center justify-center"><FileText className="w-6 h-6 text-slate-400" /></div>
-                              }
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                                <a href={file.url} target="_blank" rel="noopener noreferrer"
-                                  className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
-                                  <Eye className="w-3 h-3 text-white" />
-                                </a>
-                                <a href={file.url} download={file.name}
-                                  className="p-1.5 bg-white/20 rounded-full hover:bg-white/30">
-                                  <Download className="w-3 h-3 text-white" />
-                                </a>
-                              </div>
-                            </div>
-                          )
-                        })
-                    }
-                  </div>
+              {/* Kontaktinfo-footer */}
+              {(fallbackData.address?.formatted_address || fallbackData.contact_person) && (
+                <div className="flex flex-wrap gap-4 text-xs text-slate-500 pt-1">
+                  {fallbackData.address?.formatted_address && (
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                      {fallbackData.location ? (
+                        <button
+                          className="hover:text-slate-300 transition-colors text-left"
+                          onClick={() => {
+                            const { lat, lng } = fallbackData.location!
+                            window.open(`https://maps.google.com?q=${lat},${lng}`, '_blank')
+                          }}
+                        >
+                          {fallbackData.address.formatted_address}
+                        </button>
+                      ) : (
+                        fallbackData.address.formatted_address
+                      )}
+                    </span>
+                  )}
+                  {fallbackData.contact_person && (
+                    <span className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 shrink-0" />
+                      <span>{fallbackData.contact_person}</span>
+                      {fallbackData.contact_email && (
+                        <a href={`mailto:${fallbackData.contact_email}`} className="hover:text-slate-300 transition-colors">
+                          · {fallbackData.contact_email}
+                        </a>
+                      )}
+                      {fallbackData.contact_phone && (
+                        <a href={`tel:${fallbackData.contact_phone}`} className="hover:text-slate-300 transition-colors">
+                          · {fallbackData.contact_phone}
+                        </a>
+                      )}
+                    </span>
+                  )}
                 </div>
               )}
             </>
