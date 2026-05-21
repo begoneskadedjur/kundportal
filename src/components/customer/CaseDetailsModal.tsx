@@ -1258,7 +1258,6 @@ export default function CaseDetailsModal({
                     <CasePreparationsSection
                       caseId={caseId}
                       caseType="contract"
-                      pestType={fallbackData?.pest_type || null}
                       isReadOnly={true}
                     />
                   )}
@@ -1455,7 +1454,6 @@ export default function CaseDetailsModal({
                 <CasePreparationsSection
                   caseId={caseId}
                   caseType="contract"
-                  pestType={fallbackData?.pest_type || null}
                   isReadOnly={true}
                 />
               )}

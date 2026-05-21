@@ -162,6 +162,35 @@ export class CasePreparationService {
   }
 
   /**
+   * Hämta preparat filtrerade på tjänstegrupp
+   */
+  static async getPreparationsForServiceGroup(serviceGroupId: string): Promise<Preparation[]> {
+    try {
+      const { data, error } = await supabase
+        .from('preparations')
+        .select('*')
+        .contains('service_group_ids', [serviceGroupId])
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true })
+
+      if (error) {
+        console.error('Fel vid hämtning av preparat för tjänstegrupp:', error)
+        throw new Error(`Databasfel: ${error.message}`)
+      }
+
+      const result = data || []
+      if (result.length === 0) {
+        return await CasePreparationService.getAllActivePreparations()
+      }
+      return result
+    } catch (error) {
+      console.error('CasePreparationService.getPreparationsForServiceGroup fel:', error)
+      throw error
+    }
+  }
+
+  /**
    * Hämta alla aktiva preparat (när ingen pest_type är vald)
    */
   static async getAllActivePreparations(): Promise<Preparation[]> {

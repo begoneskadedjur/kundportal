@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { X, Loader2, Save, Beaker, Check, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react'
+import { supabase } from '../../../lib/supabase'
 import { PreparationService } from '../../../services/preparationService'
 import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
@@ -58,12 +59,17 @@ export function PreparationEditModal({
   const [thresholdErrors, setThresholdErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [stationTypes, setStationTypes] = useState<StationType[]>([])
+  const [serviceGroups, setServiceGroups] = useState<{ id: string; name: string }[]>([])
+  const [serviceGroupIds, setServiceGroupIds] = useState<string[]>([])
 
-  // Hämta stationstyper vid mount
+  // Hämta stationstyper och tjänstegrupper vid mount
   useEffect(() => {
     StationTypeService.getActiveStationTypes()
       .then(setStationTypes)
       .catch(() => setStationTypes([]))
+    supabase.from('service_groups').select('id, name').order('name')
+      .then(({ data }) => setServiceGroups(data || []))
+      .catch(() => setServiceGroups([]))
   }, [])
 
   // Fyll i formulär när preparat ändras
@@ -73,6 +79,7 @@ export function PreparationEditModal({
       setCategory(preparation.category)
       setRegistrationNumber(preparation.registration_number || '')
       setPestTypes(preparation.pest_types || [])
+      setServiceGroupIds(preparation.service_group_ids || [])
       setStationTypeIds(preparation.station_type_ids || [])
       setActiveSubstances(preparation.active_substances || '')
       setDosage(preparation.dosage || '')
@@ -89,6 +96,7 @@ export function PreparationEditModal({
       setCategory('biocidprodukt')
       setRegistrationNumber('')
       setPestTypes([])
+      setServiceGroupIds([])
       setStationTypeIds([])
       setActiveSubstances('')
       setDosage('')
@@ -109,6 +117,15 @@ export function PreparationEditModal({
       setPestTypes(pestTypes.filter(p => p !== pest))
     } else {
       setPestTypes([...pestTypes, pest])
+    }
+  }
+
+  // Toggle tjänstegrupp
+  const toggleServiceGroup = (id: string) => {
+    if (serviceGroupIds.includes(id)) {
+      setServiceGroupIds(serviceGroupIds.filter(s => s !== id))
+    } else {
+      setServiceGroupIds([...serviceGroupIds, id])
     }
   }
 
@@ -162,6 +179,7 @@ export function PreparationEditModal({
         category,
         registration_number: registrationNumber.trim() || null,
         pest_types: pestTypes,
+        service_group_ids: serviceGroupIds,
         station_type_ids: stationTypeIds,
         active_substances: activeSubstances.trim() || null,
         dosage: dosage.trim() || null,
@@ -338,6 +356,40 @@ export function PreparationEditModal({
               </p>
             )}
           </div>
+
+          {/* Tjänstegrupper */}
+          {serviceGroups.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Tjänstegrupper
+              </label>
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg">
+                {serviceGroups.map((sg) => {
+                  const isSelected = serviceGroupIds.includes(sg.id)
+                  return (
+                    <button
+                      key={sg.id}
+                      type="button"
+                      onClick={() => toggleServiceGroup(sg.id)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-teal-500/20 text-teal-400 border border-teal-500/50'
+                          : 'bg-slate-700/50 text-slate-400 border border-slate-600 hover:border-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3.5 h-3.5" />}
+                      {sg.name}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                {serviceGroupIds.length === 0
+                  ? 'Ingen grupp vald — preparatet syns vid alla ärendetyper'
+                  : `${serviceGroupIds.length} grupp${serviceGroupIds.length > 1 ? 'er' : ''} vald${serviceGroupIds.length > 1 ? 'a' : ''}`}
+              </p>
+            </div>
+          )}
 
           {/* Stationstyper */}
           {stationTypes.length > 0 && (

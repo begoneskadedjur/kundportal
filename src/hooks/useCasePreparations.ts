@@ -14,7 +14,8 @@ import toast from 'react-hot-toast'
 interface UseCasePreparationsProps {
   caseId: string | null
   caseType: CasePreparationType
-  pestType: string | null
+  pestType?: string | null
+  serviceGroupId?: string | null
   technicianId?: string | null
   technicianName?: string | null
   enabled?: boolean
@@ -50,6 +51,7 @@ export function useCasePreparations({
   caseId,
   caseType,
   pestType,
+  serviceGroupId,
   technicianId,
   technicianName,
   enabled = true
@@ -71,18 +73,18 @@ export function useCasePreparations({
     }
   }, [caseId, caseType, enabled])
 
-  // Ladda tillgängliga preparat baserat på pest_type
+  // Ladda tillgängliga preparat baserat på tjänstegrupp eller pest_type
   const fetchAvailablePreparations = useCallback(async () => {
     if (!enabled) return
 
     try {
       let data: Preparation[]
 
-      if (pestType && pestType !== 'Övrigt' && pestType !== 'Inspektion') {
-        // Filtrera på skadedjurstyp
+      if (serviceGroupId) {
+        data = await CasePreparationService.getPreparationsForServiceGroup(serviceGroupId)
+      } else if (pestType && pestType !== 'Övrigt' && pestType !== 'Inspektion') {
         data = await CasePreparationService.getPreparationsForPestType(pestType)
       } else {
-        // Hämta alla aktiva om ingen pest_type eller om "Övrigt"
         data = await CasePreparationService.getAllActivePreparations()
       }
 
@@ -90,7 +92,7 @@ export function useCasePreparations({
     } catch (error) {
       console.error('Fel vid hämtning av preparat:', error)
     }
-  }, [pestType, enabled])
+  }, [serviceGroupId, pestType, enabled])
 
   // Initial laddning
   useEffect(() => {
@@ -100,10 +102,10 @@ export function useCasePreparations({
     )
   }, [fetchCasePreparations, fetchAvailablePreparations])
 
-  // Uppdatera tillgängliga preparat när pest_type ändras
+  // Uppdatera tillgängliga preparat när serviceGroupId eller pest_type ändras
   useEffect(() => {
     fetchAvailablePreparations()
-  }, [pestType, fetchAvailablePreparations])
+  }, [serviceGroupId, pestType, fetchAvailablePreparations])
 
   // Lägg till preparat
   const addPreparation = useCallback(

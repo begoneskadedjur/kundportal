@@ -127,6 +127,7 @@ export class PreparationService {
           category: input.category || 'biocidprodukt',
           registration_number: input.registration_number || null,
           pest_types: input.pest_types || [],
+          service_group_ids: input.service_group_ids || [],
           station_type_ids: input.station_type_ids || [],
           active_substances: input.active_substances || null,
           dosage: input.dosage || null,
@@ -168,6 +169,7 @@ export class PreparationService {
       if (input.category !== undefined) updateData.category = input.category
       if (input.registration_number !== undefined) updateData.registration_number = input.registration_number
       if (input.pest_types !== undefined) updateData.pest_types = input.pest_types
+      if (input.service_group_ids !== undefined) updateData.service_group_ids = input.service_group_ids
       if (input.station_type_ids !== undefined) updateData.station_type_ids = input.station_type_ids
       if (input.active_substances !== undefined) updateData.active_substances = input.active_substances
       if (input.dosage !== undefined) updateData.dosage = input.dosage

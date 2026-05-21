@@ -1886,7 +1886,7 @@ export default function EditContractCaseModal({
                     canEdit={!isCustomerView}
                     refreshTrigger={imageRefreshTrigger}
                     showCategories={true}
-                    draftMode={!isCustomerView}
+                    draftMode={false}
                     userId={profile?.id}
                     onPendingChangesUpdate={setHasPendingImageChanges}
                   />
@@ -1898,7 +1898,8 @@ export default function EditContractCaseModal({
                 <CasePreparationsSection
                   caseId={caseData.id}
                   caseType="contract"
-                  pestType={serviceArticle?.name || formData.pest_type || null}
+                  serviceGroupId={formData.service_group_id || null}
+                  serviceType={formData.service_type || null}
                   technicianId={formData.primary_technician_id || null}
                   technicianName={formData.primary_technician_name || null}
                   isReadOnly={isCustomerView}

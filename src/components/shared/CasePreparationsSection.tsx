@@ -26,7 +26,9 @@ import Select from '../ui/Select'
 interface CasePreparationsSectionProps {
   caseId: string | null
   caseType: CasePreparationType
-  pestType: string | null
+  pestType?: string | null
+  serviceGroupId?: string | null
+  serviceType?: string | null
   technicianId?: string | null
   technicianName?: string | null
   isReadOnly?: boolean
@@ -36,6 +38,8 @@ export default function CasePreparationsSection({
   caseId,
   caseType,
   pestType,
+  serviceGroupId,
+  serviceType,
   technicianId,
   technicianName,
   isReadOnly = false
@@ -58,6 +62,7 @@ export default function CasePreparationsSection({
     caseId,
     caseType,
     pestType,
+    serviceGroupId,
     technicianId,
     technicianName,
     enabled: !!caseId
@@ -95,7 +100,6 @@ export default function CasePreparationsSection({
             <h3 className="text-white font-medium text-sm">Använda preparat</h3>
             <p className="text-[10px] text-slate-400">
               {casePreparations.length} registrerade
-              {pestType && pestType !== 'Övrigt' && ` • ${pestType}`}
             </p>
           </div>
         </div>
@@ -173,8 +177,7 @@ export default function CasePreparationsSection({
                       {/* Välj preparat */}
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">
-                          Preparat{' '}
-                          {pestType && pestType !== 'Övrigt' && `(filtrerat på ${pestType})`}
+                          Preparat
                         </label>
                         <Select
                           value={selectedPreparationId}
@@ -187,8 +190,7 @@ export default function CasePreparationsSection({
                         />
                         {availablePreparations.length === 0 && (
                           <p className="text-xs text-amber-400 mt-1">
-                            Inga preparat hittades för{' '}
-                            {pestType ? `skadedjurstyp "${pestType}"` : 'denna ärendetyp'}
+                            Inga aktiva preparat hittades
                           </p>
                         )}
                       </div>
@@ -198,7 +200,7 @@ export default function CasePreparationsSection({
                         <div className="p-3 bg-slate-800 rounded-lg text-sm">
                           <div className="flex items-start gap-2">
                             <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                            <div>
+                            <div className="flex-1">
                               {selectedPreparation.dosage && (
                                 <p className="text-slate-300">
                                   <span className="text-slate-500">Rekommenderad dos:</span>{' '}
@@ -209,6 +211,19 @@ export default function CasePreparationsSection({
                                 <p className="text-slate-400 text-xs mt-1">
                                   Aktiva substanser: {selectedPreparation.active_substances}
                                 </p>
+                              )}
+                              {serviceType === 'inspection' && selectedPreparation.threshold_warning != null && (
+                                <div className="mt-2 pt-2 border-t border-slate-700 space-y-0.5">
+                                  <p className="text-xs font-medium text-slate-400">Tröskelvärden</p>
+                                  <p className="text-xs text-amber-400">
+                                    Varning: {selectedPreparation.threshold_warning} {selectedPreparation.measurement_unit}
+                                  </p>
+                                  {selectedPreparation.threshold_critical != null && (
+                                    <p className="text-xs text-red-400">
+                                      Kritisk: {selectedPreparation.threshold_critical} {selectedPreparation.measurement_unit}
+                                    </p>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
