@@ -813,6 +813,18 @@ export default function CaseDetailsModal({
                       problemRating={fallbackData.problem_rating ?? null}
                     />
                   )}
+                  {/* Rekommendationer — direkt under bedömningen som kontext */}
+                  {fallbackData.recommendations && (
+                    <div>
+                      <p className="text-xs font-medium text-amber-500/80 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Lightbulb className="w-3.5 h-3.5" />
+                        Teknikerns rekommendationer
+                      </p>
+                      <div className="bg-amber-500/5 border-l-2 border-amber-500/40 rounded-r-xl px-4 py-3">
+                        <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.recommendations}</p>
+                      </div>
+                    </div>
+                  )}
                   {/* Ärendehistorik — visas bara om det finns återbesök */}
                   {visitHistory.length > 0 && (
                     <CaseJourneyTimeline
@@ -1088,7 +1100,7 @@ export default function CaseDetailsModal({
               )}
 
               {/* Utförda tjänster — nuvarande besök (pending, ej historiska) */}
-              {currentBillingItems.length > 0 && (
+              {(currentBillingItems.length > 0 || currentArticleItems.length > 0) && (
                 <div>
                   <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Utförda tjänster</p>
                   <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3 space-y-3">
@@ -1117,6 +1129,15 @@ export default function CaseDetailsModal({
                         </div>
                       )
                     })}
+                    {/* Omappade artiklar — visas direkt om inga service-rader finns */}
+                    {currentBillingItems.length === 0 && currentArticleItems.filter(a => !a.mapped_service_id).map(a => (
+                      <div key={a.id} className="flex items-center gap-2 text-sm text-slate-300">
+                        <span>{a.article_name ?? a.article_code ?? '–'}</span>
+                        {a.quantity !== 1 && (
+                          <span className="text-slate-500 text-xs">× {a.quantity}{a.unit ? ` ${a.unit}` : ''}</span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -1378,18 +1399,6 @@ export default function CaseDetailsModal({
                 </div>
               )}
 
-              {/* Rekommendationer */}
-              {fallbackData?.recommendations && (
-                <div>
-                  <p className="text-xs font-medium text-amber-500/80 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Lightbulb className="w-3.5 h-3.5" />
-                    Teknikerns rekommendationer
-                  </p>
-                  <div className="bg-amber-500/5 border-l-2 border-amber-500/40 rounded-r-xl px-4 py-3">
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{fallbackData.recommendations}</p>
-                  </div>
-                </div>
-              )}
 
               {/* Grid: Adress + Tekniker + Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
