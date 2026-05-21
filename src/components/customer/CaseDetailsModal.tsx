@@ -803,9 +803,8 @@ export default function CaseDetailsModal({
                       {stationInspections && (() => {
                         const all = [...stationInspections.outdoor, ...stationInspections.indoor]
                         const okCount = all.filter(r => r.status === 'ok' || r.status === 'none').length
-                        const activityCount = all.filter(r => r.status === 'activity' || r.status === 'medium' || r.status === 'high').length
-                        const needsServiceCount = all.filter(r => r.status === 'needs_service' || r.status === 'low').length
-                        if (okCount + activityCount + needsServiceCount === 0) return null
+                        const activityCount = all.filter(r => ['activity', 'medium', 'high', 'low', 'needs_service'].includes(r.status)).length
+                        if (okCount + activityCount === 0) return null
                         return (
                           <div className="px-4 py-3 border-t border-slate-700/40 flex gap-6">
                             {okCount > 0 && (
@@ -818,12 +817,6 @@ export default function CaseDetailsModal({
                               <span className="flex items-center gap-1.5 text-xs text-slate-300">
                                 <span className="w-2 h-2 rounded-full bg-amber-500" />
                                 {activityCount} med aktivitet
-                              </span>
-                            )}
-                            {needsServiceCount > 0 && (
-                              <span className="flex items-center gap-1.5 text-xs text-slate-300">
-                                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                                {needsServiceCount} behöver åtgärd
                               </span>
                             )}
                           </div>
@@ -1158,7 +1151,7 @@ export default function CaseDetailsModal({
               )}
 
               {/* Bilder */}
-              {(caseImages.length > 0 || (fallbackData.files && fallbackData.files.length > 0)) && (
+              {(caseImages.length > 0 || ((fallbackData.files?.length ?? 0) > 0)) && (
                 <div>
                   <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                     <Images className="w-3.5 h-3.5" />
