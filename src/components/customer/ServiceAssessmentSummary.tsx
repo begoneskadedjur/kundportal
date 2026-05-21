@@ -1,14 +1,11 @@
-// src/components/customer/ServiceAssessmentSummary.tsx - Service Assessment Summary Card
 import React, { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle, Clock, ChevronRight, Eye, AlertCircle, CalendarCheck } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock, ChevronRight, Eye, AlertCircle, CalendarCheck } from 'lucide-react'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
-import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Case } from '../../types/cases'
-import ReassuranceMessage from '../shared/ReassuranceMessage'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import toast from 'react-hot-toast'
 
@@ -24,6 +21,7 @@ interface UpcomingVisit {
   title: string
   scheduled_start: string
   pest_type?: string
+  service_type?: string
 }
 
 interface AssessmentSummary {
@@ -33,9 +31,16 @@ interface AssessmentSummary {
   criticalCases: number
   warningCases: number
   okCases: number
-  recentTrend: 'improving' | 'stable' | 'worsening' | null
   unacknowledgedCriticalCases: Case[]
   upcomingVisits: UpcomingVisit[]
+}
+
+const SERVICE_TYPE_LABEL: Record<string, string> = {
+  routine: 'Rutinbesök',
+  acute: 'Akut',
+  other: 'Övrigt',
+  inspection: 'Avtalat servicebesök',
+  establishment: 'Etablering',
 }
 
 const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
@@ -57,7 +62,6 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
     if (!customerId) return
 
     try {
-      // Hämta alla ärenden
       const { data: cases, error } = await supabase
         .from('cases')
         .select('*')
@@ -66,13 +70,16 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
 
       if (error) throw error
 
-      // Beräkna statistik
-      const casesWithAssessments = cases?.filter(c =>
+      // Bara servicebesök (routine/acute/other) bedömer skadedjurssituation
+      const assessableCases = (cases || []).filter(c =>
+        c.service_type !== 'inspection' && c.service_type !== 'establishment'
+      )
+
+      const casesWithAssessments = assessableCases.filter(c =>
         (c.pest_level !== null && c.pest_level !== undefined) ||
         (c.problem_rating !== null && c.problem_rating !== undefined)
-      ) || []
+      )
 
-      // Identifiera kritiska ärenden
       const criticalCasesList = casesWithAssessments.filter(c =>
         (c.pest_level && c.pest_level >= 3) ||
         (c.problem_rating && c.problem_rating >= 4)
@@ -90,28 +97,20 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
         !(c.pest_level === 2 || c.problem_rating === 3)
       ).length
 
-      // Hämta bekräftelser för kritiska ärenden
       let unacknowledgedCriticalCases: Case[] = []
-
       if (criticalCasesList.length > 0 && profile?.id) {
-        const criticalCaseIds = criticalCasesList.map(c => c.id)
-
         const { data: acknowledgments } = await supabase
           .from('case_acknowledgments')
           .select('case_id')
-          .in('case_id', criticalCaseIds)
+          .in('case_id', criticalCasesList.map(c => c.id))
           .eq('user_id', profile.id)
 
-        const acknowledgedCaseIds = new Set(acknowledgments?.map(a => a.case_id) || [])
-        unacknowledgedCriticalCases = criticalCasesList.filter(c => !acknowledgedCaseIds.has(c.id))
+        const acknowledgedIds = new Set(acknowledgments?.map(a => a.case_id) || [])
+        unacknowledgedCriticalCases = criticalCasesList.filter(c => !acknowledgedIds.has(c.id))
       }
 
-      // Senaste bedömning och trend
       const latestAssessment = casesWithAssessments.length > 0 ? casesWithAssessments[0] : null
-      const recentTrend = latestAssessment?.pest_level_trend || null
 
-      // Hämta kommande besök (schemalagda i framtiden)
-      const now = new Date().toISOString()
       const upcomingVisits: UpcomingVisit[] = (cases || [])
         .filter(c => c.scheduled_start && new Date(c.scheduled_start) > new Date())
         .sort((a, b) => new Date(a.scheduled_start!).getTime() - new Date(b.scheduled_start!).getTime())
@@ -121,7 +120,8 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
           case_number: c.case_number || '',
           title: c.title || 'Servicebesök',
           scheduled_start: c.scheduled_start!,
-          pest_type: c.pest_type
+          pest_type: c.pest_type,
+          service_type: c.service_type,
         }))
 
       setSummary({
@@ -131,7 +131,6 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
         criticalCases: criticalCasesList.length,
         warningCases,
         okCases,
-        recentTrend,
         unacknowledgedCriticalCases,
         upcomingVisits
       })
@@ -143,19 +142,13 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
     }
   }
 
-  // Hjälpfunktion för att avgöra status-nivå
   const getCaseStatusLevel = (caseItem: Case): 'critical' | 'warning' | 'ok' => {
     if ((caseItem.pest_level && caseItem.pest_level >= 3) ||
-        (caseItem.problem_rating && caseItem.problem_rating >= 4)) {
-      return 'critical'
-    }
-    if (caseItem.pest_level === 2 || caseItem.problem_rating === 3) {
-      return 'warning'
-    }
+        (caseItem.problem_rating && caseItem.problem_rating >= 4)) return 'critical'
+    if (caseItem.pest_level === 2 || caseItem.problem_rating === 3) return 'warning'
     return 'ok'
   }
 
-  // Status-emoji baserat på nivå
   const getStatusEmoji = (level: 'critical' | 'warning' | 'ok') => {
     switch (level) {
       case 'critical': return '🔴'
@@ -164,7 +157,6 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
     }
   }
 
-  // Status-text baserat på nivå
   const getStatusText = (level: 'critical' | 'warning' | 'ok') => {
     switch (level) {
       case 'critical': return 'Kritisk'
@@ -173,268 +165,171 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
     }
   }
 
+  const handleOpenCase = (caseId: string) => {
+    if (onOpenCaseDetails) onOpenCaseDetails(caseId)
+  }
+
   if (loading) {
     return (
-      <Card className={`bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700 p-6 ${className}`}>
-        <div className="flex items-center justify-center py-8">
+      <div className={`bg-slate-800/40 border border-slate-700/50 rounded-2xl overflow-hidden ${className}`}>
+        <div className="flex items-center justify-center py-10">
           <LoadingSpinner />
         </div>
-      </Card>
+      </div>
     )
   }
 
-  if (!summary || summary.casesWithAssessments === 0) {
-    return (
-      <Card className={`bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700 p-6 ${className}`}>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
-            <span className="text-lg">🚦</span>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-white">Er skadedjurssituation</h3>
-            <p className="text-sm text-slate-400">Inga bedömningar än</p>
-          </div>
-        </div>
-        <div className="text-center py-8">
-          <div className="w-16 h-16 bg-slate-700/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Clock className="w-8 h-8 text-slate-600" />
-          </div>
-          <p className="text-slate-400">Inga bedömningar att visa</p>
-          <p className="text-sm text-slate-500 mt-1">
-            Bedömningar visas efter att våra tekniker utfört servicearenden
-          </p>
-        </div>
-      </Card>
-    )
-  }
+  if (!summary) return null
 
-  const getTrendIcon = () => {
-    switch (summary.recentTrend) {
-      case 'improving':
-        return <TrendingUp className="w-4 h-4 text-green-400" />
-      case 'worsening':
-        return <TrendingDown className="w-4 h-4 text-red-400" />
-      case 'stable':
-        return <Minus className="w-4 h-4 text-yellow-400" />
-      default:
-        return null
-    }
-  }
-
-  const getTrendText = () => {
-    switch (summary.recentTrend) {
-      case 'improving':
-        return 'Förbättring'
-      case 'worsening':
-        return 'Försämring'
-      case 'stable':
-        return 'Stabilt'
-      default:
-        return null
-    }
-  }
-
-  const handleOpenCase = (caseId: string) => {
-    if (onOpenCaseDetails) {
-      onOpenCaseDetails(caseId)
-    }
-  }
-
-  // Kontrollera om senaste ärendet är bekräftat
+  const latestCaseStatus = summary.latestAssessment ? getCaseStatusLevel(summary.latestAssessment) : 'ok'
+  const latestCaseNeedsAcknowledgment = latestCaseStatus === 'critical'
   const isLatestCaseAcknowledged = summary.latestAssessment
     ? !summary.unacknowledgedCriticalCases.some(c => c.id === summary.latestAssessment?.id)
     : true
 
-  const latestCaseStatus = summary.latestAssessment
-    ? getCaseStatusLevel(summary.latestAssessment)
-    : 'ok'
-
-  const latestCaseNeedsAcknowledgment = latestCaseStatus === 'critical'
+  const hasAssessments = summary.casesWithAssessments > 0
+  const hasUpcomingVisits = summary.upcomingVisits.length > 0
 
   return (
-    <Card className={`bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700 ${className}`}>
-      <div className="p-6">
-        {/* Header med nya rubriker */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
-              <span className="text-lg">🚦</span>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Er skadedjurssituation</h3>
-              <p className="text-sm text-slate-400">
-                Sammanfattning av {summary.casesWithAssessments} bedömda ärenden
-              </p>
-            </div>
-          </div>
+    <div className={`bg-slate-800/40 border border-slate-700/50 rounded-2xl overflow-hidden ${className}`}>
 
-          {summary.recentTrend && getTrendText() && (
-            <div className="flex items-center gap-2 text-sm text-slate-300">
-              {getTrendIcon()}
-              <span>{getTrendText()}</span>
-            </div>
-          )}
-        </div>
+      {/* Header */}
+      <div className="px-4 py-4 border-b border-slate-700/40">
+        <h3 className="text-sm font-semibold text-white">Er skadedjurssituation</h3>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {summary.totalCases > 0
+            ? `Sammanfattning av ${summary.totalCases} ärenden`
+            : 'Inga ärenden än'}
+        </p>
+      </div>
 
-        {/* Bekräftelse-banner för obekräftade kritiska ärenden */}
-        {summary.unacknowledgedCriticalCases.length > 0 && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400" />
-                <span className="text-sm text-red-400 font-medium">
-                  {summary.unacknowledgedCriticalCases.length} ärende{summary.unacknowledgedCriticalCases.length > 1 ? 'n' : ''} kräver er bekräftelse
-                </span>
-              </div>
-              {onOpenCaseDetails && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleOpenCase(summary.unacknowledgedCriticalCases[0].id)}
-                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1"
-                >
-                  Visa ärende
-                  <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Summary Statistics */}
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          {/* Critical Cases */}
-          <div className={`text-center p-3 bg-red-500/10 border border-red-500/20 rounded-lg ${
-            summary.unacknowledgedCriticalCases.length > 0 ? 'ring-1 ring-red-500/50' : ''
-          }`}>
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <AlertTriangle className="w-4 h-4 text-red-400" />
-              <span className="text-xl font-bold text-red-400">{summary.criticalCases}</span>
+      {/* Trafik-ljusbadges — bara om bedömningar finns */}
+      {hasAssessments && (
+        <div className="grid grid-cols-3 divide-x divide-slate-700/40 border-b border-slate-700/40">
+          <div className={`px-4 py-3 text-center ${summary.unacknowledgedCriticalCases.length > 0 ? 'bg-red-500/5' : ''}`}>
+            <div className="flex items-center justify-center gap-1 mb-0.5">
+              <span className="text-lg font-bold text-red-400">{summary.criticalCases}</span>
               {summary.unacknowledgedCriticalCases.length > 0 && (
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
               )}
             </div>
-            <p className="text-xs text-red-300">Kritiska</p>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider">Kritiska</p>
           </div>
-
-          {/* Warning Cases */}
-          <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <Clock className="w-4 h-4 text-yellow-400" />
-              <span className="text-xl font-bold text-yellow-400">{summary.warningCases}</span>
-            </div>
-            <p className="text-xs text-yellow-300">Varningar</p>
+          <div className="px-4 py-3 text-center">
+            <span className="text-lg font-bold text-amber-400 block mb-0.5">{summary.warningCases}</span>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider">Varningar</p>
           </div>
-
-          {/* OK Cases */}
-          <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <CheckCircle className="w-4 h-4 text-green-400" />
-              <span className="text-xl font-bold text-green-400">{summary.okCases}</span>
-            </div>
-            <p className="text-xs text-green-300">OK</p>
+          <div className="px-4 py-3 text-center">
+            <span className="text-lg font-bold text-emerald-400 block mb-0.5">{summary.okCases}</span>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider">OK</p>
           </div>
         </div>
+      )}
 
-        {/* Kommande besök */}
-        {summary.upcomingVisits.length > 0 && (
-          <div className="mb-4 p-4 bg-teal-500/10 border border-teal-500/30 rounded-lg">
-            <div className="flex items-center gap-2 mb-3">
-              <CalendarCheck className="w-4 h-4 text-teal-400" />
-              <h4 className="text-sm font-semibold text-teal-400 uppercase tracking-wider">
-                Kommande besök
-              </h4>
+      {/* Bekräftelse-banner */}
+      {summary.unacknowledgedCriticalCases.length > 0 && (
+        <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <span className="text-sm text-red-400 font-medium">
+                {summary.unacknowledgedCriticalCases.length} ärende{summary.unacknowledgedCriticalCases.length > 1 ? 'n' : ''} kräver er bekräftelse
+              </span>
             </div>
-            <div className="space-y-2">
-              {summary.upcomingVisits.map((visit) => (
+            {onOpenCaseDetails && (
+              <button
+                onClick={() => handleOpenCase(summary.unacknowledgedCriticalCases[0].id)}
+                className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 shrink-0"
+              >
+                Visa ärende
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Kommande besök */}
+      {hasUpcomingVisits && (
+        <div className={`${summary.unacknowledgedCriticalCases.length > 0 ? 'mt-4' : 'mt-0'}`}>
+          <div className={`px-4 py-2.5 flex items-center gap-2 ${hasAssessments || summary.unacknowledgedCriticalCases.length > 0 ? 'border-t border-slate-700/40' : ''}`}>
+            <CalendarCheck className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Kommande besök</span>
+          </div>
+          <div className="px-4 pb-3 space-y-1.5">
+            {summary.upcomingVisits.map((visit) => {
+              const visitDate = new Date(visit.scheduled_start)
+              const serviceLabel = visit.service_type ? SERVICE_TYPE_LABEL[visit.service_type] : null
+              return (
                 <div
                   key={visit.id}
-                  className={`flex items-center justify-between p-2 rounded-lg bg-slate-800/30 ${
-                    onOpenCaseDetails ? 'cursor-pointer hover:bg-slate-700/50' : ''
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/40 ${
+                    onOpenCaseDetails ? 'cursor-pointer hover:bg-slate-700/50 hover:border-slate-600/60 transition-colors' : ''
                   }`}
                   onClick={() => onOpenCaseDetails && handleOpenCase(visit.id)}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-teal-500/20 rounded-lg flex flex-col items-center justify-center">
-                      <span className="text-xs font-bold text-teal-400">
-                        {format(new Date(visit.scheduled_start), 'd', { locale: sv })}
-                      </span>
-                      <span className="text-[10px] text-teal-400/70 uppercase">
-                        {format(new Date(visit.scheduled_start), 'MMM', { locale: sv })}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-white text-sm font-medium">
-                        {visit.title}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {format(new Date(visit.scheduled_start), 'HH:mm', { locale: sv })}
-                        {visit.pest_type && ` • ${visit.pest_type}`}
-                      </p>
-                    </div>
+                  <div className="w-9 h-9 bg-slate-700/60 rounded-lg flex flex-col items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-white leading-none">
+                      {format(visitDate, 'd', { locale: sv })}
+                    </span>
+                    <span className="text-[9px] text-slate-400 uppercase leading-none mt-0.5">
+                      {format(visitDate, 'MMM', { locale: sv })}
+                    </span>
                   </div>
-                  {onOpenCaseDetails && (
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">
+                      {visit.case_number && <span className="text-slate-400 mr-1.5">{visit.case_number}</span>}
+                      {serviceLabel || visit.title}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {format(visitDate, 'HH:mm', { locale: sv })}
+                      {visit.pest_type && ` · ${visit.pest_type}`}
+                    </p>
+                  </div>
+                  {onOpenCaseDetails && <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />}
                 </div>
-              ))}
-            </div>
+              )
+            })}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Lugnande meddelande för kritiska/varning-situationer */}
-        {(summary.criticalCases > 0 || summary.warningCases > 0) && (
-          <div className="mb-4">
-            <ReassuranceMessage
-              level={summary.criticalCases > 0 ? 'critical' : 'warning'}
-              compact={true}
-            />
+      {/* Senaste bedömda ärende */}
+      {hasAssessments && summary.latestAssessment && (
+        <div className="border-t border-slate-700/40">
+          <div className="px-4 py-2.5 flex items-center gap-2">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Senaste bedömning</span>
           </div>
-        )}
-
-        {/* Senaste bedömda ärende - kompakt kort */}
-        {summary.latestAssessment && (
           <div
-            className={`p-4 rounded-lg border transition-all ${
-              onOpenCaseDetails
-                ? 'cursor-pointer hover:bg-slate-700/30 border-slate-700/50 hover:border-slate-600'
-                : 'border-slate-700/50'
+            className={`mx-4 mb-4 p-3 rounded-xl border border-slate-700/40 bg-slate-800/50 ${
+              onOpenCaseDetails ? 'cursor-pointer hover:bg-slate-700/50 hover:border-slate-600/60 transition-colors' : ''
             }`}
             onClick={() => onOpenCaseDetails && handleOpenCase(summary.latestAssessment!.id)}
           >
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-                Senaste bedömda ärende
-              </h4>
-              {onOpenCaseDetails && (
-                <ChevronRight className="w-4 h-4 text-slate-400" />
-              )}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white font-medium">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-white font-medium">
                   #{summary.latestAssessment.case_number}
                   {summary.latestAssessment.service_type && (
-                    <span className="text-slate-400 font-normal ml-2">
-                      - {summary.latestAssessment.service_type === 'inspection' ? 'Inspektion' : 'Rutinbesök'}
+                    <span className="text-slate-400 font-normal ml-2 text-xs">
+                      {SERVICE_TYPE_LABEL[summary.latestAssessment.service_type] || summary.latestAssessment.service_type}
                     </span>
                   )}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm">
+                  <span className="text-xs">
                     {getStatusEmoji(latestCaseStatus)} {getStatusText(latestCaseStatus)}
                   </span>
                   {latestCaseNeedsAcknowledgment && (
                     <>
-                      <span className="text-slate-600">•</span>
+                      <span className="text-slate-600">·</span>
                       {isLatestCaseAcknowledged ? (
-                        <span className="text-emerald-400 text-sm flex items-center gap-1">
+                        <span className="text-emerald-400 text-xs flex items-center gap-1">
                           <CheckCircle className="w-3 h-3" />
                           Bekräftad
                         </span>
                       ) : (
-                        <span className="text-red-400 text-sm flex items-center gap-1">
+                        <span className="text-red-400 text-xs flex items-center gap-1">
                           <AlertCircle className="w-3 h-3" />
                           Ej bekräftad
                         </span>
@@ -443,43 +338,45 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
                   )}
                 </div>
               </div>
-
               {summary.latestAssessment.assessment_date && (
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-slate-500 shrink-0">
                   {new Date(summary.latestAssessment.assessment_date).toLocaleDateString('sv-SE', {
-                    day: 'numeric',
-                    month: 'short'
+                    day: 'numeric', month: 'short'
                   })}
                 </span>
               )}
             </div>
-
-            {/* Visa ärendedetaljer-knapp */}
             {onOpenCaseDetails && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full mt-3 justify-center"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleOpenCase(summary.latestAssessment!.id)
-                }}
+              <button
+                className="w-full mt-2.5 pt-2.5 border-t border-slate-700/40 text-xs text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition-colors"
+                onClick={(e) => { e.stopPropagation(); handleOpenCase(summary.latestAssessment!.id) }}
               >
-                <Eye className="w-4 h-4 mr-2" />
+                <Eye className="w-3.5 h-3.5" />
                 Visa ärendedetaljer
-              </Button>
+              </button>
             )}
           </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-700/50">
-          <div className="text-xs text-slate-500">
-            {summary.casesWithAssessments} av {summary.totalCases} ärenden bedömda
-          </div>
         </div>
-      </div>
-    </Card>
+      )}
+
+      {/* Om inga bedömningar men ärenden finns */}
+      {!hasAssessments && summary.totalCases > 0 && (
+        <div className="px-4 py-4 border-t border-slate-700/40">
+          <p className="text-xs text-slate-500 text-center">
+            Bedömningar görs vid servicebesök när situationen kräver det.
+          </p>
+        </div>
+      )}
+
+      {/* Om inga ärenden alls */}
+      {summary.totalCases === 0 && !hasUpcomingVisits && (
+        <div className="px-4 py-8 text-center">
+          <Clock className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+          <p className="text-sm text-slate-500">Inga ärenden registrerade ännu</p>
+        </div>
+      )}
+
+    </div>
   )
 }
 
