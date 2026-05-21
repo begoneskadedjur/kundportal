@@ -1219,7 +1219,7 @@ export default function CaseDetailsModal({
                 )}
 
                 {/* Snabbinfo */}
-                {(fallbackData.pest_type || (fallbackData.price && fallbackData.price > 0) || (fallbackData.time_spent_minutes && fallbackData.time_spent_minutes > 0)) && (
+                {(fallbackData.pest_type || ((fallbackData.price ?? 0) > 0) || ((fallbackData.time_spent_minutes ?? 0) > 0)) && (
                   <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3 space-y-2">
                     <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Ärendeinfo</p>
                     {fallbackData.pest_type && (

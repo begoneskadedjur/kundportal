@@ -1887,6 +1887,7 @@ export default function EditContractCaseModal({
                     refreshTrigger={imageRefreshTrigger}
                     showCategories={true}
                     draftMode={false}
+                    immediateUpload={true}
                     userId={profile?.id}
                     onPendingChangesUpdate={setHasPendingImageChanges}
                   />

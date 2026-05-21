@@ -66,6 +66,7 @@ interface CaseImageGalleryProps {
   compact?: boolean
   // Draft mode props
   draftMode?: boolean
+  immediateUpload?: boolean
   userId?: string
   onPendingChangesUpdate?: (hasPendingChanges: boolean) => void
 }
@@ -81,6 +82,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
   showCategories = true,
   compact = false,
   draftMode = false,
+  immediateUpload = false,
   userId,
   onPendingChangesUpdate
 }, ref) => {
@@ -355,8 +357,34 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
   }
 
   // Hantera filval för nya bilder
-  const handleFileSelect = useCallback((files: FileList | null) => {
-    if (!files || files.length === 0 || !draftMode) return
+  const handleFileSelect = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    if (!draftMode && !immediateUpload) return
+
+    if (immediateUpload) {
+      let uploadCount = 0
+      for (const file of Array.from(files)) {
+        if (!isValidImageType(file.type)) {
+          toast.error(`${file.name}: Ogiltigt filformat`)
+          continue
+        }
+        if (!isValidImageSize(file.size)) {
+          toast.error(`${file.name}: För stor fil (max ${MAX_IMAGE_SIZE / 1024 / 1024}MB)`)
+          continue
+        }
+        const result = await CaseImageService.uploadCaseImage(caseId, caseType, file, ['general'], undefined, userId)
+        if (result.success) {
+          uploadCount++
+        } else {
+          toast.error(`Kunde inte ladda upp ${file.name}`)
+        }
+      }
+      if (uploadCount > 0) {
+        toast.success(`${uploadCount} bild${uploadCount > 1 ? 'er' : ''} uppladdad${uploadCount > 1 ? 'e' : ''}`)
+        fetchImages()
+      }
+      return
+    }
 
     const newPendingFiles: PendingImage[] = []
 
@@ -384,7 +412,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
       setPendingUploads(prev => [...prev, ...newPendingFiles])
       toast.success(`${newPendingFiles.length} bild${newPendingFiles.length > 1 ? 'er' : ''} tillagd${newPendingFiles.length > 1 ? 'a' : ''} (sparas när du klickar Spara)`)
     }
-  }, [draftMode])
+  }, [draftMode, immediateUpload, caseId, caseType, userId, fetchImages])
 
   // Commit alla pending changes
   const commitChanges = async (): Promise<{ success: boolean; errors: string[] }> => {
@@ -929,8 +957,8 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
         </div>
       )}
 
-      {/* Draft mode upload — kompakt inline */}
-      {draftMode && canEdit && (
+      {/* Upload — kompakt inline */}
+      {(draftMode || immediateUpload) && canEdit && (
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-teal-300 cursor-pointer transition-colors">
             <Plus className="w-3.5 h-3.5" />
@@ -1007,7 +1035,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
       )}
 
       {/* Tomt state — visas bara om ingen upload-knapp finns */}
-      {displayImages.length === 0 && !(draftMode && canEdit) && (
+      {displayImages.length === 0 && !((draftMode || immediateUpload) && canEdit) && (
         <span className="text-xs text-slate-500">Inga bilder</span>
       )}
 
