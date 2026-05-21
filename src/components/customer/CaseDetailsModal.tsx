@@ -28,7 +28,8 @@ import CasePreparationsSection from '../shared/CasePreparationsSection'
 import CustomerAssessmentPanel from './CustomerAssessmentPanel'
 import CriticalAcknowledgmentBanner from './CriticalAcknowledgmentBanner'
 import CloseWarningDialog from './CloseWarningDialog'
-import RevisitHistorySection, { RevisitHistoryEntry } from '../shared/RevisitHistorySection'
+import RevisitHistorySection from '../shared/RevisitHistorySection'
+import type { RevisitHistoryEntry } from '../shared/RevisitHistorySection'
 import CaseJourneyTimeline from './CaseJourneyTimeline'
 import TrafficLightBadge from '../organisation/TrafficLightBadge'
 import { InspectionPhotoLightbox } from './InspectionPhotoLightbox'
@@ -39,7 +40,8 @@ import { getInspectionPhotoUrl } from '../../services/inspectionSessionService'
 import { useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
+import { CaseImageService } from '../../services/caseImageService'
+import type { CaseImageWithUrl } from '../../services/caseImageService'
 import { useAcknowledgment } from '../../hooks/useAcknowledgment'
 import { requiresAcknowledgment } from '../../types/acknowledgment'
 import toast from 'react-hot-toast'
@@ -450,21 +452,27 @@ export default function CaseDetailsModal({
           .order('visit_date', { ascending: false }),
         supabase
           .from('case_billing_items')
-          .select('visit_number, description, quantity')
+          .select('visit_number, article_name, service_name, quantity')
           .eq('case_id', caseId)
           .eq('item_type', 'service')
           .not('visit_number', 'is', null),
         supabase
           .from('case_billing_items')
-          .select('id, description, quantity')
+          .select('id, article_name, service_name, quantity')
           .eq('case_id', caseId)
           .eq('item_type', 'service')
           .eq('status', 'pending')
           .is('visit_number', null)
       ])
       setVisitHistory(visitsRes.data || [])
-      setVisitBillingItems((billingRes.data || []).filter(i => i.visit_number != null) as Array<{ visit_number: number; description: string; quantity: number }>)
-      setCurrentBillingItems(currentRes.data || [])
+      setVisitBillingItems(
+        (billingRes.data || [])
+          .filter(i => i.visit_number != null)
+          .map(i => ({ visit_number: i.visit_number as number, description: i.service_name ?? i.article_name ?? '', quantity: i.quantity }))
+      )
+      setCurrentBillingItems(
+        (currentRes.data || []).map(i => ({ id: i.id, description: i.service_name ?? i.article_name ?? '', quantity: i.quantity }))
+      )
     } catch (error) {
       console.error('Error fetching visit history:', error)
     }
