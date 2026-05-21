@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save, Check,
-  Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
+  Clock, FileText, Users, Star, Play, Pause, RotateCcw,
   FileSignature, ChevronDown, Download, Send, ChevronRight, Receipt, Lightbulb,
   Building, Building2, Image as ImageIcon, Trash2, Plus, AlertTriangle, MessageSquare,
   Footprints, Copy, History
@@ -1328,30 +1328,14 @@ export default function EditContractCaseModal({
     return `${hours}h ${mins}m`
   }
 
-  // Modal title with enhanced design
   const modalTitle = (
-    <div className="flex items-center gap-3">
-      <div className={`p-2 rounded-lg ${isEstablishment ? 'bg-lime-500/10' : 'bg-purple-500/10'}`}>
-        <Crown className={`w-6 h-6 ${isEstablishment ? 'text-lime-400' : 'text-purple-400'}`} />
-      </div>
-      <div>
-        <div className="flex items-center gap-3">
-          <span className="text-2xl font-bold text-white">
-            {isEstablishment ? 'Etablering' : isCustomerView ? 'Serviceärende' : 'Avtalsärende'}
-          </span>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${isEstablishment ? 'bg-lime-500/20 text-lime-300' : 'bg-purple-500/20 text-purple-300'}`}>
-            {formData.case_number || 'Genererar...'}
-          </span>
-          {visitNumber > 1 && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-              Besök {visitNumber}
-            </span>
-          )}
-        </div>
-        <p className={`text-sm ${isEstablishment ? 'text-lime-400' : 'text-purple-300'}`}>
-          {isEstablishment ? 'Utplacering av avtalsutrustning' : 'Premium kundsupport'}
-        </p>
-      </div>
+    <div className="flex items-center gap-2">
+      <span>Ärende: {formData.case_number || 'Genererar...'}</span>
+      {visitNumber > 1 && (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+          Besök {visitNumber}
+        </span>
+      )}
     </div>
   )
 

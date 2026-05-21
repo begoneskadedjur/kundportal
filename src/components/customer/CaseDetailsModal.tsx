@@ -177,6 +177,14 @@ export default function CaseDetailsModal({
     description: string
     quantity: number
   }>>([])
+  const [currentArticleItems, setCurrentArticleItems] = useState<Array<{
+    id: string
+    article_name: string | null
+    article_code: string | null
+    quantity: number
+    unit: string | null
+    mapped_service_id: string | null
+  }>>([])
 
   const [inspectionSession, setInspectionSession] = useState<{
     id: string
@@ -444,7 +452,7 @@ export default function CaseDetailsModal({
   const fetchVisitHistory = async () => {
     if (!caseId) return
     try {
-      const [visitsRes, billingRes, currentRes] = await Promise.all([
+      const [visitsRes, billingRes, currentRes, articleRes] = await Promise.all([
         supabase
           .from('visits')
           .select('id, visit_date, visit_number, technician_name, work_performed, recommendations, pest_level, time_spent_minutes')
@@ -462,6 +470,13 @@ export default function CaseDetailsModal({
           .eq('case_id', caseId)
           .eq('item_type', 'service')
           .eq('status', 'pending')
+          .is('visit_number', null),
+        supabase
+          .from('case_billing_items')
+          .select('id, article_name, article_code, quantity, unit, mapped_service_id')
+          .eq('case_id', caseId)
+          .eq('item_type', 'article')
+          .eq('status', 'pending')
           .is('visit_number', null)
       ])
       setVisitHistory(visitsRes.data || [])
@@ -473,6 +488,7 @@ export default function CaseDetailsModal({
       setCurrentBillingItems(
         (currentRes.data || []).map(i => ({ id: i.id, description: i.service_name ?? i.article_name ?? '', quantity: i.quantity }))
       )
+      setCurrentArticleItems(articleRes.data || [])
     } catch (error) {
       console.error('Error fetching visit history:', error)
     }
@@ -669,15 +685,12 @@ export default function CaseDetailsModal({
         {/* ── HEADER ─────────────────────────────────────────── */}
         <div className="px-6 py-5 border-b border-slate-700/50 flex items-start justify-between shrink-0">
           <div className="flex-1 min-w-0 pr-4">
-            {displayCaseNumber && (
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
-                {useFallback
-                  ? (String(displayCaseNumber).startsWith('BE-') ? String(displayCaseNumber) : `BE-${displayCaseNumber}`)
-                  : `#${displayCaseNumber}`}
-              </p>
-            )}
             <h2 className="text-lg font-semibold text-white leading-snug">
-              {displayTitle}
+              {fallbackData?.case_number
+                ? `Ärende: ${String(fallbackData.case_number).startsWith('BE-') ? fallbackData.case_number : `BE-${fallbackData.case_number}`}`
+                : taskDetails?.task_id
+                  ? `Ärende: #${taskDetails.task_id}`
+                  : displayTitle}
             </h2>
             <div className="flex items-center gap-4 mt-1.5 flex-wrap">
               {/* Status som prick + text */}
@@ -1078,15 +1091,32 @@ export default function CaseDetailsModal({
               {currentBillingItems.length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Utförda tjänster</p>
-                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3 space-y-1.5">
-                    {currentBillingItems.map(item => (
-                      <div key={item.id} className="flex items-center justify-between text-sm">
-                        <span className="text-slate-300">{item.description}</span>
-                        {item.quantity !== 1 && (
-                          <span className="text-slate-500 text-xs ml-2 flex-shrink-0">× {item.quantity}</span>
-                        )}
-                      </div>
-                    ))}
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3 space-y-3">
+                    {currentBillingItems.map(item => {
+                      const mappedArticles = currentArticleItems.filter(a => a.mapped_service_id === item.id)
+                      return (
+                        <div key={item.id}>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-white font-medium">{item.description}</span>
+                            {item.quantity !== 1 && (
+                              <span className="text-slate-500 text-xs ml-2 flex-shrink-0">× {item.quantity}</span>
+                            )}
+                          </div>
+                          {mappedArticles.length > 0 && (
+                            <div className="mt-1.5 pl-3 border-l border-slate-700 space-y-0.5">
+                              {mappedArticles.map(a => (
+                                <div key={a.id} className="flex items-center gap-2 text-xs text-slate-400">
+                                  <span>{a.article_name ?? a.article_code ?? '–'}</span>
+                                  {a.quantity !== 1 && (
+                                    <span className="text-slate-500">× {a.quantity}{a.unit ? ` ${a.unit}` : ''}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -1218,34 +1248,6 @@ export default function CaseDetailsModal({
                   </div>
                 )}
 
-                {/* Snabbinfo */}
-                {(fallbackData.pest_type || ((fallbackData.price ?? 0) > 0) || ((fallbackData.time_spent_minutes ?? 0) > 0)) && (
-                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 px-4 py-3 space-y-2">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Ärendeinfo</p>
-                    {fallbackData.pest_type && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Tjänst</span>
-                        <span className="text-xs text-white">{fallbackData.pest_type}</span>
-                      </div>
-                    )}
-                    {fallbackData.price && fallbackData.price > 0 && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Pris</span>
-                        <span className="text-xs text-white font-medium">{fallbackData.price} kr</span>
-                      </div>
-                    )}
-                    {fallbackData.time_spent_minutes !== undefined && fallbackData.time_spent_minutes > 0 && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Tid</span>
-                        <span className="text-xs text-white">
-                          {Math.floor(fallbackData.time_spent_minutes / 60) > 0
-                            ? `${Math.floor(fallbackData.time_spent_minutes / 60)}h ${fallbackData.time_spent_minutes % 60}min`
-                            : `${fallbackData.time_spent_minutes} min`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Material / preparat (ej inspection) */}
