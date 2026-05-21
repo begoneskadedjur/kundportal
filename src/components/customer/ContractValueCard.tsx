@@ -1,12 +1,10 @@
 import React, { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { formatCurrency } from '../../utils/formatters'
 
 interface ContractValueCardProps {
   customer: {
     contract_type: string | null
     contract_status: string | null
-    annual_value: number | null
     agreement_text: string | null
     service_details: string | null
     product_summary: string | null
@@ -65,14 +63,6 @@ const ContractValueCard: React.FC<ContractValueCardProps> = ({ customer }) => {
           </div>
         )}
 
-        {customer.annual_value != null && customer.annual_value > 0 && (
-          <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Årsvärde</p>
-            <p className="text-sm font-medium text-white font-mono">
-              {formatCurrency(customer.annual_value)}
-            </p>
-          </div>
-        )}
       </div>
 
       {hasDetails && (
