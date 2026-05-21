@@ -916,6 +916,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
           address: formData.adress ? { formatted_address: formData.adress } : null,
           case_number: caseNumber,
+          service_id: serviceId || null,
           send_booking_confirmation: formData.skicka_bokningsbekraftelse === 'Ja',
         }]).select('id').single();
         if (error) throw error;

@@ -1742,7 +1742,7 @@ export default function EditContractCaseModal({
                     setServiceArticle(svc)
                   }}
                   disabled={isCustomerView}
-                  bookingOnly={!isEstablishment}
+                  bookingOnly
                 />
                 {!formData.service_id && formData.pest_type && (
                   <p className="mt-1 text-xs text-slate-500">Befintlig: {formData.pest_type}</p>
