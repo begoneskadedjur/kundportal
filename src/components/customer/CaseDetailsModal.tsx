@@ -182,7 +182,6 @@ export default function CaseDetailsModal({
     article_name: string | null
     article_code: string | null
     quantity: number
-    unit: string | null
     mapped_service_id: string | null
   }>>([])
 
@@ -473,7 +472,7 @@ export default function CaseDetailsModal({
           .is('visit_number', null),
         supabase
           .from('case_billing_items')
-          .select('id, article_name, article_code, quantity, unit, mapped_service_id')
+          .select('id, article_name, article_code, quantity, mapped_service_id')
           .eq('case_id', caseId)
           .eq('item_type', 'article')
           .eq('status', 'pending')
@@ -1120,7 +1119,7 @@ export default function CaseDetailsModal({
                                 <div key={a.id} className="flex items-center gap-2 text-xs text-slate-400">
                                   <span>{a.article_name ?? a.article_code ?? '–'}</span>
                                   {a.quantity !== 1 && (
-                                    <span className="text-slate-500">× {a.quantity}{a.unit ? ` ${a.unit}` : ''}</span>
+                                    <span className="text-slate-500">× {a.quantity}</span>
                                   )}
                                 </div>
                               ))}
@@ -1134,7 +1133,7 @@ export default function CaseDetailsModal({
                       <div key={a.id} className="flex items-center gap-2 text-sm text-slate-300">
                         <span>{a.article_name ?? a.article_code ?? '–'}</span>
                         {a.quantity !== 1 && (
-                          <span className="text-slate-500 text-xs">× {a.quantity}{a.unit ? ` ${a.unit}` : ''}</span>
+                          <span className="text-slate-500 text-xs">× {a.quantity}</span>
                         )}
                       </div>
                     ))}
