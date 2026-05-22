@@ -553,6 +553,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   }, [caseType]);
 
+  // Förvälj tjänst "Etableringskostnad" under grupp "Övrigt" för establishment-typ
+  useEffect(() => {
+    if (caseType === 'establishment' && !serviceGroupId && !serviceId) {
+      setServiceGroupId('43bda891-8b72-4d19-8dcd-5573ba71d84b');
+      setServiceId('6ecc383d-c9e9-41d0-9940-232c841a9ede');
+    }
+  }, [caseType]);
+
   // Filtrerad kundlista för sökbar dropdown
   const filteredContractCustomers = useMemo(() => {
     const search = customerSearchTerm.toLowerCase().trim();
