@@ -37,6 +37,7 @@ interface EquipmentMapProps {
   showNumbers?: boolean
   inspectedStationIds?: Set<string>
   highlightedStationId?: string | null
+  newStationIds?: Set<string>
 }
 
 // CSS för pulsering av highlighted marker
@@ -70,7 +71,8 @@ export function EquipmentMap({
   readOnly = false,
   showNumbers = false,
   inspectedStationIds,
-  highlightedStationId
+  highlightedStationId,
+  newStationIds
 }: EquipmentMapProps) {
   const { isLoaded, error: mapError } = useGoogleMaps({ libraries: ['marker'] })
 
@@ -82,6 +84,7 @@ export function EquipmentMap({
   const previewCircleRef = useRef<google.maps.Circle | null>(null)
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
   const pulseOverlayRef = useRef<google.maps.Marker | null>(null)
+  const newStationOverlaysRef = useRef<google.maps.Marker[]>([])
 
   // State
   const [selectedEquipmentData, setSelectedEquipmentData] = useState<EquipmentPlacementWithRelations | null>(null)
@@ -419,6 +422,48 @@ export function EquipmentMap({
 
     pulseOverlayRef.current = pulseMarker
   }, [highlightedStationId, equipment, isLoaded])
+
+  // Gröna puls-markörer för nya stationer (etablering)
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current) return
+
+    newStationOverlaysRef.current.forEach(m => m.setMap(null))
+    newStationOverlaysRef.current = []
+
+    if (!newStationIds || newStationIds.size === 0) return
+
+    const pulseSize = 80
+    newStationIds.forEach(id => {
+      const station = equipment.find(e => e.id === id)
+      if (!station) return
+
+      const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="${pulseSize}" height="${pulseSize}" viewBox="0 0 ${pulseSize} ${pulseSize}">
+        <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="28" fill="#20c58f" fill-opacity="0.15" stroke="none">
+          <animate attributeName="r" values="18;36;18" dur="1.6s" repeatCount="indefinite"/>
+          <animate attributeName="fill-opacity" values="0.3;0;0.3" dur="1.6s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="22" fill="none" stroke="#20c58f" stroke-width="4" opacity="1">
+          <animate attributeName="r" values="16;26;16" dur="1.6s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="1;0.1;1" dur="1.6s" repeatCount="indefinite"/>
+          <animate attributeName="stroke-width" values="4;1;4" dur="1.6s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="${pulseSize/2}" cy="${pulseSize/2}" r="16" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.9"/>
+      </svg>`
+
+      const marker = new google.maps.Marker({
+        position: { lat: station.latitude, lng: station.longitude },
+        map: mapRef.current!,
+        icon: {
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgIcon)}`,
+          scaledSize: new google.maps.Size(pulseSize, pulseSize),
+          anchor: new google.maps.Point(pulseSize / 2, pulseSize / 2),
+        },
+        zIndex: 998,
+        clickable: false,
+      })
+      newStationOverlaysRef.current.push(marker)
+    })
+  }, [newStationIds, equipment, isLoaded])
 
   // Preview-markör och GPS-cirkel
   useEffect(() => {

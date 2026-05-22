@@ -206,6 +206,8 @@ export default function CaseDetailsModal({
   }>>([])
   const [loadingStations, setLoadingStations] = useState(false)
   const [equipmentFull, setEquipmentFull] = useState<EquipmentPlacementWithRelations[]>([])
+  const [thisVisitOutdoorIds, setThisVisitOutdoorIds] = useState<Set<string>>(new Set())
+  const [thisVisitIndoorIds, setThisVisitIndoorIds] = useState<Set<string>>(new Set())
   const [floorPlansWithStations, setFloorPlansWithStations] = useState<FloorPlanWithRelations[]>([])
   const [totalStationCount, setTotalStationCount] = useState<{ outdoor: number; indoor: number } | null>(null)
 
@@ -606,21 +608,28 @@ export default function CaseDetailsModal({
           FloorPlanService.getFloorPlansByCustomer(fallbackData.customer_id)
         ])
 
-        const thisVisitOutdoorIds = new Set((outdoorStations ?? []).map(s => s.id))
-        setEquipmentFull(fullOutdoor.filter(e => thisVisitOutdoorIds.has(e.id)))
+        const visitOutdoorIds = new Set((outdoorStations ?? []).map(s => s.id))
+        setThisVisitOutdoorIds(visitOutdoorIds)
+        // Visa ALLA kundens stationer på kartan; de nya markeras separat
+        setEquipmentFull(fullOutdoor)
 
-        // Planritningar med stationer filtrerade till detta ärende
+        // Planritningar med ALLA stationer — nya markeras via thisVisitIndoorIds
         const plansWithStations = await Promise.all(plans.map(async fp => {
           const stations = await IndoorStationService.getStationsByFloorPlan(fp.id)
-          const filtered = stations.filter((s: IndoorStationWithRelations) => {
+          return { ...fp, stations }
+        }))
+        setFloorPlansWithStations(plansWithStations)
+
+        // Beräkna vilka inomhusstationer som tillhör detta besök
+        const allIndoorThisVisit = plansWithStations.flatMap(fp =>
+          fp.stations.filter((s: IndoorStationWithRelations) => {
             const t = new Date(s.placed_at).getTime()
             const lower = new Date(caseCreatedAt).getTime()
             const upper = upperBound ? new Date(upperBound).getTime() : Infinity
             return t >= lower && t < upper
           })
-          return { ...fp, stations: filtered }
-        }))
-        setFloorPlansWithStations(plansWithStations)
+        )
+        setThisVisitIndoorIds(new Set(allIndoorThisVisit.map((s: IndoorStationWithRelations) => s.id)))
 
         setTotalStationCount({
           outdoor: fullOutdoor.filter(e => e.status === 'active').length,
@@ -1279,7 +1288,7 @@ export default function CaseDetailsModal({
                     {/* Utomhuskarta */}
                     {equipmentFull.length > 0 && (
                       <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Utomhus — placering</p>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Tillagda stationer utomhus</p>
                         <div className="rounded-lg overflow-hidden border border-slate-700/40">
                           <EquipmentMap
                             equipment={equipmentFull}
@@ -1287,16 +1296,17 @@ export default function CaseDetailsModal({
                             readOnly
                             showControls={false}
                             showNumbers
+                            newStationIds={thisVisitOutdoorIds}
                           />
                         </div>
                       </div>
                     )}
 
-                    {/* Planritningar */}
-                    {floorPlansWithStations.filter(fp => fp.stations && fp.stations.length > 0).map(fp => (
+                    {/* Planritningar — visa bara planer med minst en station från detta besök */}
+                    {floorPlansWithStations.filter(fp => fp.stations?.some(s => thisVisitIndoorIds.has(s.id))).map(fp => (
                       <div key={fp.id}>
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
-                          {fp.name}{fp.stations && fp.stations.length > 0 ? ` — ${fp.stations.length} st` : ''}
+                          Tillagda stationer inomhus — {fp.name}
                         </p>
                         <div className="rounded-lg overflow-hidden border border-slate-700/40">
                           <FloorPlanViewer
@@ -1307,6 +1317,7 @@ export default function CaseDetailsModal({
                             placementMode="view"
                             showNumbers
                             height="220px"
+                            highlightedStationId={fp.stations?.find(s => thisVisitIndoorIds.has(s.id))?.id ?? null}
                           />
                         </div>
                       </div>
@@ -1315,7 +1326,7 @@ export default function CaseDetailsModal({
                     {/* Stationslista */}
                     {placedStations.length > 0 ? (
                       <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Stationer detta besök</p>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Utplacerade stationer detta besök</p>
                         <div className="divide-y divide-slate-700/30 border border-slate-700/40 rounded-lg overflow-hidden">
                           {placedStations.map(station => (
                             <div key={station.id} className="px-3 py-2.5 flex items-start gap-3">
