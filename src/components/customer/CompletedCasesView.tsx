@@ -547,6 +547,8 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
             materials_used: selectedCase.materials_used,
             time_spent_minutes: selectedCase.time_spent_minutes,
             service_type: selectedCase.service_type,
+            created_at: selectedCase.created_at,
+            customer_id: (selectedCase as any).customer_id,
             priority: selectedCase.priority,
             work_started_at: selectedCase.work_started_at,
             files: selectedCase.files
