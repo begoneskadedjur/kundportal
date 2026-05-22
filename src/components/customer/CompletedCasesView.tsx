@@ -358,7 +358,7 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                         <div className="flex items-center gap-1.5">
                           <Wrench className="w-3 h-3 flex-shrink-0" style={{ color: typeInfo.color }} />
                           <span className="text-xs font-medium" style={{ color: typeInfo.color }}>
-                            {caseItem.service?.name || typeInfo.label}
+                            {typeInfo.label}
                           </span>
                         </div>
                       </td>
