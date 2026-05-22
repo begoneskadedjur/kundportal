@@ -203,6 +203,9 @@ export default function CaseDetailsModal({
     return type
   }
 
+  const customerFriendlyServiceName = (name: string) =>
+    name === 'Etableringskostnad' ? 'Etablering' : name
+
   const [inspectionSession, setInspectionSession] = useState<{
     id: string
     status: string
@@ -509,16 +512,69 @@ export default function CaseDetailsModal({
 
       // Hämta placerade stationer för etableringsärenden
       if (fallbackData?.service_type === 'establishment' && fallbackData.customer_id) {
-        const { data: stations } = await supabase
+        const caseCreatedAt = fallbackData.created_at ?? '1970-01-01'
+
+        // Hämta alla etableringsärenden för kunden för att bestämma övre datumsgräns
+        const { data: allEstablishments } = await supabase
+          .from('cases')
+          .select('id, created_at')
+          .eq('customer_id', fallbackData.customer_id)
+          .eq('service_type', 'establishment')
+          .order('created_at', { ascending: true })
+
+        let upperBound: string | null = null
+        if (allEstablishments) {
+          const idx = allEstablishments.findIndex(c =>
+            Math.abs(new Date(c.created_at).getTime() - new Date(caseCreatedAt).getTime()) < 60000
+          )
+          if (idx !== -1 && idx + 1 < allEstablishments.length) {
+            upperBound = allEstablishments[idx + 1].created_at
+          }
+        }
+
+        // Utomhusstationer
+        let outdoorQuery = supabase
           .from('equipment_placements')
           .select('id, equipment_type, placed_at, comment, serial_number, photo_path')
           .eq('customer_id', fallbackData.customer_id)
           .eq('status', 'active')
-          .gte('placed_at', fallbackData.created_at ?? '1970-01-01')
-          .order('placed_at', { ascending: true })
+          .gte('placed_at', caseCreatedAt)
+        if (upperBound) outdoorQuery = outdoorQuery.lt('placed_at', upperBound)
+        const { data: outdoorStations } = await outdoorQuery.order('placed_at', { ascending: true })
 
-        if (stations && stations.length > 0) {
-          const withUrls = await Promise.all(stations.map(async (s) => {
+        // Inomhusstationer via floor_plans
+        const { data: floorPlans } = await supabase
+          .from('floor_plans')
+          .select('id')
+          .eq('customer_id', fallbackData.customer_id)
+
+        type StationRow = { id: string; equipment_type: string; placed_at: string; comment: string | null; serial_number: string | null; photo_path: string | null }
+        let indoorStations: StationRow[] = []
+        const floorPlanIds = (floorPlans ?? []).map(fp => fp.id)
+        if (floorPlanIds.length > 0) {
+          let indoorQuery = supabase
+            .from('indoor_stations')
+            .select('id, station_type, placed_at, comment, photo_path')
+            .in('floor_plan_id', floorPlanIds)
+            .eq('status', 'active')
+            .gte('placed_at', caseCreatedAt)
+          if (upperBound) indoorQuery = indoorQuery.lt('placed_at', upperBound)
+          const { data: indoor } = await indoorQuery.order('placed_at', { ascending: true })
+          indoorStations = (indoor ?? []).map(s => ({
+            id: s.id,
+            equipment_type: s.station_type,
+            placed_at: s.placed_at,
+            comment: s.comment,
+            serial_number: null,
+            photo_path: s.photo_path ?? null
+          }))
+        }
+
+        const allStations: StationRow[] = [...(outdoorStations ?? []), ...indoorStations]
+          .sort((a, b) => new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime())
+
+        if (allStations.length > 0) {
+          const withUrls = await Promise.all(allStations.map(async (s) => {
             if (!s.photo_path) return { ...s, photo_url: undefined }
             const { data: urlData } = await supabase.storage
               .from('equipment-images')
@@ -1187,7 +1243,7 @@ export default function CaseDetailsModal({
                             return (
                               <div key={item.id}>
                                 <div className="flex items-center justify-between text-sm">
-                                  <span className="text-white font-medium">{item.description}</span>
+                                  <span className="text-white font-medium">{customerFriendlyServiceName(item.description)}</span>
                                   {item.quantity !== 1 && (
                                     <span className="text-slate-500 text-xs ml-2 flex-shrink-0">× {item.quantity}</span>
                                   )}
