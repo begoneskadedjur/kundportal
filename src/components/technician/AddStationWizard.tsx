@@ -26,6 +26,8 @@ import {
 import { EquipmentService } from '../../services/equipmentService'
 import { FloorPlanService, ALLOWED_FLOOR_PLAN_TYPES } from '../../services/floorPlanService'
 import { IndoorStationService } from '../../services/indoorStationService'
+import { CasePreparationService } from '../../services/casePreparationService'
+import { supabase } from '../../lib/supabase'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
@@ -304,6 +306,36 @@ export function AddStationWizard({
         input,
         technicianId || profile?.technicians?.id
       )
+
+      // Spara preparat till aktivt etableringsärende om valt
+      if (input.preparation_id && input.preparation_quantity && selectedCustomerId) {
+        try {
+          const { data: establishmentCase } = await supabase
+            .from('cases')
+            .select('id')
+            .eq('customer_id', selectedCustomerId)
+            .eq('service_type', 'establishment')
+            .not('status', 'ilike', '%avslutat%')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
+          if (establishmentCase) {
+            await CasePreparationService.addPreparation({
+              case_id: establishmentCase.id,
+              case_type: 'contract',
+              preparation_id: input.preparation_id,
+              quantity: input.preparation_quantity,
+              unit: input.preparation_unit || 'g',
+              applied_by_technician_id: profile?.technician_id || undefined,
+              applied_by_technician_name: profile?.full_name || profile?.email || undefined
+            })
+          }
+        } catch (prepError) {
+          console.error('Kunde inte spara preparat till etableringsärende:', prepError)
+        }
+      }
+
       toast.success('Station placerad!')
       setShowStationForm(false)
       resetPlacementMode()

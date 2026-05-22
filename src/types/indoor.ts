@@ -1,5 +1,6 @@
 // src/types/indoor.ts
 // TypeScript types for indoor station placement system
+import type { PreparationUnit } from './casePreparations'
 
 // ============================================
 // ENUMS & CONSTANTS
@@ -335,6 +336,9 @@ export interface CreateIndoorStationInput {
   location_description?: string;
   comment?: string;
   photo?: File;
+  preparation_id?: string | null;
+  preparation_quantity?: number | null;
+  preparation_unit?: PreparationUnit;
 }
 
 export interface UpdateIndoorStationInput {

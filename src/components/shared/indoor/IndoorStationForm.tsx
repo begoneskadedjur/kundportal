@@ -1,8 +1,8 @@
 // src/components/shared/indoor/IndoorStationForm.tsx
 // Formulär för att skapa/redigera inomhusstationer
 
-import { useState, useRef, useEffect } from 'react'
-import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn, FlaskConical } from 'lucide-react'
 import ImageLightbox from '../ImageLightbox'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -23,6 +23,10 @@ import {
 import { MAX_STATION_PHOTO_SIZE, ALLOWED_PHOTO_TYPES } from '../../../services/indoorStationService'
 import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
+import { CasePreparationService } from '../../../services/casePreparationService'
+import type { Preparation } from '../../../types/preparations'
+import type { PreparationUnit } from '../../../types/casePreparations'
+import { PREPARATION_UNIT_CONFIG } from '../../../types/casePreparations'
 
 // Ikon-mappning för stationstyper från DB
 const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
@@ -77,6 +81,14 @@ export function IndoorStationForm({
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Preparat-state
+  const [availablePreparations, setAvailablePreparations] = useState<Preparation[]>([])
+  const [stationHasPreparations, setStationHasPreparations] = useState(false)
+  const [loadingPreparations, setLoadingPreparations] = useState(false)
+  const [preparationId, setPreparationId] = useState<string | null>(null)
+  const [preparationQuantity, setPreparationQuantity] = useState<number | null>(null)
+  const [preparationUnit, setPreparationUnit] = useState<PreparationUnit>('g')
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Hämta dynamiska stationstyper och sätt initial typ
@@ -105,6 +117,39 @@ export function IndoorStationForm({
     loadStationTypes()
   }, [isEditing, initialStationType])
 
+  // Ladda preparat när stationstyp ändras
+  const loadPreparationsForType = useCallback(async (typeCode: string) => {
+    const matchedType = dynamicStationTypes.find(t => t.code === typeCode)
+    if (!matchedType) {
+      setStationHasPreparations(false)
+      setAvailablePreparations([])
+      return
+    }
+    setLoadingPreparations(true)
+    try {
+      const hasPreps = await CasePreparationService.stationTypeHasPreparations(matchedType.id)
+      setStationHasPreparations(hasPreps)
+      if (hasPreps) {
+        const preps = await CasePreparationService.getPreparationsForStationType(matchedType.id)
+        setAvailablePreparations(preps)
+      } else {
+        setAvailablePreparations([])
+        setPreparationId(null)
+        setPreparationQuantity(null)
+      }
+    } catch {
+      setStationHasPreparations(false)
+    } finally {
+      setLoadingPreparations(false)
+    }
+  }, [dynamicStationTypes])
+
+  useEffect(() => {
+    if (!loadingTypes && dynamicStationTypes.length > 0) {
+      loadPreparationsForType(stationType)
+    }
+  }, [stationType, loadingTypes, dynamicStationTypes, loadPreparationsForType])
+
   // Hämta aktuell stationstyp-config (dynamisk eller legacy)
   const getCurrentTypeConfig = (typeCode: string) => {
     const dynamicType = dynamicStationTypes.find(t => t.code === typeCode)
@@ -132,6 +177,8 @@ export function IndoorStationForm({
   // Auto-generera stationsnummer när typ ändras (bara för nya stationer)
   const handleTypeChange = (type: IndoorStationType) => {
     setStationType(type)
+    setPreparationId(null)
+    setPreparationQuantity(null)
     if (!isEditing) {
       const config = getCurrentTypeConfig(type)
       const suggested = generateStationNumber(type, existingStationNumbers, config?.prefix)
@@ -206,7 +253,10 @@ export function IndoorStationForm({
           position_y_percent: position.y,
           location_description: locationDescription.trim() || undefined,
           comment: comment.trim() || undefined,
-          photo: selectedPhoto || undefined
+          photo: selectedPhoto || undefined,
+          preparation_id: preparationId || undefined,
+          preparation_quantity: preparationQuantity || undefined,
+          preparation_unit: preparationId ? preparationUnit : undefined
         }
         await onSubmit(createInput)
       }
@@ -389,6 +439,68 @@ export function IndoorStationForm({
           />
         </div>
       </div>
+
+      {/* Preparat (visas bara för stationstyper med kopplat preparat) */}
+      {stationHasPreparations && (
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-1.5">
+            <FlaskConical className="w-4 h-4" />
+            Preparat (valfritt)
+          </label>
+          {loadingPreparations ? (
+            <div className="flex items-center gap-2 py-2 text-slate-400 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Laddar preparat...
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <select
+                value={preparationId || ''}
+                onChange={(e) => {
+                  const val = e.target.value || null
+                  setPreparationId(val)
+                  setPreparationQuantity(val ? (preparationQuantity ?? 1) : null)
+                }}
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+              >
+                <option value="">Inget preparat</option>
+                {availablePreparations.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+
+              {preparationId && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Mängd</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={preparationQuantity ?? ''}
+                      onChange={(e) => setPreparationQuantity(e.target.value ? parseFloat(e.target.value) : null)}
+                      placeholder="0"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Enhet</label>
+                    <select
+                      value={preparationUnit}
+                      onChange={(e) => setPreparationUnit(e.target.value as PreparationUnit)}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    >
+                      {(Object.entries(PREPARATION_UNIT_CONFIG) as [PreparationUnit, typeof PREPARATION_UNIT_CONFIG[PreparationUnit]][]).map(([unit, config]) => (
+                        <option key={unit} value={unit}>{config.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Photo */}
       <div>
