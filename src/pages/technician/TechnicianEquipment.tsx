@@ -482,6 +482,47 @@ export default function TechnicianEquipment() {
     }
   }
 
+  // Byt från inomhus till utomhus-placering (anropas från AddStationWizard)
+  const handleSwitchToOutdoor = (customerId: string) => {
+    setIsWizardOpen(false)
+    setWizardAutoIndoor(false)
+    setWizardCustomerId(customerId)
+    setBatchCustomerName(customers.find(c => c.id === customerId)?.company_name || '')
+    setShowSuccessState(false)
+    setFormResetKey(prev => prev + 1)
+    setIsFormOpen(true)
+  }
+
+  // Avsluta etablering från inomhusflödet (markerar ärende som Avslutat)
+  const handleFinishEstablishmentFromIndoor = async (customerId: string) => {
+    setIsWizardOpen(false)
+    setWizardAutoIndoor(false)
+    setWizardCustomerId(null)
+    const name = customers.find(c => c.id === customerId)?.company_name
+      || allCustomers.find(c => c.customer_id === customerId)?.customer_name
+      || ''
+
+    const { data: openCase } = await supabase
+      .from('cases')
+      .select('id')
+      .eq('customer_id', customerId)
+      .eq('service_type', 'establishment')
+      .not('status', 'ilike', '%avslutat%')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (openCase?.id) {
+      await supabase
+        .from('cases')
+        .update({ status: 'Avslutat' })
+        .eq('id', openCase.id)
+    }
+
+    refreshData()
+    await checkAndPromptSchedule(customerId, name)
+  }
+
   // Check om en kund saknar schema och visa prompt
   const checkAndPromptSchedule = async (customerId: string, customerName: string) => {
     try {
@@ -656,13 +697,11 @@ export default function TechnicianEquipment() {
           technicianId={technicianId}
           preselectedCustomerId={wizardCustomerId}
           autoSelectIndoor={wizardAutoIndoor}
+          onSwitchToOutdoor={handleSwitchToOutdoor}
+          onFinishEstablishment={handleFinishEstablishmentFromIndoor}
           onIndoorFinished={(customerId) => {
             setWizardAutoIndoor(false)
-            const name = allCustomers.find(c => c.customer_id === customerId)?.customer_name
-              || customers.find(c => c.id === customerId)?.company_name
-              || ''
             refreshData()
-            checkAndPromptSchedule(customerId, name)
           }}
         />
 
@@ -725,7 +764,7 @@ export default function TechnicianEquipment() {
                         className="w-full py-3 px-4 border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-300 rounded-xl transition-colors flex items-center justify-center gap-2"
                       >
                         <Check className="w-4 h-4" />
-                        Klar med etableringen
+                        Färdig med etablering
                       </button>
                     </div>
                   </div>

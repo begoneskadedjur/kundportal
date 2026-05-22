@@ -54,6 +54,8 @@ interface AddStationWizardProps {
   technicianId?: string
   onIndoorFinished?: (customerId: string) => void
   autoSelectIndoor?: boolean
+  onSwitchToOutdoor?: (customerId: string) => void
+  onFinishEstablishment?: (customerId: string) => void
 }
 
 interface CustomerOption {
@@ -69,7 +71,9 @@ export function AddStationWizard({
   preselectedCustomerId,
   technicianId,
   onIndoorFinished,
-  autoSelectIndoor = false
+  autoSelectIndoor = false,
+  onSwitchToOutdoor,
+  onFinishEstablishment
 }: AddStationWizardProps) {
   const { profile } = useAuth()
   const [currentStep, setCurrentStep] = useState<WizardStep>(1)
@@ -456,7 +460,6 @@ export function AddStationWizard({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center"
-        onClick={(e) => e.target === e.currentTarget && handleClose()}
       >
         <motion.div
           initial={{ y: '100%', opacity: 0 }}
@@ -842,27 +845,48 @@ export function AddStationWizard({
                         </div>
                       )}
 
-                      {/* Klar / Placera fler footer */}
+                      {/* Footer med tre val efter minst en station placerats */}
                       {placementMode === 'view' && stations.length > 0 && (
-                        <div className="px-4 py-3 border-t border-slate-700/50 bg-slate-900/50 flex-shrink-0 flex items-center justify-between gap-3">
-                          <span className="text-xs text-slate-500">
-                            {stations.length} {stations.length === 1 ? 'station' : 'stationer'} placerade
-                          </span>
-                          <div className="flex gap-2">
+                        <div className="px-4 py-3 border-t border-slate-700/50 bg-slate-900/50 flex-shrink-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-slate-500">
+                              {stations.length} {stations.length === 1 ? 'station' : 'stationer'} placerade
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-2">
                             <button
                               onClick={() => setShowTypeSelector(true)}
-                              className="px-3 py-1.5 text-sm border border-slate-600 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1.5"
+                              className="w-full px-3 py-2 text-sm bg-[#20c58f] hover:bg-[#1ab07f] text-white rounded-lg transition-colors flex items-center justify-center gap-1.5 font-medium"
                             >
                               <Plus className="w-3.5 h-3.5" />
-                              Placera fler
+                              Placera fler stationer
                             </button>
-                            <button
-                              onClick={handleFinishIndoor}
-                              className="px-3 py-1.5 text-sm bg-[#20c58f] hover:bg-[#1ab07f] text-white rounded-lg transition-colors flex items-center gap-1.5"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              Klar
-                            </button>
+                            {onSwitchToOutdoor && selectedCustomerId && (
+                              <button
+                                onClick={() => {
+                                  const cid = selectedCustomerId
+                                  handleClose()
+                                  onSwitchToOutdoor(cid)
+                                }}
+                                className="w-full px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                              >
+                                <MapPin className="w-3.5 h-3.5" />
+                                Placera stationer utomhus
+                              </button>
+                            )}
+                            {onFinishEstablishment && selectedCustomerId && (
+                              <button
+                                onClick={() => {
+                                  const cid = selectedCustomerId
+                                  handleClose()
+                                  onFinishEstablishment(cid)
+                                }}
+                                className="w-full px-3 py-2 text-sm border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-300 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                Färdig med etablering
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
