@@ -19,7 +19,8 @@ import {
   Package,
   ChevronDown,
   ChevronUp,
-  Camera
+  Camera,
+  Loader2
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -45,6 +46,13 @@ import type { CaseImageWithUrl } from '../../services/caseImageService'
 import { useAcknowledgment } from '../../hooks/useAcknowledgment'
 import { requiresAcknowledgment } from '../../types/acknowledgment'
 import toast from 'react-hot-toast'
+import EquipmentMap from '../shared/equipment/EquipmentMap'
+import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
+import { EquipmentService } from '../../services/equipmentService'
+import { FloorPlanService } from '../../services/floorPlanService'
+import { IndoorStationService } from '../../services/indoorStationService'
+import type { EquipmentPlacementWithRelations } from '../../types/database'
+import type { FloorPlanWithRelations, IndoorStationWithRelations } from '../../types/indoor'
 
 interface CaseDetailsModalProps {
   caseId: string
@@ -194,7 +202,12 @@ export default function CaseDetailsModal({
     serial_number: string | null
     photo_path: string | null
     photo_url?: string
+    isIndoor?: boolean
   }>>([])
+  const [loadingStations, setLoadingStations] = useState(false)
+  const [equipmentFull, setEquipmentFull] = useState<EquipmentPlacementWithRelations[]>([])
+  const [floorPlansWithStations, setFloorPlansWithStations] = useState<FloorPlanWithRelations[]>([])
+  const [totalStationCount, setTotalStationCount] = useState<{ outdoor: number; indoor: number } | null>(null)
 
   const equipmentTypeLabel = (type: string) => {
     if (type === 'mechanical_trap' || type === 'mekanisk_falla') return 'Mekanisk fälla'
@@ -512,6 +525,7 @@ export default function CaseDetailsModal({
 
       // Hämta placerade stationer för etableringsärenden
       if (fallbackData?.service_type === 'establishment' && fallbackData.customer_id) {
+        setLoadingStations(true)
         const caseCreatedAt = fallbackData.created_at ?? '1970-01-01'
 
         // Hämta alla etableringsärenden för kunden för att bestämma övre datumsgräns
@@ -585,9 +599,38 @@ export default function CaseDetailsModal({
           }))
           setPlacedStations(withUrls)
         }
+
+        // Hämta full equipment-data för karta och statistik
+        const [fullOutdoor, plans] = await Promise.all([
+          EquipmentService.getEquipmentByCustomer(fallbackData.customer_id),
+          FloorPlanService.getFloorPlansByCustomer(fallbackData.customer_id)
+        ])
+
+        const thisVisitOutdoorIds = new Set((outdoorStations ?? []).map(s => s.id))
+        setEquipmentFull(fullOutdoor.filter(e => thisVisitOutdoorIds.has(e.id)))
+
+        // Planritningar med stationer filtrerade till detta ärende
+        const plansWithStations = await Promise.all(plans.map(async fp => {
+          const stations = await IndoorStationService.getStationsByFloorPlan(fp.id)
+          const filtered = stations.filter((s: IndoorStationWithRelations) => {
+            const t = new Date(s.placed_at).getTime()
+            const lower = new Date(caseCreatedAt).getTime()
+            const upper = upperBound ? new Date(upperBound).getTime() : Infinity
+            return t >= lower && t < upper
+          })
+          return { ...fp, stations: filtered }
+        }))
+        setFloorPlansWithStations(plansWithStations)
+
+        setTotalStationCount({
+          outdoor: fullOutdoor.filter(e => e.status === 'active').length,
+          indoor: plans.reduce((sum, fp) => sum + (fp.station_count ?? 0), 0)
+        })
+        setLoadingStations(false)
       }
     } catch (error) {
       console.error('Error fetching visit history:', error)
+      setLoadingStations(false)
     }
   }
 
@@ -1168,58 +1211,144 @@ export default function CaseDetailsModal({
                 </div>
               )}
 
-              {/* Etablering — placerade stationer eller placeholder */}
+              {/* Etablering — informationsrik rapport */}
               {fallbackData.service_type === 'establishment' && (
-                placedStations.length > 0 ? (
-                  <div className="rounded-xl border border-slate-700/60 overflow-hidden">
-                    <div className="px-4 pt-3 pb-2 border-b border-slate-700/40">
-                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-                        Placerade stationer ({placedStations.length})
-                      </p>
-                    </div>
-                    <div className="divide-y divide-slate-700/30">
-                      {placedStations.map(station => (
-                        <div key={station.id} className="px-4 py-3 flex items-start gap-3">
-                          {station.photo_url && (
-                            <a href={station.photo_url} target="_blank" rel="noopener noreferrer"
-                              className="w-14 h-14 rounded-lg overflow-hidden border border-slate-700 shrink-0 hover:border-slate-500 transition-colors">
-                              <img src={station.photo_url} alt="" className="w-full h-full object-cover" />
-                            </a>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white font-medium">{equipmentTypeLabel(station.equipment_type)}</p>
-                            {station.serial_number && (
-                              <p className="text-xs text-slate-500">Nr: {station.serial_number}</p>
-                            )}
-                            {station.comment && (
-                              <p className="text-xs text-slate-400 mt-0.5">{station.comment}</p>
-                            )}
-                            <p className="text-xs text-slate-600 mt-0.5">
-                              {new Date(station.placed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                <div className="rounded-xl border border-slate-700/60 overflow-hidden">
+                  <div className="px-4 pt-3 pb-2 border-b border-slate-700/40 flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Etableringsrapport</p>
+                    {loadingStations && <Loader2 className="w-3 h-3 text-slate-500 animate-spin" />}
                   </div>
-                ) : !fallbackData.work_report && (
-                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
-                    <div className="px-4 pt-4 pb-3 border-b border-slate-700/40">
-                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Etableringsrapport</p>
-                    </div>
-                    <div className="px-4 py-6">
-                      <p className="text-xs text-slate-500 mb-3">Etableringsresultat fylls i efter genomfört besök</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        {['Installerade stationer', 'Utrustningstyp', 'Rapport', 'Rekommendationer'].map(label => (
-                          <div key={label}>
-                            <p className="text-xs text-slate-500 mb-1">{label}</p>
-                            <div className="h-3 bg-slate-700/40 rounded w-3/4" />
-                          </div>
-                        ))}
+
+                  <div className="px-4 py-3 space-y-4">
+                    {/* Tekniker + datum */}
+                    {fallbackData.primary_technician_name && (
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                        <span className="flex items-center gap-1.5">
+                          <User className="w-3 h-3 shrink-0" />
+                          {fallbackData.primary_technician_name}
+                        </span>
+                        {fallbackData.created_at && (
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3 shrink-0" />
+                            {new Date(fallbackData.created_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </span>
+                        )}
                       </div>
-                    </div>
+                    )}
+
+                    {/* Statistikblock */}
+                    {!loadingStations && placedStations.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-slate-800/50 rounded-lg p-2.5 text-center">
+                          <p className="text-lg font-semibold text-white">{placedStations.length}</p>
+                          <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Tillagda detta besök</p>
+                        </div>
+                        {totalStationCount && (
+                          <>
+                            <div className="bg-slate-800/50 rounded-lg p-2.5 text-center">
+                              <p className="text-lg font-semibold text-white">{totalStationCount.outdoor}</p>
+                              <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Utomhus totalt</p>
+                            </div>
+                            <div className="bg-slate-800/50 rounded-lg p-2.5 text-center">
+                              <p className="text-lg font-semibold text-white">{totalStationCount.indoor}</p>
+                              <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Inomhus totalt</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Utrustningstyper — chips */}
+                    {placedStations.length > 0 && (() => {
+                      const counts = placedStations.reduce((acc, s) => {
+                        const label = equipmentTypeLabel(s.equipment_type)
+                        acc[label] = (acc[label] ?? 0) + 1
+                        return acc
+                      }, {} as Record<string, number>)
+                      return (
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(counts).map(([label, count]) => (
+                            <span key={label} className="px-2 py-0.5 rounded-full bg-slate-700/60 text-xs text-slate-300 border border-slate-600/40">
+                              {count}× {label}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                    })()}
+
+                    {/* Utomhuskarta */}
+                    {equipmentFull.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Utomhus — placering</p>
+                        <div className="rounded-lg overflow-hidden border border-slate-700/40">
+                          <EquipmentMap
+                            equipment={equipmentFull}
+                            height="220px"
+                            readOnly
+                            showControls={false}
+                            showNumbers
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Planritningar */}
+                    {floorPlansWithStations.filter(fp => fp.stations && fp.stations.length > 0).map(fp => (
+                      <div key={fp.id}>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                          {fp.name}{fp.stations && fp.stations.length > 0 ? ` — ${fp.stations.length} st` : ''}
+                        </p>
+                        <div className="rounded-lg overflow-hidden border border-slate-700/40">
+                          <FloorPlanViewer
+                            imageUrl={fp.image_url ?? ''}
+                            imageWidth={fp.image_width}
+                            imageHeight={fp.image_height}
+                            stations={fp.stations ?? []}
+                            placementMode="view"
+                            showNumbers
+                            height="220px"
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Stationslista */}
+                    {placedStations.length > 0 ? (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Stationer detta besök</p>
+                        <div className="divide-y divide-slate-700/30 border border-slate-700/40 rounded-lg overflow-hidden">
+                          {placedStations.map(station => (
+                            <div key={station.id} className="px-3 py-2.5 flex items-start gap-3">
+                              {station.photo_url && (
+                                <a href={station.photo_url} target="_blank" rel="noopener noreferrer"
+                                  className="w-12 h-12 rounded-lg overflow-hidden border border-slate-700 shrink-0 hover:border-slate-500 transition-colors">
+                                  <img src={station.photo_url} alt="" className="w-full h-full object-cover" />
+                                </a>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm text-white font-medium">{equipmentTypeLabel(station.equipment_type)}</p>
+                                  {station.isIndoor && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">Inomhus</span>
+                                  )}
+                                </div>
+                                {station.serial_number && <p className="text-xs text-slate-500">Nr: {station.serial_number}</p>}
+                                {station.comment && <p className="text-xs text-slate-400 mt-0.5">{station.comment}</p>}
+                                <p className="text-xs text-slate-600 mt-0.5">
+                                  {new Date(station.placed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : loadingStations ? (
+                      <div className="py-6 text-center text-xs text-slate-500">Hämtar stationsdata...</div>
+                    ) : (
+                      <p className="text-xs text-slate-500 py-4 text-center">Etableringsresultat fylls i efter genomfört besök</p>
+                    )}
                   </div>
-                )
+                </div>
               )}
 
               {/* ── BESÖKSBLOCK: arbetsrapport + tjänster + bilder + tekniker ── */}
