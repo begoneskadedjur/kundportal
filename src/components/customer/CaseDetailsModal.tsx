@@ -90,6 +90,8 @@ interface CaseDetailsModalProps {
     contact_person?: string
     contact_email?: string
     contact_phone?: string
+    // Kund
+    customer_id?: string
     // Datum
     created_at?: string
     updated_at?: string
@@ -184,6 +186,22 @@ export default function CaseDetailsModal({
     quantity: number
     mapped_service_id: string | null
   }>>([])
+  const [placedStations, setPlacedStations] = useState<Array<{
+    id: string
+    equipment_type: string
+    placed_at: string
+    comment: string | null
+    serial_number: string | null
+    photo_path: string | null
+    photo_url?: string
+  }>>([])
+
+  const equipmentTypeLabel = (type: string) => {
+    if (type === 'mechanical_trap' || type === 'mekanisk_falla') return 'Mekanisk fälla'
+    if (type === 'concrete_station' || type === 'betongstation') return 'Betongstation'
+    if (type === 'bait_station') return 'Betesstation'
+    return type
+  }
 
   const [inspectionSession, setInspectionSession] = useState<{
     id: string
@@ -488,6 +506,28 @@ export default function CaseDetailsModal({
         (currentRes.data || []).map(i => ({ id: i.id, description: i.service_name ?? i.article_name ?? '', quantity: i.quantity }))
       )
       setCurrentArticleItems(articleRes.data || [])
+
+      // Hämta placerade stationer för etableringsärenden
+      if (fallbackData?.service_type === 'establishment' && fallbackData.customer_id) {
+        const { data: stations } = await supabase
+          .from('equipment_placements')
+          .select('id, equipment_type, placed_at, comment, serial_number, photo_path')
+          .eq('customer_id', fallbackData.customer_id)
+          .eq('status', 'active')
+          .gte('placed_at', fallbackData.created_at ?? '1970-01-01')
+          .order('placed_at', { ascending: true })
+
+        if (stations && stations.length > 0) {
+          const withUrls = await Promise.all(stations.map(async (s) => {
+            if (!s.photo_path) return { ...s, photo_url: undefined }
+            const { data: urlData } = await supabase.storage
+              .from('equipment-images')
+              .createSignedUrl(s.photo_path, 3600)
+            return { ...s, photo_url: urlData?.signedUrl ?? undefined }
+          }))
+          setPlacedStations(withUrls)
+        }
+      }
     } catch (error) {
       console.error('Error fetching visit history:', error)
     }
@@ -1070,24 +1110,58 @@ export default function CaseDetailsModal({
                 </div>
               )}
 
-              {/* Etablering — placeholder */}
-              {fallbackData.service_type === 'establishment' && !fallbackData.work_report && (
-                <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
-                  <div className="px-4 pt-4 pb-3 border-b border-slate-700/40">
-                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Etableringsrapport</p>
-                  </div>
-                  <div className="px-4 py-6">
-                    <p className="text-xs text-slate-500 mb-3">Etableringsresultat fylls i efter genomfört besök</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {['Installerade stationer', 'Utrustningstyp', 'Rapport', 'Rekommendationer'].map(label => (
-                        <div key={label}>
-                          <p className="text-xs text-slate-500 mb-1">{label}</p>
-                          <div className="h-3 bg-slate-700/40 rounded w-3/4" />
+              {/* Etablering — placerade stationer eller placeholder */}
+              {fallbackData.service_type === 'establishment' && (
+                placedStations.length > 0 ? (
+                  <div className="rounded-xl border border-slate-700/60 overflow-hidden">
+                    <div className="px-4 pt-3 pb-2 border-b border-slate-700/40">
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        Placerade stationer ({placedStations.length})
+                      </p>
+                    </div>
+                    <div className="divide-y divide-slate-700/30">
+                      {placedStations.map(station => (
+                        <div key={station.id} className="px-4 py-3 flex items-start gap-3">
+                          {station.photo_url && (
+                            <a href={station.photo_url} target="_blank" rel="noopener noreferrer"
+                              className="w-14 h-14 rounded-lg overflow-hidden border border-slate-700 shrink-0 hover:border-slate-500 transition-colors">
+                              <img src={station.photo_url} alt="" className="w-full h-full object-cover" />
+                            </a>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white font-medium">{equipmentTypeLabel(station.equipment_type)}</p>
+                            {station.serial_number && (
+                              <p className="text-xs text-slate-500">Nr: {station.serial_number}</p>
+                            )}
+                            {station.comment && (
+                              <p className="text-xs text-slate-400 mt-0.5">{station.comment}</p>
+                            )}
+                            <p className="text-xs text-slate-600 mt-0.5">
+                              {new Date(station.placed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                </div>
+                ) : !fallbackData.work_report && (
+                  <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
+                    <div className="px-4 pt-4 pb-3 border-b border-slate-700/40">
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Etableringsrapport</p>
+                    </div>
+                    <div className="px-4 py-6">
+                      <p className="text-xs text-slate-500 mb-3">Etableringsresultat fylls i efter genomfört besök</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {['Installerade stationer', 'Utrustningstyp', 'Rapport', 'Rekommendationer'].map(label => (
+                          <div key={label}>
+                            <p className="text-xs text-slate-500 mb-1">{label}</p>
+                            <div className="h-3 bg-slate-700/40 rounded w-3/4" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )
               )}
 
               {/* ── BESÖKSBLOCK: arbetsrapport + tjänster + bilder + tekniker ── */}

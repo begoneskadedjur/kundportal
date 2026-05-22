@@ -2,6 +2,7 @@
 // Omdesignad: Enhetlig vy utan utomhus/inomhus-tabbar
 // Visar kunder med utplacerade stationer (expanderbara rader)
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { supabase } from '../../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
@@ -470,6 +471,24 @@ export default function TechnicianEquipment() {
     setLastUsedMap(false)
 
     if (finishedCustomerId) {
+      // Markera öppet etableringsärende som avslutat
+      const { data: openCase } = await supabase
+        .from('cases')
+        .select('id')
+        .eq('customer_id', finishedCustomerId)
+        .eq('service_type', 'establishment')
+        .not('status', 'ilike', '%avslutat%')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (openCase?.id) {
+        await supabase
+          .from('cases')
+          .update({ status: 'Avslutat' })
+          .eq('id', openCase.id)
+      }
+
       await checkAndPromptSchedule(finishedCustomerId, finishedCustomerName)
     }
   }

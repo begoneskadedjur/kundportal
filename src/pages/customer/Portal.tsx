@@ -449,7 +449,9 @@ const CustomerPortal: React.FC = () => {
             time_spent_minutes: selectedCaseForModal.time_spent_minutes,
             work_report: selectedCaseForModal.work_report,
             materials_used: selectedCaseForModal.materials_used,
-            address: selectedCaseForModal.address
+            address: selectedCaseForModal.address,
+            customer_id: (selectedCaseForModal as any).customer_id ?? effectiveCustomerId ?? undefined,
+            created_at: (selectedCaseForModal as any).created_at
           }}
         />
       )}
