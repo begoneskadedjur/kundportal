@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { FileText, Download, Calendar, Search, Filter, History, X, TrendingUp, BarChart3, ClipboardCheck, CheckCircle2, AlertTriangle, FileSpreadsheet } from 'lucide-react'
+import React, { useEffect, useState, useMemo } from 'react'
+import { FileText, Download, Calendar, Search, History, X, TrendingUp, BarChart3, ClipboardCheck, FileSpreadsheet, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { sanitationReportService, SanitationReport } from '../../services/sanitationReportService'
 import { getCompletedSessionsWithSummary } from '../../services/inspectionSessionService'
 import { generateInspectionPDF, generateInspectionExcel } from '../../services/inspectionReportService'
@@ -7,7 +7,6 @@ import type { InspectionSessionWithRelations } from '../../types/inspectionSessi
 import { useAuth } from '../../contexts/AuthContext'
 import { useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import Select from '../../components/ui/Select'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -15,20 +14,17 @@ import { sv } from 'date-fns/locale'
 type ReportTab = 'inspections' | 'sanitation'
 
 interface SanitationReportsProps {
-  customerId?: string  // Optional override för multisite
+  customerId?: string
 }
 
 const SanitationReports: React.FC<SanitationReportsProps> = ({ customerId: externalCustomerId }) => {
   const { getLabel: getInspLabel, getColor: getInspColor } = useInspectionStatusLabels()
   const [activeTab, setActiveTab] = useState<ReportTab>('inspections')
 
-  // Sanitation reports state
   const [reports, setReports] = useState<SanitationReport[]>([])
-  const [filteredReports, setFilteredReports] = useState<SanitationReport[]>([])
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateFilter, setDateFilter] = useState<'all' | '30d' | '3m' | '6m' | '1y'>('all')
   const [showHistory, setShowHistory] = useState<string | null>(null)
   const [historyData, setHistoryData] = useState<{
     current: SanitationReport | null
@@ -37,10 +33,10 @@ const SanitationReports: React.FC<SanitationReportsProps> = ({ customerId: exter
   } | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
 
-  // Inspection reports state
   const [inspectionSessions, setInspectionSessions] = useState<InspectionSessionWithRelations[]>([])
   const [loadingInspections, setLoadingInspections] = useState(true)
   const [downloadingInspection, setDownloadingInspection] = useState<string | null>(null)
+  const [sortDesc, setSortDesc] = useState(true)
 
   const { profile } = useAuth()
   const effectiveCustomerId = externalCustomerId || profile?.customer_id
@@ -52,104 +48,33 @@ const SanitationReports: React.FC<SanitationReportsProps> = ({ customerId: exter
     }
   }, [effectiveCustomerId])
 
-  useEffect(() => {
-    filterReports()
-  }, [reports, searchTerm, dateFilter])
-
   const loadReports = async () => {
     if (!effectiveCustomerId) return
-
     try {
       setLoading(true)
-      const { data, error } = await sanitationReportService.getReports({
-        customer_id: effectiveCustomerId
-      })
-
-      if (error) {
-        console.error('Error loading reports:', error)
-        toast.error('Kunde inte ladda rapporter')
-        return
-      }
-
+      const { data, error } = await sanitationReportService.getReports({ customer_id: effectiveCustomerId })
+      if (error) { toast.error('Kunde inte ladda rapporter'); return }
       setReports(data || [])
-    } catch (error) {
-      console.error('Error in loadReports:', error)
-      toast.error('Ett fel uppstod vid laddning av rapporter')
-    } finally {
-      setLoading(false)
-    }
+    } catch { toast.error('Ett fel uppstod vid laddning av rapporter') }
+    finally { setLoading(false) }
   }
 
   const loadInspectionSessions = async () => {
     if (!effectiveCustomerId) return
-
     try {
       setLoadingInspections(true)
       const sessions = await getCompletedSessionsWithSummary(effectiveCustomerId, 100)
       setInspectionSessions(sessions)
-    } catch (error) {
-      console.error('Error loading inspection sessions:', error)
-      toast.error('Kunde inte ladda kontrollrapporter')
-    } finally {
-      setLoadingInspections(false)
-    }
-  }
-
-  const filterReports = () => {
-    let filtered = [...reports]
-
-    // Sökfilter
-    if (searchTerm) {
-      filtered = filtered.filter(report =>
-        report.file_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        report.pest_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        report.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        report.technician_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    // Datumfilter
-    if (dateFilter !== 'all') {
-      const now = new Date()
-      let filterDate = new Date()
-
-      switch (dateFilter) {
-        case '30d':
-          filterDate.setDate(now.getDate() - 30)
-          break
-        case '3m':
-          filterDate.setMonth(now.getMonth() - 3)
-          break
-        case '6m':
-          filterDate.setMonth(now.getMonth() - 6)
-          break
-        case '1y':
-          filterDate.setFullYear(now.getFullYear() - 1)
-          break
-      }
-
-      filtered = filtered.filter(report => {
-        const reportDate = new Date(report.created_at || '')
-        return reportDate >= filterDate
-      })
-    }
-
-    setFilteredReports(filtered)
+    } catch { toast.error('Kunde inte ladda kontrollrapporter') }
+    finally { setLoadingInspections(false) }
   }
 
   const handleDownload = async (report: SanitationReport) => {
     if (!report.id) return
-
     try {
       setDownloading(report.id)
       const { data: blob, error } = await sanitationReportService.downloadReport(report.id)
-
-      if (error || !blob) {
-        toast.error('Kunde inte ladda ner rapport')
-        return
-      }
-
-      // Skapa nedladdningslänk
+      if (error || !blob) { toast.error('Kunde inte ladda ner rapport'); return }
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -158,707 +83,401 @@ const SanitationReports: React.FC<SanitationReportsProps> = ({ customerId: exter
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
-
       toast.success('Rapport nedladdad!')
-    } catch (error) {
-      console.error('Error downloading report:', error)
-      toast.error('Ett fel uppstod vid nedladdning')
-    } finally {
-      setDownloading(null)
-    }
+    } catch { toast.error('Ett fel uppstod vid nedladdning') }
+    finally { setDownloading(null) }
   }
 
   const handleDownloadInspection = async (sessionId: string, type: 'pdf' | 'excel') => {
     try {
       setDownloadingInspection(`${sessionId}-${type}`)
-      if (type === 'pdf') {
-        await generateInspectionPDF(sessionId)
-      } else {
-        await generateInspectionExcel(sessionId)
-      }
+      if (type === 'pdf') await generateInspectionPDF(sessionId)
+      else await generateInspectionExcel(sessionId)
       toast.success(`${type === 'pdf' ? 'PDF' : 'Excel'}-rapport nedladdad!`)
-    } catch (error) {
-      console.error('Error generating inspection report:', error)
-      toast.error('Kunde inte generera rapport')
-    } finally {
-      setDownloadingInspection(null)
-    }
+    } catch { toast.error('Kunde inte generera rapport') }
+    finally { setDownloadingInspection(null) }
   }
 
   const handleShowHistory = async (caseId: string) => {
     try {
       setLoadingHistory(true)
       setShowHistory(caseId)
-
       const { data, error } = await sanitationReportService.getReportHistory(caseId)
-
-      if (error) {
-        console.error('Error loading report history:', error)
-        toast.error('Kunde inte ladda rapporthistorik')
-        setShowHistory(null)
-        return
-      }
-
+      if (error) { toast.error('Kunde inte ladda rapporthistorik'); setShowHistory(null); return }
       setHistoryData(data)
-    } catch (error) {
-      console.error('Error in handleShowHistory:', error)
-      toast.error('Ett fel uppstod vid laddning av historik')
-      setShowHistory(null)
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
-
-  const closeHistory = () => {
-    setShowHistory(null)
-    setHistoryData(null)
+    } catch { toast.error('Ett fel uppstod vid laddning av historik'); setShowHistory(null) }
+    finally { setLoadingHistory(false) }
   }
 
   const formatDate = (dateString: string | undefined | null) => {
     if (!dateString) return '-'
-    return new Date(dateString).toLocaleDateString('sv-SE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
+    return new Date(dateString).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })
   }
 
   const formatFileSize = (bytes: number | undefined) => {
     if (!bytes) return '-'
-    const kb = bytes / 1024
-    const mb = kb / 1024
-    if (mb >= 1) {
-      return `${mb.toFixed(1)} MB`
-    }
-    return `${kb.toFixed(0)} KB`
+    const mb = bytes / 1024 / 1024
+    return mb >= 1 ? `${mb.toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`
   }
+
+  // Sorted + filtered inspection sessions
+  const sortedSessions = useMemo(() => {
+    return [...inspectionSessions].sort((a, b) => {
+      const da = new Date(a.completed_at || a.created_at || 0).getTime()
+      const db = new Date(b.completed_at || b.created_at || 0).getTime()
+      return sortDesc ? db - da : da - db
+    })
+  }, [inspectionSessions, sortDesc])
+
+  // Sorted + filtered sanitation reports
+  const filteredReports = useMemo(() => {
+    let filtered = [...reports]
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase()
+      filtered = filtered.filter(r =>
+        r.file_name.toLowerCase().includes(q) ||
+        r.pest_type?.toLowerCase().includes(q) ||
+        r.technician_name?.toLowerCase().includes(q)
+      )
+    }
+    return filtered.sort((a, b) => {
+      const da = new Date(a.report_date || a.created_at || 0).getTime()
+      const db = new Date(b.report_date || b.created_at || 0).getTime()
+      return sortDesc ? db - da : da - db
+    })
+  }, [reports, searchTerm, sortDesc])
 
   // --- Inspection Reports Tab ---
   const renderInspectionReports = () => {
     if (loadingInspections) {
       return (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <LoadingSpinner />
-            <p className="text-slate-400 mt-4">Laddar kontrollrapporter...</p>
-          </div>
+        <div className="flex items-center justify-center py-16">
+          <LoadingSpinner />
         </div>
       )
     }
 
     if (inspectionSessions.length === 0) {
       return (
-        <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-12 text-center">
-          <ClipboardCheck className="mx-auto h-16 w-16 text-slate-500 mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">
-            Inga kontrollrapporter ännu
-          </h3>
-          <p className="text-slate-400">
-            Era kontrollrapporter visas här efter genomförda kontroller
-          </p>
+        <div className="rounded-xl border border-slate-700/60 p-10 text-center">
+          <ClipboardCheck className="mx-auto h-10 w-10 text-slate-600 mb-3" />
+          <p className="text-sm font-medium text-slate-400">Inga kontrollrapporter ännu</p>
+          <p className="text-xs text-slate-500 mt-1">Era kontrollrapporter visas här efter genomförda kontroller</p>
         </div>
       )
     }
 
-    // Stats
-    const totalSessions = inspectionSessions.length
     const totalStations = inspectionSessions.reduce((sum, s) => sum + (s.inspection_summary?.total || 0), 0)
     const latestDate = inspectionSessions[0]?.completed_at || inspectionSessions[0]?.created_at
 
     return (
-      <>
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-400">
-                    Genomförda kontroller
-                  </p>
-                  <p className="text-2xl font-bold text-white mt-1 font-mono">
-                    {totalSessions}
-                  </p>
-                </div>
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                  <ClipboardCheck className="h-6 w-6 text-emerald-400" />
-                </div>
-              </div>
-            </div>
+      <div className="space-y-4">
+        {/* Compact stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border border-slate-700/60 p-3">
+            <p className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">Genomförda</p>
+            <p className="text-xl font-semibold text-white">{inspectionSessions.length}</p>
           </div>
-
-          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-blue-500/30 transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-blue-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-400">
-                    Senaste kontroll
-                  </p>
-                  <p className="text-lg font-semibold text-white mt-1">
-                    {formatDate(latestDate)}
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                  <Calendar className="h-6 w-6 text-blue-400" />
-                </div>
-              </div>
-            </div>
+          <div className="rounded-xl border border-slate-700/60 p-3">
+            <p className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">Senaste</p>
+            <p className="text-sm font-medium text-white truncate">{latestDate ? format(new Date(latestDate), 'd MMM yyyy', { locale: sv }) : '—'}</p>
           </div>
-
-          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-purple-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-400">
-                    Totalt kontrollerade stationer
-                  </p>
-                  <p className="text-2xl font-bold text-white mt-1 font-mono">
-                    {totalStations}
-                  </p>
-                </div>
-                <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                  <BarChart3 className="h-6 w-6 text-purple-400" />
-                </div>
-              </div>
-            </div>
+          <div className="rounded-xl border border-slate-700/60 p-3">
+            <p className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">Stationer totalt</p>
+            <p className="text-xl font-semibold text-white">{totalStations}</p>
           </div>
         </div>
 
-        {/* Inspection Sessions List */}
-        <div className="grid gap-4">
-          {inspectionSessions.map((session) => {
+        {/* Sort toggle */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-slate-500">{inspectionSessions.length} rapporter</p>
+          <button
+            onClick={() => setSortDesc(v => !v)}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors"
+          >
+            {sortDesc ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            {sortDesc ? 'Nyast först' : 'Äldst först'}
+          </button>
+        </div>
+
+        {/* List */}
+        <div className="rounded-xl border border-slate-700/60 overflow-hidden divide-y divide-slate-700/40">
+          {sortedSessions.map((session) => {
             const summary = session.inspection_summary
             const sessionDate = session.completed_at || session.created_at
             const isDownloadingPDF = downloadingInspection === `${session.id}-pdf`
             const isDownloadingExcel = downloadingInspection === `${session.id}-excel`
 
             return (
-              <div
-                key={session.id}
-                className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="absolute inset-0 bg-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                          <ClipboardCheck className="h-6 w-6 text-emerald-400" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-white text-lg">
-                            Kontrollrapport — {sessionDate ? format(new Date(sessionDate), 'd MMMM yyyy', { locale: sv }) : 'Okänt datum'}
-                          </h3>
-                          <p className="text-sm text-slate-400">
-                            {session.technician?.name || 'Okänd tekniker'}
-                          </p>
-                        </div>
-                      </div>
+              <div key={session.id} className="px-4 py-3 flex items-center gap-3 hover:bg-slate-800/40 transition-colors">
+                <div className="p-2 rounded-lg bg-slate-800/60 border border-slate-700/50 shrink-0">
+                  <ClipboardCheck className="w-4 h-4 text-[#20c58f]" />
+                </div>
 
-                      {/* Station counts */}
-                      <div className="flex items-center flex-wrap gap-3 text-sm">
-                        {summary && (
-                          <>
-                            {(['none', 'low', 'medium', 'high'] as const).map(lvl => (
-                              <span key={lvl} className="flex items-center gap-1.5" style={{ color: getInspColor(lvl) }}>
-                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: getInspColor(lvl) }} />
-                                {summary[lvl]} {getInspLabel(lvl)}
-                              </span>
-                            ))}
-                            <span className="text-slate-400 ml-1">
-                              Totalt: {summary.total} stationer
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Download buttons */}
-                    <div className="flex items-center gap-2 ml-6">
-                      <button
-                        onClick={() => handleDownloadInspection(session.id, 'pdf')}
-                        disabled={isDownloadingPDF}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Ladda ner PDF"
-                      >
-                        {isDownloadingPDF ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <FileText className="h-4 w-4" />
-                        )}
-                        <span className="hidden sm:inline">PDF</span>
-                      </button>
-                      <button
-                        onClick={() => handleDownloadInspection(session.id, 'excel')}
-                        disabled={isDownloadingExcel}
-                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Ladda ner Excel"
-                      >
-                        {isDownloadingExcel ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <FileSpreadsheet className="h-4 w-4" />
-                        )}
-                        <span className="hidden sm:inline">Excel</span>
-                      </button>
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-white">
+                      Avtalat servicebesök
+                    </p>
+                    <span className="text-xs text-slate-500">
+                      {sessionDate ? format(new Date(sessionDate), 'd MMM yyyy', { locale: sv }) : '—'}
+                    </span>
                   </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-slate-500">{session.technician?.name || 'Okänd tekniker'}</span>
+                    {summary && (
+                      <span className="text-xs text-slate-600">·</span>
+                    )}
+                    {summary && (['none', 'low', 'medium', 'high'] as const).map(lvl => (
+                      summary[lvl] > 0 ? (
+                        <span key={lvl} className="flex items-center gap-1 text-xs" style={{ color: getInspColor(lvl) }}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: getInspColor(lvl) }} />
+                          {summary[lvl]} {getInspLabel(lvl)}
+                        </span>
+                      ) : null
+                    ))}
+                    {summary && (
+                      <span className="text-xs text-slate-600">· {summary.total} st</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => handleDownloadInspection(session.id, 'pdf')}
+                    disabled={isDownloadingPDF}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#20c58f] hover:bg-[#1aad7d] text-white text-xs font-medium transition-colors disabled:opacity-50"
+                  >
+                    {isDownloadingPDF ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                    PDF
+                  </button>
+                  <button
+                    onClick={() => handleDownloadInspection(session.id, 'excel')}
+                    disabled={isDownloadingExcel}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                  >
+                    {isDownloadingExcel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                    Excel
+                  </button>
                 </div>
               </div>
             )
           })}
         </div>
-      </>
+      </div>
     )
   }
 
   // --- Sanitation Reports Tab ---
   const renderSanitationReports = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-16">
+          <LoadingSpinner />
+        </div>
+      )
+    }
+
+    if (reports.length === 0) {
+      return (
+        <div className="rounded-xl border border-slate-700/60 p-10 text-center">
+          <FileText className="mx-auto h-10 w-10 text-slate-600 mb-3" />
+          <p className="text-sm font-medium text-slate-400">Inga saneringsrapporter ännu</p>
+          <p className="text-xs text-slate-500 mt-1">Era saneringsrapporter visas här när de genererats</p>
+        </div>
+      )
+    }
+
     return (
-      <>
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-400">
-                    Totalt antal rapporter
-                  </p>
-                  <p className="text-2xl font-bold text-white mt-1 font-mono">
-                    {reports.length}
-                  </p>
-                </div>
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                  <FileText className="h-6 w-6 text-emerald-400" />
-                </div>
-              </div>
-            </div>
+      <div className="space-y-4">
+        {/* Search + sort */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Sök rapporter..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-sm bg-slate-800/60 border border-slate-700/60 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]/50"
+            />
           </div>
-
-          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-blue-500/30 transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-blue-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-400">
-                    Senaste rapporten
-                  </p>
-                  <p className="text-lg font-semibold text-white mt-1">
-                    {reports.length > 0
-                      ? formatDate(reports[0].created_at)
-                      : 'Ingen rapport'
-                    }
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                  <Calendar className="h-6 w-6 text-blue-400" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-purple-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-400">
-                    Total storlek
-                  </p>
-                  <p className="text-2xl font-bold text-white mt-1 font-mono">
-                    {formatFileSize(reports.reduce((sum, r) => sum + (r.file_size || 0), 0))}
-                  </p>
-                </div>
-                <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                  <Download className="h-6 w-6 text-purple-400" />
-                </div>
-              </div>
-            </div>
-          </div>
+          <button
+            onClick={() => setSortDesc(v => !v)}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors shrink-0"
+          >
+            {sortDesc ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            {sortDesc ? 'Nyast först' : 'Äldst först'}
+          </button>
         </div>
 
-        {/* Search and Filter */}
-        <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Sök rapporter..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-600 rounded-lg bg-slate-700 text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Reports List */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <LoadingSpinner />
-              <p className="text-slate-400 mt-4">Laddar rapporter...</p>
-            </div>
-          </div>
-        ) : filteredReports.length === 0 ? (
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-12 text-center">
-            <FileText className="mx-auto h-16 w-16 text-slate-500 mb-4" />
-            <h3 className="text-lg font-medium text-white mb-2">
-              {searchTerm || dateFilter !== 'all'
-                ? 'Inga rapporter hittades'
-                : 'Inga rapporter ännu'
-              }
-            </h3>
-            <p className="text-slate-400">
-              {searchTerm || dateFilter !== 'all'
-                ? 'Prova att ändra dina sökkriterier'
-                : 'Era saneringsrapporter kommer att visas här när de har genererats'
-              }
-            </p>
+        {filteredReports.length === 0 ? (
+          <div className="rounded-xl border border-slate-700/60 p-8 text-center">
+            <p className="text-sm text-slate-400">Inga rapporter hittades</p>
           </div>
         ) : (
-          <div className="grid gap-6">
+          <div className="rounded-xl border border-slate-700/60 overflow-hidden divide-y divide-slate-700/40">
             {filteredReports.map((report) => (
-              <div
-                key={report.id}
-                className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="absolute inset-0 bg-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                          <FileText className="h-6 w-6 text-emerald-400" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-white text-lg">
-                            {report.file_name}
-                          </h3>
-                          <p className="text-sm text-slate-400">
-                            {formatDate(report.report_date || report.created_at)}
-                          </p>
-                        </div>
-                      </div>
+              <div key={report.id} className="px-4 py-3 flex items-center gap-3 hover:bg-slate-800/40 transition-colors">
+                <div className="p-2 rounded-lg bg-slate-800/60 border border-slate-700/50 shrink-0">
+                  <FileText className="w-4 h-4 text-slate-400" />
+                </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        {report.technician_name && (
-                          <div>
-                            <span className="font-medium text-slate-300">
-                              Tekniker:
-                            </span>{' '}
-                            <span className="text-slate-400">
-                              {report.technician_name}
-                            </span>
-                          </div>
-                        )}
-
-                        {report.pest_type && (
-                          <div>
-                            <span className="font-medium text-slate-300">
-                              Skadedjur:
-                            </span>{' '}
-                            <span className="text-slate-400">
-                              {report.pest_type}
-                            </span>
-                          </div>
-                        )}
-
-                        {report.address && (
-                          <div className="sm:col-span-2">
-                            <span className="font-medium text-slate-300">
-                              Adress:
-                            </span>{' '}
-                            <span className="text-slate-400">
-                              {report.address}
-                            </span>
-                          </div>
-                        )}
-
-                        <div>
-                          <span className="font-medium text-slate-300">
-                            Storlek:
-                          </span>{' '}
-                          <span className="text-slate-400">
-                            {formatFileSize(report.file_size)}
-                          </span>
-                        </div>
-
-                        {report.version && report.version > 1 && (
-                          <div>
-                            <span className="font-medium text-slate-300">
-                              Version:
-                            </span>{' '}
-                            <span className="text-slate-400">
-                              {report.version}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 ml-6">
-                      {/* Show history button if there are multiple versions */}
-                      {report.version && report.version > 1 && (
-                        <button
-                          onClick={() => handleShowHistory(report.case_id)}
-                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 flex items-center gap-2"
-                          title="Visa rapporthistorik"
-                        >
-                          <History className="h-4 w-4" />
-                          <span className="hidden sm:inline">Historik</span>
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => handleDownload(report)}
-                        disabled={downloading === report.id}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {downloading === report.id ? (
-                          <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                            <span>Laddar...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Download className="h-5 w-5" />
-                            <span>Ladda ner</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-white truncate">{report.file_name}</p>
                   </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap text-xs text-slate-500">
+                    <span>{formatDate(report.report_date || report.created_at)}</span>
+                    {report.technician_name && <><span>·</span><span>{report.technician_name}</span></>}
+                    {report.pest_type && <><span>·</span><span>{report.pest_type}</span></>}
+                    <span>·</span><span>{formatFileSize(report.file_size)}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {report.version && report.version > 1 && (
+                    <button
+                      onClick={() => handleShowHistory(report.case_id)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium transition-colors"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Historik</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDownload(report)}
+                    disabled={downloading === report.id}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#20c58f] hover:bg-[#1aad7d] text-white text-xs font-medium transition-colors disabled:opacity-50"
+                  >
+                    {downloading === report.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Download className="w-3.5 h-3.5" />}
+                    Ladda ner
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </>
+      </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Header */}
-      <div className="bg-slate-800/50 backdrop-blur border-b border-slate-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <FileText className="w-7 h-7 text-blue-400" />
-                Rapporter
-              </h1>
-              <p className="text-slate-400 mt-1">
-                Kontrollrapporter och saneringsrapporter
-              </p>
-            </div>
-
-            {activeTab === 'sanitation' && (
-              <div className="flex items-center gap-4">
-                {/* Filter Selector */}
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-slate-400" />
-                  <Select
-                    value={dateFilter}
-                    onChange={(v) => setDateFilter(v as any)}
-                    options={[
-                      { value: 'all', label: 'Alla rapporter' },
-                      { value: '30d', label: 'Senaste 30 dagarna' },
-                      { value: '3m', label: 'Senaste 3 månaderna' },
-                      { value: '6m', label: 'Senaste 6 månaderna' },
-                      { value: '1y', label: 'Senaste året' },
-                    ]}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Tabs */}
-          <div className="flex items-center gap-1 mt-6">
-            <button
-              onClick={() => setActiveTab('inspections')}
-              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-                activeTab === 'inspections'
-                  ? 'bg-[#20c58f] text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <ClipboardCheck className="w-4 h-4" />
-              Kontrollrapporter
-              {inspectionSessions.length > 0 && (
-                <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs font-mono ${
-                  activeTab === 'inspections' ? 'bg-white/20' : 'bg-slate-700'
-                }`}>
-                  {inspectionSessions.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('sanitation')}
-              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-                activeTab === 'sanitation'
-                  ? 'bg-[#20c58f] text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              Saneringsrapporter
-              {reports.length > 0 && (
-                <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs font-mono ${
-                  activeTab === 'sanitation' ? 'bg-white/20' : 'bg-slate-700'
-                }`}>
-                  {reports.length}
-                </span>
-              )}
-            </button>
-          </div>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-white flex items-center gap-2">
+            <FileText className="w-5 h-5 text-slate-400" />
+            Rapporter
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">Kontrollrapporter och saneringsrapporter</p>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'inspections' ? renderInspectionReports() : renderSanitationReports()}
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-slate-700/60 pb-px">
+        <button
+          onClick={() => setActiveTab('inspections')}
+          className={`px-3 py-1.5 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
+            activeTab === 'inspections'
+              ? 'text-white bg-[#20c58f]/10 border border-[#20c58f]/30 border-b-0 -mb-px'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <ClipboardCheck className="w-3.5 h-3.5" />
+          Kontrollrapporter
+          {!loadingInspections && inspectionSessions.length > 0 && (
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-slate-700/80 text-slate-400">
+              {inspectionSessions.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('sanitation')}
+          className={`px-3 py-1.5 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
+            activeTab === 'sanitation'
+              ? 'text-white bg-[#20c58f]/10 border border-[#20c58f]/30 border-b-0 -mb-px'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          Saneringsrapporter
+          {!loading && reports.length > 0 && (
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-slate-700/80 text-slate-400">
+              {reports.length}
+            </span>
+          )}
+        </button>
+      </div>
 
-        {/* History Modal (sanitation only) */}
-        {showHistory && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
-              <div className="flex items-center justify-between p-6 border-b border-slate-700">
-                <h3 className="text-xl font-semibold text-white flex items-center gap-3">
-                  <History className="w-6 h-6 text-purple-400" />
-                  Rapporthistorik
-                </h3>
-                <button
-                  onClick={closeHistory}
-                  className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors duration-200"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
+      {/* Content */}
+      {activeTab === 'inspections' ? renderInspectionReports() : renderSanitationReports()}
 
-              <div className="p-6 overflow-y-auto max-h-[60vh]">
-                {loadingHistory ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="text-center">
-                      <LoadingSpinner />
-                      <span className="block mt-3 text-slate-400">Laddar historik...</span>
-                    </div>
-                  </div>
-                ) : historyData ? (
-                  <div className="space-y-4">
-                    <div className="mb-6">
-                      <p className="text-slate-400 flex items-center gap-2">
-                        <BarChart3 className="w-4 h-4" />
-                        Totalt {historyData.total_versions} versioner av denna rapport
-                      </p>
-                    </div>
+      {/* History Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <History className="w-4 h-4 text-slate-400" />
+                Rapporthistorik
+              </h3>
+              <button onClick={() => { setShowHistory(null); setHistoryData(null) }} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-                    {historyData.history.map((historyReport, index) => (
-                      <div
-                        key={historyReport.id}
-                        className={`group relative p-4 rounded-lg border transition-all duration-200 ${
-                          historyReport.is_current
-                            ? 'border-emerald-500/50 bg-emerald-500/10'
-                            : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className={`p-2 rounded-lg ${
-                                historyReport.is_current
-                                  ? 'bg-emerald-500/20 border border-emerald-500/30'
-                                  : 'bg-slate-700 border border-slate-600'
-                              }`}>
-                                <FileText className={`h-5 w-5 ${
-                                  historyReport.is_current ? 'text-emerald-400' : 'text-slate-400'
-                                }`} />
-                              </div>
-                              <div>
-                                <h4 className="font-medium text-white">
-                                  {historyReport.file_name}
-                                </h4>
-                                {historyReport.is_current && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full font-medium mt-1">
-                                    <TrendingUp className="w-3 h-3" />
-                                    Aktuell version
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <span className="font-medium text-slate-300">Version:</span>{' '}
-                                <span className="text-slate-400 font-mono">{historyReport.version || 1}</span>
-                              </div>
-                              <div>
-                                <span className="font-medium text-slate-300">Skapad:</span>{' '}
-                                <span className="text-slate-400">
-                                  {formatDate(historyReport.created_at)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="font-medium text-slate-300">Storlek:</span>{' '}
-                                <span className="text-slate-400 font-mono">
-                                  {formatFileSize(historyReport.file_size)}
-                                </span>
-                              </div>
-                              {historyReport.replaced_at && (
-                                <div>
-                                  <span className="font-medium text-slate-300">Ersatt:</span>{' '}
-                                  <span className="text-slate-400">
-                                    {formatDate(historyReport.replaced_at)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => handleDownload(historyReport)}
-                            disabled={downloading === historyReport.id}
-                            className="ml-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {downloading === historyReport.id ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                <span className="hidden sm:inline">Laddar...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Download className="h-4 w-4" />
-                                <span className="hidden sm:inline">Ladda ner</span>
-                              </>
-                            )}
-                          </button>
+            <div className="p-4 overflow-y-auto max-h-[65vh]">
+              {loadingHistory ? (
+                <div className="flex items-center justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : historyData ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500 mb-3">{historyData.total_versions} versioner av denna rapport</p>
+                  {historyData.history.map((historyReport) => (
+                    <div
+                      key={historyReport.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border ${
+                        historyReport.is_current
+                          ? 'border-[#20c58f]/30 bg-[#20c58f]/5'
+                          : 'border-slate-700/60 bg-slate-800/30'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-white truncate">{historyReport.file_name}</p>
+                          {historyReport.is_current && (
+                            <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f] font-medium">Aktuell</span>
+                          )}
                         </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          v{historyReport.version || 1} · {formatDate(historyReport.created_at)} · {formatFileSize(historyReport.file_size)}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="text-slate-500 mb-2">
-                      <X className="w-8 h-8 mx-auto" />
+                      <button
+                        onClick={() => handleDownload(historyReport)}
+                        disabled={downloading === historyReport.id}
+                        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#20c58f] hover:bg-[#1aad7d] text-white text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        {downloading === historyReport.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Download className="w-3.5 h-3.5" />}
+                        Ladda ner
+                      </button>
                     </div>
-                    <p className="text-slate-400">Kunde inte ladda historik</p>
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-sm text-slate-400 py-8">Kunde inte ladda historik</p>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
