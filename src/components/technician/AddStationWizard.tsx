@@ -51,6 +51,7 @@ interface AddStationWizardProps {
   preselectedCustomerId?: string | null
   technicianId?: string
   onIndoorFinished?: (customerId: string) => void
+  autoSelectIndoor?: boolean
 }
 
 interface CustomerOption {
@@ -65,7 +66,8 @@ export function AddStationWizard({
   onComplete,
   preselectedCustomerId,
   technicianId,
-  onIndoorFinished
+  onIndoorFinished,
+  autoSelectIndoor = false
 }: AddStationWizardProps) {
   const { profile } = useAuth()
   const [currentStep, setCurrentStep] = useState<WizardStep>(1)
@@ -104,17 +106,23 @@ export function AddStationWizard({
     }
   }, [isOpen])
 
-  // Om förhandsvald kund, hoppa till steg 2
+  // Om förhandsvald kund, hoppa till steg 2 (eller direkt inomhus om autoSelectIndoor)
   useEffect(() => {
     if (isOpen && preselectedCustomerId) {
       setSelectedCustomerId(preselectedCustomerId)
-      setCurrentStep(2)
+      if (autoSelectIndoor) {
+        setStationType('indoor')
+        setCurrentStep(3)
+        loadFloorPlans(preselectedCustomerId)
+      } else {
+        setCurrentStep(2)
+      }
     } else if (isOpen) {
       setCurrentStep(1)
       setSelectedCustomerId(null)
       setStationType(null)
     }
-  }, [isOpen, preselectedCustomerId])
+  }, [isOpen, preselectedCustomerId, autoSelectIndoor])
 
   // Sätt kundnamn när customers-listan laddats och kund är förvald
   useEffect(() => {

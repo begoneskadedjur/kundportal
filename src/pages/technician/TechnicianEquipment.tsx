@@ -24,7 +24,8 @@ import {
   ArrowLeft,
   MapPin,
   Check,
-  Wrench
+  Wrench,
+  Home
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
@@ -70,6 +71,7 @@ export default function TechnicianEquipment() {
   // Wizard state
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [wizardCustomerId, setWizardCustomerId] = useState<string | null>(null)
+  const [wizardAutoIndoor, setWizardAutoIndoor] = useState(false)
 
   // Batch-placering state
   const [batchCount, setBatchCount] = useState(0)
@@ -466,6 +468,20 @@ export default function TechnicianEquipment() {
     setFormResetKey(prev => prev + 1) // Tvinga ommontering av formuläret
   }
 
+  // Byt till inomhusplacering från success-state
+  const handleGoIndoor = () => {
+    const customerId = wizardCustomerId
+    setShowSuccessState(false)
+    setIsFormOpen(false)
+    setEditingEquipment(null)
+    setPreviewPosition(null)
+    if (customerId) {
+      setWizardCustomerId(customerId)
+      setWizardAutoIndoor(true)
+      setIsWizardOpen(true)
+    }
+  }
+
   // Check om en kund saknar schema och visa prompt
   const checkAndPromptSchedule = async (customerId: string, customerName: string) => {
     try {
@@ -635,11 +651,13 @@ export default function TechnicianEquipment() {
         {/* Wizard för att lägga till station */}
         <AddStationWizard
           isOpen={isWizardOpen}
-          onClose={() => setIsWizardOpen(false)}
+          onClose={() => { setIsWizardOpen(false); setWizardAutoIndoor(false) }}
           onComplete={handleWizardComplete}
           technicianId={technicianId}
           preselectedCustomerId={wizardCustomerId}
+          autoSelectIndoor={wizardAutoIndoor}
           onIndoorFinished={(customerId) => {
+            setWizardAutoIndoor(false)
             const name = allCustomers.find(c => c.customer_id === customerId)?.customer_name
               || customers.find(c => c.id === customerId)?.company_name
               || ''
@@ -655,19 +673,14 @@ export default function TechnicianEquipment() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end justify-center"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                  handleFinishBatch()
-                }
-              }}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center"
             >
               <motion.div
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="bg-slate-900 rounded-t-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+                className="bg-slate-900 rounded-t-2xl md:rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 {showSuccessState ? (
@@ -698,13 +711,21 @@ export default function TechnicianEquipment() {
                         className="w-full py-3 px-4 bg-[#20c58f] hover:bg-[#1ab07f] text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="w-5 h-5" />
-                        Placera ytterligare
+                        Placera fler utomhus
+                      </button>
+                      <button
+                        onClick={handleGoIndoor}
+                        className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Home className="w-5 h-5" />
+                        Placera inomhus
                       </button>
                       <button
                         onClick={handleFinishBatch}
-                        className="w-full py-3 px-4 border border-slate-700 text-slate-300 hover:bg-slate-800 rounded-xl transition-colors"
+                        className="w-full py-3 px-4 border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-300 rounded-xl transition-colors flex items-center justify-center gap-2"
                       >
-                        Klar
+                        <Check className="w-4 h-4" />
+                        Klar med etableringen
                       </button>
                     </div>
                   </div>
