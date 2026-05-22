@@ -13,11 +13,8 @@ import {
 } from '../../types/database'
 import { EquipmentService, CustomerStationSummary } from '../../services/equipmentService'
 import { ContractService } from '../../services/contractService'
-import {
-  EquipmentPlacementForm,
-  EquipmentFormData,
-  type ExistingStation
-} from '../../components/shared/equipment'
+import { EquipmentPlacementForm, type FormData as EquipmentFormData } from '../../components/shared/equipment/EquipmentPlacementForm'
+import type { ExistingStation } from '../../components/shared/equipment/MapLocationPicker'
 import {
   Plus,
   Loader2,

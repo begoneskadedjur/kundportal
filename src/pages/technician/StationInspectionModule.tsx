@@ -45,7 +45,7 @@ import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 // Komponenter för karta och planritning
-import { EquipmentMap } from '../../components/shared/equipment'
+import { EquipmentMap } from '../../components/shared/equipment/EquipmentMap'
 import { FloorPlanViewer } from '../../components/shared/indoor/FloorPlanViewer'
 
 // Service-funktioner
