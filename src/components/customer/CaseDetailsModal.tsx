@@ -548,7 +548,7 @@ export default function CaseDetailsModal({
           .select('id')
           .eq('customer_id', fallbackData.customer_id)
 
-        type StationRow = { id: string; equipment_type: string; placed_at: string; comment: string | null; serial_number: string | null; photo_path: string | null }
+        type StationRow = { id: string; equipment_type: string; placed_at: string; comment: string | null; serial_number: string | null; photo_path: string | null; isIndoor?: boolean }
         let indoorStations: StationRow[] = []
         const floorPlanIds = (floorPlans ?? []).map(fp => fp.id)
         if (floorPlanIds.length > 0) {
@@ -566,7 +566,8 @@ export default function CaseDetailsModal({
             placed_at: s.placed_at,
             comment: s.comment,
             serial_number: null,
-            photo_path: s.photo_path ?? null
+            photo_path: s.photo_path ?? null,
+            isIndoor: true
           }))
         }
 
@@ -576,8 +577,9 @@ export default function CaseDetailsModal({
         if (allStations.length > 0) {
           const withUrls = await Promise.all(allStations.map(async (s) => {
             if (!s.photo_path) return { ...s, photo_url: undefined }
+            const bucket = s.isIndoor ? 'indoor-station-photos' : 'equipment-images'
             const { data: urlData } = await supabase.storage
-              .from('equipment-images')
+              .from(bucket)
               .createSignedUrl(s.photo_path, 3600)
             return { ...s, photo_url: urlData?.signedUrl ?? undefined }
           }))
