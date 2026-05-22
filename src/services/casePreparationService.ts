@@ -2,14 +2,14 @@
 // Service för hantering av preparatanvändning i ärenden
 
 import { supabase } from '../lib/supabase'
-import {
+import type {
   CasePreparation,
   CasePreparationWithDetails,
   CreateCasePreparationInput,
   UpdateCasePreparationInput,
   CasePreparationType
 } from '../types/casePreparations'
-import { Preparation } from '../types/preparations'
+import type { Preparation } from '../types/preparations'
 
 /**
  * Service för CRUD-operationer på preparatanvändning i ärenden
@@ -187,6 +187,54 @@ export class CasePreparationService {
     } catch (error) {
       console.error('CasePreparationService.getPreparationsForServiceGroup fel:', error)
       throw error
+    }
+  }
+
+  /**
+   * Hämta preparat filtrerade på stationstyp (via station_type_ids-array)
+   * Returnerar alla aktiva preparat om inga matchar stationstypen.
+   */
+  static async getPreparationsForStationType(stationTypeId: string): Promise<Preparation[]> {
+    try {
+      const { data, error } = await supabase
+        .from('preparations')
+        .select('*')
+        .contains('station_type_ids', [stationTypeId])
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true })
+
+      if (error) {
+        console.error('Fel vid hämtning av preparat för stationstyp:', error)
+        throw new Error(`Databasfel: ${error.message}`)
+      }
+
+      const result = data || []
+      if (result.length === 0) {
+        return await CasePreparationService.getAllActivePreparations()
+      }
+      return result
+    } catch (error) {
+      console.error('CasePreparationService.getPreparationsForStationType fel:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Kontrollera om en stationstyp har matchande preparat
+   */
+  static async stationTypeHasPreparations(stationTypeId: string): Promise<boolean> {
+    try {
+      const { count, error } = await supabase
+        .from('preparations')
+        .select('id', { count: 'exact', head: true })
+        .contains('station_type_ids', [stationTypeId])
+        .eq('is_active', true)
+
+      if (error) return false
+      return (count ?? 0) > 0
+    } catch {
+      return false
     }
   }
 

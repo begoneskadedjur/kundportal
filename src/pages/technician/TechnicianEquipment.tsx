@@ -39,6 +39,7 @@ import { getRecurringSchedulesByCustomer } from '../../services/recurringSchedul
 import type { BatchScheduleUnit } from '../../types/recurringSchedule'
 import { getOutdoorInspectionsByStation } from '../../services/inspectionSessionService'
 import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
+import { CasePreparationService } from '../../services/casePreparationService'
 
 interface Customer {
   id: string
@@ -344,6 +345,35 @@ export default function TechnicianEquipment() {
           )
           if (!photoResult.success) {
             console.error('Foto kunde inte laddas upp:', photoResult.error)
+          }
+        }
+
+        // Spara preparat till aktivt etableringsärende om valt
+        if (formData.preparation_id && formData.preparation_quantity) {
+          try {
+            const { data: establishmentCase } = await supabase
+              .from('cases')
+              .select('id')
+              .eq('customer_id', customerId)
+              .eq('service_type', 'establishment')
+              .not('status', 'ilike', '%avslutat%')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+
+            if (establishmentCase) {
+              await CasePreparationService.addPreparation({
+                case_id: establishmentCase.id,
+                case_type: 'contract',
+                preparation_id: formData.preparation_id,
+                quantity: formData.preparation_quantity,
+                unit: formData.preparation_unit || 'g',
+                applied_by_technician_id: profile?.technician_id || undefined,
+                applied_by_technician_name: profile?.full_name || profile?.email || undefined
+              })
+            }
+          } catch (prepError) {
+            console.error('Kunde inte spara preparat till etableringsärende:', prepError)
           }
         }
 

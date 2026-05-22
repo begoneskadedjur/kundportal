@@ -1,5 +1,5 @@
 // src/components/shared/equipment/EquipmentPlacementForm.tsx - Formulär för att skapa/redigera utrustning
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   EquipmentType,
@@ -13,6 +13,10 @@ import { useGpsLocation } from '../../../hooks/useGpsLocation'
 import { MapLocationPicker, type ExistingStation } from './MapLocationPicker'
 import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
+import { CasePreparationService } from '../../../services/casePreparationService'
+import type { Preparation } from '../../../types/preparations'
+import type { PreparationUnit } from '../../../types/casePreparations'
+import { PREPARATION_UNIT_CONFIG } from '../../../types/casePreparations'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import type { OutdoorInspectionWithRelations } from '../../../types/inspectionSession'
@@ -36,7 +40,8 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
-  ZoomIn
+  ZoomIn,
+  FlaskConical
 } from 'lucide-react'
 import ImageLightbox from '../ImageLightbox'
 
@@ -85,6 +90,9 @@ export interface FormData {
   comment: string
   status: EquipmentStatus
   photo?: File | null
+  preparation_id?: string | null
+  preparation_quantity?: number | null
+  preparation_unit?: PreparationUnit
 }
 
 // Legacy-ikoner för bakåtkompatibilitet
@@ -116,6 +124,11 @@ export function EquipmentPlacementForm({
   // Dynamiska stationstyper från DB
   const [dynamicStationTypes, setDynamicStationTypes] = useState<StationType[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
+
+  // Preparat-state
+  const [availablePreparations, setAvailablePreparations] = useState<Preparation[]>([])
+  const [stationHasPreparations, setStationHasPreparations] = useState(false)
+  const [loadingPreparations, setLoadingPreparations] = useState(false)
 
   // Hämta dynamiska stationstyper vid mount
   useEffect(() => {
@@ -228,6 +241,40 @@ export function EquipmentPlacementForm({
       }
     }
   }, [isEditing, loadingTypes, dynamicStationTypes])
+
+  // Ladda preparat när stationstyp ändras
+  const loadPreparationsForType = useCallback(async (equipmentType: EquipmentType) => {
+    const stationType = dynamicStationTypes.find(t => t.code === equipmentType)
+    if (!stationType) {
+      setStationHasPreparations(false)
+      setAvailablePreparations([])
+      return
+    }
+
+    setLoadingPreparations(true)
+    try {
+      const hasPreps = await CasePreparationService.stationTypeHasPreparations(stationType.id)
+      setStationHasPreparations(hasPreps)
+      if (hasPreps) {
+        const preps = await CasePreparationService.getPreparationsForStationType(stationType.id)
+        setAvailablePreparations(preps)
+      } else {
+        setAvailablePreparations([])
+        setFormData(prev => ({ ...prev, preparation_id: null, preparation_quantity: null }))
+      }
+    } catch (err) {
+      console.error('Fel vid hämtning av preparat:', err)
+      setStationHasPreparations(false)
+    } finally {
+      setLoadingPreparations(false)
+    }
+  }, [dynamicStationTypes])
+
+  useEffect(() => {
+    if (!loadingTypes && dynamicStationTypes.length > 0) {
+      loadPreparationsForType(formData.equipment_type)
+    }
+  }, [formData.equipment_type, loadingTypes, dynamicStationTypes, loadPreparationsForType])
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [photoPreview, setPhotoPreview] = useState<string | null>(
@@ -561,6 +608,74 @@ export function EquipmentPlacementForm({
           </p>
         )}
       </div>
+
+      {/* Preparat (visas bara för stationstyper med kopplat preparat) */}
+      {stationHasPreparations && (
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-1.5">
+            <FlaskConical className="w-4 h-4" />
+            Preparat (valfritt)
+          </label>
+          {loadingPreparations ? (
+            <div className="flex items-center gap-2 py-2 text-slate-400 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Laddar preparat...
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <select
+                value={formData.preparation_id || ''}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  preparation_id: e.target.value || null,
+                  preparation_quantity: e.target.value ? (prev.preparation_quantity ?? 1) : null
+                }))}
+                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+              >
+                <option value="">Inget preparat</option>
+                {availablePreparations.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+
+              {formData.preparation_id && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Mängd</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={formData.preparation_quantity ?? ''}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        preparation_quantity: e.target.value ? parseFloat(e.target.value) : null
+                      }))}
+                      placeholder="0"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Enhet</label>
+                    <select
+                      value={formData.preparation_unit || 'g'}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        preparation_unit: e.target.value as PreparationUnit
+                      }))}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    >
+                      {(Object.entries(PREPARATION_UNIT_CONFIG) as [PreparationUnit, typeof PREPARATION_UNIT_CONFIG[PreparationUnit]][]).map(([unit, config]) => (
+                        <option key={unit} value={unit}>{config.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* GPS-position */}
       <div>
