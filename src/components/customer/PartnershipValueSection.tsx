@@ -28,9 +28,6 @@ const PartnershipValueSection: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/50 border border-slate-700/50 rounded-lg">
-              <svg className="w-4 h-4 text-amber-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2l2.5 6.5H21l-5.5 4 2 6.5L12 15l-5.5 4 2-6.5L3 8.5h6.5z" />
-              </svg>
               <span className="text-xs text-slate-300">Auktoriserad skadedjurskontroll</span>
             </div>
           </div>
