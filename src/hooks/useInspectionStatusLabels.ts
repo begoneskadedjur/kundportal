@@ -12,8 +12,8 @@ export interface InspectionStatusLabel {
 
 const DEFAULT_LABELS: Record<string, InspectionStatusLabel> = {
   none:   { level: 'none',   label: 'Ingen aktivitet',    color: '#22c55e' },
-  low:    { level: 'low',    label: 'Lite aktivitet',     color: '#86efac' },
-  medium: { level: 'medium', label: 'Medelhög aktivitet', color: '#f59e0b' },
+  low:    { level: 'low',    label: 'Lite aktivitet',     color: '#eab308' },
+  medium: { level: 'medium', label: 'Medelhög aktivitet', color: '#f97316' },
   high:   { level: 'high',   label: 'Betydande aktivitet',color: '#ef4444' },
   // Legacy-mappningar
   ok:           { level: 'ok',           label: 'Ingen aktivitet',  color: '#22c55e' },

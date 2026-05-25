@@ -1277,22 +1277,16 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               </div>
             )}
 
-            {/* Legend för tröskelvärden */}
+            {/* Legend för aktivitetsnivåer */}
             <div className="bg-slate-800/30 rounded-lg p-4">
-              <p className="text-xs text-slate-500 mb-2">Mätvärdeindikatorer:</p>
+              <p className="text-xs text-slate-500 mb-2">Aktivitetsindikatorer:</p>
               <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                  <span className="text-xs text-slate-400">OK - Inom normala värden</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-amber-500" />
-                  <span className="text-xs text-slate-400">Varning - Överstiger/understiger varningsnivå</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <span className="text-xs text-slate-400">Kritisk - Överstiger/understiger kritisk nivå</span>
-                </div>
+                {(['none', 'low', 'medium', 'high'] as const).map(level => (
+                  <div key={level} className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: getColor(level) }} />
+                    <span className="text-xs text-slate-400">{getLabel(level)}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </>

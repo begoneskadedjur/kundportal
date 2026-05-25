@@ -95,14 +95,14 @@ export const INSPECTION_STATUS_CONFIG: Record<InspectionStatus, {
   },
   low: {
     label: 'Lite aktivitet',
-    color: 'green-300',
-    bgColor: 'bg-green-300/20',
+    color: 'yellow-500',
+    bgColor: 'bg-yellow-500/20',
     icon: '↑'
   },
   medium: {
     label: 'Medelhög aktivitet',
-    color: 'amber-500',
-    bgColor: 'bg-amber-500/20',
+    color: 'orange-500',
+    bgColor: 'bg-orange-500/20',
     icon: '!'
   },
   high: {

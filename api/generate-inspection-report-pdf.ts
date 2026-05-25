@@ -47,9 +47,9 @@ const getStatusColor = (status: string, dynamicColors?: Record<string, string>) 
   switch (status) {
     case 'none':
     case 'ok': return '#22c55e'
-    case 'low': return '#4ade80'
+    case 'low': return '#eab308'
     case 'medium':
-    case 'activity': return '#f59e0b'
+    case 'activity': return '#f97316'
     case 'high':
     case 'needs_service': return '#ef4444'
     case 'replaced': return '#3B82F6'
