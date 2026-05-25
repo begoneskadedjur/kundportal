@@ -200,6 +200,21 @@ export default function UserModal({
           }
         }
 
+        if (email !== (existingUser.email ?? '')) {
+          const response = await fetch('/api/update-multisite-user-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: existingUser.user_id, newEmail: email })
+          })
+          const result = await response.json()
+          if (!response.ok) throw new Error(result.error || 'Kunde inte uppdatera e-post')
+
+          await supabase
+            .from('profiles')
+            .update({ email })
+            .eq('user_id', existingUser.user_id)
+        }
+
         toast.success('Användare uppdaterad')
       } else {
         const userId = crypto.randomUUID()
@@ -288,12 +303,11 @@ export default function UserModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="namn@foretag.se"
-                disabled={!!existingUser}
                 required
               />
-              {existingUser && (
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Kan inte ändras för befintliga användare
+              {existingUser && email !== (existingUser.email ?? '') && (
+                <p className="text-xs text-amber-400 mt-0.5">
+                  E-postadressen kommer att uppdateras. Användaren kan behöva logga in på nytt.
                 </p>
               )}
             </div>
