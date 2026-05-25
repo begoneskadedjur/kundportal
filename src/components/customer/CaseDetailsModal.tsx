@@ -205,6 +205,12 @@ export default function CaseDetailsModal({
     isIndoor?: boolean
   }>>([])
   const [loadingStations, setLoadingStations] = useState(false)
+  const [visitPreparations, setVisitPreparations] = useState<Array<{
+    name: string
+    registration_number: string | null
+    quantity: number
+    unit: string
+  }>>([])
   const [equipmentFull, setEquipmentFull] = useState<EquipmentPlacementWithRelations[]>([])
   const [thisVisitOutdoorIds, setThisVisitOutdoorIds] = useState<Set<string>>(new Set())
   const [thisVisitIndoorIds, setThisVisitIndoorIds] = useState<Set<string>>(new Set())
@@ -600,6 +606,21 @@ export default function CaseDetailsModal({
             return { ...s, photo_url: urlData?.signedUrl ?? undefined }
           }))
           setPlacedStations(withUrls)
+        }
+
+        // Hämta preparat för detta etableringsärende
+        const { data: prepData } = await supabase
+          .from('case_preparations')
+          .select('quantity, unit, preparation:preparations(name, registration_number)')
+          .eq('case_id', caseId)
+          .eq('case_type', 'contract')
+        if (prepData && prepData.length > 0) {
+          setVisitPreparations(prepData.map((p: any) => ({
+            name: p.preparation.name,
+            registration_number: p.preparation.registration_number ?? null,
+            quantity: p.quantity,
+            unit: p.unit
+          })))
         }
 
         // Hämta full equipment-data för karta och statistik
@@ -1345,6 +1366,15 @@ export default function CaseDetailsModal({
                                 </div>
                                 {station.serial_number && <p className="text-xs text-slate-500">Nr: {station.serial_number}</p>}
                                 {station.comment && <p className="text-xs text-slate-400 mt-0.5">{station.comment}</p>}
+                                {visitPreparations.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {visitPreparations.map((p, i) => (
+                                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/20">
+                                        {p.name}{p.registration_number ? ` (${p.registration_number})` : ''} · {p.quantity} {p.unit}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                                 <p className="text-xs text-slate-600 mt-0.5">
                                   {new Date(station.placed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
                                 </p>

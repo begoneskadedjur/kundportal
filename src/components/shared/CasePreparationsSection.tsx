@@ -131,6 +131,9 @@ export default function CasePreparationsSection({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-white text-sm font-medium truncate">{cp.preparation.name}</span>
+                            {cp.preparation.registration_number && (
+                              <span className="text-[10px] text-slate-500 font-mono">{cp.preparation.registration_number}</span>
+                            )}
                             {categoryConfig && (
                               <span
                                 className={`px-1.5 py-0.5 text-[10px] rounded-full ${categoryConfig.bgColor} ${categoryConfig.color}`}
