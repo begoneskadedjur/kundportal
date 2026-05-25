@@ -1,4 +1,5 @@
 import React from 'react'
+import { Clock, MessageSquare } from 'lucide-react'
 
 const PartnershipValueSection: React.FC = () => {
   return (
@@ -16,32 +17,55 @@ const PartnershipValueSection: React.FC = () => {
 
           {/* Certifieringar */}
           <div className="mt-4 flex flex-wrap gap-2">
-            {/* ISO 14001 — miljöcertifiering */}
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/50 border border-slate-700/50 rounded-lg">
-              <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M8 12c1-3 4-5 7-4" />
-                <path d="M12 8c-3 1-5 4-4 7" />
-                <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-              </svg>
+              <img src="/images/ISO 14001.png" alt="ISO 14001" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
               <span className="text-xs text-slate-300">ISO 14001</span>
             </div>
 
-            {/* ISO 9001 — kvalitetsledning */}
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/50 border border-slate-700/50 rounded-lg">
-              <svg className="w-4 h-4 text-blue-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="3" width="14" height="18" rx="2" />
-                <path d="M9 7h6M9 11h6M9 15h4" />
-              </svg>
+              <img src="/images/ISO 9001.png" alt="ISO 9001" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
               <span className="text-xs text-slate-300">ISO 9001</span>
             </div>
 
-            {/* Auktoriserad skadedjursbekämpare */}
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/50 border border-slate-700/50 rounded-lg">
               <svg className="w-4 h-4 text-amber-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2l2.5 6.5H21l-5.5 4 2 6.5L12 15l-5.5 4 2-6.5L3 8.5h6.5z" />
               </svg>
-              <span className="text-xs text-slate-300">Auktoriserad bekämpare</span>
+              <span className="text-xs text-slate-300">Auktoriserad skadedjurskontroll</span>
+            </div>
+          </div>
+
+          {/* Inställelsetider & svarstider */}
+          <div className="mt-4 pt-4 border-t border-slate-700/50">
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Inställelsetider & svarstider</p>
+            <div className="space-y-3">
+
+              <div className="flex gap-2.5">
+                <Clock className="w-3.5 h-3.5 text-[#20c58f] flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-slate-300">Inställelsetid</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Standard: <span className="text-slate-400">3 arbetsdagar</span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Akut ärende: <span className="text-slate-400">Samma dag</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2.5">
+                <MessageSquare className="w-3.5 h-3.5 text-[#20c58f] flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-slate-300">E-post & samtal</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Besvaras samma dag <span className="text-slate-400">08:00–17:00 mån–fre</span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Utanför arbetstid besvaras nästföljande arbetsdag
+                  </p>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
