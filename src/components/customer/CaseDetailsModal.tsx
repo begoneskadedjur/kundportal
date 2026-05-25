@@ -1196,41 +1196,53 @@ export default function CaseDetailsModal({
                         </div>
                       )}
 
-                      {/* Rapport-nedladdning */}
-                      <div className="border-t border-slate-700/40 px-4 py-3 flex items-center gap-3">
-                        <span className="text-xs text-slate-500 mr-1">Ladda ner rapport</span>
-                        <button
-                          onClick={handleInspectionPDF}
-                          disabled={generatingReport !== null}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-300 transition-colors disabled:opacity-50"
-                        >
-                          <FileDown className="w-3.5 h-3.5" />
-                          {generatingReport === 'pdf' ? 'Genererar...' : 'PDF'}
-                        </button>
-                        <button
-                          onClick={handleInspectionExcel}
-                          disabled={generatingReport !== null}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-300 transition-colors disabled:opacity-50"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          {generatingReport === 'excel' ? 'Genererar...' : 'Excel'}
-                        </button>
-                      </div>
+                      {/* Rapport-nedladdning — bara för genomförda besök */}
+                      {inspectionSession.status === 'completed' && (
+                        <div className="border-t border-slate-700/40 px-4 py-3 flex items-center gap-3">
+                          <span className="text-xs text-slate-500 mr-1">Ladda ner rapport</span>
+                          <button
+                            onClick={handleInspectionPDF}
+                            disabled={generatingReport !== null}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-300 transition-colors disabled:opacity-50"
+                          >
+                            <FileDown className="w-3.5 h-3.5" />
+                            {generatingReport === 'pdf' ? 'Genererar...' : 'PDF'}
+                          </button>
+                          <button
+                            onClick={handleInspectionExcel}
+                            disabled={generatingReport !== null}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-300 transition-colors disabled:opacity-50"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            {generatingReport === 'excel' ? 'Genererar...' : 'Excel'}
+                          </button>
+                        </div>
+                      )}
 
-                      {/* Sessionnotering */}
+                      {/* Sessionnotering — saniterad från interna ärendenummer */}
                       {inspectionSession.notes && (
                         <div className="border-t border-slate-700/40 px-4 py-3">
                           <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Teknikernotering</p>
-                          <p className="text-sm text-slate-300">{inspectionSession.notes}</p>
+                          <p className="text-sm text-slate-300">
+                            {inspectionSession.notes.replace(/'BE-\d+'/g, 'ett annat ärende')}
+                          </p>
                         </div>
                       )}
                     </>
                   ) : (
-                    <div className="px-4 py-6">
-                      <p className="text-xs text-slate-500 mb-3">Kontrolldata fylls i efter genomfört servicebesök</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        {['Kontrollerade stationer', 'Stationer med aktivitet', 'Genomförd datum', 'Teknikernotering'].map(label => (
-                          <div key={label}>
+                    <div className="px-4 py-5">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#20c58f20' }}>
+                          <Calendar className="w-4 h-4" style={{ color: '#20c58f' }} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">Besöket är bokat</p>
+                          <p className="text-xs text-slate-500">Resultatet visas här efter genomfört besök</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 opacity-40 pointer-events-none select-none">
+                        {['Kontrollerade stationer', 'Aktivitetsnivå'].map(label => (
+                          <div key={label} className="bg-slate-800/40 rounded-lg px-3 py-2">
                             <p className="text-xs text-slate-500 mb-1">{label}</p>
                             <div className="h-3 bg-slate-700/40 rounded w-3/4" />
                           </div>

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { Calendar, Clock, AlertCircle, Eye, FileText, Flag, User, ClipboardCheck } from 'lucide-react'
+import { Calendar, Clock, AlertCircle, Eye, FileText, Flag, User, ClipboardCheck, ArrowUpDown } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -63,6 +63,7 @@ export default function CaseList() {
   const [error, setError] = useState<string | null>(null)
   const [selectedCase, setSelectedCase] = useState<Case | null>(null)
   const [revisitCounts, setRevisitCounts] = useState<Record<string, number>>({})
+  const [sortDesc, setSortDesc] = useState(true)
   const { profile } = useAuth()
 
   useEffect(() => {
@@ -216,10 +217,29 @@ export default function CaseList() {
     )
   }
 
+  const sortedCases = [...cases].sort((a, b) => {
+    const aDate = a.scheduled_date ?? a.created_at
+    const bDate = b.scheduled_date ?? b.created_at
+    const diff = new Date(aDate).getTime() - new Date(bDate).getTime()
+    return sortDesc ? -diff : diff
+  })
+
   return (
     <>
+      {/* Sorteringskontroll */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-slate-500">{cases.length} ärenden</span>
+        <button
+          onClick={() => setSortDesc(p => !p)}
+          className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors"
+        >
+          <ArrowUpDown className="w-3 h-3" />
+          Nästa besök {sortDesc ? '↓' : '↑'}
+        </button>
+      </div>
+
       <div className="space-y-2">
-        {cases.map((case_) => {
+        {sortedCases.map((case_) => {
           const serviceTypeCfg = case_.service_type ? SERVICE_TYPE_LABELS[case_.service_type] : null
           const totalStations = (case_.total_outdoor_stations || 0) + (case_.total_indoor_stations || 0)
           const inspectedStations = (case_.inspected_outdoor_stations || 0) + (case_.inspected_indoor_stations || 0)
@@ -234,7 +254,7 @@ export default function CaseList() {
                     <h3 className="text-sm font-semibold text-white truncate">
                       {case_.title}
                     </h3>
-                    {case_.case_number && (
+                    {case_.case_number && case_.case_number !== case_.title && (
                       <span className="text-xs text-slate-500 shrink-0">#{case_.case_number}</span>
                     )}
                     {serviceTypeCfg && (
@@ -274,29 +294,33 @@ export default function CaseList() {
                       </span>
                     )}
 
-                    {(case_.completed_date || case_.scheduled_date || case_.created_at) && (
-                      <span className="flex items-center gap-1 text-xs text-slate-500">
-                        <Calendar className="w-3 h-3" />
-                        {case_.completed_date
-                          ? formatDate(case_.completed_date)
-                          : case_.scheduled_date
-                          ? formatDate(case_.scheduled_date)
-                          : formatDate(case_.created_at)}
-                      </span>
-                    )}
+                    <span className="flex items-center gap-1 text-xs text-slate-600">
+                      <Clock className="w-3 h-3" />
+                      {formatDate(case_.created_at)}
+                    </span>
                   </div>
                 </div>
 
-                {/* Höger: Visa-knapp */}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setSelectedCase(case_)}
-                  className="flex items-center gap-1.5 shrink-0"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  Visa
-                </Button>
+                {/* Höger: Nästa besök + Visa-knapp */}
+                <div className="flex items-center gap-3 shrink-0">
+                  {case_.scheduled_date && (
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-500">Nästa besök</p>
+                      <p className="text-xs font-medium text-[#20c58f]">
+                        {formatDate(case_.scheduled_date)}
+                      </p>
+                    </div>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSelectedCase(case_)}
+                    className="flex items-center gap-1.5"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    Visa
+                  </Button>
+                </div>
               </div>
             </Card>
           )
