@@ -28,9 +28,10 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
 
         if (casesError) throw casesError
 
+        const SCHEDULED_TYPES = ['inspection', 'routine', 'establishment']
         const activeCount = casesData?.filter(caseItem =>
           !isCompletedStatus(caseItem.status) &&
-          caseItem.service_type !== 'inspection'
+          !SCHEDULED_TYPES.includes(caseItem.service_type ?? '')
         ).length || 0
         setActiveCasesCount(activeCount)
 

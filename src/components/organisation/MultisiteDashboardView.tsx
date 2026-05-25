@@ -164,30 +164,75 @@ function SingleSiteDashboard({ siteId, sites }: { siteId: string; sites: SiteOpt
 // =============================================
 // ALLA ENHETER → Tabbar per enhet + aggregerad översikt
 // =============================================
+
+const SCHEDULED_TYPES = ['inspection', 'routine', 'establishment']
+
+interface AggregatedKPIs {
+  completedInspections: number
+  totalInspections: number
+  nextInspection: { start: Date; end: Date | null } | null
+  activeCases: number
+  nextVisit: { start: Date; end: Date | null } | null
+}
+
 function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userRoleType: string }) {
   const { organization } = useMultisite()
   const [customers, setCustomers] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'all' | string>('all')
+  const [aggregated, setAggregated] = useState<AggregatedKPIs | null>(null)
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
   const [isCaseModalOpen, setIsCaseModalOpen] = useState(false)
   const [showServiceRequest, setShowServiceRequest] = useState(false)
 
   useEffect(() => {
-    fetchCustomers()
+    fetchAll()
   }, [sites])
 
-  const fetchCustomers = async () => {
+  const fetchAll = async () => {
     if (sites.length === 0) { setLoading(false); return }
-    const { data } = await supabase
-      .from('customers')
-      .select('*')
-      .in('id', sites.map(s => s.id))
-    if (data) {
+    const siteIds = sites.map(s => s.id)
+
+    const [{ data: customersData }, { data: casesData }, { data: sessionsData }] = await Promise.all([
+      supabase.from('customers').select('*').in('id', siteIds),
+      supabase.from('cases').select('id, status, scheduled_start, scheduled_end, service_type, customer_id').in('customer_id', siteIds),
+      supabase.from('station_inspection_sessions').select('id, status, case:cases!inner(customer_id)').eq('status', 'completed').in('cases.customer_id', siteIds),
+    ])
+
+    if (customersData) {
       const map: Record<string, any> = {}
-      data.forEach(c => { map[c.id] = c })
+      customersData.forEach(c => { map[c.id] = c })
       setCustomers(map)
     }
+
+    if (casesData) {
+      const now = new Date()
+      const { isCompletedStatus } = await import('../../types/database')
+
+      const totalInspections = casesData.filter(c => c.service_type === 'inspection').length
+      const activeCases = casesData.filter(c => !isCompletedStatus(c.status) && !SCHEDULED_TYPES.includes(c.service_type ?? '')).length
+
+      const upcomingInspections = casesData
+        .filter(c => c.service_type === 'inspection' && c.scheduled_start && new Date(c.scheduled_start) > now)
+        .sort((a, b) => new Date(a.scheduled_start!).getTime() - new Date(b.scheduled_start!).getTime())
+
+      const upcomingVisits = casesData
+        .filter(c => c.service_type !== 'inspection' && c.scheduled_start && new Date(c.scheduled_start) > now)
+        .sort((a, b) => new Date(a.scheduled_start!).getTime() - new Date(b.scheduled_start!).getTime())
+
+      setAggregated({
+        completedInspections: sessionsData?.length ?? 0,
+        totalInspections,
+        activeCases,
+        nextInspection: upcomingInspections[0]
+          ? { start: new Date(upcomingInspections[0].scheduled_start!), end: upcomingInspections[0].scheduled_end ? new Date(upcomingInspections[0].scheduled_end) : null }
+          : null,
+        nextVisit: upcomingVisits[0]
+          ? { start: new Date(upcomingVisits[0].scheduled_start!), end: upcomingVisits[0].scheduled_end ? new Date(upcomingVisits[0].scheduled_end) : null }
+          : null,
+      })
+    }
+
     setLoading(false)
   }
 
@@ -195,6 +240,19 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
     setSelectedCaseId(caseId)
     setIsCaseModalOpen(true)
   }, [])
+
+  const formatNextDate = (d: { start: Date; end: Date | null } | null): { value: string; sub: string } => {
+    if (!d) return { value: 'Ej schemalagt', sub: '' }
+    const now = new Date()
+    const diffDays = Math.ceil((d.start.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    const startTime = d.start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+    const endTime = d.end?.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+    const timeRange = endTime ? `${startTime}–${endTime}` : startTime
+    const dateStr = d.start.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+    if (diffDays === 0) return { value: 'Idag', sub: timeRange }
+    if (diffDays === 1) return { value: 'Imorgon', sub: timeRange }
+    return { value: dateStr, sub: timeRange }
+  }
 
   if (loading) {
     return (
@@ -206,6 +264,9 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
 
   const activeSite = activeTab !== 'all' ? sites.find(s => s.id === activeTab) : null
   const activeSiteCustomer = activeSite ? customers[activeSite.id] : null
+
+  const nextInspDisplay = aggregated ? formatNextDate(aggregated.nextInspection) : { value: 'Ej schemalagt', sub: '' }
+  const nextVisitDisplay = aggregated ? formatNextDate(aggregated.nextVisit) : { value: 'Ej schemalagt', sub: '' }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -248,8 +309,40 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
       </div>
 
       {/* Vy: Alla enheter — aggregerad */}
-      {activeTab === 'all' && (
-        <div className="space-y-4">
+      {activeTab === 'all' && aggregated && (
+        <div className="space-y-6">
+          {/* Aggregerat KPI-grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 bg-slate-800/50 border border-slate-700 rounded-xl divide-y divide-slate-700 lg:divide-y-0 lg:divide-x divide-slate-700">
+            {[
+              {
+                label: 'Genomförda servicebesök',
+                value: aggregated.completedInspections,
+                sub: `${aggregated.completedInspections}/${aggregated.totalInspections} schemalagda`
+              },
+              {
+                label: 'Nästa servicebesök',
+                value: nextInspDisplay.value,
+                sub: nextInspDisplay.sub
+              },
+              {
+                label: 'Aktiva ärenden',
+                value: aggregated.activeCases,
+                sub: aggregated.activeCases === 1 ? 'aktivt ärende' : 'aktiva ärenden'
+              },
+              {
+                label: 'Nästa besök',
+                value: nextVisitDisplay.value,
+                sub: nextVisitDisplay.sub
+              }
+            ].map((cell, i) => (
+              <div key={i} className="px-5 py-4">
+                <p className="text-xs text-slate-500 mb-1">{cell.label}</p>
+                <p className="text-2xl font-semibold text-white font-mono leading-tight">{cell.value}</p>
+                {cell.sub && <p className="text-xs text-slate-500 mt-0.5">{cell.sub}</p>}
+              </div>
+            ))}
+          </div>
+
           {/* Kompakt enhetslista */}
           <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-700/60">
@@ -268,10 +361,8 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
                       <p className="text-sm font-medium text-white">{site.site_name}</p>
                       {site.region && <p className="text-xs text-slate-500">{site.region}</p>}
                     </div>
-                    {customer && (
-                      <span className="text-xs text-slate-500 shrink-0">
-                        {customer.contract_type || ''}
-                      </span>
+                    {customer?.contract_type && (
+                      <span className="text-xs text-slate-500 shrink-0">{customer.contract_type}</span>
                     )}
                     <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
                   </button>
