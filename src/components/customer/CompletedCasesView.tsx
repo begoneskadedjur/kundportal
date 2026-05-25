@@ -65,7 +65,7 @@ function hasIssue(caseItem: Case): boolean {
          (caseItem.problem_rating !== null && caseItem.problem_rating >= 4)
 }
 
-type SortField = 'created_at' | 'pest_level' | 'problem_rating' | 'status'
+type SortField = 'created_at' | 'pest_level' | 'problem_rating' | 'status' | 'scheduled_start'
 type SortDir = 'asc' | 'desc'
 
 export function CompletedCasesView({ customerId, companyName }: CompletedCasesViewProps) {
@@ -150,6 +150,9 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
       } else if (sortField === 'problem_rating') {
         av = a.problem_rating ?? -1
         bv = b.problem_rating ?? -1
+      } else if (sortField === 'scheduled_start') {
+        av = a.scheduled_start ? new Date(a.scheduled_start).getTime() : 0
+        bv = b.scheduled_start ? new Date(b.scheduled_start).getTime() : 0
       } else {
         av = a.status ?? ''
         bv = b.status ?? ''
@@ -301,7 +304,7 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                     className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-white select-none"
                     onClick={() => toggleSort('created_at')}
                   >
-                    Datum <SortIcon field="created_at" />
+                    Skapat <SortIcon field="created_at" />
                   </th>
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider">Tjänst</th>
                   {hasRoutineCases && (
@@ -321,7 +324,12 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                     </th>
                   )}
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider">Tekniker</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider">Nästa besök</th>
+                  <th
+                    className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-white select-none"
+                    onClick={() => toggleSort('scheduled_start')}
+                  >
+                    Nästa besök <SortIcon field="scheduled_start" />
+                  </th>
                   <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider">Kostnad</th>
                   <th className="px-4 py-2.5"></th>
                 </tr>
@@ -346,7 +354,9 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                           <span className="text-white text-sm font-medium max-w-[220px] truncate block">
                             {caseItem.title || caseItem.case_number || 'Ärende'}
                           </span>
-                          <span className="text-xs text-slate-500">#{caseItem.case_number}</span>
+                          {caseItem.case_number && caseItem.case_number !== caseItem.title && (
+                            <span className="text-xs text-slate-500">#{caseItem.case_number}</span>
+                          )}
                         </div>
                       </td>
 
