@@ -6,7 +6,6 @@ import {
   Home,
   LogOut,
   FileText,
-  Receipt,
   ClipboardCheck,
   MapPin,
   ChevronLeft,
@@ -71,14 +70,6 @@ const navItems: NavItem[] = [
     activeColor: 'text-blue-400',
     activeBg: 'bg-blue-500/20'
   },
-  {
-    id: 'quotes',
-    label: 'Offerter',
-    shortLabel: 'Offerter',
-    icon: Receipt,
-    activeColor: 'text-amber-400',
-    activeBg: 'bg-amber-500/20'
-  }
 ]
 
 interface SiteOption {

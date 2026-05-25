@@ -1,6 +1,6 @@
 // src/components/customer/CustomerPortalNavigation.tsx - Navigation for Customer Portal
 import React from 'react'
-import { BarChart3, Home, LogOut, FileText, Building2, Receipt, ClipboardCheck, MapPin } from 'lucide-react'
+import { BarChart3, Home, LogOut, FileText, Building2, ClipboardCheck, MapPin } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import Button from '../ui/Button'
@@ -131,19 +131,6 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
               Rapporter
             </button>
 
-            <button
-              onClick={() => onViewChange('quotes')}
-              className={`
-                px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
-                ${currentView === 'quotes'
-                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }
-              `}
-            >
-              <Receipt className="w-4 h-4" />
-              Offerter
-            </button>
           </div>
 
           {/* Sign Out */}
