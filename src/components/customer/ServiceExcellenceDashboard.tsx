@@ -14,6 +14,7 @@ interface ServiceExcellenceDashboardProps {
 const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({ customer }) => {
   const [activeCasesCount, setActiveCasesCount] = useState<number>(0)
   const [completedInspectionsCount, setCompletedInspectionsCount] = useState<number>(0)
+  const [totalInspectionsCount, setTotalInspectionsCount] = useState<number>(0)
   const [nextInspection, setNextInspection] = useState<string | null>(null)
   const [nextVisit, setNextVisit] = useState<string | null>(null)
 
@@ -32,6 +33,9 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
           caseItem.service_type !== 'inspection'
         ).length || 0
         setActiveCasesCount(activeCount)
+
+        const totalInspections = casesData?.filter(c => c.service_type === 'inspection').length || 0
+        setTotalInspectionsCount(totalInspections)
 
         const upcomingInspections = casesData
           ?.filter(caseItem => caseItem.scheduled_start && caseItem.service_type === 'inspection')
@@ -117,12 +121,12 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
 
   const cells = [
     {
-      label: 'Genomförda kontroller',
+      label: 'Genomförda servicebesök',
       value: completedInspectionsCount,
-      sub: completedInspectionsCount === 1 ? 'kontrollsession' : 'kontrollsessioner'
+      sub: `${completedInspectionsCount}/${totalInspectionsCount} schemalagda`
     },
     {
-      label: 'Nästa kontroll',
+      label: 'Nästa servicebesök',
       value: nextInspDisplay.value,
       sub: nextInspDisplay.sub
     },

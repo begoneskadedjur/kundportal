@@ -18,6 +18,7 @@ import CaseDetailsModal from '../customer/CaseDetailsModal'
 
 // Organisation components (för alla enheter)
 import OrganizationServiceRequest from './OrganizationServiceRequest'
+import { ChevronRight } from 'lucide-react'
 
 interface SiteOption {
   id: string
@@ -161,12 +162,13 @@ function SingleSiteDashboard({ siteId, sites }: { siteId: string; sites: SiteOpt
 }
 
 // =============================================
-// ALLA ENHETER → En sektion per enhet, samma design som singel-vy
+// ALLA ENHETER → Tabbar per enhet + aggregerad översikt
 // =============================================
 function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userRoleType: string }) {
   const { organization } = useMultisite()
   const [customers, setCustomers] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'all' | string>('all')
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
   const [isCaseModalOpen, setIsCaseModalOpen] = useState(false)
   const [showServiceRequest, setShowServiceRequest] = useState(false)
@@ -202,8 +204,11 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
     )
   }
 
+  const activeSite = activeTab !== 'all' ? sites.find(s => s.id === activeTab) : null
+  const activeSiteCustomer = activeSite ? customers[activeSite.id] : null
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
       {/* Org-header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5">
@@ -215,43 +220,91 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
         </p>
       </div>
 
-      {/* En sektion per enhet */}
-      {sites.map(site => {
-        const customer = customers[site.id]
-        if (!customer) return null
-        return (
-          <div key={site.id} className="space-y-6">
-            {/* Enhetsrubrik */}
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-800" />
-              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                {site.site_name}{site.region ? ` · ${site.region}` : ''}
-              </h2>
-              <div className="h-px flex-1 bg-slate-800" />
+      {/* Tabb-navigation */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`text-sm px-4 py-1.5 rounded-full border transition-colors ${
+            activeTab === 'all'
+              ? 'bg-[#20c58f] border-[#20c58f] text-white'
+              : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+          }`}
+        >
+          Alla enheter
+        </button>
+        {sites.map(site => (
+          <button
+            key={site.id}
+            onClick={() => setActiveTab(site.id)}
+            className={`text-sm px-4 py-1.5 rounded-full border transition-colors ${
+              activeTab === site.id
+                ? 'bg-slate-700 border-slate-600 text-white'
+                : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+            }`}
+          >
+            {site.site_name}
+          </button>
+        ))}
+      </div>
+
+      {/* Vy: Alla enheter — aggregerad */}
+      {activeTab === 'all' && (
+        <div className="space-y-4">
+          {/* Kompakt enhetslista */}
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-700/60">
+              <h3 className="text-sm font-semibold text-white">Enheter</h3>
             </div>
-
-            {/* KPI-grid */}
-            <ServiceExcellenceDashboard customer={customer} />
-
-            {/* Avtal + Ärendebedömning + Kontakt */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <ContractValueCard customer={customer} />
-                <ServiceAssessmentSummary
-                  customerId={site.id}
-                  onOpenCaseDetails={handleOpenCaseDetails}
-                />
-              </div>
-              <div className="space-y-6">
-                <RelationshipShowcase customer={customer} />
-              </div>
+            <div className="divide-y divide-slate-700/40">
+              {sites.map(site => {
+                const customer = customers[site.id]
+                return (
+                  <button
+                    key={site.id}
+                    onClick={() => setActiveTab(site.id)}
+                    className="flex items-center gap-4 w-full px-5 py-3 hover:bg-slate-700/20 transition-colors text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white">{site.site_name}</p>
+                      {site.region && <p className="text-xs text-slate-500">{site.region}</p>}
+                    </div>
+                    {customer && (
+                      <span className="text-xs text-slate-500 shrink-0">
+                        {customer.contract_type || ''}
+                      </span>
+                    )}
+                    <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+                  </button>
+                )
+              })}
             </div>
           </div>
-        )
-      })}
 
-      {/* Om BeGone */}
-      <PartnershipValueSection />
+          <PartnershipValueSection />
+        </div>
+      )}
+
+      {/* Vy: En specifik enhet */}
+      {activeTab !== 'all' && activeSite && activeSiteCustomer && (
+        <div className="space-y-6">
+          <ServiceExcellenceDashboard customer={activeSiteCustomer} />
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <ContractValueCard customer={activeSiteCustomer} />
+              <ServiceAssessmentSummary
+                customerId={activeSite.id}
+                onOpenCaseDetails={handleOpenCaseDetails}
+              />
+            </div>
+            <div className="space-y-6">
+              <RelationshipShowcase customer={activeSiteCustomer} />
+            </div>
+          </div>
+
+          <PartnershipValueSection />
+        </div>
+      )}
 
       {/* Ärendemodal */}
       {selectedCaseId && (
