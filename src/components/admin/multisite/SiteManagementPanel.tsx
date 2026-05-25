@@ -76,10 +76,10 @@ export default function SiteManagementPanel({
       // Om detta är den första anläggningen, gör den till primär
       const isPrimary = sites.length === 0 || formData.is_primary
 
-      // Hämta huvudkontor för att få organisationsnamn och id
+      // Hämta huvudkontor för att få organisationsnamn, id och avtalstyp
       const { data: huvudkontor } = await supabase
         .from('customers')
-        .select('id, company_name')
+        .select('id, company_name, contract_type')
         .eq('organization_id', organizationId)
         .eq('site_type', 'huvudkontor')
         .single()
@@ -98,7 +98,7 @@ export default function SiteManagementPanel({
           organization_id: organizationId,
           parent_customer_id: huvudkontor?.id,
           is_multisite: true,
-          contract_type: 'multisite',
+          contract_type: huvudkontor?.contract_type || null,
           contact_email: '',
           is_active: true
         })

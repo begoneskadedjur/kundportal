@@ -42,6 +42,8 @@ interface Customer {
   product_summary?: string | null
   service_details?: string | null
   agreement_text?: string | null
+  is_multisite?: boolean | null
+  parent_customer_id?: string | null
 }
 
 interface EditCustomerModalProps {
@@ -168,6 +170,15 @@ export default function EditCustomerModal({
         .single()
 
       if (error) throw error
+
+      // Propagera contract_type till alla barn-enheter om detta är en multisite-förälder
+      if (editableFields.contract_type !== undefined && customer.is_multisite && !customer.parent_customer_id) {
+        await supabase
+          .from('customers')
+          .update({ contract_type: editableFields.contract_type, updated_at: new Date().toISOString() })
+          .eq('parent_customer_id', customer.id)
+      }
+
       toast.success('Kund uppdaterad!')
       onSave(data)
       onClose()
