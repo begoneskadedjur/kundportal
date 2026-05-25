@@ -24,7 +24,7 @@ import SiteOverviewModal from './SiteOverviewModal'
 import MultisitePendingQuoteNotification from './MultisitePendingQuoteNotification'
 import OrganizationServiceRequest from './OrganizationServiceRequest'
 
-import { Building2, MapPin, AlertTriangle, CheckCircle, Calendar, Clock } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 
 interface SiteOption {
   id: string
@@ -173,6 +173,7 @@ function SingleSiteDashboard({ siteId, sites }: { siteId: string; sites: SiteOpt
 function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userRoleType: string }) {
   const { organization } = useMultisite()
   const [stats, setStats] = useState({ activeCases: 0, completedThisMonth: 0, scheduledVisits: 0, totalSites: 0 })
+  const [hasCaseAssessments, setHasCaseAssessments] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedSite, setSelectedSite] = useState<any>(null)
   const [showSiteModal, setShowSiteModal] = useState(false)
@@ -197,7 +198,7 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
 
       const { data: cases } = await supabase
         .from('cases')
-        .select('id, status, updated_at, scheduled_start')
+        .select('id, status, updated_at, scheduled_start, pest_level, problem_rating')
         .in('customer_id', siteIds)
 
       if (cases) {
@@ -216,6 +217,7 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
             new Date(c.scheduled_start) >= new Date()
           ).length
         })
+        setHasCaseAssessments(cases.some(c => c.pest_level != null || c.problem_rating != null))
       }
     } catch (error) {
       console.error('Error fetching stats:', error)
@@ -227,72 +229,45 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
   const siteIds = sites.map(s => s.id)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-900/20 to-teal-900/20 rounded-2xl p-6 border border-emerald-700/30 mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5 mb-8">
+          <h1 className="text-2xl font-bold text-white">
             {organization?.organization_name || 'Organisation'}
           </h1>
-          <p className="text-emerald-200">
+          <p className="text-sm text-slate-400 mt-0.5">
             {userRoleType === 'verksamhetschef' && 'Översikt över hela organisationen'}
             {userRoleType === 'regionchef' && `Översikt över ${sites.length} enheter i din region`}
             {userRoleType === 'platsansvarig' && 'Översikt'}
           </p>
         </div>
 
-        {/* KPI-kort */}
+        {/* KPI-grid */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner />
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-emerald-500/20 rounded-lg">
-                  <Building2 className="w-5 h-5 text-emerald-400" />
-                </div>
-                <span className="text-slate-400 text-sm">Enheter</span>
+          <div className="grid grid-cols-2 lg:grid-cols-4 bg-slate-800/50 border border-slate-700 rounded-xl divide-y divide-slate-700 lg:divide-y-0 lg:divide-x divide-slate-700 mb-8">
+            {[
+              { label: 'Enheter', value: stats.totalSites, sub: 'aktiva platser' },
+              { label: 'Aktiva ärenden', value: stats.activeCases, sub: null },
+              { label: 'Avklarade denna månad', value: stats.completedThisMonth, sub: null },
+              { label: 'Kommande besök', value: stats.scheduledVisits, sub: null },
+            ].map(({ label, value, sub }) => (
+              <div key={label} className="px-5 py-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+                <p className="text-2xl font-semibold text-white font-mono leading-tight">{value}</p>
+                {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
               </div>
-              <p className="text-2xl font-bold text-white">{stats.totalSites}</p>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                </div>
-                <span className="text-slate-400 text-sm">Aktiva ärenden</span>
-              </div>
-              <p className="text-2xl font-bold text-white">{stats.activeCases}</p>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-400" />
-                </div>
-                <span className="text-slate-400 text-sm">Avklarade denna mån</span>
-              </div>
-              <p className="text-2xl font-bold text-white">{stats.completedThisMonth}</p>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <Calendar className="w-5 h-5 text-blue-400" />
-                </div>
-                <span className="text-slate-400 text-sm">Kommande besök</span>
-              </div>
-              <p className="text-2xl font-bold text-white">{stats.scheduledVisits}</p>
-            </div>
+            ))}
           </div>
         )}
 
-        {/* Enheter med trafikljus */}
+        {/* Enheter */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <MapPin className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-xl font-semibold text-white">Enheter</h2>
-          </div>
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Enheter</h2>
           {sites.length === 0 ? (
             <div className="text-center py-12 bg-slate-800/30 border border-slate-700/50 rounded-xl">
               <Building2 className="w-12 h-12 text-slate-600 mx-auto mb-4" />
@@ -314,8 +289,8 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
           )}
         </div>
 
-        {/* Trafikljusöversikt */}
-        {siteIds.length > 0 && (
+        {/* Trafikljusöversikt — visas bara om det finns bedömningar */}
+        {siteIds.length > 0 && hasCaseAssessments && (
           <div className="mb-8">
             <TrafficLightAggregatedView
               organizationId={organization?.organization_id}
@@ -342,10 +317,10 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
         )}
       </div>
 
-      {/* FAB-knapp för att begära service */}
+      {/* FAB-knapp */}
       <button
         onClick={() => setShowServiceRequest(true)}
-        className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full p-4 shadow-lg hover:shadow-emerald-500/25 transition-all duration-300 z-30"
+        className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 bg-[#20c58f] hover:bg-[#1aad7d] text-white rounded-full p-4 shadow-lg transition-all duration-300 z-30"
         title="Begär service"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
