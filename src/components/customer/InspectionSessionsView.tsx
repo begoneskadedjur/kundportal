@@ -1283,8 +1283,8 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               <div className="flex flex-wrap gap-4">
                 {(['none', 'low', 'medium', 'high'] as const).map(level => (
                   <div key={level} className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: getColor(level) }} />
-                    <span className="text-xs text-slate-400">{getLabel(level)}</span>
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: getStatusColor2(level) }} />
+                    <span className="text-xs text-slate-400">{getStatusLabel(level)}</span>
                   </div>
                 ))}
               </div>
