@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react'
 import SanitationReports from '../../pages/customer/SanitationReports'
+import OrganisationSanitationReports from './OrganisationSanitationReports'
 
 interface SiteOption {
   id: string
@@ -23,7 +24,7 @@ export default function MultisiteReportsView({
   userRoleType,
   organizationName
 }: MultisiteReportsViewProps) {
-  const [activeSiteTab, setActiveSiteTab] = useState(sites[0]?.id || '')
+  const [activeSiteTab, setActiveSiteTab] = useState<'all' | string>('all')
 
   // En enhet vald → rendera direkt
   if (selectedSiteId !== 'all') {
@@ -32,9 +33,7 @@ export default function MultisiteReportsView({
     )
   }
 
-  // Alla enheter → org-header + site-tabs + SanitationReports per enhet
-  const currentSite = sites.find(s => s.id === activeSiteTab)
-
+  // Alla enheter → org-header + site-tabs (inkl. "Alla enheter") + innehåll
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -47,7 +46,17 @@ export default function MultisiteReportsView({
         </div>
 
         {/* Site tabs */}
-        <div className="flex border-b border-slate-700 overflow-x-auto mb-6">
+        <div className="flex border-b border-slate-700 overflow-x-auto">
+          <button
+            onClick={() => setActiveSiteTab('all')}
+            className={`relative text-sm px-4 py-2.5 font-medium whitespace-nowrap transition-colors after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:transition-colors ${
+              activeSiteTab === 'all'
+                ? 'text-[#20c58f] after:bg-[#20c58f]'
+                : 'text-slate-400 hover:text-white after:bg-transparent'
+            }`}
+          >
+            Alla enheter
+          </button>
           {sites.map(site => (
             <button
               key={site.id}
@@ -64,7 +73,12 @@ export default function MultisiteReportsView({
           ))}
         </div>
 
-        {currentSite && (
+        {activeSiteTab === 'all' ? (
+          <OrganisationSanitationReports
+            siteIds={sites.map(s => s.id)}
+            userRoleType={userRoleType}
+          />
+        ) : (
           <SanitationReports
             key={activeSiteTab}
             customerId={activeSiteTab}
