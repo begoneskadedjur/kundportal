@@ -66,12 +66,11 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
   useEffect(() => { loadReports() }, [customerId, siteIds, organization, availableSites])
   useEffect(() => { filterReports() }, [reports, searchTerm, dateFilter, selectedSite])
 
-  // Ladda inspection sessions när siteInfo är redo
   useEffect(() => {
-    if (siteInfo.size > 0 || (siteIds && siteIds.length > 0)) {
+    if (siteIds && siteIds.length > 0) {
       loadInspectionSessions()
     }
-  }, [siteInfo, siteIds])
+  }, [siteIds])
 
   const loadReports = useCallback(async () => {
     try {
@@ -144,10 +143,18 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
     if (ids.length === 0) { setLoadingInspections(false); return }
     setLoadingInspections(true)
     try {
+      const { data: siteRows } = await supabase
+        .from('customers')
+        .select('id, company_name, site_name')
+        .in('id', ids)
+      const localNames = new Map(
+        (siteRows || []).map(s => [s.id, s.site_name || s.company_name || 'Okänd enhet'])
+      )
+
       const allSessions: SessionWithSite[] = []
       for (const siteId of ids) {
         const sessions = await getCompletedSessionsWithSummary(siteId, 100)
-        const name = siteInfo.get(siteId)?.name || 'Okänd enhet'
+        const name = localNames.get(siteId) || siteInfo.get(siteId)?.name || 'Okänd enhet'
         allSessions.push(...sessions.map(s => ({ ...s, siteName: name })))
       }
       allSessions.sort((a, b) =>
