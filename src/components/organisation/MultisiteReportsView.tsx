@@ -1,8 +1,9 @@
 // src/components/organisation/MultisiteReportsView.tsx
-// Wrapper för rapporter: per enhet eller staplade per enhet (alla)
+// Wrapper för rapporter: per enhet eller samlad organisationsvy
 
 import React, { useState } from 'react'
 import SanitationReports from '../../pages/customer/SanitationReports'
+import OrganisationSanitationReports from './OrganisationSanitationReports'
 
 interface SiteOption {
   id: string
@@ -74,18 +75,10 @@ export default function MultisiteReportsView({
 
         {/* Innehåll */}
         {activeSiteTab === 'all' ? (
-          <div className="space-y-10">
-            {sites.map(site => (
-              <div key={site.id}>
-                <div className="flex items-center gap-3 mb-4">
-                  <h2 className="text-base font-semibold text-white">{site.site_name}</h2>
-                  {site.region && <span className="text-xs text-slate-500">({site.region})</span>}
-                  <div className="flex-1 h-px bg-slate-800" />
-                </div>
-                <SanitationReports customerId={site.id} />
-              </div>
-            ))}
-          </div>
+          <OrganisationSanitationReports
+            siteIds={sites.map(s => s.id)}
+            userRoleType={userRoleType}
+          />
         ) : (
           <SanitationReports key={activeSiteTab} customerId={activeSiteTab} />
         )}
