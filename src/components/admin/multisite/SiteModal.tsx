@@ -141,7 +141,7 @@ export default function SiteModal({
       // Hämta organization_id från huvudkontoret
       const { data: parentOrg, error: parentError } = await supabase
         .from('customers')
-        .select('organization_id, contract_type')
+        .select('organization_id, contract_type, contract_start_date, contract_end_date')
         .eq('id', parentCustomerId)
         .single()
 
@@ -166,6 +166,8 @@ export default function SiteModal({
         is_multisite: true,
         site_type: 'enhet',
         contract_type: parentOrg.contract_type,
+        contract_start_date: parentOrg.contract_start_date || null,
+        contract_end_date: parentOrg.contract_end_date || null,
         contract_status: 'signed',
         is_active: true,
         source_type: 'oneflow' as const,

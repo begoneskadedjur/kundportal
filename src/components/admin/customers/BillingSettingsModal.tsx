@@ -529,6 +529,19 @@ export default function BillingSettingsModal({
       if (adjError) throw adjError
     }
 
+    // Propagera avtalsdatum till övriga barn-enheter
+    if (isMultisite && sites.length > 1) {
+      const otherSiteIds = sites.slice(1).map(s => s.id)
+      await supabase
+        .from('customers')
+        .update({
+          contract_start_date: contractStartDate || null,
+          contract_end_date: contractEndDate || null,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', otherSiteIds)
+    }
+
     if (isMultisite && billingType === 'per_site') {
       for (const site of siteBilling) {
         const { error: se } = await supabase
