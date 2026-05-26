@@ -30,6 +30,9 @@ interface SiteBillingData {
 
 interface BillingSettingsModalProps {
   customerId: string | null
+  // För multisite: id på den barn-enhet vars contracts-rad vi laddar (kontraktsladdning).
+  // Billing-inställningar (annual_value etc) sparas istället på headquarterCustomerId.
+  headquarterCustomerId?: string | null
   // Multi-kontrakt-refaktor (Fas 6): scope:ar modalen till ett specifikt kontrakt.
   // När satt: läs/skriv avtalsfält (annual_value, contract_start_date,
   // contract_end_date, billing_frequency, billing_anchor_month, billing_active)
@@ -72,6 +75,7 @@ const fmt = (n: number) =>
 
 export default function BillingSettingsModal({
   customerId,
+  headquarterCustomerId = null,
   contractId = null,
   customerName,
   contactEmail,
@@ -195,7 +199,7 @@ export default function BillingSettingsModal({
     }
     setSiteBilling(
       sites
-        .filter(s => s.id !== customerId)
+        .filter(s => s.id !== (headquarterCustomerId ?? customerId))
         .map(s => ({
           id: s.id,
           site_name: s.site_name || s.company_name || 'Okänd enhet',
@@ -353,15 +357,16 @@ export default function BillingSettingsModal({
   // Ladda befintliga contract-fakturor för live-diff (en gång per öppning)
   useEffect(() => {
     if (!isOpen || !customerId) { setExistingInvoices([]); return }
+    const invoiceCustomerId = headquarterCustomerId ?? customerId
     ;(async () => {
       const { data } = await supabase
         .from('invoices')
         .select('id, status, billing_period_start, subtotal, total_amount')
-        .eq('customer_id', customerId)
+        .eq('customer_id', invoiceCustomerId)
         .eq('invoice_type', 'contract')
       setExistingInvoices((data as any) || [])
     })()
-  }, [isOpen, customerId])
+  }, [isOpen, customerId, headquarterCustomerId])
 
   // Ladda billing_paused_until från DB (saknas som prop)
   useEffect(() => {
@@ -493,10 +498,12 @@ export default function BillingSettingsModal({
     customerUpdate.billing_anchor_month = billingAnchorMonth
     customerUpdate.billing_active = billingActive
 
+    // För multisite: spara billing-inställningar på hauptkontoret, inte barn-enheten
+    const saveId = headquarterCustomerId ?? customerId
     const { error } = await supabase
       .from('customers')
       .update(customerUpdate)
-      .eq('id', customerId)
+      .eq('id', saveId)
     if (error) throw error
 
     // Skriv avtalsfälten även till contracts-raden när scopad

@@ -1697,10 +1697,11 @@ export default function Customers() {
       {/* Billing Settings Modal */}
       {billingSettingsOrg && (
         <BillingSettingsModal
-          customerId={
+          customerId={billingSettingsOrg.sites[0]?.id || null}
+          headquarterCustomerId={
             billingSettingsOrg.organizationType === 'multisite'
-              ? (billingSettingsOrg.headquarterCustomer?.id || billingSettingsOrg.sites[0]?.id || null)
-              : (billingSettingsOrg.sites[0]?.id || null)
+              ? (billingSettingsOrg.headquarterCustomer?.id || null)
+              : null
           }
           contractId={billingSettingsContractId}
           customerName={billingSettingsOrg.company_name}
