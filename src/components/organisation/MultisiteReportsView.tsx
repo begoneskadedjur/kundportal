@@ -1,9 +1,8 @@
 // src/components/organisation/MultisiteReportsView.tsx
-// Wrapper för rapporter: per enhet eller ackumulerat
+// Wrapper för rapporter: per enhet eller staplade per enhet (alla)
 
 import React, { useState } from 'react'
 import SanitationReports from '../../pages/customer/SanitationReports'
-import OrganisationSanitationReports from './OrganisationSanitationReports'
 
 interface SiteOption {
   id: string
@@ -33,7 +32,7 @@ export default function MultisiteReportsView({
     )
   }
 
-  // Alla enheter → org-header + site-tabs (inkl. "Alla enheter") + innehåll
+  // Alla enheter → org-header + site-tabs + innehåll
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -73,16 +72,22 @@ export default function MultisiteReportsView({
           ))}
         </div>
 
+        {/* Innehåll */}
         {activeSiteTab === 'all' ? (
-          <OrganisationSanitationReports
-            siteIds={sites.map(s => s.id)}
-            userRoleType={userRoleType}
-          />
+          <div className="space-y-10">
+            {sites.map(site => (
+              <div key={site.id}>
+                <div className="flex items-center gap-3 mb-4">
+                  <h2 className="text-base font-semibold text-white">{site.site_name}</h2>
+                  {site.region && <span className="text-xs text-slate-500">({site.region})</span>}
+                  <div className="flex-1 h-px bg-slate-800" />
+                </div>
+                <SanitationReports customerId={site.id} />
+              </div>
+            ))}
+          </div>
         ) : (
-          <SanitationReports
-            key={activeSiteTab}
-            customerId={activeSiteTab}
-          />
+          <SanitationReports key={activeSiteTab} customerId={activeSiteTab} />
         )}
       </div>
     </div>
