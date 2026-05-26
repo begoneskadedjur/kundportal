@@ -774,8 +774,10 @@ export function useConsolidatedCustomers() {
             : computeContractTotal(site.annual_value, site.contract_length)
           return sum + base + site.casesValue
         }, 0)
-        org.totalAnnualValue = sites.reduce((sum, site) => sum + (site.annual_value || 0), 0)
-        org.totalMonthlyValue = sites.reduce((sum, site) => sum + (site.monthly_value || 0), 0)
+        // Priset ägs av huvudkontoret — läs direkt därifrån, summera inte barn-enheter
+        const hq = org.headquarterCustomer
+        org.totalAnnualValue = hq?.annual_value ? Number(hq.annual_value) : 0
+        org.totalMonthlyValue = hq?.monthly_value ? Number(hq.monthly_value) : 0
         
         // Aggregera cases-värden
         org.totalCasesValue = sites.reduce((sum, site) => sum + site.casesValue, 0)

@@ -1697,25 +1697,85 @@ export default function Customers() {
       {/* Billing Settings Modal */}
       {billingSettingsOrg && (
         <BillingSettingsModal
-          customerId={billingSettingsOrg.sites[0]?.id || null}
+          customerId={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? (billingSettingsOrg.headquarterCustomer?.id || billingSettingsOrg.sites[0]?.id || null)
+              : (billingSettingsOrg.sites[0]?.id || null)
+          }
           contractId={billingSettingsContractId}
           customerName={billingSettingsOrg.company_name}
           contactEmail={billingSettingsOrg.contact_email}
           isMultisite={billingSettingsOrg.organizationType === 'multisite'}
-          currentBillingFrequency={billingSettingsOrg.sites[0]?.billing_frequency || null}
-          currentPriceListId={billingSettingsOrg.sites[0]?.price_list_id || null}
-          currentBillingEmail={billingSettingsOrg.sites[0]?.billing_email || null}
-          currentBillingAddress={billingSettingsOrg.sites[0]?.billing_address || null}
-          currentBillingType={billingSettingsOrg.sites[0]?.billing_type || null}
-          currentBillingReference={billingSettingsOrg.sites[0]?.billing_reference || null}
-          currentCostCenter={billingSettingsOrg.sites[0]?.cost_center || null}
-          currentBillingRecipient={billingSettingsOrg.sites[0]?.billing_recipient || null}
-          currentPriceAdjustmentPercent={billingSettingsOrg.sites[0]?.price_adjustment_percent ?? null}
-          currentBillingActive={(billingSettingsOrg.sites[0] as any)?.billing_active ?? false}
-          currentContractStartDate={billingSettingsOrg.sites[0]?.contract_start_date ?? null}
-          currentContractEndDate={billingSettingsOrg.sites[0]?.contract_end_date ?? null}
-          currentBillingAnchorMonth={(billingSettingsOrg.sites[0] as any)?.billing_anchor_month ?? null}
-          currentAdhocInvoiceGrouping={(billingSettingsOrg.sites[0] as any)?.adhoc_invoice_grouping ?? null}
+          currentBillingFrequency={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.billing_frequency || billingSettingsOrg.sites[0]?.billing_frequency || null)
+              : (billingSettingsOrg.sites[0]?.billing_frequency || null)
+          }
+          currentPriceListId={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.price_list_id || billingSettingsOrg.sites[0]?.price_list_id || null)
+              : (billingSettingsOrg.sites[0]?.price_list_id || null)
+          }
+          currentBillingEmail={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.billing_email || billingSettingsOrg.sites[0]?.billing_email || null)
+              : (billingSettingsOrg.sites[0]?.billing_email || null)
+          }
+          currentBillingAddress={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.billing_address || billingSettingsOrg.sites[0]?.billing_address || null)
+              : (billingSettingsOrg.sites[0]?.billing_address || null)
+          }
+          currentBillingType={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.billing_type || billingSettingsOrg.sites[0]?.billing_type || null)
+              : (billingSettingsOrg.sites[0]?.billing_type || null)
+          }
+          currentBillingReference={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.billing_reference || billingSettingsOrg.sites[0]?.billing_reference || null)
+              : (billingSettingsOrg.sites[0]?.billing_reference || null)
+          }
+          currentCostCenter={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.cost_center || billingSettingsOrg.sites[0]?.cost_center || null)
+              : (billingSettingsOrg.sites[0]?.cost_center || null)
+          }
+          currentBillingRecipient={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.billing_recipient || billingSettingsOrg.sites[0]?.billing_recipient || null)
+              : (billingSettingsOrg.sites[0]?.billing_recipient || null)
+          }
+          currentPriceAdjustmentPercent={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.price_adjustment_percent ?? billingSettingsOrg.sites[0]?.price_adjustment_percent ?? null)
+              : (billingSettingsOrg.sites[0]?.price_adjustment_percent ?? null)
+          }
+          currentBillingActive={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.billing_active ?? (billingSettingsOrg.sites[0] as any)?.billing_active ?? false)
+              : ((billingSettingsOrg.sites[0] as any)?.billing_active ?? false)
+          }
+          currentContractStartDate={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.contract_start_date ?? billingSettingsOrg.sites[0]?.contract_start_date ?? null)
+              : (billingSettingsOrg.sites[0]?.contract_start_date ?? null)
+          }
+          currentContractEndDate={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.contract_end_date ?? billingSettingsOrg.sites[0]?.contract_end_date ?? null)
+              : (billingSettingsOrg.sites[0]?.contract_end_date ?? null)
+          }
+          currentBillingAnchorMonth={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.billing_anchor_month ?? (billingSettingsOrg.sites[0] as any)?.billing_anchor_month ?? null)
+              : ((billingSettingsOrg.sites[0] as any)?.billing_anchor_month ?? null)
+          }
+          currentAdhocInvoiceGrouping={
+            billingSettingsOrg.organizationType === 'multisite'
+              ? ((billingSettingsOrg.headquarterCustomer as any)?.adhoc_invoice_grouping ?? (billingSettingsOrg.sites[0] as any)?.adhoc_invoice_grouping ?? null)
+              : ((billingSettingsOrg.sites[0] as any)?.adhoc_invoice_grouping ?? null)
+          }
           sites={billingSettingsOrg.sites || []}
           isOpen={billingSettingsOpen}
           onClose={() => {
