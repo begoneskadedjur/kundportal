@@ -767,10 +767,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing session or summary data' })
     }
 
-    const customerName = (customer?.company_name || 'kund').replace(/[^a-zåäöA-ZÅÄÖ0-9]/g, '_')
+    const customerName = (customer?.company_name || 'Kund').replace(/[/\\:*?"<>|]/g, '').replace(/\s+/g, ' ').trim()
     const sessionDate = session.completed_at || session.created_at
     const dateStr = sessionDate ? new Date(sessionDate).toISOString().slice(0, 10) : 'okänt-datum'
-    const filename = `Kontrollrapport_${customerName}_${dateStr}.pdf`
+    const filename = `Avtalat Servicebesök - ${customerName} ${dateStr}.pdf`
 
     // Hämta dynamiska etiketter och färger från databasen
     const { data: labelRows } = await supabase

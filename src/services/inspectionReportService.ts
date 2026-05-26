@@ -453,10 +453,10 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
   // ============================================================
   // SPARA
   // ============================================================
-  const customerName = (session.customer?.company_name || 'kund').replace(/[^a-zåäöA-ZÅÄÖ0-9]/g, '_')
+  const customerName = (session.customer?.company_name || 'Kund').replace(/[/\\:*?"<>|]/g, '').replace(/\s+/g, ' ').trim()
   const sessionDate = session.completed_at || session.created_at
   const dateStr = sessionDate ? new Date(sessionDate).toISOString().slice(0, 10) : 'okänt-datum'
-  const filename = `Kontrollrapport_${customerName}_${dateStr}.xlsx`
+  const filename = `Avtalat Servicebesök - ${customerName} ${dateStr}.xlsx`
 
   const buffer = await wb.xlsx.writeBuffer()
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
