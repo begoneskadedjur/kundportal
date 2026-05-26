@@ -192,6 +192,7 @@ const OrganisationPortal: React.FC = () => {
           selectedSiteId={selectedSiteId}
           sites={siteOptions}
           userRoleType={userRole.role_type}
+          organizationName={organization?.organization_name}
         />
       )}
 
