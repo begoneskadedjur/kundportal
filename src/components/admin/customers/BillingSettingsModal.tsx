@@ -272,16 +272,18 @@ export default function BillingSettingsModal({
   }, [isOpen, customerId])
 
   // Ladda kundens nuvarande fasta avtalsvärde (om satt)
+  // För multisite: läs från huvudkontoret (headquarterCustomerId), annars customerId
   useEffect(() => {
     if (!isOpen || !customerId) return
     setFixedContractValue('')
-    supabase.from('customers').select('annual_value').eq('id', customerId).single()
+    const readId = headquarterCustomerId ?? customerId
+    supabase.from('customers').select('annual_value').eq('id', readId).single()
       .then(({ data }) => {
         if (data && (data as any).annual_value) {
           setFixedContractValue(String((data as any).annual_value))
         }
       })
-  }, [isOpen, customerId])
+  }, [isOpen, customerId, headquarterCustomerId])
 
   // Hämta avtalstjänster + interna artiklar från kundens signerade kontrakt (case_billing_items)
   useEffect(() => {
@@ -536,8 +538,7 @@ export default function BillingSettingsModal({
       if (adjError) throw adjError
     }
 
-    // Propagera avtalsdatum till alla barn-enheter + nollställ pris på dem
-    // (priset ägs av huvudkontoret, inte barn-enheterna)
+    // Propagera bara avtalsdatum till barn-enheter — rör inte annual_value
     if (isMultisite && sites.length > 0) {
       const siteIds = sites.map(s => s.id)
       await supabase
@@ -545,8 +546,6 @@ export default function BillingSettingsModal({
         .update({
           contract_start_date: contractStartDate || null,
           contract_end_date: contractEndDate || null,
-          annual_value: null,
-          monthly_value: null,
           updated_at: new Date().toISOString()
         })
         .in('id', siteIds)
