@@ -160,6 +160,8 @@ const OrganisationPortal: React.FC = () => {
         <MultisiteStationsView
           selectedSiteId={selectedSiteId}
           sites={siteOptions}
+          organizationName={organization?.organization_name}
+          userRoleType={userRole.role_type}
           highlightedStationId={highlightedStationId}
           highlightedStationType={highlightedStationType}
           highlightedFloorPlanId={highlightedFloorPlanId}
@@ -170,6 +172,8 @@ const OrganisationPortal: React.FC = () => {
         <MultisiteInspectionsView
           selectedSiteId={selectedSiteId}
           sites={siteOptions}
+          organizationName={organization?.organization_name}
+          userRoleType={userRole.role_type}
           onNavigateToStation={handleNavigateToStation}
         />
       )}
@@ -178,6 +182,8 @@ const OrganisationPortal: React.FC = () => {
         <MultisiteCasesView
           selectedSiteId={selectedSiteId}
           sites={siteOptions}
+          organizationName={organization?.organization_name}
+          userRoleType={userRole.role_type}
         />
       )}
 

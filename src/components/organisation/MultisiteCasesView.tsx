@@ -14,11 +14,15 @@ interface SiteOption {
 interface MultisiteCasesViewProps {
   selectedSiteId: string | 'all'
   sites: SiteOption[]
+  organizationName?: string
+  userRoleType?: string
 }
 
 export default function MultisiteCasesView({
   selectedSiteId,
-  sites
+  sites,
+  organizationName,
+  userRoleType
 }: MultisiteCasesViewProps) {
   const [activeSiteTab, setActiveSiteTab] = useState(sites[0]?.id || '')
 
@@ -38,7 +42,14 @@ export default function MultisiteCasesView({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Org-header */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5">
+          <h1 className="text-2xl font-bold text-white">{organizationName || 'Organisation'}</h1>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {userRoleType === 'verksamhetschef' ? 'Översikt över hela organisationen' : `Översikt över ${sites.length} enheter`}
+          </p>
+        </div>
         {/* Site tabs */}
         <div className="flex border-b border-slate-700 overflow-x-auto mb-6">
           {sites.map(site => (
