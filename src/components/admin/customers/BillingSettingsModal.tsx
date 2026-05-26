@@ -529,7 +529,7 @@ export default function BillingSettingsModal({
       if (adjError) throw adjError
     }
 
-    // Propagera avtalsdatum till övriga barn-enheter
+    // Propagera avtalsdatum till övriga barn-enheter + nollställ pris (priset ägs av sites[0])
     if (isMultisite && sites.length > 1) {
       const otherSiteIds = sites.slice(1).map(s => s.id)
       await supabase
@@ -537,6 +537,8 @@ export default function BillingSettingsModal({
         .update({
           contract_start_date: contractStartDate || null,
           contract_end_date: contractEndDate || null,
+          annual_value: null,
+          monthly_value: null,
           updated_at: new Date().toISOString()
         })
         .in('id', otherSiteIds)
