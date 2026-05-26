@@ -282,13 +282,13 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
       </div>
 
       {/* Tabb-navigation */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex border-b border-slate-700 overflow-x-auto">
         <button
           onClick={() => setActiveTab('all')}
-          className={`text-sm px-4 py-1.5 rounded-full border transition-colors ${
+          className={`relative text-sm px-4 py-2.5 font-medium whitespace-nowrap transition-colors after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:transition-colors ${
             activeTab === 'all'
-              ? 'bg-[#20c58f] border-[#20c58f] text-white'
-              : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+              ? 'text-[#20c58f] after:bg-[#20c58f]'
+              : 'text-slate-400 hover:text-white after:bg-transparent'
           }`}
         >
           Alla enheter
@@ -297,10 +297,10 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
           <button
             key={site.id}
             onClick={() => setActiveTab(site.id)}
-            className={`text-sm px-4 py-1.5 rounded-full border transition-colors ${
+            className={`relative text-sm px-4 py-2.5 font-medium whitespace-nowrap transition-colors after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:transition-colors ${
               activeTab === site.id
-                ? 'bg-slate-700 border-slate-600 text-white'
-                : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+                ? 'text-[#20c58f] after:bg-[#20c58f]'
+                : 'text-slate-400 hover:text-white after:bg-transparent'
             }`}
           >
             {site.site_name}
