@@ -202,6 +202,9 @@ export interface ConsolidatedCustomer {
   // Metadata
   created_at: string | null
   updated_at: string | null
+
+  // Rådata för huvudkontoret (multisite) — används för redigering
+  headquarterCustomer?: Customer | null
 }
 
 export interface ConsolidatedAnalytics {
@@ -661,7 +664,8 @@ export function useConsolidatedCustomers() {
             hasHighRiskSites: false,
             
             created_at: huvudkontor.created_at,
-            updated_at: huvudkontor.updated_at
+            updated_at: huvudkontor.updated_at,
+            headquarterCustomer: huvudkontor
           })
         }
         

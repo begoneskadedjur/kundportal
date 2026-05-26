@@ -751,9 +751,9 @@ export default function Customers() {
     }
   }
 
-  // Handle customer edit — receives full org, passes site[0] to modal
+  // Handle customer edit — skickar huvudkontoret för multisite, annars sites[0]
   const handleEditCustomer = (org: any) => {
-    setEditingCustomer(org.sites?.[0] || org)
+    setEditingCustomer(org.headquarterCustomer || org.sites?.[0] || org)
     setEditingOrgId(org.id)
     setEditModalOpen(true)
   }
