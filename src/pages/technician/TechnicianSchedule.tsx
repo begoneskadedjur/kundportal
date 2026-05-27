@@ -498,7 +498,7 @@ export default function TechnicianSchedule() {
 
   const calendarLegend = (
     <div className="px-2 pb-2.5 pt-2 border-t border-slate-800">
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+      <div className="flex flex-wrap gap-1.5 lg:flex-wrap overflow-x-auto lg:overflow-x-visible pb-0.5 scrollbar-none">
         {legendFilters.map(f => {
           const isActive = activeDotFilter === f.key;
           return (
