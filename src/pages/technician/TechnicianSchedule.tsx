@@ -22,7 +22,7 @@ import EditContractCaseModal from '../../components/coordinator/EditContractCase
 import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ReportModal from '../../components/admin/technicians/ReportModal'
-import { BeGoneCaseRow } from '../../types/database' // NYTT: Importerar den centrala typen
+import { BeGoneCaseRow, WorkSchedule } from '../../types/database' // NYTT: Importerar den centrala typen
 import '../../styles/FullCalendar.css'
 
 // Definiera en mer komplett typ för ärenden som används i denna komponent
@@ -160,6 +160,38 @@ const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduleCaseType, onOp
     );
 };
 
+type TechnicianAbsence = { id: string; technician_id: string; start_date: string; end_date: string; reason: string; notes: string | null };
+
+const DAY_KEYS: (keyof WorkSchedule)[] = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+function isOffDay(dateStr: string, workSchedule: WorkSchedule | null): boolean {
+  if (!workSchedule) return false;
+  const d = new Date(dateStr + 'T12:00:00');
+  const key = DAY_KEYS[d.getDay()];
+  return !workSchedule[key]?.active;
+}
+
+function getAbsenceStatus(dateStr: string, absences: TechnicianAbsence[], workSchedule: WorkSchedule | null): { absent: boolean; fullDay: boolean } {
+  const dayStart = new Date(dateStr + 'T00:00:00');
+  const dayEnd = new Date(dateStr + 'T23:59:59');
+  const overlapping = absences.filter(a => {
+    const aStart = new Date(a.start_date);
+    const aEnd = new Date(a.end_date);
+    return aStart <= dayEnd && aEnd >= dayStart;
+  });
+  if (overlapping.length === 0) return { absent: false, fullDay: false };
+
+  // Avgör heldagsfrånvaro: täcker hela arbetsdagen eller hela kalenderdagen
+  const d = new Date(dateStr + 'T12:00:00');
+  const key = DAY_KEYS[d.getDay()];
+  const schedule = workSchedule?.[key];
+  const workStart = schedule ? new Date(dateStr + 'T' + schedule.start + ':00') : new Date(dateStr + 'T08:00:00');
+  const workEnd = schedule ? new Date(dateStr + 'T' + schedule.end + ':00') : new Date(dateStr + 'T17:00:00');
+
+  const fullDay = overlapping.some(a => new Date(a.start_date) <= workStart && new Date(a.end_date) >= workEnd);
+  return { absent: true, fullDay };
+}
+
 const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { isOpen: boolean, onClose: () => void, activeStatuses: Set<string>, setActiveStatuses: (s: Set<string>) => void }) => { const toggleStatus = (status: string) => { const newStatuses = new Set(activeStatuses); if (newStatuses.has(status)) newStatuses.delete(status); else newStatuses.add(status); setActiveStatuses(newStatuses); }; return (<AnimatePresence>{isOpen && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-40 flex justify-center items-center p-4"><motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl"><header className="p-4 border-b border-slate-800 flex items-center justify-between"><h2 className="text-lg font-bold">Filtrera Ärenden</h2><Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button></header><div className="p-4 flex-grow overflow-y-auto"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{ALL_VALID_STATUSES.map(status => (<label key={status} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-slate-800/50"><input type="checkbox" checked={activeStatuses.has(status)} onChange={() => toggleStatus(status)} className="h-5 w-5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 shrink-0" /><span className={`text-sm ${activeStatuses.has(status) ? 'text-white' : 'text-slate-400'}`}>{status}</span></label>))}</div></div><footer className="p-4 border-t border-slate-800 flex flex-col sm:flex-row gap-2"><Button variant="secondary" onClick={() => setActiveStatuses(new Set(ALL_VALID_STATUSES))} className="w-full">Visa alla</Button><Button variant="secondary" onClick={() => setActiveStatuses(new Set(DEFAULT_ACTIVE_STATUSES))} className="w-full">Återställ</Button><Button variant="primary" onClick={onClose} className="w-full">Klar</Button></footer></motion.div></motion.div>)}</AnimatePresence>);};
 
 export default function TechnicianSchedule() {
@@ -186,6 +218,8 @@ export default function TechnicianSchedule() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false);
+  const [workSchedule, setWorkSchedule] = useState<WorkSchedule | null>(null);
+  const [absences, setAbsences] = useState<TechnicianAbsence[]>([]);
 
   const fetchScheduledCases = useCallback(async (technicianId: string) => { 
     setLoading(true); 
@@ -263,7 +297,18 @@ export default function TechnicianSchedule() {
       setLoading(false) 
     }}, []);
   
-  useEffect(() => { if (isTechnician && profile?.technician_id) { fetchScheduledCases(profile.technician_id); }}, [isTechnician, profile?.technician_id, fetchScheduledCases]);
+  useEffect(() => {
+    if (!isTechnician || !profile?.technician_id) return;
+    fetchScheduledCases(profile.technician_id);
+    const id = profile.technician_id;
+    Promise.all([
+      supabase.from('technicians').select('work_schedule').eq('id', id).single(),
+      supabase.from('technician_absences').select('*').eq('technician_id', id)
+    ]).then(([schedRes, absRes]) => {
+      if (schedRes.data?.work_schedule) setWorkSchedule(schedRes.data.work_schedule as WorkSchedule);
+      if (absRes.data) setAbsences(absRes.data as TechnicianAbsence[]);
+    });
+  }, [isTechnician, profile?.technician_id, fetchScheduledCases]);
 
   // Hantera öppning av specifikt ärende från notifikation/länk
   useEffect(() => {
@@ -363,10 +408,8 @@ export default function TechnicianSchedule() {
   const handleDateClick = (clickInfo: DateClickArg) => { setSelectedDate(clickInfo.dateStr); };
   const handleDayChange = (offset: number) => { const currentDate = new Date(selectedDate); currentDate.setUTCHours(12); currentDate.setDate(currentDate.getDate() + offset); setSelectedDate(toDateString(currentDate)); };
   
-  // Förbättrad indikering för månadsvyn baserat på antal ärenden
+  // Indikering för månadsvyn baserat på antal ärenden (alltid synlig, även för 0)
   const getCaseIndicator = (count: number) => {
-    if (count === 0) return null;
-    
     if (count >= 10) {
       return (
         <div className="absolute bottom-0.5 right-0.5 flex items-center justify-center w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full border border-red-400">
@@ -381,16 +424,39 @@ export default function TechnicianSchedule() {
       return <div className="absolute bottom-1 right-1 w-1.5 h-1.5 bg-green-500 rounded-full border border-green-400"></div>;
     }
   };
-  
-  const renderDayCellContent = (dayRenderInfo: any) => { 
-    const dayString = dayRenderInfo.date.toISOString().split('T')[0]; 
-    const count = eventsByDay[dayString] || 0; 
+
+  const renderDayCellContent = (dayRenderInfo: any) => {
+    const dayString = dayRenderInfo.date.toISOString().split('T')[0];
+    const count = eventsByDay[dayString] || 0;
+    const offDay = isOffDay(dayString, workSchedule);
+    const absenceStatus = getAbsenceStatus(dayString, absences, workSchedule);
+
+    if (offDay) {
+      return (
+        <div className="relative w-full h-full flex items-center justify-center opacity-40">
+          <span>{dayRenderInfo.dayNumberText}</span>
+        </div>
+      );
+    }
+
     return (
-      <div className="relative w-full h-full flex items-center justify-center" aria-label={count > 0 ? `${count} ärenden` : undefined}>
+      <div className="relative w-full h-full flex items-center justify-center">
         <span>{dayRenderInfo.dayNumberText}</span>
-        {getCaseIndicator(count)}
+        {absenceStatus.absent && absenceStatus.fullDay ? (
+          // Heldagsfrånvaro: bara grå prick, ingen ärendeprick
+          <div className="absolute bottom-1 right-1 w-2 h-2 bg-slate-400 rounded-full border border-slate-300"></div>
+        ) : (
+          <>
+            {/* Ärendeprick nere till höger */}
+            {getCaseIndicator(count)}
+            {/* Delfrånvaro: grå prick nere till vänster */}
+            {absenceStatus.absent && (
+              <div className="absolute bottom-1 left-1 w-1.5 h-1.5 bg-slate-400 rounded-full border border-slate-300"></div>
+            )}
+          </>
+        )}
       </div>
-    ); 
+    );
   };
 
   useEffect(() => { const dateObj = new Date(selectedDate); dateObj.setUTCHours(12); calendarRef.current?.getApi().gotoDate(dateObj); mobileCalendarRef.current?.getApi().gotoDate(dateObj); document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected')); const dayElement = document.querySelector(`td[data-date="${selectedDate}"]`); if (dayElement) dayElement.classList.add('day-selected'); }, [selectedDate]);
@@ -402,6 +468,20 @@ export default function TechnicianSchedule() {
     // Behöver type assertion här eftersom ReportModal har en mer generell typ
     handleOpenModal(caseData as ScheduleCaseType);
   };
+
+  const calendarLegend = (
+    <div className="px-3 pb-3 pt-1 border-t border-slate-800 space-y-1.5">
+      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Förklaring</p>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-2 h-2 rounded-full bg-green-500 border border-green-400 shrink-0"></span>1–2 ärenden</span>
+        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-2 h-2 rounded-full bg-yellow-500 border border-yellow-400 shrink-0"></span>3–5 ärenden</span>
+        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-500 border border-orange-400 shrink-0"></span>6–9 ärenden</span>
+        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-4 h-4 rounded-full bg-red-500 border border-red-400 shrink-0 text-white text-xs font-bold flex items-center justify-center leading-none" style={{fontSize:'9px'}}>9+</span>10+ ärenden</span>
+        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-2 h-2 rounded-full bg-slate-400 border border-slate-300 shrink-0"></span>Frånvaro</span>
+        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-3 h-3 rounded-sm bg-slate-800 border border-slate-600 opacity-40 shrink-0"></span>Ledig dag</span>
+      </div>
+    </div>
+  );
 
   if (loading) return <div className="flex items-center justify-center py-20"><LoadingSpinner /></div>;
   const filtersAreActive = activeStatuses.size !== DEFAULT_ACTIVE_STATUSES.size || !([...DEFAULT_ACTIVE_STATUSES].every(status => activeStatuses.has(status)));
@@ -426,7 +506,7 @@ export default function TechnicianSchedule() {
           </div>
         </div>
         <div className="flex-grow max-w-screen-2xl mx-auto w-full p-2 sm:p-4 flex lg:flex-row flex-col gap-4">
-          <aside className="hidden lg:block lg:w-1/3 xl:w-1/4"><Card className="p-0 bg-slate-900/50 border-slate-800 sticky top-[76px]"><FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card></aside>
+          <aside className="hidden lg:block lg:w-1/3 xl:w-1/4"><Card className="p-0 bg-slate-900/50 border-slate-800 sticky top-[76px]"><FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/>{calendarLegend}</Card></aside>
           <main className="flex-grow w-full lg:w-2/3 xl:w-3/4">
             <div className="lg:hidden mb-4 p-1 bg-slate-800 rounded-lg flex gap-1">{(['agenda', 'month'] as const).map(view => (<Button key={view} variant={mobileView === view ? 'primary' : 'ghost'} onClick={() => setMobileView(view)} className="w-full">{view === 'agenda' ? 'Dagens Ärenden' : 'Månad'}</Button>))}</div>
             <div className="mb-4 flex gap-2"><div className="flex-grow relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input type="text" placeholder="Sök på kund eller adress..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/></div><Button variant="secondary" onClick={handleRefresh} disabled={isRefreshing} title="Uppdatera ärenden"><RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /></Button><Button variant="secondary" onClick={() => setIsReportModalOpen(true)} title="Rapport & Analys"><BarChart className="w-4 h-4" /></Button><Button variant="secondary" onClick={() => setIsFilterPanelOpen(true)} className="relative"><Filter className="w-4 h-4" />{filtersAreActive && <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-slate-800" />}</Button></div>
@@ -441,7 +521,7 @@ export default function TechnicianSchedule() {
                   <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-12 h-12 text-slate-600 mb-2" /><h3 className="text-lg font-semibold text-slate-300">Inga ärenden</h3><p className="text-slate-500">Du har inga schemalagda ärenden för denna dag.</p></motion.div>)}</AnimatePresence></div>
                 </div>
                 <div className={(mobileView === 'month' && window.innerWidth < 1024) ? 'block' : 'hidden'}>
-                  <Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card>
+                  <Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/>{calendarLegend}</Card>
                   <div className="mt-4">
                     <h2 className="text-base font-semibold text-white mb-3">{selectedDateObject.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
                     <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-8 h-8 text-slate-600 mb-2" /><p className="text-slate-500 text-sm">Inga ärenden denna dag.</p></motion.div>)}</AnimatePresence></div>
