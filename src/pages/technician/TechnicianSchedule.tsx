@@ -175,8 +175,8 @@ function getAbsenceStatus(dateStr: string, absences: TechnicianAbsence[], workSc
   const dayStart = new Date(dateStr + 'T00:00:00');
   const dayEnd = new Date(dateStr + 'T23:59:59');
   const overlapping = absences.filter(a => {
-    const aStart = new Date(a.start_date);
-    const aEnd = new Date(a.end_date);
+    const aStart = new Date(a.start_date.replace(' ', 'T'));
+    const aEnd = new Date(a.end_date.replace(' ', 'T'));
     return aStart <= dayEnd && aEnd >= dayStart;
   });
   if (overlapping.length === 0) return { absent: false, fullDay: false };
@@ -188,7 +188,7 @@ function getAbsenceStatus(dateStr: string, absences: TechnicianAbsence[], workSc
   const workStart = schedule ? new Date(dateStr + 'T' + schedule.start + ':00') : new Date(dateStr + 'T08:00:00');
   const workEnd = schedule ? new Date(dateStr + 'T' + schedule.end + ':00') : new Date(dateStr + 'T17:00:00');
 
-  const fullDay = overlapping.some(a => new Date(a.start_date) <= workStart && new Date(a.end_date) >= workEnd);
+  const fullDay = overlapping.some(a => new Date(a.start_date.replace(' ', 'T')) <= workStart && new Date(a.end_date.replace(' ', 'T')) >= workEnd);
   return { absent: true, fullDay };
 }
 
@@ -343,7 +343,14 @@ export default function TechnicianSchedule() {
       .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime());
   }, [filteredCases, selectedDate]);
   
-  const eventsByDay = useMemo(() => filteredCases.reduce((acc, event) => { if (!event.start_date) return acc; const day = event.start_date.substring(0, 10); if (!acc[day]) acc[day] = 0; acc[day]++; return acc; }, {} as Record<string, number>), [filteredCases]);
+  const eventsByDay = useMemo(() => filteredCases.reduce((acc, event) => {
+    if (!event.start_date) return acc;
+    const d = new Date(event.start_date.replace(' ', 'T'));
+    const day = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (!acc[day]) acc[day] = 0;
+    acc[day]++;
+    return acc;
+  }, {} as Record<string, number>), [filteredCases]);
 
   const handleOpenModal = (caseData: ScheduleCaseType) => {
     if (caseData.case_type === 'inspection') {
@@ -436,7 +443,8 @@ export default function TechnicianSchedule() {
   };
 
   const renderDayCellContent = (dayRenderInfo: any) => {
-    const dayString = dayRenderInfo.date.toISOString().split('T')[0];
+    const d = dayRenderInfo.date;
+    const dayString = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const count = eventsByDay[dayString] || 0;
     const offDay = isOffDay(dayString, workSchedule);
     const absenceStatus = getAbsenceStatus(dayString, absences, workSchedule);
