@@ -23,6 +23,7 @@ import InspectionCaseModal from '../../components/coordinator/InspectionCaseModa
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ReportModal from '../../components/admin/technicians/ReportModal'
 import { BeGoneCaseRow, WorkSchedule } from '../../types/database' // NYTT: Importerar den centrala typen
+import { getTechWorkHours } from '../../components/coordinator/schedule/scheduleUtils'
 import '../../styles/FullCalendar.css'
 
 // Definiera en mer komplett typ för ärenden som används i denna komponent
@@ -220,7 +221,6 @@ export default function TechnicianSchedule() {
   const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false);
   const [workSchedule, setWorkSchedule] = useState<WorkSchedule | null>(null);
   const [absences, setAbsences] = useState<TechnicianAbsence[]>([]);
-  const [activeDotFilter, setActiveDotFilter] = useState<'all' | 'green' | 'yellow' | 'orange' | 'red' | 'absence' | 'off'>('all');
 
   const fetchScheduledCases = useCallback(async (technicianId: string) => { 
     setLoading(true); 
@@ -343,14 +343,14 @@ export default function TechnicianSchedule() {
       .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime());
   }, [filteredCases, selectedDate]);
   
-  const eventsByDay = useMemo(() => filteredCases.reduce((acc, event) => {
+  const casesByDay = useMemo(() => filteredCases.reduce((acc, event) => {
     if (!event.start_date) return acc;
     const d = new Date(event.start_date.replace(' ', 'T'));
     const day = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    if (!acc[day]) acc[day] = 0;
-    acc[day]++;
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(event);
     return acc;
-  }, {} as Record<string, number>), [filteredCases]);
+  }, {} as Record<string, ScheduleCaseType[]>), [filteredCases]);
 
   const handleOpenModal = (caseData: ScheduleCaseType) => {
     if (caseData.case_type === 'inspection') {
@@ -416,43 +416,15 @@ export default function TechnicianSchedule() {
   const handleDateClick = (clickInfo: DateClickArg) => { setSelectedDate(clickInfo.dateStr); };
   const handleDayChange = (offset: number) => { const currentDate = new Date(selectedDate); currentDate.setUTCHours(12); currentDate.setDate(currentDate.getDate() + offset); setSelectedDate(toDateString(currentDate)); };
   
-  const getDotClass = (count: number): { size: string; color: string } => {
-    if (count >= 10) return { size: 'w-2 h-2', color: 'bg-red-400' };
-    if (count >= 6)  return { size: 'w-2 h-2', color: 'bg-orange-400' };
-    if (count >= 3)  return { size: 'w-2 h-2', color: 'bg-yellow-400' };
-    if (count >= 1)  return { size: 'w-1.5 h-1.5', color: 'bg-emerald-400' };
-    return { size: 'w-1 h-1', color: 'bg-slate-600' };
-  };
-
-  const getDotFilterKey = (count: number): 'green' | 'yellow' | 'orange' | 'red' => {
-    if (count >= 10) return 'red';
-    if (count >= 6)  return 'orange';
-    if (count >= 3)  return 'yellow';
-    return 'green';
-  };
-
-  const dayMatchesFilter = (count: number, offDay: boolean, absence: { absent: boolean; fullDay: boolean }): boolean => {
-    if (activeDotFilter === 'all') return true;
-    if (activeDotFilter === 'off') return offDay;
-    if (activeDotFilter === 'absence') return absence.absent && absence.fullDay;
-    if (activeDotFilter === 'green') return !offDay && !absence.fullDay && count < 3;
-    if (activeDotFilter === 'yellow') return !offDay && count >= 3 && count < 6;
-    if (activeDotFilter === 'orange') return !offDay && count >= 6 && count < 10;
-    if (activeDotFilter === 'red') return !offDay && count >= 10;
-    return true;
-  };
-
   const renderDayCellContent = (dayRenderInfo: any) => {
     const d = dayRenderInfo.date;
     const dayString = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const count = eventsByDay[dayString] || 0;
     const offDay = isOffDay(dayString, workSchedule);
     const absenceStatus = getAbsenceStatus(dayString, absences, workSchedule);
-    const dimmed = activeDotFilter !== 'all' && !dayMatchesFilter(count, offDay, absenceStatus);
 
     if (offDay) {
       return (
-        <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 transition-opacity ${dimmed ? 'opacity-15' : 'opacity-35'}`}>
+        <div className="flex flex-col items-center justify-center w-full h-full gap-0.5 opacity-35">
           <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
         </div>
       );
@@ -460,26 +432,32 @@ export default function TechnicianSchedule() {
 
     if (absenceStatus.absent && absenceStatus.fullDay) {
       return (
-        <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 transition-opacity ${dimmed ? 'opacity-15' : ''}`}>
+        <div className="flex flex-col items-center justify-center w-full h-full gap-0.5">
           <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></div>
+          <div className="w-4/5 h-1 bg-slate-700/50 rounded-full overflow-hidden">
+            <div className="h-full w-full bg-slate-500 rounded-full" />
+          </div>
         </div>
       );
     }
 
-    const dot = getDotClass(count);
+    const dayCases = casesByDay[dayString] || [];
+    let scheduledHours = 0;
+    for (const c of dayCases) {
+      if (c.start_date && c.due_date) {
+        scheduledHours += (new Date(c.due_date.replace(' ', 'T')).getTime() - new Date(c.start_date.replace(' ', 'T')).getTime()) / 3_600_000;
+      }
+    }
+    const capacity = getTechWorkHours(workSchedule, d);
+    const ratio = capacity > 0 ? Math.min(scheduledHours / capacity, 1) : 0;
+    const barColor = ratio === 0 ? 'bg-slate-600' : ratio < 0.7 ? 'bg-emerald-500' : ratio < 0.9 ? 'bg-amber-500' : 'bg-red-500';
+
     return (
-      <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 transition-opacity ${dimmed ? 'opacity-15' : ''}`}>
+      <div className="flex flex-col items-center justify-center w-full h-full gap-0.5">
         <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
-        <div className="flex items-center gap-0.5">
-          <div className={`${dot.size} ${dot.color} rounded-full shrink-0`}></div>
-          {absenceStatus.absent && (
-            <div className="w-1 h-1 rounded-full bg-slate-400 shrink-0"></div>
-          )}
+        <div className="w-4/5 h-1 bg-slate-700/50 rounded-full overflow-hidden">
+          <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${ratio * 100}%` }} />
         </div>
-        {count >= 10 && (
-          <span className="text-[9px] text-red-400 font-bold leading-none">{count > 99 ? '99+' : count}</span>
-        )}
       </div>
     );
   };
@@ -494,39 +472,6 @@ export default function TechnicianSchedule() {
     handleOpenModal(caseData as ScheduleCaseType);
   };
 
-  const legendFilters: { key: typeof activeDotFilter; label: string; dot: string; activeBorder: string; activeBg: string }[] = [
-    { key: 'all',      label: 'Alla',      dot: 'bg-slate-500',   activeBorder: 'border-slate-400',   activeBg: 'bg-slate-700/50' },
-    { key: 'green',    label: '1–2',       dot: 'bg-emerald-400', activeBorder: 'border-emerald-400', activeBg: 'bg-emerald-900/30' },
-    { key: 'yellow',   label: '3–5',       dot: 'bg-yellow-400',  activeBorder: 'border-yellow-400',  activeBg: 'bg-yellow-900/30' },
-    { key: 'orange',   label: '6–9',       dot: 'bg-orange-400',  activeBorder: 'border-orange-400',  activeBg: 'bg-orange-900/30' },
-    { key: 'red',      label: '10+',       dot: 'bg-red-400',     activeBorder: 'border-red-400',     activeBg: 'bg-red-900/30' },
-    { key: 'absence',  label: 'Frånvaro',  dot: 'bg-slate-400',   activeBorder: 'border-slate-300',   activeBg: 'bg-slate-700/50' },
-    { key: 'off',      label: 'Ledig',     dot: 'bg-slate-700',   activeBorder: 'border-slate-500',   activeBg: 'bg-slate-800/50' },
-  ];
-
-  const calendarLegend = (
-    <div className="px-2 pb-2.5 pt-2 border-t border-slate-800">
-      <div className="flex flex-wrap gap-1.5 lg:flex-wrap overflow-x-auto lg:overflow-x-visible pb-0.5 scrollbar-none">
-        {legendFilters.map(f => {
-          const isActive = activeDotFilter === f.key;
-          return (
-            <button
-              key={f.key}
-              onClick={() => setActiveDotFilter(f.key)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs whitespace-nowrap border transition-all shrink-0 ${
-                isActive
-                  ? `${f.activeBorder} ${f.activeBg} text-white`
-                  : 'border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-300 hover:border-slate-600'
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${f.dot} shrink-0`}></span>
-              {f.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
 
   if (loading) return <div className="flex items-center justify-center py-20"><LoadingSpinner /></div>;
   const filtersAreActive = activeStatuses.size !== DEFAULT_ACTIVE_STATUSES.size || !([...DEFAULT_ACTIVE_STATUSES].every(status => activeStatuses.has(status)));
@@ -551,7 +496,7 @@ export default function TechnicianSchedule() {
           </div>
         </div>
         <div className="flex-grow max-w-screen-2xl mx-auto w-full p-2 sm:p-4 flex lg:flex-row flex-col gap-4">
-          <aside className="hidden lg:block lg:w-1/3 xl:w-1/4"><Card className="p-0 bg-slate-900/50 border-slate-800 sticky top-[76px]"><FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/>{calendarLegend}</Card></aside>
+          <aside className="hidden lg:block lg:w-1/3 xl:w-1/4"><Card className="p-0 bg-slate-900/50 border-slate-800 sticky top-[76px]"><FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card></aside>
           <main className="flex-grow w-full lg:w-2/3 xl:w-3/4">
             <div className="lg:hidden mb-4 p-1 bg-slate-800 rounded-lg flex gap-1">{(['agenda', 'month'] as const).map(view => (<Button key={view} variant={mobileView === view ? 'primary' : 'ghost'} onClick={() => setMobileView(view)} className="w-full">{view === 'agenda' ? 'Dagens Ärenden' : 'Månad'}</Button>))}</div>
             <div className="mb-4 flex gap-2"><div className="flex-grow relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input type="text" placeholder="Sök på kund eller adress..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/></div><Button variant="secondary" onClick={handleRefresh} disabled={isRefreshing} title="Uppdatera ärenden"><RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /></Button><Button variant="secondary" onClick={() => setIsReportModalOpen(true)} title="Rapport & Analys"><BarChart className="w-4 h-4" /></Button><Button variant="secondary" onClick={() => setIsFilterPanelOpen(true)} className="relative"><Filter className="w-4 h-4" />{filtersAreActive && <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-slate-800" />}</Button></div>
@@ -566,7 +511,7 @@ export default function TechnicianSchedule() {
                   <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-12 h-12 text-slate-600 mb-2" /><h3 className="text-lg font-semibold text-slate-300">Inga ärenden</h3><p className="text-slate-500">Du har inga schemalagda ärenden för denna dag.</p></motion.div>)}</AnimatePresence></div>
                 </div>
                 <div className={(mobileView === 'month' && window.innerWidth < 1024) ? 'block' : 'hidden'}>
-                  <Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/>{calendarLegend}</Card>
+                  <Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card>
                   <div className="mt-4">
                     <h2 className="text-base font-semibold text-white mb-3">{selectedDateObject.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
                     <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-8 h-8 text-slate-600 mb-2" /><p className="text-slate-500 text-sm">Inga ärenden denna dag.</p></motion.div>)}</AnimatePresence></div>
