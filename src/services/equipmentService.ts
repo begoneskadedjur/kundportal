@@ -548,7 +548,7 @@ export class EquipmentService {
           customer_id,
           status,
           placed_at,
-          customer:customers!customer_id(id, company_name, contact_address, organization_id, parent_customer_id, is_multisite, site_type, site_name)
+          customer:customers!customer_id(id, company_name, contact_address, organization_id, parent_customer_id, is_multisite, site_type, site_name, contract_start_date, contract_end_date)
         `)
         .eq('placed_by_technician_id', technicianId)
 
@@ -566,7 +566,7 @@ export class EquipmentService {
           placed_at,
           floor_plan:floor_plans!floor_plan_id(
             customer_id,
-            customer:customers!customer_id(id, company_name, contact_address, organization_id, parent_customer_id, is_multisite, site_type, site_name)
+            customer:customers!customer_id(id, company_name, contact_address, organization_id, parent_customer_id, is_multisite, site_type, site_name, contract_start_date, contract_end_date)
           )
         `)
         .eq('placed_by_technician_id', technicianId)
@@ -586,6 +586,8 @@ export class EquipmentService {
         is_multisite: boolean
         site_type: 'huvudkontor' | 'enhet' | null
         site_name: string | null
+        contract_start_date: string | null
+        contract_end_date: string | null
         outdoor_stations: Array<{ status: string; placed_at: string }>
         indoor_stations: Array<{ status: string; placed_at: string }>
       }>()
@@ -605,6 +607,8 @@ export class EquipmentService {
             is_multisite: item.customer.is_multisite || false,
             site_type: item.customer.site_type || null,
             site_name: item.customer.site_name || null,
+            contract_start_date: item.customer.contract_start_date || null,
+            contract_end_date: item.customer.contract_end_date || null,
             outdoor_stations: [],
             indoor_stations: []
           })
@@ -632,6 +636,8 @@ export class EquipmentService {
             is_multisite: cust.is_multisite || false,
             site_type: cust.site_type || null,
             site_name: cust.site_name || null,
+            contract_start_date: cust.contract_start_date || null,
+            contract_end_date: cust.contract_end_date || null,
             outdoor_stations: [],
             indoor_stations: []
           })
@@ -680,7 +686,9 @@ export class EquipmentService {
           parent_customer_id: customer.parent_customer_id,
           is_multisite: customer.is_multisite,
           site_type: customer.site_type,
-          site_name: customer.site_name
+          site_name: customer.site_name,
+          contract_start_date: customer.contract_start_date,
+          contract_end_date: customer.contract_end_date
         }
       })
 
@@ -988,6 +996,9 @@ export interface CustomerStationSummary {
   is_multisite: boolean
   site_type: 'huvudkontor' | 'enhet' | null
   site_name: string | null
+  // Kontraktsfält
+  contract_start_date: string | null
+  contract_end_date: string | null
 }
 
 export interface IndoorStationWithRelations {

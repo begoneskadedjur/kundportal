@@ -267,7 +267,7 @@ export function RecurringScheduleWizard({
     if (!frequency || !dayPattern) return
     setLoadingPreview(true)
     try {
-      const previewEnd = addMonths(startDate, 14)
+      const previewEnd = contractEndDate ? new Date(contractEndDate) : addMonths(startDate, 14)
 
       const dates = await previewScheduleDates({
         technicianId,
@@ -296,7 +296,7 @@ export function RecurringScheduleWizard({
     if (!frequency || !dayPattern) return
     setLoadingPreview(true)
     try {
-      const previewEnd = addMonths(startDate, 14)
+      const previewEnd = contractEndDate ? new Date(contractEndDate) : addMonths(startDate, 14)
 
       // Generate dates for the FIRST unit using the full conflict-aware algorithm
       const firstUnit = effectiveUnits[0]

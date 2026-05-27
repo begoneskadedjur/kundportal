@@ -22,11 +22,12 @@ import { CaseNumberService } from './caseNumberService'
 export async function createRecurringSchedule(
   input: CreateRecurringScheduleInput
 ): Promise<RecurringSchedule | null> {
-  // Always generate 14 months ahead from start.
-  // contract_end_date is the binding period end, NOT when service stops.
-  // The cron job checks customer.contract_status to determine the real stop point.
+  // Generera till avtalsslutet om det finns, annars 14 månader framåt som fallback.
+  // Cron-jobbet hanterar automatisk förlängning om avtalet förnyas (is_auto_renewing = true).
   const startDate = new Date(input.schedule_start_date)
-  const generatedUntil = addMonths(startDate, 14)
+  const generatedUntil = input.contract_end_date
+    ? new Date(input.contract_end_date)
+    : addMonths(startDate, 14)
 
   const { data, error } = await supabase
     .from('recurring_schedules')

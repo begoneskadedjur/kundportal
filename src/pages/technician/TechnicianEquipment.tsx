@@ -1083,6 +1083,8 @@ export default function TechnicianEquipment() {
           customerName={schedulePromptCustomerName}
           technicianId={technicianId}
           batchUnits={batchScheduleUnits.length > 1 ? batchScheduleUnits : undefined}
+          contractStartDate={allCustomers.find(c => c.customer_id === schedulePromptCustomerId)?.contract_start_date}
+          contractEndDate={allCustomers.find(c => c.customer_id === schedulePromptCustomerId)?.contract_end_date}
         />
       )}
 
