@@ -220,6 +220,7 @@ export default function TechnicianSchedule() {
   const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false);
   const [workSchedule, setWorkSchedule] = useState<WorkSchedule | null>(null);
   const [absences, setAbsences] = useState<TechnicianAbsence[]>([]);
+  const [activeDotFilter, setActiveDotFilter] = useState<'all' | 'green' | 'yellow' | 'orange' | 'red' | 'absence' | 'off'>('all');
 
   const fetchScheduledCases = useCallback(async (technicianId: string) => { 
     setLoading(true); 
@@ -408,21 +409,30 @@ export default function TechnicianSchedule() {
   const handleDateClick = (clickInfo: DateClickArg) => { setSelectedDate(clickInfo.dateStr); };
   const handleDayChange = (offset: number) => { const currentDate = new Date(selectedDate); currentDate.setUTCHours(12); currentDate.setDate(currentDate.getDate() + offset); setSelectedDate(toDateString(currentDate)); };
   
-  // Indikering för månadsvyn baserat på antal ärenden (alltid synlig, även för 0)
-  const getCaseIndicator = (count: number) => {
-    if (count >= 10) {
-      return (
-        <div className="absolute bottom-0.5 right-0.5 flex items-center justify-center w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full border border-red-400">
-          {count > 99 ? '9+' : count}
-        </div>
-      );
-    } else if (count >= 6) {
-      return <div className="absolute bottom-1 right-1 w-2.5 h-2.5 bg-orange-500 rounded-full border border-orange-400"></div>;
-    } else if (count >= 3) {
-      return <div className="absolute bottom-1 right-1 w-2 h-2 bg-yellow-500 rounded-full border border-yellow-400"></div>;
-    } else {
-      return <div className="absolute bottom-1 right-1 w-1.5 h-1.5 bg-green-500 rounded-full border border-green-400"></div>;
-    }
+  const getDotClass = (count: number): { size: string; color: string } => {
+    if (count >= 10) return { size: 'w-2 h-2', color: 'bg-red-400' };
+    if (count >= 6)  return { size: 'w-2 h-2', color: 'bg-orange-400' };
+    if (count >= 3)  return { size: 'w-2 h-2', color: 'bg-yellow-400' };
+    if (count >= 1)  return { size: 'w-1.5 h-1.5', color: 'bg-emerald-400' };
+    return { size: 'w-1 h-1', color: 'bg-slate-600' };
+  };
+
+  const getDotFilterKey = (count: number): 'green' | 'yellow' | 'orange' | 'red' => {
+    if (count >= 10) return 'red';
+    if (count >= 6)  return 'orange';
+    if (count >= 3)  return 'yellow';
+    return 'green';
+  };
+
+  const dayMatchesFilter = (count: number, offDay: boolean, absence: { absent: boolean; fullDay: boolean }): boolean => {
+    if (activeDotFilter === 'all') return true;
+    if (activeDotFilter === 'off') return offDay;
+    if (activeDotFilter === 'absence') return absence.absent && absence.fullDay;
+    if (activeDotFilter === 'green') return !offDay && !absence.fullDay && count < 3;
+    if (activeDotFilter === 'yellow') return !offDay && count >= 3 && count < 6;
+    if (activeDotFilter === 'orange') return !offDay && count >= 6 && count < 10;
+    if (activeDotFilter === 'red') return !offDay && count >= 10;
+    return true;
   };
 
   const renderDayCellContent = (dayRenderInfo: any) => {
@@ -430,30 +440,37 @@ export default function TechnicianSchedule() {
     const count = eventsByDay[dayString] || 0;
     const offDay = isOffDay(dayString, workSchedule);
     const absenceStatus = getAbsenceStatus(dayString, absences, workSchedule);
+    const dimmed = activeDotFilter !== 'all' && !dayMatchesFilter(count, offDay, absenceStatus);
 
     if (offDay) {
       return (
-        <div className="relative w-full h-full flex items-center justify-center opacity-40">
-          <span>{dayRenderInfo.dayNumberText}</span>
+        <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 transition-opacity ${dimmed ? 'opacity-15' : 'opacity-35'}`}>
+          <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
         </div>
       );
     }
 
+    if (absenceStatus.absent && absenceStatus.fullDay) {
+      return (
+        <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 transition-opacity ${dimmed ? 'opacity-15' : ''}`}>
+          <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></div>
+        </div>
+      );
+    }
+
+    const dot = getDotClass(count);
     return (
-      <div className="relative w-full h-full flex items-center justify-center">
-        <span>{dayRenderInfo.dayNumberText}</span>
-        {absenceStatus.absent && absenceStatus.fullDay ? (
-          // Heldagsfrånvaro: bara grå prick, ingen ärendeprick
-          <div className="absolute bottom-1 right-1 w-2 h-2 bg-slate-400 rounded-full border border-slate-300"></div>
-        ) : (
-          <>
-            {/* Ärendeprick nere till höger */}
-            {getCaseIndicator(count)}
-            {/* Delfrånvaro: grå prick nere till vänster */}
-            {absenceStatus.absent && (
-              <div className="absolute bottom-1 left-1 w-1.5 h-1.5 bg-slate-400 rounded-full border border-slate-300"></div>
-            )}
-          </>
+      <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 transition-opacity ${dimmed ? 'opacity-15' : ''}`}>
+        <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
+        <div className="flex items-center gap-0.5">
+          <div className={`${dot.size} ${dot.color} rounded-full shrink-0`}></div>
+          {absenceStatus.absent && (
+            <div className="w-1 h-1 rounded-full bg-slate-400 shrink-0"></div>
+          )}
+        </div>
+        {count >= 10 && (
+          <span className="text-[9px] text-red-400 font-bold leading-none">{count > 99 ? '99+' : count}</span>
         )}
       </div>
     );
@@ -469,16 +486,36 @@ export default function TechnicianSchedule() {
     handleOpenModal(caseData as ScheduleCaseType);
   };
 
+  const legendFilters: { key: typeof activeDotFilter; label: string; dot: string; activeBorder: string; activeBg: string }[] = [
+    { key: 'all',      label: 'Alla',      dot: 'bg-slate-500',   activeBorder: 'border-slate-400',   activeBg: 'bg-slate-700/50' },
+    { key: 'green',    label: '1–2',       dot: 'bg-emerald-400', activeBorder: 'border-emerald-400', activeBg: 'bg-emerald-900/30' },
+    { key: 'yellow',   label: '3–5',       dot: 'bg-yellow-400',  activeBorder: 'border-yellow-400',  activeBg: 'bg-yellow-900/30' },
+    { key: 'orange',   label: '6–9',       dot: 'bg-orange-400',  activeBorder: 'border-orange-400',  activeBg: 'bg-orange-900/30' },
+    { key: 'red',      label: '10+',       dot: 'bg-red-400',     activeBorder: 'border-red-400',     activeBg: 'bg-red-900/30' },
+    { key: 'absence',  label: 'Frånvaro',  dot: 'bg-slate-400',   activeBorder: 'border-slate-300',   activeBg: 'bg-slate-700/50' },
+    { key: 'off',      label: 'Ledig',     dot: 'bg-slate-700',   activeBorder: 'border-slate-500',   activeBg: 'bg-slate-800/50' },
+  ];
+
   const calendarLegend = (
-    <div className="px-3 pb-3 pt-1 border-t border-slate-800 space-y-1.5">
-      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Förklaring</p>
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
-        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-2 h-2 rounded-full bg-green-500 border border-green-400 shrink-0"></span>1–2 ärenden</span>
-        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-2 h-2 rounded-full bg-yellow-500 border border-yellow-400 shrink-0"></span>3–5 ärenden</span>
-        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-500 border border-orange-400 shrink-0"></span>6–9 ärenden</span>
-        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-4 h-4 rounded-full bg-red-500 border border-red-400 shrink-0 text-white text-xs font-bold flex items-center justify-center leading-none" style={{fontSize:'9px'}}>9+</span>10+ ärenden</span>
-        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-2 h-2 rounded-full bg-slate-400 border border-slate-300 shrink-0"></span>Frånvaro</span>
-        <span className="flex items-center gap-1 text-xs text-slate-400"><span className="inline-block w-3 h-3 rounded-sm bg-slate-800 border border-slate-600 opacity-40 shrink-0"></span>Ledig dag</span>
+    <div className="px-2 pb-2.5 pt-2 border-t border-slate-800">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+        {legendFilters.map(f => {
+          const isActive = activeDotFilter === f.key;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setActiveDotFilter(f.key)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs whitespace-nowrap border transition-all shrink-0 ${
+                isActive
+                  ? `${f.activeBorder} ${f.activeBg} text-white`
+                  : 'border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-300 hover:border-slate-600'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${f.dot} shrink-0`}></span>
+              {f.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
