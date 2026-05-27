@@ -221,6 +221,7 @@ export default function TechnicianSchedule() {
   const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false);
   const [workSchedule, setWorkSchedule] = useState<WorkSchedule | null>(null);
   const [absences, setAbsences] = useState<TechnicianAbsence[]>([]);
+  const [capacityFilter, setCapacityFilter] = useState<'off' | 'empty' | 'low' | 'high' | 'full' | null>(null);
 
   const fetchScheduledCases = useCallback(async (technicianId: string) => { 
     setLoading(true); 
@@ -416,15 +417,38 @@ export default function TechnicianSchedule() {
   const handleDateClick = (clickInfo: DateClickArg) => { setSelectedDate(clickInfo.dateStr); };
   const handleDayChange = (offset: number) => { const currentDate = new Date(selectedDate); currentDate.setUTCHours(12); currentDate.setDate(currentDate.getDate() + offset); setSelectedDate(toDateString(currentDate)); };
   
+  const getDayCapacityLevel = useCallback((dayString: string, d: Date): 'off' | 'empty' | 'low' | 'high' | 'full' => {
+    const offDay = isOffDay(dayString, workSchedule);
+    if (offDay) return 'off';
+    const absenceStatus = getAbsenceStatus(dayString, absences, workSchedule);
+    if (absenceStatus.absent && absenceStatus.fullDay) return 'off';
+    const dayCases = casesByDay[dayString] || [];
+    let scheduledHours = 0;
+    for (const c of dayCases) {
+      if (c.start_date && c.due_date) {
+        scheduledHours += (new Date(c.due_date.replace(' ', 'T')).getTime() - new Date(c.start_date.replace(' ', 'T')).getTime()) / 3_600_000;
+      }
+    }
+    const capacity = getTechWorkHours(workSchedule, d);
+    const ratio = capacity > 0 ? Math.min(scheduledHours / capacity, 1) : 0;
+    if (ratio === 0) return 'empty';
+    if (ratio < 0.7) return 'low';
+    if (ratio < 0.9) return 'high';
+    return 'full';
+  }, [workSchedule, absences, casesByDay]);
+
   const renderDayCellContent = (dayRenderInfo: any) => {
     const d = dayRenderInfo.date;
     const dayString = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const offDay = isOffDay(dayString, workSchedule);
     const absenceStatus = getAbsenceStatus(dayString, absences, workSchedule);
 
+    const level = getDayCapacityLevel(dayString, d);
+    const faded = capacityFilter !== null && level !== capacityFilter;
+
     if (offDay) {
       return (
-        <div className="flex flex-col items-center justify-center w-full h-full gap-0.5 opacity-35">
+        <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 opacity-35 ${faded ? 'opacity-20' : ''}`}>
           <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
         </div>
       );
@@ -432,7 +456,7 @@ export default function TechnicianSchedule() {
 
     if (absenceStatus.absent && absenceStatus.fullDay) {
       return (
-        <div className="flex flex-col items-center justify-center w-full h-full gap-0.5">
+        <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 ${faded ? 'opacity-30' : ''}`}>
           <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
           <div className="w-4/5 h-1 bg-slate-700/50 rounded-full overflow-hidden">
             <div className="h-full w-full bg-slate-500 rounded-full" />
@@ -453,7 +477,7 @@ export default function TechnicianSchedule() {
     const barColor = ratio === 0 ? 'bg-slate-600' : ratio < 0.7 ? 'bg-emerald-500' : ratio < 0.9 ? 'bg-amber-500' : 'bg-red-500';
 
     return (
-      <div className="flex flex-col items-center justify-center w-full h-full gap-0.5">
+      <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 transition-opacity ${faded ? 'opacity-30' : ''}`}>
         <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
         <div className="w-4/5 h-1 bg-slate-700/50 rounded-full overflow-hidden">
           <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${ratio * 100}%` }} />
@@ -496,7 +520,33 @@ export default function TechnicianSchedule() {
           </div>
         </div>
         <div className="flex-grow max-w-screen-2xl mx-auto w-full p-2 sm:p-4 flex lg:flex-row flex-col gap-4">
-          <aside className="hidden lg:block lg:w-1/3 xl:w-1/4"><Card className="p-0 bg-slate-900/50 border-slate-800 sticky top-[76px]"><FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card></aside>
+          <aside className="hidden lg:block lg:w-1/3 xl:w-1/4 sticky top-[76px]">
+            <Card className="p-0 bg-slate-900/50 border-slate-800">
+              <FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/>
+            </Card>
+            <div className="flex flex-wrap gap-1.5 mt-2 px-1">
+              {([
+                { key: 'off',   label: 'Ledig',          dotColor: 'bg-slate-500' },
+                { key: 'empty', label: 'Inga ärenden',   dotColor: 'bg-slate-600' },
+                { key: 'low',   label: 'Låg–medel',      dotColor: 'bg-emerald-500' },
+                { key: 'high',  label: 'Hög beläggning', dotColor: 'bg-amber-500' },
+                { key: 'full',  label: 'Fullt/överbokat',dotColor: 'bg-red-500' },
+              ] as const).map(({ key, label, dotColor }) => (
+                <button
+                  key={key}
+                  onClick={() => setCapacityFilter(f => f === key ? null : key)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all border
+                    ${capacityFilter === key
+                      ? 'bg-slate-700 text-white border-slate-500'
+                      : 'bg-slate-800/60 text-slate-400 border-slate-700/50 hover:bg-slate-700/60 hover:text-slate-300'
+                    }`}
+                >
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </aside>
           <main className="flex-grow w-full lg:w-2/3 xl:w-3/4">
             <div className="lg:hidden mb-4 p-1 bg-slate-800 rounded-lg flex gap-1">{(['agenda', 'month'] as const).map(view => (<Button key={view} variant={mobileView === view ? 'primary' : 'ghost'} onClick={() => setMobileView(view)} className="w-full">{view === 'agenda' ? 'Dagens Ärenden' : 'Månad'}</Button>))}</div>
             <div className="mb-4 flex gap-2"><div className="flex-grow relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input type="text" placeholder="Sök på kund eller adress..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/></div><Button variant="secondary" onClick={handleRefresh} disabled={isRefreshing} title="Uppdatera ärenden"><RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /></Button><Button variant="secondary" onClick={() => setIsReportModalOpen(true)} title="Rapport & Analys"><BarChart className="w-4 h-4" /></Button><Button variant="secondary" onClick={() => setIsFilterPanelOpen(true)} className="relative"><Filter className="w-4 h-4" />{filtersAreActive && <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-slate-800" />}</Button></div>
@@ -512,6 +562,28 @@ export default function TechnicianSchedule() {
                 </div>
                 <div className={(mobileView === 'month' && window.innerWidth < 1024) ? 'block' : 'hidden'}>
                   <Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card>
+                  <div className="flex flex-wrap gap-1.5 mt-2 px-1">
+                    {([
+                      { key: 'off',   label: 'Ledig',          dotColor: 'bg-slate-500' },
+                      { key: 'empty', label: 'Inga ärenden',   dotColor: 'bg-slate-600' },
+                      { key: 'low',   label: 'Låg–medel',      dotColor: 'bg-emerald-500' },
+                      { key: 'high',  label: 'Hög beläggning', dotColor: 'bg-amber-500' },
+                      { key: 'full',  label: 'Fullt/överbokat',dotColor: 'bg-red-500' },
+                    ] as const).map(({ key, label, dotColor }) => (
+                      <button
+                        key={key}
+                        onClick={() => setCapacityFilter(f => f === key ? null : key)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all border
+                          ${capacityFilter === key
+                            ? 'bg-slate-700 text-white border-slate-500'
+                            : 'bg-slate-800/60 text-slate-400 border-slate-700/50 hover:bg-slate-700/60 hover:text-slate-300'
+                          }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                   <div className="mt-4">
                     <h2 className="text-base font-semibold text-white mb-3">{selectedDateObject.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
                     <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-8 h-8 text-slate-600 mb-2" /><p className="text-slate-500 text-sm">Inga ärenden denna dag.</p></motion.div>)}</AnimatePresence></div>
