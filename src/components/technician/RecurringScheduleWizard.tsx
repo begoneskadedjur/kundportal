@@ -472,6 +472,30 @@ export function RecurringScheduleWizard({
 
   if (!isOpen) return null
 
+  if (!contractEndDate) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full p-6">
+          <div className="flex items-start gap-3 mb-4">
+            <AlertTriangle className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-base font-semibold text-white mb-1">Avtalsslutdatum saknas</h3>
+              <p className="text-sm text-slate-400">
+                Kunden <span className="text-white font-medium">{customerName}</span> saknar ett registrerat avtalsslutdatum.
+                Ange detta i kundkortet innan återkommande kontroller kan schemaläggas.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button onClick={onClose} className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+              Stäng
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <AnimatePresence>
       <motion.div

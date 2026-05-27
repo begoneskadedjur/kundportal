@@ -25,9 +25,11 @@ export async function createRecurringSchedule(
   // Generera till avtalsslutet om det finns, annars 14 månader framåt som fallback.
   // Cron-jobbet hanterar automatisk förlängning om avtalet förnyas (is_auto_renewing = true).
   const startDate = new Date(input.schedule_start_date)
-  const generatedUntil = input.contract_end_date
-    ? new Date(input.contract_end_date)
-    : addMonths(startDate, 14)
+  if (!input.contract_end_date) {
+    console.error('createRecurringSchedule: contract_end_date saknas')
+    return null
+  }
+  const generatedUntil = new Date(input.contract_end_date)
 
   const { data, error } = await supabase
     .from('recurring_schedules')
