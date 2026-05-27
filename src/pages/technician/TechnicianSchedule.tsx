@@ -343,7 +343,7 @@ export default function TechnicianSchedule() {
       .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime());
   }, [filteredCases, selectedDate]);
   
-  const eventsByDay = useMemo(() => filteredCases.reduce((acc, event) => { if (!event.start_date) return acc; const day = event.start_date.split('T')[0]; if (!acc[day]) acc[day] = 0; acc[day]++; return acc; }, {} as Record<string, number>), [filteredCases]);
+  const eventsByDay = useMemo(() => filteredCases.reduce((acc, event) => { if (!event.start_date) return acc; const day = event.start_date.substring(0, 10); if (!acc[day]) acc[day] = 0; acc[day]++; return acc; }, {} as Record<string, number>), [filteredCases]);
 
   const handleOpenModal = (caseData: ScheduleCaseType) => {
     if (caseData.case_type === 'inspection') {
