@@ -70,14 +70,17 @@ import { generateInspectionPDF, generateInspectionExcel } from '../../services/i
 function calcTrend(
   current: number | null,
   previous: number | null
-): { trend: number | null; trendDirection: 'up' | 'down' | 'stable' } {
+): { trend: number | null; trendDirection: 'up' | 'down' | 'stable'; trendPercent: number | null; previousValue: number | null } {
   if (current === null || previous === null) {
-    return { trend: null, trendDirection: 'stable' }
+    return { trend: null, trendDirection: 'stable', trendPercent: null, previousValue: previous }
   }
   const diff = current - previous
+  const pct = previous !== 0 ? Math.round((diff / previous) * 100) : null
   return {
     trend: diff,
-    trendDirection: diff > 0 ? 'up' : diff < 0 ? 'down' : 'stable'
+    trendDirection: diff > 0 ? 'up' : diff < 0 ? 'down' : 'stable',
+    trendPercent: pct,
+    previousValue: previous
   }
 }
 
@@ -120,6 +123,7 @@ interface StationWithLatestInspection {
   // Trend jämfört med föregående inspektion
   previousValue?: number | null
   trend?: number | null
+  trendPercent?: number | null
   trendDirection?: 'up' | 'down' | 'stable'
 }
 
@@ -1267,12 +1271,29 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                                   </td>
                                   <td className="px-4 py-2 text-right">
                                     {station.trend !== null && station.trend !== undefined ? (
-                                      <div className={`flex items-center justify-end gap-1 ${station.trendDirection === 'down' ? 'text-emerald-400' : station.trendDirection === 'up' ? 'text-red-400' : 'text-slate-500'}`}>
-                                        {station.trendDirection === 'down' && <TrendingDown className="w-3.5 h-3.5" />}
-                                        {station.trendDirection === 'up' && <TrendingUp className="w-3.5 h-3.5" />}
-                                        {station.trendDirection === 'stable' && <Minus className="w-3.5 h-3.5" />}
-                                        <span className="font-medium">{station.trend > 0 ? '+' : ''}{station.trend}</span>
-                                      </div>
+                                      (() => {
+                                        const color = station.trendDirection === 'down' ? 'text-emerald-400' : station.trendDirection === 'up' ? 'text-red-400' : 'text-slate-500'
+                                        const unit = station.measurementUnit || ''
+                                        const prevVal = station.previousValue
+                                        const currVal = station.latestInspection?.measurementValue
+                                        const tooltipText = station.trendDirection === 'stable'
+                                          ? `Oförändrat jämfört med föregående besök (${prevVal} ${unit})`
+                                          : `Föregående besök: ${prevVal} ${unit} → Nu: ${currVal} ${unit}`
+                                        const displayPct = station.trendPercent !== null && station.trendPercent !== undefined
+                                          ? `${station.trendPercent > 0 ? '+' : ''}${station.trendPercent}%`
+                                          : station.trendDirection === 'stable' ? '±0%' : `${station.trend! > 0 ? '+' : ''}${station.trend}`
+                                        return (
+                                          <div
+                                            className={`flex items-center justify-end gap-1 cursor-help ${color}`}
+                                            title={tooltipText}
+                                          >
+                                            {station.trendDirection === 'down' && <TrendingDown className="w-3.5 h-3.5" />}
+                                            {station.trendDirection === 'up' && <TrendingUp className="w-3.5 h-3.5" />}
+                                            {station.trendDirection === 'stable' && <Minus className="w-3.5 h-3.5" />}
+                                            <span className="font-medium text-xs">{displayPct}</span>
+                                          </div>
+                                        )
+                                      })()
                                     ) : (
                                       <span className="text-slate-500">—</span>
                                     )}
